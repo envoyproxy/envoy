@@ -15,6 +15,7 @@
 
 using testing::_;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnNew;
@@ -31,7 +32,7 @@ TEST(Random, DISABLED_benchmarkRandom) {
   }
 }
 
-TEST(Random, sanityCheckOfUniquenessRandom) {
+TEST(Random, SanityCheckOfUniquenessRandom) {
   Runtime::RandomGeneratorImpl random;
   std::set<uint64_t> results;
   const size_t num_of_results = 1000000;
@@ -43,7 +44,7 @@ TEST(Random, sanityCheckOfUniquenessRandom) {
   EXPECT_EQ(num_of_results, results.size());
 }
 
-TEST(UUID, checkLengthOfUUID) {
+TEST(UUID, CheckLengthOfUUID) {
   RandomGeneratorImpl random;
 
   std::string result = random.uuid();
@@ -52,7 +53,7 @@ TEST(UUID, checkLengthOfUUID) {
   EXPECT_EQ(expected_length, result.length());
 }
 
-TEST(UUID, sanityCheckOfUniqueness) {
+TEST(UUID, SanityCheckOfUniqueness) {
   std::set<std::string> uuids;
   const size_t num_of_uuids = 100000;
 
@@ -66,7 +67,7 @@ TEST(UUID, sanityCheckOfUniqueness) {
 
 class DiskBackedLoaderImplTest : public testing::Test {
 protected:
-  DiskBackedLoaderImplTest() : api_(Api::createApiForTest(store)) {}
+  DiskBackedLoaderImplTest() : api_(Api::createApiForTest(store_)) {}
 
   static void SetUpTestSuite() {
     TestEnvironment::exec(
@@ -74,23 +75,36 @@ protected:
   }
 
   void setup() {
-    EXPECT_CALL(dispatcher, createFilesystemWatcher_())
-        .WillOnce(ReturnNew<NiceMock<Filesystem::MockWatcher>>());
+    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(InvokeWithoutArgs([this] {
+      Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
+      EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
+          .WillOnce(Invoke([this](const std::string&, uint32_t,
+                                  Filesystem::Watcher::OnChangedCb cb) { on_changed_cb_ = cb; }));
+      return mock_watcher;
+    }));
   }
 
   void run(const std::string& primary_dir, const std::string& override_dir) {
-    loader = std::make_unique<DiskBackedLoaderImpl>(dispatcher, tls,
-                                                    TestEnvironment::temporaryPath(primary_dir),
-                                                    "envoy", override_dir, store, generator, *api_);
+    loader_ = std::make_unique<DiskBackedLoaderImpl>(
+        dispatcher_, tls_, base_, TestEnvironment::temporaryPath(primary_dir), "envoy",
+        override_dir, store_, generator_, *api_);
   }
 
-  Event::MockDispatcher dispatcher;
-  NiceMock<ThreadLocal::MockInstance> tls;
+  void write(const std::string& path, const std::string& value) {
+    TestEnvironment::writeStringToFileForTest(path, value);
+  }
 
-  Stats::IsolatedStoreImpl store;
-  MockRandomGenerator generator;
-  std::unique_ptr<LoaderImpl> loader;
+  void updateDiskLayer() { on_changed_cb_(Filesystem::Watcher::Events::MovedTo); }
+
+  Event::MockDispatcher dispatcher_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+
+  Filesystem::Watcher::OnChangedCb on_changed_cb_;
+  Stats::IsolatedStoreImpl store_;
+  MockRandomGenerator generator_;
+  std::unique_ptr<LoaderImpl> loader_;
   Api::ApiPtr api_;
+  ProtobufWkt::Struct base_;
 };
 
 TEST_F(DiskBackedLoaderImplTest, All) {
@@ -98,18 +112,18 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   run("test/common/runtime/test_data/current", "envoy_override");
 
   // Basic string getting.
-  EXPECT_EQ("world", loader->snapshot().get("file2"));
-  EXPECT_EQ("hello\nworld", loader->snapshot().get("subdir.file3"));
-  EXPECT_EQ("", loader->snapshot().get("invalid"));
+  EXPECT_EQ("world", loader_->snapshot().get("file2"));
+  EXPECT_EQ("hello\nworld", loader_->snapshot().get("subdir.file3"));
+  EXPECT_EQ("", loader_->snapshot().get("invalid"));
 
   // Integer getting.
-  EXPECT_EQ(1UL, loader->snapshot().getInteger("file1", 1));
-  EXPECT_EQ(2UL, loader->snapshot().getInteger("file3", 1));
-  EXPECT_EQ(123UL, loader->snapshot().getInteger("file4", 1));
+  EXPECT_EQ(1UL, loader_->snapshot().getInteger("file1", 1));
+  EXPECT_EQ(2UL, loader_->snapshot().getInteger("file3", 1));
+  EXPECT_EQ(123UL, loader_->snapshot().getInteger("file4", 1));
 
   // Boolean getting.
   bool value;
-  SnapshotImpl* snapshot = reinterpret_cast<SnapshotImpl*>(&loader->snapshot());
+  SnapshotImpl* snapshot = reinterpret_cast<SnapshotImpl*>(&loader_->snapshot());
 
   EXPECT_EQ(true, snapshot->getBoolean("file11", value));
   EXPECT_EQ(true, value);
@@ -131,75 +145,80 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
 
   // Files with comments.
-  EXPECT_EQ(123UL, loader->snapshot().getInteger("file5", 1));
-  EXPECT_EQ("/home#about-us", loader->snapshot().get("file6"));
-  EXPECT_EQ("", loader->snapshot().get("file7"));
+  EXPECT_EQ(123UL, loader_->snapshot().getInteger("file5", 1));
+  EXPECT_EQ("/home#about-us", loader_->snapshot().get("file6"));
+  EXPECT_EQ("", loader_->snapshot().get("file7"));
 
   // Feature enablement.
-  EXPECT_CALL(generator, random()).WillOnce(Return(1));
-  EXPECT_TRUE(loader->snapshot().featureEnabled("file3", 1));
+  EXPECT_CALL(generator_, random()).WillOnce(Return(1));
+  EXPECT_TRUE(loader_->snapshot().featureEnabled("file3", 1));
 
-  EXPECT_CALL(generator, random()).WillOnce(Return(2));
-  EXPECT_FALSE(loader->snapshot().featureEnabled("file3", 1));
+  EXPECT_CALL(generator_, random()).WillOnce(Return(2));
+  EXPECT_FALSE(loader_->snapshot().featureEnabled("file3", 1));
 
   // Fractional percent feature enablement
   envoy::type::FractionalPercent fractional_percent;
   fractional_percent.set_numerator(5);
   fractional_percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
 
-  EXPECT_CALL(generator, random()).WillOnce(Return(50));
-  EXPECT_TRUE(loader->snapshot().featureEnabled("file8", fractional_percent)); // valid data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(50));
+  EXPECT_TRUE(loader_->snapshot().featureEnabled("file8", fractional_percent)); // valid data
 
-  EXPECT_CALL(generator, random()).WillOnce(Return(60));
-  EXPECT_FALSE(loader->snapshot().featureEnabled("file8", fractional_percent)); // valid data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(60));
+  EXPECT_FALSE(loader_->snapshot().featureEnabled("file8", fractional_percent)); // valid data
 
   // We currently expect that runtime values represented as fractional percents that are provided as
   // integers are parsed simply as percents (denominator of 100).
-  EXPECT_CALL(generator, random()).WillOnce(Return(53));
-  EXPECT_FALSE(loader->snapshot().featureEnabled("file10", fractional_percent)); // valid int data
-  EXPECT_CALL(generator, random()).WillOnce(Return(51));
-  EXPECT_TRUE(loader->snapshot().featureEnabled("file10", fractional_percent)); // valid int data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(53));
+  EXPECT_FALSE(loader_->snapshot().featureEnabled("file10", fractional_percent)); // valid int data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(51));
+  EXPECT_TRUE(loader_->snapshot().featureEnabled("file10", fractional_percent)); // valid int data
 
-  EXPECT_CALL(generator, random()).WillOnce(Return(4));
-  EXPECT_TRUE(loader->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(4));
+  EXPECT_TRUE(
+      loader_->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
 
-  EXPECT_CALL(generator, random()).WillOnce(Return(6));
+  EXPECT_CALL(generator_, random()).WillOnce(Return(6));
   EXPECT_FALSE(
-      loader->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
+      loader_->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
 
-  EXPECT_CALL(generator, random()).WillOnce(Return(4));
-  EXPECT_TRUE(loader->snapshot().featureEnabled("file1", fractional_percent)); // invalid data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(4));
+  EXPECT_TRUE(loader_->snapshot().featureEnabled("file1", fractional_percent)); // invalid data
 
-  EXPECT_CALL(generator, random()).WillOnce(Return(6));
-  EXPECT_FALSE(loader->snapshot().featureEnabled("file1", fractional_percent)); // invalid data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(6));
+  EXPECT_FALSE(loader_->snapshot().featureEnabled("file1", fractional_percent)); // invalid data
 
   // Check stable value
-  EXPECT_TRUE(loader->snapshot().featureEnabled("file3", 1, 1));
-  EXPECT_FALSE(loader->snapshot().featureEnabled("file3", 1, 3));
+  EXPECT_TRUE(loader_->snapshot().featureEnabled("file3", 1, 1));
+  EXPECT_FALSE(loader_->snapshot().featureEnabled("file3", 1, 3));
 
   // Check stable value and num buckets.
-  EXPECT_FALSE(loader->snapshot().featureEnabled("file4", 1, 200, 300));
-  EXPECT_TRUE(loader->snapshot().featureEnabled("file4", 1, 122, 300));
+  EXPECT_FALSE(loader_->snapshot().featureEnabled("file4", 1, 200, 300));
+  EXPECT_TRUE(loader_->snapshot().featureEnabled("file4", 1, 122, 300));
 
   // Overrides from override dir
-  EXPECT_EQ("hello override", loader->snapshot().get("file1"));
+  EXPECT_EQ("hello override", loader_->snapshot().get("file1"));
 }
 
 TEST_F(DiskBackedLoaderImplTest, GetLayers) {
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    foo: whatevs
+  )EOF");
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
-  const auto& layers = loader->snapshot().getLayers();
-  EXPECT_EQ(3, layers.size());
-  EXPECT_EQ("hello", layers[0]->values().find("file1")->second.raw_string_value_);
-  EXPECT_EQ("hello override", layers[1]->values().find("file1")->second.raw_string_value_);
+  const auto& layers = loader_->snapshot().getLayers();
+  EXPECT_EQ(4, layers.size());
+  EXPECT_EQ("whatevs", layers[0]->values().find("foo")->second.raw_string_value_);
+  EXPECT_EQ("hello", layers[1]->values().find("file1")->second.raw_string_value_);
+  EXPECT_EQ("hello override", layers[2]->values().find("file1")->second.raw_string_value_);
   // Admin should be last
   EXPECT_NE(nullptr, dynamic_cast<const AdminLayer*>(layers.back().get()));
-  EXPECT_TRUE(layers[2]->values().empty());
+  EXPECT_TRUE(layers[3]->values().empty());
 
-  loader->mergeValues({{"foo", "bar"}});
+  loader_->mergeValues({{"foo", "bar"}});
   // The old snapshot and its layers should have been invalidated. Refetch.
-  const auto& new_layers = loader->snapshot().getLayers();
-  EXPECT_EQ("bar", new_layers[2]->values().find("foo")->second.raw_string_value_);
+  const auto& new_layers = loader_->snapshot().getLayers();
+  EXPECT_EQ("bar", new_layers[3]->values().find("foo")->second.raw_string_value_);
 }
 
 TEST_F(DiskBackedLoaderImplTest, BadDirectory) {
@@ -211,7 +230,7 @@ TEST_F(DiskBackedLoaderImplTest, OverrideFolderDoesNotExist) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override_does_not_exist");
 
-  EXPECT_EQ("hello", loader->snapshot().get("file1"));
+  EXPECT_EQ("hello", loader_->snapshot().get("file1"));
 }
 
 TEST_F(DiskBackedLoaderImplTest, PercentHandling) {
@@ -222,19 +241,19 @@ TEST_F(DiskBackedLoaderImplTest, PercentHandling) {
 
   // Smoke test integer value of 0, should be interpreted as 0%
   {
-    loader->mergeValues({{"foo", "0"}});
+    loader_->mergeValues({{"foo", "0"}});
 
-    EXPECT_FALSE(loader->snapshot().featureEnabled("foo", default_value, 0));
-    EXPECT_FALSE(loader->snapshot().featureEnabled("foo", default_value, 5));
+    EXPECT_FALSE(loader_->snapshot().featureEnabled("foo", default_value, 0));
+    EXPECT_FALSE(loader_->snapshot().featureEnabled("foo", default_value, 5));
   }
 
   // Smoke test integer value of 5, should be interpreted as 5%
   {
-    loader->mergeValues({{"foo", "5"}});
-    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 0));
-    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 4));
-    EXPECT_FALSE(loader->snapshot().featureEnabled("foo", default_value, 5));
-    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 100));
+    loader_->mergeValues({{"foo", "5"}});
+    EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 0));
+    EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 4));
+    EXPECT_FALSE(loader_->snapshot().featureEnabled("foo", default_value, 5));
+    EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 100));
   }
 
   // Verify uint64 -> uint32 conversion by using a runtime value with all 0s in
@@ -247,12 +266,12 @@ TEST_F(DiskBackedLoaderImplTest, PercentHandling) {
     // not the uint32 conversion is handled properly.
     uint64_t high_value = 1UL << 60;
     std::string high_value_str = std::to_string(high_value);
-    loader->mergeValues({{"foo", high_value_str}});
-    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 0));
-    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 50));
-    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 100));
-    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 12389));
-    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 23859235));
+    loader_->mergeValues({{"foo", high_value_str}});
+    EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 0));
+    EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 50));
+    EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 100));
+    EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 12389));
+    EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 23859235));
   }
 }
 
@@ -278,52 +297,200 @@ void testNewOverrides(Loader& loader, Stats::Store& store) {
   EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
 }
 
-TEST_F(DiskBackedLoaderImplTest, mergeValues) {
+TEST_F(DiskBackedLoaderImplTest, MergeValues) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
-  testNewOverrides(*loader, store);
+  testNewOverrides(*loader_, store_);
 
   // Override string
-  loader->mergeValues({{"file2", "new world"}});
-  EXPECT_EQ("new world", loader->snapshot().get("file2"));
-  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
+  loader_->mergeValues({{"file2", "new world"}});
+  EXPECT_EQ("new world", loader_->snapshot().get("file2"));
+  EXPECT_EQ(1, store_.gauge("runtime.admin_overrides_active").value());
 
   // Remove overridden string
-  loader->mergeValues({{"file2", ""}});
-  EXPECT_EQ("world", loader->snapshot().get("file2"));
-  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
+  loader_->mergeValues({{"file2", ""}});
+  EXPECT_EQ("world", loader_->snapshot().get("file2"));
+  EXPECT_EQ(0, store_.gauge("runtime.admin_overrides_active").value());
 
   // Override integer
-  loader->mergeValues({{"file3", "42"}});
-  EXPECT_EQ(42, loader->snapshot().getInteger("file3", 1));
-  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
+  loader_->mergeValues({{"file3", "42"}});
+  EXPECT_EQ(42, loader_->snapshot().getInteger("file3", 1));
+  EXPECT_EQ(1, store_.gauge("runtime.admin_overrides_active").value());
 
   // Remove overridden integer
-  loader->mergeValues({{"file3", ""}});
-  EXPECT_EQ(2, loader->snapshot().getInteger("file3", 1));
-  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
+  loader_->mergeValues({{"file3", ""}});
+  EXPECT_EQ(2, loader_->snapshot().getInteger("file3", 1));
+  EXPECT_EQ(0, store_.gauge("runtime.admin_overrides_active").value());
 
   // Override override string
-  loader->mergeValues({{"file1", "hello overridden override"}});
-  EXPECT_EQ("hello overridden override", loader->snapshot().get("file1"));
-  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
+  loader_->mergeValues({{"file1", "hello overridden override"}});
+  EXPECT_EQ("hello overridden override", loader_->snapshot().get("file1"));
+  EXPECT_EQ(1, store_.gauge("runtime.admin_overrides_active").value());
 
   // Remove overridden override string
-  loader->mergeValues({{"file1", ""}});
-  EXPECT_EQ("hello override", loader->snapshot().get("file1"));
-  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
+  loader_->mergeValues({{"file1", ""}});
+  EXPECT_EQ("hello override", loader_->snapshot().get("file1"));
+  EXPECT_EQ(0, store_.gauge("runtime.admin_overrides_active").value());
 }
 
-TEST(LoaderImplTest, All) {
-  MockRandomGenerator generator;
-  NiceMock<ThreadLocal::MockInstance> tls;
-  Stats::IsolatedStoreImpl store;
-  LoaderImpl loader(generator, store, tls);
-  EXPECT_EQ("", loader.snapshot().get("foo"));
-  EXPECT_EQ(1UL, loader.snapshot().getInteger("foo", 1));
-  EXPECT_CALL(generator, random()).WillOnce(Return(49));
-  EXPECT_TRUE(loader.snapshot().featureEnabled("foo", 50));
-  testNewOverrides(loader, store);
+// Validate that admin overrides disk, disk overrides bootstrap.
+TEST_F(DiskBackedLoaderImplTest, LayersOverride) {
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    some: thing
+    other: thang
+    file2: whatevs
+  )EOF");
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+  // Disk overrides bootstrap.
+  EXPECT_EQ("world", loader_->snapshot().get("file2"));
+  EXPECT_EQ("thing", loader_->snapshot().get("some"));
+  EXPECT_EQ("thang", loader_->snapshot().get("other"));
+  // Admin overrides disk and bootstrap.
+  loader_->mergeValues({{"file2", "pluto"}, {"some", "day soon"}});
+  EXPECT_EQ("pluto", loader_->snapshot().get("file2"));
+  EXPECT_EQ("day soon", loader_->snapshot().get("some"));
+  EXPECT_EQ("thang", loader_->snapshot().get("other"));
+  // Admin overrides stick over filesystem updates.
+  EXPECT_EQ("Layer cake", loader_->snapshot().get("file14"));
+  EXPECT_EQ("Cheese cake", loader_->snapshot().get("file15"));
+  loader_->mergeValues({{"file14", "Mega layer cake"}});
+  EXPECT_EQ("Mega layer cake", loader_->snapshot().get("file14"));
+  EXPECT_EQ("Cheese cake", loader_->snapshot().get("file15"));
+  write("test/common/runtime/test_data/current/envoy/file14", "Sad cake");
+  write("test/common/runtime/test_data/current/envoy/file15", "Happy cake");
+  updateDiskLayer();
+  EXPECT_EQ("Mega layer cake", loader_->snapshot().get("file14"));
+  EXPECT_EQ("Happy cake", loader_->snapshot().get("file15"));
+}
+
+class LoaderImplTest : public testing::Test {
+protected:
+  void setup() { loader_ = std::make_unique<LoaderImpl>(base_, generator_, store_, tls_); }
+
+  MockRandomGenerator generator_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::IsolatedStoreImpl store_;
+  std::unique_ptr<LoaderImpl> loader_;
+  ProtobufWkt::Struct base_;
+};
+
+TEST_F(LoaderImplTest, All) {
+  setup();
+  EXPECT_EQ("", loader_->snapshot().get("foo"));
+  EXPECT_EQ(1UL, loader_->snapshot().getInteger("foo", 1));
+  EXPECT_CALL(generator_, random()).WillOnce(Return(49));
+  EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", 50));
+  testNewOverrides(*loader_, store_);
+}
+
+// Validate proto parsing sanity.
+TEST_F(LoaderImplTest, ProtoParsing) {
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    file1: hello override
+    file2: world
+    file3: 2
+    file4: 123
+    file8:
+      numerator: 52
+      denominator: HUNDRED
+    file9:
+      numerator: 100
+      denominator: NONSENSE
+    file10: 52
+    file11: true
+    file12: FaLSe
+    file13: false
+    subdir:
+      file3: "hello\nworld"
+    numerator_only:
+      numerator: 52
+    denominator_only:
+      denominator: HUNDRED
+    false_friend:
+      numerator: 100
+      foo: bar
+    empty: {}
+  )EOF");
+  setup();
+
+  // Basic string getting.
+  EXPECT_EQ("world", loader_->snapshot().get("file2"));
+  EXPECT_EQ("hello\nworld", loader_->snapshot().get("subdir.file3"));
+  EXPECT_EQ("", loader_->snapshot().get("invalid"));
+
+  // Integer getting.
+  EXPECT_EQ(1UL, loader_->snapshot().getInteger("file1", 1));
+  EXPECT_EQ(2UL, loader_->snapshot().getInteger("file3", 1));
+  EXPECT_EQ(123UL, loader_->snapshot().getInteger("file4", 1));
+
+  // Boolean getting.
+  bool value;
+  SnapshotImpl* snapshot = reinterpret_cast<SnapshotImpl*>(&loader_->snapshot());
+
+  EXPECT_EQ(true, snapshot->getBoolean("file11", value));
+  EXPECT_EQ(true, value);
+  EXPECT_EQ(true, snapshot->getBoolean("file12", value));
+  EXPECT_EQ(false, value);
+  EXPECT_EQ(true, snapshot->getBoolean("file13", value));
+  EXPECT_EQ(false, value);
+  // File1 is not a boolean.
+  EXPECT_EQ(false, snapshot->getBoolean("file1", value));
+  // Neither is blah.blah
+  EXPECT_EQ(false, snapshot->getBoolean("blah.blah", value));
+
+  // Fractional percent feature enablement
+  envoy::type::FractionalPercent fractional_percent;
+  fractional_percent.set_numerator(5);
+  fractional_percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+
+  EXPECT_CALL(generator_, random()).WillOnce(Return(50));
+  EXPECT_TRUE(loader_->snapshot().featureEnabled("file8", fractional_percent)); // valid data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(60));
+  EXPECT_FALSE(loader_->snapshot().featureEnabled("file8", fractional_percent)); // valid data
+
+  // We currently expect that runtime values represented as fractional percents that are provided as
+  // integers are parsed simply as percents (denominator of 100).
+  EXPECT_CALL(generator_, random()).WillOnce(Return(53));
+  EXPECT_FALSE(loader_->snapshot().featureEnabled("file10", fractional_percent)); // valid int data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(51));
+  EXPECT_TRUE(loader_->snapshot().featureEnabled("file10", fractional_percent)); // valid int data
+
+  // Invalid fractional percent is ignored.
+  EXPECT_CALL(generator_, random()).WillOnce(Return(4));
+  EXPECT_TRUE(
+      loader_->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(6));
+  EXPECT_FALSE(
+      loader_->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(4));
+  EXPECT_TRUE(
+      loader_->snapshot().featureEnabled("false_friend", fractional_percent)); // invalid proto data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(6));
+  EXPECT_FALSE(
+      loader_->snapshot().featureEnabled("false_friend", fractional_percent)); // invalid proto data
+
+  // Numerator only FractionalPercent is handled.
+  EXPECT_CALL(generator_, random()).WillOnce(Return(50));
+  EXPECT_TRUE(
+      loader_->snapshot().featureEnabled("numerator_only", fractional_percent)); // valid data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(60));
+  EXPECT_FALSE(
+      loader_->snapshot().featureEnabled("numerator_only", fractional_percent)); // valid data
+
+  // Denominator only FractionalPercent is handled.
+  EXPECT_CALL(generator_, random()).WillOnce(Return(4));
+  EXPECT_FALSE(
+      loader_->snapshot().featureEnabled("denominator_only", fractional_percent)); // valid data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(6));
+  EXPECT_FALSE(
+      loader_->snapshot().featureEnabled("denominator_only", fractional_percent)); // valid data
+
+  // Empty message is handled.
+  EXPECT_CALL(generator_, random()).WillOnce(Return(4));
+  EXPECT_FALSE(loader_->snapshot().featureEnabled("empty", fractional_percent)); // valid data
+  EXPECT_CALL(generator_, random()).WillOnce(Return(6));
+  EXPECT_FALSE(loader_->snapshot().featureEnabled("empty", fractional_percent)); // valid data
 }
 
 class DiskLayerTest : public testing::Test {

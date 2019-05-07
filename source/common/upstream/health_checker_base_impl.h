@@ -46,11 +46,12 @@ public:
   void start() override;
 
 protected:
-  class ActiveHealthCheckSession {
+  class ActiveHealthCheckSession : public Event::DeferredDeletable {
   public:
     virtual ~ActiveHealthCheckSession();
     HealthTransition setUnhealthy(envoy::data::core::v2alpha::HealthCheckFailureType type);
     void start() { onIntervalBase(); }
+    void onDeferredDeleteBase();
 
   protected:
     ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
@@ -66,6 +67,7 @@ protected:
     void onIntervalBase();
     virtual void onTimeout() PURE;
     void onTimeoutBase();
+    virtual void onDeferredDelete() PURE;
 
     HealthCheckerImplBase& parent_;
     Event::TimerPtr interval_timer_;
@@ -80,6 +82,7 @@ protected:
   HealthCheckerImplBase(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+  ~HealthCheckerImplBase();
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
   virtual envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const PURE;
