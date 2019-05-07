@@ -54,9 +54,7 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
 }
 
 class AllFeaturesHooks : public DefaultListenerHooks {
-  void onRuntimeCreated() override {
-    Runtime::RuntimeFeaturesPeer::setAllFeaturesAllowed();
-  }
+  void onRuntimeCreated() override { Runtime::RuntimeFeaturesPeer::setAllFeaturesAllowed(); }
 };
 
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
