@@ -22,9 +22,11 @@ ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer) : span_(span)
 
 void ZipkinSpan::finishSpan() { span_.finish(); }
 
-void ZipkinSpan::setOperation(const std::string& operation) { span_.setName(operation); }
+void ZipkinSpan::setOperation(absl::string_view operation) {
+  span_.setName(std::string(operation));
+}
 
-void ZipkinSpan::setTag(const std::string& name, const std::string& value) {
+void ZipkinSpan::setTag(absl::string_view name, absl::string_view value) {
   span_.setTag(name, value);
 }
 

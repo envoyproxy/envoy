@@ -48,6 +48,7 @@ using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::DoAll;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -691,9 +692,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   // Verify tag is set based on the request headers.
-  EXPECT_CALL(*span, setTag(":method", "GET"));
+  EXPECT_CALL(*span, setTag(Eq(":method"), Eq("GET")));
   // Verify if the activeSpan interface returns reference to the current span.
-  EXPECT_CALL(*span, setTag("service-cluster", "scoobydoo"));
+  EXPECT_CALL(*span, setTag(Eq("service-cluster"), Eq("scoobydoo")));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(_)).Times(0);
@@ -823,7 +824,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
-  EXPECT_CALL(*span, setOperation("testOp"));
+  EXPECT_CALL(*span, setOperation(Eq("testOp")));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
@@ -958,7 +959,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
   // Verify that span operation overridden by value supplied in response header.
-  EXPECT_CALL(*span, setOperation("testOp"));
+  EXPECT_CALL(*span, setOperation(Eq("testOp")));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
