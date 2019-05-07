@@ -2006,6 +2006,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
       Http::Utility::sendLocalReply(
           Grpc::Common::hasGrpcContentType(*parent_.request_headers_),
           [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
+            parent_.chargeStats(*response_headers);
             parent_.response_headers_ = std::move(response_headers);
             parent_.response_encoder_->encodeHeaders(*parent_.response_headers_, end_stream);
             parent_.state_.local_complete_ = end_stream;

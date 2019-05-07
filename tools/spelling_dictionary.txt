@@ -395,7 +395,9 @@ dereferencing
 deregistered
 deserialization
 deserialize
+deserialized
 deserializer
+deserializers
 dest
 destructor
 destructors
@@ -590,6 +592,7 @@ parameterizing
 params
 paren
 parentid
+parsers
 pcall
 pcap
 pclose
@@ -715,6 +718,7 @@ templating
 templatize
 templatized
 templatizing
+testee
 th
 thru
 tm
