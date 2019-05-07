@@ -250,6 +250,9 @@ private:
     TcpHealthCheckerImpl& parent_;
     Network::ClientConnectionPtr client_;
     std::shared_ptr<TcpSessionCallbacks> session_callbacks_;
+    // If true, stream reset was initiated by us, not e.g. remote reset.
+    // In this case healthcheck status already reported, only state cleanup required.
+    bool expect_reset_{};
   };
 
   typedef std::unique_ptr<TcpActiveHealthCheckSession> TcpActiveHealthCheckSessionPtr;
