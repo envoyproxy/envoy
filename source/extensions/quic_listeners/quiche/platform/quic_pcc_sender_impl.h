@@ -6,6 +6,8 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include "common/common/assert.h"
+
 #include "quiche/quic/core/quic_types.h"
 
 namespace quic {
@@ -23,6 +25,7 @@ SendAlgorithmInterface* CreatePccSenderImpl(const QuicClock* clock, const RttSta
                                             QuicRandom* random, QuicConnectionStats* stats,
                                             QuicPacketCount initial_congestion_window,
                                             QuicPacketCount max_congestion_window) {
+  PANIC("PccSender is not supported.");
   return nullptr;
 }
 

@@ -584,10 +584,12 @@ TEST_F(QuicPlatformTest, QuicFlags) {
 }
 
 TEST_F(QuicPlatformTest, QuicPccSender) {
-  EXPECT_EQ(nullptr, quic::CreatePccSender(/*clock=*/nullptr, /*rtt_stats=*/nullptr,
-                                           /*unacked_packets=*/nullptr, /*random=*/nullptr,
-                                           /*stats=*/nullptr, /*initial_congestion_window=*/0,
-                                           /*max_congestion_window=*/0));
+  EXPECT_DEATH_LOG_TO_STDERR(quic::CreatePccSender(/*clock=*/nullptr, /*rtt_stats=*/nullptr,
+                                                   /*unacked_packets=*/nullptr, /*random=*/nullptr,
+                                                   /*stats=*/nullptr,
+                                                   /*initial_congestion_window=*/0,
+                                                   /*max_congestion_window=*/0),
+                             "PccSender is not supported.");
 }
 
 class FileUtilsTest : public testing::Test {

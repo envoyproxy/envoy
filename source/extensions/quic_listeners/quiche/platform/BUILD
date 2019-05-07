@@ -166,6 +166,7 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//source/common/common:assert_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:utility_lib",
