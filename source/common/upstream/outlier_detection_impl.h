@@ -156,7 +156,8 @@ public:
   }
 
   const std::unique_ptr<SuccessRateMonitor>& getSRMonitor(SuccessRateMonitorType type) const {
-    return (externalOrigin == type) ? externalOriginSRMonitor_ : localOriginSRMonitor_;
+    return (SuccessRateMonitorType::ExternalOrigin == type) ? externalOriginSRMonitor_
+                                                            : localOriginSRMonitor_;
   }
 
   double successRate(SuccessRateMonitorType type) const override {
@@ -363,8 +364,9 @@ private:
   EjectionPair local_origin_SR_num_;
 
   const EjectionPair& getSRNums(DetectorHostMonitor::SuccessRateMonitorType monitor_type) const {
-    return (DetectorHostMonitor::externalOrigin == monitor_type) ? external_origin_SR_num_
-                                                                 : local_origin_SR_num_;
+    return (DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin == monitor_type)
+               ? external_origin_SR_num_
+               : local_origin_SR_num_;
   }
   EjectionPair& getSRNums(DetectorHostMonitor::SuccessRateMonitorType monitor_type) {
     return const_cast<EjectionPair&>(

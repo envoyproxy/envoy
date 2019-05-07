@@ -1022,10 +1022,12 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   NiceMock<Upstream::Outlier::MockDetector> outlier_detector;
   ON_CALL(Const(cluster), outlierDetector()).WillByDefault(Return(&outlier_detector));
   ON_CALL(outlier_detector,
-          successRateEjectionThreshold(Upstream::Outlier::DetectorHostMonitor::externalOrigin))
+          successRateEjectionThreshold(
+              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
       .WillByDefault(Return(6.0));
   ON_CALL(outlier_detector,
-          successRateEjectionThreshold(Upstream::Outlier::DetectorHostMonitor::localOrigin))
+          successRateEjectionThreshold(
+              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))
       .WillByDefault(Return(9.0));
 
   ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(true));
@@ -1067,11 +1069,13 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL))
       .WillByDefault(Return(true));
 
-  ON_CALL(host->outlier_detector_,
-          successRate(Upstream::Outlier::DetectorHostMonitor::externalOrigin))
+  ON_CALL(
+      host->outlier_detector_,
+      successRate(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
       .WillByDefault(Return(43.2));
   ON_CALL(*host, weight()).WillByDefault(Return(5));
-  ON_CALL(host->outlier_detector_, successRate(Upstream::Outlier::DetectorHostMonitor::localOrigin))
+  ON_CALL(host->outlier_detector_,
+          successRate(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))
       .WillByDefault(Return(93.2));
 
   Buffer::OwnedImpl response;

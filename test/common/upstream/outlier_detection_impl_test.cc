@@ -773,13 +773,19 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
   ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.success_rate_stdev_factor", 1900))
       .WillByDefault(Return(1900));
   interval_timer_->callback_();
-  EXPECT_EQ(50, hosts_[4]->outlierDetector().successRate(DetectorHostMonitor::externalOrigin));
-  EXPECT_EQ(90, detector->successRateAverage(DetectorHostMonitor::externalOrigin));
-  EXPECT_EQ(52, detector->successRateEjectionThreshold(DetectorHostMonitor::externalOrigin));
+  EXPECT_EQ(50, hosts_[4]->outlierDetector().successRate(
+                    DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
+  EXPECT_EQ(90, detector->successRateAverage(
+                    DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
+  EXPECT_EQ(52, detector->successRateEjectionThreshold(
+                    DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
   // Make sure that local origin success rate monitor is not affected
-  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(DetectorHostMonitor::localOrigin));
-  EXPECT_EQ(-1, detector->successRateAverage(DetectorHostMonitor::localOrigin));
-  EXPECT_EQ(-1, detector->successRateEjectionThreshold(DetectorHostMonitor::localOrigin));
+  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(
+                    DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
+  EXPECT_EQ(-1,
+            detector->successRateAverage(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
+  EXPECT_EQ(-1, detector->successRateEjectionThreshold(
+                    DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
   EXPECT_TRUE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
@@ -821,9 +827,12 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
-  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(DetectorHostMonitor::externalOrigin));
-  EXPECT_EQ(-1, detector->successRateAverage(DetectorHostMonitor::externalOrigin));
-  EXPECT_EQ(-1, detector->successRateEjectionThreshold(DetectorHostMonitor::externalOrigin));
+  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(
+                    DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
+  EXPECT_EQ(-1, detector->successRateAverage(
+                    DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
+  EXPECT_EQ(-1, detector->successRateEjectionThreshold(
+                    DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
 }
 
 TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
@@ -868,13 +877,19 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
   ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.success_rate_stdev_factor", 1900))
       .WillByDefault(Return(1900));
   interval_timer_->callback_();
-  EXPECT_EQ(50, hosts_[4]->outlierDetector().successRate(DetectorHostMonitor::localOrigin));
-  EXPECT_EQ(90, detector->successRateAverage(DetectorHostMonitor::localOrigin));
-  EXPECT_EQ(52, detector->successRateEjectionThreshold(DetectorHostMonitor::localOrigin));
+  EXPECT_EQ(50, hosts_[4]->outlierDetector().successRate(
+                    DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
+  EXPECT_EQ(90,
+            detector->successRateAverage(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
+  EXPECT_EQ(52, detector->successRateEjectionThreshold(
+                    DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
   // Make sure that external origin success rate monitor is not affected
-  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(DetectorHostMonitor::externalOrigin));
-  EXPECT_EQ(-1, detector->successRateAverage(DetectorHostMonitor::externalOrigin));
-  EXPECT_EQ(-1, detector->successRateEjectionThreshold(DetectorHostMonitor::externalOrigin));
+  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(
+                    DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
+  EXPECT_EQ(-1, detector->successRateAverage(
+                    DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
+  EXPECT_EQ(-1, detector->successRateEjectionThreshold(
+                    DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
   EXPECT_TRUE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
@@ -912,9 +927,12 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
-  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(DetectorHostMonitor::localOrigin));
-  EXPECT_EQ(-1, detector->successRateAverage(DetectorHostMonitor::localOrigin));
-  EXPECT_EQ(-1, detector->successRateEjectionThreshold(DetectorHostMonitor::localOrigin));
+  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(
+                    DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
+  EXPECT_EQ(-1,
+            detector->successRateAverage(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
+  EXPECT_EQ(-1, detector->successRateEjectionThreshold(
+                    DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
 }
 
 // Validate that empty hosts doesn't crash success rate handling when success_rate_minimum_hosts is
@@ -1188,11 +1206,14 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
 
   StringViewSaver log3;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
-  EXPECT_CALL(host->outlier_detector_, successRate(DetectorHostMonitor::externalOrigin))
+  EXPECT_CALL(host->outlier_detector_,
+              successRate(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
       .WillOnce(Return(0));
-  EXPECT_CALL(detector, successRateAverage(DetectorHostMonitor::externalOrigin))
+  EXPECT_CALL(detector,
+              successRateAverage(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
       .WillOnce(Return(0));
-  EXPECT_CALL(detector, successRateEjectionThreshold(DetectorHostMonitor::externalOrigin))
+  EXPECT_CALL(detector, successRateEjectionThreshold(
+                            DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
       .WillOnce(Return(0));
   EXPECT_CALL(*file,
               write(absl::string_view(

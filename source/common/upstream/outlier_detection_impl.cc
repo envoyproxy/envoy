@@ -614,12 +614,12 @@ void DetectorImpl::onIntervalTimer() {
     host.second->updateCurrentSuccessRateBucket();
     // Refresh host success rate stat for the /clusters endpoint. If there is a new valid value, it
     // will get updated in processSuccessRateEjections().
-    host.second->successRate(DetectorHostMonitor::localOrigin, -1);
-    host.second->successRate(DetectorHostMonitor::externalOrigin, -1);
+    host.second->successRate(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin, -1);
+    host.second->successRate(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin, -1);
   }
 
-  processSuccessRateEjections(DetectorHostMonitor::externalOrigin);
-  processSuccessRateEjections(DetectorHostMonitor::localOrigin);
+  processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
+  processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
 
   armIntervalTimer();
 }
@@ -647,8 +647,8 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
       (type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN)) {
     const DetectorHostMonitor::SuccessRateMonitorType monitor_type =
         (type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN)
-            ? DetectorHostMonitor::externalOrigin
-            : DetectorHostMonitor::localOrigin;
+            ? DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin
+            : DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin;
     event.mutable_eject_success_rate_event()->set_cluster_average_success_rate(
         detector.successRateAverage(monitor_type));
     event.mutable_eject_success_rate_event()->set_cluster_success_rate_ejection_threshold(

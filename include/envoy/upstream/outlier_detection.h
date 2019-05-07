@@ -43,7 +43,7 @@ enum class Result {
 class DetectorHostMonitor {
 public:
   // Types of Success Rate monitors.
-  using SuccessRateMonitorType = enum { externalOrigin, localOrigin };
+  enum class SuccessRateMonitorType { ExternalOrigin, LocalOrigin };
 
   virtual ~DetectorHostMonitor() {}
 
