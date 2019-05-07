@@ -264,6 +264,7 @@ typedef std::shared_ptr<const LocalityWeights> LocalityWeightsConstSharedPtr;
  * Base host set interface. This contains all of the endpoints for a given LocalityLbEndpoints
  * priority level.
  */
+// TODO(snowp): Remove the const ref accessors in favor of the shared_ptr ones.
 class HostSet {
 public:
   virtual ~HostSet() {}

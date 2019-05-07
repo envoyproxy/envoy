@@ -246,7 +246,6 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
     // it to healthy. This makes startup faster with a small reduction in overall reliability
     // depending on the HC settings.
     if (first_check_ || ++num_healthy_ == parent_.healthy_threshold_) {
-      host_->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
       host_->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.incHealthy();
       changed_state = HealthTransition::Changed;
@@ -256,6 +255,15 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
     } else {
       changed_state = HealthTransition::ChangePending;
     }
+  }
+
+  // Clear the pending flag if it is set. By removing this we're marking the host as having been
+  // health checked.
+  if (host_->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
+    host_->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    // Even though the health value of the host might have not changed, we set this to Changed to
+    // that the cluster can update its list of excluded hosts.
+    changed_state = HealthTransition::Changed;
   }
 
   if (degraded != host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
@@ -308,10 +316,12 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
     }
   }
 
+  // Clear the pending flag if it is set. By removing this we're marking the host as having been
+  // health checked.
   if (host_->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
     host_->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
-    // Even though the health value of the host changed, we set this to Changed to that the cluster
-    // can update its list of excluded hosts.
+    // Even though the health value of the host didn't change, we set this to Changed to that the
+    // cluster can update its list of excluded hosts.
     changed_state = HealthTransition::Changed;
   }
 
