@@ -92,9 +92,10 @@ Buffer::InstancePtr GoogleGrpcUtils::makeBufferInstance(const grpc::ByteBuffer& 
       };
   // NB: addBufferFragment takes a pointer alias to the BufferFragmentImpl which is passed in so we
   // need to ensure that the lifetime of those objects exceeds that of the Buffer::Instance.
-  ::posix_memalign(reinterpret_cast<void**>(&container->fragments_),
-                   alignof(Buffer::BufferFragmentImpl),
-                   sizeof(Buffer::BufferFragmentImpl) * slices.size());
+  RELEASE_ASSERT(!::posix_memalign(reinterpret_cast<void**>(&container->fragments_),
+                                   alignof(Buffer::BufferFragmentImpl),
+                                   sizeof(Buffer::BufferFragmentImpl) * slices.size()),
+                 "posix_memalign failure");
   for (size_t i = 0; i < slices.size(); i++) {
     new (&container->fragments_[i])
         Buffer::BufferFragmentImpl(slices[i].begin(), slices[i].size(), releaser);
