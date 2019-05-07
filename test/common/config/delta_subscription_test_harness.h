@@ -163,7 +163,7 @@ public:
   const Protobuf::MethodDescriptor* method_descriptor_;
   Grpc::MockAsyncClient* async_client_;
   Event::MockDispatcher dispatcher_;
-  Runtime::MockRandomGenerator random_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<DeltaSubscriptionImpl> subscription_;

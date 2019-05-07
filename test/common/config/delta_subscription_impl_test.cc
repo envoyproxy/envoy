@@ -4,7 +4,10 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness, public testing::Test {};
+class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness, public testing::Test {
+protected:
+  DeltaSubscriptionImplTest() : DeltaSubscriptionTestHarness() {}
+};
 
 TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
   startSubscription({"name1", "name2", "name3"});
@@ -69,6 +72,15 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
       });
   subscription_->resume();
   // DeltaSubscriptionTestHarness's dtor will check that both ACKs were sent with the correct nonce.
+}
+
+TEST_F(DeltaSubscriptionImplTest, NoGrpcStream) {
+  // Have to call start() to get state_ populated (which this test needs to not segfault), but
+  // start() also tries to start the GrpcStream. So, have that attempt return nullptr.
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(async_stream_, sendMessage(_, _)).Times(0);
+  subscription_->start({"name1"}, callbacks_);
+  subscription_->updateResources({"name1", "name2"});
 }
 
 } // namespace
