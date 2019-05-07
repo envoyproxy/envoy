@@ -287,6 +287,8 @@ public:
    */
   inline StatName statName() const;
 
+  uint8_t* bytes() { return bytes_.get(); }
+
 private:
   SymbolTable::StoragePtr bytes_;
 };
@@ -353,9 +355,14 @@ public:
 #endif
 
   /**
-   * @return uint8_t* A pointer to the first byte of data (skipping over size bytes).
+   * @return A pointer to the first byte of data (skipping over size bytes).
    */
   const uint8_t* data() const { return size_and_data_ + StatNameSizeEncodingBytes; }
+
+  /**
+   * @return whether this is empty.
+   */
+  bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
 
 private:
   const uint8_t* size_and_data_;
@@ -398,6 +405,41 @@ public:
 
 private:
   SymbolTable& symbol_table_;
+};
+
+/**
+ * Maintains storage for a collection of StatName objects. Like
+ * StatNameManagedStorage, this has an RAII usage model, taking
+ * care of decrementing ref-counts in the SymbolTable for all
+ * contained StatNames on destruction or on clear();
+ *
+ * Example usage:
+ *   StatNamePool pool(symbol_table);
+ *   StatName name1 = pool.add("name1");
+ *   StatName name2 = pool.add("name2");
+ */
+class StatNamePool {
+public:
+  explicit StatNamePool(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+  ~StatNamePool() { clear(); }
+
+  /**
+   * Removes all StatNames from the pool.
+   */
+  void clear();
+
+  /**
+   * @param name the name to add the container.
+   * @return the StatName held in the container for this name.
+   */
+  StatName add(absl::string_view name);
+
+private:
+  // We keep the stat names in a vector of StatNameStorage, storing the
+  // SymbolTable reference separately. This saves 8 bytes per StatName,
+  // at the cost of having a destructor that calls clear().
+  SymbolTable& symbol_table_;
+  std::vector<StatNameStorage> storage_vector_;
 };
 
 // Represents an ordered container of StatNames. The encoding for each StatName
