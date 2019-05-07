@@ -156,8 +156,8 @@ public:
   }
 
   const std::unique_ptr<SuccessRateMonitor>& getSRMonitor(SuccessRateMonitorType type) const {
-    return (SuccessRateMonitorType::ExternalOrigin == type) ? externalOriginSRMonitor_
-                                                            : localOriginSRMonitor_;
+    return (SuccessRateMonitorType::ExternalOrigin == type) ? external_origin_SR_monitor_
+                                                            : local_origin_SR_monitor_;
   }
 
   double successRate(SuccessRateMonitorType type) const override {
@@ -191,8 +191,8 @@ private:
   //   and for external origin failures when external/local events are split
   // - local origin: for local events when external/local events are split and
   //   not used when external/local events are not split.
-  std::unique_ptr<SuccessRateMonitor> externalOriginSRMonitor_;
-  std::unique_ptr<SuccessRateMonitor> localOriginSRMonitor_;
+  std::unique_ptr<SuccessRateMonitor> external_origin_SR_monitor_;
+  std::unique_ptr<SuccessRateMonitor> local_origin_SR_monitor_;
 
   void putResultNoLocalExternalSplit(Result result, absl::optional<uint64_t> code);
   void putResultWithLocalExternalSplit(Result result, absl::optional<uint64_t> code);
