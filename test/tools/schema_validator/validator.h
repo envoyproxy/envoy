@@ -8,8 +8,6 @@
 
 #include "test/test_common/utility.h"
 
-// #include "test/mocks/upstream/mocks.h"
-
 namespace Envoy {
 
 /**
