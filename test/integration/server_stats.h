@@ -10,6 +10,13 @@ public:
   virtual ~IntegrationTestServerStats() {}
 
   /**
+   * Wait for a counter to == a given value.
+   * @param name counter name.
+   * @param value target value.
+   */
+  virtual void waitForCounterEq(const std::string& name, uint64_t value) PURE;
+
+  /**
    * Wait for a counter to >= a given value.
    * @param name counter name.
    * @param value target value.

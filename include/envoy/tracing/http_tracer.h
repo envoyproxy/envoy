@@ -74,14 +74,14 @@ public:
    * Set the operation name.
    * @param operation the operation name
    */
-  virtual void setOperation(const std::string& operation) PURE;
+  virtual void setOperation(absl::string_view operation) PURE;
 
   /**
    * Attach metadata to a Span, to be handled in an implementation-dependent fashion.
    * @param name the name of the tag
    * @param value the value to associate with the tag
    */
-  virtual void setTag(const std::string& name, const std::string& value) PURE;
+  virtual void setTag(absl::string_view name, absl::string_view value) PURE;
 
   /**
    * Record an event associated with a span, to be handled in an implementation-dependent fashion.

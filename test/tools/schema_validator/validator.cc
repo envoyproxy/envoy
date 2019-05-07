@@ -1,8 +1,9 @@
 #include "test/tools/schema_validator/validator.h"
 
-#include "common/router/config_impl.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/rds.pb.validate.h"
 
-#include "test/test_common/printers.h"
+#include "common/protobuf/utility.h"
 
 #include "tclap/CmdLine.h"
 
@@ -46,16 +47,14 @@ Options::Options(int argc, char** argv) {
 }
 
 void Validator::validate(const std::string& json_path, Schema::Type schema_type) {
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(json_path, *api_);
 
   switch (schema_type) {
   case Schema::Type::Route: {
-    Runtime::MockLoader runtime;
-    Upstream::MockClusterManager cm;
     // Construct a envoy::api::v2::RouteConfiguration to validate the Route configuration and
     // ignore the output since nothing will consume it.
     envoy::api::v2::RouteConfiguration route_config;
-    Config::RdsJson::translateRouteConfiguration(*loader, route_config);
+    MessageUtil::loadFromFile(json_path, route_config, *api_);
+    MessageUtil::validate(route_config);
     break;
   }
   default:

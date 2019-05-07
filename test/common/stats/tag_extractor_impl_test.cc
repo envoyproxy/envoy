@@ -338,6 +338,14 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 
   regex_tester.testRegex("http.rds_connection_manager.rds.route_config.123.update_success",
                          "http.rds.update_success", {rds_hcm, rds_route_config});
+
+  // Listener manager worker id
+  Tag worker_id;
+  worker_id.name_ = tag_names.WORKER_ID;
+  worker_id.value_ = "worker_123";
+
+  regex_tester.testRegex("listener_manager.worker_123.dispatcher.loop_duration_us",
+                         "listener_manager.dispatcher.loop_duration_us", {worker_id});
 }
 
 TEST(TagExtractorTest, ExtractRegexPrefix) {
