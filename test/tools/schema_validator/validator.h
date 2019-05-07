@@ -2,10 +2,10 @@
 
 #include <string>
 
-#include "common/json/json_loader.h"
+#include "envoy/api/api.h"
 
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "common/stats/isolated_store_impl.h"
+
 #include "test/test_common/utility.h"
 
 namespace Envoy {

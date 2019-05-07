@@ -800,8 +800,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
     // should be used to override the active span's operation.
     if (req_operation_override) {
       if (!req_operation_override->value().empty()) {
-        // TODO(dnoe): Migrate setOperation to take string_view (#6580)
-        active_span_->setOperation(std::string(req_operation_override->value().getStringView()));
+        active_span_->setOperation(req_operation_override->value().getStringView());
 
         // Clear the decorated operation so won't be used in the response header, as
         // it has been overridden by the inbound decorator operation request header.
@@ -1313,7 +1312,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
       // should be used to override the active span's operation.
       if (resp_operation_override) {
         if (!resp_operation_override->value().empty() && active_span_) {
-          active_span_->setOperation(std::string(resp_operation_override->value().getStringView()));
+          active_span_->setOperation(resp_operation_override->value().getStringView());
         }
         // Remove header so not propagated to service.
         headers.removeEnvoyDecoratorOperation();

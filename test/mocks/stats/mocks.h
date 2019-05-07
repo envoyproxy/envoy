@@ -64,6 +64,8 @@ public:
     return tag_extracted_name_.empty() ? name() : tag_extracted_name_;
   }
   StatName tagExtractedStatName() const override { return tag_extracted_stat_name_->statName(); }
+  void iterateTagStatNames(const TagStatNameIterFn& fn) const override;
+  void iterateTags(const TagIterFn& fn) const override;
 
   Test::Global<FakeSymbolTableImpl> symbol_table_; // Must outlive name_.
   MetricName name_;
