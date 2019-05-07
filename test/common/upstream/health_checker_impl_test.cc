@@ -2441,7 +2441,8 @@ TEST_F(TcpHealthCheckerImplTest, DoubleTimeout) {
   timeout_timer_->callback_();
   EXPECT_EQ(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->getActiveHealthFailureType(),
             Host::ActiveHealthFailureType::TIMEOUT);
-  EXPECT_EQ(Host::Health::Unhealthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+  EXPECT_EQ(Host::Health::Unhealthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
   expectClientCreate();
   EXPECT_CALL(*connection_, write(_, _));
