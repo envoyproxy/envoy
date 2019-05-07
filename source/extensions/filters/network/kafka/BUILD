@@ -91,6 +91,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "serialization_lib",
+    srcs = [
+        "serialization.cc",
+    ],
     hdrs = [
         "external/serialization_composite.h",
         "serialization.h",
