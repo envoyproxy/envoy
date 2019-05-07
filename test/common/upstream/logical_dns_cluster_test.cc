@@ -366,6 +366,30 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   EXPECT_THROW_WITH_MESSAGE(
       setupFromV2Yaml(multiple_endpoints_yaml), EnvoyException,
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+
+  const std::string custom_resolver_yaml = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_refresh_rate: 4s
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+  dns_lookup_family: V4_ONLY
+  load_assignment:
+    cluster_name: name
+    endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: hello.world.com
+                port_value: 443
+                resolver_name: customresolver
+            health_check_config:
+              port_value: 8000
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(setupFromV2Yaml(custom_resolver_yaml), EnvoyException,
+                            "LOGICAL_DNS clusters must NOT have a custom resolver name set");
 }
 
 TEST_F(LogicalDnsClusterTest, Basic) {

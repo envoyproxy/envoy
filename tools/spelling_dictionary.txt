@@ -175,6 +175,7 @@ OT
 OU
 PB
 PC
+PCC
 PDF
 PEM
 PERF
@@ -394,7 +395,9 @@ dereferencing
 deregistered
 deserialization
 deserialize
+deserialized
 deserializer
+deserializers
 dest
 destructor
 destructors
@@ -589,6 +592,7 @@ parameterizing
 params
 paren
 parentid
+parsers
 pcall
 pcap
 pclose
@@ -714,6 +718,7 @@ templating
 templatize
 templatized
 templatizing
+testee
 th
 thru
 tm
@@ -730,6 +735,7 @@ typeid
 ucontext
 uint
 un
+unacked
 unary
 unconfigurable
 unconfigured

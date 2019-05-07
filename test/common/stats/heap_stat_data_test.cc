@@ -13,29 +13,23 @@ namespace {
 
 class HeapStatDataTest : public testing::Test {
 protected:
-  HeapStatDataTest() : alloc_(symbol_table_) {}
+  HeapStatDataTest() : alloc_(symbol_table_), pool_(symbol_table_) {}
   ~HeapStatDataTest() { clearStorage(); }
 
   StatNameStorage makeStatStorage(absl::string_view name) {
     return StatNameStorage(name, symbol_table_);
   }
 
-  StatName makeStat(absl::string_view name) {
-    stat_name_storage_.emplace_back(makeStatStorage(name));
-    return stat_name_storage_.back().statName();
-  }
+  StatName makeStat(absl::string_view name) { return pool_.add(name); }
 
   void clearStorage() {
-    for (auto& stat_name_storage : stat_name_storage_) {
-      stat_name_storage.free(symbol_table_);
-    }
-    stat_name_storage_.clear();
+    pool_.clear();
     EXPECT_EQ(0, symbol_table_.numSymbols());
   }
 
   FakeSymbolTableImpl symbol_table_;
   HeapStatDataAllocator alloc_;
-  std::vector<StatNameStorage> stat_name_storage_;
+  StatNamePool pool_;
 };
 
 // No truncation occurs in the implementation of HeapStatData.

@@ -100,7 +100,7 @@ envoy_cc_test_library(
     srcs = ["quic_epoll_clock.cc"],
     hdrs = ["quic_epoll_clock.h"],
     deps = [
-        "@com_googlesource_quiche//:quic_platform_clock_lib",
+        "@com_googlesource_quiche//:quic_platform",
         "@com_googlesource_quiche//:quic_platform_epoll_lib",
     ],
 )
@@ -134,6 +134,12 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//test/test_common:environment_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_sleep_impl_lib",
+    hdrs = ["quic_sleep_impl.h"],
+    deps = ["@com_googlesource_quiche//:quic_core_time_lib"],
 )
 
 envoy_cc_test_library(
