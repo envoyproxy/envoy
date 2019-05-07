@@ -80,7 +80,7 @@ public:
   std::map<SockOptKey, bool> boolsockopts_;
 };
 
-class MockHotRestartOsSysCalls : public HotRestartOsSysCalls {
+class MockHotRestartOsSysCalls : public HotRestartOsSysCallsImpl {
   // Api::HotRestartOsSysCalls
   MOCK_METHOD3(shmOpen, SysCallIntResult(const char*, int, mode_t));
   MOCK_METHOD1(shmUnlink, SysCallIntResult(const char*));
