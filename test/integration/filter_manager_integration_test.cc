@@ -46,7 +46,17 @@ public:
   explicit TestWithAuxiliaryFilter(const std::string& auxiliary_filter_name)
       : auxiliary_filter_name_(auxiliary_filter_name) {}
 
+  virtual ~TestWithAuxiliaryFilter() {}
+
 protected:
+  /**
+   * Returns configuration for a given auxiliary filter.
+   *
+   * Assuming that representative configurations differ in the context of "envoy.echo",
+   * "envoy.tcp_proxy" and "envoy.http_connection_manager".
+   */
+  virtual std::string filterConfig(const std::string& auxiliary_filter_name) PURE;
+
   /**
    * Adds an auxiliary filter to the head of the filter chain.
    * @param config_helper helper object.
@@ -56,7 +66,11 @@ protected:
       // we want to run the same test on unmodified filter chain and observe identical behaviour
       return;
     }
-    addNetworkFilter(config_helper, fmt::format("name: {}", auxiliary_filter_name_));
+    addNetworkFilter(config_helper, fmt::format(R"EOF(
+      name: {}
+    )EOF",
+                                                auxiliary_filter_name_) +
+                                        filterConfig(auxiliary_filter_name_));
     // double-check the filter was actually added
     config_helper.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       ASSERT_EQ(auxiliary_filter_name_,
@@ -139,6 +153,18 @@ public:
     test_server_.reset();
     fake_upstreams_.clear();
   }
+
+protected:
+  // Returns configuration for a given auxiliary filter
+  std::string filterConfig(const std::string& auxiliary_filter_name) override {
+    return auxiliary_filter_name == inject_data_outside_callback_filter ? R"EOF(
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filter_manager.Throttler
+        tick_interval_ms: 1
+        max_chunk_length: 5
+    )EOF"
+                                                                        : "";
+  }
 };
 
 /**
@@ -193,7 +219,7 @@ TEST_P(InjectDataWithTcpProxyFilterIntegrationTest, UsageOfInjectDataMethodsShou
   enable_half_close_ = true;
   initialize();
 
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  auto tcp_client = makeTcpConnection(lookupPort("listener_0"));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
@@ -253,6 +279,18 @@ public:
   void TearDown() override {
     // already cleaned up in ~HttpIntegrationTest()
   }
+
+protected:
+  // Returns configuration for a given auxiliary filter
+  std::string filterConfig(const std::string& auxiliary_filter_name) override {
+    return auxiliary_filter_name == inject_data_outside_callback_filter ? R"EOF(
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filter_manager.Throttler
+        tick_interval_ms: 1
+        max_chunk_length: 10
+    )EOF"
+                                                                        : "";
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -274,7 +312,7 @@ TEST_P(InjectDataWithHttpConnectionManagerIntegrationTest,
   auto response = codec_client_->makeRequestWithBody(headers, "hello!");
 
   waitForNextUpstreamRequest();
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("hello!", upstream_request_->body().toString());
 
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);

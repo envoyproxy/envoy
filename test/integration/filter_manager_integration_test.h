@@ -8,6 +8,11 @@
 
 #include "common/buffer/buffer_impl.h"
 
+#include "extensions/filters/network/common/factory_base.h"
+
+#include "test/integration/filter_manager_integration_test.pb.h"
+#include "test/integration/filter_manager_integration_test.pb.validate.h"
+
 namespace Envoy {
 namespace {
 
@@ -75,7 +80,6 @@ void Throttler::onTimerTick() {
  */
 class ThrottlerFilter : public Network::Filter, public Network::ConnectionCallbacks {
 public:
-  ThrottlerFilter() : ThrottlerFilter(std::chrono::milliseconds(1), 1) {}
   ThrottlerFilter(std::chrono::milliseconds tick_interval, uint64_t max_chunk_length)
       : tick_interval_(tick_interval), max_chunk_length_(max_chunk_length) {}
 
@@ -149,34 +153,21 @@ void ThrottlerFilter::onEvent(Network::ConnectionEvent event) {
 /**
  * Config factory for ThrottlerFilter.
  */
-class ThrottlerFilterConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
+class ThrottlerFilterConfigFactory : public Extensions::NetworkFilters::Common::FactoryBase<
+                                         test::integration::filter_manager::Throttler> {
 public:
-  explicit ThrottlerFilterConfigFactory(const std::string& name) : name_(name) {}
-
-  // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                               Server::Configuration::FactoryContext&) override {
-    return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addFilter(std::make_shared<ThrottlerFilter>());
-    };
-  }
-
-  Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::FactoryContext&) override {
-    return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addFilter(std::make_shared<ThrottlerFilter>());
-    };
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
-  }
-
-  std::string name() override { return name_; }
+  explicit ThrottlerFilterConfigFactory(const std::string& name) : FactoryBase(name) {}
 
 private:
-  const std::string name_;
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const test::integration::filter_manager::Throttler& proto_config,
+      Server::Configuration::FactoryContext&) override {
+    return [proto_config](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addFilter(std::make_shared<ThrottlerFilter>(
+          std::chrono::milliseconds(proto_config.tick_interval_ms()),
+          proto_config.max_chunk_length()));
+    };
+  }
 };
 
 /**
@@ -255,9 +246,7 @@ public:
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb createFilterFactory(const Json::Object&,
                                                Server::Configuration::FactoryContext&) override {
-    return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addFilter(std::make_shared<DispenserFilter>());
-    };
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   Network::FilterFactoryCb

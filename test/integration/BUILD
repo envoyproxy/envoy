@@ -96,6 +96,11 @@ envoy_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "filter_manager_integration_proto",
+    srcs = [":filter_manager_integration_test.proto"],
+)
+
 envoy_cc_test(
     name = "filter_manager_integration_test",
     srcs = [
@@ -103,8 +108,10 @@ envoy_cc_test(
         "filter_manager_integration_test.h",
     ],
     deps = [
+        ":filter_manager_integration_proto_cc",
         ":http_integration_lib",
         ":integration_lib",
+        "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/echo:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/server:utility_lib",
