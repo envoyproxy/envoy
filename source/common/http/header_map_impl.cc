@@ -113,7 +113,7 @@ void HeaderString::append(const char* data, uint32_t size) {
   }
 
   case Type::Inline: {
-    const uint64_t new_capacity = static_cast<uint64_t>(size) + 1 + string_length_;
+    const uint64_t new_capacity = static_cast<uint64_t>(size) + string_length_;
     if (new_capacity <= sizeof(inline_buffer_)) {
       // Already inline and the new value fits in inline storage.
       break;
@@ -148,7 +148,6 @@ void HeaderString::append(const char* data, uint32_t size) {
 
   memcpy(buffer_.dynamic_ + string_length_, data, size);
   string_length_ += size;
-  buffer_.dynamic_[string_length_] = 0;
   ASSERT(valid());
 }
 
