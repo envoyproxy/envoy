@@ -88,7 +88,7 @@ public:
                                  bool insert_envoy_original_path) const PURE;
 
   /**
-   * return name of the route
+   * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
 };
@@ -717,6 +717,9 @@ public:
    */
   virtual InternalRedirectAction internalRedirectAction() const PURE;
 
+  /**
+   * @return std::string& the name of the route.
+   */
   virtual const std::string& routeName() const PURE;
 };
 
