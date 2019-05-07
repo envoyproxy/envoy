@@ -6,8 +6,8 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "absl/hash/hash.h"
 #include "absl/container/node_hash_map.h"
+#include "absl/hash/hash.h"
 
 namespace quiche {
 
