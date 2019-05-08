@@ -449,6 +449,9 @@ public:
   uint8_t* addReturningStorage(absl::string_view name);
 
 private:
+  // We keep the stat names in a vector of StatNameStorage, storing the
+  // SymbolTable reference separately. This saves 8 bytes per StatName,
+  // at the cost of having a destructor that calls clear().
   SymbolTable& symbol_table_;
   std::vector<StatNameStorage> storage_vector_;
 };

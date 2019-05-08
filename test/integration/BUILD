@@ -211,6 +211,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/test_common:utility_lib",
