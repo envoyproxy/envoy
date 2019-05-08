@@ -23,14 +23,17 @@
         }
 
         function handler() {
-            var responseHeaders = client.getAllResponseHeaders()
-            if (responseHeaders === "") {
-                document.getElementById("results").textContent = 'Rejected by CSRF';
+            var responseCode = client.status;
+            if (client.readyState == 4 && responseCode == 403) {
+                resultText = 'Rejected by CSRF';
             }
-            if (client.readyState == 4 && client.status == 200) {
+            else if (client.readyState == 4 && responseCode == 200) {
                 resultText = client.responseText;
-                document.getElementById("results").textContent = resultText;
             }
+            else if (client.readyState == 4) {
+                resultText = 'Unknown Error. Check the console.';
+            }
+            document.getElementById("results").textContent = resultText;
         }
     </script>
 </head>
@@ -42,10 +45,10 @@
         This page demonstrates a few scenarios for CSRF.
     </p>
     <p>
-        Enter the IP address of backend Docker container. As we are running Docker Compose this should just be localhost.<br/>
+        Enter the IP address of the destination Docker container.<br/>
     </p>
     <div>
-        <input id="destinationip" type="text" placeholder="Destination IP" value="localhost"/>
+        <input id="destinationip" type="text" placeholder="Destination IP"/>
         <button id="submit" onclick="submitToDomain()">Post to destination</button><br/>
         <div style="width:20%;float:left;">
             <h5>CSRF Enforcement</h5>

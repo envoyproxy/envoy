@@ -34,47 +34,88 @@ The following documentation runs through the setup of both services.
 
 **Step 1: Install Docker**
 
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
+Ensure that you have a recent versions of ``docker``, ``docker-compose``, and ``docker-machine``.
 
 A simple way to achieve this is via the `Docker Toolbox <https://www.docker.com/products/docker-toolbox>`_.
 
-**Step 2: Clone the Envoy repo and start all of our containers**
+**Step 2: Setup Docker Machines**
+
+First, let's create a couple of new machines which will hold the containers.
+
+Terminal 1 (samesite)
+
+.. code-block:: console
+
+  $ docker-machine create --driver virtualbox samesite
+  $ eval $(docker-machine env samesite)
+
+Terminal 2 (crosssite)
+
+.. code-block:: console
+
+  $ docker-machine create --driver virtualbox crosssite
+  $ eval $(docker-machine env crosssite)
+
+**Step 3: Clone the Envoy repo and start all of our containers**
 
 If you have not cloned the Envoy repo, clone it with ``git clone git@github.com:envoyproxy/envoy``
 or ``git clone https://github.com/envoyproxy/envoy.git``
 
-Terminal 1
+Terminal 1 (samesite)
 
 .. code-block:: console
 
   $ pwd
-  envoy/examples/csrf
+  envoy/examples/csrf/samesite
   $ docker-compose pull
   $ docker-compose up --build -d
   $ docker-compose ps
 
-            Name                        Command          State                            Ports
+            Name                        Command              State                            Ports
   ----------------------------------------------------------------------------------------------------------------------
-  csrf_front-envoy_1      /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
-  csrf_service_1          /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 80/tcp
+  samesite_front-envoy_1      /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
+  samesite_service_1          /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 80/tcp
 
-Terminal 2
+Terminal 2 (crosssite)
 
 .. code-block:: console
 
   $ pwd
-  envoy/examples/csrf
+  envoy/examples/csrf/crosssite
   $ docker-compose up --build -d
   $ docker-compose ps
 
-            Name                       Command           State                            Ports
+            Name                       Command                State                            Ports
   ----------------------------------------------------------------------------------------------------------------------
-  csrf_front-envoy_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
-  csrf_service_1          /docker-entrypoint.sh /bin ... Up      10000/tcp, 80/tcp
+  crosssite_front-envoy_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
+  crosssite_service_1          /docker-entrypoint.sh /bin ... Up      10000/tcp, 80/tcp
 
-**Step 3: Test Envoy's CSRF capabilities**
+**Step 4: Test Envoy's CSRF capabilities**
 
-You can now open a browser to view your frontend service at ``localhost:8000``.
+You should be able to get the IP address of both machines by running the following commands:
+
+.. code-block:: console
+
+  $ docker-machine ip samesite
+  192.168.99.100
+  $ docker-machine ip crossssite
+  192.168.99.101
+
+You can now open a browser to view your ``crosssite`` frontend service.
+
+.. code-block:: console
+
+  $ open "http://$(docker-machine ip crosssite):8000"
+
+Enter the IP of the ``samesite`` machine to demonstrate cross-site requests. Requests
+with the enabled enforcement will fail.
+
+To demonstrate same-site requests open the frontend service for ``samesite`` and enter
+the IP address of the ``samesite`` machine as the destination.
+
+.. code-block:: console
+
+  $ open "http://$(docker-machine ip samesite):8000"
 
 Results of the cross-site request will be shown on the page under *Request Results*.
 Your browser's CSRF enforcement logs can be found in the console and in the
@@ -89,12 +130,12 @@ For example:
 If you change the destination to be the same as one displaying the website and
 set the CSRF enforcement to enabled the request will go through successfully.
 
-**Step 4: Check stats of backend via admin**
+**Step 5: Check stats of backend via admin**
 
 When Envoy runs, it can listen to ``admin`` requests if a port is configured. In
-the example configs, the backend admin is bound to port ``8003``.
+the example configs, the backend admin is bound to port ``8001``.
 
-If you go to ``localhost:8003/stats`` you will be able to view
+If you go to ``localhost:8001/stats`` you will be able to view
 all of the Envoy stats for the backend. You should see the CORS stats for
 invalid and valid origins increment as you make requests from the frontend cluster.
 
