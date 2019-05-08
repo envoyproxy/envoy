@@ -43,8 +43,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
                                std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
                                Thread::ThreadFactory& thread_factory,
                                Filesystem::Instance& file_system)
-    : process_cleanup_(ProcessWide::setup()), options_(options),
-      component_factory_(component_factory), thread_factory_(thread_factory),
+    : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
       file_system_(file_system), stats_allocator_(symbol_table_) {
   switch (options_.mode()) {
   case Server::Mode::InitOnly:

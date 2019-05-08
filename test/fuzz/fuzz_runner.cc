@@ -26,9 +26,9 @@ PerTestEnvironment::PerTestEnvironment()
 PerTestEnvironment::~PerTestEnvironment() { TestEnvironment::removePath(test_tmpdir_); }
 
 void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum default_log_level) {
-  // We hold on to process_cleanup to provide RAII cleanup of process-wide
+  // We hold on to process_wide to provide RAII cleanup of process-wide
   // state.
-  auto process_cleanup = Envoy::ProcessWide::setup();
+  ProcessWide process_wide;
   TestEnvironment::initializeOptions(argc, argv);
 
   const auto environment_log_level = TestEnvironment::getOptions().logLevel();

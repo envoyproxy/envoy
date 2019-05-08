@@ -3,7 +3,6 @@
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
 
-#include "common/common/cleanup.h"
 #include "common/common/thread.h"
 #include "common/event/real_time_system.h"
 #include "common/stats/fake_symbol_table_impl.h"
@@ -65,7 +64,7 @@ public:
                     const AdminRequestFn& handler);
 
 protected:
-  CleanupPtr process_cleanup_;
+  ProcessWide process_wide_; // Process-wide state setup/teardown.
   const Envoy::OptionsImpl& options_;
   Stats::FakeSymbolTableImpl symbol_table_;
   Server::ComponentFactory& component_factory_;

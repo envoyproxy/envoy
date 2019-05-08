@@ -91,7 +91,6 @@ envoy_cc_library(
     external_deps = ["ares"],
     deps = [
         "//source/common/common:assert_lib",
-        "//source/common/common:cleanup_lib",
         "//source/common/event:libevent_lib",
         "//source/common/http/http2:nghttp2_lib",
         "//source/server:proto_descriptors_lib",

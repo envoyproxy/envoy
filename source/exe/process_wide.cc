@@ -14,7 +14,7 @@
 
 namespace Envoy {
 
-CleanupPtr ProcessWide::setup() {
+ProcessWide::ProcessWide() {
 #ifdef ENVOY_GOOGLE_GRPC
   grpc_init();
 #endif
@@ -22,12 +22,13 @@ CleanupPtr ProcessWide::setup() {
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
   Http::Http2::initializeNghttp2Logging();
-  return std::make_unique<Cleanup>([] {
-    ares_library_cleanup();
+}
+
+ProcessWide::~ProcessWide() {
+  ares_library_cleanup();
 #ifdef ENVOY_GOOGLE_GRPC
-    grpc_shutdown();
+  grpc_shutdown();
 #endif
-  });
 }
 
 } // namespace Envoy

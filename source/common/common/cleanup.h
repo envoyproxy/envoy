@@ -1,7 +1,6 @@
 #pragma once
 
 #include <functional>
-#include <memory>
 
 namespace Envoy {
 
@@ -14,7 +13,5 @@ public:
 private:
   std::function<void()> f_;
 };
-
-typedef std::unique_ptr<Cleanup> CleanupPtr;
 
 } // namespace Envoy
