@@ -13,27 +13,16 @@ namespace Stats {
 
 class StatsIsolatedStoreImplTest : public testing::Test {
 protected:
-  ~StatsIsolatedStoreImplTest() override { clearStorage(); }
-
-  void clearStorage() {
-    for (auto& stat_name_storage : stat_name_storage_) {
-      stat_name_storage.free(store_.symbolTable());
-    }
-    stat_name_storage_.clear();
+  StatsIsolatedStoreImplTest() : pool_(store_.symbolTable()) {}
+  ~StatsIsolatedStoreImplTest() override {
+    pool_.clear();
     EXPECT_EQ(0, store_.symbolTable().numSymbols());
   }
 
-  StatName makeStatName(absl::string_view name) {
-    stat_name_storage_.emplace_back(makeStatStorage(name));
-    return stat_name_storage_.back().statName();
-  }
-
-  StatNameStorage makeStatStorage(absl::string_view name) {
-    return StatNameStorage(name, store_.symbolTable());
-  }
+  StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
   IsolatedStoreImpl store_;
-  std::vector<StatNameStorage> stat_name_storage_;
+  StatNamePool pool_;
 };
 
 TEST_F(StatsIsolatedStoreImplTest, All) {
@@ -123,8 +112,7 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
 }
 
 TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
-  Stats::StatsOptionsImpl stats_options;
-  const std::string long_string(stats_options.maxNameLength() + 1, 'A');
+  const std::string long_string(128, 'A');
 
   ScopePtr scope = store_.createScope("scope.");
   Counter& counter = scope->counter(long_string);

@@ -293,6 +293,12 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
   return entry;
 }
 
+SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value) {
+  // This isn't the smartest way to do it; we're round-tripping via YAML, this should be optimized
+  // if runtime parsing becomes performance sensitive.
+  return createEntry(MessageUtil::getYamlStringFromMessage(value, false, false));
+}
+
 bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
   absl::string_view stripped = entry.raw_string_value_;
   stripped = absl::StripAsciiWhitespace(stripped);
@@ -401,19 +407,58 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
   }
 }
 
-LoaderImpl::LoaderImpl(RandomGenerator& generator, Stats::Store& store,
-                       ThreadLocal::SlotAllocator& tls)
-    : LoaderImpl(DoNotLoadSnapshot{}, generator, store, tls) {
+ProtoLayer::ProtoLayer(const ProtobufWkt::Struct& proto) : OverrideLayerImpl{"base"} {
+  for (const auto& f : proto.fields()) {
+    walkProtoValue(f.second, f.first);
+  }
+}
+
+void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix) {
+  switch (v.kind_case()) {
+  case ProtobufWkt::Value::KIND_NOT_SET:
+  case ProtobufWkt::Value::kListValue:
+  case ProtobufWkt::Value::kNullValue:
+    throw EnvoyException(fmt::format("Invalid runtime entry value for {}", prefix));
+    break;
+  case ProtobufWkt::Value::kStringValue:
+    values_.emplace(prefix, SnapshotImpl::createEntry(v.string_value()));
+    break;
+  case ProtobufWkt::Value::kNumberValue:
+  case ProtobufWkt::Value::kBoolValue:
+    values_.emplace(prefix, SnapshotImpl::createEntry(v));
+    break;
+  case ProtobufWkt::Value::kStructValue: {
+    const ProtobufWkt::Struct& s = v.struct_value();
+    if (s.fields().empty() || s.fields().find("numerator") != s.fields().end() ||
+        s.fields().find("denominator") != s.fields().end()) {
+      values_.emplace(prefix, SnapshotImpl::createEntry(v));
+      break;
+    }
+    for (const auto& f : s.fields()) {
+      walkProtoValue(f.second, prefix + "." + f.first);
+    }
+    break;
+  }
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+LoaderImpl::LoaderImpl(const ProtobufWkt::Struct& base, RandomGenerator& generator,
+                       Stats::Store& store, ThreadLocal::SlotAllocator& tls)
+    : LoaderImpl(DoNotLoadSnapshot{}, base, generator, store, tls) {
   loadNewSnapshot();
 }
 
-LoaderImpl::LoaderImpl(DoNotLoadSnapshot /* unused */, RandomGenerator& generator,
-                       Stats::Store& store, ThreadLocal::SlotAllocator& tls)
-    : generator_(generator), stats_(generateStats(store)), admin_layer_(stats_),
+LoaderImpl::LoaderImpl(DoNotLoadSnapshot /* unused */, const ProtobufWkt::Struct& base,
+                       RandomGenerator& generator, Stats::Store& store,
+                       ThreadLocal::SlotAllocator& tls)
+    : generator_(generator), stats_(generateStats(store)), admin_layer_(stats_), base_(base),
       tls_(tls.allocateSlot()) {}
 
 std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
   std::vector<Snapshot::OverrideLayerConstPtr> layers;
+  layers.emplace_back(std::make_unique<const ProtoLayer>(base_));
   layers.emplace_back(std::make_unique<const AdminLayer>(admin_layer_));
   return std::make_unique<SnapshotImpl>(generator_, stats_, std::move(layers));
 }
@@ -432,13 +477,11 @@ void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>&
   loadNewSnapshot();
 }
 
-DiskBackedLoaderImpl::DiskBackedLoaderImpl(Event::Dispatcher& dispatcher,
-                                           ThreadLocal::SlotAllocator& tls,
-                                           const std::string& root_symlink_path,
-                                           const std::string& subdir,
-                                           const std::string& override_dir, Stats::Store& store,
-                                           RandomGenerator& generator, Api::Api& api)
-    : LoaderImpl(DoNotLoadSnapshot{}, generator, store, tls),
+DiskBackedLoaderImpl::DiskBackedLoaderImpl(
+    Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls, const ProtobufWkt::Struct& base,
+    const std::string& root_symlink_path, const std::string& subdir,
+    const std::string& override_dir, Stats::Store& store, RandomGenerator& generator, Api::Api& api)
+    : LoaderImpl(DoNotLoadSnapshot{}, base, generator, store, tls),
       watcher_(dispatcher.createFilesystemWatcher()), root_path_(root_symlink_path + "/" + subdir),
       override_path_(root_symlink_path + "/" + override_dir), api_(api) {
   watcher_->addWatch(root_symlink_path, Filesystem::Watcher::Events::MovedTo,
@@ -456,6 +499,7 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
 
 std::unique_ptr<SnapshotImpl> DiskBackedLoaderImpl::createNewSnapshot() {
   std::vector<Snapshot::OverrideLayerConstPtr> layers;
+  layers.emplace_back(std::make_unique<const ProtoLayer>(base_));
   try {
     layers.push_back(std::make_unique<DiskLayer>("root", root_path_, api_));
     if (api_.fileSystem().directoryExists(override_path_)) {

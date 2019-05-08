@@ -78,6 +78,10 @@ message HostHealthStatus {
   // The host is currently being marked as degraded through active health checking.
   bool failed_active_degraded_check = 4;
 
+  // The host has been removed from service discovery, but is being stabilized due to active
+  // health checking.
+  bool pending_dynamic_removal = 5;
+
   // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported
   // here.
   // TODO(mrice32): pipe through remaining EDS health status possibilities.

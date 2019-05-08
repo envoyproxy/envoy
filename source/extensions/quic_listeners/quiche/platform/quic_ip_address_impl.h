@@ -48,7 +48,8 @@ public:
   bool FromString(const std::string&) { return false; }
   bool IsIPv4() const { return true; }
   bool IsIPv6() const { return false; }
-
+  in_addr GetIPv4() const { return in_addr(); }
+  in6_addr GetIPv6() const { return in6_addr(); }
   bool InSameSubnet(const QuicIpAddressImpl&, int) { return false; }
 };
 

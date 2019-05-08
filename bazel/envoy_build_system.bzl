@@ -1,6 +1,7 @@
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 load("@rules_foreign_cc//tools/build_defs:cmake.bzl", "cmake_external")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
@@ -381,8 +382,6 @@ def envoy_cc_binary(
         deps = deps,
     )
 
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
-
 # Envoy C++ fuzz test targes. These are not included in coverage runs.
 def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
     if not (corpus.startswith("//") or corpus.startswith(":")):
@@ -683,6 +682,10 @@ def envoy_select_google_grpc(xs, repository = ""):
         repository + "//bazel:disable_google_grpc": [],
         "//conditions:default": xs,
     })
+
+# Dependencies on Google grpc should be wrapped with this function.
+def envoy_google_grpc_external_deps():
+    return envoy_select_google_grpc([envoy_external_dep_path("grpc")])
 
 # Select the given values if exporting is enabled in the current build.
 def envoy_select_exported_symbols(xs):

@@ -12,6 +12,8 @@
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
 
+#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
+
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/quic_listeners/quiche/platform/quic_epoll_clock.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
@@ -43,6 +45,7 @@
 #include "quiche/quic/platform/api/quic_mem_slice.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
+#include "quiche/quic/platform/api/quic_pcc_sender.h"
 #include "quiche/quic/platform/api/quic_port_utils.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
@@ -551,42 +554,44 @@ TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
   ASSERT_EQ(last_now, now);
 }
 
-TEST_F(QuicPlatformTest, ConstructMemSliceFromBuffer) {
-  std::string str(512, 'b');
-  // Fragment needs to out-live buffer.
-  bool fragment_releaser_called = false;
-  Envoy::Buffer::BufferFragmentImpl fragment(
-      str.data(), str.length(),
-      [&fragment_releaser_called](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
-        // Used to verify that mem slice release appropriately.
-        fragment_releaser_called = true;
-      });
-  Envoy::Buffer::OwnedImpl buffer;
-  EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer, 0)}, "");
-  std::string str2(1024, 'a');
-  // str2 is copied.
-  buffer.add(str2);
-  EXPECT_EQ(1u, buffer.getRawSlices(nullptr, 0));
-  buffer.addBufferFragment(fragment);
+TEST_F(QuicPlatformTest, QuicFlags) {
+  auto& flag_registry = quiche::FlagRegistry::GetInstance();
+  flag_registry.ResetFlags();
 
-  quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer, str2.length())};
-  EXPECT_EQ(str.length(), buffer.length());
-  EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
-  std::string str2_old = str2;
-  // slice1 is released, but str2 should not be affected.
-  slice1.Reset();
-  EXPECT_TRUE(slice1.empty());
-  EXPECT_EQ(nullptr, slice1.data());
-  EXPECT_EQ(str2_old, str2);
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
+  SetQuicReloadableFlag(quic_testonly_default_false, true);
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
 
-  quic::QuicMemSlice slice2{quic::QuicMemSliceImpl(buffer, str.length())};
-  EXPECT_EQ(0, buffer.length());
-  EXPECT_EQ(str.data(), slice2.data());
-  EXPECT_EQ(str, std::string(slice2.data(), slice2.length()));
-  slice2.Reset();
-  EXPECT_TRUE(slice2.empty());
-  EXPECT_EQ(nullptr, slice2.data());
-  EXPECT_TRUE(fragment_releaser_called);
+  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
+  SetQuicRestartFlag(quic_testonly_default_false, true);
+  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_false));
+
+  EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+  SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
+  EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+
+  flag_registry.ResetFlags();
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
+  EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+  flag_registry.FindFlag("quic_reloadable_flag_quic_testonly_default_false")
+      ->SetValueFromString("true");
+  flag_registry.FindFlag("quic_restart_flag_quic_testonly_default_true")->SetValueFromString("0");
+  flag_registry.FindFlag("quic_time_wait_list_seconds")->SetValueFromString("100");
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
+  EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+}
+
+TEST_F(QuicPlatformTest, QuicPccSender) {
+  EXPECT_DEATH_LOG_TO_STDERR(quic::CreatePccSender(/*clock=*/nullptr, /*rtt_stats=*/nullptr,
+                                                   /*unacked_packets=*/nullptr, /*random=*/nullptr,
+                                                   /*stats=*/nullptr,
+                                                   /*initial_congestion_window=*/0,
+                                                   /*max_congestion_window=*/0),
+                             "PccSender is not supported.");
 }
 
 class FileUtilsTest : public testing::Test {
@@ -698,5 +703,42 @@ TEST_F(QuicPlatformTest, TestSystemEventLoop) {
   QuicSystemEventLoop("dummy");
 }
 
+TEST_F(QuicPlatformTest, ConstructMemSliceFromBuffer) {
+  std::string str(512, 'b');
+  // Fragment needs to out-live buffer.
+  bool fragment_releaser_called = false;
+  Envoy::Buffer::BufferFragmentImpl fragment(
+      str.data(), str.length(),
+      [&fragment_releaser_called](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
+        // Used to verify that mem slice release appropriately.
+        fragment_releaser_called = true;
+      });
+  Envoy::Buffer::OwnedImpl buffer;
+  EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer, 0)}, "");
+  std::string str2(1024, 'a');
+  // str2 is copied.
+  buffer.add(str2);
+  EXPECT_EQ(1u, buffer.getRawSlices(nullptr, 0));
+  buffer.addBufferFragment(fragment);
+
+  quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer, str2.length())};
+  EXPECT_EQ(str.length(), buffer.length());
+  EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
+  std::string str2_old = str2;
+  // slice1 is released, but str2 should not be affected.
+  slice1.Reset();
+  EXPECT_TRUE(slice1.empty());
+  EXPECT_EQ(nullptr, slice1.data());
+  EXPECT_EQ(str2_old, str2);
+
+  quic::QuicMemSlice slice2{quic::QuicMemSliceImpl(buffer, str.length())};
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_EQ(str.data(), slice2.data());
+  EXPECT_EQ(str, std::string(slice2.data(), slice2.length()));
+  slice2.Reset();
+  EXPECT_TRUE(slice2.empty());
+  EXPECT_EQ(nullptr, slice2.data());
+  EXPECT_TRUE(fragment_releaser_called);
+}
 } // namespace
 } // namespace quic

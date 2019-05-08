@@ -147,7 +147,7 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
     for (const Http::LowerCaseString& header : tracing_config.requestHeadersForTags()) {
       const Http::HeaderEntry* entry = request_headers->get(header);
       if (entry) {
-        span.setTag(header.get(), std::string(entry->value().getStringView()));
+        span.setTag(header.get(), entry->value().getStringView());
       }
     }
   }

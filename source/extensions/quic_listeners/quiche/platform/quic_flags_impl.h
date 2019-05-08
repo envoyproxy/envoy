@@ -9,34 +9,36 @@
 #include <string>
 #include <vector>
 
-// This is a dummy implementation which just allows its dependency to build.
-// TODO(mpwarres): implement once QUICHE flag mechanism is defined.
-// GetQuic(Restart|Reloadable)FlagImpl will be implemented with non-macro construct.
+#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 
-extern bool FLAGS_quic_supports_tls_handshake;
-#define GetQuicFlagImpl(flag) ({ false; })
-#define SetQuicFlagImpl(flag, value)                                                               \
-  do {                                                                                             \
-  } while (0)
-#define GetQuicReloadableFlagImpl(flag) ({ false; })
+// |flag| is the global flag variable, which is a pointer to TypedFlag<type>.
+#define GetQuicFlagImpl(flag) (quiche::flag)->value()
+
+// |flag| is the global flag variable, which is a pointer to TypedFlag<type>.
+#define SetQuicFlagImpl(flag, value) (quiche::flag)->SetValue(value)
+
+#define GetQuicReloadableFlagImpl(flag) quiche::FLAGS_quic_reloadable_flag_##flag->value()
+
 #define SetQuicReloadableFlagImpl(flag, value)                                                     \
-  do {                                                                                             \
-  } while (0)
-#define GetQuicRestartFlagImpl(flag) ({ false; })
-#define SetQuicRestartFlagImpl(flag, value)                                                        \
-  do {                                                                                             \
-  } while (0)
+  quiche::FLAGS_quic_reloadable_flag_##flag->SetValue(value)
 
-#define DEFINE_QUIC_COMMAND_LINE_FLAG_IMPL(type, name, default_value, help)                        \
-  do {                                                                                             \
-  } while (0)
+#define GetQuicRestartFlagImpl(flag) quiche::FLAGS_quic_restart_flag_##flag->value()
+
+#define SetQuicRestartFlagImpl(flag, value) quiche::FLAGS_quic_restart_flag_##flag->SetValue(value)
+
+// Not wired into command-line parsing.
+#define DEFINE_QUIC_COMMAND_LINE_FLAG_IMPL(type, flag, value, help)                                \
+  quiche::TypedFlag<type>* FLAGS_##flag = new TypedFlag<type>(#flag, value, help);
 
 namespace quic {
+
+// TODO(mpwarres): implement. Lower priority since only used by QUIC command-line tools.
 inline std::vector<std::string> QuicParseCommandLineFlagsImpl(const char* /*usage*/, int /*argc*/,
                                                               const char* const* /*argv*/) {
   return std::vector<std::string>();
 }
 
+// TODO(mpwarres): implement. Lower priority since only used by QUIC command-line tools.
 inline void QuicPrintCommandLineFlagHelpImpl(const char* /*usage*/) {}
 
 } // namespace quic
