@@ -24,10 +24,10 @@ constexpr static int32_t NULL_BYTES_LENGTH = -1;
  * @return number of bytes consumed.
  */
 template <typename DeserializerType, typename LengthType, typename ByteType>
-size_t feed_bytes_into_buffers(absl::string_view& data, DeserializerType& length_deserializer,
-                               bool& length_consumed_marker, LengthType& required,
-                               std::vector<ByteType>& data_buffer, bool& ready,
-                               const LengthType null_value_length, const bool allow_null_value) {
+size_t feedBytesIntoBuffers(absl::string_view& data, DeserializerType& length_deserializer,
+                            bool& length_consumed_marker, LengthType& required,
+                            std::vector<ByteType>& data_buffer, bool& ready,
+                            const LengthType null_value_length, const bool allow_null_value) {
 
   const size_t length_consumed = length_deserializer.feed(data);
   if (!length_deserializer.ready()) {
@@ -85,22 +85,22 @@ size_t feed_bytes_into_buffers(absl::string_view& data, DeserializerType& length
 }
 
 size_t StringDeserializer::feed(absl::string_view& data) {
-  return feed_bytes_into_buffers<Int16Deserializer, int16_t, char>(
+  return feedBytesIntoBuffers<Int16Deserializer, int16_t, char>(
       data, length_buf_, length_consumed_, required_, data_buf_, ready_, NULL_STRING_LENGTH, false);
 }
 
 size_t NullableStringDeserializer::feed(absl::string_view& data) {
-  return feed_bytes_into_buffers<Int16Deserializer, int16_t, char>(
+  return feedBytesIntoBuffers<Int16Deserializer, int16_t, char>(
       data, length_buf_, length_consumed_, required_, data_buf_, ready_, NULL_STRING_LENGTH, true);
 }
 
 size_t BytesDeserializer::feed(absl::string_view& data) {
-  return feed_bytes_into_buffers<Int32Deserializer, int32_t, unsigned char>(
+  return feedBytesIntoBuffers<Int32Deserializer, int32_t, unsigned char>(
       data, length_buf_, length_consumed_, required_, data_buf_, ready_, NULL_BYTES_LENGTH, false);
 }
 
 size_t NullableBytesDeserializer::feed(absl::string_view& data) {
-  return feed_bytes_into_buffers<Int32Deserializer, int32_t, unsigned char>(
+  return feedBytesIntoBuffers<Int32Deserializer, int32_t, unsigned char>(
       data, length_buf_, length_consumed_, required_, data_buf_, ready_, NULL_BYTES_LENGTH, true);
 }
 
