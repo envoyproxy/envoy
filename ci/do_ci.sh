@@ -39,15 +39,38 @@ function bazel_with_collection() {
   collect_build_profile $1
 }
 
-function bazel_release_binary_build() {
-  echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static
-  collect_build_profile release_build
-  # Copy the envoy-static binary somewhere that we can access outside of the
-  # container.
+function cp_binary_for_outside_access() {
+  DELIVERY_LOCATION=$1
   cp -f \
     "${ENVOY_SRCDIR}"/bazel-bin/source/exe/envoy-static \
-    "${ENVOY_DELIVERY_DIR}"/envoy
+    "${ENVOY_DELIVERY_DIR}"/${DELIVERY_LOCATION}
+}
+
+function bazel_sizeopt_binary_build() {
+  echo "Building..."
+  bazel build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static --define optimize_binary_size=enabled
+  collect_build_profile sizeopt_build
+
+  # Copy the envoy-static binary somewhere that we can access outside of the
+  # container.
+  cp_binary_for_outside_access envoy
+
+  # TODO(mattklein123): Replace this with caching and a different job which creates images.
+  echo "Copying size optimized binary for image build..."
+  mkdir -p "${ENVOY_SRCDIR}"/build_sizeopt
+  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_sizeopt
+  mkdir -p "${ENVOY_SRCDIR}"/build_sizeopt_stripped
+  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_sizeopt_stripped/envoy
+}
+
+function bazel_release_binary_build() {
+  echo "Building..."
+  bazel build ${BAZEL_BUILD_OPTIONS} //source/exe:envoy-static
+  collect_build_profile release_build
+
+  # Copy the envoy-static binary somewhere that we can access outside of the
+  # container.
+  cp_binary_for_outside_access envoy
 
   # TODO(mattklein123): Replace this with caching and a different job which creates images.
   echo "Copying release binary for image build..."
@@ -61,11 +84,10 @@ function bazel_debug_binary_build() {
   echo "Building..."
   bazel build ${BAZEL_BUILD_OPTIONS} -c dbg //source/exe:envoy-static
   collect_build_profile debug_build
+
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container.
-  cp -f \
-    "${ENVOY_SRCDIR}"/bazel-bin/source/exe/envoy-static \
-    "${ENVOY_DELIVERY_DIR}"/envoy-debug
+  cp_binary_for_outside_access envoy-debug
 }
 
 if [[ "$1" == "bazel.release" ]]; then
@@ -93,6 +115,18 @@ elif [[ "$1" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel release build..."
   bazel_release_binary_build
+  exit 0
+elif [[ "$1" == "bazel.sizeopt.server_only" ]]; then
+  setup_clang_toolchain
+  echo "bazel size optimized build..."
+  bazel_sizeopt_binary_build
+  exit 0
+elif [[ "$1" == "bazel.sizeopt" ]]; then
+  setup_clang_toolchain
+  echo "bazel size optimized build with tests..."
+  bazel_sizeopt_binary_build
+  echo "Testing..."
+  bazel test ${BAZEL_TEST_OPTIONS} //test/... --config optimize_binary_size=enabled
   exit 0
 elif [[ "$1" == "bazel.debug" ]]; then
   setup_clang_toolchain
