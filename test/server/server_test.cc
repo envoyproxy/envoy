@@ -274,6 +274,18 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
 }
 
+// Validate server runtime is parsed from bootstrap.
+TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
+  initialize("test/server/runtime_bootstrap.yaml");
+  EXPECT_EQ("bar", server_->runtime().snapshot().get("foo"));
+}
+
+// Validate invalid runtime in bootstrap is rejected.
+TEST_P(ServerInstanceImplTest, InvalidBootstrapRuntime) {
+  EXPECT_THROW_WITH_MESSAGE(initialize("test/server/invalid_runtime_bootstrap.yaml"),
+                            EnvoyException, "Invalid runtime entry value for foo");
+}
+
 // Regression test for segfault when server initialization fails prior to
 // ClusterManager initialization.
 TEST_P(ServerInstanceImplTest, BootstrapClusterManagerInitializationFail) {
@@ -341,7 +353,7 @@ TEST_P(ServerInstanceImplTest, ValidateFail) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   try {
-    initialize("test/server/empty_runtime.yaml");
+    initialize("test/server/invalid_bootstrap.yaml");
     FAIL();
   } catch (const EnvoyException& e) {
     EXPECT_THAT(e.what(), HasSubstr("Proto constraint validation failed"));

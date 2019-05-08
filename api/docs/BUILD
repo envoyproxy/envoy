@@ -33,6 +33,7 @@ proto_library(
         "//envoy/config/accesslog/v2:als",
         "//envoy/config/accesslog/v2:file",
         "//envoy/config/bootstrap/v2:bootstrap",
+        "//envoy/config/cluster/redis:redis_cluster",
         "//envoy/config/common/tap/v2alpha:common",
         "//envoy/config/filter/accesslog/v2:accesslog",
         "//envoy/config/filter/dubbo/router/v2alpha1:router",

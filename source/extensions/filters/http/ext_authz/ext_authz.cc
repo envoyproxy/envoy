@@ -162,6 +162,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   if (response->status == CheckStatus::Denied ||
       (response->status == CheckStatus::Error && !config_->failureModeAllow())) {
     ENVOY_STREAM_LOG(debug, "ext_authz filter rejected the request", *callbacks_);
+    const std::string& details = response->status == CheckStatus::Denied
+                                     ? StreamInfo::ResponseCodeDetails::get().AuthzDenied
+                                     : StreamInfo::ResponseCodeDetails::get().AuthzError;
     callbacks_->sendLocalReply(
         response->status_code, response->body,
         [& headers = response->headers_to_add,
@@ -174,7 +177,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
             ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, header.first.get(), header.second);
           }
         },
-        absl::nullopt);
+        absl::nullopt, details);
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService);
   } else {
     ENVOY_STREAM_LOG(debug, "ext_authz filter accepted the request", *callbacks_);

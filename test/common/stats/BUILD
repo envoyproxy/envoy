@@ -29,6 +29,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "metric_impl_test",
+    srcs = ["metric_impl_test.cc"],
+    deps = [
+        "//source/common/stats:fake_symbol_table_lib",
+        "//source/common/stats:heap_stat_data_lib",
+        "//test/test_common:logging_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "source_impl_test",
     srcs = ["source_impl_test.cc"],
     deps = [

@@ -14,6 +14,7 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
@@ -41,7 +42,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
-
 namespace {
 
 // Transcoder:
@@ -262,10 +262,13 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
     if (!request_status.ok()) {
       ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
       error_ = true;
-      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
-                                         absl::string_view(request_status.error_message().data(),
-                                                           request_status.error_message().size()),
-                                         nullptr, absl::nullopt);
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::BadRequest,
+          absl::string_view(request_status.error_message().data(),
+                            request_status.error_message().size()),
+          nullptr, absl::nullopt,
+          absl::StrCat(StreamInfo::ResponseCodeDetails::get().GrpcTranscodeFailedEarly, "{",
+                       MessageUtil::CodeEnumToString(request_status.code()), "}"));
 
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -300,10 +303,13 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
   if (!request_status.ok()) {
     ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
     error_ = true;
-    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
-                                       absl::string_view(request_status.error_message().data(),
-                                                         request_status.error_message().size()),
-                                       nullptr, absl::nullopt);
+    decoder_callbacks_->sendLocalReply(
+        Http::Code::BadRequest,
+        absl::string_view(request_status.error_message().data(),
+                          request_status.error_message().size()),
+        nullptr, absl::nullopt,
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().GrpcTranscodeFailed, "{",
+                     MessageUtil::CodeEnumToString(request_status.code()), "}"));
 
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
