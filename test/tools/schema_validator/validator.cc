@@ -22,12 +22,12 @@ const std::string& Schema::toString(Type type) {
 
 Options::Options(int argc, char** argv) {
   TCLAP::CmdLine cmd("schema_validator_tool", ' ', "none", false);
-  TCLAP::ValueArg<std::string> json_path("j", "json-path", "Path to JSON file.", true, "", "string",
-                                         cmd);
+  TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", true,
+                                           "", "string", cmd);
   TCLAP::ValueArg<std::string> schema_type(
       "t", "schema-type",
-      "Type of schema to validate the JSON against. Supported schema is: 'route'.", true, "",
-      "string", cmd);
+      "Type of schema to validate the configuration against. Supported schema is: 'route'.", true,
+      "", "string", cmd);
 
   try {
     cmd.parse(argc, argv);
@@ -43,17 +43,17 @@ Options::Options(int argc, char** argv) {
     exit(EXIT_FAILURE);
   }
 
-  json_path_ = json_path.getValue();
+  config_path_ = config_path.getValue();
 }
 
-void Validator::validate(const std::string& json_path, Schema::Type schema_type) {
+void Validator::validate(const std::string& config_path, Schema::Type schema_type) {
 
   switch (schema_type) {
   case Schema::Type::Route: {
     // Construct a envoy::api::v2::RouteConfiguration to validate the Route configuration and
     // ignore the output since nothing will consume it.
     envoy::api::v2::RouteConfiguration route_config;
-    MessageUtil::loadFromFile(json_path, route_config, *api_);
+    MessageUtil::loadFromFile(config_path, route_config, *api_);
     MessageUtil::validate(route_config);
     break;
   }
