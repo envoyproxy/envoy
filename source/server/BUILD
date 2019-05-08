@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_proto_library",
     "envoy_select_hot_restart",
 )
 
@@ -107,13 +108,8 @@ envoy_cc_library(
     ],
 )
 
-cc_proto_library(
-    name = "hot_restart_cc",
-    deps = [":hot_restart_proto"],
-)
-
-proto_library(
-    name = "hot_restart_proto",
+envoy_proto_library(
+    name = "hot_restart",
     srcs = ["hot_restart.proto"],
 )
 
