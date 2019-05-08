@@ -180,7 +180,7 @@ TEST(HeaderStringTest, All) {
   // Append, small buffer to dynamic
   {
     HeaderString string;
-    std::string test(128, 'a');
+    std::string test(127, 'a');
     string.append(test.c_str(), test.size());
     EXPECT_EQ(HeaderString::Type::Inline, string.type());
     string.append("a", 1);
@@ -208,20 +208,20 @@ TEST(HeaderStringTest, All) {
   // Append, realloc dynamic.
   {
     HeaderString string;
-    std::string large(129, 'a');
+    std::string large(128, 'a');
     string.append(large.c_str(), large.size());
     EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
     std::string large2 = large + large;
     string.append(large2.c_str(), large2.size());
     large += large2;
     EXPECT_EQ(large, string.getStringView());
-    EXPECT_EQ(387U, string.size());
+    EXPECT_EQ(384U, string.size());
   }
 
   // Append, realloc close to limit with small buffer.
   {
     HeaderString string;
-    std::string large(129, 'a');
+    std::string large(128, 'a');
     string.append(large.c_str(), large.size());
     EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
     std::string large2(120, 'b');
@@ -229,7 +229,7 @@ TEST(HeaderStringTest, All) {
     std::string large3(32, 'c');
     string.append(large3.c_str(), large3.size());
     EXPECT_EQ((large + large2 + large3), string.getStringView());
-    EXPECT_EQ(281U, string.size());
+    EXPECT_EQ(280U, string.size());
   }
 
   // Set integer, inline
@@ -243,7 +243,7 @@ TEST(HeaderStringTest, All) {
   // Set integer, dynamic
   {
     HeaderString string;
-    std::string large(129, 'a');
+    std::string large(128, 'a');
     string.append(large.c_str(), large.size());
     string.setInteger(123456789);
     EXPECT_EQ("123456789", string.getStringView());
@@ -260,7 +260,7 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(11U, string.size());
     EXPECT_EQ(HeaderString::Type::Reference, string.type());
 
-    const std::string large(129, 'a');
+    const std::string large(128, 'a');
     string.setCopy(large.c_str(), large.size());
     EXPECT_NE(string.getStringView().data(), large.c_str());
     EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
