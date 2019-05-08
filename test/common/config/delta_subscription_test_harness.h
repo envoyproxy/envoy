@@ -74,6 +74,7 @@ public:
         Protobuf::RepeatedFieldBackInserter(expected_request.mutable_resource_names_unsubscribe()));
     if (!last_response_nonce_.empty()) {
       nonce_acks_required_.push(last_response_nonce_);
+      last_response_nonce_ = "";
     }
     expected_request.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
@@ -89,7 +90,7 @@ public:
     EXPECT_CALL(async_stream_,
                 sendMessage(ProtoEqIgnoringField(expected_request, "response_nonce"), false))
         .WillOnce([this](const Protobuf::Message& message, bool) {
-          std::string nonce =
+          const std::string nonce =
               static_cast<const envoy::api::v2::DeltaDiscoveryRequest&>(message).response_nonce();
           if (!nonce.empty()) {
             nonce_acks_sent_.push(nonce);

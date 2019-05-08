@@ -151,6 +151,7 @@ MSVC
 MTLS
 MiB
 NACK
+NACKs
 NACKed
 NBF
 NBSP
@@ -767,6 +768,7 @@ unreferenced
 unregister
 unregisters
 unresolvable
+unsubscription
 unterminated
 untruncated
 untrusted
