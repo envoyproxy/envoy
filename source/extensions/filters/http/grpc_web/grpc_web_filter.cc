@@ -15,6 +15,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcWeb {
 
+struct RcDetailsValues {
+  // The grpc web filter couldn't decode the data as the size wasn't a multiple of 4.
+  const std::string GrpcDecodeFailedDueToSize = "grpc_base_64_decode_failed_bad_size";
+  // The grpc web filter couldn't decode the data provided.
+  const std::string GrpcDecodeFailedDueToData = "grpc_base_64_decode_failed";
+};
+typedef ConstSingleton<RcDetailsValues> RcDetails;
+
 // Bit mask denotes a trailers frame of gRPC-Web.
 const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;
 
@@ -95,9 +103,9 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool en
     }
     if (available % 4 != 0) {
       // Client end stream with invalid base64. Note, base64 padding is mandatory.
-      decoder_callbacks_->sendLocalReply(
-          Http::Code::BadRequest, "Bad gRPC-web request, invalid base64 data.", nullptr,
-          absl::nullopt, StreamInfo::ResponseCodeDetails::get().GrpcDecodeFailedDueToSize);
+      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                         "Bad gRPC-web request, invalid base64 data.", nullptr,
+                                         absl::nullopt, RcDetails::get().GrpcDecodeFailedDueToSize);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   } else if (available < 4) {
@@ -112,9 +120,9 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool en
                   decoding_buffer_.length()));
   if (decoded.empty()) {
     // Error happened when decoding base64.
-    decoder_callbacks_->sendLocalReply(
-        Http::Code::BadRequest, "Bad gRPC-web request, invalid base64 data.", nullptr,
-        absl::nullopt, StreamInfo::ResponseCodeDetails::get().GrpcDecodeFailedDueToData);
+    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                       "Bad gRPC-web request, invalid base64 data.", nullptr,
+                                       absl::nullopt, RcDetails::get().GrpcDecodeFailedDueToData);
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
