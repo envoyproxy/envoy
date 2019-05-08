@@ -5,7 +5,6 @@ load(
     "envoy_cc_library",
     "envoy_cc_test_library",
     "envoy_package",
-    "envoy_select_quiche",
 )
 
 envoy_package()
@@ -48,21 +47,20 @@ envoy_cc_library(
     name = "http2_platform_impl_lib",
     hdrs = [
         "http2_arraysize_impl.h",
+        "http2_bug_tracker_impl.h",
         "http2_containers_impl.h",
         "http2_estimate_memory_usage_impl.h",
         "http2_export_impl.h",
         "http2_flag_utils_impl.h",
         "http2_flags_impl.h",
+        "http2_logging_impl.h",
         "http2_macros_impl.h",
         "http2_optional_impl.h",
         "http2_ptr_util_impl.h",
         "http2_string_impl.h",
         "http2_string_piece_impl.h",
-    ] + envoy_select_quiche([
-        "http2_bug_tracker_impl.h",
-        "http2_logging_impl.h",
         "http2_string_utils_impl.h",
-    ]),
+    ],
     external_deps = [
         "abseil_base",
         "abseil_optional",
@@ -71,10 +69,9 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":flags_impl_lib",
-    ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
-    ]),
+    ],
 )
 
 envoy_cc_library(
@@ -96,7 +93,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_base_impl_lib",
-    srcs = ["quic_flags_impl.cc"] + envoy_select_quiche(["quic_mem_slice_impl.cc"]),
+    srcs = [
+        "quic_flags_impl.cc",
+        "quic_mem_slice_impl.cc",
+    ],
     hdrs = [
         "quic_aligned_impl.h",
         "quic_arraysize_impl.h",
@@ -195,8 +195,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_mem_slice_storage_impl_lib",
-    srcs = envoy_select_quiche(["quic_mem_slice_storage_impl.cc"]),
-    hdrs = envoy_select_quiche(["quic_mem_slice_storage_impl.h"]),
+    srcs = ["quic_mem_slice_storage_impl.cc"],
+    hdrs = ["quic_mem_slice_storage_impl.h"],
     copts = [
         "-Wno-error=invalid-offsetof",
         "-Wno-unused-parameter",
@@ -220,23 +220,22 @@ envoy_cc_library(
     name = "spdy_platform_impl_lib",
     hdrs = [
         "spdy_arraysize_impl.h",
+        "spdy_bug_tracker_impl.h",
         "spdy_containers_impl.h",
         "spdy_endianness_util_impl.h",
         "spdy_estimate_memory_usage_impl.h",
         "spdy_export_impl.h",
         "spdy_flags_impl.h",
+        "spdy_logging_impl.h",
         "spdy_macros_impl.h",
         "spdy_mem_slice_impl.h",
         "spdy_ptr_util_impl.h",
         "spdy_string_impl.h",
         "spdy_string_piece_impl.h",
+        "spdy_string_utils_impl.h",
         "spdy_test_helpers_impl.h",
         "spdy_test_utils_prod_impl.h",
-    ] + envoy_select_quiche([
-        "spdy_bug_tracker_impl.h",
-        "spdy_logging_impl.h",
-        "spdy_string_utils_impl.h",
-    ]),
+    ],
     external_deps = [
         "abseil_base",
         "abseil_hash",
@@ -247,20 +246,15 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":flags_impl_lib",
-    ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
         "//source/common/common:assert_lib",
-    ]),
+    ],
 )
 
 envoy_cc_library(
     name = "spdy_platform_unsafe_arena_impl_lib",
-    hdrs = [
-        "spdy_unsafe_arena_impl.h",
-    ],
+    hdrs = ["spdy_unsafe_arena_impl.h"],
     visibility = ["//visibility:public"],
-    deps = envoy_select_quiche([
-        "@com_googlesource_quiche//:spdy_simple_arena_lib",
-    ]),
+    deps = ["@com_googlesource_quiche//:spdy_simple_arena_lib"],
 )
