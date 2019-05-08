@@ -369,6 +369,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_error_codes.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [":quic_platform_export"],
 )
 
