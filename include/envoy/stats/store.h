@@ -44,11 +44,13 @@ public:
    */
   virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
 
+  // TODO(fredlas) can be removed once #6712 is merged.
   /**
    * @return whether any known counter exists with this name.
    */
   virtual bool counterExists(const std::string& counter_name) PURE;
 
+  // TODO(fredlas) can be removed once #6712 is merged.
   /**
    * @return whether any known gauge exists with this name.
    */
