@@ -116,6 +116,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       // a write event is not being registered for the socket, this logic is simply setting the
       // timer and waiting for it to trigger to close the socket.
       if (!inDelayedClose()) {
+        read_enabled_ = false;
         initializeDelayedCloseTimer();
         delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
       }
@@ -269,9 +270,8 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
     read_end_stream_raised_ = true;
   }
 
-  if (!inDelayedClose()) {
-    filter_manager_.onRead();
-  }
+  ASSERT(!inDelayedClose());
+  filter_manager_.onRead();
 }
 
 void ConnectionImpl::enableHalfClose(bool enabled) {
