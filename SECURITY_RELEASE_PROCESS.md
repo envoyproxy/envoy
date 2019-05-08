@@ -317,12 +317,13 @@ CrashOverride will vouch for the "Seven" distribution joining the distribution l
 
 | E-mail                                    | Organization  |
 |-------------------------------------------|:-------------:|
-| vulnerabilities@discuss.istio.io          | Istio         |
-| google-internal-envoy-security@google.com | Google        |
-| envoy-security@solo.io                    | solo.io       |
-| security@cilium.io                        | Cilium        |
-| secalert@redhat.com                       | Red Hat       |
+| envoy-security-team@aspenmesh.io          | Aspen Mesh    |
 | aws-app-mesh-security@amazon.com          | AWS           |
+| security@cilium.io                        | Cilium        |
 | vulnerabilityreports@cloudfoundry.org     | Cloud Foundry |
-| envoy-security@tetrate.io                 | Tetrate       |
 | secalert@datawire.io                      | Datawire      |
+| google-internal-envoy-security@google.com | Google        |
+| vulnerabilities@discuss.istio.io          | Istio         |
+| secalert@redhat.com                       | Red Hat       |
+| envoy-security@solo.io                    | solo.io       |
+| envoy-security@tetrate.io                 | Tetrate       |
