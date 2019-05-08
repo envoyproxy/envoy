@@ -13,6 +13,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
+struct RcDetailsValues {
+  // The rbac filter rejected the request
+  const std::string RbacAccessDenied = "rbac_access_denied";
+};
+typedef ConstSingleton<RcDetailsValues> RcDetails;
+
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope)
@@ -107,7 +113,7 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
     } else {
       ENVOY_LOG(debug, "enforced denied");
       callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
-                                 absl::nullopt);
+                                 absl::nullopt, RcDetails::get().RbacAccessDenied);
       config_->stats().denied_.inc();
       return Http::FilterHeadersStatus::StopIteration;
     }
