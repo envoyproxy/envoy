@@ -1127,11 +1127,11 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
     buffered_request_body_->move(data);
   } else {
     // Encodes metadata if exists.
-    if (!parent_.downstream_metadata_map_vector_.empty()) {
+    if (!downstream_metadata_map_vector_.empty()) {
       ENVOY_STREAM_LOG(trace, "Send metadata before sending data. {}", *parent_.callbacks_,
-                       parent_.downstream_metadata_map_vector_);
-      request_encoder_->encodeMetadata(parent_.downstream_metadata_map_vector_);
-      parent_.downstream_metadata_map_vector_.clear();
+                       downstream_metadata_map_vector_);
+      request_encoder_->encodeMetadata(downstream_metadata_map_vector_);
+      downstream_metadata_map_vector_.clear();
     }
 
     ENVOY_STREAM_LOG(trace, "proxying {} bytes", *parent_.callbacks_, data.length());
@@ -1152,11 +1152,11 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
     ENVOY_STREAM_LOG(trace, "buffering trailers", *parent_.callbacks_);
   } else {
     // Encodes metadata if exists.
-    if (!parent_.downstream_metadata_map_vector_.empty()) {
+    if (!downstream_metadata_map_vector_.empty()) {
       ENVOY_STREAM_LOG(trace, "Send metadata before sending trailers. {}", *parent_.callbacks_,
-                       parent_.downstream_metadata_map_vector_);
-      request_encoder_->encodeMetadata(parent_.downstream_metadata_map_vector_);
-      parent_.downstream_metadata_map_vector_.clear();
+                       downstream_metadata_map_vector_);
+      request_encoder_->encodeMetadata(downstream_metadata_map_vector_);
+      downstream_metadata_map_vector_.clear();
     }
 
     ENVOY_STREAM_LOG(trace, "proxying trailers", *parent_.callbacks_);
@@ -1169,7 +1169,7 @@ void Filter::UpstreamRequest::encodeMetadata(Http::MetadataMapPtr&& metadata_map
   if (!request_encoder_) {
     ENVOY_STREAM_LOG(trace, "request_encoder_ not ready. Store metadata_map to encode later: {}",
                      *parent_.callbacks_, *metadata_map_ptr);
-    parent_.downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_ptr));
+    downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_ptr));
   } else {
     ENVOY_STREAM_LOG(trace, "Encode metadata: {}", *parent_.callbacks_, *metadata_map_ptr);
     Http::MetadataMapVector metadata_map_vector;
@@ -1280,7 +1280,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   bool end_stream = !buffered_request_body_ && encode_complete_ && !encode_trailers_;
   // If end_stream is set in headers, and there are metadata to send, delays end_stream. The case
   // only happens when decoding headers filters return ContinueAndEndStream.
-  bool delay_headers_end_stream = end_stream && !parent_.downstream_metadata_map_vector_.empty();
+  bool delay_headers_end_stream = end_stream && !downstream_metadata_map_vector_.empty();
   request_encoder.encodeHeaders(*parent_.downstream_headers_,
                                 end_stream && !delay_headers_end_stream);
   calling_encode_headers_ = false;
@@ -1294,11 +1294,11 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
     onResetStream(deferred_reset_reason_.value(), absl::string_view());
   } else {
     // Encode metadata after headers and before any other frame type.
-    if (!parent_.downstream_metadata_map_vector_.empty()) {
+    if (!downstream_metadata_map_vector_.empty()) {
       ENVOY_STREAM_LOG(trace, "Send metadata onPoolReady. {}", *parent_.callbacks_,
-                       parent_.downstream_metadata_map_vector_);
-      request_encoder.encodeMetadata(parent_.downstream_metadata_map_vector_);
-      parent_.downstream_metadata_map_vector_.clear();
+                       downstream_metadata_map_vector_);
+      request_encoder.encodeMetadata(downstream_metadata_map_vector_);
+      downstream_metadata_map_vector_.clear();
       if (delay_headers_end_stream) {
         Buffer::OwnedImpl empty_data("");
         request_encoder.encodeData(empty_data, true);

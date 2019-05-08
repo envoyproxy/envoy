@@ -354,6 +354,7 @@ private:
     // access logging is configured.
     Http::HeaderMapPtr upstream_headers_;
     Http::HeaderMapPtr upstream_trailers_;
+    Http::MetadataMapVector downstream_metadata_map_vector_;
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;
@@ -430,7 +431,6 @@ private:
   bool grpc_request_{};
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
-  Http::MetadataMapVector downstream_metadata_map_vector_;
   MonotonicTime downstream_request_complete_time_;
   uint32_t buffer_limit_{0};
   MetadataMatchCriteriaConstPtr metadata_match_;

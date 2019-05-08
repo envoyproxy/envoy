@@ -481,6 +481,7 @@ public:
    *
    * @param metadata supplies the decoded metadata.
    */
+  // TODO(soya3129): returns Continue in the base class.
   virtual FilterMetadataStatus decodeMetadata(MetadataMap& metadata_map) PURE;
 
   /**
