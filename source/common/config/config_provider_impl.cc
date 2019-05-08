@@ -74,7 +74,7 @@ bool ConfigSubscriptionInstance::checkAndApplyConfigUpdate(const Protobuf::Messa
 }
 
 void DeltaConfigSubscriptionInstance::applyConfigUpdate(
-    const std::function<void(const ConfigSharedPtr&)>& updateFn) {
+    const std::function<void(const ConfigSharedPtr&)>& update_fn) {
   // The Config implementation is assumed to be shared across the config providers bound to this
   // subscription, therefore, simply propagating the update to all worker threads for a single bound
   // provider will be sufficient.
@@ -86,14 +86,14 @@ void DeltaConfigSubscriptionInstance::applyConfigUpdate(
   }
 
   // TODO(AndresGuedez): currently, the caller has to compute the differences in resources between
-  // DS API config updates and passes a granular updateFn() that adds/modifies/removes resources as
+  // DS API config updates and passes a granular update_fn() that adds/modifies/removes resources as
   // needed. Such logic could be generalized as part of this framework such that this function owns
   // the diffing and issues the corresponding call to add/modify/remove a resource according to a
   // vector of functions passed by the caller.
   auto* typed_provider =
       static_cast<DeltaMutableConfigProviderBase*>(getAnyBoundMutableConfigProvider());
   ConfigSharedPtr config = typed_provider->getConfig();
-  typed_provider->onConfigUpdate([config, updateFn]() { updateFn(config); });
+  typed_provider->onConfigUpdate([config, update_fn]() { update_fn(config); });
 }
 
 ConfigProviderManagerImplBase::ConfigProviderManagerImplBase(Server::Admin& admin,

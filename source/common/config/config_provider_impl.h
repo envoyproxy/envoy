@@ -239,6 +239,7 @@ private:
   friend class MutableConfigProviderBase;
   friend class DeltaMutableConfigProviderBase;
   friend class ConfigProviderManagerImplBase;
+  friend class MockMutableConfigProviderBase;
 };
 
 using ConfigSubscriptionCommonBaseSharedPtr = std::shared_ptr<ConfigSubscriptionCommonBase>;
@@ -289,9 +290,9 @@ protected:
    * Propagates a config update to the config providers and worker threads associated with the
    * subscription.
    *
-   * @param updateFn the callback to run on each worker thread.
+   * @param update_fn the callback to run on each worker thread.
    */
-  void applyConfigUpdate(const std::function<void(const ConfigSharedPtr&)>& updateFn);
+  void applyConfigUpdate(const std::function<void(const ConfigSharedPtr&)>& update_fn);
 };
 
 /**
@@ -461,7 +462,8 @@ public:
   virtual ProtobufTypes::MessagePtr dumpConfigs() const PURE;
 
 protected:
-  using ConfigProviderSet = std::unordered_set<ConfigProvider*>;
+  // Ordered set for deterministic config dump output.
+  using ConfigProviderSet = std::set<ConfigProvider*>;
   using ConfigProviderMap = std::unordered_map<ConfigProviderInstanceType,
                                                std::unique_ptr<ConfigProviderSet>, EnumClassHash>;
   using ConfigSubscriptionMap =
