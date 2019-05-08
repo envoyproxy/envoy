@@ -57,7 +57,6 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string&
                            grpc_status->value().getStringView()))
       .inc();
   uint64_t grpc_status_code;
-  // TODO(dnoe): Migrate to pure string_view (#6580)
   const bool success = absl::SimpleAtoi(grpc_status->value().getStringView(), &grpc_status_code) &&
                        grpc_status_code == 0;
   chargeStat(cluster, protocol, grpc_service, grpc_method, success);

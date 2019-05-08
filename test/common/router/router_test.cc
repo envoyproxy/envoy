@@ -36,6 +36,7 @@ using testing::AssertionFailure;
 using testing::AssertionResult;
 using testing::AssertionSuccess;
 using testing::AtLeast;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Matcher;
@@ -3171,7 +3172,8 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
       .WillOnce(Return(child_span));
   EXPECT_CALL(callbacks_, tracingConfig());
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   router_.decodeHeaders(headers, true);
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
@@ -3202,7 +3204,8 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
       .WillOnce(Return(child_span));
   EXPECT_CALL(callbacks_, tracingConfig());
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   router_.decodeHeaders(headers, true);
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});

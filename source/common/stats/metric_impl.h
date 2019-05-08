@@ -30,6 +30,8 @@ public:
   std::string tagExtractedName() const override;
   std::vector<Tag> tags() const override;
   StatName tagExtractedStatName() const override;
+  void iterateTagStatNames(const TagStatNameIterFn& fn) const override;
+  void iterateTags(const TagIterFn& fn) const override;
 
 protected:
   void clear();
