@@ -34,7 +34,6 @@
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_options_impl.h"
 #include "common/filesystem/directory.h"
 #include "common/filesystem/filesystem_impl.h"
 
@@ -179,9 +178,15 @@ envoy::config::bootstrap::v2::Bootstrap
 TestUtility::parseBootstrapFromJson(const std::string& json_string) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Stats::StatsOptionsImpl stats_options;
-  Config::BootstrapJson::translateBootstrap(*json_object_ptr, bootstrap, stats_options);
+  Config::BootstrapJson::translateBootstrap(*json_object_ptr, bootstrap);
   return bootstrap;
+}
+
+std::string TestUtility::addLeftAndRightPadding(absl::string_view to_pad, int desired_length) {
+  int line_fill_len = desired_length - to_pad.length();
+  int first_half_len = line_fill_len / 2;
+  int second_half_len = line_fill_len - first_half_len;
+  return absl::StrCat(std::string(first_half_len, '='), to_pad, std::string(second_half_len, '='));
 }
 
 std::vector<std::string> TestUtility::split(const std::string& source, char split) {
@@ -380,26 +385,6 @@ bool TestHeaderMapImpl::has(const std::string& key) { return get(LowerCaseString
 bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nullptr; }
 
 } // namespace Http
-
-namespace Stats {
-
-MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options,
-                                         SymbolTable& symbol_table)
-    : TestAllocator(stats_options, symbol_table) {
-  ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
-    return TestAllocator::alloc(name);
-  }));
-
-  ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
-    return TestAllocator::free(data);
-  }));
-
-  EXPECT_CALL(*this, alloc(absl::string_view("stats.overflow")));
-}
-
-MockedTestAllocator::~MockedTestAllocator() {}
-
-} // namespace Stats
 
 namespace Api {
 

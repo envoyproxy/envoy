@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_directory_genrule",
     "envoy_package",
     "envoy_proto_library",
@@ -94,6 +95,15 @@ envoy_proto_library(
     ],
 )
 
+# envoy_cc_test_binary is generating mostly static binary regardless of config
+envoy_cc_test_binary(
+    name = "config_impl_test_static",
+    deps = [
+        "config_impl_test_lib",
+        "//test:main",
+    ],
+)
+
 sh_binary(
     name = "corpus_from_config_impl_sh",
     srcs = ["corpus_from_config_impl.sh"],
@@ -105,11 +115,11 @@ envoy_directory_genrule(
     srcs = [
         # This is deliberately in srcs, since we run into host/target confusion
         # otherwise in oss-fuzz builds.
-        ":config_impl_test",
+        ":config_impl_test_static",
     ],
     cmd = " ".join([
         "$(location corpus_from_config_impl_sh)",
-        "$(location //test/common/router:config_impl_test)",
+        "$(location //test/common/router:config_impl_test_static)",
     ]),
     tools = [":corpus_from_config_impl_sh"],
 )

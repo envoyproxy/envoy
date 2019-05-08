@@ -155,7 +155,7 @@ LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
   lb->degraded_per_priority_load_ = degraded_per_priority_load_;
   lb->per_priority_state_ = per_priority_state_;
 
-  return std::move(lb);
+  return lb;
 }
 
 } // namespace Upstream

@@ -10,6 +10,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
+
 namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2UpstreamIntegrationTest,
@@ -311,6 +313,64 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   for (uint32_t i = 1; i < num_requests; ++i) {
     responses[i]->waitForReset();
   }
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/6744
+TEST_P(Http2UpstreamIntegrationTest, HittingEncoderFilterLimitForGrpc) {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        const std::string access_log_name =
+            TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+        // Configure just enough of an upstream access log to reference the upstream headers.
+        const std::string yaml_string = R"EOF(
+name: envoy.router
+config:
+  upstream_log:
+    name: envoy.file_access_log
+    filter:
+      not_health_check_filter: {}
+    config:
+      path: /dev/null
+  )EOF";
+        const std::string json = Json::Factory::loadFromYamlString(yaml_string)->asJsonString();
+        MessageUtil::loadFromJson(json, *hcm.mutable_http_filters(1));
+      });
+
+  // As with ProtocolIntegrationTest.HittingEncoderFilterLimit use a filter
+  // which buffers response data but in this case, make sure the sendLocalReply
+  // is gRPC.
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.setBufferLimits(1024, 1024);
+  initialize();
+
+  // Send the request.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"},
+                                                          {"te", "trailers"}});
+  auto downstream_request = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  Buffer::OwnedImpl data(R"({"TableName":"locations"})");
+  codec_client_->sendData(*downstream_request, data, true);
+  waitForNextUpstreamRequest();
+
+  // Send the response headers.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Now send an overly large response body. At some point, too much data will
+  // be buffered, the stream will be reset, and the connection will disconnect.
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  upstream_request_->encodeData(1024 * 65, false);
+  ASSERT_TRUE(upstream_request_->waitForReset());
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
 }
 
 } // namespace Envoy
