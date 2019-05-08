@@ -73,7 +73,7 @@ bool ConfigSubscriptionInstance::checkAndApplyConfigUpdate(const Protobuf::Messa
   return true;
 }
 
-void DeltaConfigSubscriptionInstance::applyConfigUpdate(
+void DeltaConfigSubscriptionInstance::applyDeltaConfigUpdate(
     const std::function<void(const ConfigSharedPtr&)>& update_fn) {
   // The Config implementation is assumed to be shared across the config providers bound to this
   // subscription, therefore, simply propagating the update to all worker threads for a single bound

@@ -292,7 +292,7 @@ protected:
    *
    * @param update_fn the callback to run on each worker thread.
    */
-  void applyConfigUpdate(const std::function<void(const ConfigSharedPtr&)>& update_fn);
+  void applyDeltaConfigUpdate(const std::function<void(const ConfigSharedPtr&)>& update_fn);
 };
 
 /**

@@ -645,7 +645,7 @@ void DeltaDummyConfigSubscription::onConfigUpdate(
     auto dummy_config = MessageUtil::anyConvert<test::common::config::DummyConfig>(resource_any);
     proto_map_[version_info] = dummy_config;
     // Propagate the new config proto to all worker threads.
-    applyConfigUpdate([&dummy_config](const ConfigSharedPtr& config) {
+    applyDeltaConfigUpdate([&dummy_config](const ConfigSharedPtr& config) {
       auto* thread_local_dummy_config = static_cast<ThreadLocalDummyConfig*>(config.get());
       // Per above, append only for now.
       thread_local_dummy_config->addProto(dummy_config);
