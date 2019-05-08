@@ -52,19 +52,6 @@ public:
   StatName statName() const override { return this->data_.statName(); }
 };
 
-// Partially implements a StatDataAllocator, leaving alloc & free for subclasses.
-// We templatize on StatData rather than defining a virtual base StatData class
-// for performance reasons; stat increment is on the hot path.
-//
-// The two production derivations cover using a fixed block of shared-memory for
-// hot restart stat continuity, and heap allocation for more efficient RAM usage
-// for when hot-restart is not required.
-//
-// Also note that RawStatData needs to live in a shared memory block, and it's
-// possible, but not obvious, that a vptr would be usable across processes. In
-// any case, RawStatData is allocated from a shared-memory block rather than via
-// new, so the usual C++ compiler assistance for setting up vptrs will not be
-// available. This could be resolved with placed new, or another nesting level.
 class HeapStatDataAllocator : public StatDataAllocatorImpl<HeapStatData> {
 public:
   HeapStatDataAllocator(SymbolTable& symbol_table) : StatDataAllocatorImpl(symbol_table) {}
