@@ -83,7 +83,9 @@ upstream connection by using a
 the :ref:`Original Src Listener Filter <arch_overview_ip_transparency_original_src_listener>`. The
 main difference is that it can infer the original source address from HTTP headers, which is important
 for cases where a single downstream connection carries multiple HTTP requests from different original
-source addresses.
+source addresses. Deployments with a front proxy forwarding to sidecar proxies are examples where case
+applies.
+
 This filter will work with any upstream HTTP host. However, it requires fairly complex configuration,
 and it may not be supported in all deployments due to routing constraints.
 
