@@ -403,7 +403,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::Timespan(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
-      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()) {
+      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()),
+      upstream_options_(std::make_shared<Network::Socket::Options>()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
   if (connection_manager_.codec_->protocol() == Protocol::Http2) {
@@ -800,8 +801,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
     // should be used to override the active span's operation.
     if (req_operation_override) {
       if (!req_operation_override->value().empty()) {
-        // TODO(dnoe): Migrate setOperation to take string_view (#6580)
-        active_span_->setOperation(std::string(req_operation_override->value().getStringView()));
+        active_span_->setOperation(req_operation_override->value().getStringView());
 
         // Clear the decorated operation so won't be used in the response header, as
         // it has been overridden by the inbound decorator operation request header.
@@ -1341,7 +1341,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     connection_manager_.stats_.named_.downstream_rq_response_before_rq_complete_.inc();
   }
 
-  if (connection_manager_.drain_state_ == DrainState::Closing &&
+  if (connection_manager_.drain_state_ != DrainState::NotDraining &&
       connection_manager_.codec_->protocol() != Protocol::Http2) {
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
     // Do not do this for H2 (which drains via GOAWAY) or Upgrade (as the upgrade
@@ -1368,7 +1368,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
       // should be used to override the active span's operation.
       if (resp_operation_override) {
         if (!resp_operation_override->value().empty() && active_span_) {
-          active_span_->setOperation(std::string(resp_operation_override->value().getStringView()));
+          active_span_->setOperation(resp_operation_override->value().getStringView());
         }
         // Remove header so not propagated to service.
         headers.removeEnvoyDecoratorOperation();

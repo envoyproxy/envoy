@@ -177,7 +177,7 @@ jobs:
            path: generated/docs
    mac:
      macos:
-       xcode: "9.3.0"
+       xcode: "9.3.1"
      environment:
        BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:

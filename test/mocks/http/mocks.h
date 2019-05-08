@@ -148,6 +148,8 @@ public:
   MOCK_METHOD1(setDecoderBufferLimit, void(uint32_t));
   MOCK_METHOD0(decoderBufferLimit, uint32_t());
   MOCK_METHOD0(recreateStream, bool());
+  MOCK_METHOD1(addUpstreamSocketOptions, void(const Network::Socket::OptionsSharedPtr& options));
+  MOCK_CONST_METHOD0(getUpstreamSocketOptions, Network::Socket::OptionsSharedPtr());
 
   // Http::StreamDecoderFilterCallbacks
   void sendLocalReply(Code code, absl::string_view body,
