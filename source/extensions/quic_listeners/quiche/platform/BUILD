@@ -94,7 +94,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_platform_base_impl_lib",
     srcs = [
-        "quic_flags_impl.cc",
         "quic_mem_slice_impl.cc",
     ],
     hdrs = [
