@@ -189,6 +189,7 @@ public:
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
   MOCK_METHOD1(counterExists, bool(const std::string& counter_name));
+  MOCK_METHOD1(gaugeExists, bool(const std::string& gauge_name));
 
   Counter& counterFromStatName(StatName name) override {
     return counter(symbol_table_->toString(name));

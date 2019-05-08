@@ -169,6 +169,7 @@ public:
   std::vector<GaugeSharedPtr> gauges() const override;
   std::vector<ParentHistogramSharedPtr> histograms() const override;
   bool counterExists(const std::string& counter_name) override;
+  bool gaugeExists(const std::string& gauge_name) override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }

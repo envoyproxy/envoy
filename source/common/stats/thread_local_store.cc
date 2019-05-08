@@ -149,10 +149,21 @@ std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
 bool ThreadLocalStoreImpl::counterExists(const std::string& counter_name) {
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
-
     if (scope->central_cache_.counters_.find(
             StatNameManagedStorage(counter_name, symbolTable()).statName()) !=
         scope->central_cache_.counters_.end()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ThreadLocalStoreImpl::gaugeExists(const std::string& gauge_name) {
+  Thread::LockGuard lock(lock_);
+  for (ScopeImpl* scope : scopes_) {
+    if (scope->central_cache_.gauges_.find(
+            StatNameManagedStorage(gauge_name, symbolTable()).statName()) !=
+        scope->central_cache_.gauges_.end()) {
       return true;
     }
   }

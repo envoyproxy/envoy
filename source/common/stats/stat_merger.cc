@@ -5,8 +5,7 @@
 namespace Envoy {
 namespace Stats {
 
-StatMerger::StatMerger(Stats::Store& target_store)
-    : target_store_(target_store), temp_counter_scope_(target_store_.createScope("")) {}
+StatMerger::StatMerger(Stats::Store& target_store) : temp_scope_(target_store.createScope("")) {}
 
 bool StatMerger::shouldImport(Gauge& gauge, const std::string& gauge_name) {
   absl::optional<bool> should_import = gauge.cachedShouldImport();
@@ -57,13 +56,13 @@ bool StatMerger::shouldImport(Gauge& gauge, const std::string& gauge_name) {
 
 void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas) {
   for (const auto& counter : counter_deltas) {
-    temp_counter_scope_->counter(counter.first).add(counter.second);
+    temp_scope_->counter(counter.first).add(counter.second);
   }
 }
 
 void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges) {
   for (const auto& gauge : gauges) {
-    auto& gauge_ref = target_store_.gauge(gauge.first);
+    auto& gauge_ref = temp_scope_->gauge(gauge.first);
     uint64_t& parent_value_ref = parent_gauge_values_[gauge_ref.statName()];
     uint64_t old_parent_value = parent_value_ref;
     uint64_t new_parent_value = gauge.second;

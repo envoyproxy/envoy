@@ -83,6 +83,10 @@ public:
     StatNameManagedStorage storage(counter_name, symbolTable());
     return counters_.statExists(storage.statName());
   }
+  bool gaugeExists(const std::string& gauge_name) override {
+    StatNameManagedStorage storage(gauge_name, symbolTable());
+    return gauges_.statExists(storage.statName());
+  }
 
   Counter& counter(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());

@@ -169,19 +169,23 @@ TEST(StatMergerNonFixtureTest, newStatFromParent) {
     counter_deltas["newcounter0"] = 0;
     counter_deltas["newcounter1"] = 1;
     counter_deltas["newcounter2"] = 2;
-    gauges["newgauge"] = 5;
+    gauges["newgauge1"] = 1;
+    gauges["newgauge2"] = 2;
     stat_merger.mergeStats(counter_deltas, gauges);
     EXPECT_EQ(0, store.counter("newcounter0").value());
     EXPECT_EQ(0, store.counter("newcounter0").latch());
     EXPECT_EQ(1, store.counter("newcounter1").value());
     EXPECT_EQ(1, store.counter("newcounter1").latch());
-    EXPECT_EQ(5, store.gauge("newgauge").value());
+    EXPECT_EQ(1, store.gauge("newgauge1").value());
   }
   // We accessed 0 and 1 above, but not 2. Now that StatMerger has been destroyed,
   // 2 should be gone.
+  // TODO(fredlas) replace counterExists with Scope::getCounter once #6712 is merged.
   EXPECT_TRUE(store.counterExists("newcounter0"));
   EXPECT_TRUE(store.counterExists("newcounter1"));
   EXPECT_FALSE(store.counterExists("newcounter2"));
+  EXPECT_TRUE(store.gaugeExists("newgauge1"));
+  EXPECT_FALSE(store.gaugeExists("newgauge2"));
   // HACK: doesn't like shutting down without threading having started.
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
