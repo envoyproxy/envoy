@@ -76,14 +76,6 @@ export BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HOME --test_env=PYT
   --cache_test_results=no --test_output=all ${BAZEL_EXTRA_TEST_OPTIONS}"
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
 
-# Replace the existing Bazel output cache with a copy of the image's prebuilt deps.
-if [[ -d /bazel-prebuilt-output && ! -d "${TEST_TMPDIR}/_bazel_${USER}" ]]; then
-  BAZEL_OUTPUT_BASE="$(bazel info output_base)"
-  mkdir -p "${TEST_TMPDIR}/_bazel_${USER}/install"
-  rsync -a /bazel-prebuilt-root/install/* "${TEST_TMPDIR}/_bazel_${USER}/install/"
-  rsync -a /bazel-prebuilt-output "${BAZEL_OUTPUT_BASE}"
-fi
-
 if [ "$1" != "-nofetch" ]; then
   # Setup Envoy consuming project.
   if [[ ! -a "${ENVOY_FILTER_EXAMPLE_SRCDIR}" ]]

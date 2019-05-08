@@ -23,6 +23,7 @@ import "envoy/config/metrics/v2/stats.proto";
 import "envoy/config/overload/v2alpha/overload.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
@@ -205,8 +206,8 @@ message Runtime {
   // symbolic link. An atomic link swap is used when a new tree should be
   // switched to. This parameter specifies the path to the symbolic link. Envoy
   // will watch the location for changes and reload the file system tree when
-  // they happen.
-  string symlink_root = 1 [(validate.rules).string.min_bytes = 1];
+  // they happen. If this parameter is not set, there will be no disk based runtime.
+  string symlink_root = 1;
 
   // Specifies the subdirectory to load within the root directory. This is
   // useful if multiple systems share the same delivery mechanism. Envoy
@@ -220,4 +221,10 @@ message Runtime {
   // Sometimes it is useful to have a per service cluster directory for runtime
   // configuration. See below for exactly how the override directory is used.
   string override_subdirectory = 3;
+
+  // Static base runtime. This will be :ref:`overridden
+  // <config_runtime_layering>` by other runtime layers, e.g.
+  // disk or admin. This follows the :ref:`runtime protobuf JSON representation
+  // encoding <config_runtime_proto_json>`.
+  google.protobuf.Struct base = 4;
 }

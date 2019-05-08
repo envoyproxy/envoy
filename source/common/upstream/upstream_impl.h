@@ -809,6 +809,11 @@ protected:
 };
 
 /**
+ * Utility function to get Dns from cluster.
+ */
+Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Cluster& cluster);
+
+/**
  * Implementation of Upstream::Cluster that does periodic DNS resolution and updates the host
  * member set if the DNS members change.
  */

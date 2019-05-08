@@ -856,6 +856,30 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   EXPECT_CALL(resolver3.active_dns_query_, cancel());
 }
 
+// Verifies that specifying a custom resolver when using STRICT_DNS fails
+TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    drain_connections_on_host_removal: true
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443, resolver_name: customresolver }}]
+  )EOF";
+
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  Envoy::Stats::ScopePtr scope =
+      stats_.createScope(fmt::format("cluster.{}.", cluster_config.name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+      singleton_manager_, tls_, *api_);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      std::make_unique<StrictDnsClusterImpl>(cluster_config, runtime_, dns_resolver_,
+                                             factory_context, std::move(scope), false),
+      EnvoyException, "STRICT_DNS clusters must NOT have a custom resolver name set");
+}
+
 TEST(HostImplTest, HostCluster) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);

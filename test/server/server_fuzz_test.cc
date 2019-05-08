@@ -7,6 +7,7 @@
 #include "server/proto_descriptors.h"
 #include "server/server.h"
 
+#include "test/common/runtime/utility.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
@@ -52,9 +53,13 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
   return output;
 }
 
+class AllFeaturesHooks : public DefaultListenerHooks {
+  void onRuntimeCreated() override { Runtime::RuntimeFeaturesPeer::setAllFeaturesAllowed(); }
+};
+
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
   testing::NiceMock<MockOptions> options;
-  DefaultListenerHooks hooks;
+  AllFeaturesHooks hooks;
   testing::NiceMock<MockHotRestart> restart;
   Stats::TestIsolatedStoreImpl stats_store;
   Thread::MutexBasicLockable fakelock;

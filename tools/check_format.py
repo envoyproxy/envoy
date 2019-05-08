@@ -28,23 +28,23 @@ REPOSITORIES_BZL = "bazel/repositories.bzl"
 # Files matching these exact names can reference real-world time. These include the class
 # definitions for real-world time, the construction of them in main(), and perf annotation.
 # For now it includes the validation server but that really should be injected too.
-REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
-                       './source/common/event/real_time_system.cc',
-                       './source/common/event/real_time_system.h', './source/exe/main_common.cc',
-                       './source/exe/main_common.h', './source/server/config_validation/server.cc',
-                       './source/common/common/perf_annotation.h',
-                       './test/test_common/simulated_time_system.cc',
-                       './test/test_common/simulated_time_system.h',
-                       './test/test_common/test_time.cc', './test/test_common/test_time.h',
-                       './test/test_common/utility.cc', './test/test_common/utility.h',
-                       './test/integration/integration.h')
+REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
+                       "./source/common/event/real_time_system.cc",
+                       "./source/common/event/real_time_system.h", "./source/exe/main_common.cc",
+                       "./source/exe/main_common.h", "./source/server/config_validation/server.cc",
+                       "./source/common/common/perf_annotation.h",
+                       "./test/test_common/simulated_time_system.cc",
+                       "./test/test_common/simulated_time_system.h",
+                       "./test/test_common/test_time.cc", "./test/test_common/test_time.h",
+                       "./test/test_common/utility.cc", "./test/test_common/utility.h",
+                       "./test/integration/integration.h")
 
 # Files in these paths can use MessageLite::SerializeAsString
-SERIALIZE_AS_STRING_WHITELIST = ('./test/common/protobuf/utility_test.cc',
-                                 './test/common/grpc/codec_test.cc')
+SERIALIZE_AS_STRING_WHITELIST = ("./test/common/protobuf/utility_test.cc",
+                                 "./test/common/grpc/codec_test.cc")
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
-JSON_STRING_TO_MESSAGE_WHITELIST = ('./source/common/protobuf/utility.cc')
+JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-8")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
@@ -146,11 +146,14 @@ def checkTools():
 
 
 def checkNamespace(file_path):
+  nolint = "NOLINT(namespace-%s)" % namespace_check.lower()
   with open(file_path) as f:
     text = f.read()
-    if not re.search('^\s*namespace\s+Envoy\s*{', text, re.MULTILINE) and \
-       not 'NOLINT(namespace-envoy)' in text:
-      return ["Unable to find Envoy namespace or NOLINT(namespace-envoy) for file: %s" % file_path]
+    if not re.search("^\s*namespace\s+%s\s*{" % namespace_check, text, re.MULTILINE) and \
+       not nolint in text:
+      return [
+          "Unable to find %s namespace or %s for file: %s" % (namespace_check, nolint, file_path)
+      ]
   return []
 
 
@@ -235,7 +238,7 @@ def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
     if pattern in text:
-      error_messages = [file_path + ': ' + error_message]
+      error_messages = [file_path + ": " + error_message]
       for i, line in enumerate(text.splitlines()):
         if pattern in line:
           error_messages.append("  %s:%s" % (file_path, i + 1))
@@ -282,8 +285,8 @@ def hasInvalidAngleBracketDirectory(line):
   return subdir in SUBDIR_SET
 
 
-VERSION_HISTORY_NEW_LINE_REGEX = re.compile('\* [a-z \-_]*: [a-z:`]')
-VERSION_HISTORY_NEW_RELEASE_REGEX = re.compile('^====[=]+$')
+VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* [a-z \-_]*: [a-z:`]")
+VERSION_HISTORY_NEW_RELEASE_REGEX = re.compile("^====[=]+$")
 
 
 def checkCurrentReleaseNotes(file_path, error_messages):
@@ -302,7 +305,7 @@ def checkCurrentReleaseNotes(file_path, error_messages):
       # If we see a version marker we are now in the section for the current release.
       in_current_release = True
 
-    if line.startswith('*') and not VERSION_HISTORY_NEW_LINE_REGEX.match(line):
+    if line.startswith("*") and not VERSION_HISTORY_NEW_LINE_REGEX.match(line):
       reportError("Version history line malformed. "
                   "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s" % line)
   file_handle.close()
@@ -326,16 +329,16 @@ def checkFileContents(file_path, checker):
   return error_messages
 
 
-DOT_MULTI_SPACE_REGEX = re.compile('\\. +')
+DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
 
 
 def fixSourceLine(line):
   # Strip double space after '.'  This may prove overenthusiastic and need to
   # be restricted to comments and metadata files but works for now.
-  line = re.sub(DOT_MULTI_SPACE_REGEX, '. ', line)
+  line = re.sub(DOT_MULTI_SPACE_REGEX, ". ", line)
 
   if hasInvalidAngleBracketDirectory(line):
-    line = line.replace('<', '"').replace(">", '"')
+    line = line.replace("<", '"').replace(">", '"')
 
   # Fix incorrect protobuf namespace references.
   for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
@@ -350,12 +353,12 @@ def fixSourceLine(line):
 # pattern. But in that case there is a strong pattern of using time_system in
 # various spellings as the variable name.
 def hasCondVarWaitFor(line):
-  wait_for = line.find('.waitFor(')
+  wait_for = line.find(".waitFor(")
   if wait_for == -1:
     return False
   preceding = line[0:wait_for]
-  if preceding.endswith('time_system') or preceding.endswith('timeSystem()') or \
-     preceding.endswith('time_system_'):
+  if preceding.endswith("time_system") or preceding.endswith("timeSystem()") or \
+     preceding.endswith("time_system_"):
     return False
   return True
 
@@ -378,20 +381,20 @@ def checkSourceLine(line, file_path, reportError):
     if '"google/protobuf' in line or "google::protobuf" in line:
       reportError("unexpected direct dependency on google.protobuf, use "
                   "the definitions in common/protobuf/protobuf.h instead.")
-  if line.startswith('#include <mutex>') or line.startswith('#include <condition_variable'):
+  if line.startswith("#include <mutex>") or line.startswith("#include <condition_variable"):
     # We don't check here for std::mutex because that may legitimately show up in
     # comments, for example this one.
     reportError("Don't use <mutex> or <condition_variable*>, switch to "
                 "Thread::MutexBasicLockable in source/common/common/thread.h")
-  if line.startswith('#include <shared_mutex>'):
+  if line.startswith("#include <shared_mutex>"):
     # We don't check here for std::shared_timed_mutex because that may
     # legitimately show up in comments, for example this one.
     reportError("Don't use <shared_mutex>, use absl::Mutex for reader/writer locks.")
-  if not whitelistedForRealTime(file_path) and not 'NO_CHECK_FORMAT(real_time)' in line:
-    if 'RealTimeSource' in line or \
-       ('RealTimeSystem' in line and not 'TestRealTimeSystem' in line) or \
-       'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line or \
-       'std::this_thread::sleep_for' in line or hasCondVarWaitFor(line):
+  if not whitelistedForRealTime(file_path) and not "NO_CHECK_FORMAT(real_time)" in line:
+    if "RealTimeSource" in line or \
+       ("RealTimeSystem" in line and not "TestRealTimeSystem" in line) or \
+       "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
+       "std::this_thread::sleep_for" in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
   # Check that we use the absl::Time library
   if "std::get_time" in line:
@@ -411,11 +414,11 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use strftime; use absl::FormatTime instead")
   if "strptime" in line:
     reportError("Don't use strptime; use absl::FormatTime instead")
-  if 'std::atomic_' in line:
+  if "std::atomic_" in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.
     reportError("Don't use free std::atomic_* functions, use std::atomic<T> members instead.")
-  if '__attribute__((packed))' in line and file_path != './include/envoy/common/platform.h':
+  if "__attribute__((packed))" in line and file_path != "./include/envoy/common/platform.h":
     # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
     # can be used instead
     reportError("Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
@@ -425,40 +428,40 @@ def checkSourceLine(line, file_path, reportError):
     # by MSVC
     reportError("Don't use designated initializers in struct initialization, "
                 "they are not part of C++14")
-  if ' ?: ' in line:
+  if " ?: " in line:
     # The ?: operator is non-standard, it is a GCC extension
     reportError("Don't use the '?:' operator, it is a non-standard GCC extension")
-  if line.startswith('using testing::Test;'):
+  if line.startswith("using testing::Test;"):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
-  if line.startswith('using testing::TestWithParams;'):
+  if line.startswith("using testing::TestWithParams;"):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
-  if not whitelistedForSerializeAsString(file_path) and 'SerializeAsString' in line:
+  if not whitelistedForSerializeAsString(file_path) and "SerializeAsString" in line:
     # The MessageLite::SerializeAsString doesn't generate deterministic serialization,
     # use MessageUtil::hash instead.
     reportError(
         "Don't use MessageLite::SerializeAsString for generating deterministic serialization, use MessageUtil::hash instead."
     )
-  if not whitelistedForJsonStringToMessage(file_path) and 'JsonStringToMessage' in line:
+  if not whitelistedForJsonStringToMessage(file_path) and "JsonStringToMessage" in line:
     # Centralize all usage of JSON parsing so it is easier to make changes in JSON parsing
     # behavior.
     reportError("Don't use Protobuf::util::JsonStringToMessage, use MessageUtil::loadFromJson.")
 
 
 def checkBuildLine(line, file_path, reportError):
-  if '@bazel_tools' in line and not (isSkylarkFile(file_path) or file_path.startswith('./bazel/')):
-    reportError('unexpected @bazel_tools reference, please indirect via a definition in //bazel')
+  if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/")):
+    reportError("unexpected @bazel_tools reference, please indirect via a definition in //bazel")
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
   if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
-      not isExternalBuildFile(file_path) and '@envoy//' in line):
+      not isExternalBuildFile(file_path) and "@envoy//" in line):
     reportError("Superfluous '@envoy//' prefix")
 
 
 def fixBuildLine(line, file_path):
   if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
       not isExternalBuildFile(file_path)):
-    line = line.replace('@envoy//', '//')
+    line = line.replace("@envoy//", "//")
   return line
 
 
@@ -515,7 +518,8 @@ def checkSourcePath(file_path):
   if not file_path.endswith(DOCS_SUFFIX):
     if not file_path.endswith(PROTO_SUFFIX):
       error_messages += checkNamespace(file_path)
-      command = ("%s %s | diff %s -" % (HEADER_ORDER_PATH, file_path, file_path))
+      command = ("%s --include_dir_order %s --path %s | diff %s -" %
+                 (HEADER_ORDER_PATH, include_dir_order, file_path, file_path))
       error_messages += executeCommand(command, "header_order.py check failed", file_path)
     command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
     error_messages += executeCommand(command, "clang-format check failed", file_path)
@@ -559,7 +563,8 @@ def executeCommand(command,
 
 
 def fixHeaderOrder(file_path):
-  command = "%s --rewrite %s" % (HEADER_ORDER_PATH, file_path)
+  command = "%s --rewrite --include_dir_order %s --path %s" % (HEADER_ORDER_PATH, include_dir_order,
+                                                               file_path)
   if os.system(command) != 0:
     return ["header_order.py rewrite error: %s" % (file_path)]
   return []
@@ -635,36 +640,49 @@ def checkErrorMessages(error_messages):
 
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description='Check or fix file format.')
+  parser = argparse.ArgumentParser(description="Check or fix file format.")
   parser.add_argument(
-      'operation_type',
+      "operation_type",
       type=str,
-      choices=['check', 'fix'],
+      choices=["check", "fix"],
       help="specify if the run should 'check' or 'fix' format.")
   parser.add_argument(
-      'target_path',
+      "target_path",
       type=str,
       nargs="?",
       default=".",
       help="specify the root directory for the script to recurse over. Default '.'.")
   parser.add_argument(
-      '--add-excluded-prefixes', type=str, nargs="+", help="exclude additional prefixes.")
+      "--add-excluded-prefixes", type=str, nargs="+", help="exclude additional prefixes.")
   parser.add_argument(
-      '-j',
-      '--num-workers',
+      "-j",
+      "--num-workers",
       type=int,
       default=multiprocessing.cpu_count(),
       help="number of worker processes to use; defaults to one per core.")
-  parser.add_argument('--api-prefix', type=str, default='./api/', help="path of the API tree")
+  parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree")
   parser.add_argument(
-      '--skip_envoy_build_rule_check',
-      action='store_true',
+      "--skip_envoy_build_rule_check",
+      action="store_true",
       help="Skip checking for '@envoy//' prefix in build rules.")
+  parser.add_argument(
+      "--namespace_check",
+      type=str,
+      nargs="?",
+      default="Envoy",
+      help="Specify namespace check string. Default 'Envoy'.")
+  parser.add_argument(
+      "--include_dir_order",
+      type=str,
+      default=",".join(common.includeDirOrder()),
+      help="specify the header block include directory order")
   args = parser.parse_args()
 
   operation_type = args.operation_type
   target_path = args.target_path
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
+  namespace_check = args.namespace_check
+  include_dir_order = args.include_dir_order
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
 
