@@ -8,12 +8,7 @@ independently sourced, the following steps should be followed:
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
 2. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements).
-3. Configure a Bazel [WORKSPACE](https://bazel.build/versions/master/docs/be/workspace.html)
-   to point Bazel at the Envoy dependencies. An example is provided in the CI Docker image
-   [WORKSPACE](https://github.com/envoyproxy/envoy/blob/master/ci/WORKSPACE) and corresponding
-   [BUILD](https://github.com/envoyproxy/envoy/blob/master/ci/prebuilt/BUILD) files.
-4. `bazel build --package_path %workspace%:<path to Envoy source tree> //source/exe:envoy-static`
-   from the directory containing your WORKSPACE.
+3. `bazel build //source/exe:envoy-static` from the repository root.
 
 ## Quick start Bazel build for developers
 
