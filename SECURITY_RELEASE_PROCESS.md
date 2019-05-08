@@ -326,3 +326,4 @@ CrashOverride will vouch for the "Seven" distribution joining the distribution l
 | vulnerabilityreports@cloudfoundry.org     | Cloud Foundry |
 | envoy-security@tetrate.io                 | Tetrate       |
 | secalert@datawire.io                      | Datawire      |
+| envoy-security-team@aspenmesh.io          | Aspen Mesh    |
