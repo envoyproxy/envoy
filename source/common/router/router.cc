@@ -232,11 +232,16 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     code_stats.chargeResponseStat(info);
 
     if (!alt_stat_prefix_.empty()) {
-      Http::CodeStats::ResponseStatInfo info{config_.scope_,   cluster_->statsScope(),
-                                             alt_stat_prefix_, response_status_code,
-                                             internal_request, EMPTY_STRING,
-                                             EMPTY_STRING,     config_.local_info_.zoneName(),
-                                             upstreamZone(upstream_host),    is_canary};
+      Http::CodeStats::ResponseStatInfo info{config_.scope_,
+                                             cluster_->statsScope(),
+                                             alt_stat_prefix_,
+                                             response_status_code,
+                                             internal_request,
+                                             EMPTY_STRING,
+                                             EMPTY_STRING,
+                                             config_.local_info_.zoneName(),
+                                             upstreamZone(upstream_host),
+                                             is_canary};
 
       code_stats.chargeResponseStat(info);
     }
