@@ -186,12 +186,8 @@ TEST(StatMergerNonFixtureTest, newStatFromParent) {
   EXPECT_FALSE(store.counterExists("newcounter2"));
   EXPECT_TRUE(store.gaugeExists("newgauge1"));
   EXPECT_FALSE(store.gaugeExists("newgauge2"));
-  // HACK: doesn't like shutting down without threading having started.
-  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
-  NiceMock<ThreadLocal::MockInstance> tls;
-  store.initializeThreading(main_thread_dispatcher, tls);
+
   store.shutdownThreading();
-  tls.shutdownThread();
 }
 
 } // namespace
