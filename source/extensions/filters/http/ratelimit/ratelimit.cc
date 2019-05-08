@@ -152,7 +152,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     state_ = State::Responded;
     callbacks_->sendLocalReply(
         Http::Code::TooManyRequests, "", [this](Http::HeaderMap& headers) { addHeaders(headers); },
-        config_->rateLimitedGrpcStatus());
+        config_->rateLimitedGrpcStatus(), StreamInfo::ResponseCodeDetails::get().RateLimited);
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
     if (config_->failureModeAllow()) {
@@ -162,7 +162,8 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       }
     } else {
       state_ = State::Responded;
-      callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt);
+      callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt,
+                                 StreamInfo::ResponseCodeDetails::get().RateLimitError);
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
     }
   } else if (!initiating_call_) {

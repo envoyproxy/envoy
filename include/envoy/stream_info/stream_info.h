@@ -146,6 +146,18 @@ struct ResponseCodeDetailValues {
   // This will generally be accompanied by details about the transcoder failure.
   const std::string GrpcTranscodeFailed = "grpc_json_transcode_failure";
 
+  // The ext_authz filter denied the downstream request.
+  const std::string AuthzDenied = "ext_authz_denied";
+  // The ext_authz filter encountered a failure, and was configured to fail-closed.
+  const std::string AuthzError = "ext_authz_error";
+
+  // The fault filter injected an abort for this request.
+  const std::string FaultAbort = "fault_filter_abort";
+
+  // This request went above the configured limits for the rate limit filter.
+  const std::string RateLimited = "request_rate_limited";
+  // The rate limiter encountered a failure, and was configured to fail-closed.
+  const std::string RateLimitError = "rate_limiter_error";
   // TODO(#6542): continue addding values for sendLocalReply use-cases
 };
 
