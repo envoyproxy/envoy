@@ -307,6 +307,39 @@ http_logs:
   }
 
   {
+      NiceMock<StreamInfo::MockStreamInfo> stream_info;
+      stream_info.host_ = nullptr;
+      stream_info.start_time_ = SystemTime(1h);
+      stream_info.upstream_transport_failure_reason_ = "TLS error";
+
+      Http::TestHeaderMapImpl request_headers{
+          {":method", "PATCH"},
+      };
+
+      expectLog(R"EOF(
+  http_logs:
+    log_entry:
+      common_properties:
+        downstream_remote_address:
+          socket_address:
+            address: "127.0.0.1"
+            port_value: 0
+        downstream_local_address:
+          socket_address:
+            address: "127.0.0.2"
+            port_value: 0
+        start_time:
+          seconds: 3600
+        upstream_transport_failure_reason: "TLS error"
+      request:
+        request_method: "PATCH"
+        request_headers_bytes: 12
+      response: {}
+  )EOF");
+      access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+  }
+
+  {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.host_ = nullptr;
     stream_info.start_time_ = SystemTime(1h);
