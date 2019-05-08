@@ -13,7 +13,7 @@ downstream remote address is determined based on the logic for the "trusted clie
 outlined in :ref:`XFF <config_http_conn_man_headers_x-forwarded-for>`.
 
 
-Note that the filter is intended to be used in conjuction with the
+Note that the filter is intended to be used in conjunction with the
 :ref:`Router <config_http_filters_router>` filter. In particular, it must run prior to the router
 filter so that it may add the desired source IP to the state of the filter chain.
 
