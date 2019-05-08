@@ -3,6 +3,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
 
+#include "common/common/cleanup.h"
 #include "common/common/thread.h"
 #include "common/event/real_time_system.h"
 #include "common/stats/fake_symbol_table_impl.h"
@@ -10,6 +11,7 @@
 #include "common/thread_local/thread_local_impl.h"
 
 #include "exe/platform_impl.h"
+#include "exe/process_wide.h"
 
 #include "server/listener_hooks.h"
 #include "server/options_impl.h"
@@ -38,7 +40,6 @@ public:
                  ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
                  std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
                  Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
-  ~MainCommonBase();
 
   bool run();
 
@@ -64,6 +65,7 @@ public:
                     const AdminRequestFn& handler);
 
 protected:
+  CleanupPtr process_cleanup_;
   const Envoy::OptionsImpl& options_;
   Stats::FakeSymbolTableImpl symbol_table_;
   Server::ComponentFactory& component_factory_;
