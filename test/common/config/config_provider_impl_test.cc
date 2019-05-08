@@ -7,6 +7,7 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -453,7 +454,7 @@ dynamic_dummy_configs:
     last_updated: { seconds: 1234567891, nanos: 567000000 }
 )EOF",
                             expected_config_dump);
-  EXPECT_EQ(expected_config_dump.DebugString(), dummy_config_dump4.DebugString());
+  EXPECT_THAT(expected_config_dump, ProtoEqIgnoreRepeatedFieldOrdering(dummy_config_dump4));
 }
 
 // Tests that dynamic config providers enforce that the context's localInfo is
