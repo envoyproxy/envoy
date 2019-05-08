@@ -97,6 +97,11 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     return;
   }
 
+  // We're now closed, there's no reason to read from this point forward. This
+  // is important to set explicitly, to handle things like delayed close. This
+  // will also apply TCP back pressure.
+  read_enabled_ = false;
+
   uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
   const bool delayed_close_timeout_set = delayedCloseTimeout().count() > 0;
@@ -116,7 +121,6 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       // a write event is not being registered for the socket, this logic is simply setting the
       // timer and waiting for it to trigger to close the socket.
       if (!inDelayedClose()) {
-        read_enabled_ = false;
         initializeDelayedCloseTimer();
         delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
       }
@@ -148,10 +152,6 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       }
       return;
     }
-
-    // All close types that follow do not actually close() the socket immediately so that buffered
-    // data can be written. However, we do want to stop reading to apply TCP backpressure.
-    read_enabled_ = false;
 
     // NOTE: At this point, it's already been validated that the connection is not already in
     // delayed close processing and therefore the timer has not yet been created.
