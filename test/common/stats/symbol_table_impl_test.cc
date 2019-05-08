@@ -45,17 +45,15 @@ protected:
       table_ = std::move(table);
       break;
     }
-    initStorage();
+    pool_ = std::make_unique<StatNamePool>(*table_);
   }
 
   ~StatNameTest() override { clearStorage(); }
 
   void clearStorage() {
-    stat_name_storage_.reset();
+    pool_->clear();
     EXPECT_EQ(0, table_->numSymbols());
   }
-
-  void initStorage() { stat_name_storage_ = std::make_unique<StatNameManagedContainer>(*table_); }
 
   SymbolVec getSymbols(StatName stat_name) {
     return SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
@@ -68,13 +66,12 @@ protected:
     return table_->toString(makeStat(stat_name));
   }
 
-  StatName makeStat(absl::string_view name) { return stat_name_storage_->add(name); }
+  StatName makeStat(absl::string_view name) { return pool_->add(name); }
 
   FakeSymbolTableImpl* fake_symbol_table_{nullptr};
   SymbolTableImpl* real_symbol_table_{nullptr};
   std::unique_ptr<SymbolTable> table_;
-
-  std::unique_ptr<StatNameManagedContainer> stat_name_storage_;
+  std::unique_ptr<StatNamePool> pool_;
 };
 
 INSTANTIATE_TEST_CASE_P(StatNameTest, StatNameTest,
@@ -90,8 +87,8 @@ TEST_P(StatNameTest, TestArbitrarySymbolRoundtrip) {
 }
 
 TEST_P(StatNameTest, TestEmpty) {
-  EXPECT_TRUE(stat_name_storage_->add("").empty());
-  EXPECT_FALSE(stat_name_storage_->add("x").empty());
+  EXPECT_TRUE(makeStat("").empty());
+  EXPECT_FALSE(makeStat("x").empty());
   EXPECT_TRUE(StatName().empty());
 }
 
@@ -143,7 +140,6 @@ TEST_P(StatNameDeathTest, TestBadDecodes) {
     // Decoding a symbol vec that exists is perfectly normal...
     EXPECT_NO_THROW(decodeSymbolVec(vec_1));
     clearStorage();
-    initStorage();
     // But when the StatName is destroyed, its symbols are as well.
     EXPECT_DEATH(decodeSymbolVec(vec_1), "");
   }
@@ -204,7 +200,6 @@ TEST_P(StatNameTest, FreePoolTest) {
     EXPECT_EQ(monotonicCounter(), 5);
     EXPECT_EQ(table_->numSymbols(), 5);
     clearStorage();
-    initStorage();
   }
   EXPECT_EQ(monotonicCounter(), 5);
   EXPECT_EQ(table_->numSymbols(), 0);

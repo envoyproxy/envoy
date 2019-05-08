@@ -19,7 +19,7 @@ namespace Envoy {
 namespace Http {
 
 CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
-    : storage_(symbol_table), symbol_table_(symbol_table), canary_(makeStatName("canary")),
+    : stat_name_pool_(symbol_table), symbol_table_(symbol_table), canary_(makeStatName("canary")),
       canary_upstream_rq_time_(makeStatName("canary.upstream_rq_time")),
       external_(makeStatName("external")),
       external_rq_time_(makeStatName("external.upstream_rq_time")),
@@ -68,8 +68,8 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
 }
 
 void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
-  Stats::StatNameManagedContainer stat_name_storage(symbol_table_);
-  // Stats::StatName prefix = stat_name_storage.add(stripTrailingDot(info.prefix_));
+  Stats::StatNamePool pool(symbol_table_);
+  // Stats::StatName prefix = pool.add(stripTrailingDot(info.prefix_));
   Code code = static_cast<Code>(info.response_status_code_);
 
   ASSERT(&info.cluster_scope_.symbolTable() == &symbol_table_);
@@ -120,8 +120,8 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
 }
 
 void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
-  Stats::StatNameManagedContainer stat_name_storage(symbol_table_);
-  // Stats::StatName prefix = stat_name_storage.add(stripTrailingDot(info.prefix_));
+  Stats::StatNamePool pool(symbol_table_);
+  // Stats::StatName prefix = pool.add(stripTrailingDot(info.prefix_));
 
   uint64_t count = info.response_time_.count();
   recordHistogram(info.cluster_scope_, {info.prefix_, upstream_rq_time_}, count);
@@ -178,7 +178,7 @@ Stats::StatName CodeStatsImpl::upstreamRqGroup(Code response_code) const {
 CodeStatsImpl::RequestCodeGroup::RequestCodeGroup(absl::string_view prefix,
                                                   CodeStatsImpl& code_stats)
     : code_stats_(code_stats), prefix_(std::string(prefix)),
-      stat_name_storage_(code_stats_.symbol_table_) {
+      stat_name_pool_(code_stats_.symbol_table_) {
   for (uint32_t i = 0; i < NumHttpCodes; ++i) {
     rc_stat_names_[i] = nullptr;
   }
@@ -201,7 +201,7 @@ Stats::StatName CodeStatsImpl::RequestCodeGroup::statName(Code response_code) {
     // for the same code.
     if (atomic_ref.load() == nullptr) {
       atomic_ref =
-          stat_name_storage_.addReturningStorage(absl::StrCat(prefix_, enumToInt(response_code)));
+          stat_name_pool_.addReturningStorage(absl::StrCat(prefix_, enumToInt(response_code)));
     }
   }
   return Stats::StatName(atomic_ref.load());

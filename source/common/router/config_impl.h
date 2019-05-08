@@ -24,6 +24,7 @@
 #include "common/router/header_parser.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/router/router_ratelimit.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -155,6 +156,7 @@ public:
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   const std::string& name() const override { return name_; }
+  Stats::StatName statName() const override { return stat_name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
@@ -170,19 +172,26 @@ private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
 
   struct VirtualClusterEntry : public VirtualCluster {
-    VirtualClusterEntry(const envoy::api::v2::route::VirtualCluster& virtual_cluster);
+    VirtualClusterEntry(const envoy::api::v2::route::VirtualCluster& virtual_cluster,
+                        Stats::StatNamePool& pool);
 
     // Router::VirtualCluster
     const std::string& name() const override { return name_; }
+    Stats::StatName statName() const override { return stat_name_; }
 
     std::regex pattern_;
     absl::optional<std::string> method_;
     std::string name_;
+    Stats::StatName stat_name_;
   };
 
   struct CatchAllVirtualCluster : public VirtualCluster {
     // Router::VirtualCluster
     const std::string& name() const override { return name_; }
+    Stats::StatName statName() const override {
+      ASSERT(false);
+      return Stats::StatName();
+    }
 
     std::string name_{"other"};
   };
@@ -191,6 +200,8 @@ private:
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
   const std::string name_;
+  Stats::StatNamePool stat_name_pool_;
+  Stats::StatName stat_name_;
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
   SslRequirements ssl_requirements_;
@@ -785,6 +796,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   const std::string name_;
+  Stats::SymbolTable& symbol_table_;
 };
 
 /**

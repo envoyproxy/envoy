@@ -951,7 +951,7 @@ void PriorityStateManager::registerHostForPriority(
       new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
                    lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
                    lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
-                   lb_endpoint.health_status()));
+                   lb_endpoint.health_status(), info_->statsScope().symbolTable()));
   registerHostForPriority(host, locality_lb_endpoint);
 }
 
@@ -1389,7 +1389,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
               lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
               locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config(),
-              locality_lb_endpoint_.priority(), lb_endpoint_.health_status()));
+              locality_lb_endpoint_.priority(), lb_endpoint_.health_status(),
+              info_->statsScope().symbolTable()));
         }
 
         HostVector hosts_added;

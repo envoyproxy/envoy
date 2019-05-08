@@ -379,37 +379,16 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
 
 class LookupWithStatNameTest : public testing::Test {
 public:
-<<<<<<< HEAD
   LookupWithStatNameTest()
-      : alloc_(symbol_table_), store_(options_, alloc_), stat_name_storage_(symbol_table_) {}
+      : alloc_(symbol_table_), store_(alloc_), pool_(symbol_table_) {}
   ~LookupWithStatNameTest() override { store_.shutdownThreading(); }
-=======
-  LookupWithStatNameTest() : alloc_(symbol_table_), store_(alloc_) {}
-  ~LookupWithStatNameTest() override {
-    store_.shutdownThreading();
-    clearStorage();
-  }
 
-  void clearStorage() {
-    for (auto& stat_name_storage : stat_name_storage_) {
-      stat_name_storage.free(store_.symbolTable());
-    }
-    stat_name_storage_.clear();
-    EXPECT_EQ(0, store_.symbolTable().numSymbols());
-  }
-
-  StatName makeStatName(absl::string_view name) {
-    stat_name_storage_.emplace_back(makeStatStorage(name));
-    return stat_name_storage_.back().statName();
-  }
->>>>>>> master
-
-  StatName makeStatName(absl::string_view name) { return stat_name_storage_.add(name); }
+  StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
   Stats::FakeSymbolTableImpl symbol_table_;
   HeapStatDataAllocator alloc_;
   ThreadLocalStoreImpl store_;
-  StatNameManagedContainer stat_name_storage_;
+  StatNamePool pool_;
 };
 
 TEST_F(LookupWithStatNameTest, All) {

@@ -335,6 +335,11 @@ public:
    * @return the name of the virtual cluster.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return the stat-name of the virtual cluster.
+   */
+  virtual Stats::StatName statName() const PURE;
 };
 
 class RateLimitPolicy;
@@ -367,6 +372,11 @@ public:
    * @return const std::string& the name of the virtual host.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return the stat-name of the virtual host.
+   */
+  virtual Stats::StatName statName() const PURE;
 
   /**
    * @return const RateLimitPolicy& the rate limit policy for the virtual host.

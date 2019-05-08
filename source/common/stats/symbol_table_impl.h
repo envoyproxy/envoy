@@ -407,10 +407,28 @@ private:
   SymbolTable& symbol_table_;
 };
 
-class StatNameManagedContainer {
+/**
+ * Maintains storage for a collection of StatName objects. Like
+ * StatNameManagedStorage, this has an RAII usage model, taking
+ * care of decrementing ref-counts in the SymbolTable for all
+ * contained StatNames on destruction or on clear();
+ *
+ * Example usage:
+ *   StatNamePool pool(symbol_table);
+ *   StatName name1 = pool.add("name1");
+ *   StatName name2 = pool.add("name2");
+ *   uint8_t* storage = pool.addReturningStorage("name3");
+ *   StatName name3(storage);
+ */
+class StatNamePool {
 public:
-  explicit StatNameManagedContainer(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
-  ~StatNameManagedContainer();
+  explicit StatNamePool(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+  ~StatNamePool() { clear(); }
+
+  /**
+   * Removes all StatNames from the pool.
+   */
+  void clear();
 
   /**
    * @param name the name to add the container.
@@ -419,6 +437,11 @@ public:
   StatName add(absl::string_view name);
 
   /**
+   * Does essentially the same thing as add(), but returns the storage as a
+   * pointer which can later be used to create a StatName. This can be used
+   * to accumulate a vector of uint8_t* which can later be used to create
+   * StatName objects on demand.
+   *
    * @param name the name to add the container.
    * @return a pointer to the bytes held in the container for this name, suitable for
    *         using to construct a StatName.

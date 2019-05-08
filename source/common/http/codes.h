@@ -86,14 +86,14 @@ private:
     CodeStatsImpl& code_stats_;
     std::string prefix_;
     absl::Mutex mutex_;
-    Stats::StatNameManagedContainer stat_name_storage_ GUARDED_BY(mutex_);
+    Stats::StatNamePool stat_name_pool_ GUARDED_BY(mutex_);
   };
 
   static absl::string_view stripTrailingDot(absl::string_view prefix);
-  Stats::StatName makeStatName(absl::string_view name) { return storage_.add(name); }
+  Stats::StatName makeStatName(absl::string_view name) { return stat_name_pool_.add(name); }
   Stats::StatName upstreamRqGroup(Code response_code) const;
 
-  Stats::StatNameManagedContainer storage_;
+  Stats::StatNamePool stat_name_pool_;
   Stats::SymbolTable& symbol_table_;
 
   Stats::StatName canary_;

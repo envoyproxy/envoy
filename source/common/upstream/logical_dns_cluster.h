@@ -45,12 +45,14 @@ public:
 private:
   struct LogicalHost : public HostImpl {
     LogicalHost(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-                Network::Address::InstanceConstSharedPtr address, LogicalDnsCluster& parent)
+                Network::Address::InstanceConstSharedPtr address, LogicalDnsCluster& parent,
+                Stats::SymbolTable& symbol_table)
         : HostImpl(cluster, hostname, address, parent.lbEndpoint().metadata(),
                    parent.lbEndpoint().load_balancing_weight().value(),
                    parent.localityLbEndpoint().locality(),
                    parent.lbEndpoint().endpoint().health_check_config(),
-                   parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
+                   parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status(),
+                   symbol_table),
           parent_(parent) {}
 
     // Upstream::Host

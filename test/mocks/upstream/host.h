@@ -9,6 +9,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/test_common/global.h"
 
 #include "gmock/gmock.h"
 
@@ -90,6 +91,11 @@ public:
   MOCK_CONST_METHOD0(locality, const envoy::api::v2::core::Locality&());
   MOCK_CONST_METHOD0(priority, uint32_t());
   MOCK_METHOD1(priority, void(uint32_t));
+  Stats::StatName localityZoneStatName() const override {
+    locality_zone_stat_name_ = std::make_unique<Stats::StatNameManagedStorage>(
+        locality().zone(), symbol_table_);
+    return locality_zone_stat_name_->statName();
+  }
 
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
@@ -98,6 +104,8 @@ public:
   testing::NiceMock<MockClusterInfo> cluster_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
+  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
 
 class MockHost : public Host {
