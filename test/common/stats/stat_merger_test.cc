@@ -186,8 +186,6 @@ TEST(StatMergerNonFixtureTest, newStatFromParent) {
   EXPECT_FALSE(store.counterExists("newcounter2"));
   EXPECT_TRUE(store.gaugeExists("newgauge1"));
   EXPECT_FALSE(store.gaugeExists("newgauge2"));
-
-  store.shutdownThreading();
 }
 
 } // namespace
