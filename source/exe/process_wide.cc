@@ -13,8 +13,14 @@
 #endif
 
 namespace Envoy {
+namespace {
+// Static variable to sanity check init state.
+bool process_wide_iniitalized;
+} // namespace
 
 ProcessWide::ProcessWide() {
+  ASSERT(!process_wide_iniitalized);
+  process_wide_iniitalized = true;
 #ifdef ENVOY_GOOGLE_GRPC
   grpc_init();
 #endif
@@ -25,6 +31,8 @@ ProcessWide::ProcessWide() {
 }
 
 ProcessWide::~ProcessWide() {
+  ASSERT(process_wide_iniitalized);
+  process_wide_iniitalized = false;
   ares_library_cleanup();
 #ifdef ENVOY_GOOGLE_GRPC
   grpc_shutdown();
