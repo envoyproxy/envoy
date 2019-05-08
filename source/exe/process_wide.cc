@@ -14,29 +14,34 @@
 
 namespace Envoy {
 namespace {
-// Static variable to sanity check init state.
-bool process_wide_initalized;
+// Static variable to count initialization pairs. For tests like
+// main_common_test, we need to count to avoid double initialization or
+// shutdown.
+uint32_t process_wide_initalized;
 } // namespace
 
-ProcessWide::ProcessWide() {
-  ASSERT(!process_wide_initalized);
-  process_wide_initalized = true;
+ProcessWide::ProcessWide() : initialization_depth_(process_wide_initalized) {
+  if (process_wide_initalized++ == 0) {
 #ifdef ENVOY_GOOGLE_GRPC
-  grpc_init();
+    grpc_init();
 #endif
-  ares_library_init(ARES_LIB_INIT_ALL);
-  Event::Libevent::Global::initialize();
-  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
-  Http::Http2::initializeNghttp2Logging();
+    ares_library_init(ARES_LIB_INIT_ALL);
+    Event::Libevent::Global::initialize();
+    RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
+    Http::Http2::initializeNghttp2Logging();
+  }
 }
 
 ProcessWide::~ProcessWide() {
-  ASSERT(process_wide_initalized);
-  process_wide_initalized = false;
-  ares_library_cleanup();
+  ASSERT(process_wide_initalized > 0);
+  if (--process_wide_initalized == 0) {
+    process_wide_initalized = false;
+    ares_library_cleanup();
 #ifdef ENVOY_GOOGLE_GRPC
-  grpc_shutdown();
+    grpc_shutdown();
 #endif
+  }
+  ASSERT(process_wide_initalized == initialization_depth_);
 }
 
 } // namespace Envoy
