@@ -106,11 +106,9 @@ public:
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers), http_context_(http_context),
-        stat_name_pool_(scope_.symbolTable()),
-        retry_(stat_name_pool_.add("retry")),
+        stat_name_pool_(scope_.symbolTable()), retry_(stat_name_pool_.add("retry")),
         zone_name_(stat_name_pool_.add(local_info_.zoneName())),
-        empty_stat_name_(stat_name_pool_.add("")),
-        shadow_writer_(std::move(shadow_writer)),
+        empty_stat_name_(stat_name_pool_.add("")), shadow_writer_(std::move(shadow_writer)),
         time_source_(time_source) {}
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,

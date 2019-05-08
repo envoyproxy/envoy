@@ -71,9 +71,10 @@ public:
         canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                                 Config::MetadataEnvoyLbKeys::get().CANARY)
                     .bool_value()),
-        metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)),
-        locality_(locality), locality_zone_stat_name_(locality.zone(), symbol_table),
-        stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))},
+        metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)), locality_(locality),
+        locality_zone_stat_name_(locality.zone(), symbol_table), stats_{ALL_HOST_STATS(
+                                                                     POOL_COUNTER(stats_store_),
+                                                                     POOL_GAUGE(stats_store_))},
         priority_(priority) {
     if (health_check_config.port_value() != 0 &&
         dest_address->type() != Network::Address::Type::Ip) {

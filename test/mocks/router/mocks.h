@@ -22,6 +22,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/stats/fake_symbol_table_impl.h"
+
 #include "test/test_common/global.h"
 
 #include "gmock/gmock.h"

@@ -28,7 +28,6 @@ public:
       : global_store_(*symbol_table_), cluster_scope_(*symbol_table_), code_stats_(*symbol_table_),
         stat_name_storage_(*symbol_table_) {}
 
-
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    const std::string& request_vhost_name = EMPTY_STRING,
                    const std::string& request_vcluster_name = EMPTY_STRING,
@@ -214,11 +213,16 @@ TEST_F(CodeUtilityTest, ResponseTimingTest) {
   Stats::MockStore cluster_scope;
 
   Stats::StatNameManagedStorage prefix("prefix", *symbol_table_);
-  Http::CodeStats::ResponseTimingInfo info{
-      global_store, cluster_scope, stat_name_storage_.add("prefix"), std::chrono::milliseconds(5),
-      true,         true,          stat_name_storage_.add("vhost_name"),
-      stat_name_storage_.add("req_vcluster_name"), stat_name_storage_.add("from_az"),
-      stat_name_storage_.add("to_az")};
+  Http::CodeStats::ResponseTimingInfo info{global_store,
+                                           cluster_scope,
+                                           stat_name_storage_.add("prefix"),
+                                           std::chrono::milliseconds(5),
+                                           true,
+                                           true,
+                                           stat_name_storage_.add("vhost_name"),
+                                           stat_name_storage_.add("req_vcluster_name"),
+                                           stat_name_storage_.add("from_az"),
+                                           stat_name_storage_.add("to_az")};
 
   EXPECT_CALL(cluster_scope, histogram("prefix.upstream_rq_time"));
   EXPECT_CALL(cluster_scope, deliverHistogramToSinks(

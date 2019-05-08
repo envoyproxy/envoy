@@ -379,8 +379,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
 
 class LookupWithStatNameTest : public testing::Test {
 public:
-  LookupWithStatNameTest()
-      : alloc_(symbol_table_), store_(alloc_), pool_(symbol_table_) {}
+  LookupWithStatNameTest() : alloc_(symbol_table_), store_(alloc_), pool_(symbol_table_) {}
   ~LookupWithStatNameTest() override { store_.shutdownThreading(); }
 
   StatName makeStatName(absl::string_view name) { return pool_.add(name); }

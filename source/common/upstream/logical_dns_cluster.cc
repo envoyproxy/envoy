@@ -102,14 +102,12 @@ void LogicalDnsCluster::startResolve() {
             Stats::SymbolTable& symbol_table = info_->statsScope().symbolTable();
             switch (address_list.front()->ip()->version()) {
             case Network::Address::IpVersion::v4:
-              logical_host_.reset(
-                  new LogicalHost(info_, hostname_, Network::Utility::getIpv4AnyAddress(), *this,
-                                  symbol_table));
+              logical_host_.reset(new LogicalHost(
+                  info_, hostname_, Network::Utility::getIpv4AnyAddress(), *this, symbol_table));
               break;
             case Network::Address::IpVersion::v6:
-              logical_host_.reset(
-                  new LogicalHost(info_, hostname_, Network::Utility::getIpv6AnyAddress(), *this,
-                                  symbol_table));
+              logical_host_.reset(new LogicalHost(
+                  info_, hostname_, Network::Utility::getIpv6AnyAddress(), *this, symbol_table));
               break;
             }
             const auto& locality_lb_endpoint = localityLbEndpoint();

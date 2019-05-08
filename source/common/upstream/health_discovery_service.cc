@@ -213,8 +213,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                      envoy::api::v2::core::Metadata::default_instance(), 1,
                      envoy::api::v2::core::Locality().default_instance(),
                      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0,
-                     envoy::api::v2::core::HealthStatus::UNKNOWN,
-                     stats.symbolTable()));
+                     envoy::api::v2::core::HealthStatus::UNKNOWN, stats.symbolTable()));
   }
   initialize([] {});
 }

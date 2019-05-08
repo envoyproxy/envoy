@@ -92,8 +92,8 @@ public:
   MOCK_CONST_METHOD0(priority, uint32_t());
   MOCK_METHOD1(priority, void(uint32_t));
   Stats::StatName localityZoneStatName() const override {
-    locality_zone_stat_name_ = std::make_unique<Stats::StatNameManagedStorage>(
-        locality().zone(), symbol_table_);
+    locality_zone_stat_name_ =
+        std::make_unique<Stats::StatNameManagedStorage>(locality().zone(), symbol_table_);
     return locality_zone_stat_name_->statName();
   }
 
