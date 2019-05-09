@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/data/core/v2alpha/local_reply.pb.h"
+#include "envoy/data/core/v2alpha/local_reply_configuration.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -265,8 +265,9 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
   return ret;
 }
 
-Utility::LocalReplyInfo Utility::generateLocalReplyInfo(const Http::HeaderMap& request_headers) {
-  bool is_head_request = false, accept_json_type = false;
+Utility::LocalReplyInfo Utility::generateLocalReplyInfo(const Http::HeaderMap& request_headers,
+                                                        const Http::LocalReplyType& reply_type) {
+  bool is_head_request = false;
 
   const bool is_grpc = Grpc::Utility::hasGrpcContentType(request_headers);
 
@@ -274,15 +275,7 @@ Utility::LocalReplyInfo Utility::generateLocalReplyInfo(const Http::HeaderMap& r
     is_head_request = true;
   }
 
-  if (!is_grpc) {
-    const Http::HeaderEntry* accept = request_headers.Accept();
-    // As long as can accept the json type response priority return json type.
-    accept_json_type =
-        accept != nullptr &&
-        (accept->value().getStringView().find(Http::Headers::get().ContentTypeValues.Json.c_str()));
-  }
-
-  return LocalReplyInfo{is_grpc, is_head_request, accept_json_type};
+  return LocalReplyInfo{is_grpc, is_head_request, reply_type};
 }
 
 void Utility::sendLocalReply(const Utility::LocalReplyInfo& info,
@@ -329,21 +322,30 @@ void Utility::sendLocalReply(
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
 
-  envoy::data::core::v2alpha::LocalReply local_reply;
   std::string json_body;
   absl::string_view final_body_text = body_text;
-
-  if (info.accept_json_type) {
+  switch (info.reply_type) {
+  case Http::LocalReplyType::AlwaysJson: {
+    std::string json_body;
+    envoy::data::core::v2alpha::LocalReplyConfiguration::JsonReply local_reply;
     local_reply.set_body(final_body_text.begin(), final_body_text.length());
     json_body = MessageUtil::getJsonStringFromMessage(local_reply, true, true);
     response_headers->insertContentLength().value(json_body.size());
     final_body_text = absl::string_view(json_body);
     response_headers->insertContentType().value(Headers::get().ContentTypeValues.Json);
+    break;
   }
-
-  if (!info.accept_json_type && !final_body_text.empty()) {
-    response_headers->insertContentLength().value(final_body_text.size());
-    response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
+  case Http::LocalReplyType::AlwaysText: {
+    if (!final_body_text.empty()) {
+      response_headers->insertContentLength().value(final_body_text.size());
+      response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
+    }
+    break;
+  }
+  case Http::LocalReplyType::DetermineViaAcceptHeader:
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (info.is_head_request) {

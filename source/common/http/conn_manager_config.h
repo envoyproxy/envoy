@@ -165,6 +165,8 @@ public:
   }
 };
 
+enum class LocalReplyType { DetermineViaAcceptHeader, AlwaysJson, AlwaysText };
+
 /**
  * Abstract configuration for the connection manager.
  */
@@ -357,6 +359,11 @@ public:
    * @return if the HttpConnectionManager should normalize url following RFC3986
    */
   virtual bool shouldNormalizePath() const PURE;
+
+  /*
+   * @return LocalReplyType the Local reply body type
+   */
+  virtual LocalReplyType localReplyType() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

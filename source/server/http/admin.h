@@ -148,6 +148,7 @@ public:
                      Http::HeaderMap& response_headers, std::string& body) override;
   void closeSocket();
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
+  Http::LocalReplyType localReplyType() const override { return Http::LocalReplyType::AlwaysText; }
 
 private:
   /**

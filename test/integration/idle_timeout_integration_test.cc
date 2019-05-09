@@ -1,4 +1,4 @@
-#include "envoy/data/core/v2alpha/local_reply.pb.h"
+#include "envoy/data/core/v2alpha/local_reply_configuration.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/test_time.h"
@@ -197,19 +197,25 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutHeadRequestAfterDownstrea
 
 TEST_P(IdleTimeoutIntegrationTest,
        PerStreamIdleTimeoutHeadRequestAfterDownstreamJsonContentTypeRequest) {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+    hcm.mutable_local_reply_config()->set_always_json(true);
+  };
+
   enable_per_stream_idle_timeout_ = true;
-  auto response = setupPerStreamIdleTimeoutTest("GET", "application/json");
+  auto response = setupPerStreamIdleTimeoutTest("GET");
 
   waitForTimeout(*response, "downstream_rq_idle_timeout");
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("408", response->headers().Status()->value().c_str());
+  EXPECT_EQ("408", response->headers().Status()->value().getStringView());
   EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
-            response->headers().ContentType()->value().c_str());
-  envoy::data::core::v2alpha::LocalReply local_reply;
+            response->headers().ContentType()->value().getStringView());
+  envoy::data::core::v2alpha::LocalReplyConfiguration::JsonReply local_reply;
   local_reply.set_body("stream timeout");
-  envoy::data::core::v2alpha::LocalReply receive_local_reply;
+  envoy::data::core::v2alpha::LocalReplyConfiguration::JsonReply receive_local_reply;
   MessageUtil::loadFromJsonEx(response->body(), receive_local_reply,
                               MessageUtil::proto_unknown_fields);
   EXPECT_TRUE(TestUtility::protoEqual(local_reply, receive_local_reply));

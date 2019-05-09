@@ -12,6 +12,7 @@ import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/rds.proto";
 import "envoy/api/v2/srds.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
+import "envoy/data/core/v2alpha/local_reply_configuration.proto";
 import "envoy/type/percent.proto";
 
 import "google/protobuf/any.proto";
@@ -424,6 +425,9 @@ message HttpConnectionManager {
   // Note that Envoy does not perform
   // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`
   google.protobuf.BoolValue normalize_path = 30;
+
+  // Used to configure the Local reply the type of the body
+  envoy.data.core.v2alpha.LocalReplyConfiguration local_reply_config = 32;
 }
 
 message Rds {

@@ -330,6 +330,22 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     }
   }
+
+  if (config.has_local_reply_config()) {
+    switch (config.local_reply_config().reply_type_case()) {
+    case envoy::data::core::v2alpha::LocalReplyConfiguration::kAlwaysJson:
+      local_reply_type_ = Http::LocalReplyType::AlwaysJson;
+      break;
+    case envoy::data::core::v2alpha::LocalReplyConfiguration::kAlwaysText:
+      local_reply_type_ = Http::LocalReplyType::AlwaysJson;
+      break;
+    case envoy::data::core::v2alpha::LocalReplyConfiguration::kDetermineViaAcceptHeader:
+      local_reply_type_ = Http::LocalReplyType::DetermineViaAcceptHeader;
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
 }
 
 void HttpConnectionManagerConfig::processFilter(

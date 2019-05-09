@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package envoy.data.core.v2alpha;
+
+option java_outer_classname = "LocalReplyConfigurationProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.data.core.v2alpha";
+
+// [#protodoc-title: Local reply configuration]
+// Behavior for configuring local replies
+message LocalReplyConfiguration {
+  message JsonReply {
+    string body = 1;
+  }
+
+  // If not set, the default is always_text
+  oneof reply_type {
+    // [#not-implemented-hide:]
+    bool determine_via_accept_header = 2;
+    bool always_json = 3;
+    bool always_text = 4;
+  }
+}

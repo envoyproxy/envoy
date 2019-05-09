@@ -296,7 +296,8 @@ private:
     // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
     // called here may change the content type, so we must check it before the call.
     FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) {
-      local_reply_info_ = Utility::generateLocalReplyInfo(headers);
+      local_reply_info_ = Utility::generateLocalReplyInfo(
+          headers, parent_.connection_manager_.config_.localReplyType());
       FilterHeadersStatus status = handle_->decodeHeaders(headers, end_stream);
       if (end_stream) {
         handle_->decodeComplete();

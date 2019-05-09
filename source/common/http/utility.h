@@ -13,6 +13,7 @@
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
 
+#include "common/http/conn_manager_config.h"
 #include "common/json/json_loader.h"
 
 #include "absl/strings/string_view.h"
@@ -178,14 +179,15 @@ Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOption
 struct LocalReplyInfo {
   bool is_grpc{false};
   bool is_head_request{false};
-  bool accept_json_type{false};
+  Http::LocalReplyType reply_type{Http::LocalReplyType::AlwaysText};
 };
 
 /**
  * @return LocalReplyInfo A populated LocalReplyInfo object from the
  * Http::HeaderMap& request_headers.
  */
-LocalReplyInfo generateLocalReplyInfo(const Http::HeaderMap& request_headers);
+LocalReplyInfo generateLocalReplyInfo(const Http::HeaderMap& request_headers,
+                                      const Http::LocalReplyType& reply_type);
 
 /**
  * Create a locally generated response using filter callbacks.

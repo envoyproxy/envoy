@@ -288,6 +288,7 @@ envoy_cc_library(
         "http_parser",
     ],
     deps = [
+        ":conn_manager_config_interface",
         ":exception_lib",
         ":header_map_lib",
         ":headers_lib",
@@ -307,7 +308,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/core:http_uri_cc",
         "@envoy_api//envoy/api/v2/core:protocol_cc",
-        "@envoy_api//envoy/data/core/v2alpha:local_reply_cc",
+        "@envoy_api//envoy/data/core/v2alpha:local_reply_configuration_cc",
     ],
 )
 

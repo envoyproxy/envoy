@@ -1,7 +1,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/data/core/v2alpha/local_reply.pb.h"
+#include "envoy/data/core/v2alpha/local_reply_configuration.pb.h"
 #include "envoy/api/v2/core/protocol.pb.h"
 #include "envoy/api/v2/core/protocol.pb.validate.h"
 
@@ -543,17 +543,17 @@ TEST(HttpUtility, SendLocalReplyJsonConntentTypeRequest) {
   bool is_reset = false;
   EXPECT_CALL(callbacks, encodeHeaders_(_, false))
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.ContentType()->value().c_str(),
+        EXPECT_EQ(headers.ContentType()->value().getStringView(),
                   Http::Headers::get().ContentTypeValues.Json);
       }));
   EXPECT_CALL(callbacks, encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void {
-        envoy::data::core::v2alpha::LocalReply local_reply;
+        envoy::data::core::v2alpha::LocalReplyConfiguration::JsonReply local_reply;
         local_reply.set_body("large");
         EXPECT_EQ(MessageUtil::getJsonStringFromMessage(local_reply, true, true), data.toString());
       }));
   Utility::LocalReplyInfo info;
-  info.accept_json_type = true;
+  info.reply_type = Http::LocalReplyType::AlwaysJson;
   Utility::sendLocalReply(info, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
                           absl::nullopt);
 }
