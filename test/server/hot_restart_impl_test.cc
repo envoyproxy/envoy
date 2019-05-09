@@ -6,6 +6,7 @@
 
 #include "server/hot_restart_impl.h"
 
+#include "test/mocks/api/hot_restart.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/logging.h"
