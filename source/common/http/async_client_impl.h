@@ -355,6 +355,8 @@ private:
   void setDecoderBufferLimit(uint32_t) override {}
   uint32_t decoderBufferLimit() override { return 0; }
   bool recreateStream() override { return false; }
+  void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
+  Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
 
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;

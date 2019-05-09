@@ -69,7 +69,7 @@ function bazel_debug_binary_build() {
 }
 
 if [[ "$1" == "bazel.release" ]]; then
-  setup_gcc_toolchain
+  setup_clang_toolchain
   echo "bazel release build with tests..."
   bazel_release_binary_build
 
@@ -84,34 +84,25 @@ if [[ "$1" == "bazel.release" ]]; then
     # We have various test binaries in the test directory such as tools, benchmarks, etc. We
     # run a build pass to make sure they compile.
 
-    # Reduce the amount of memory and number of cores Bazel tries to use to
-    # prevent it from launching too many subprocesses. This should prevent the
-    # system from running out of memory and killing tasks. See discussion on
-    # https://github.com/envoyproxy/envoy/pull/5611.
-    # TODO(akonradi): use --local_cpu_resources flag once Bazel has a release
-    # after 0.21.
-    [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_resources=12288,5,1"
-    [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=12288,5,1 --local_test_jobs=8"
-
     bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
     # Now run all of the tests which should already be compiled.
     bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c opt //test/...
   fi
   exit 0
 elif [[ "$1" == "bazel.release.server_only" ]]; then
-  setup_gcc_toolchain
+  setup_clang_toolchain
   echo "bazel release build..."
   bazel_release_binary_build
   exit 0
 elif [[ "$1" == "bazel.debug" ]]; then
-  setup_gcc_toolchain
+  setup_clang_toolchain
   echo "bazel debug build with tests..."
   bazel_debug_binary_build
   echo "Testing..."
   bazel test ${BAZEL_TEST_OPTIONS} -c dbg //test/...
   exit 0
 elif [[ "$1" == "bazel.debug.server_only" ]]; then
-  setup_gcc_toolchain
+  setup_clang_toolchain
   echo "bazel debug build..."
   bazel_debug_binary_build
   exit 0
