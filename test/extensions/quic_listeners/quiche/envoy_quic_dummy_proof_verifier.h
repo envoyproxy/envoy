@@ -4,7 +4,7 @@
 
 namespace Envoy {
 
-class EnvoyQuicFakeProofVerifier : public quic::ProofVerifier {
+class EnvoyQuicDummyProofVerifier : public quic::ProofVerifier {
 public:
   EnvoyQuicFakeProofVerifier() {}
   ~EnvoyQuicFakeProofVerifier() override {}

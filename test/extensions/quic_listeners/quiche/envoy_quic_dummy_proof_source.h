@@ -5,7 +5,11 @@
 
 namespace Envoy {
 
-class EnvoyQuicFakeProofSource : public quic::ProofSource {
+// A dummy implementation of ProofSource interface which provides identical
+// dummy CryptoProof, Chain and signature string. This is used for testing
+// purpose before we have a real ProofSource which reads certs from Envoy
+// config.
+class EnvoyQuicDummyProofSource : public quic::ProofSource {
 public:
   EnvoyQuicFakeProofSource() {}
   ~EnvoyQuicFakeProofSource() override {}
