@@ -24,14 +24,11 @@ public:
     }
   }
 
-  // TODO(PiotrSikora): Revert https://github.com/envoyproxy/envoy/pull/1500 once protobuf string
-  // types converge.
-
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  const std::string zoneName() const override { return node_.locality().zone(); }
-  const std::string clusterName() const override { return node_.cluster(); }
-  const std::string nodeName() const override { return node_.id(); }
-  const envoy::api::v2::core::Node& node() const override { return node_; }
+  const std::string& zoneName() const override { return node_.locality().zone(); }
+  const std::string& clusterName() const override { return node_.cluster(); }
+  const std::string& nodeName() const override { return node_.id(); }
+  const envoy::api::v2::Node& node() const override { return node_; }
 
 private:
   envoy::api::v2::core::Node node_;
