@@ -200,7 +200,7 @@ public:
   ConfigProviderPtr
   createStaticConfigProvider(std::vector<std::unique_ptr<const Protobuf::Message>>&&,
                              Server::Configuration::FactoryContext&, const OptionalArg&) override {
-    ASSERT(false || "this provider does not expect multiple config protos");
+    ASSERT(false, "this provider does not expect multiple config protos");
     return nullptr;
   }
 };
