@@ -5,9 +5,10 @@ resources:
 
 jobs:
 - job: BuildEnvoy
+  timeoutInMinutes: 120
   pool:
     vmImage: 'Ubuntu 16.04'
   container: envoy-build
   steps:
-  - script: bazel build -c opt //source/... --action_env=PATH=PATH=/usr/lib/llvm-8/bin:$PATH --action_env=CC=clang --action_env=CXX=clang++
+  - script: bazel build //source/exe:envoy-static
 
