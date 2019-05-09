@@ -26,7 +26,7 @@ struct BufferInstanceContainer {
   Buffer::InstancePtr buffer_;
 
   static void derefBufferInstanceContainer(void* container_ptr) {
-    auto container = reinterpret_cast<BufferInstanceContainer*>(container_ptr);
+    auto container = static_cast<BufferInstanceContainer*>(container_ptr);
     container->ref_count_--;
     // This is safe because the ref_count_ is never incremented.
     if (container->ref_count_ <= 0) {

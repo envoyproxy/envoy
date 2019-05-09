@@ -14,18 +14,19 @@ class GoogleGrpcUtils {
 public:
   /**
    * Build grpc::ByteBuffer which aliases the data in a Buffer::InstancePtr.
-   * @param bufferInstance source data container.
+   * @param buffer source data container.
    * @return byteBuffer target container aliased to the data in Buffer::Instance and owning the
    * Buffer::Instance.
    */
-  static grpc::ByteBuffer makeByteBuffer(Buffer::InstancePtr&& bufferInstance);
+  static grpc::ByteBuffer makeByteBuffer(Buffer::InstancePtr&& buffer);
 
   /**
    * Build Buffer::Instance which aliases the data in a grpc::ByteBuffer.
-   * @param byteBuffer source data container.
-   * @param Buffer::InstancePtr target container aliased to the data in grpc::ByteBuffer.
+   * @param buffer source data container.
+   * @return a Buffer::InstancePtr aliased to the data in the provided grpc::ByteBuffer and
+   * owning the corresponding grpc::Slice(s).
    */
-  static Buffer::InstancePtr makeBufferInstance(const grpc::ByteBuffer& byteBuffer);
+  static Buffer::InstancePtr makeBufferInstance(const grpc::ByteBuffer& buffer);
 };
 
 } // namespace Grpc

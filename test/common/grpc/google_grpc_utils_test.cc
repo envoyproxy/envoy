@@ -10,6 +10,7 @@
 
 namespace Envoy {
 namespace Grpc {
+namespace {
 
 TEST(GoogleGrpcUtilsTest, MakeBufferInstanceEmpty) {
   grpc::ByteBuffer byte_buffer;
@@ -18,6 +19,8 @@ TEST(GoogleGrpcUtilsTest, MakeBufferInstanceEmpty) {
 
 TEST(GoogleGrpcUtilsTest, MakeByteBufferEmpty) {
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
+  GoogleGrpcUtils::makeByteBuffer(std::move(buffer));
+  buffer = nullptr;
   GoogleGrpcUtils::makeByteBuffer(std::move(buffer));
 }
 
@@ -53,9 +56,12 @@ TEST(GoogleGrpcUtilsTest, MakeByteBuffer1) {
 // Test building a grpc::ByteBuffer from a Bufffer::Instance with 3 slices.
 TEST(GoogleGrpcUtilsTest, MakeByteBuffer3) {
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
-  buffer->add("test", 4);
-  buffer->add(" ", 1);
-  buffer->add("this", 4);
+  Buffer::BufferFragmentImpl f1("test", 4, nullptr);
+  buffer->addBufferFragment(f1);
+  Buffer::BufferFragmentImpl f2(" ", 1, nullptr);
+  buffer->addBufferFragment(f2);
+  Buffer::BufferFragmentImpl f3("this", 4, nullptr);
+  buffer->addBufferFragment(f3);
   auto byte_buffer = GoogleGrpcUtils::makeByteBuffer(std::move(buffer));
   std::vector<grpc::Slice> slices;
   byte_buffer.Dump(&slices);
@@ -77,5 +83,6 @@ TEST(GoogleGrpcUtilsTest, ByteBufferInstanceRoundTrip) {
   EXPECT_EQ(buffer_instance2->toString(), "test this");
 }
 
+} // namespace
 } // namespace Grpc
 } // namespace Envoy
