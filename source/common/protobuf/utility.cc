@@ -291,8 +291,9 @@ std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
     return "UNAVAILABLE";
   case ProtobufUtil::error::DATA_LOSS:
     return "DATA_LOSS";
+  default:
+    return "";
   }
-  return "";
 }
 
 bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2) {
