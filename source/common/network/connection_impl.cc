@@ -97,11 +97,6 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     return;
   }
 
-  // We're now closed, there's no reason to read from this point forward. This
-  // is important to set explicitly, to handle things like delayed close. This
-  // will also apply TCP back pressure.
-  read_enabled_ = false;
-
   uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
   const bool delayed_close_timeout_set = delayedCloseTimeout().count() > 0;
@@ -245,9 +240,10 @@ void ConnectionImpl::noDelay(bool enable) {
 uint64_t ConnectionImpl::id() const { return id_; }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
-  if (!read_enabled_) {
+  if (!read_enabled_ || inDelayedClose()) {
     return;
   }
+  ASSERT(ioHandle().isOpen());
 
   if (read_buffer_size == 0 && !read_end_stream_) {
     return;
@@ -270,7 +266,6 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
     read_end_stream_raised_ = true;
   }
 
-  ASSERT(!inDelayedClose());
   filter_manager_.onRead();
 }
 
