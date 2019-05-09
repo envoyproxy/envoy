@@ -179,37 +179,7 @@ public:
   /**
    * Can throw EnvoyException if given string length is not valid.
    */
-  size_t feed(absl::string_view& data) override {
-    const size_t length_consumed = length_buf_.feed(data);
-    if (!length_buf_.ready()) {
-      // Break early: we still need to fill in length buffer.
-      return length_consumed;
-    }
-
-    if (!length_consumed_) {
-      required_ = length_buf_.get();
-      if (required_ >= 0) {
-        data_buf_ = std::vector<char>(required_);
-      } else {
-        throw EnvoyException(fmt::format("invalid STRING length: {}", required_));
-      }
-      length_consumed_ = true;
-    }
-
-    const size_t data_consumed = std::min<size_t>(required_, data.size());
-    const size_t written = data_buf_.size() - required_;
-    if (data_consumed > 0) {
-      memcpy(data_buf_.data() + written, data.data(), data_consumed);
-      required_ -= data_consumed;
-      data = {data.data() + data_consumed, data.size() - data_consumed};
-    }
-
-    if (required_ == 0) {
-      ready_ = true;
-    }
-
-    return length_consumed + data_consumed;
-  }
+  size_t feed(absl::string_view& data) override;
 
   bool ready() const override { return ready_; }
 
@@ -241,47 +211,7 @@ public:
   /**
    * Can throw EnvoyException if given string length is not valid.
    */
-  size_t feed(absl::string_view& data) override {
-    const size_t length_consumed = length_buf_.feed(data);
-    if (!length_buf_.ready()) {
-      // Break early: we still need to fill in length buffer.
-      return length_consumed;
-    }
-
-    if (!length_consumed_) {
-      required_ = length_buf_.get();
-
-      if (required_ >= 0) {
-        data_buf_ = std::vector<char>(required_);
-      }
-      if (required_ == NULL_STRING_LENGTH) {
-        ready_ = true;
-      }
-      if (required_ < NULL_STRING_LENGTH) {
-        throw EnvoyException(fmt::format("invalid NULLABLE_STRING length: {}", required_));
-      }
-
-      length_consumed_ = true;
-    }
-
-    if (ready_) {
-      return length_consumed;
-    }
-
-    const size_t data_consumed = std::min<size_t>(required_, data.size());
-    const size_t written = data_buf_.size() - required_;
-    if (data_consumed > 0) {
-      memcpy(data_buf_.data() + written, data.data(), data_consumed);
-      required_ -= data_consumed;
-      data = {data.data() + data_consumed, data.size() - data_consumed};
-    }
-
-    if (required_ == 0) {
-      ready_ = true;
-    }
-
-    return length_consumed + data_consumed;
-  }
+  size_t feed(absl::string_view& data) override;
 
   bool ready() const override { return ready_; }
 
@@ -291,8 +221,6 @@ public:
   }
 
 private:
-  constexpr static int16_t NULL_STRING_LENGTH{-1};
-
   Int16Deserializer length_buf_;
   bool length_consumed_{false};
 
@@ -314,37 +242,7 @@ public:
   /**
    * Can throw EnvoyException if given bytes length is not valid.
    */
-  size_t feed(absl::string_view& data) override {
-    const size_t length_consumed = length_buf_.feed(data);
-    if (!length_buf_.ready()) {
-      // Break early: we still need to fill in length buffer.
-      return length_consumed;
-    }
-
-    if (!length_consumed_) {
-      required_ = length_buf_.get();
-      if (required_ >= 0) {
-        data_buf_ = std::vector<unsigned char>(required_);
-      } else {
-        throw EnvoyException(fmt::format("invalid BYTES length: {}", required_));
-      }
-      length_consumed_ = true;
-    }
-
-    const size_t data_consumed = std::min<size_t>(required_, data.size());
-    const size_t written = data_buf_.size() - required_;
-    if (data_consumed > 0) {
-      memcpy(data_buf_.data() + written, data.data(), data_consumed);
-      required_ -= data_consumed;
-      data = {data.data() + data_consumed, data.size() - data_consumed};
-    }
-
-    if (required_ == 0) {
-      ready_ = true;
-    }
-
-    return length_consumed + data_consumed;
-  }
+  size_t feed(absl::string_view& data) override;
 
   bool ready() const override { return ready_; }
 
@@ -374,61 +272,15 @@ public:
   /**
    * Can throw EnvoyException if given bytes length is not valid.
    */
-  size_t feed(absl::string_view& data) override {
-    const size_t length_consumed = length_buf_.feed(data);
-    if (!length_buf_.ready()) {
-      // Break early: we still need to fill in length buffer.
-      return length_consumed;
-    }
-
-    if (!length_consumed_) {
-      required_ = length_buf_.get();
-
-      if (required_ >= 0) {
-        data_buf_ = std::vector<unsigned char>(required_);
-      }
-      if (required_ == NULL_BYTES_LENGTH) {
-        ready_ = true;
-      }
-      if (required_ < NULL_BYTES_LENGTH) {
-        throw EnvoyException(fmt::format("invalid NULLABLE_BYTES length: {}", required_));
-      }
-
-      length_consumed_ = true;
-    }
-
-    if (ready_) {
-      return length_consumed;
-    }
-
-    const size_t data_consumed = std::min<size_t>(required_, data.size());
-    const size_t written = data_buf_.size() - required_;
-    if (data_consumed > 0) {
-      memcpy(data_buf_.data() + written, data.data(), data_consumed);
-      required_ -= data_consumed;
-      data = {data.data() + data_consumed, data.size() - data_consumed};
-    }
-
-    if (required_ == 0) {
-      ready_ = true;
-    }
-
-    return length_consumed + data_consumed;
-  }
+  size_t feed(absl::string_view& data) override;
 
   bool ready() const override { return ready_; }
 
   NullableBytes get() const override {
-    if (NULL_BYTES_LENGTH == required_) {
-      return absl::nullopt;
-    } else {
-      return {data_buf_};
-    }
+    return required_ >= 0 ? absl::make_optional(data_buf_) : absl::nullopt;
   }
 
 private:
-  constexpr static int32_t NULL_BYTES_LENGTH{-1};
-
   Int32Deserializer length_buf_;
   bool length_consumed_{false};
   int32_t required_;

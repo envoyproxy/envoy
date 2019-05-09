@@ -38,8 +38,13 @@ public:
   }
 
   ~DeltaSubscriptionTestHarness() {
-    ASSERT(nonce_acks_required_ == nonce_acks_sent_,
-           "Not all nonces were ACKd, or there were unexpected ACKs!");
+    while (!nonce_acks_required_.empty()) {
+      EXPECT_FALSE(nonce_acks_sent_.empty());
+      EXPECT_EQ(nonce_acks_required_.front(), nonce_acks_sent_.front());
+      nonce_acks_required_.pop();
+      nonce_acks_sent_.pop();
+    }
+    EXPECT_TRUE(nonce_acks_sent_.empty());
   }
 
   void startSubscription(const std::set<std::string>& cluster_names) override {
@@ -67,7 +72,10 @@ public:
     std::copy(
         unsubscribe.begin(), unsubscribe.end(),
         Protobuf::RepeatedFieldBackInserter(expected_request.mutable_resource_names_unsubscribe()));
-    nonce_acks_required_.insert(last_response_nonce_);
+    if (!last_response_nonce_.empty()) {
+      nonce_acks_required_.push(last_response_nonce_);
+      last_response_nonce_ = "";
+    }
     expected_request.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
     for (auto const& resource : initial_resource_versions) {
@@ -82,8 +90,11 @@ public:
     EXPECT_CALL(async_stream_,
                 sendMessage(ProtoEqIgnoringField(expected_request, "response_nonce"), false))
         .WillOnce([this](const Protobuf::Message& message, bool) {
-          nonce_acks_sent_.insert(
-              static_cast<const envoy::api::v2::DeltaDiscoveryRequest&>(message).response_nonce());
+          const std::string nonce =
+              static_cast<const envoy::api::v2::DeltaDiscoveryRequest&>(message).response_nonce();
+          if (!nonce.empty()) {
+            nonce_acks_sent_.push(nonce);
+          }
         });
   }
 
@@ -153,7 +164,7 @@ public:
   const Protobuf::MethodDescriptor* method_descriptor_;
   Grpc::MockAsyncClient* async_client_;
   Event::MockDispatcher dispatcher_;
-  Runtime::MockRandomGenerator random_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<DeltaSubscriptionImpl> subscription_;
@@ -163,10 +174,8 @@ public:
   Event::MockTimer* init_timeout_timer_;
   envoy::api::v2::core::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
-
-private:
-  std::set<std::string> nonce_acks_required_;
-  std::set<std::string> nonce_acks_sent_;
+  std::queue<std::string> nonce_acks_required_;
+  std::queue<std::string> nonce_acks_sent_;
 };
 
 } // namespace
