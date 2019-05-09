@@ -841,6 +841,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
       Buffer::OwnedImpl empty_data("");
       ENVOY_STREAM_LOG(
           trace, "inserting an empty data frame for end_stream due metadata being added.", *this);
+      // Metadata frame doesn't carry end of stream bit. We need an empty data frame to end the
+      // stream.
       addDecodedData(*((*entry).get()), empty_data, true);
     }
 
@@ -1078,9 +1080,9 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
 
 void ConnectionManagerImpl::ActiveStream::decodeMetadata(MetadataMapPtr&& metadata_map) {
   resetIdleTimer();
-  // After going through filters, the ownership of metadata_map will be passed to router filter.
-  // Router filter may encode metadata_map to the next hop immediately or store metadata_map and
-  // encode later when connection pool is ready.
+  // After going through filters, the ownership of metadata_map will be passed to terminal filter.
+  // The terminal filter may encode metadata_map to the next hop immediately or store metadata_map
+  // and encode later when connection pool is ready.
   decodeMetadata(nullptr, *metadata_map);
 }
 
@@ -1095,9 +1097,7 @@ void ConnectionManagerImpl::ActiveStream::decodeMetadata(ActiveStreamDecoderFilt
     // If the filter pointed by entry hasn't returned from decodeHeaders, stores newly added
     // metadata in case decodeHeaders returns StopAllIteration.
     if (!(*entry)->decode_headers_called_ || (*entry)->stoppedAll()) {
-      Http::MetadataMap metadata;
-      metadata.insert(metadata_map.begin(), metadata_map.end());
-      Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata);
+      Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
       (*entry)->saved_request_metadata_.emplace_back(std::move(metadata_map_ptr));
       return;
     }
@@ -1907,7 +1907,7 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::cre
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::handleMetadataAfterHeadersCallback() {
   // If we drain accumulated metadata, the iteration must start with the current filter.
-  bool saved_state = iterate_from_current_filter_;
+  const bool saved_state = iterate_from_current_filter_;
   iterate_from_current_filter_ = true;
   // If decodeHeaders() returns StopAllIteration, we should skip draining metadata, and wait
   // for doMetadata() to drain the metadata after iteration continues.

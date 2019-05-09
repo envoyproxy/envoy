@@ -349,6 +349,7 @@ MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
 }
 
 void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr) {
+  // TODO(soya3129): remove decoder_ check or change to ASSERT after #6852.
   if (decoder_ != nullptr) {
     decoder_->decodeMetadata(std::move(metadata_map_ptr));
   }

@@ -550,6 +550,7 @@ private:
     std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_{};
     // Stores metadata added in the decoding filter that is being processed. Will be cleared before
     // processing the next filter.
+    // TODO(soya3129): change this to creation on demand.
     MetadataMapVector request_metadata_map_vector_;
     // Saves metadata if a filter has returned StopAllIteration.
     MetadataMapVector saved_request_metadata_when_stopall_;

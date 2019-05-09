@@ -354,13 +354,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   Http::ConnectionPool::Instance* conn_pool = nullptr;
-  if (upstream_requests_.front() == nullptr) {
-    // Fetch a connection pool for the upstream cluster.
-    conn_pool = getConnPool();
-    if (!conn_pool) {
-      sendNoHealthyUpstreamResponse();
-      return Http::FilterHeadersStatus::StopIteration;
-    }
+  // Fetch a connection pool for the upstream cluster.
+  conn_pool = getConnPool();
+  if (!conn_pool) {
+    sendNoHealthyUpstreamResponse();
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_.suppress_envoy_headers_,
@@ -395,11 +393,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
-  if (upstream_requests_.front() == nullptr) {
-    UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(*this, *conn_pool);
-    upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
-  }
-
+  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(*this, *conn_pool);
+  upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
     onRequestComplete();
@@ -1126,13 +1121,7 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
 
     buffered_request_body_->move(data);
   } else {
-    // Encodes metadata if exists.
-    if (!downstream_metadata_map_vector_.empty()) {
-      ENVOY_STREAM_LOG(trace, "Send metadata before sending data. {}", *parent_.callbacks_,
-                       downstream_metadata_map_vector_);
-      request_encoder_->encodeMetadata(downstream_metadata_map_vector_);
-      downstream_metadata_map_vector_.clear();
-    }
+    ASSERT(downstream_metadata_map_vector_.empty());
 
     ENVOY_STREAM_LOG(trace, "proxying {} bytes", *parent_.callbacks_, data.length());
     stream_info_.addBytesSent(data.length());
@@ -1151,13 +1140,7 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
   if (!request_encoder_) {
     ENVOY_STREAM_LOG(trace, "buffering trailers", *parent_.callbacks_);
   } else {
-    // Encodes metadata if exists.
-    if (!downstream_metadata_map_vector_.empty()) {
-      ENVOY_STREAM_LOG(trace, "Send metadata before sending trailers. {}", *parent_.callbacks_,
-                       downstream_metadata_map_vector_);
-      request_encoder_->encodeMetadata(downstream_metadata_map_vector_);
-      downstream_metadata_map_vector_.clear();
-    }
+    ASSERT(downstream_metadata_map_vector_.empty());
 
     ENVOY_STREAM_LOG(trace, "proxying trailers", *parent_.callbacks_);
     request_encoder_->encodeTrailers(trailers);
@@ -1280,7 +1263,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   bool end_stream = !buffered_request_body_ && encode_complete_ && !encode_trailers_;
   // If end_stream is set in headers, and there are metadata to send, delays end_stream. The case
   // only happens when decoding headers filters return ContinueAndEndStream.
-  bool delay_headers_end_stream = end_stream && !downstream_metadata_map_vector_.empty();
+  const bool delay_headers_end_stream = end_stream && !downstream_metadata_map_vector_.empty();
   request_encoder.encodeHeaders(*parent_.downstream_headers_,
                                 end_stream && !delay_headers_end_stream);
   calling_encode_headers_ = false;
@@ -1295,7 +1278,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   } else {
     // Encode metadata after headers and before any other frame type.
     if (!downstream_metadata_map_vector_.empty()) {
-      ENVOY_STREAM_LOG(trace, "Send metadata onPoolReady. {}", *parent_.callbacks_,
+      ENVOY_STREAM_LOG(debug, "Send metadata onPoolReady. {}", *parent_.callbacks_,
                        downstream_metadata_map_vector_);
       request_encoder.encodeMetadata(downstream_metadata_map_vector_);
       downstream_metadata_map_vector_.clear();

@@ -495,8 +495,9 @@ public:
    *
    * @param metadata supplies the decoded metadata.
    */
-  // TODO(soya3129): returns Continue in the base class.
-  virtual FilterMetadataStatus decodeMetadata(MetadataMap& metadata_map) PURE;
+  virtual FilterMetadataStatus decodeMetadata(MetadataMap& /* metadata_map */) {
+    return Http::FilterMetadataStatus::Continue;
+  }
 
   /**
    * Called by the filter manager once to initialize the filter decoder callbacks that the
