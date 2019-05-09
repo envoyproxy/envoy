@@ -14,20 +14,20 @@ OriginalSrcFilter::OriginalSrcFilter(const Config& config) : config_(config) {}
 void OriginalSrcFilter::onDestroy() {}
 
 Http::FilterHeadersStatus OriginalSrcFilter::decodeHeaders(Http::HeaderMap&, bool) {
-  auto address = callbacks_->streamInfo().downstreamRemoteAddress();
-  ASSERT(address);
+  const auto downstream_address = callbacks_->streamInfo().downstreamRemoteAddress();
+  ASSERT(downstream_address);
 
   ENVOY_LOG(debug,
             "Got a new connection in the original_src filter for address {}. Marking with {}",
-            address->asString(), config_.mark());
+            downstream_address->asString(), config_.mark());
 
-  if (address->type() != Network::Address::Type::Ip) {
+  if (downstream_address->type() != Network::Address::Type::Ip) {
     // Nothing we can do with this.
     return Http::FilterHeadersStatus::Continue;
   }
 
-  auto options_to_add =
-      Filters::Common::OriginalSrc::buildOriginalSrcOptions(std::move(address), config_.mark());
+  const auto options_to_add = Filters::Common::OriginalSrc::buildOriginalSrcOptions(
+      std::move(downstream_address), config_.mark());
   callbacks_->addUpstreamSocketOptions(options_to_add);
   return Http::FilterHeadersStatus::Continue;
 }

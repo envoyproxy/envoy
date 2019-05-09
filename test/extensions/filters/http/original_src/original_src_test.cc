@@ -74,14 +74,14 @@ protected:
   }
 };
 
-TEST_F(OriginalSrcHttpTest, onNonIpAddressDecodeSkips) {
+TEST_F(OriginalSrcHttpTest, OnNonIpAddressDecodeSkips) {
   auto filter = makeDefaultFilter();
   setAddressToReturn("unix://domain.socket");
   EXPECT_CALL(callbacks_, addUpstreamSocketOptions(_)).Times(0);
   EXPECT_EQ(filter->decodeHeaders(headers_, false), Http::FilterHeadersStatus::Continue);
 }
 
-TEST_F(OriginalSrcHttpTest, decodeHeadersIpv4AddressAddsOption) {
+TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressAddsOption) {
   auto filter = makeDefaultFilter();
 
   Network::Socket::OptionsSharedPtr options;
@@ -90,7 +90,7 @@ TEST_F(OriginalSrcHttpTest, decodeHeadersIpv4AddressAddsOption) {
 
   EXPECT_EQ(filter->decodeHeaders(headers_, false), Http::FilterHeadersStatus::Continue);
 
-  // not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
+  // Not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
   // for now.
   ASSERT_NE(options->at(0), nullptr);
 
@@ -100,7 +100,7 @@ TEST_F(OriginalSrcHttpTest, decodeHeadersIpv4AddressAddsOption) {
   options->at(0)->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
 }
 
-TEST_F(OriginalSrcHttpTest, decodeHeadersIpv4AddressUsesCorrectAddress) {
+TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressUsesCorrectAddress) {
   auto filter = makeDefaultFilter();
   Network::Socket::OptionsSharedPtr options;
   setAddressToReturn("tcp://1.2.3.4:0");
@@ -108,7 +108,7 @@ TEST_F(OriginalSrcHttpTest, decodeHeadersIpv4AddressUsesCorrectAddress) {
 
   filter->decodeHeaders(headers_, false);
   std::vector<uint8_t> key;
-  // not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
+  // Not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
   // for now.
   options->at(0)->hashKey(key);
   std::vector<uint8_t> expected_key = {1, 2, 3, 4};
@@ -116,7 +116,7 @@ TEST_F(OriginalSrcHttpTest, decodeHeadersIpv4AddressUsesCorrectAddress) {
   EXPECT_EQ(key, expected_key);
 }
 
-TEST_F(OriginalSrcHttpTest, decodeHeadersIpv4AddressBleachesPort) {
+TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressBleachesPort) {
   auto filter = makeDefaultFilter();
   Network::Socket::OptionsSharedPtr options;
   setAddressToReturn("tcp://1.2.3.4:80");
@@ -128,12 +128,12 @@ TEST_F(OriginalSrcHttpTest, decodeHeadersIpv4AddressBleachesPort) {
   const auto expected_address = Network::Utility::parseInternetAddress("1.2.3.4");
   EXPECT_CALL(socket, setLocalAddress(PointeesEq(expected_address)));
 
-  // not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
+  // Not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
   // for now.
   options->at(0)->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
 }
 
-TEST_F(OriginalSrcHttpTest, filterAddsTransparentOption) {
+TEST_F(OriginalSrcHttpTest, FilterAddsTransparentOption) {
   if (!ENVOY_SOCKET_IP_TRANSPARENT.has_value()) {
     // The option isn't supported on this platform. Just skip the test.
     return;
@@ -152,7 +152,7 @@ TEST_F(OriginalSrcHttpTest, filterAddsTransparentOption) {
   EXPECT_TRUE(transparent_option.has_value());
 }
 
-TEST_F(OriginalSrcHttpTest, filterAddsMarkOption) {
+TEST_F(OriginalSrcHttpTest, FilterAddsMarkOption) {
   if (!ENVOY_SOCKET_SO_MARK.has_value()) {
     // The option isn't supported on this platform. Just skip the test.
     return;
@@ -193,7 +193,7 @@ TEST_F(OriginalSrcHttpTest, Mark0NotAdded) {
   ASSERT_FALSE(mark_option.has_value());
 }
 
-TEST_F(OriginalSrcHttpTest, decodeDataDoesNothing) {
+TEST_F(OriginalSrcHttpTest, DecodeDataDoesNothing) {
   StrictMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   auto filter = makeFilterWithCallbacks(callbacks);
 
@@ -201,13 +201,13 @@ TEST_F(OriginalSrcHttpTest, decodeDataDoesNothing) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(buffer_, false));
 }
 
-TEST_F(OriginalSrcHttpTest, decodeTrailersDoesNothing) {
+TEST_F(OriginalSrcHttpTest, DecodeTrailersDoesNothing) {
   StrictMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   auto filter = makeFilterWithCallbacks(callbacks);
 
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(headers_));
 
-  // make sure the headers aren't changed at all by comparing them to the default.
+  // Make sure the headers haven't changed at all by comparing them to the default.
   EXPECT_EQ(headers_, Http::TestHeaderMapImpl());
 }
 } // namespace

@@ -13,14 +13,14 @@ namespace HttpFilters {
 namespace OriginalSrc {
 
 /**
- * Implements the Original Src http filter. This filter places the source address of the requested,
- * as determined by the stream's `downstreamRemoteAddress()`, into an option which will  be used to
- * partition upstream connections. This does not support non-ip (e.g. AF_UNIX) connections; they
- * will use the same address they would have had this filter not been installed.
+ * Implements the Original Src http filter. This filter places the downstream source address of the
+ * request, as determined by the stream's `downstreamRemoteAddress()`, into an option which will  be
+ * used to partition upstream connections. This does not support non-ip (e.g. AF_UNIX) connections;
+ * they will use the same address they would have had this filter not been installed.
  */
 class OriginalSrcFilter : public Http::StreamDecoderFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  OriginalSrcFilter(const Config& config);
+  explicit OriginalSrcFilter(const Config& config);
 
   // Http::StreamFilterBase
   void onDestroy() override;
