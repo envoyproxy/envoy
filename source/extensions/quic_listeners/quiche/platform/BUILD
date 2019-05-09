@@ -104,7 +104,6 @@ envoy_cc_library(
         "quic_flag_utils_impl.h",
         "quic_flags_impl.h",
         "quic_iovec_impl.h",
-        "quic_logging_impl.h",
         "quic_map_util_impl.h",
         "quic_prefetch_impl.h",
         "quic_ptr_util_impl.h",
@@ -182,7 +181,10 @@ envoy_cc_library(
         "abseil_node_hash_map",
     ],
     visibility = ["//visibility:public"],
-    deps = [":quic_platform_base_impl_lib"],
+    deps = [
+        ":quic_platform_base_impl_lib",
+        ":quic_platform_logging_impl_lib",
+    ],
 )
 
 envoy_cc_library(
