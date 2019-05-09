@@ -707,7 +707,3 @@ def envoy_select_boringssl(if_fips, default = None):
         "@envoy//bazel:boringssl_fips": if_fips,
         "//conditions:default": default or [],
     })
-
-# Selects the part of QUICHE that does not yet work with the current CI.
-def envoy_select_quiche(xs, repository = ""):
-    return xs

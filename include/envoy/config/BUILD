@@ -14,6 +14,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/common:time_interface",
+        "//source/common/common:assert_lib",
         "//source/common/protobuf",
     ],
 )
