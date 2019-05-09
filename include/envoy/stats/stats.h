@@ -61,6 +61,30 @@ public:
    */
   virtual StatName tagExtractedStatName() const PURE;
 
+  // Function to be called from iterateTagStatNames passing name and value as StatNames.
+  using TagStatNameIterFn = std::function<bool(StatName, StatName)>;
+
+  /**
+   * Iterates over all tags, calling a functor for each name/value pair. The
+   * functor can return 'true' to continue or 'false' to stop the
+   * iteration.
+   *
+   * @param fn The functor to call for StatName pair.
+   */
+  virtual void iterateTagStatNames(const TagStatNameIterFn& fn) const PURE;
+
+  // Function to be called from iterateTags passing name and value as const Tag&.
+  using TagIterFn = std::function<bool(const Tag&)>;
+
+  /**
+   * Iterates over all tags, calling a functor for each one. The
+   * functor can return 'true' to continue or 'false' to stop the
+   * iteration.
+   *
+   * @param fn The functor to call for each Tag.
+   */
+  virtual void iterateTags(const TagIterFn& fn) const PURE;
+
   /**
    * Indicates whether this metric has been updated since the server was started.
    */

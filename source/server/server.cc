@@ -378,21 +378,24 @@ void InstanceImpl::startWorkers() {
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
-  if (config.runtime()) {
-    ENVOY_LOG(info, "runtime symlink: {}", config.runtime()->symlinkRoot());
-    ENVOY_LOG(info, "runtime subdirectory: {}", config.runtime()->subdirectory());
+  if (!config.baseRuntime().fields().empty()) {
+    ENVOY_LOG(info, "non-empty base runtime layer specified in bootstrap");
+  }
+  if (config.diskRuntime()) {
+    ENVOY_LOG(info, "disk runtime symlink: {}", config.diskRuntime()->symlinkRoot());
+    ENVOY_LOG(info, "disk runtime subdirectory: {}", config.diskRuntime()->subdirectory());
 
     std::string override_subdirectory =
-        config.runtime()->overrideSubdirectory() + "/" + server.localInfo().clusterName();
-    ENVOY_LOG(info, "runtime override subdirectory: {}", override_subdirectory);
+        config.diskRuntime()->overrideSubdirectory() + "/" + server.localInfo().clusterName();
+    ENVOY_LOG(info, "disk runtime override subdirectory: {}", override_subdirectory);
 
     return std::make_unique<Runtime::DiskBackedLoaderImpl>(
-        server.dispatcher(), server.threadLocal(), config.runtime()->symlinkRoot(),
-        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random(),
-        server.api());
+        server.dispatcher(), server.threadLocal(), config.baseRuntime(),
+        config.diskRuntime()->symlinkRoot(), config.diskRuntime()->subdirectory(),
+        override_subdirectory, server.stats(), server.random(), server.api());
   } else {
-    return std::make_unique<Runtime::LoaderImpl>(server.random(), server.stats(),
-                                                 server.threadLocal());
+    return std::make_unique<Runtime::LoaderImpl>(config.baseRuntime(), server.random(),
+                                                 server.stats(), server.threadLocal());
   }
 }
 

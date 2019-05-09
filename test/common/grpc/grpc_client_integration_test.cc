@@ -7,6 +7,8 @@
 
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
 
+using testing::Eq;
+
 namespace Envoy {
 namespace Grpc {
 namespace {
@@ -272,8 +274,9 @@ TEST_P(GrpcClientIntegrationTest, RequestTrailersOnly) {
   initialize();
   auto request = createRequest(empty_metadata_);
   const Http::TestHeaderMapImpl reply_headers{{":status", "200"}, {"grpc-status", "0"}};
-  EXPECT_CALL(*request->child_span_, setTag(Tracing::Tags::get().GrpcStatusCode, "0"));
-  EXPECT_CALL(*request->child_span_, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
+  EXPECT_CALL(*request->child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("0")));
+  EXPECT_CALL(*request->child_span_,
+              setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*request, onFailure(Status::Internal, "", _)).WillExitIfNeeded();
   dispatcher_helper_.setStreamEventPending();
   EXPECT_CALL(*request->child_span_, finishSpan());
@@ -340,7 +343,7 @@ TEST_P(GrpcClientIntegrationTest, CancelRequest) {
   initialize();
   auto request = createRequest(empty_metadata_);
   EXPECT_CALL(*request->child_span_,
-              setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled));
+              setTag(Eq(Tracing::Tags::get().Status), Eq(Tracing::Tags::get().Canceled)));
   EXPECT_CALL(*request->child_span_, finishSpan());
   request->grpc_request_->cancel();
   dispatcher_helper_.dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
