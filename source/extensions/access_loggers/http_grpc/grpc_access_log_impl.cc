@@ -219,6 +219,8 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
 
     peer_properties->set_subject(stream_info.downstreamSslConnection()->subjectPeerCertificate());
 
+    tls_properties->set_tls_session_id(stream_info.downstreamSslConnection()->sessionId());
+
     // TODO(snowp): Populate remaining tls_properties fields.
   }
   common_properties->mutable_start_time()->MergeFrom(

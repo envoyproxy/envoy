@@ -397,6 +397,9 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.subjectLocalCertificate();
         });
+  } else if (field_name == "DOWNSTREAM_TLS_SESSION_ID") {
+    field_extractor_ = sslConnectionInfoStringExtractor(
+        [](const Ssl::ConnectionInfo& connection_info) { return connection_info.sessionId(); });
   } else if (field_name == "UPSTREAM_TRANSPORT_FAILURE_REASON") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       if (!stream_info.upstreamTransportFailureReason().empty()) {
