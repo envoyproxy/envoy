@@ -43,7 +43,7 @@ private:
   void disableInitFetchTimeoutTimer();
 
   std::string path_;
-  Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_;
+  Protobuf::RepeatedPtrField<std::string> resources_;
   Config::SubscriptionCallbacks* callbacks_{};
   envoy::api::v2::DiscoveryRequest request_;
   SubscriptionStats stats_;
