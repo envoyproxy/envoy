@@ -20,6 +20,7 @@ public:
         stat_name_("cluster.cluster_0.membership_healthy",
                    const_cast<Stats::SymbolTable&>(root_scope_.symbolTable())) {}
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override {
+    ENVOY_LOG_MISC(debug, "scope={}", static_cast<const void*>(&root_scope_));
     // TODO(ahedberg): This seg-faults because it thinks this stat doesn't exist...because the test
     // server and the API have different stats stores and symbol tables! :(
     if (root_scope_.getGauge(stat_name_.statName())->value() == 0) {

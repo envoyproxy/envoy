@@ -382,6 +382,10 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
   test_server_ = IntegrationTestServer::create(bootstrap_path, version_, on_server_init_function_,
                                                deterministic_, timeSystem(), *api_,
                                                defer_listener_finalization_);
+  api_for_server_stat_store_ = Api::createApiForTest(test_server_->stat_store());
+  if (use_test_server_stat_store_) {
+    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_for_server_stat_store_));
+  }
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that

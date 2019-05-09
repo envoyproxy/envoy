@@ -293,7 +293,6 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatMap<std::shared_ptr<StatType>>* tls_cache, StatNameHashSet* tls_rejected_stats,
     StatType& null_stat) {
 
-  // We do name-rejections on the full name, prior to truncation.
   if (tls_rejected_stats != nullptr &&
       tls_rejected_stats->find(name) != tls_rejected_stats->end()) {
     return null_stat;
@@ -329,6 +328,11 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   // If we have a TLS cache, insert the stat.
   if (tls_cache) {
     tls_cache->insert(std::make_pair((*central_ref)->statName(), *central_ref));
+    ENVOY_LOG_MISC(debug, "stat added to central cache map");
+    name.debugPrint();
+    ENVOY_LOG_MISC(debug, "central_cache_map = {}", static_cast<void*>(&central_cache_map));
+    ENVOY_LOG_MISC(debug, "this = {}", static_cast<const void*>(this));
+    ENVOY_LOG_MISC(debug, "parent_ = {}", static_cast<void*>(&parent_));
   }
 
   // Finally we return the reference.
@@ -342,7 +346,6 @@ const StatType* ThreadLocalStoreImpl::ScopeImpl::safeGetStat(
     StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
     StatMap<std::shared_ptr<StatType>>* tls_cache, StatNameHashSet* tls_rejected_stats) const {
 
-  // We do name-rejections on the full name, prior to truncation.
   if (tls_rejected_stats != nullptr &&
       tls_rejected_stats->find(name) != tls_rejected_stats->end()) {
     return nullptr;
@@ -359,10 +362,15 @@ const StatType* ThreadLocalStoreImpl::ScopeImpl::safeGetStat(
   // We must now look in the central store so we must be locked. We grab a reference to the
   // central store location. It might contain nothing. In this case, we return
   // nullptr.
-  Thread::LockGuard lock(parent_.lock_);
+  // already holding lock in parent
   auto iter = central_cache_map.find(name);
   if (iter == central_cache_map.end()) {
     // The stat doesn't exist in the central store, so return nullptr.
+    ENVOY_LOG_MISC(debug, "stat not in central cache map");
+    name.debugPrint();
+    ENVOY_LOG_MISC(debug, "central_cache_map = {}", static_cast<void*>(&central_cache_map));
+    ENVOY_LOG_MISC(debug, "this = {}", static_cast<const void*>(this));
+    ENVOY_LOG_MISC(debug, "parent_ = {}", static_cast<void*>(&parent_));
     return nullptr;
   }
 
@@ -582,7 +590,6 @@ const Histogram* ThreadLocalStoreImpl::ScopeImpl::getHistogram(StatName name) co
     }
   }
 
-  Thread::LockGuard lock(parent_.lock_);
   auto iter = central_cache_.histograms_.find(final_stat_name);
   ParentHistogramImplSharedPtr* central_ref = nullptr;
   if (iter == central_cache_.histograms_.end()) {

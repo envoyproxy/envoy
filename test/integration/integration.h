@@ -193,6 +193,7 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
+  Api::ApiPtr api_for_server_stat_store_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
 
   // Functions for testing reloadable config (xDS)
@@ -300,6 +301,10 @@ protected:
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.
   bool defer_listener_finalization_{false};
+
+  // Set true if you want the FactoryContext's api() call to return the Api
+  // object associated with test_server_'s stat store, rather than *api_.
+  bool use_test_server_stat_store_{false};
 
   // Member variables for xDS testing.
   FakeUpstream* xds_upstream_{};

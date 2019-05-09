@@ -42,6 +42,7 @@ public:
   const Base* get(StatName name) const {
     auto stat = stats_.find(name);
     if (stat == stats_.end()) {
+      name.debugPrint();
       return nullptr;
     }
     return stat->second.get();

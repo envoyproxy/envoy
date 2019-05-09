@@ -164,11 +164,37 @@ public:
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   const TagProducer& tagProducer() const { return *tag_producer_; }
   const Counter* getCounter(StatName name) const override {
-    return default_scope_->getCounter(name);
+    const Counter* found_counter = nullptr;
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      found_counter = scope->getCounter(name);
+      if (found_counter != nullptr) {
+        return found_counter;
+      }
+    }
+    return nullptr;
   }
-  const Gauge* getGauge(StatName name) const override { return default_scope_->getGauge(name); }
+  const Gauge* getGauge(StatName name) const override {
+    const Gauge* found_gauge = nullptr;
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      found_gauge = scope->getGauge(name);
+      if (found_gauge != nullptr) {
+        return found_gauge;
+      }
+    }
+    return nullptr;
+  }
   const Histogram* getHistogram(StatName name) const override {
-    return default_scope_->getHistogram(name);
+    const Histogram* found_histogram = nullptr;
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      found_histogram = scope->getHistogram(name);
+      if (found_histogram != nullptr) {
+        return found_histogram;
+      }
+    }
+    return nullptr;
   }
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;

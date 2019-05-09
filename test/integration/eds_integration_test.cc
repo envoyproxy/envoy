@@ -165,6 +165,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
 }
 
 TEST_P(EdsIntegrationTest, StatsReadyFilter) {
+  //  use_test_server_stat_store_ = true;
   config_helper_.addFilter("name: eds-ready-filter");
   initialize();
 
