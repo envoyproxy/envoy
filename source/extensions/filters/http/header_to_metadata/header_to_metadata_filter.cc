@@ -101,7 +101,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
   // Sane enough, add the key/value.
   switch (type) {
   case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_STRING:
-    val.set_string_value(ProtobufTypes::String(value));
+    val.set_string_value(std::string(value));
     break;
   case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_NUMBER: {
     double dval;

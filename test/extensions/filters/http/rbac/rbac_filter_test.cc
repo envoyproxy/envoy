@@ -67,8 +67,8 @@ public:
     ON_CALL(req_info_, setDynamicMetadata(HttpFilterNames::get().Rbac, _))
         .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
           req_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>(
-                  HttpFilterNames::get().Rbac, obj));
+              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(HttpFilterNames::get().Rbac,
+                                                                  obj));
         }));
   }
 

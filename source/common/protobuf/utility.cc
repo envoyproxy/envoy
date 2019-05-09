@@ -225,7 +225,7 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   if (always_print_primitive_fields) {
     json_options.always_print_primitive_fields = true;
   }
-  ProtobufTypes::String json;
+  std::string json;
   const auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
   // This should always succeed unless something crash-worthy such as out-of-memory.
   RELEASE_ASSERT(status.ok(), "");
@@ -236,7 +236,7 @@ void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message
   // TODO(htuch): Consolidate with the inflight cleanups here.
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
-  ProtobufTypes::String json;
+  std::string json;
   const auto status = Protobuf::util::MessageToJsonString(source, &json, json_options);
   if (!status.ok()) {
     throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
