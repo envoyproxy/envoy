@@ -7,7 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.data.core.v2alpha";
 
 // [#protodoc-title: Local reply configuration]
-// Behavior for configuring local replies
+
 message LocalReplyConfiguration {
   message JsonReply {
     string body = 1;
