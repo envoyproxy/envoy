@@ -62,10 +62,7 @@ envoy_cc_library(
     name = "common_lib",
     srcs = ["common.cc"],
     hdrs = ["common.h"],
-    external_deps = [
-        "abseil_optional",
-        "grpc",
-    ],
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",
@@ -114,7 +111,6 @@ envoy_cc_library(
         "grpc",
     ],
     deps = [
-        ":async_client_lib",
         ":common_lib",
         ":google_grpc_creds_lib",
         "//include/envoy/api:api_interface",
