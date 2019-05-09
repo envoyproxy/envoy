@@ -13,6 +13,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
+struct RcDetailsValues {
+  // The ext_authz filter denied the downstream request.
+  const std::string AuthzDenied = "ext_authz_denied";
+  // The ext_authz filter encountered a failure, and was configured to fail-closed.
+  const std::string AuthzError = "ext_authz_error";
+};
+typedef ConstSingleton<RcDetailsValues> RcDetails;
+
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   disabled_ = other.disabled_;
   auto begin_it = other.context_extensions_.begin();
@@ -163,8 +171,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       (response->status == CheckStatus::Error && !config_->failureModeAllow())) {
     ENVOY_STREAM_LOG(debug, "ext_authz filter rejected the request", *callbacks_);
     const std::string& details = response->status == CheckStatus::Denied
-                                     ? StreamInfo::ResponseCodeDetails::get().AuthzDenied
-                                     : StreamInfo::ResponseCodeDetails::get().AuthzError;
+                                     ? RcDetails::get().AuthzDenied
+                                     : RcDetails::get().AuthzError;
     callbacks_->sendLocalReply(
         response->status_code, response->body,
         [& headers = response->headers_to_add,

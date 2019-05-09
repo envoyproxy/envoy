@@ -8,7 +8,6 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
-    "envoy_select_quiche",
 )
 
 envoy_package()
