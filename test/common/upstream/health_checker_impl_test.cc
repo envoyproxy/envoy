@@ -3076,6 +3076,8 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedSuccessFirst) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
+      Host::HealthFlag::PENDING_ACTIVE_HC);
 
   expectSessionCreate();
   expectHealthcheckStart(0);
@@ -3089,6 +3091,8 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedSuccessFirst) {
   EXPECT_CALL(*event_logger_, logAddHealthy(_, _, true));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::PENDING_ACTIVE_HC));
 }
 
 // Test host recovery after first failed check requires several successful checks.
@@ -3098,6 +3102,8 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedFailFirst) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
+      Host::HealthFlag::PENDING_ACTIVE_HC);
 
   expectSessionCreate();
   expectHealthcheckStart(0);
@@ -3105,11 +3111,14 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedFailFirst) {
 
   // Failing first disables fast success.
   expectHealthcheckStop(0);
-  // Host was unhealthy from the start, no state change.
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  // Host was unhealthy from the start, but we expect a state change due to the pending active hc
+  // flag changing.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::NOT_SERVING);
   expectHostHealthy(false);
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::PENDING_ACTIVE_HC));
 
   // Next successful healthcheck does not move host int healthy state (because we configured
   // healthchecker this way).
