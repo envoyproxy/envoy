@@ -49,8 +49,6 @@ public:
     return vec;
   }
 
-  bool statExists(StatName name) { return stats_.find(name) != stats_.end(); }
-
 private:
   StatNameHashMap<std::shared_ptr<Base>> stats_;
   Allocator alloc_;
@@ -77,15 +75,6 @@ public:
   std::vector<GaugeSharedPtr> gauges() const override { return gauges_.toVector(); }
   std::vector<ParentHistogramSharedPtr> histograms() const override {
     return std::vector<ParentHistogramSharedPtr>{};
-  }
-
-  bool counterExists(const std::string& counter_name) override {
-    StatNameManagedStorage storage(counter_name, symbolTable());
-    return counters_.statExists(storage.statName());
-  }
-  bool gaugeExists(const std::string& gauge_name) override {
-    StatNameManagedStorage storage(gauge_name, symbolTable());
-    return gauges_.statExists(storage.statName());
   }
 
   Counter& counter(const std::string& name) override {

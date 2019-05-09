@@ -180,12 +180,11 @@ TEST(StatMergerNonFixtureTest, newStatFromParent) {
   }
   // We accessed 0 and 1 above, but not 2. Now that StatMerger has been destroyed,
   // 2 should be gone.
-  // TODO(fredlas) replace counterExists with Scope::getCounter once #6712 is merged.
-  EXPECT_TRUE(store.counterExists("newcounter0"));
-  EXPECT_TRUE(store.counterExists("newcounter1"));
-  EXPECT_FALSE(store.counterExists("newcounter2"));
-  EXPECT_TRUE(store.gaugeExists("newgauge1"));
-  EXPECT_FALSE(store.gaugeExists("newgauge2"));
+  EXPECT_TRUE(TestUtility::findCounter(store, "newcounter0"));
+  EXPECT_TRUE(TestUtility::findCounter(store, "newcounter1"));
+  EXPECT_FALSE(TestUtility::findCounter(store, "newcounter2"));
+  EXPECT_TRUE(TestUtility::findGauge(store, "newgauge1"));
+  EXPECT_FALSE(TestUtility::findGauge(store, "newgauge2"));
 }
 
 } // namespace

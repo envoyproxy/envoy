@@ -43,18 +43,6 @@ public:
    * @return a list of all known histograms.
    */
   virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
-
-  // TODO(fredlas) can be removed once #6712 is merged.
-  /**
-   * @return whether any known counter exists with this name.
-   */
-  virtual bool counterExists(const std::string& counter_name) PURE;
-
-  // TODO(fredlas) can be removed once #6712 is merged.
-  /**
-   * @return whether any known gauge exists with this name.
-   */
-  virtual bool gaugeExists(const std::string& gauge_name) PURE;
 };
 
 typedef std::unique_ptr<Store> StorePtr;

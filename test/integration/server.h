@@ -170,13 +170,6 @@ public:
     return store_.histograms();
   }
 
-  bool counterExists(const std::string& counter_name) override {
-    return store_.counterExists(counter_name);
-  }
-  bool gaugeExists(const std::string& gauge_name) override {
-    return store_.gaugeExists(gauge_name);
-  }
-
   // Stats::StoreRoot
   void addSink(Sink&) override {}
   void setTagProducer(TagProducerPtr&&) override {}
