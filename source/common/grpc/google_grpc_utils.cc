@@ -41,7 +41,7 @@ grpc::ByteBuffer GoogleGrpcUtils::makeByteBuffer(Buffer::InstancePtr&& buffer_in
   }
   Buffer::RawSlice on_raw_slice;
   // NB: we need to pass in >= 1 in order to get the real "n" (see Buffer::Instance for details).
-  int n_slices = buffer_instance->getRawSlices(&on_raw_slice, 1);
+  const int n_slices = buffer_instance->getRawSlices(&on_raw_slice, 1);
   if (n_slices <= 0) {
     return {};
   }
@@ -79,9 +79,6 @@ Buffer::InstancePtr GoogleGrpcUtils::makeBufferInstance(const grpc::ByteBuffer& 
   // lifetime of the Slice(s) exceeds our Buffer::Instance.
   std::vector<grpc::Slice> slices;
   byte_buffer.Dump(&slices);
-  if (slices.empty()) {
-    return buffer;
-  }
   auto* container = new ByteBufferContainer(static_cast<int>(slices.size()));
   std::function<void(const void*, size_t, const Buffer::BufferFragmentImpl*)> releaser =
       [container](const void*, size_t, const Buffer::BufferFragmentImpl*) {
