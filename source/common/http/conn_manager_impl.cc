@@ -686,7 +686,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
         request_headers_->Path() && !request_headers_->Path()->value().getStringView().empty();
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Utility::generateLocalReplyInfo(*request_headers_), Code::NotFound, "", nullptr,
-                   absl::nullopt, has_path ? StreamInfo::ResponseCodeDetails::get().AbsolutePath
+                   absl::nullopt,
+                   has_path ? StreamInfo::ResponseCodeDetails::get().AbsolutePath
                             : StreamInfo::ResponseCodeDetails::get().MissingPath);
     return;
   }
@@ -694,8 +695,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // Path sanitization should happen before any path access other than the above sanity check.
   if (!ConnectionManagerUtility::maybeNormalizePath(*request_headers_,
                                                     connection_manager_.config_)) {
-    sendLocalReply(Utility::generateLocalReplyInfo(*request_headers_), Code::BadRequest, "", nullptr,
-                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
+    sendLocalReply(Utility::generateLocalReplyInfo(*request_headers_), Code::BadRequest, "",
+                   nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
   }
 
