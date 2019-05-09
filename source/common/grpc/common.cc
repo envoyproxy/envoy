@@ -118,6 +118,8 @@ bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string*
 Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& message) {
   // http://www.grpc.io/docs/guides/wire.html
   // Reserve enough space for the entire message and the 5 byte header.
+  // NB: we do not use prependGrpcFrameHeader because that would add another BufferFragment and this
+  // (using a single BufferFragment) is more efficient.
   Buffer::InstancePtr body(new Buffer::OwnedImpl());
   const uint32_t size = message.ByteSize();
   const uint32_t alloc_size = size + 5;
