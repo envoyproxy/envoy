@@ -14,6 +14,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Csrf {
 
+struct RcDetailsValues {
+  const std::string OriginMismatch = "csrf_origin_mismatch";
+};
+typedef ConstSingleton<RcDetailsValues> RcDetails;
+
 namespace {
 bool isModifyMethod(const Http::HeaderMap& headers) {
   const Envoy::Http::HeaderEntry* method = headers.Method();
@@ -101,7 +106,8 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::HeaderMap& headers, bo
     return Http::FilterHeadersStatus::Continue;
   }
 
-  callbacks_->sendLocalReply(Http::Code::Forbidden, "Invalid origin", nullptr, absl::nullopt);
+  callbacks_->sendLocalReply(Http::Code::Forbidden, "Invalid origin", nullptr, absl::nullopt,
+                             RcDetails::get().OriginMismatch);
   return Http::FilterHeadersStatus::StopIteration;
 }
 

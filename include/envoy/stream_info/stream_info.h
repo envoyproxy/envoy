@@ -66,7 +66,8 @@ enum ResponseFlag {
 };
 
 /**
- * Constants for the response code details field of StreamInfo.
+ * Constants for the response code details field of StreamInfo for details sent
+ * by core (non-extension) code.
  *
  * These provide details about the stream state such as whether the
  * response is from the upstream or from envoy (in case of a local reply).
@@ -127,38 +128,6 @@ struct ResponseCodeDetailValues {
   // indicates that original "success" headers may have been sent downstream
   // despite the subsequent failure.
   const std::string LateUpstreamReset = "upstream_reset_after_response_started";
-
-  // The grpc web filter couldn't decode the data as the size wasn't a multiple of 4.
-  const std::string GrpcDecodeFailedDueToSize = "grpc_base_64_decode_failed_bad_size";
-  // The grpc web filter couldn't decode the data provided.
-  const std::string GrpcDecodeFailedDueToData = "grpc_base_64_decode_failed";
-
-  // The gRPC HTTP/1 reverse bridge failed because the body payload was too
-  // small to be a gRPC frame.
-  const std::string GrpcBridgeFailedTooSmall = "grpc_bridge_data_too_small";
-  // The gRPC HTTP/1 bridge encountered an unsupported content type.
-  const std::string GrpcBridgeFailedContentType = "grpc_bridge_content_type_wrong";
-
-  // The gRPC json transcoder filter failed to transcode when processing request headers.
-  // This will generally be accompanied by details about the transcoder failure.
-  const std::string GrpcTranscodeFailedEarly = "early_grpc_json_transcode_failure";
-  // The gRPC json transcoder filter failed to transcode when processing the request body.
-  // This will generally be accompanied by details about the transcoder failure.
-  const std::string GrpcTranscodeFailed = "grpc_json_transcode_failure";
-
-  // The ext_authz filter denied the downstream request.
-  const std::string AuthzDenied = "ext_authz_denied";
-  // The ext_authz filter encountered a failure, and was configured to fail-closed.
-  const std::string AuthzError = "ext_authz_error";
-
-  // The fault filter injected an abort for this request.
-  const std::string FaultAbort = "fault_filter_abort";
-
-  // This request went above the configured limits for the rate limit filter.
-  const std::string RateLimited = "request_rate_limited";
-  // The rate limiter encountered a failure, and was configured to fail-closed.
-  const std::string RateLimitError = "rate_limiter_error";
-  // TODO(#6542): continue addding values for sendLocalReply use-cases
 };
 
 typedef ConstSingleton<ResponseCodeDetailValues> ResponseCodeDetails;
