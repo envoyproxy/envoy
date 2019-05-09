@@ -113,8 +113,7 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
   auto cluster_load_assignment =
       MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[0]);
   MessageUtil::validate(cluster_load_assignment);
-  // TODO(PiotrSikora): Remove this hack once fixed internally.
-  if (!(cluster_load_assignment.cluster_name() == cluster_name_)) {
+  if (cluster_load_assignment.cluster_name() != cluster_name_) {
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
                                      cluster_load_assignment.cluster_name()));
   }

@@ -71,7 +71,7 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& health_che
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
-            std::string(health_check_config.custom_health_check().name()));
+            health_check_config.custom_health_check().name());
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,
                                             std::move(event_logger)));
