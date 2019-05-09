@@ -60,13 +60,13 @@ public:
    * Computes the size of this request, if it were to be serialized.
    * @return serialized size of request
    */
-  virtual size_t computeSize() const PURE;
+  virtual uint32_t computeSize() const PURE;
 
   /**
    * Encode the contents of this request into a given buffer.
    * @param dst buffer instance to keep serialized message
    */
-  virtual size_t encode(Buffer::Instance& dst) const PURE;
+  virtual uint32_t encode(Buffer::Instance& dst) const PURE;
 
   /**
    * Request's header.
@@ -89,11 +89,11 @@ public:
       : AbstractRequest{request_header}, data_{data} {};
 
   /**
-   * Compute the size of request, what includes both the request header and its real data.
+   * Compute the size of request, which includes both the request header and its real data.
    */
-  size_t computeSize() const override {
+  uint32_t computeSize() const override {
     const EncodingContext context{request_header_.api_version_};
-    size_t result = 0;
+    uint32_t result{0};
     // Compute size of header.
     result += context.computeSize(request_header_.api_key_);
     result += context.computeSize(request_header_.api_version_);
@@ -107,9 +107,9 @@ public:
   /**
    * Encodes given request into a buffer, with any extra configuration carried by the context.
    */
-  size_t encode(Buffer::Instance& dst) const override {
+  uint32_t encode(Buffer::Instance& dst) const override {
     EncodingContext context{request_header_.api_version_};
-    size_t written{0};
+    uint32_t written{0};
     // Encode request header.
     written += context.encode(request_header_.api_key_, dst);
     written += context.encode(request_header_.api_version_, dst);

@@ -80,7 +80,7 @@ void RequestDecoder::doParse(const Buffer::RawSlice& slice) {
 }
 
 void RequestEncoder::encode(const AbstractRequest& message) {
-  const int32_t size = htobe32(message.computeSize());
+  const uint32_t size = htobe32(message.computeSize());
   output_.add(&size, sizeof(size)); // Encode data length.
   message.encode(output_);          // Encode data.
 }
