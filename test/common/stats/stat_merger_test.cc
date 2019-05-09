@@ -5,12 +5,9 @@
 #include "common/stats/stat_merger.h"
 #include "common/stats/thread_local_store.h"
 
-#include "test/mocks/event/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-
-using testing::NiceMock;
 
 namespace Envoy {
 namespace Stats {

@@ -55,8 +55,7 @@ envoy_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stat_merger_lib",
         "//source/common/stats:thread_local_store_lib",
-        "//test/mocks/event:event_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
