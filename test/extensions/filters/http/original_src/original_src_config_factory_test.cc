@@ -18,7 +18,7 @@ namespace HttpFilters {
 namespace OriginalSrc {
 namespace {
 
-TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
+TEST(OriginalSrcHttpConfigFactoryTest, TestCreateFactory) {
   std::string yaml = R"EOF(
     mark: 5
 )EOF";

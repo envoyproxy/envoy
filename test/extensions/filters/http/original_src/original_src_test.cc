@@ -26,7 +26,7 @@ namespace HttpFilters {
 namespace OriginalSrc {
 namespace {
 
-class OriginalSrcTest : public testing::Test {
+class OriginalSrcHttpTest : public testing::Test {
 public:
   std::unique_ptr<OriginalSrcFilter> makeDefaultFilter() {
     return makeFilterWithCallbacks(callbacks_);
@@ -74,14 +74,14 @@ protected:
   }
 };
 
-TEST_F(OriginalSrcTest, onNonIpAddressDecodeSkips) {
+TEST_F(OriginalSrcHttpTest, onNonIpAddressDecodeSkips) {
   auto filter = makeDefaultFilter();
   setAddressToReturn("unix://domain.socket");
   EXPECT_CALL(callbacks_, addUpstreamSocketOptions(_)).Times(0);
   EXPECT_EQ(filter->decodeHeaders(headers_, false), Http::FilterHeadersStatus::Continue);
 }
 
-TEST_F(OriginalSrcTest, decodeHeadersIpv4AddressAddsOption) {
+TEST_F(OriginalSrcHttpTest, decodeHeadersIpv4AddressAddsOption) {
   auto filter = makeDefaultFilter();
 
   Network::Socket::OptionsSharedPtr options;
@@ -100,7 +100,7 @@ TEST_F(OriginalSrcTest, decodeHeadersIpv4AddressAddsOption) {
   options->at(0)->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
 }
 
-TEST_F(OriginalSrcTest, decodeHeadersIpv4AddressUsesCorrectAddress) {
+TEST_F(OriginalSrcHttpTest, decodeHeadersIpv4AddressUsesCorrectAddress) {
   auto filter = makeDefaultFilter();
   Network::Socket::OptionsSharedPtr options;
   setAddressToReturn("tcp://1.2.3.4:0");
@@ -116,7 +116,7 @@ TEST_F(OriginalSrcTest, decodeHeadersIpv4AddressUsesCorrectAddress) {
   EXPECT_EQ(key, expected_key);
 }
 
-TEST_F(OriginalSrcTest, decodeHeadersIpv4AddressBleachesPort) {
+TEST_F(OriginalSrcHttpTest, decodeHeadersIpv4AddressBleachesPort) {
   auto filter = makeDefaultFilter();
   Network::Socket::OptionsSharedPtr options;
   setAddressToReturn("tcp://1.2.3.4:80");
@@ -133,7 +133,7 @@ TEST_F(OriginalSrcTest, decodeHeadersIpv4AddressBleachesPort) {
   options->at(0)->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
 }
 
-TEST_F(OriginalSrcTest, filterAddsTransparentOption) {
+TEST_F(OriginalSrcHttpTest, filterAddsTransparentOption) {
   if (!ENVOY_SOCKET_IP_TRANSPARENT.has_value()) {
     // The option isn't supported on this platform. Just skip the test.
     return;
@@ -152,7 +152,7 @@ TEST_F(OriginalSrcTest, filterAddsTransparentOption) {
   EXPECT_TRUE(transparent_option.has_value());
 }
 
-TEST_F(OriginalSrcTest, filterAddsMarkOption) {
+TEST_F(OriginalSrcHttpTest, filterAddsMarkOption) {
   if (!ENVOY_SOCKET_SO_MARK.has_value()) {
     // The option isn't supported on this platform. Just skip the test.
     return;
@@ -174,7 +174,7 @@ TEST_F(OriginalSrcTest, filterAddsMarkOption) {
   EXPECT_EQ(value_as_bstr, mark_option->value_);
 }
 
-TEST_F(OriginalSrcTest, Mark0NotAdded) {
+TEST_F(OriginalSrcHttpTest, Mark0NotAdded) {
   if (!ENVOY_SOCKET_SO_MARK.has_value()) {
     // The option isn't supported on this platform. Just skip the test.
     return;
@@ -193,7 +193,7 @@ TEST_F(OriginalSrcTest, Mark0NotAdded) {
   ASSERT_FALSE(mark_option.has_value());
 }
 
-TEST_F(OriginalSrcTest, decodeDataDoesNothing) {
+TEST_F(OriginalSrcHttpTest, decodeDataDoesNothing) {
   StrictMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   auto filter = makeFilterWithCallbacks(callbacks);
 
@@ -201,7 +201,7 @@ TEST_F(OriginalSrcTest, decodeDataDoesNothing) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(buffer_, false));
 }
 
-TEST_F(OriginalSrcTest, decodeTrailersDoesNothing) {
+TEST_F(OriginalSrcHttpTest, decodeTrailersDoesNothing) {
   StrictMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   auto filter = makeFilterWithCallbacks(callbacks);
 
