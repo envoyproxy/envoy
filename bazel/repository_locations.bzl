@@ -38,9 +38,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/circonus-labs/libcircllhist/archive/63a16dd6f2fc7bc841bb17ff92be8318df60e2e1.tar.gz"],
     ),
     com_github_cyan4973_xxhash = dict(
-        sha256 = "19030315f4fc1b4b2cdb9d7a317069a109f90e39d1fe4c9159b7aaa39030eb95",
-        strip_prefix = "xxHash-0.6.5",
-        urls = ["https://github.com/Cyan4973/xxHash/archive/v0.6.5.tar.gz"],
+        sha256 = "b34792646d5e19964bb7bba24f06cb13aecaac623ab91a54da08aa19d3686d7e",
+        strip_prefix = "xxHash-0.7.0",
+        urls = ["https://github.com/Cyan4973/xxHash/archive/v0.7.0.tar.gz"],
     ),
     com_github_envoyproxy_sqlparser = dict(
         sha256 = "425dfee0c4fe9aff8acf2365cde3dd2ba7fb878d2ba37562d33920e34c40c05e",
@@ -82,9 +82,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gperftools/gperftools/archive/fc00474ddc21fff618fc3f009b46590e241e425e.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
-        sha256 = "01c5e617d098a33672ddb640d0e50831fb7c613999435e5dcf115021abde6b9a",
-        strip_prefix = "grpc-1.20.0",
-        urls = ["https://github.com/grpc/grpc/archive/v1.20.0.tar.gz"],
+        sha256 = "ba8b08a697b66e14af35da07753583cf32ff3d14dcd768f91b1bbe2e6c07c349",
+        strip_prefix = "grpc-1.20.1",
+        urls = ["https://github.com/grpc/grpc/archive/v1.20.1.tar.gz"],
     ),
     com_github_luajit_luajit = dict(
         sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",
@@ -92,14 +92,14 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/LuaJIT/LuaJIT/archive/v2.1.0-beta3.tar.gz"],
     ),
     com_github_nanopb_nanopb = dict(
-        sha256 = "b8dd5cb0d184d424ddfea13ddee3f7b0920354334cbb44df434d55e5f0086b12",
-        strip_prefix = "nanopb-0.3.9.2",
-        urls = ["https://github.com/nanopb/nanopb/archive/0.3.9.2.tar.gz"],
+        sha256 = "5fb4dab0b7f6a239908407fe07c9d03877cd0502abb637e38c41091cb9c1d438",
+        strip_prefix = "nanopb-0.3.9.3",
+        urls = ["https://github.com/nanopb/nanopb/archive/0.3.9.3.tar.gz"],
     ),
     com_github_nghttp2_nghttp2 = dict(
-        sha256 = "6b222a264aca23d497f7878a7751bd9da12676717493fe747db49afb51daae79",
-        strip_prefix = "nghttp2-1.36.0",
-        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.36.0/nghttp2-1.36.0.tar.gz"],
+        sha256 = "fe9a75ec44e3a2e8f7f0cb83ad91e663bbc4c5085baf37b57ee2610846d7cf5d",
+        strip_prefix = "nghttp2-1.38.0",
+        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.38.0/nghttp2-1.38.0.tar.gz"],
     ),
     io_opentracing_cpp = dict(
         sha256 = "015c4187f7a6426a2b5196f0ccd982aa87f010cf61f507ae3ce5c90523f92301",
@@ -164,9 +164,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/nodejs/http-parser/archive/v2.9.0.tar.gz"],
     ),
     com_github_pallets_jinja = dict(
-        sha256 = "f84be1bb0040caca4cea721fcbbbbd61f9be9464ca236387158b0feea01914a4",
-        strip_prefix = "Jinja2-2.10",
-        urls = ["https://github.com/pallets/jinja/releases/download/2.10/Jinja2-2.10.tar.gz"],
+        sha256 = "e9baab084b8d84b511c75aca98bba8585041dbe971d5476ee53d9c6eea1b58b3",
+        strip_prefix = "jinja-2.10.1",
+        urls = ["https://github.com/pallets/jinja/archive/2.10.1.tar.gz"],
     ),
     com_github_pallets_markupsafe = dict(
         sha256 = "222a10e3237d92a9cd45ed5ea882626bc72bc5e0264d3ed0f2c9129fa69fc167",
@@ -201,9 +201,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/googletest/archive/eb9225ce361affe561592e0912320b9db84985d0.tar.gz"],
     ),
     com_google_protobuf = dict(
-        sha256 = "3e933375ecc58d01e52705479b82f155aea2d02cc55d833f8773213e74f88363",
-        strip_prefix = "protobuf-3.7.0",
-        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.7.0/protobuf-all-3.7.0.tar.gz"],
+        sha256 = "c10ef8d8ad5a9e5f850483051b7f9ee2c8bb3ca2e0e16a4cf105bd1321afb2d6",
+        strip_prefix = "protobuf-3.7.1",
+        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/protobuf-all-3.7.1.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
         sha256 = "dedd76b0169eb8c72e479529301a1d9b914a4ccb4d2b5ddb4ebe92d63a7b2152",
@@ -213,14 +213,14 @@ REPOSITORY_LOCATIONS = dict(
     ),
     com_github_golang_protobuf = dict(
         # TODO(sesmith177): Remove this dependency when:
-        #   1. There's a release of rules_go that includes golang/protobuf v1.3.0
-        sha256 = "f44cfe140cdaf0031dac7d7376eee4d5b07084cce400d7ecfac4c46d33f18a52",
-        strip_prefix = "protobuf-1.3.0",
-        urls = ["https://github.com/golang/protobuf/archive/v1.3.0.tar.gz"],
+        #   1. There's a release of rules_go that includes golang/protobuf v1.3.1
+        sha256 = "3f3a6123054a9847093c119895f1660612f301fe95358f3a6a1a33fd0933e6cf",
+        strip_prefix = "protobuf-1.3.1",
+        urls = ["https://github.com/golang/protobuf/archive/v1.3.1.tar.gz"],
     ),
     io_bazel_rules_go = dict(
-        sha256 = "6776d68ebb897625dead17ae510eac3d5f6342367327875210df44dbe2aeeb19",
-        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.17.1/rules_go-0.17.1.tar.gz"],
+        sha256 = "91b79f4758fd16f2c6426279ce00c1d2d8577d61c519db39675ed84657e1a95e",
+        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.17.4/rules_go-0.17.4.tar.gz"],
     ),
     rules_foreign_cc = dict(
         sha256 = "136470a38dcd00c7890230402b43004dc947bf1e3dd0289dd1bd2bfb1e0a3484",
