@@ -45,7 +45,7 @@ grpc::ByteBuffer GoogleGrpcUtils::makeByteBuffer(Buffer::InstancePtr&& buffer_in
   if (n_slices <= 0) {
     return {};
   }
-  auto container = new BufferInstanceContainer{n_slices, std::move(buffer_instance)};
+  auto* container = new BufferInstanceContainer{n_slices, std::move(buffer_instance)};
   if (n_slices == 1) {
     grpc::Slice one_slice(on_raw_slice.mem_, on_raw_slice.len_,
                           &BufferInstanceContainer::derefBufferInstanceContainer, container);
