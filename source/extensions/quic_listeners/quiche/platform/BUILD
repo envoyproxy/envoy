@@ -9,11 +9,20 @@ load(
 
 envoy_package()
 
-# Build targets in this package are part of the QUICHE platform implementation,
-# are are not to be consumed or referenced directly by other Envoy code. The
-# only consumers should be build rules under @com_googlesource_quiche//..., and
-# tests. In a monorepo, this would be enforced via visibility attribute, but
+# Build targets in this package are part of the QUICHE platform implementation.
+# These implementations are the infrastructure building block for QUIC. They are
+# used in 2 different ways:
+#
+# Most of them are not to be consumed or referenced directly by other Envoy code.
+# Their only consumers should be build rules under @com_googlesource_quiche//...,
+# and tests. In a monorepo, this would be enforced via visibility attribute, but
 # Bazel does not support limiting visibility to specific external dependencies.
+#
+# Very few of them are used by Envoy to interact with QUIC. What they do is
+# wrapping Envoy data type to QUIC data type.
+#
+# See a detailed description of QUIC platform API dependency model at:
+# https://quiche.googlesource.com/quiche/+/refs/heads/master/quic/platform/api/README.md
 
 # TODO: add build target for quic_platform_impl_lib
 

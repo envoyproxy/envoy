@@ -17,6 +17,13 @@
 #include "absl/base/optimization.h"
 #include "absl/synchronization/mutex.h"
 
+// This implementation is only used by Quiche code, use macros provided by
+// assert.h and logger.h in Envoy code instead. See QUIC platform API
+// dependency model described in
+// https://quiche.googlesource.com/quiche/+/refs/heads/master/quic/platform/api/README.md
+//
+// The implementation is backed by Envoy::Logger.
+
 // If |condition| is true, use |logstream| to stream the log message and send it to spdlog.
 // If |condition| is false, |logstream| will not be instantiated.
 // The switch(0) is used to suppress a compiler warning on ambiguous "else".
@@ -56,7 +63,6 @@
 #define QUIC_LOG_WARNING_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::WARNING)
 #define QUIC_LOG_ERROR_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::ERROR)
 
-// CHECK and DCHECK are only used by quiche code, use ASSERT instead in envoy code.
 #define CHECK(condition)                                                                           \
   QUIC_LOG_IF_IMPL(FATAL, ABSL_PREDICT_FALSE(!(condition))) << "CHECK failed: " #condition "."
 

@@ -8,13 +8,14 @@
 
 #include "common/common/assert.h"
 
+#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/genfiles/external/com_googlesource_quiche/quiche/quic/core/quic_types.h"
+
 namespace quic {
 
 Envoy::Buffer::BufferFragmentImpl*
 QuicMemSliceImpl::allocateBufferAndFragment(QuicBufferAllocator* allocator, size_t length) {
-  auto bundle = reinterpret_cast<BufferFragmentBundle*>(
-      allocator->New(sizeof(BufferFragmentBundle) + length));
-  Envoy::Buffer::BufferFragmentImpl& fragment = bundle->fragment_with_padding_.fragment_;
+  BufferFragmentBundle* bundle = BufferFragmentBundle::CreateBundleWithSize(allocator, length);
+  Envoy::Buffer::BufferFragmentImpl& fragment = bundle->fragment();
   return new (&fragment) Envoy::Buffer::BufferFragmentImpl(
       bundle->buffer_, length,
       [allocator](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl* frag) {

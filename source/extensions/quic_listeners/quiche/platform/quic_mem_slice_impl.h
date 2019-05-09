@@ -6,6 +6,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include <cstddef>
 #include <iostream>
 #include <memory>
 
@@ -61,6 +62,13 @@ public:
 private:
   // Used to align both fragment and buffer at max aligned address.
   struct BufferFragmentBundle {
+    static BufferFragmentBundle* CreateBundleWithSize(QuicBufferAllocator* allocator,
+                                                      size_t length) {
+      return reinterpret_cast<BufferFragmentBundle*>(
+          allocator->New(sizeof(BufferFragmentBundle) + length));
+    }
+
+    Envoy::Buffer::BufferFragmentImpl& fragment() { return fragment_with_padding_.fragment_; }
     // Wrap fragment in a nested struct so that it can be padded according to
     // its alignment requirement: max_align_t. This ensures buffer to start at a
     // max aligned address.
