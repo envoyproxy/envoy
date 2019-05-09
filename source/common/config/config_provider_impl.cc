@@ -10,6 +10,8 @@ ImmutableConfigProviderBase::ImmutableConfigProviderBase(
     : last_updated_(factory_context.timeSource().systemTime()),
       config_provider_manager_(config_provider_manager), instance_type_(instance_type),
       api_type_(api_type) {
+  ASSERT(instance_type_ == ConfigProviderInstanceType::Static ||
+         instance_type_ == ConfigProviderInstanceType::Inline);
   config_provider_manager_.bindImmutableConfigProvider(this);
 }
 
