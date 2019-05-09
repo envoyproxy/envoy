@@ -85,9 +85,9 @@ SharedMemory* attachSharedMemory(const Options& options) {
 
 void initializeMutex(pthread_mutex_t& mutex) {
   pthread_mutexattr_t attribute;
-  // pthread_mutexattr_init(&attribute);
-  // pthread_mutexattr_setpshared(&attribute, PTHREAD_PROCESS_SHARED);
-  // pthread_mutexattr_setrobust(&attribute, PTHREAD_MUTEX_ROBUST);
+  pthread_mutexattr_init(&attribute);
+  pthread_mutexattr_setpshared(&attribute, PTHREAD_PROCESS_SHARED);
+  pthread_mutexattr_setrobust(&attribute, PTHREAD_MUTEX_ROBUST);
   pthread_mutex_init(&mutex, &attribute);
 }
 

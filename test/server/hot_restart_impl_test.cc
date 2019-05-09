@@ -50,7 +50,8 @@ public:
   Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   Api::MockHotRestartOsSysCalls hot_restart_os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::HotRestartOsSysCallsImpl> hot_restart_os_calls{&hot_restart_os_sys_calls_};
+  TestThreadsafeSingletonInjector<Api::HotRestartOsSysCallsImpl> hot_restart_os_calls{
+      &hot_restart_os_sys_calls_};
   NiceMock<MockOptions> options_;
   std::vector<uint8_t> buffer_;
   std::unique_ptr<HotRestartImpl> hot_restart_;
