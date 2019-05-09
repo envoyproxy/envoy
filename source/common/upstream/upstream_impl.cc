@@ -720,7 +720,8 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
     }
   }
 
-  return {healthy_list, degraded_list, excluded_list};
+  return std::tuple<HealthyHostVectorConstSharedPtr, DegradedHostVectorConstSharedPtr,
+                    ExcludedHostVectorConstSharedPtr>{healthy_list, degraded_list, excluded_list};
 }
 
 std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
@@ -731,8 +732,9 @@ ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
        [](const Host& host) { return host.health() == Host::Health::Degraded; },
        [](const Host& host) { return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC); }});
 
-  return {std::move(filtered_clones[0]), std::move(filtered_clones[1]),
-          std::move(filtered_clones[2])};
+  return std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
+                    HostsPerLocalityConstSharedPtr>{
+      std::move(filtered_clones[0]), std::move(filtered_clones[1]), std::move(filtered_clones[2])};
 }
 
 bool ClusterInfoImpl::maintenanceMode() const {
