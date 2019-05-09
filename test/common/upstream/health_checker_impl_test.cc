@@ -2170,13 +2170,15 @@ public:
       : cluster_(new NiceMock<MockClusterMockPrioritySet>()),
         event_logger_(new MockHealthCheckEventLogger()) {}
 
-  void setupData() {
-    std::string json = R"EOF(
+  void setupData(unsigned int unhealthy_threshold = 2) {
+    std::ostringstream json;
+    json << R"EOF(
     {
       "type": "tcp",
       "timeout_ms": 1000,
       "interval_ms": 1000,
-      "unhealthy_threshold": 2,
+      "unhealthy_threshold": )EOF"
+         << unhealthy_threshold << R"EOF(,
       "healthy_threshold": 2,
       "send": [
         {"binary": "01"}
@@ -2187,9 +2189,9 @@ public:
     }
     )EOF";
 
-    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
-                                                   dispatcher_, runtime_, random_,
-                                                   HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_.reset(
+        new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json.str()), dispatcher_,
+                                 runtime_, random_, HealthCheckEventLoggerPtr(event_logger_)));
   }
 
   void setupNoData() {
@@ -2394,6 +2396,40 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutThenRemoteClose) {
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*connection_, close(_));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
+}
+
+TEST_F(TcpHealthCheckerImplTest, Timeout) {
+  InSequence s;
+
+  setupData(1);
+  health_checker_->start();
+
+  expectSessionCreate();
+  expectClientCreate();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  EXPECT_CALL(*connection_, write(_, _));
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+
+  cluster_->prioritySet().getMockHostSet(0)->runCallbacks(
+      {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {});
+
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  Buffer::OwnedImpl response;
+  add_uint8(response, 1);
+  read_filter_->onData(response, false);
+
+  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  timeout_timer_->callback_();
+  EXPECT_EQ(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->getActiveHealthFailureType(),
+            Host::ActiveHealthFailureType::TIMEOUT);
+  EXPECT_EQ(Host::Health::Unhealthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
 TEST_F(TcpHealthCheckerImplTest, DoubleTimeout) {
