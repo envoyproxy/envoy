@@ -454,8 +454,12 @@ TEST_P(LoadStatsIntegrationTest, LocalityWeighted) {
   locality_weighted_lb_ = true;
   initialize();
 
+  // Debug logs for #6874
+  std::cerr << "Waiting for load stats stream.\n";
   waitForLoadStatsStream();
+  std::cerr << "Waiting for load stats request.\n";
   waitForLoadStatsRequest({});
+  std::cerr << "Done waiting.\n";
   loadstats_stream_->startGrpcStream();
 
   requestLoadStatsResponse({"cluster_0"});
@@ -473,7 +477,9 @@ TEST_P(LoadStatsIntegrationTest, LocalityWeighted) {
   sendAndReceiveUpstream(0);
 
   // Verify we get the expect request distribution.
+  std::cerr << "Waiting for load stats request 2.\n";
   waitForLoadStatsRequest({localityStats("winter", 4, 0, 0), localityStats("dragon", 2, 0, 0)});
+  std::cerr << "Done waiting.\n";
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
   // On slow machines, more than one load stats response may be pushed while we are simulating load.
