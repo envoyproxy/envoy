@@ -403,7 +403,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::Timespan(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
-      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()) {
+      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()),
+      upstream_options_(std::make_shared<Network::Socket::Options>()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
   if (connection_manager_.codec_->protocol() == Protocol::Http2) {
@@ -1285,7 +1286,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     connection_manager_.stats_.named_.downstream_rq_response_before_rq_complete_.inc();
   }
 
-  if (connection_manager_.drain_state_ == DrainState::Closing &&
+  if (connection_manager_.drain_state_ != DrainState::NotDraining &&
       connection_manager_.codec_->protocol() != Protocol::Http2) {
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
     // Do not do this for H2 (which drains via GOAWAY) or Upgrade (as the upgrade

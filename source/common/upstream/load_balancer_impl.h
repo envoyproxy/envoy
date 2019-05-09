@@ -148,6 +148,8 @@ public:
   bool shouldSelectAnotherHost(const Host&) override { return false; }
 
   uint32_t hostSelectionRetryCount() const override { return 1; }
+
+  Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override { return {}; }
 };
 
 /**

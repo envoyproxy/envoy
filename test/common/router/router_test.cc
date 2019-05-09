@@ -7,6 +7,7 @@
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
 #include "common/http/context_impl.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/router.h"
@@ -2972,6 +2973,25 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
       }));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(false));
   router_.decodeHeaders(incoming_headers, true);
+}
+
+TEST_F(RouterTest, UpstreamSocketOptionsReturnedEmpty) {
+  EXPECT_CALL(callbacks_, getUpstreamSocketOptions())
+      .WillOnce(Return(Network::Socket::OptionsSharedPtr()));
+
+  auto options = router_.upstreamSocketOptions();
+
+  EXPECT_EQ(options.get(), nullptr);
+}
+
+TEST_F(RouterTest, UpstreamSocketOptionsReturnedNonEmpty) {
+  Network::Socket::OptionsSharedPtr to_return =
+      Network::SocketOptionFactory::buildIpTransparentOptions();
+  EXPECT_CALL(callbacks_, getUpstreamSocketOptions()).WillOnce(Return(to_return));
+
+  auto options = router_.upstreamSocketOptions();
+
+  EXPECT_EQ(to_return, options);
 }
 
 class WatermarkTest : public RouterTest {
