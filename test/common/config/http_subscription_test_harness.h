@@ -104,7 +104,8 @@ public:
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
-                           const std::string& version, bool accept) override {
+                           const std::string& version, bool accept,
+                           const std::string& response_code = "200") override {
     std::string response_json = "{\"version_info\":\"" + version + "\",\"resources\":[";
     for (const auto& cluster : cluster_names) {
       response_json += "{\"@type\":\"type.googleapis.com/"
@@ -115,7 +116,7 @@ public:
     response_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
     EXPECT_TRUE(Protobuf::util::JsonStringToMessage(response_json, &response_pb).ok());
-    Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
+    Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", response_code}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
     message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
     EXPECT_CALL(callbacks_,

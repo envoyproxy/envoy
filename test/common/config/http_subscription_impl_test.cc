@@ -42,6 +42,17 @@ TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
   verifyStats(3, 1, 0, 1, 7148434200721666028);
 }
 
+// Validate that the client considers a HTTP 304 as "No changes" and not an error
+TEST_F(HttpSubscriptionImplTest) {
+  startSubscription({"cluster0", "cluster1"});
+  EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
+  EXPECT_CALL(*timer_, enableTimer(_));
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+  http_callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
+  timerTick();
+  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true, "304");
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy
