@@ -17,23 +17,24 @@ namespace {
 // Auxiliary network filter that makes use of ReadFilterCallbacks::injectReadDataToFilterChain()
 // and WriteFilterCallbacks::injectWriteDataToFilterChain() methods outside of the context of
 // ReadFilter::onData() and WriteFilter::onWrite(), i.e. on timer event
-const std::string inject_data_outside_callback_filter = "inject-data-outside-filter-callback";
+const char inject_data_outside_callback_filter[] = "inject-data-outside-filter-callback";
 
 // Auxiliary network filter that makes use of ReadFilterCallbacks::injectReadDataToFilterChain()
 // and WriteFilterCallbacks::injectWriteDataToFilterChain() methods in the context of
 // ReadFilter::onData() and WriteFilter::onWrite()
-const std::string inject_data_inside_callback_filter = "inject-data-inside-filter-callback";
+const char inject_data_inside_callback_filter[] = "inject-data-inside-filter-callback";
 
 // Do not use ReadFilterCallbacks::injectReadDataToFilterChain() and
 // WriteFilterCallbacks::injectWriteDataToFilterChain() methods at all
-const std::string no_inject_data = "no-inject-data";
+const char no_inject_data[] = "no-inject-data";
 
-// List of auxiliary filters to test against.
-const std::vector<std::string> auxiliary_filters{
-    inject_data_outside_callback_filter, inject_data_inside_callback_filter, no_inject_data};
+// List of auxiliary filters to test against
+const std::vector<std::string> auxiliary_filters() {
+  return {inject_data_outside_callback_filter, inject_data_inside_callback_filter, no_inject_data};
+}
 
 // Used to pretty print test parameters
-const std::regex invalid_param_name_regex("[^a-zA-Z0-9_]");
+const std::regex invalid_param_name_regex() { return std::regex{"[^a-zA-Z0-9_]"}; }
 
 /**
  * Integration test with one of auxiliary filters (listed above)
@@ -140,7 +141,7 @@ public:
         "{}_{}",
         TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
             std::get<0>(params.param), params.index)),
-        std::regex_replace(std::get<1>(params.param), invalid_param_name_regex, "_"));
+        std::regex_replace(std::get<1>(params.param), invalid_param_name_regex(), "_"));
   }
 
   explicit InjectDataToFilterChainIntegrationTest(const std::string& config)
@@ -187,7 +188,7 @@ public:
 INSTANTIATE_TEST_SUITE_P(
     Params, InjectDataWithEchoFilterIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::ValuesIn(auxiliary_filters)),
+                     testing::ValuesIn(auxiliary_filters())),
     InjectDataToFilterChainIntegrationTest::testParamsToString);
 
 TEST_P(InjectDataWithEchoFilterIntegrationTest, UsageOfInjectDataMethodsShouldBeUnnoticeable) {
@@ -212,7 +213,7 @@ public:
 INSTANTIATE_TEST_SUITE_P(
     Params, InjectDataWithTcpProxyFilterIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::ValuesIn(auxiliary_filters)),
+                     testing::ValuesIn(auxiliary_filters())),
     InjectDataToFilterChainIntegrationTest::testParamsToString);
 
 TEST_P(InjectDataWithTcpProxyFilterIntegrationTest, UsageOfInjectDataMethodsShouldBeUnnoticeable) {
@@ -267,7 +268,7 @@ public:
         TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
             std::get<0>(params.param), params.index)),
         (std::get<1>(params.param) == Http::CodecClient::Type::HTTP2 ? "Http2" : "Http"),
-        std::regex_replace(std::get<2>(params.param), invalid_param_name_regex, "_"));
+        std::regex_replace(std::get<2>(params.param), invalid_param_name_regex(), "_"));
   }
 
   InjectDataWithHttpConnectionManagerIntegrationTest()
@@ -298,7 +299,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(Http::CodecClient::Type::HTTP1,
                                      Http::CodecClient::Type::HTTP2),
-                     testing::ValuesIn(auxiliary_filters)),
+                     testing::ValuesIn(auxiliary_filters())),
     InjectDataWithHttpConnectionManagerIntegrationTest::testParamsToString);
 
 TEST_P(InjectDataWithHttpConnectionManagerIntegrationTest,
