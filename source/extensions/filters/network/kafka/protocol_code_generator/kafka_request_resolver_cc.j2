@@ -23,10 +23,10 @@ namespace Kafka {
 RequestParserSharedPtr RequestParserResolver::createParser(int16_t api_key, int16_t api_version,
                                                            RequestContextSharedPtr context) const {
 
-{% for request_type in request_types %}{% for field_list in request_type.compute_field_lists() %}
-  if ({{ request_type.get_extra('api_key') }} == api_key
+{% for message_type in message_types %}{% for field_list in message_type.compute_field_lists() %}
+  if ({{ message_type.get_extra('api_key') }} == api_key
     && {{ field_list.version }} == api_version) {
-    return std::make_shared<{{ request_type.name }}V{{ field_list.version }}Parser>(context);
+    return std::make_shared<{{ message_type.name }}V{{ field_list.version }}Parser>(context);
   }{% endfor %}{% endfor %}
   return std::make_shared<SentinelParser>(context);
 }

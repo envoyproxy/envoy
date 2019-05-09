@@ -1,10 +1,12 @@
 {#
-  Template for structure representing a composite entity in Kafka protocol (e.g. FetchRequest).
-  Rendered templates for each structure in Kafka protocol will be put into 'requests.h' file.
+  Template for structure representing a composite entity in Kafka protocol (request or response).
+  Rendered templates for each structure in Kafka protocol will be put into 'requests.h'
+  or 'responses.h'.
 
   Each structure is capable of holding all versions of given entity (what means its fields are
   actually a superset of union of all versions' fields). Each version has a dedicated deserializer
-  (named $requestV$versionDeserializer), which calls the matching constructor.
+  (named "${name}V${version}Deserializer" e.g. ProduceRequestV0Deserializer or
+  FetchResponseV1Deserializer), which calls the matching constructor.
 
   To serialize, it is necessary to pass the encoding context (that contains the version that's
   being serialized). Depending on the version, the fields will be written to the buffer.

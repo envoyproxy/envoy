@@ -1,5 +1,6 @@
 #include "extensions/filters/network/kafka/request_codec.h"
 
+#include "test/extensions/filters/network/kafka/buffer_based_test.h"
 #include "test/extensions/filters/network/kafka/serialization_utilities.h"
 #include "test/mocks/server/mocks.h"
 
@@ -11,12 +12,11 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace RequestCodecIntegrationTest {
 
-class RequestCodecIntegrationTest : public testing::Test {
-protected:
-  template <typename T> void putInBuffer(T arg);
+class RequestCodecIntegrationTest : public testing::Test,
+                                    public MessageBasedTest<RequestEncoder> {};
 
-  Buffer::OwnedImpl buffer_;
-};
+using RequestCapturingCallback =
+    CapturingCallback<RequestCallback, AbstractRequestSharedPtr, RequestParseFailureSharedPtr>;
 
 // Other request types are tested in (generated) 'request_codec_request_test.cc'.
 TEST_F(RequestCodecIntegrationTest, shouldProduceAbortedMessageOnUnknownData) {
@@ -29,15 +29,15 @@ TEST_F(RequestCodecIntegrationTest, shouldProduceAbortedMessageOnUnknownData) {
     const int16_t api_key = static_cast<int16_t>(base_api_key + i);
     const RequestHeader header = {api_key, 0, 0, "client-id"};
     const std::vector<unsigned char> data = std::vector<unsigned char>(1024);
-    putInBuffer(Request<std::vector<unsigned char>>{header, data});
+    const auto message = Request<std::vector<unsigned char>>{header, data};
+    putMessageIntoBuffer(message);
     sent_headers.push_back(header);
   }
 
   const InitialParserFactory& initial_parser_factory = InitialParserFactory::getDefaultInstance();
   const RequestParserResolver& request_parser_resolver =
       RequestParserResolver::getDefaultInstance();
-  const CapturingRequestCallbackSharedPtr request_callback =
-      std::make_shared<CapturingRequestCallback>();
+  const auto request_callback = std::make_shared<RequestCapturingCallback>();
 
   RequestDecoder testee{initial_parser_factory, request_parser_resolver, {request_callback}};
 
@@ -45,7 +45,7 @@ TEST_F(RequestCodecIntegrationTest, shouldProduceAbortedMessageOnUnknownData) {
   testee.onData(buffer_);
 
   // then
-  ASSERT_EQ(request_callback->getCaptured().size(), 0);
+  ASSERT_EQ(request_callback->getCapturedMessages().size(), 0);
 
   const std::vector<RequestParseFailureSharedPtr>& parse_failures =
       request_callback->getParseFailures();
@@ -57,12 +57,6 @@ TEST_F(RequestCodecIntegrationTest, shouldProduceAbortedMessageOnUnknownData) {
     ASSERT_NE(failure_data, nullptr);
     ASSERT_EQ(failure_data->request_header_, sent_headers[i]);
   }
-}
-
-// Helper function.
-template <typename T> void RequestCodecIntegrationTest::putInBuffer(T arg) {
-  RequestEncoder encoder{buffer_};
-  encoder.encode(arg);
 }
 
 } // namespace RequestCodecIntegrationTest
