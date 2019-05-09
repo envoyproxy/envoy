@@ -342,6 +342,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     case envoy::data::core::v2alpha::LocalReplyConfiguration::kDetermineViaAcceptHeader:
       local_reply_type_ = Http::LocalReplyType::DetermineViaAcceptHeader;
       break;
+    case envoy::data::core::v2alpha::LocalReplyConfiguration::REPLY_TYPE_NOT_SET:
+      local_reply_type_ = Http::LocalReplyType::AlwaysJson;
+      break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }

@@ -35,9 +35,7 @@ public:
     HttpProtocolIntegrationTest::initialize();
   }
 
-  IntegrationStreamDecoderPtr
-  setupPerStreamIdleTimeoutTest(const char* method = "GET",
-                                const char* accept_type = "text/plain") {
+  IntegrationStreamDecoderPtr setupPerStreamIdleTimeoutTest(const char* method = "GET") {
     initialize();
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -45,8 +43,7 @@ public:
         codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", method},
                                                             {":path", "/test/long/url"},
                                                             {":scheme", "http"},
-                                                            {":authority", "host"},
-                                                            {"accept", accept_type}});
+                                                            {":authority", "host"}});
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
     AssertionResult result =

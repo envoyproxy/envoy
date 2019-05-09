@@ -8,6 +8,7 @@ option java_package = "io.envoyproxy.envoy.data.core.v2alpha";
 
 // [#protodoc-title: Local reply configuration]
 
+// Configure the local reply of the body type
 message LocalReplyConfiguration {
   message JsonReply {
     string body = 1;

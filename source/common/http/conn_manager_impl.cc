@@ -1240,6 +1240,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   if (!state_.created_filter_chain_) {
     createFilterChain();
   }
+  stream_info_.setResponseCodeDetails(details);
   Utility::sendLocalReply(
       local_reply_info,
       [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {

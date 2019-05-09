@@ -322,22 +322,22 @@ void Utility::sendLocalReply(
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
 
-  std::string json_body;
-  absl::string_view final_body_text = body_text;
+  std::string body(body_text);
+
   switch (info.reply_type) {
   case Http::LocalReplyType::AlwaysJson: {
     std::string json_body;
     envoy::data::core::v2alpha::LocalReplyConfiguration::JsonReply local_reply;
-    local_reply.set_body(final_body_text.begin(), final_body_text.length());
+    local_reply.set_body(body.c_str(), body.size());
     json_body = MessageUtil::getJsonStringFromMessage(local_reply, true, true);
     response_headers->insertContentLength().value(json_body.size());
-    final_body_text = absl::string_view(json_body);
+    body = std::move(json_body);
     response_headers->insertContentType().value(Headers::get().ContentTypeValues.Json);
     break;
   }
   case Http::LocalReplyType::AlwaysText: {
-    if (!final_body_text.empty()) {
-      response_headers->insertContentLength().value(final_body_text.size());
+    if (!body_text.empty()) {
+      response_headers->insertContentLength().value(body.size());
       response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
     }
     break;
@@ -353,10 +353,10 @@ void Utility::sendLocalReply(
     return;
   }
 
-  encode_headers(std::move(response_headers), final_body_text.empty());
+  encode_headers(std::move(response_headers), body.empty());
   // encode_headers()) may have changed the referenced is_reset so we need to test it
-  if (!final_body_text.empty() && !is_reset) {
-    Buffer::OwnedImpl buffer(final_body_text);
+  if (!body.empty() && !is_reset) {
+    Buffer::OwnedImpl buffer(body);
     encode_data(buffer, true);
   }
 }
