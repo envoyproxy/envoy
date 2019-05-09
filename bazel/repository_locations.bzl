@@ -159,9 +159,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/jwt_verify_lib/archive/85cf0edf1f1bc507ff7d96a8d6a9bc20307b0fcf.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
-        sha256 = "5199500e352584852c95c13423edc5f0cb329297c81dd69c3c8f52a75496da08",
-        strip_prefix = "http-parser-2.9.2",
-        urls = ["https://github.com/nodejs/http-parser/archive/v2.9.2.tar.gz"],
+        sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
+        strip_prefix = "http-parser-2.9.0",
+        urls = ["https://github.com/nodejs/http-parser/archive/v2.9.0.tar.gz"],
     ),
     com_github_pallets_jinja = dict(
         sha256 = "e9baab084b8d84b511c75aca98bba8585041dbe971d5476ee53d9c6eea1b58b3",
