@@ -11,6 +11,7 @@
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
 #include "common/http/headers.h"
+#include "common/stats/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
@@ -331,19 +332,11 @@ void HystrixSink::flush(Stats::Source& source) {
   std::unordered_map<std::string, QuantileLatencyMap> time_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : source.cachedHistograms()) {
     if (histogram->tagExtractedStatName() == cluster_upstream_rq_time_) {
-      std::string value;
-      histogram->iterateTagStatNames(
-          [&value, this](Stats::StatName tag_name, Stats::StatName tag_value) -> bool {
-            if (tag_name == cluster_name_) {
-              value = server_.stats().symbolTable().toString(tag_value);
-              return false;
-            }
-            return true;
-          });
-
+      absl::optional<Stats::StatName> value = Stats::Utility::findTag(*histogram, cluster_name_);
       // Make sure we found the cluster name tag
-      ASSERT(!value.empty());
-      auto it_bool_pair = time_histograms.emplace(std::make_pair(value, QuantileLatencyMap()));
+      ASSERT(value);
+      std::string value_str = server_.stats().symbolTable().toString(*value);
+      auto it_bool_pair = time_histograms.emplace(std::make_pair(value_str, QuantileLatencyMap()));
       // Make sure histogram with this name was not already added
       ASSERT(it_bool_pair.second);
       QuantileLatencyMap& hist_map = it_bool_pair.first->second;
