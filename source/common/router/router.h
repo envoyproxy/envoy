@@ -239,6 +239,10 @@ public:
     return retry_state_->hostSelectionMaxAttempts();
   }
 
+  Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
+    return callbacks_->getUpstreamSocketOptions();
+  }
+
   /**
    * Set a computed cookie to be sent with the downstream headers.
    * @param key supplies the size of the cookie

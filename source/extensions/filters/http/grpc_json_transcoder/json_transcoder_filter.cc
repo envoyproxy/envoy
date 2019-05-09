@@ -42,8 +42,18 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
-namespace {
 
+struct RcDetailsValues {
+  // The gRPC json transcoder filter failed to transcode when processing request headers.
+  // This will generally be accompanied by details about the transcoder failure.
+  const std::string GrpcTranscodeFailedEarly = "early_grpc_json_transcode_failure";
+  // The gRPC json transcoder filter failed to transcode when processing the request body.
+  // This will generally be accompanied by details about the transcoder failure.
+  const std::string GrpcTranscodeFailed = "grpc_json_transcode_failure";
+};
+typedef ConstSingleton<RcDetailsValues> RcDetails;
+
+namespace {
 // Transcoder:
 // https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/blob/master/src/include/grpc_transcoding/transcoder.h
 // implementation based on JsonRequestTranslator & ResponseToJsonTranslator
@@ -267,7 +277,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
           absl::string_view(request_status.error_message().data(),
                             request_status.error_message().size()),
           nullptr, absl::nullopt,
-          absl::StrCat(StreamInfo::ResponseCodeDetails::get().GrpcTranscodeFailedEarly, "{",
+          absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{",
                        MessageUtil::CodeEnumToString(request_status.code()), "}"));
 
       return Http::FilterHeadersStatus::StopIteration;
@@ -308,7 +318,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
         absl::string_view(request_status.error_message().data(),
                           request_status.error_message().size()),
         nullptr, absl::nullopt,
-        absl::StrCat(StreamInfo::ResponseCodeDetails::get().GrpcTranscodeFailed, "{",
+        absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "{",
                      MessageUtil::CodeEnumToString(request_status.code()), "}"));
 
     return Http::FilterDataStatus::StopIterationNoBuffer;

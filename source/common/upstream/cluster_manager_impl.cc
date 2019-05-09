@@ -40,6 +40,16 @@
 
 namespace Envoy {
 namespace Upstream {
+namespace {
+
+void addOptionsIfNotNull(Network::Socket::OptionsSharedPtr& options,
+                         const Network::Socket::OptionsSharedPtr& to_add) {
+  if (to_add != nullptr) {
+    Network::Socket::appendOptions(options, to_add);
+  }
+}
+
+} // namespace
 
 void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
   // See comments in ClusterManagerImpl::addOrUpdateCluster() for why this is only called during
@@ -1133,22 +1143,22 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     return nullptr;
   }
 
-  // Inherit socket options from downstream connection, if set.
   std::vector<uint8_t> hash_key = {uint8_t(protocol)};
 
-  // Use downstream connection socket options for computing connection pool hash key, if any.
+  Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
+  if (context) {
+    // Inherit socket options from downstream connection, if set.
+    if (context->downstreamConnection()) {
+      addOptionsIfNotNull(upstream_options, context->downstreamConnection()->socketOptions());
+    }
+    addOptionsIfNotNull(upstream_options, context->upstreamSocketOptions());
+  }
+
+  // Use the socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with
   // different options are not pooled together.
-  bool have_options = false;
-  if (context && context->downstreamConnection()) {
-    const Network::ConnectionSocket::OptionsSharedPtr& options =
-        context->downstreamConnection()->socketOptions();
-    if (options) {
-      for (const auto& option : *options) {
-        have_options = true;
-        option->hashKey(hash_key);
-      }
-    }
+  for (const auto& option : *upstream_options) {
+    option->hashKey(hash_key);
   }
 
   ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
@@ -1159,7 +1169,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
       container.pools_->getPool(priority, hash_key, [&]() {
         return parent_.parent_.factory_.allocateConnPool(
             parent_.thread_local_dispatcher_, host, priority, protocol,
-            have_options ? context->downstreamConnection()->socketOptions() : nullptr);
+            !upstream_options->empty() ? upstream_options : nullptr);
       });
 
   if (pool.has_value()) {
