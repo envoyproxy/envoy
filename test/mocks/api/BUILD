@@ -11,7 +11,10 @@ envoy_package()
 envoy_cc_mock(
     name = "api_mocks",
     srcs = ["mocks.cc"],
-    hdrs = ["mocks.h"],
+    hdrs = ["mocks.h"] + select({
+        "//bazel:disable_hot_restart": [],
+        "//conditions:default": ["hot_restart.h"],
+    }),
     deps = [
         "//include/envoy/api:api_interface",
         "//include/envoy/api:os_sys_calls_interface",

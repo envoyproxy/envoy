@@ -9,7 +9,6 @@
 #include "envoy/event/timer.h"
 
 #include "common/api/os_sys_calls_impl.h"
-#include "common/api/os_sys_calls_impl_hot_restart.h"
 
 #if defined(__linux__)
 #include "common/api/os_sys_calls_impl_linux.h"
@@ -78,13 +77,6 @@ public:
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<int, int, int>;
   std::map<SockOptKey, bool> boolsockopts_;
-};
-
-class MockHotRestartOsSysCalls : public HotRestartOsSysCallsImpl {
-public:
-  // Api::HotRestartOsSysCalls
-  MOCK_METHOD3(shmOpen, SysCallIntResult(const char*, int, mode_t));
-  MOCK_METHOD1(shmUnlink, SysCallIntResult(const char*));
 };
 
 #if defined(__linux__)
