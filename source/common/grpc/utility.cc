@@ -97,7 +97,8 @@ bool Utility::hasGrpcContentType(const Http::HeaderMap& headers) {
          absl::StartsWith(content_type->value().getStringView(),
                           Http::Headers::get().ContentTypeValues.Grpc) &&
          (content_type->value().size() == Http::Headers::get().ContentTypeValues.Grpc.size() ||
-          content_type->value().c_str()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
+          content_type->value()
+                  .getStringView()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }
 
 } // namespace Grpc

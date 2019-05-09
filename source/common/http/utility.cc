@@ -265,34 +265,21 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
   return ret;
 }
 
-<<<<<<< HEAD
-void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks,
-                             const bool& is_reset, Code response_code, absl::string_view body_text,
-                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                             bool is_head_request) {
-  sendLocalReply(is_grpc,
-                 [&](HeaderMapPtr&& headers, bool end_stream) -> void {
-                   callbacks.encodeHeaders(std::move(headers), end_stream);
-                 },
-                 [&](Buffer::Instance& data, bool end_stream) -> void {
-                   callbacks.encodeData(data, end_stream);
-                 },
-                 is_reset, response_code, body_text, grpc_status, is_head_request);
-=======
 Utility::LocalReplyInfo Utility::generateLocalReplyInfo(const Http::HeaderMap& request_headers) {
   bool is_head_request = false, accept_json_type = false;
 
   const bool is_grpc = Grpc::Utility::hasGrpcContentType(request_headers);
 
-  if (Http::Headers::get().MethodValues.Head == request_headers.Method()->value().c_str()) {
+  if (Http::Headers::get().MethodValues.Head == request_headers.Method()->value().getStringView()) {
     is_head_request = true;
   }
 
   if (!is_grpc) {
     const Http::HeaderEntry* accept = request_headers.Accept();
     // As long as can accept the json type response priority return json type.
-    accept_json_type = accept != nullptr &&
-                       (accept->value().find(Http::Headers::get().ContentTypeValues.Json.c_str()));
+    accept_json_type =
+        accept != nullptr &&
+        (accept->value().getStringView().find(Http::Headers::get().ContentTypeValues.Json.c_str()));
   }
 
   return LocalReplyInfo{is_grpc, is_head_request, accept_json_type};
@@ -302,15 +289,15 @@ void Utility::sendLocalReply(const Utility::LocalReplyInfo& info,
                              StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
                              Code response_code, absl::string_view body_text,
                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
-  sendLocalReply(info,
-                 [&](HeaderMapPtr&& headers, bool end_stream) -> void {
-                   callbacks.encodeHeaders(std::move(headers), end_stream);
-                 },
-                 [&](Buffer::Instance& data, bool end_stream) -> void {
-                   callbacks.encodeData(data, end_stream);
-                 },
-                 is_reset, response_code, body_text, grpc_status);
->>>>>>> Refactor sendLocalReply
+  sendLocalReply(
+      info,
+      [&](HeaderMapPtr&& headers, bool end_stream) -> void {
+        callbacks.encodeHeaders(std::move(headers), end_stream);
+      },
+      [&](Buffer::Instance& data, bool end_stream) -> void {
+        callbacks.encodeData(data, end_stream);
+      },
+      is_reset, response_code, body_text, grpc_status);
 }
 
 void Utility::sendLocalReply(

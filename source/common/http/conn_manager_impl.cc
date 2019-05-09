@@ -516,7 +516,8 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
 
     sendLocalReply(request_headers_ != nullptr ? Utility::generateLocalReplyInfo(*request_headers_)
                                                : Utility::LocalReplyInfo{},
-                   Http::Code::RequestTimeout, "stream timeout", nullptr, absl::nullopt);
+                   Http::Code::RequestTimeout, "stream timeout", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
   }
 }
 
@@ -524,7 +525,8 @@ void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
   sendLocalReply(request_headers_ != nullptr ? Utility::generateLocalReplyInfo(*request_headers_)
                                              : Utility::LocalReplyInfo{},
-                 Http::Code::RequestTimeout, "request timeout", nullptr, absl::nullopt);
+                 Http::Code::RequestTimeout, "request timeout", nullptr, absl::nullopt,
+                 StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
@@ -611,7 +613,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     state_.created_filter_chain_ = true;
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
     sendLocalReply(Utility::generateLocalReplyInfo(*request_headers_),
-                   Http::Code::ServiceUnavailable, "envoy overloaded", nullptr, absl::nullopt);
+                   Http::Code::ServiceUnavailable, "envoy overloaded", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().Overload);
     return;
   }
 
@@ -640,7 +643,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     if (!connection_manager_.config_.http1Settings().accept_http_10_) {
       // Send "Upgrade Required" if HTTP/1.0 support is not explicitly configured on.
       sendLocalReply(Utility::generateLocalReplyInfo(*request_headers_), Code::UpgradeRequired, "",
-                     nullptr, absl::nullopt);
+                     nullptr, absl::nullopt, StreamInfo::ResponseCodeDetails::get().LowVersion);
       return;
     } else {
       // HTTP/1.0 defaults to single-use connections. Make sure the connection
@@ -663,7 +666,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     } else {
       // Require host header. For HTTP/1.1 Host has already been translated to :authority.
       sendLocalReply(Utility::generateLocalReplyInfo(*request_headers_), Code::BadRequest, "",
-                     nullptr, absl::nullopt);
+                     nullptr, absl::nullopt, StreamInfo::ResponseCodeDetails::get().MissingHost);
       return;
     }
   }
@@ -671,7 +674,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   ASSERT(connection_manager_.config_.maxRequestHeadersKb() > 0);
   if (request_headers_->byteSize() > (connection_manager_.config_.maxRequestHeadersKb() * 1024)) {
     sendLocalReply(Utility::generateLocalReplyInfo(*request_headers_),
-                   Code::RequestHeaderFieldsTooLarge, "", nullptr, absl::nullopt);
+                   Code::RequestHeaderFieldsTooLarge, "", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
     return;
   }
 
@@ -743,7 +747,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       // Do not allow upgrades if the route does not support it.
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
       sendLocalReply(Utility::generateLocalReplyInfo(*request_headers_), Code::Forbidden, "",
-                     nullptr, absl::nullopt);
+                     nullptr, absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
       return;
     }
     // Allow non websocket requests to go through websocket enabled routes.
@@ -1214,29 +1218,31 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     const Utility::LocalReplyInfo& local_reply_info, Code code, absl::string_view body,
     const std::function<void(HeaderMap& headers)>& modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
   ASSERT(response_headers_ == nullptr);
   // For early error handling, do a best-effort attempt to create a filter chain
   // to ensure access logging.
   if (!state_.created_filter_chain_) {
     createFilterChain();
   }
-  Utility::sendLocalReply(local_reply_info,
-                          [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
-                            if (modify_headers != nullptr) {
-                              modify_headers(*headers);
-                            }
-                            response_headers_ = std::move(headers);
-                            // TODO: Start encoding from the last decoder filter that saw the
-                            // request instead.
-                            encodeHeaders(nullptr, *response_headers_, end_stream);
-                          },
-                          [this](Buffer::Instance& data, bool end_stream) -> void {
-                            // TODO: Start encoding from the last decoder filter that saw the
-                            // request instead.
-                            encodeData(nullptr, data, end_stream);
-                          },
-                          state_.destroyed_, code, body, grpc_status);
+  Utility::sendLocalReply(
+      local_reply_info,
+      [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
+        if (modify_headers != nullptr) {
+          modify_headers(*headers);
+        }
+        response_headers_ = std::move(headers);
+        // TODO: Start encoding from the last decoder filter that saw the
+        // request instead.
+        encodeHeaders(nullptr, *response_headers_, end_stream);
+      },
+      [this](Buffer::Instance& data, bool end_stream) -> void {
+        // TODO: Start encoding from the last decoder filter that saw the
+        // request instead.
+        encodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
+      },
+      state_.destroyed_, code, body, grpc_status);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
