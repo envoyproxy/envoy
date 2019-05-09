@@ -456,7 +456,7 @@ def envoy_cc_test(
     if coverage:
         test_lib_tags.append("coverage_test_lib")
     envoy_cc_test_library(
-        name = name + "_lib",
+        name = name + "__lib",
         srcs = srcs,
         data = data,
         external_deps = external_deps,
@@ -472,7 +472,7 @@ def envoy_cc_test(
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
         deps = [
-            ":" + name + "_lib",
+            ":" + name + "__lib",
             repository + "//test:main",
         ],
         # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
