@@ -93,8 +93,7 @@ void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
     // Add this resource to our delta added/updated pile...
     envoy::api::v2::Resource* to_add = to_add_repeated.Add();
     const std::string listener_name =
-        MessageUtil::anyConvert<envoy::api::v2::Listener>(listener_blob)
-            .name(); // TODO TODO reflection? (also can CDS be similarly improved?)
+        MessageUtil::anyConvert<envoy::api::v2::Listener>(listener_blob).name();
     to_add->set_name(listener_name);
     to_add->set_version(version_info);
     to_add->mutable_resource()->MergeFrom(listener_blob);
