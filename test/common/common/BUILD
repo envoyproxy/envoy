@@ -203,3 +203,13 @@ envoy_cc_test(
         "//source/common/common:thread_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "thread_impl_test",
+    srcs = ["thread_impl_test.cc"],
+    external_deps = ["abseil_flat_hash_set"],
+    deps = [
+        "//source/common/common:thread_lib",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
+)

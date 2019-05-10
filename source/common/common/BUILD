@@ -208,6 +208,7 @@ envoy_cc_posix_library(
     srcs = ["posix/thread_impl.cc"],
     hdrs = ["posix/thread_impl.h"],
     strip_include_prefix = "posix",
+    external_deps = ["abseil_hash"],
     deps = [
         ":assert_lib",
         "//include/envoy/thread:thread_interface",
@@ -219,6 +220,7 @@ envoy_cc_win32_library(
     srcs = ["win32/thread_impl.cc"],
     hdrs = ["win32/thread_impl.h"],
     strip_include_prefix = "win32",
+    external_deps = ["abseil_hash"],
     deps = [
         ":assert_lib",
         "//include/envoy/thread:thread_interface",

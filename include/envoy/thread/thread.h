@@ -5,6 +5,7 @@
 
 #include "envoy/common/pure.h"
 
+#include "absl/hash/hash.h"
 #include "common/common/thread_annotations.h"
 
 namespace Envoy {
@@ -16,6 +17,15 @@ public:
 
   virtual std::string debugString() const PURE;
   virtual bool isCurrentThreadId() const PURE;
+  virtual bool operator==(const ThreadId& b) const PURE;
+  template <typename H>
+  friend H AbslHashValue(H state, const ThreadId& value) {
+    value.HashValue(absl::HashState::Create(&state));
+    return std::move(state);
+  }
+
+ private:
+  virtual void HashValue(absl::HashState state) const PURE;
 };
 
 using ThreadIdPtr = std::unique_ptr<ThreadId>;
