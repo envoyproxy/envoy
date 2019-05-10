@@ -292,7 +292,8 @@ void BinaryProtocolImpl::writeFieldEnd(Buffer::Instance& buffer) { UNREFERENCED_
 
 void BinaryProtocolImpl::writeMapBegin(Buffer::Instance& buffer, FieldType key_type,
                                        FieldType value_type, uint32_t size) {
-  if (size > std::numeric_limits<int32_t>::max()) {
+  uint32_t max_int = std::numeric_limits<int32_t>::max();
+  if (size > max_int) {
     throw EnvoyException(fmt::format("illegal binary protocol map size {}", size));
   }
 
@@ -305,7 +306,8 @@ void BinaryProtocolImpl::writeMapEnd(Buffer::Instance& buffer) { UNREFERENCED_PA
 
 void BinaryProtocolImpl::writeListBegin(Buffer::Instance& buffer, FieldType elem_type,
                                         uint32_t size) {
-  if (size > std::numeric_limits<int32_t>::max()) {
+  uint32_t max_int = std::numeric_limits<int32_t>::max();
+  if (size > max_int) {
     throw EnvoyException(fmt::format("illegal binary protocol list/set size {}", size));
   }
 

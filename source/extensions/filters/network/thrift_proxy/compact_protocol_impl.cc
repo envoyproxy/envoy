@@ -467,7 +467,8 @@ void CompactProtocolImpl::writeFieldEnd(Buffer::Instance& buffer) {
 
 void CompactProtocolImpl::writeMapBegin(Buffer::Instance& buffer, FieldType key_type,
                                         FieldType value_type, uint32_t size) {
-  if (size > std::numeric_limits<int32_t>::max()) {
+  uint32_t max_int = std::numeric_limits<int32_t>::max();
+  if (size > max_int) {
     throw EnvoyException(fmt::format("illegal compact protocol map size {}", size));
   }
 
@@ -486,7 +487,8 @@ void CompactProtocolImpl::writeMapEnd(Buffer::Instance& buffer) { UNREFERENCED_P
 
 void CompactProtocolImpl::writeListBegin(Buffer::Instance& buffer, FieldType elem_type,
                                          uint32_t size) {
-  if (size > std::numeric_limits<int32_t>::max()) {
+  uint32_t max_int = std::numeric_limits<int32_t>::max();
+  if (size > max_int) {
     throw EnvoyException(fmt::format("illegal compact protocol list/set size {}", size));
   }
 

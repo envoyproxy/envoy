@@ -54,10 +54,9 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) 
   TestStreamInfo test_stream_info;
   test_stream_info.metadata_ = stream_info.dynamic_metadata();
   // libc++ clocks don't track at nanosecond on macOS.
+  uint64_t max_nanoseconds = std::numeric_limits<std::chrono::nanoseconds::rep>::max();
   const auto start_time =
-      std::numeric_limits<std::chrono::nanoseconds::rep>::max() < stream_info.start_time()
-          ? 0
-          : stream_info.start_time() / 1000;
+      max_nanoseconds < stream_info.start_time() ? 0 : stream_info.start_time() / 1000;
   test_stream_info.start_time_ = SystemTime(std::chrono::microseconds(start_time));
   if (stream_info.has_response_code()) {
     test_stream_info.response_code_ = stream_info.response_code().value();

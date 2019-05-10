@@ -646,7 +646,8 @@ bool ObjectHandler::Uint(unsigned value) {
 }
 bool ObjectHandler::Int64(int64_t value) { return handleValueEvent(Field::createValue(value)); }
 bool ObjectHandler::Uint64(uint64_t value) {
-  if (value > std::numeric_limits<int64_t>::max()) {
+  uint64_t max_int = std::numeric_limits<int64_t>::max();
+  if (value > max_int) {
     throw Exception(fmt::format("JSON value from line {} is larger than int64_t (not supported)",
                                 stream_.getLineNumber()));
   }
