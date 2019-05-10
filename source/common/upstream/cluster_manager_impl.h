@@ -203,9 +203,12 @@ public:
   Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
   bool removeCluster(const std::string& cluster) override;
   void shutdown() override {
+    // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
     ads_mux_.reset();
     active_clusters_.clear();
+    warming_clusters_.clear();
+    updateGauges();
   }
 
   const envoy::api::v2::core::BindConfig& bindConfig() const override { return bind_config_; }
@@ -323,7 +326,7 @@ private:
     static void removeHosts(const std::string& name, const HostVector& hosts_removed,
                             ThreadLocal::Slot& tls);
     static void updateClusterMembership(const std::string& name, uint32_t priority,
-                                        PrioritySet::UpdateHostsParams&& update_hosts_params,
+                                        PrioritySet::UpdateHostsParams update_hosts_params,
                                         LocalityWeightsConstSharedPtr locality_weights,
                                         const HostVector& hosts_added,
                                         const HostVector& hosts_removed, ThreadLocal::Slot& tls,

@@ -48,6 +48,7 @@ using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::DoAll;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -341,7 +342,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
       .Times(2)
       .WillRepeatedly(Invoke([&](HeaderMap& headers, bool) -> FilterHeadersStatus {
         EXPECT_NE(nullptr, headers.ForwardedFor());
-        EXPECT_STREQ("http", headers.ForwardedProto()->value().c_str());
+        EXPECT_EQ("http", headers.ForwardedProto()->value().getStringView());
         if (headers.Path()->value() == "/healthcheck") {
           filter->callbacks_->streamInfo().healthCheck(true);
         }
@@ -406,7 +407,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](HeaderMap& headers, bool) -> FilterHeadersStatus {
         EXPECT_NE(nullptr, headers.ForwardedFor());
-        EXPECT_STREQ("http", headers.ForwardedProto()->value().c_str());
+        EXPECT_EQ("http", headers.ForwardedProto()->value().getStringView());
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -551,8 +552,10 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
 
   EXPECT_CALL(*filter, encodeHeaders(_, true));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("404", headers.Status()->value().c_str());
+      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+        EXPECT_EQ("404", headers.Status()->value().getStringView());
+        EXPECT_EQ("absolute_path_rejected",
+                  filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
       }));
   EXPECT_CALL(*filter, onDestroy());
 
@@ -588,8 +591,10 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
 
   EXPECT_CALL(*filter, encodeHeaders(_, true));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("400", headers.Status()->value().c_str());
+      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.Status()->value().getStringView());
+        EXPECT_EQ("path_normalization_failed",
+                  filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
       }));
   EXPECT_CALL(*filter, onDestroy());
 
@@ -615,7 +620,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
 
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](HeaderMap& header_map, bool) -> FilterHeadersStatus {
-        EXPECT_EQ(normalized_path, header_map.Path()->value().c_str());
+        EXPECT_EQ(normalized_path, header_map.Path()->value().getStringView());
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -658,7 +663,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
 
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _))
       .WillOnce(Invoke([&](const Http::HeaderMap& header_map, uint64_t) {
-        EXPECT_EQ(normalized_path, header_map.Path()->value().c_str());
+        EXPECT_EQ(normalized_path, header_map.Path()->value().getStringView());
         return route;
       }));
   EXPECT_CALL(filter_factory_, createFilterChain(_))
@@ -687,9 +692,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   // Verify tag is set based on the request headers.
-  EXPECT_CALL(*span, setTag(":method", "GET"));
+  EXPECT_CALL(*span, setTag(Eq(":method"), Eq("GET")));
   // Verify if the activeSpan interface returns reference to the current span.
-  EXPECT_CALL(*span, setTag("service-cluster", "scoobydoo"));
+  EXPECT_CALL(*span, setTag(Eq("service-cluster"), Eq("scoobydoo")));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(_)).Times(0);
@@ -791,7 +796,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   // Verify decorator operation response header has been defined.
   EXPECT_CALL(encoder, encodeHeaders(_, true))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("testOp", headers.EnvoyDecoratorOperation()->value().c_str());
+        EXPECT_EQ("testOp", headers.EnvoyDecoratorOperation()->value().getStringView());
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -819,7 +824,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
-  EXPECT_CALL(*span, setOperation("testOp"));
+  EXPECT_CALL(*span, setOperation(Eq("testOp")));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
@@ -922,7 +927,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
       .WillOnce(Invoke([](HeaderMap& headers, bool) -> FilterHeadersStatus {
         EXPECT_NE(nullptr, headers.EnvoyDecoratorOperation());
         // Verify that decorator operation has been set as request header.
-        EXPECT_STREQ("testOp", headers.EnvoyDecoratorOperation()->value().c_str());
+        EXPECT_EQ("testOp", headers.EnvoyDecoratorOperation()->value().getStringView());
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -954,7 +959,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
   // Verify that span operation overridden by value supplied in response header.
-  EXPECT_CALL(*span, setOperation("testOp"));
+  EXPECT_CALL(*span, setOperation(Eq("testOp")));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
@@ -1191,6 +1196,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(400));
+        EXPECT_EQ("missing_host_header", stream_info.responseCodeDetails().value());
         EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
         EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
@@ -1314,7 +1320,7 @@ TEST_F(HttpConnectionManagerImplTest, NoPath) {
 
   EXPECT_CALL(encoder, encodeHeaders(_, true))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("404", headers.Status()->value().c_str());
+        EXPECT_EQ("404", headers.Status()->value().getStringView());
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -1365,7 +1371,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutGlobal) {
   // 408 direct response after timeout.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("408", headers.Status()->value().c_str());
+        EXPECT_EQ("408", headers.Status()->value().getStringView());
       }));
   std::string response_body;
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
@@ -1447,7 +1453,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
   // 408 direct response after timeout.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("408", headers.Status()->value().c_str());
+        EXPECT_EQ("408", headers.Status()->value().getStringView());
       }));
 
   std::string response_body;
@@ -1554,7 +1560,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
   // 408 direct response after timeout.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("408", headers.Status()->value().c_str());
+        EXPECT_EQ("408", headers.Status()->value().getStringView());
       }));
   std::string response_body;
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
@@ -1626,7 +1632,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
   // 408 direct response after timeout.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("408", headers.Status()->value().c_str());
+        EXPECT_EQ("408", headers.Status()->value().getStringView());
       }));
   std::string response_body;
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
@@ -1677,7 +1683,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterUpstreamHeaders) 
   // 200 upstream response.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("200", headers.Status()->value().c_str());
+        EXPECT_EQ("200", headers.Status()->value().getStringView());
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -1744,7 +1750,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
   // 200 upstream response.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("200", headers.Status()->value().c_str());
+        EXPECT_EQ("200", headers.Status()->value().getStringView());
       }));
 
   std::string response_body;
@@ -1809,7 +1815,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutCallbackDisarmsAndReturns408
 
     EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
         .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-          EXPECT_STREQ("408", headers.Status()->value().c_str());
+          EXPECT_EQ("408", headers.Status()->value().getStringView());
         }));
     EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
 
@@ -1989,7 +1995,7 @@ TEST_F(HttpConnectionManagerImplTest, RejectWebSocketOnNonWebSocketRoute) {
 
   EXPECT_CALL(encoder, encodeHeaders(_, true))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("403", headers.Status()->value().c_str());
+        EXPECT_EQ("403", headers.Status()->value().getStringView());
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2019,7 +2025,7 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
   EXPECT_CALL(encoder, encodeHeaders(_, false))
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
         EXPECT_NE(nullptr, headers.Connection());
-        EXPECT_STREQ("upgrade", headers.Connection()->value().c_str());
+        EXPECT_EQ("upgrade", headers.Connection()->value().getStringView());
       }));
 
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
@@ -2069,7 +2075,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillOnce(Invoke([](HeaderMap& headers, bool) -> FilterHeadersStatus {
         EXPECT_NE(nullptr, headers.ForwardedFor());
-        EXPECT_STREQ("https", headers.ForwardedProto()->value().c_str());
+        EXPECT_EQ("https", headers.ForwardedProto()->value().getStringView());
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -2128,7 +2134,40 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
         EXPECT_NE(nullptr, headers.Server());
-        EXPECT_STREQ("envoy-server-test", headers.Server()->value().c_str());
+        EXPECT_EQ("envoy-server-test", headers.Server()->value().getStringView());
+      }));
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay));
+
+  HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(HttpConnectionManagerImplTest, DisconnectOnProxyConnectionDisconnect) {
+  InSequence s;
+  setup(false, "envoy-server-test");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{new TestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/"}, {":method", "GET"}, {"proxy-connection", "close"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+  }));
+
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
+        EXPECT_NE(nullptr, headers.Connection());
+        EXPECT_EQ("close", headers.Connection()->value().getStringView());
+        EXPECT_EQ(nullptr, headers.ProxyConnection());
       }));
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
   EXPECT_CALL(filter_callbacks_.connection_,
@@ -2170,7 +2209,7 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
   EXPECT_CALL(encoder, encodeHeaders(_, false))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
         EXPECT_NE(nullptr, headers.Server());
-        EXPECT_STREQ("", headers.Server()->value().c_str());
+        EXPECT_EQ("", headers.Server()->value().getStringView());
       }));
   filter->callbacks_->encodeHeaders(std::move(response_headers), false);
 
@@ -2968,6 +3007,12 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWith
     MockDownstreamWatermarkCallbacks callbacks;
     EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
     decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
+
+    // Ensures that when new callbacks are registered they get invoked immediately
+    // and the already-registered callbacks do not.
+    MockDownstreamWatermarkCallbacks callbacks2;
+    EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark());
+    decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks2);
   }
 }
 
@@ -3086,10 +3131,13 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
 
   MockDownstreamWatermarkCallbacks callbacks;
   decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
+  MockDownstreamWatermarkCallbacks callbacks2;
+  decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks2);
 
   // Now overload the buffer with response data. The downstream watermark
   // callbacks should be called.
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark());
   Buffer::OwnedImpl fake_response("A long enough string to go over watermarks");
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, false))
       .WillOnce(Return(FilterDataStatus::StopIterationAndWatermark));
@@ -3098,6 +3146,7 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   // Change the limit so the buffered data is below the new watermark.
   buffer_len = encoder_filters_[1]->callbacks_->encodingBuffer()->length();
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark());
   encoder_filters_[1]->callbacks_->setEncoderBufferLimit((buffer_len + 1) * 2);
 }
 
@@ -3119,6 +3168,8 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
   EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   Buffer::OwnedImpl data("A longer string");
   decoder_filters_[0]->callbacks_->addDecodedData(data, false);
+  const auto rc_details = encoder_filters_[1]->callbacks_->streamInfo().responseCodeDetails();
+  EXPECT_EQ("request_payload_too_large", rc_details.value());
 }
 
 // Return 413 from an intermediate filter and make sure we don't continue the filter chain.
@@ -3248,7 +3299,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
       .WillOnce(Invoke([&](HeaderMap& headers, bool) -> FilterHeadersStatus {
-        EXPECT_STREQ("11", headers.ContentLength()->value().c_str());
+        EXPECT_EQ("11", headers.ContentLength()->value().getStringView());
         return FilterHeadersStatus::Continue;
       }));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());
@@ -3944,7 +3995,7 @@ TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
   // 503 direct response when overloaded.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("503", headers.Status()->value().c_str());
+        EXPECT_EQ("503", headers.Status()->value().getStringView());
       }));
   std::string response_body;
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
@@ -3982,7 +4033,7 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenOverloaded) {
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("close", headers.Connection()->value().c_str());
+        EXPECT_EQ("close", headers.Connection()->value().getStringView());
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -4003,7 +4054,7 @@ TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersRejected) {
 
     EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
         .WillOnce(Invoke([&response_code](const HeaderMap& headers, bool) -> void {
-          response_code = headers.Status()->value().c_str();
+          response_code = std::string(headers.Status()->value().getStringView());
         }));
     decoder->decodeHeaders(std::move(headers), true);
     conn_manager_->newStream(response_encoder_);
@@ -4119,6 +4170,38 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnEncodingPat
   EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   expectOnDestroy();
   encoder_filters_[1]->callbacks_->continueEncoding();
+}
+
+TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
+  setup(false, "");
+
+  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{new TestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/"}, {":method", "GET"}, {"connection", "keep-alive"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+
+    HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+    filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+
+    data.drain(4);
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
+        EXPECT_EQ("close", headers.Connection()->value().getStringView());
+      }));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
 }
 } // namespace Http
 } // namespace Envoy

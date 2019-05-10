@@ -33,21 +33,9 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
     cookies.append("; ", 2);
   }
 
-  cookies.append(value.c_str(), value.size());
+  const absl::string_view value_view = value.getStringView();
+  cookies.append(value_view.data(), value_view.size());
   return true;
-}
-
-void initializeNghttp2Logging() {
-  nghttp2_set_debug_vprintf_callback([](const char* format, va_list args) {
-    char buf[2048];
-    const int n = ::vsnprintf(buf, sizeof(buf), format, args);
-    // nghttp2 inserts new lines, but we also insert a new line in the ENVOY_LOG
-    // below, so avoid double \n.
-    if (n >= 1 && static_cast<size_t>(n) < sizeof(buf) && buf[n - 1] == '\n') {
-      buf[n - 1] = '\0';
-    }
-    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::http2), trace, "nghttp2: {}", buf);
-  });
 }
 
 ConnectionImpl::Http2Callbacks ConnectionImpl::http2_callbacks_;
@@ -79,9 +67,11 @@ static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& he
   if (header.value().type() == HeaderString::Type::Reference) {
     flags |= NGHTTP2_NV_FLAG_NO_COPY_VALUE;
   }
-  headers.push_back({remove_const<uint8_t>(header.key().c_str()),
-                     remove_const<uint8_t>(header.value().c_str()), header.key().size(),
-                     header.value().size(), flags});
+  const absl::string_view header_key = header.key().getStringView();
+  const absl::string_view header_value = header.value().getStringView();
+  headers.push_back({remove_const<uint8_t>(header_key.data()),
+                     remove_const<uint8_t>(header_value.data()), header_key.size(),
+                     header_value.size(), flags});
 }
 
 void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_headers,

@@ -69,7 +69,7 @@ void OwnedImpl::prepend(absl::string_view data) {
     // only seems to happen the original buffer was created via
     // addBufferFragment(), this forces the code execution path in
     // evbuffer_prepend related to immutable buffers.
-    if (data.size() == 0) {
+    if (data.empty()) {
       return;
     }
     evbuffer_prepend(buffer_.get(), data.data(), data.size());

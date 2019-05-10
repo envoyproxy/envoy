@@ -29,6 +29,46 @@ enum class FilterStatus {
 };
 
 /**
+ * Callbacks used by individual filter instances to communicate with the filter manager.
+ */
+class NetworkFilterCallbacks {
+public:
+  virtual ~NetworkFilterCallbacks() {}
+
+  /**
+   * @return the connection that owns this filter.
+   */
+  virtual Connection& connection() PURE;
+};
+
+/**
+ * Callbacks used by individual write filter instances to communicate with the filter manager.
+ */
+class WriteFilterCallbacks : public virtual NetworkFilterCallbacks {
+public:
+  virtual ~WriteFilterCallbacks() {}
+
+  /**
+   * Pass data directly to subsequent filters in the filter chain. This method is used in
+   * advanced cases in which a filter needs full control over how subsequent filters view data.
+   * Using this method allows a filter to buffer data (or not) and then periodically inject data
+   * to subsequent filters, indicating end_stream at an appropriate time.
+   * This can be used to implement rate limiting, periodic data emission, etc.
+   *
+   * When using this callback, filters should generally move passed in buffer and return
+   * FilterStatus::StopIteration from their onWrite() call, since use of this method
+   * indicates that a filter does not wish to participate in a standard write flow
+   * and will perform any necessary buffering and continuation on its own.
+   *
+   * @param data supplies the write data to be propagated directly to further filters in the filter
+   *             chain.
+   * @param end_stream supplies the end_stream status to be propagated directly to further filters
+   *                   in the filter chain.
+   */
+  virtual void injectWriteDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+};
+
+/**
  * A write path binary connection filter.
  */
 class WriteFilter {
@@ -42,6 +82,19 @@ public:
    * @return status used by the filter manager to manage further filter iteration.
    */
   virtual FilterStatus onWrite(Buffer::Instance& data, bool end_stream) PURE;
+
+  /**
+   * Initializes the write filter callbacks used to interact with the filter manager. It will be
+   * called by the filter manager a single time when the filter is first registered. Thus, any
+   * construction that requires the backing connection should take place in the context of this
+   * function.
+   *
+   * IMPORTANT: No outbound networking or complex processing should be done in this function.
+   *            That should be done in the context of ReadFilter::onNewConnection() if needed.
+   *
+   * @param callbacks supplies the callbacks.
+   */
+  virtual void initializeWriteFilterCallbacks(WriteFilterCallbacks&) {}
 };
 
 typedef std::shared_ptr<WriteFilter> WriteFilterSharedPtr;
@@ -49,14 +102,9 @@ typedef std::shared_ptr<WriteFilter> WriteFilterSharedPtr;
 /**
  * Callbacks used by individual read filter instances to communicate with the filter manager.
  */
-class ReadFilterCallbacks {
+class ReadFilterCallbacks : public virtual NetworkFilterCallbacks {
 public:
   virtual ~ReadFilterCallbacks() {}
-
-  /**
-   * @return the connection that owns this read filter.
-   */
-  virtual Connection& connection() PURE;
 
   /**
    * If a read filter stopped filter iteration, continueReading() can be called to continue the
@@ -64,6 +112,31 @@ public:
    * buffer (it will also have onNewConnection() called on it if it was not previously called).
    */
   virtual void continueReading() PURE;
+
+  /**
+   * Pass data directly to subsequent filters in the filter chain. This method is used in
+   * advanced cases in which a filter needs full control over how subsequent filters view data,
+   * and does not want to make use of connection-level buffering. Using this method allows
+   * a filter to buffer data (or not) and then periodically inject data to subsequent filters,
+   * indicating end_stream at an appropriate time. This can be used to implement rate limiting,
+   * periodic data emission, etc.
+   *
+   * When using this callback, filters should generally move passed in buffer and return
+   * FilterStatus::StopIteration from their onData() call, since use of this method
+   * indicates that a filter does not wish to participate in standard connection-level
+   * buffering and continuation and will perform any necessary buffering and continuation on its
+   * own.
+   *
+   * This callback is different from continueReading() in that the specified data and end_stream
+   * status will be propagated verbatim to further filters in the filter chain
+   * (while continueReading() propagates connection-level read buffer and end_stream status).
+   *
+   * @param data supplies the read data to be propagated directly to further filters in the filter
+   *             chain.
+   * @param end_stream supplies the end_stream status to be propagated directly to further filters
+   *                   in the filter chain.
+   */
+  virtual void injectReadDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
    * Return the currently selected upstream host, if any. This can be used for communication

@@ -461,13 +461,13 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
         // Update second hostset accordingly;
         HostVectorSharedPtr new_hosts(
             new HostVector(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
-        HostVectorSharedPtr healthy_hosts(
-            new HostVector(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
+        auto healthy_hosts = std::make_shared<const HealthyHostVector>(
+            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts());
         const HostsPerLocalityConstSharedPtr empty_hosts_per_locality{new HostsPerLocalityImpl()};
 
         second.updateHosts(0,
-                           HostSetImpl::updateHostsParams(new_hosts, empty_hosts_per_locality,
-                                                          healthy_hosts, empty_hosts_per_locality),
+                           updateHostsParams(new_hosts, empty_hosts_per_locality, healthy_hosts,
+                                             empty_hosts_per_locality),
                            {}, added, removed, absl::nullopt);
       });
 

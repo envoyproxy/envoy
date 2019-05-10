@@ -2,81 +2,118 @@
 
 #include "test/common/config/delta_subscription_test_harness.h"
 
-using testing::AnyNumber;
-using testing::UnorderedElementsAre;
-
 namespace Envoy {
 namespace Config {
 namespace {
 
-class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness, public testing::Test {};
+class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness, public testing::Test {
+protected:
+  DeltaSubscriptionImplTest() : DeltaSubscriptionTestHarness() {}
+};
 
-TEST_F(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
-  // Envoy is interested in three resources: name1, name2, and name3.
+TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
   startSubscription({"name1", "name2", "name3"});
+  expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::GrpcStatus::Ok, "", {});
+  subscription_->updateResources({"name3", "name4"});
+  expectSendMessage({"name1", "name2"}, {}, Grpc::Status::GrpcStatus::Ok, "", {});
+  subscription_->updateResources({"name1", "name2", "name3", "name4"});
+  expectSendMessage({}, {"name1", "name2"}, Grpc::Status::GrpcStatus::Ok, "", {});
+  subscription_->updateResources({"name3", "name4"});
+  expectSendMessage({"name1", "name2"}, {}, Grpc::Status::GrpcStatus::Ok, "", {});
+  subscription_->updateResources({"name1", "name2", "name3", "name4"});
+  expectSendMessage({}, {"name1", "name2", "name3"}, Grpc::Status::GrpcStatus::Ok, "", {});
+  subscription_->updateResources({"name4"});
+}
 
-  // Ignore these for now, although at the very end there is one we will care about.
-  EXPECT_CALL(async_stream_, sendMessageRaw(_, _)).Times(AnyNumber());
-
-  // Semi-hack: we don't want the requests to actually get sent, since it would clear out the
-  // request_ that we want to inspect. pause() does the trick!
+// Checks that after a pause(), no requests are sent until resume().
+// Also demonstrates the collapsing of subscription interest updates into a single
+// request. (This collapsing happens any time multiple updates arrive before a request
+// can be sent, not just with pausing: rate limiting or a down gRPC stream would also do it).
+TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
+  startSubscription({"name1", "name2", "name3"});
   subscription_->pause();
 
-  // The xDS server's first update includes items for name1 and 2, but not 3.
-  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> add1_2;
-  auto* resource = add1_2.Add();
-  resource->set_name("name1");
-  resource->set_version("version1A");
-  resource = add1_2.Add();
-  resource->set_name("name2");
-  resource->set_version("version2A");
-  subscription_->onConfigUpdate(add1_2, {}, "debugversion1");
-  subscription_->handleStreamEstablished();
-  envoy::api::v2::DeltaDiscoveryRequest cur_request = subscription_->internalRequestStateForTest();
-  EXPECT_EQ("version1A", cur_request.initial_resource_versions().at("name1"));
-  EXPECT_EQ("version2A", cur_request.initial_resource_versions().at("name2"));
-  EXPECT_EQ(cur_request.initial_resource_versions().end(),
-            cur_request.initial_resource_versions().find("name3"));
+  expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::GrpcStatus::Ok, "", {});
+  // If not for the pause, these updates would make the expectSendMessage fail due to too many
+  // messages being sent.
+  subscription_->updateResources({"name3", "name4"});
+  subscription_->updateResources({"name1", "name2", "name3", "name4"});
+  subscription_->updateResources({"name3", "name4"});
+  subscription_->updateResources({"name1", "name2", "name3", "name4"});
+  subscription_->updateResources({"name3", "name4"});
 
-  // The next update updates 1, removes 2, and adds 3. The map should then have 1 and 3.
-  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> add1_3;
-  resource = add1_3.Add();
-  resource->set_name("name1");
-  resource->set_version("version1B");
-  resource = add1_3.Add();
-  resource->set_name("name3");
-  resource->set_version("version3A");
-  Protobuf::RepeatedPtrField<std::string> remove2;
-  *remove2.Add() = "name2";
-  subscription_->onConfigUpdate(add1_3, remove2, "debugversion2");
-  subscription_->handleStreamEstablished();
-  cur_request = subscription_->internalRequestStateForTest();
-  EXPECT_EQ("version1B", cur_request.initial_resource_versions().at("name1"));
-  EXPECT_EQ(cur_request.initial_resource_versions().end(),
-            cur_request.initial_resource_versions().find("name2"));
-  EXPECT_EQ("version3A", cur_request.initial_resource_versions().at("name3"));
+  subscription_->resume();
+}
 
-  // The next update removes 1 and 3. The map we send the server should be empty...
-  Protobuf::RepeatedPtrField<std::string> remove1_3;
-  *remove1_3.Add() = "name1";
-  *remove1_3.Add() = "name3";
-  subscription_->onConfigUpdate({}, remove1_3, "debugversion3");
-  subscription_->handleStreamEstablished();
-  cur_request = subscription_->internalRequestStateForTest();
-  EXPECT_TRUE(cur_request.initial_resource_versions().empty());
+TEST_F(DeltaSubscriptionImplTest, ResponseCausesAck) {
+  startSubscription({"name1"});
+  deliverConfigUpdate({"name1"}, "someversion", true);
+}
 
-  // ...but our own map should remember our interest. In particular, losing interest in all 3 should
-  // cause their names to appear in the resource_names_unsubscribe field of a DeltaDiscoveryRequest.
-  subscription_->resume(); // now we do want the request to actually get sendMessage()'d.
-  EXPECT_CALL(async_stream_, sendMessageRaw(_, _)).WillOnce([](Buffer::InstancePtr&& msg, bool) {
-    envoy::api::v2::DeltaDiscoveryRequest sent_request;
-    Buffer::ZeroCopyInputStreamImpl stream(std::move(msg));
-    EXPECT_TRUE(sent_request.ParseFromZeroCopyStream(&stream));
-    EXPECT_THAT(sent_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
-    EXPECT_THAT(sent_request.resource_names_unsubscribe(),
-                UnorderedElementsAre("name1", "name2", "name3"));
-  });
-  subscription_->subscribe({"name4"}); // (implies "we no longer care about name1,2,3")
+// Checks that after a pause(), no ACK requests are sent until resume(), but that after the
+// resume, *all* ACKs that arrived during the pause are sent (in order).
+TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
+  startSubscription({"name1", "name2", "name3"});
+  subscription_->pause();
+  // The server gives us our first version of resource name1.
+  // subscription_ now wants to ACK name1 (but can't due to pause).
+  {
+    auto message = std::make_unique<envoy::api::v2::DeltaDiscoveryResponse>();
+    auto* resource = message->mutable_resources()->Add();
+    resource->set_name("name1");
+    resource->set_version("version1A");
+    const std::string nonce = std::to_string(HashUtil::xxHash64("version1A"));
+    message->set_nonce(nonce);
+    nonce_acks_required_.push(nonce);
+    subscription_->onDiscoveryResponse(std::move(message));
+  }
+  // The server gives us our first version of resource name2.
+  // subscription_ now wants to ACK name1 and then name2 (but can't due to pause).
+  {
+    auto message = std::make_unique<envoy::api::v2::DeltaDiscoveryResponse>();
+    auto* resource = message->mutable_resources()->Add();
+    resource->set_name("name2");
+    resource->set_version("version2A");
+    const std::string nonce = std::to_string(HashUtil::xxHash64("version2A"));
+    message->set_nonce(nonce);
+    nonce_acks_required_.push(nonce);
+    subscription_->onDiscoveryResponse(std::move(message));
+  }
+  // The server gives us an updated version of resource name1.
+  // subscription_ now wants to ACK name1A, then name2, then name1B (but can't due to pause).
+  {
+    auto message = std::make_unique<envoy::api::v2::DeltaDiscoveryResponse>();
+    auto* resource = message->mutable_resources()->Add();
+    resource->set_name("name1");
+    resource->set_version("version1B");
+    const std::string nonce = std::to_string(HashUtil::xxHash64("version1B"));
+    message->set_nonce(nonce);
+    nonce_acks_required_.push(nonce);
+    subscription_->onDiscoveryResponse(std::move(message));
+  }
+  // All ACK sendMessage()s will happen upon calling resume().
+  EXPECT_CALL(async_stream_, sendMessageRaw(_, _)
+      .WillRepeatedly([this](const Buffer::InstancePtr&& buffer, bool) {
+        envoy::api::v2::DeltaDiscoveryRequest message;
+        Buffer::ZeroCopyInputStreamImpl stream(std::move(buffer));
+        EXPECT_TRUE(message->ParseFromZeroCopyStream(&stream)));
+        const std::string nonce = message.response_nonce();
+        if (!nonce.empty()) {
+          nonce_acks_sent_.push(nonce);
+        }
+      });
+  subscription_->resume();
+  // DeltaSubscriptionTestHarness's dtor will check that all ACKs were sent with the correct nonces,
+  // in the correct order.
+}
+
+TEST_F(DeltaSubscriptionImplTest, NoGrpcStream) {
+  // Have to call start() to get state_ populated (which this test needs to not segfault), but
+  // start() also tries to start the GrpcStream. So, have that attempt return nullptr.
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(async_stream_, sendMessage(_, _)).Times(0);
+  subscription_->start({"name1"}, callbacks_);
+  subscription_->updateResources({"name1", "name2"});
 }
 
 } // namespace

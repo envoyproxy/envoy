@@ -6,7 +6,6 @@
 #include "common/config/cds_json.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_options_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "fmt/printf.h"
@@ -47,10 +46,8 @@ inline std::string clustersJson(const std::vector<std::string>& clusters) {
 inline envoy::api::v2::Cluster parseClusterFromJson(const std::string& json_string) {
   envoy::api::v2::Cluster cluster;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Stats::StatsOptionsImpl stats_options;
   Config::CdsJson::translateCluster(*json_object_ptr,
-                                    absl::optional<envoy::api::v2::core::ConfigSource>(), cluster,
-                                    stats_options);
+                                    absl::optional<envoy::api::v2::core::ConfigSource>(), cluster);
   return cluster;
 }
 
@@ -69,8 +66,7 @@ parseSdsClusterFromJson(const std::string& json_string,
                         const envoy::api::v2::core::ConfigSource eds_config) {
   envoy::api::v2::Cluster cluster;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Stats::StatsOptionsImpl stats_options;
-  Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster, stats_options);
+  Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster);
   return cluster;
 }
 
@@ -136,6 +132,24 @@ parseHealthCheckFromV1Json(const std::string& json_string) {
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::CdsJson::translateHealthCheck(*json_object_ptr, health_check);
   return health_check;
+}
+
+inline PrioritySet::UpdateHostsParams
+updateHostsParams(HostVectorConstSharedPtr hosts, HostsPerLocalityConstSharedPtr hosts_per_locality,
+                  HealthyHostVectorConstSharedPtr healthy_hosts,
+                  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality) {
+  return HostSetImpl::updateHostsParams(
+      hosts, hosts_per_locality, std::move(healthy_hosts), std::move(healthy_hosts_per_locality),
+      std::make_shared<const DegradedHostVector>(), HostsPerLocalityImpl::empty(),
+      std::make_shared<const ExcludedHostVector>(), HostsPerLocalityImpl::empty());
+}
+
+inline PrioritySet::UpdateHostsParams
+updateHostsParams(HostVectorConstSharedPtr hosts,
+                  HostsPerLocalityConstSharedPtr hosts_per_locality) {
+  return updateHostsParams(std::move(hosts), std::move(hosts_per_locality),
+                           std::make_shared<const HealthyHostVector>(),
+                           HostsPerLocalityImpl::empty());
 }
 
 } // namespace

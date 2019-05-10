@@ -136,8 +136,9 @@ protected:
     response_headers.iterate(
         [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
           IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
-          Http::LowerCaseString lower_key{entry.key().c_str()};
-          EXPECT_STREQ(entry.value().c_str(), response->headers().get(lower_key)->value().c_str());
+          Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
+          EXPECT_EQ(entry.value().getStringView(),
+                    response->headers().get(lower_key)->value().getStringView());
           return Http::HeaderMap::Iterate::Continue;
         },
         response.get());

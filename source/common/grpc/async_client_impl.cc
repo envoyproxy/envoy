@@ -175,9 +175,8 @@ void AsyncStreamImpl::onReset() {
   streamError(Status::GrpcStatus::Internal);
 }
 
-void AsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) {
-  Common::PrependGrpcFrameHeader(request.get());
-  stream_->sendData(*request, end_stream);
+void AsyncStreamImpl::sendMessage(const Protobuf::Message& request, bool end_stream) {
+  stream_->sendData(*Common::serializeToGrpcFrame(request), end_stream);
 }
 
 void AsyncStreamImpl::closeStream() {

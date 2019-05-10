@@ -34,7 +34,7 @@ public:
             Invoke([&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
               EXPECT_EQ(message, inner_message);
-              EXPECT_EQ(shadowed_host, message->headers().Host()->value().c_str());
+              EXPECT_EQ(shadowed_host, message->headers().Host()->value().getStringView());
               callback_ = &callbacks;
               return &request;
             }));

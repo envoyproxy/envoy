@@ -209,7 +209,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
     formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append));
   }
 
-  ASSERT(formatters.size() > 0);
+  ASSERT(!formatters.empty());
 
   if (formatters.size() == 1) {
     return std::move(formatters[0]);
@@ -236,7 +236,7 @@ HeaderParserPtr HeaderParser::configure(
 
 HeaderParserPtr HeaderParser::configure(
     const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add,
-    const Protobuf::RepeatedPtrField<ProtobufTypes::String>& headers_to_remove) {
+    const Protobuf::RepeatedPtrField<std::string>& headers_to_remove) {
   HeaderParserPtr header_parser = configure(headers_to_add);
 
   for (const auto& header : headers_to_remove) {

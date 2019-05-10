@@ -10,6 +10,8 @@
 #include "envoy/stats/sink.h"
 #include "envoy/stats/source.h"
 
+#include "common/stats/symbol_table_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
@@ -155,6 +157,11 @@ private:
 
   // Map from cluster names to a struct of all of that cluster's stat windows.
   std::unordered_map<std::string, ClusterStatsCachePtr> cluster_stats_cache_map_;
+
+  // Saved StatNames for fast comparisons in loop.
+  Stats::StatNamePool stat_name_pool_;
+  Stats::StatName cluster_name_;
+  Stats::StatName cluster_upstream_rq_time_;
 };
 
 typedef std::unique_ptr<HystrixSink> HystrixSinkPtr;

@@ -1,11 +1,11 @@
 #pragma once
 
-#include <map>
 #include <memory>
 #include <vector>
 
 #include "envoy/stream_info/filter_state.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -26,10 +26,7 @@ private:
     FilterState::StateType state_type_;
   };
 
-  // The explicit non-type-specific comparator is necessary to allow use of find() method
-  // with absl::string_view. See
-  // https://stackoverflow.com/questions/20317413/what-are-transparent-comparators.
-  std::map<std::string, std::unique_ptr<FilterObject>, std::less<>> data_storage_;
+  absl::flat_hash_map<std::string, std::unique_ptr<FilterObject>> data_storage_;
 };
 
 } // namespace StreamInfo

@@ -117,7 +117,7 @@ public:
   bool verbose() const override { return false; }
 
 private:
-  const std::vector<Http::LowerCaseString> request_headers_for_tags_;
+  const std::vector<Http::LowerCaseString> request_headers_for_tags_{};
 };
 
 typedef ConstSingleton<EgressConfigImpl> EgressConfig;
@@ -130,8 +130,8 @@ public:
   }
 
   // Tracing::Span
-  void setOperation(const std::string&) override {}
-  void setTag(const std::string&, const std::string&) override {}
+  void setOperation(absl::string_view) override {}
+  void setTag(absl::string_view, absl::string_view) override {}
   void log(SystemTime, const std::string&) override {}
   void finishSpan() override {}
   void injectContext(Http::HeaderMap&) override {}

@@ -7,13 +7,7 @@ namespace StreamInfo {
 
 void FilterStateImpl::setData(absl::string_view data_name, std::unique_ptr<Object>&& data,
                               FilterState::StateType state_type) {
-  // TODO(Google): Remove string conversion when fixed internally. Fixing
-  // this TODO will also require an explicit cast from absl::string_view to
-  // std::string in the data_storage_ index below; see
-  // https://github.com/abseil/abseil-cpp/blob/master/absl/strings/string_view.h#L328
-  const std::string name(data_name);
-  const auto& it = data_storage_.find(name);
-
+  const auto& it = data_storage_.find(data_name);
   if (it != data_storage_.end()) {
     // We have another object with same data_name. Check for mutability
     // violations namely: readonly data cannot be overwritten. mutable data
@@ -31,18 +25,16 @@ void FilterStateImpl::setData(absl::string_view data_name, std::unique_ptr<Objec
   std::unique_ptr<FilterStateImpl::FilterObject> filter_object(new FilterStateImpl::FilterObject());
   filter_object->data_ = std::move(data);
   filter_object->state_type_ = state_type;
-  data_storage_[name] = std::move(filter_object);
+  data_storage_[data_name] = std::move(filter_object);
 }
 
 bool FilterStateImpl::hasDataWithName(absl::string_view data_name) const {
-  // TODO(Google): Remove string conversion when fixed internally.
-  return data_storage_.count(std::string(data_name)) > 0;
+  return data_storage_.count(data_name) > 0;
 }
 
 const FilterState::Object*
 FilterStateImpl::getDataReadOnlyGeneric(absl::string_view data_name) const {
-  // TODO(Google): Remove string conversion when fixed internally.
-  const auto& it = data_storage_.find(std::string(data_name));
+  const auto& it = data_storage_.find(data_name);
 
   if (it == data_storage_.end()) {
     throw EnvoyException("FilterState::getDataReadOnly<T> called for unknown data name.");
@@ -53,8 +45,7 @@ FilterStateImpl::getDataReadOnlyGeneric(absl::string_view data_name) const {
 }
 
 FilterState::Object* FilterStateImpl::getDataMutableGeneric(absl::string_view data_name) {
-  // TODO(Google): Remove string conversion when fixed internally.
-  const auto& it = data_storage_.find(std::string(data_name));
+  const auto& it = data_storage_.find(data_name);
 
   if (it == data_storage_.end()) {
     throw EnvoyException("FilterState::getDataMutable<T> called for unknown data name.");

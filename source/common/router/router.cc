@@ -34,8 +34,9 @@ uint32_t getLength(const Buffer::Instance* instance) { return instance ? instanc
 
 bool schemeIsHttp(const Http::HeaderMap& downstream_headers,
                   const Network::Connection& connection) {
-  if (downstream_headers.ForwardedProto() && downstream_headers.ForwardedProto()->value().c_str() ==
-                                                 Http::Headers::get().SchemeValues.Http) {
+  if (downstream_headers.ForwardedProto() &&
+      downstream_headers.ForwardedProto()->value().getStringView() ==
+          Http::Headers::get().SchemeValues.Http) {
     return true;
   }
   if (!connection.ssl()) {
@@ -124,6 +125,15 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   if (grpc_request && route.maxGrpcTimeout()) {
     const std::chrono::milliseconds max_grpc_timeout = route.maxGrpcTimeout().value();
     std::chrono::milliseconds grpc_timeout = Grpc::Common::getGrpcTimeout(request_headers);
+    if (route.grpcTimeoutOffset()) {
+      // We only apply the offset if it won't result in grpc_timeout hitting 0 or below, as
+      // setting it to 0 means infinity and a negative timeout makes no sense.
+      const auto offset = *route.grpcTimeoutOffset();
+      if (offset < grpc_timeout) {
+        grpc_timeout -= offset;
+      }
+    }
+
     // Cap gRPC timeout to the configured maximum considering that 0 means infinity.
     if (max_grpc_timeout != std::chrono::milliseconds(0) &&
         (grpc_timeout == std::chrono::milliseconds(0) || grpc_timeout > max_grpc_timeout)) {
@@ -138,7 +148,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
   uint64_t header_timeout;
   if (header_timeout_entry) {
-    if (StringUtil::atoull(header_timeout_entry->value().c_str(), header_timeout)) {
+    if (absl::SimpleAtoi(header_timeout_entry->value().getStringView(), &header_timeout)) {
       timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
     }
     request_headers.removeEnvoyUpstreamRequestTimeoutMs();
@@ -147,7 +157,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   // See if there is a per try/retry timeout. If it's >= global we just ignore it.
   Http::HeaderEntry* per_try_timeout_entry = request_headers.EnvoyUpstreamRequestPerTryTimeoutMs();
   if (per_try_timeout_entry) {
-    if (StringUtil::atoull(per_try_timeout_entry->value().c_str(), header_timeout)) {
+    if (absl::SimpleAtoi(per_try_timeout_entry->value().getStringView(), &header_timeout)) {
       timeout.per_try_timeout_ = std::chrono::milliseconds(header_timeout);
     }
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
@@ -181,7 +191,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
 
 Filter::~Filter() {
   // Upstream resources should already have been cleaned.
-  ASSERT(!upstream_request_);
+  ASSERT(upstream_requests_.empty());
   ASSERT(!retry_state_);
 }
 
@@ -206,10 +216,6 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     const bool internal_request =
         internal_request_header && internal_request_header->value() == "true";
 
-    // TODO(mattklein123): Remove copy when G string compat issues are fixed.
-    const std::string zone_name = config_.local_info_.zoneName();
-    const std::string upstream_zone = upstreamZone(upstream_host);
-
     Http::CodeStats::ResponseStatInfo info{config_.scope_,
                                            cluster_->statsScope(),
                                            EMPTY_STRING,
@@ -218,19 +224,24 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                            route_entry_->virtualHost().name(),
                                            request_vcluster_ ? request_vcluster_->name()
                                                              : EMPTY_STRING,
-                                           zone_name,
-                                           upstream_zone,
+                                           config_.local_info_.zoneName(),
+                                           upstreamZone(upstream_host),
                                            is_canary};
 
     Http::CodeStats& code_stats = httpContext().codeStats();
     code_stats.chargeResponseStat(info);
 
     if (!alt_stat_prefix_.empty()) {
-      Http::CodeStats::ResponseStatInfo info{config_.scope_,   cluster_->statsScope(),
-                                             alt_stat_prefix_, response_status_code,
-                                             internal_request, EMPTY_STRING,
-                                             EMPTY_STRING,     zone_name,
-                                             upstream_zone,    is_canary};
+      Http::CodeStats::ResponseStatInfo info{config_.scope_,
+                                             cluster_->statsScope(),
+                                             alt_stat_prefix_,
+                                             response_status_code,
+                                             internal_request,
+                                             EMPTY_STRING,
+                                             EMPTY_STRING,
+                                             config_.local_info_.zoneName(),
+                                             upstreamZone(upstream_host),
+                                             is_canary};
 
       code_stats.chargeResponseStat(info);
     }
@@ -274,10 +285,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (!route_) {
     config_.stats_.no_route_.inc();
     ENVOY_STREAM_LOG(debug, "no cluster match for URL '{}'", *callbacks_,
-                     headers.Path()->value().c_str());
+                     headers.Path()->value().getStringView());
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, absl::nullopt);
+    callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, absl::nullopt,
+                               StreamInfo::ResponseCodeDetails::get().RouteNotFound);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -296,7 +308,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
           }
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
         },
-        absl::nullopt);
+        absl::nullopt, StreamInfo::ResponseCodeDetails::get().DirectResponse);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -309,7 +321,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     callbacks_->sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "", nullptr,
-                               absl::nullopt);
+                               absl::nullopt,
+                               StreamInfo::ResponseCodeDetails::get().ClusterNotFound);
     return Http::FilterHeadersStatus::StopIteration;
   }
   cluster_ = cluster->info();
@@ -317,11 +330,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
-                   route_entry_->clusterName(), headers.Path()->value().c_str());
+                   route_entry_->clusterName(), headers.Path()->value().getStringView());
 
   const Http::HeaderEntry* request_alt_name = headers.EnvoyUpstreamAltStatName();
   if (request_alt_name) {
-    alt_stat_prefix_ = std::string(request_alt_name->value().c_str()) + ".";
+    alt_stat_prefix_ = std::string(request_alt_name->value().getStringView()) + ".";
     headers.removeEnvoyUpstreamAltStatName();
   }
 
@@ -329,14 +342,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (cluster_->maintenanceMode()) {
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
-    callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "maintenance mode",
-                               [this](Http::HeaderMap& headers) {
-                                 if (!config_.suppress_envoy_headers_) {
-                                   headers.insertEnvoyOverloaded().value(
-                                       Http::Headers::get().EnvoyOverloadedValues.True);
-                                 }
-                               },
-                               absl::nullopt);
+    callbacks_->sendLocalReply(
+        Http::Code::ServiceUnavailable, "maintenance mode",
+        [this](Http::HeaderMap& headers) {
+          if (!config_.suppress_envoy_headers_) {
+            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+          }
+        },
+        absl::nullopt, StreamInfo::ResponseCodeDetails::get().MaintenanceMode);
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -380,8 +393,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
-  upstream_request_ = std::make_unique<UpstreamRequest>(*this, *conn_pool);
-  upstream_request_->encodeHeaders(end_stream);
+  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(*this, *conn_pool);
+  upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
+  upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
     onRequestComplete();
   }
@@ -409,10 +423,12 @@ void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, false);
   callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", nullptr,
-                             absl::nullopt);
+                             absl::nullopt,
+                             StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream);
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
+  ASSERT(upstream_requests_.size() == 1);
   bool buffering = (retry_state_ && retry_state_->enabled()) || do_shadowing_;
   if (buffering && buffer_limit_ > 0 &&
       getLength(callbacks_->decodingBuffer()) + data.length() > buffer_limit_) {
@@ -427,7 +443,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     // If we are going to buffer for retries or shadowing, we need to make a copy before encoding
     // since it's all moves from here on.
     Buffer::OwnedImpl copy(data);
-    upstream_request_->encodeData(copy, end_stream);
+    upstream_requests_.front()->encodeData(copy, end_stream);
 
     // If we are potentially going to retry or shadow this request we need to buffer.
     // This will not cause the connection manager to 413 because before we hit the
@@ -436,7 +452,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     // potentially shadow.
     callbacks_->addDecodedData(data, true);
   } else {
-    upstream_request_->encodeData(data, end_stream);
+    upstream_requests_.front()->encodeData(data, end_stream);
   }
 
   if (end_stream) {
@@ -449,7 +465,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
   ENVOY_STREAM_LOG(debug, "router decoding trailers:\n{}", *callbacks_, trailers);
   downstream_trailers_ = &trailers;
-  upstream_request_->encodeTrailers(trailers);
+  ASSERT(upstream_requests_.size() == 1);
+  upstream_requests_.front()->encodeTrailers(trailers);
   onRequestComplete();
   return Http::FilterTrailersStatus::StopIteration;
 }
@@ -463,13 +480,15 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 }
 
 void Filter::cleanup() {
-  // upstream_request_ is only destroyed in this method (cleanup()) or when we
+  ASSERT(upstream_requests_.size() <= 1);
+  // UpstreamRequests are only destroyed in this method (cleanup()) or when we
   // do a retry (setupRetry()). In the latter case we don't want to save the
   // upstream timings to the downstream info.
-  if (upstream_request_) {
-    callbacks_->streamInfo().setUpstreamTiming(upstream_request_->upstream_timing_);
+  if (upstream_requests_.size() == 1) {
+    UpstreamRequestPtr upstream_request =
+        upstream_requests_.back()->removeFromList(upstream_requests_);
+    callbacks_->streamInfo().setUpstreamTiming(upstream_request->upstream_timing_);
   }
-  upstream_request_.reset();
   retry_state_.reset();
   if (response_timeout_) {
     response_timeout_->disableTimer();
@@ -497,12 +516,14 @@ void Filter::maybeDoShadowing() {
 }
 
 void Filter::onRequestComplete() {
+  // This should be called exactly once, when the downstream request has been received in full.
+  ASSERT(!downstream_end_stream_);
   downstream_end_stream_ = true;
   Event::Dispatcher& dispatcher = callbacks_->dispatcher();
   downstream_request_complete_time_ = dispatcher.timeSource().monotonicTime();
 
   // Possible that we got an immediate reset.
-  if (upstream_request_) {
+  if (upstream_requests_.size() == 1) {
     // Even if we got an immediate reset, we could still shadow, but that is a riskier change and
     // seems unnecessary right now.
     maybeDoShadowing();
@@ -511,12 +532,18 @@ void Filter::onRequestComplete() {
       response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
       response_timeout_->enableTimer(timeout_.global_timeout_);
     }
+
+    for (auto& upstream_request : upstream_requests_) {
+      if (upstream_request->create_per_try_timeout_on_request_complete_) {
+        upstream_request->setupPerTryTimeout();
+      }
+    }
   }
 }
 
 void Filter::onDestroy() {
-  if (upstream_request_ && !attempting_internal_redirect_with_complete_stream_) {
-    upstream_request_->resetStream();
+  if (upstream_requests_.size() == 1 && !attempting_internal_redirect_with_complete_stream_) {
+    upstream_requests_.front()->resetStream();
   }
   cleanup();
 }
@@ -525,60 +552,62 @@ void Filter::onResponseTimeout() {
   ENVOY_STREAM_LOG(debug, "upstream timeout", *callbacks_);
   cluster_->stats().upstream_rq_timeout_.inc();
 
-  // It's possible to timeout during a retry backoff delay when we have no upstream request.
-  if (upstream_request_) {
-    if (upstream_request_->upstream_host_) {
-      upstream_request_->upstream_host_->stats().rq_timeout_.inc();
+  ASSERT(upstream_requests_.size() <= 1);
+  if (upstream_requests_.size() == 1) {
+    if (upstream_requests_.front()->upstream_host_) {
+      upstream_requests_.front()->upstream_host_->stats().rq_timeout_.inc();
     }
-    upstream_request_->resetStream();
+
+    updateOutlierDetection(timeout_response_code_, *upstream_requests_.front().get());
+    upstream_requests_.front()->resetStream();
   }
 
-  updateOutlierDetection(timeout_response_code_);
-  onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
+  onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout,
+                         StreamInfo::ResponseCodeDetails::get().UpstreamTimeout);
 }
 
-void Filter::onPerTryTimeout() {
-  updateOutlierDetection(timeout_response_code_);
+void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
+  updateOutlierDetection(timeout_response_code_, upstream_request);
 
-  if (maybeRetryReset(Http::StreamResetReason::LocalReset)) {
+  if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request)) {
     return;
   }
 
-  onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
+  onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout,
+                         StreamInfo::ResponseCodeDetails::get().UpstreamPerTryTimeout);
 }
 
-void Filter::updateOutlierDetection(Http::Code code) {
-  Upstream::HostDescriptionConstSharedPtr upstream_host;
-  if (upstream_request_) {
-    upstream_host = upstream_request_->upstream_host_;
-    if (upstream_host) {
-      upstream_host->outlierDetector().putHttpResponseCode(enumToInt(code));
-    }
+void Filter::updateOutlierDetection(Http::Code code, UpstreamRequest& upstream_request) {
+  if (upstream_request.upstream_host_) {
+    upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(enumToInt(code));
   }
 }
 
-void Filter::onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flags) {
+void Filter::onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flags,
+                                    absl::string_view details) {
   const absl::string_view body =
       timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
-  onUpstreamAbort(timeout_response_code_, response_flags, body, false);
+  onUpstreamAbort(timeout_response_code_, response_flags, body, false, details);
 }
 
 void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flags,
-                             absl::string_view body, bool dropped) {
+                             absl::string_view body, bool dropped, absl::string_view details) {
+  ASSERT(upstream_requests_.size() <= 1);
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
   if (downstream_response_started_) {
-    if (upstream_request_ != nullptr && upstream_request_->grpc_rq_success_deferred_) {
-      upstream_request_->upstream_host_->stats().rq_error_.inc();
+    if (upstream_requests_.size() == 1 && upstream_requests_.front()->grpc_rq_success_deferred_) {
+      upstream_requests_.front()->upstream_host_->stats().rq_error_.inc();
       config_.stats_.rq_reset_after_downstream_response_started_.inc();
     }
     // This will destroy any created retry timers.
+    callbacks_->streamInfo().setResponseCodeDetails(details);
     cleanup();
     callbacks_->resetStream();
   } else {
     Upstream::HostDescriptionConstSharedPtr upstream_host;
-    if (upstream_request_) {
-      upstream_host = upstream_request_->upstream_host_;
+    if (upstream_requests_.size() == 1) {
+      upstream_host = upstream_requests_.front()->upstream_host_;
     }
 
     // This will destroy any created retry timers.
@@ -594,27 +623,26 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
     if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
-    callbacks_->sendLocalReply(code, body,
-                               [dropped, this](Http::HeaderMap& headers) {
-                                 if (dropped && !config_.suppress_envoy_headers_) {
-                                   headers.insertEnvoyOverloaded().value(
-                                       Http::Headers::get().EnvoyOverloadedValues.True);
-                                 }
-                               },
-                               absl::nullopt);
+    callbacks_->sendLocalReply(
+        code, body,
+        [dropped, this](Http::HeaderMap& headers) {
+          if (dropped && !config_.suppress_envoy_headers_) {
+            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+          }
+        },
+        absl::nullopt, details);
   }
 }
 
-bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason) {
+bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
+                             UpstreamRequest& upstream_request) {
   // We don't retry if we already started the response.
   if (downstream_response_started_ || !retry_state_) {
     return false;
   }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host;
-  if (upstream_request_) {
-    upstream_host = upstream_request_->upstream_host_;
-  }
+  upstream_host = upstream_request.upstream_host_;
 
   // Notify retry modifiers about the attempted host.
   if (upstream_host != nullptr) {
@@ -638,14 +666,14 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason) {
 }
 
 void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
-                             absl::string_view transport_failure_reason) {
-  ASSERT(upstream_request_);
+                             absl::string_view transport_failure_reason,
+                             UpstreamRequest& upstream_request) {
   ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
                    Http::Utility::resetReasonToString(reset_reason));
 
-  updateOutlierDetection(Http::Code::ServiceUnavailable);
+  updateOutlierDetection(Http::Code::ServiceUnavailable, upstream_request);
 
-  if (maybeRetryReset(reset_reason)) {
+  if (maybeRetryReset(reset_reason, upstream_request)) {
     return;
   }
 
@@ -656,7 +684,13 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
 
   const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
   callbacks_->streamInfo().setUpstreamTransportFailureReason(transport_failure_reason);
-  onUpstreamAbort(Http::Code::ServiceUnavailable, response_flags, body, dropped);
+  const std::string& basic_details =
+      downstream_response_started_ ? StreamInfo::ResponseCodeDetails::get().LateUpstreamReset
+                                   : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;
+  const std::string details = absl::StrCat(
+      basic_details, "{", Http::Utility::resetReasonToString(reset_reason),
+      transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}");
+  onUpstreamAbort(Http::Code::ServiceUnavailable, response_flags, body, dropped, details);
 }
 
 StreamInfo::ResponseFlag
@@ -679,7 +713,8 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream) {
+void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers,
+                                         UpstreamRequest& upstream_request, bool end_stream) {
   // We need to defer gRPC success until after we have processed grpc-status in
   // the trailers.
   if (grpc_request_) {
@@ -687,19 +722,21 @@ void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool en
       absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
       if (grpc_status &&
           !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
-        upstream_request_->upstream_host_->stats().rq_success_.inc();
+        upstream_request.upstream_host_->stats().rq_success_.inc();
       } else {
-        upstream_request_->upstream_host_->stats().rq_error_.inc();
+        upstream_request.upstream_host_->stats().rq_error_.inc();
       }
     } else {
-      upstream_request_->grpc_rq_success_deferred_ = true;
+      upstream_request.grpc_rq_success_deferred_ = true;
     }
   } else {
-    upstream_request_->upstream_host_->stats().rq_success_.inc();
+    upstream_request.upstream_host_->stats().rq_success_.inc();
   }
 }
 
-void Filter::onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers) {
+void Filter::onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers,
+                                          UpstreamRequest& upstream_request) {
+  chargeUpstreamCode(100, *headers, upstream_request.upstream_host_, false);
   ENVOY_STREAM_LOG(debug, "upstream 100 continue", *callbacks_);
 
   downstream_response_started_ = true;
@@ -713,24 +750,25 @@ void Filter::onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers) {
 }
 
 void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
-                               bool end_stream) {
+                               UpstreamRequest& upstream_request, bool end_stream) {
+  ASSERT(upstream_requests_.size() == 1);
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
 
-  upstream_request_->upstream_host_->outlierDetector().putHttpResponseCode(response_code);
+  upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
-    upstream_request_->upstream_host_->healthChecker().setUnhealthy();
+    upstream_request.upstream_host_->healthChecker().setUnhealthy();
   }
 
   if (retry_state_) {
     // Notify retry modifiers about the attempted host.
-    retry_state_->onHostAttempted(upstream_request_->upstream_host_);
+    retry_state_->onHostAttempted(upstream_request.upstream_host_);
 
+    // Capture upstream_host since setupRetry() in the following line will clear
+    // upstream_request.
+    const auto upstream_host = upstream_request.upstream_host_;
     const RetryStatus retry_status =
         retry_state_->shouldRetryHeaders(*headers, [this]() -> void { doRetry(); });
-    // Capture upstream_host since setupRetry() in the following line will clear
-    // upstream_request_.
-    const auto upstream_host = upstream_request_->upstream_host_;
     if (retry_status == RetryStatus::Yes && setupRetry(end_stream)) {
       Http::CodeStats& code_stats = httpContext().codeStats();
       code_stats.chargeBasicResponseStat(cluster_->statsScope(), "retry.",
@@ -751,7 +789,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
 
   if (static_cast<Http::Code>(response_code) == Http::Code::Found &&
       route_entry_->internalRedirectAction() == InternalRedirectAction::Handle &&
-      setupRedirect(*headers)) {
+      setupRedirect(*headers, upstream_request)) {
     return;
     // If the redirect could not be handled, fail open and let it pass to the
     // next downstream.
@@ -769,12 +807,12 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
     }
   }
 
-  upstream_request_->upstream_canary_ =
+  upstream_request.upstream_canary_ =
       (headers->EnvoyUpstreamCanary() && headers->EnvoyUpstreamCanary()->value() == "true") ||
-      upstream_request_->upstream_host_->canary();
-  chargeUpstreamCode(response_code, *headers, upstream_request_->upstream_host_, false);
+      upstream_request.upstream_host_->canary();
+  chargeUpstreamCode(response_code, *headers, upstream_request.upstream_host_, false);
   if (!Http::CodeUtility::is5xx(response_code)) {
-    handleNon5xxResponseHeaders(*headers, end_stream);
+    handleNon5xxResponseHeaders(*headers, upstream_request, end_stream);
   }
 
   // Append routing cookies
@@ -789,35 +827,40 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
 
   downstream_response_started_ = true;
   if (end_stream) {
-    onUpstreamComplete();
+    onUpstreamComplete(upstream_request);
   }
 
+  callbacks_->streamInfo().setResponseCodeDetails(
+      StreamInfo::ResponseCodeDetails::get().ViaUpstream);
   callbacks_->encodeHeaders(std::move(headers), end_stream);
 }
 
-void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
+                            bool end_stream) {
+  ASSERT(upstream_requests_.size() == 1);
   if (end_stream) {
     // gRPC request termination without trailers is an error.
-    if (upstream_request_->grpc_rq_success_deferred_) {
-      upstream_request_->upstream_host_->stats().rq_error_.inc();
+    if (upstream_request.grpc_rq_success_deferred_) {
+      upstream_request.upstream_host_->stats().rq_error_.inc();
     }
-    onUpstreamComplete();
+    onUpstreamComplete(upstream_request);
   }
 
   callbacks_->encodeData(data, end_stream);
 }
 
-void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers) {
-  if (upstream_request_->grpc_rq_success_deferred_) {
+void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers, UpstreamRequest& upstream_request) {
+  ASSERT(upstream_requests_.size() == 1);
+  if (upstream_request.grpc_rq_success_deferred_) {
     absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*trailers);
     if (grpc_status &&
         !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
-      upstream_request_->upstream_host_->stats().rq_success_.inc();
+      upstream_request.upstream_host_->stats().rq_success_.inc();
     } else {
-      upstream_request_->upstream_host_->stats().rq_error_.inc();
+      upstream_request.upstream_host_->stats().rq_error_.inc();
     }
   }
-  onUpstreamComplete();
+  onUpstreamComplete(upstream_request);
   callbacks_->encodeTrailers(std::move(trailers));
 }
 
@@ -825,9 +868,9 @@ void Filter::onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map) {
   callbacks_->encodeMetadata(std::move(metadata_map));
 }
 
-void Filter::onUpstreamComplete() {
+void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   if (!downstream_end_stream_) {
-    upstream_request_->resetStream();
+    upstream_request.resetStream();
   }
 
   if (config_.emit_dynamic_stats_ && !callbacks_->streamInfo().healthCheck() &&
@@ -836,27 +879,24 @@ void Filter::onUpstreamComplete() {
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
         dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
-    upstream_request_->upstream_host_->outlierDetector().putResponseTime(response_time);
+    upstream_request.upstream_host_->outlierDetector().putResponseTime(response_time);
 
     const Http::HeaderEntry* internal_request_header = downstream_headers_->EnvoyInternalRequest();
     const bool internal_request =
         internal_request_header && internal_request_header->value() == "true";
-
-    // TODO(mattklein123): Remove copy when G string compat issues are fixed.
-    const std::string zone_name = config_.local_info_.zoneName();
 
     Http::CodeStats& code_stats = httpContext().codeStats();
     Http::CodeStats::ResponseTimingInfo info{config_.scope_,
                                              cluster_->statsScope(),
                                              EMPTY_STRING,
                                              response_time,
-                                             upstream_request_->upstream_canary_,
+                                             upstream_request.upstream_canary_,
                                              internal_request,
                                              route_entry_->virtualHost().name(),
                                              request_vcluster_ ? request_vcluster_->name()
                                                                : EMPTY_STRING,
-                                             zone_name,
-                                             upstreamZone(upstream_request_->upstream_host_)};
+                                             config_.local_info_.zoneName(),
+                                             upstreamZone(upstream_request.upstream_host_)};
 
     code_stats.chargeResponseTiming(info);
 
@@ -865,12 +905,12 @@ void Filter::onUpstreamComplete() {
                                                cluster_->statsScope(),
                                                alt_stat_prefix_,
                                                response_time,
-                                               upstream_request_->upstream_canary_,
+                                               upstream_request.upstream_canary_,
                                                internal_request,
                                                EMPTY_STRING,
                                                EMPTY_STRING,
-                                               zone_name,
-                                               upstreamZone(upstream_request_->upstream_host_)};
+                                               config_.local_info_.zoneName(),
+                                               upstreamZone(upstream_request.upstream_host_)};
 
       code_stats.chargeResponseTiming(info);
     }
@@ -889,16 +929,18 @@ bool Filter::setupRetry(bool end_stream) {
     return false;
   }
 
+  ASSERT(upstream_requests_.size() == 1);
   ENVOY_STREAM_LOG(debug, "performing retry", *callbacks_);
   if (!end_stream) {
-    upstream_request_->resetStream();
+    upstream_requests_.front()->resetStream();
   }
 
-  upstream_request_.reset();
+  upstream_requests_.front()->removeFromList(upstream_requests_);
+
   return true;
 }
 
-bool Filter::setupRedirect(const Http::HeaderMap& headers) {
+bool Filter::setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upstream_request) {
   ENVOY_STREAM_LOG(debug, "attempting internal redirect", *callbacks_);
   const Http::HeaderEntry* location = headers.Location();
 
@@ -912,7 +954,7 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers) {
   // completion here and check it in onDestroy. This is annoyingly complicated but is better than
   // needlessly resetting streams.
   attempting_internal_redirect_with_complete_stream_ =
-      upstream_request_->upstream_timing_.last_upstream_rx_byte_received_ && downstream_end_stream_;
+      upstream_request.upstream_timing_.last_upstream_rx_byte_received_ && downstream_end_stream_;
 
   // As with setupRetry, redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
@@ -947,19 +989,19 @@ void Filter::doRetry() {
   }
 
   ASSERT(response_timeout_ || timeout_.global_timeout_.count() == 0);
-  ASSERT(!upstream_request_);
-  upstream_request_ = std::make_unique<UpstreamRequest>(*this, *conn_pool);
-  upstream_request_->encodeHeaders(!callbacks_->decodingBuffer() && !downstream_trailers_);
+  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(*this, *conn_pool);
+  upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
+  upstream_requests_.front()->encodeHeaders(!callbacks_->decodingBuffer() && !downstream_trailers_);
   // It's possible we got immediately reset.
-  if (upstream_request_) {
+  if (upstream_requests_.size() == 1) {
     if (callbacks_->decodingBuffer()) {
       // If we are doing a retry we need to make a copy.
       Buffer::OwnedImpl copy(*callbacks_->decodingBuffer());
-      upstream_request_->encodeData(copy, !downstream_trailers_);
+      upstream_requests_.front()->encodeData(copy, !downstream_trailers_);
     }
 
     if (downstream_trailers_) {
-      upstream_request_->encodeTrailers(*downstream_trailers_);
+      upstream_requests_.front()->encodeTrailers(*downstream_trailers_);
     }
   }
 }
@@ -968,7 +1010,7 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
     : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
       stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSource()),
       calling_encode_headers_(false), upstream_canary_(false), encode_complete_(false),
-      encode_trailers_(false) {
+      encode_trailers_(false), create_per_try_timeout_on_request_complete_(false) {
 
   if (parent_.config_.start_child_span_) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
@@ -994,14 +1036,14 @@ Filter::UpstreamRequest::~UpstreamRequest() {
   stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
-    upstream_log->log(parent_.downstream_headers_, upstream_headers_, upstream_trailers_,
-                      stream_info_);
+    upstream_log->log(parent_.downstream_headers_, upstream_headers_.get(),
+                      upstream_trailers_.get(), stream_info_);
   }
 }
 
 void Filter::UpstreamRequest::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
   ASSERT(100 == Http::Utility::getResponseStatus(*headers));
-  parent_.onUpstream100ContinueHeaders(std::move(headers));
+  parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
 }
 
 void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
@@ -1009,22 +1051,26 @@ void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool e
   upstream_timing_.onFirstUpstreamRxByteReceived(parent_.callbacks_->dispatcher().timeSource());
   maybeEndDecode(end_stream);
 
-  upstream_headers_ = headers.get();
+  if (!parent_.config_.upstream_logs_.empty()) {
+    upstream_headers_ = std::make_unique<Http::HeaderMapImpl>(*headers);
+  }
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   stream_info_.response_code_ = static_cast<uint32_t>(response_code);
-  parent_.onUpstreamHeaders(response_code, std::move(headers), end_stream);
+  parent_.onUpstreamHeaders(response_code, std::move(headers), *this, end_stream);
 }
 
 void Filter::UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
   maybeEndDecode(end_stream);
   stream_info_.addBytesReceived(data.length());
-  parent_.onUpstreamData(data, end_stream);
+  parent_.onUpstreamData(data, *this, end_stream);
 }
 
 void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   maybeEndDecode(true);
-  upstream_trailers_ = trailers.get();
-  parent_.onUpstreamTrailers(std::move(trailers));
+  if (!parent_.config_.upstream_logs_.empty()) {
+    upstream_trailers_ = std::make_unique<Http::HeaderMapImpl>(*trailers);
+  }
+  parent_.onUpstreamTrailers(std::move(trailers), *this);
 }
 
 void Filter::UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
@@ -1093,7 +1139,7 @@ void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason,
   clearRequestEncoder();
   if (!calling_encode_headers_) {
     stream_info_.setResponseFlag(parent_.streamResetReasonToResponseFlag(reason));
-    parent_.onUpstreamReset(reason, transport_failure_reason);
+    parent_.onUpstreamReset(reason, transport_failure_reason, *this);
   } else {
     deferred_reset_reason_ = reason;
   }
@@ -1134,7 +1180,7 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
     }
     resetStream();
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
-    parent_.onPerTryTimeout();
+    parent_.onPerTryTimeout(*this);
   } else {
     ENVOY_STREAM_LOG(debug,
                      "ignored upstream per try timeout due to already started downstream response",
@@ -1168,7 +1214,11 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
 
-  setupPerTryTimeout();
+  if (parent_.downstream_end_stream_) {
+    setupPerTryTimeout();
+  } else {
+    create_per_try_timeout_on_request_complete_ = true;
+  }
 
   conn_pool_stream_handle_ = nullptr;
   setRequestEncoder(request_encoder);
@@ -1236,14 +1286,19 @@ void Filter::UpstreamRequest::clearRequestEncoder() {
 
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
   ASSERT(parent_.request_encoder_);
+  ASSERT(parent_.parent_.upstream_requests_.size() == 1);
   // The downstream connection is overrun. Pause reads from upstream.
+  // If there are multiple calls to readDisable either the codec (H2) or the underlying
+  // Network::Connection (H1) will handle reference counting.
   parent_.parent_.cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
   parent_.request_encoder_->getStream().readDisable(true);
 }
 
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark() {
   ASSERT(parent_.request_encoder_);
-  // The downstream connection has buffer available. Resume reads from upstream.
+  ASSERT(parent_.parent_.upstream_requests_.size() == 1);
+  // One source of connection blockage has buffer available. Pass this on to the stream, which
+  // will resume reads if this was the last remaining high watermark.
   parent_.parent_.cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
   parent_.request_encoder_->getStream().readDisable(false);
 }

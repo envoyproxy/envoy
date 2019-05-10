@@ -281,35 +281,35 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
                                 const HostVector& hosts_removed) {
   updateFallbackSubset(priority, hosts_added, hosts_removed);
 
-  processSubsets(hosts_added, hosts_removed,
-                 [&](LbSubsetEntryPtr entry) {
-                   const bool active_before = entry->active();
-                   entry->priority_subset_->update(priority, hosts_added, hosts_removed);
+  processSubsets(
+      hosts_added, hosts_removed,
+      [&](LbSubsetEntryPtr entry) {
+        const bool active_before = entry->active();
+        entry->priority_subset_->update(priority, hosts_added, hosts_removed);
 
-                   if (active_before && !entry->active()) {
-                     stats_.lb_subsets_active_.dec();
-                     stats_.lb_subsets_removed_.inc();
-                   } else if (!active_before && entry->active()) {
-                     stats_.lb_subsets_active_.inc();
-                     stats_.lb_subsets_created_.inc();
-                   }
-                 },
-                 [&](LbSubsetEntryPtr entry, HostPredicate predicate, const SubsetMetadata& kvs,
-                     bool adding_host) {
-                   UNREFERENCED_PARAMETER(kvs);
-                   if (adding_host) {
-                     ENVOY_LOG(debug, "subset lb: creating load balancer for {}",
-                               describeMetadata(kvs));
+        if (active_before && !entry->active()) {
+          stats_.lb_subsets_active_.dec();
+          stats_.lb_subsets_removed_.inc();
+        } else if (!active_before && entry->active()) {
+          stats_.lb_subsets_active_.inc();
+          stats_.lb_subsets_created_.inc();
+        }
+      },
+      [&](LbSubsetEntryPtr entry, HostPredicate predicate, const SubsetMetadata& kvs,
+          bool adding_host) {
+        UNREFERENCED_PARAMETER(kvs);
+        if (adding_host) {
+          ENVOY_LOG(debug, "subset lb: creating load balancer for {}", describeMetadata(kvs));
 
-                     // Initialize new entry with hosts and update stats. (An uninitialized entry
-                     // with only removed hosts is a degenerate case and we leave the entry
-                     // uninitialized.)
-                     entry->priority_subset_.reset(new PrioritySubsetImpl(
-                         *this, predicate, locality_weight_aware_, scale_locality_weight_));
-                     stats_.lb_subsets_active_.inc();
-                     stats_.lb_subsets_created_.inc();
-                   }
-                 });
+          // Initialize new entry with hosts and update stats. (An uninitialized entry
+          // with only removed hosts is a degenerate case and we leave the entry
+          // uninitialized.)
+          entry->priority_subset_.reset(new PrioritySubsetImpl(
+              *this, predicate, locality_weight_aware_, scale_locality_weight_));
+          stats_.lb_subsets_active_.inc();
+          stats_.lb_subsets_created_.inc();
+        }
+      });
 }
 
 bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host) {
@@ -318,7 +318,7 @@ bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host
       host_metadata.filter_metadata().find(Config::MetadataFilters::get().ENVOY_LB);
 
   if (filter_it == host_metadata.filter_metadata().end()) {
-    return kvs.size() == 0;
+    return kvs.empty();
   }
 
   const ProtobufWkt::Struct& data_struct = filter_it->second;
@@ -535,19 +535,27 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     }
   }
 
-  auto healthy_hosts = std::make_shared<HostVector>();
-  healthy_hosts->reserve(original_host_set_.healthyHosts().size());
+  auto healthy_hosts = std::make_shared<HealthyHostVector>();
+  healthy_hosts->get().reserve(original_host_set_.healthyHosts().size());
   for (const auto& host : original_host_set_.healthyHosts()) {
     if (cached_predicate(*host)) {
-      healthy_hosts->emplace_back(host);
+      healthy_hosts->get().emplace_back(host);
     }
   }
 
-  auto degraded_hosts = std::make_shared<HostVector>();
-  degraded_hosts->reserve(original_host_set_.degradedHosts().size());
+  auto degraded_hosts = std::make_shared<DegradedHostVector>();
+  degraded_hosts->get().reserve(original_host_set_.degradedHosts().size());
   for (const auto& host : original_host_set_.degradedHosts()) {
     if (cached_predicate(*host)) {
-      degraded_hosts->emplace_back(host);
+      degraded_hosts->get().emplace_back(host);
+    }
+  }
+
+  auto excluded_hosts = std::make_shared<ExcludedHostVector>();
+  excluded_hosts->get().reserve(original_host_set_.excludedHosts().size());
+  for (const auto& host : original_host_set_.excludedHosts()) {
+    if (cached_predicate(*host)) {
+      excluded_hosts->get().emplace_back(host);
     }
   }
 
@@ -561,13 +569,15 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     hosts_per_locality = std::make_shared<HostsPerLocalityImpl>(
         *hosts, original_host_set_.hostsPerLocality().hasLocalLocality());
   } else {
-    hosts_per_locality = original_host_set_.hostsPerLocality().filter(cached_predicate);
+    hosts_per_locality = original_host_set_.hostsPerLocality().filter({cached_predicate})[0];
   }
 
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
-      original_host_set_.healthyHostsPerLocality().filter(cached_predicate);
+      original_host_set_.healthyHostsPerLocality().filter({cached_predicate})[0];
   HostsPerLocalityConstSharedPtr degraded_hosts_per_locality =
-      original_host_set_.degradedHostsPerLocality().filter(cached_predicate);
+      original_host_set_.degradedHostsPerLocality().filter({cached_predicate})[0];
+  auto excluded_hosts_per_locality =
+      original_host_set_.excludedHostsPerLocality().filter({cached_predicate})[0];
 
   // We can use the cached predicate here, since we trust that the hosts in hosts_added were also
   // present in the list of all hosts.
@@ -589,9 +599,10 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
 
   HostSetImpl::updateHosts(HostSetImpl::updateHostsParams(
                                hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality,
-                               degraded_hosts, degraded_hosts_per_locality),
+                               degraded_hosts, degraded_hosts_per_locality, excluded_hosts,
+                               excluded_hosts_per_locality),
                            determineLocalityWeights(*hosts_per_locality), filtered_added,
-                           filtered_removed);
+                           filtered_removed, absl::nullopt);
 }
 
 LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocalityWeights(

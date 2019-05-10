@@ -1,6 +1,7 @@
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 load("@rules_foreign_cc//tools/build_defs:cmake.bzl", "cmake_external")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
@@ -83,7 +84,14 @@ def envoy_copts(repository, test = False):
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
            envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
-           envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository)
+           envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
+           envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
+
+def envoy_linkstatic():
+    return select({
+        "@envoy//bazel:asan_build": 0,
+        "//conditions:default": 1,
+    })
 
 def envoy_static_link_libstdcpp_linkopts():
     return envoy_select_force_libcpp(
@@ -334,7 +342,7 @@ def envoy_cc_library(
         ],
         include_prefix = envoy_include_prefix(native.package_name()),
         alwayslink = 1,
-        linkstatic = 1,
+        linkstatic = envoy_linkstatic(),
         linkstamp = select({
             repository + "//bazel:windows_x86_64": None,
             "//conditions:default": linkstamp,
@@ -373,8 +381,6 @@ def envoy_cc_binary(
         stamp = 1,
         deps = deps,
     )
-
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 # Envoy C++ fuzz test targes. These are not included in coverage runs.
 def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
@@ -441,6 +447,7 @@ def envoy_cc_test(
         deps = [],
         tags = [],
         args = [],
+        copts = [],
         shard_count = None,
         coverage = True,
         local = False,
@@ -456,12 +463,13 @@ def envoy_cc_test(
         deps = deps,
         repository = repository,
         tags = test_lib_tags,
+        copts = copts,
     )
     native.cc_test(
         name = name,
-        copts = envoy_copts(repository, test = True),
+        copts = envoy_copts(repository, test = True) + copts,
         linkopts = envoy_test_linkopts(),
-        linkstatic = 1,
+        linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
         deps = [
             ":" + name + "_lib",
@@ -486,20 +494,23 @@ def envoy_cc_test_infrastructure_library(
         external_deps = [],
         deps = [],
         repository = "",
-        tags = []):
+        tags = [],
+        include_prefix = None,
+        copts = []):
     native.cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
         data = data,
-        copts = envoy_copts(repository, test = True),
+        copts = envoy_copts(repository, test = True) + copts,
         testonly = 1,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             envoy_external_dep_path("googletest"),
         ],
         tags = tags,
+        include_prefix = include_prefix,
         alwayslink = 1,
-        linkstatic = 1,
+        linkstatic = envoy_linkstatic(),
         visibility = ["//visibility:public"],
     )
 
@@ -513,7 +524,9 @@ def envoy_cc_test_library(
         external_deps = [],
         deps = [],
         repository = "",
-        tags = []):
+        tags = [],
+        include_prefix = None,
+        copts = []):
     deps = deps + [
         repository + "//test/test_common:printers_includes",
     ]
@@ -526,6 +539,8 @@ def envoy_cc_test_library(
         deps,
         repository,
         tags,
+        include_prefix,
+        copts,
     )
 
 # Envoy test binaries should be specified with this function.
@@ -648,6 +663,13 @@ def envoy_select_hot_restart(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Select the given values if default path normalization is on in the current build.
+def envoy_select_path_normalization_by_default(xs, repository = ""):
+    return select({
+        repository + "//bazel:enable_path_normalization_by_default": xs,
+        "//conditions:default": [],
+    })
+
 def envoy_select_perf_annotation(xs):
     return select({
         "@envoy//bazel:enable_perf_annotation": xs,
@@ -660,6 +682,10 @@ def envoy_select_google_grpc(xs, repository = ""):
         repository + "//bazel:disable_google_grpc": [],
         "//conditions:default": xs,
     })
+
+# Dependencies on Google grpc should be wrapped with this function.
+def envoy_google_grpc_external_deps():
+    return envoy_select_google_grpc([envoy_external_dep_path("grpc")])
 
 # Select the given values if exporting is enabled in the current build.
 def envoy_select_exported_symbols(xs):
@@ -681,7 +707,3 @@ def envoy_select_boringssl(if_fips, default = None):
         "@envoy//bazel:boringssl_fips": if_fips,
         "//conditions:default": default or [],
     })
-
-# Selects the part of QUICHE that does not yet work with the current CI.
-def envoy_select_quiche(xs, repository = ""):
-    return xs

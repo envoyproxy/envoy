@@ -56,7 +56,7 @@ public:
     }
   }
 
-  void expectSendMessage(const std::vector<std::string>& cluster_names,
+  void expectSendMessage(const std::set<std::string>& cluster_names,
                          const std::string& version) override {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
@@ -64,38 +64,46 @@ public:
                                                         Http::AsyncClient::Callbacks& callbacks,
                                                         const Http::AsyncClient::RequestOptions&) {
           http_callbacks_ = &callbacks;
-          EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));
+          EXPECT_EQ("POST", std::string(request->headers().Method()->value().getStringView()));
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
-                    std::string(request->headers().ContentType()->value().c_str()));
-          EXPECT_EQ("eds_cluster", std::string(request->headers().Host()->value().c_str()));
+                    std::string(request->headers().ContentType()->value().getStringView()));
+          EXPECT_EQ("eds_cluster", std::string(request->headers().Host()->value().getStringView()));
           EXPECT_EQ("/v2/discovery:endpoints",
-                    std::string(request->headers().Path()->value().c_str()));
+                    std::string(request->headers().Path()->value().getStringView()));
           std::string expected_request = "{";
           if (!version_.empty()) {
             expected_request += "\"version_info\":\"" + version + "\",";
           }
           expected_request += "\"node\":{\"id\":\"fo0\"},";
           if (!cluster_names.empty()) {
-            expected_request +=
-                "\"resource_names\":[\"" + StringUtil::join(cluster_names, "\",\"") + "\"]";
+            std::string joined_cluster_names;
+            {
+              std::string delimiter = "\",\"";
+              std::ostringstream buf;
+              std::copy(cluster_names.begin(), cluster_names.end(),
+                        std::ostream_iterator<std::string>(buf, delimiter.c_str()));
+              std::string with_comma = buf.str();
+              joined_cluster_names = with_comma.substr(0, with_comma.length() - delimiter.length());
+            }
+            expected_request += "\"resource_names\":[\"" + joined_cluster_names + "\"]";
           }
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());
           EXPECT_EQ(fmt::format_int(expected_request.size()).str(),
-                    std::string(request->headers().ContentLength()->value().c_str()));
+                    std::string(request->headers().ContentLength()->value().getStringView()));
           request_in_progress_ = true;
           return &http_request_;
         }));
   }
 
-  void startSubscription(const std::vector<std::string>& cluster_names) override {
+  void startSubscription(const std::set<std::string>& cluster_names) override {
     version_ = "";
     cluster_names_ = cluster_names;
     expectSendMessage(cluster_names, "");
     subscription_->start(cluster_names, callbacks_);
   }
 
-  void updateResources(const std::vector<std::string>& cluster_names) override {
+  void updateResources(const std::set<std::string>& cluster_names) override {
     cluster_names_ = cluster_names;
     expectSendMessage(cluster_names, version_);
     subscription_->updateResources(cluster_names);
@@ -154,7 +162,7 @@ public:
 
   bool request_in_progress_{};
   std::string version_;
-  std::vector<std::string> cluster_names_;
+  std::set<std::string> cluster_names_;
   const Protobuf::MethodDescriptor* method_descriptor_;
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;

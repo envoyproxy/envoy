@@ -15,6 +15,8 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
+        "//include/envoy/config:xds_grpc_context_interface",
+        "//source/common/config:config_provider_lib",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2:cds_cc",

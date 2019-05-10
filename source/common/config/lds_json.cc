@@ -1,7 +1,5 @@
 #include "common/config/lds_json.h"
 
-#include "envoy/stats/stats_options.h"
-
 #include "common/common/assert.h"
 #include "common/config/address_json.h"
 #include "common/config/json_utility.h"
@@ -17,12 +15,10 @@ namespace Envoy {
 namespace Config {
 
 void LdsJson::translateListener(const Json::Object& json_listener,
-                                envoy::api::v2::Listener& listener,
-                                const Stats::StatsOptions& stats_options) {
+                                envoy::api::v2::Listener& listener) {
   json_listener.validateSchema(Json::Schema::LISTENER_SCHEMA);
 
   const std::string name = json_listener.getString("name", "");
-  Utility::checkObjNameLength("Invalid listener name", name, stats_options);
   listener.set_name(name);
 
   AddressJson::translateAddress(json_listener.getString("address"), true, true,

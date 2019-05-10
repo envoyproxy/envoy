@@ -11,6 +11,7 @@
 #include "extensions/tracers/zipkin/tracer_interface.h"
 #include "extensions/tracers/zipkin/util.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -224,7 +225,7 @@ public:
    * @param key The key name of the annotation.
    * @param value The value associated with the key.
    */
-  BinaryAnnotation(const std::string& key, const std::string& value)
+  BinaryAnnotation(absl::string_view key, absl::string_view value)
       : key_(key), value_(value), annotation_type_(STRING) {}
 
   /**
@@ -547,7 +548,7 @@ public:
    * @param name The binary annotation's key.
    * @param value The binary annotation's value.
    */
-  void setTag(const std::string& name, const std::string& value);
+  void setTag(absl::string_view name, absl::string_view value);
 
   /**
    * Adds an annotation to the span

@@ -74,17 +74,15 @@ TEST_P(FaultIntegrationTestAllProtocols, ResponseRateLimitNoTrailers) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  Buffer::OwnedImpl data(std::string(1152, 'a'));
+  Buffer::OwnedImpl data(std::string(127, 'a'));
   upstream_request_->encodeData(data, true);
-  decoder->waitForBodyData(1024);
 
-  // Advance time and wait for a tick worth of data.
-  simTime().sleep(std::chrono::milliseconds(63));
-  decoder->waitForBodyData(1088);
+  // Wait for a tick worth of data.
+  decoder->waitForBodyData(64);
 
-  // Advance time and wait for a tick worth of data and end stream.
+  // Wait for a tick worth of data and end stream.
   simTime().sleep(std::chrono::milliseconds(63));
-  decoder->waitForBodyData(1152);
+  decoder->waitForBodyData(127);
   decoder->waitForEndStream();
 
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
@@ -110,13 +108,15 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
 
   // Verify response body throttling.
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  Buffer::OwnedImpl data(std::string(1025, 'a'));
+  Buffer::OwnedImpl data(std::string(128, 'a'));
   upstream_request_->encodeData(data, true);
-  decoder->waitForBodyData(1024);
 
-  // Advance time and wait for a tick worth of data and end stream.
+  // Wait for a tick worth of data.
+  decoder->waitForBodyData(64);
+
+  // Wait for a tick worth of data and end stream.
   simTime().sleep(std::chrono::milliseconds(63));
-  decoder->waitForBodyData(1025);
+  decoder->waitForBodyData(128);
   decoder->waitForEndStream();
 
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
@@ -149,17 +149,15 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyFlushed) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  Buffer::OwnedImpl data(std::string(1152, 'a'));
+  Buffer::OwnedImpl data(std::string(127, 'a'));
   upstream_request_->encodeData(data, false);
-  decoder->waitForBodyData(1024);
+
+  // Wait for a tick worth of data.
+  decoder->waitForBodyData(64);
 
   // Advance time and wait for a tick worth of data.
   simTime().sleep(std::chrono::milliseconds(63));
-  decoder->waitForBodyData(1088);
-
-  // Advance time and wait for a tick worth of data.
-  simTime().sleep(std::chrono::milliseconds(63));
-  decoder->waitForBodyData(1152);
+  decoder->waitForBodyData(127);
 
   // Send trailers and wait for end stream.
   Http::TestHeaderMapImpl trailers{{"hello", "world"}};
@@ -179,19 +177,17 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyNotFlushed) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  Buffer::OwnedImpl data(std::string(1152, 'a'));
+  Buffer::OwnedImpl data(std::string(128, 'a'));
   upstream_request_->encodeData(data, false);
   Http::TestHeaderMapImpl trailers{{"hello", "world"}};
   upstream_request_->encodeTrailers(trailers);
-  decoder->waitForBodyData(1024);
 
-  // Advance time and wait for a tick worth of data.
-  simTime().sleep(std::chrono::milliseconds(63));
-  decoder->waitForBodyData(1088);
+  // Wait for a tick worth of data.
+  decoder->waitForBodyData(64);
 
   // Advance time and wait for a tick worth of data, trailers, and end stream.
   simTime().sleep(std::chrono::milliseconds(63));
-  decoder->waitForBodyData(1152);
+  decoder->waitForBodyData(128);
   decoder->waitForEndStream();
   EXPECT_NE(nullptr, decoder->trailers());
 
