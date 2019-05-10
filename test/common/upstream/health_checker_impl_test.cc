@@ -236,20 +236,18 @@ public:
   }
 
   void setupNoServiceValidationNoReuseConnectionHC() {
-    std::string json = R"EOF(
-    {
-      "type": "http",
-      "timeout_ms": 1000,
-      "interval_ms": 1000,
-      "interval_jitter_ms": 1000,
-      "unhealthy_threshold": 2,
-      "healthy_threshold": 2,
-      "reuse_connection": false,
-      "path": "/healthcheck"
-    }
+    std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    reuse_connection: false
+    http_health_check:
+      path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                         dispatcher_, runtime_, random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
@@ -284,20 +282,18 @@ public:
   }
 
   void setupServiceValidationHC() {
-    std::string json = R"EOF(
-    {
-      "type": "http",
-      "timeout_ms": 1000,
-      "interval_ms": 1000,
-      "service_name": "locations",
-      "interval_jitter_ms": 1000,
-      "unhealthy_threshold": 2,
-      "healthy_threshold": 2,
-      "path": "/healthcheck"
-    }
+    std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name: locations
+      path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                         dispatcher_, runtime_, random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
@@ -2216,66 +2212,54 @@ public:
         event_logger_(new MockHealthCheckEventLogger()) {}
 
   void setupData(unsigned int unhealthy_threshold = 2) {
-    std::ostringstream json;
-    json << R"EOF(
-    {
-      "type": "tcp",
-      "timeout_ms": 1000,
-      "interval_ms": 1000,
-      "unhealthy_threshold": )EOF"
-         << unhealthy_threshold << R"EOF(,
-      "healthy_threshold": 2,
-      "send": [
-        {"binary": "01"}
-      ],
-      "receive": [
-        {"binary": "02"}
-      ]
-    }
+    std::ostringstream yaml;
+    yaml << R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: )EOF"
+         << unhealthy_threshold << R"EOF(
+    healthy_threshold: 2
+    tcp_health_check:
+      send:
+        text: "01"
+      receive:
+      - text: "02"
     )EOF";
 
     health_checker_.reset(
-        new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json.str()), dispatcher_,
+        new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml.str()), dispatcher_,
                                  runtime_, random_, HealthCheckEventLoggerPtr(event_logger_)));
   }
 
   void setupNoData() {
-    std::string json = R"EOF(
-    {
-      "type": "tcp",
-      "timeout_ms": 1000,
-      "interval_ms": 1000,
-      "unhealthy_threshold": 2,
-      "healthy_threshold": 2,
-      "send": [],
-      "receive": []
-    }
+    std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    tcp_health_check: {}
     )EOF";
 
-    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
+    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                    dispatcher_, runtime_, random_,
                                                    HealthCheckEventLoggerPtr(event_logger_)));
   }
 
   void setupDataDontReuseConnection() {
-    std::string json = R"EOF(
-      {
-        "type": "tcp",
-        "timeout_ms": 1000,
-        "interval_ms": 1000,
-        "unhealthy_threshold": 2,
-        "healthy_threshold": 2,
-        "reuse_connection": false,
-        "send": [
-          {"binary": "01"}
-        ],
-        "receive": [
-          {"binary": "02"}
-        ]
-      }
-      )EOF";
+    std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    reuse_connection: false
+    tcp_health_check:
+      send:
+        text: "01"
+      receive:
+      - text: "02"
+    )EOF";
 
-    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
+    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                    dispatcher_, runtime_, random_,
                                                    HealthCheckEventLoggerPtr(event_logger_)));
   }
