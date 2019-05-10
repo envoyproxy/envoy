@@ -101,7 +101,8 @@ public:
    * @param request_headers supplies the request headers.
    * @return HedgingParams the final parameters to use for request hedging.
    */
-  static HedgingParams finalHedgingParams(const RouteEntry& route, Http::HeaderMap& request_headers);
+  static HedgingParams finalHedgingParams(const RouteEntry& route,
+                                          Http::HeaderMap& request_headers);
 };
 
 /**
