@@ -30,6 +30,7 @@ public:
               const RateLimitSettings& rate_limit_settings);
   ~GrpcMuxImpl();
 
+  void start() override;
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
                             GrpcMuxCallbacks& callbacks) override;
 

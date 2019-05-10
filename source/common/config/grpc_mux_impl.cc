@@ -28,6 +28,8 @@ GrpcMuxImpl::~GrpcMuxImpl() {
   }
 }
 
+void GrpcMuxImpl::start() { grpc_stream_.establishStream(); }
+
 void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   if (!grpc_stream_.grpcStreamAvailable()) {
     ENVOY_LOG(debug, "No stream available to sendDiscoveryRequest for {}", type_url);

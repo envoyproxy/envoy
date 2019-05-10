@@ -149,6 +149,7 @@ public:
   virtual void resume(const std::string& type_url) PURE;
 
   // TODO(fredlas) remove, only here for compatibility with old-style GrpcMuxImpl.
+  virtual void start() PURE;
   virtual GrpcMuxWatchPtr subscribe(const std::string& type_url,
                                     const std::set<std::string>& resources,
                                     GrpcMuxCallbacks& callbacks) PURE;

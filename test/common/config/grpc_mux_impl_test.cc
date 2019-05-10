@@ -107,6 +107,7 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
+  grpc_mux_->start();
   EXPECT_EQ(1, stats_.gauge("control_plane.connected_state").value());
   expectSendMessage("bar", {"z"}, "");
   auto bar_z_sub = grpc_mux_->subscribe("bar", {"z"}, callbacks_);
@@ -138,6 +139,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
   expectSendMessage("baz", {"z"}, "");
+  grpc_mux_->start();
 
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)).Times(3);
   EXPECT_CALL(random_, random());
@@ -146,6 +148,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
   EXPECT_EQ(0, stats_.gauge("control_plane.connected_state").value());
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
   expectSendMessage("baz", {"z"}, "");
@@ -186,6 +189,7 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
 
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, "");
+  grpc_mux_->start();
 
   {
     std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
@@ -219,6 +223,7 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
   auto foo_sub = grpc_mux_->subscribe(type_url, {}, callbacks_);
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {}, "");
+  grpc_mux_->start();
 
   {
     std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
@@ -254,6 +259,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   // Should dedupe the "x" resource.
   expectSendMessage(type_url, {"y", "z", "x"}, "");
+  grpc_mux_->start();
 
   {
     std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
@@ -331,6 +337,7 @@ TEST_F(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
 
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x", "y"}, "");
+  grpc_mux_->start();
 
   std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
       new envoy::api::v2::DiscoveryResponse());
@@ -353,6 +360,7 @@ TEST_F(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
 
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {}, "");
+  grpc_mux_->start();
 
   std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
       new envoy::api::v2::DiscoveryResponse());
@@ -406,6 +414,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
 
   auto foo_sub = grpc_mux_->subscribe("foo", {"x"}, callbacks_);
   expectSendMessage("foo", {"x"}, "");
+  grpc_mux_->start();
 
   // Exhausts the limit.
   onReceiveMessage(99);
@@ -458,6 +467,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSetti
 
   auto foo_sub = grpc_mux_->subscribe("foo", {"x"}, callbacks_);
   expectSendMessage("foo", {"x"}, "");
+  grpc_mux_->start();
 
   // Validate that drain_request_timer is enabled when there are no tokens.
   EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(100)));
@@ -511,6 +521,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
 
   auto foo_sub = grpc_mux_->subscribe("foo", {"x"}, callbacks_);
   expectSendMessage("foo", {"x"}, "");
+  grpc_mux_->start();
 
   // Validate that rate limit is not enforced for 100 requests.
   onReceiveMessage(100);
@@ -538,6 +549,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
 
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
 
+  grpc_mux_->start();
   {
     // subscribe and unsubscribe to simulate a cluster added and removed
     expectSendMessage(type_url, {"y"}, "");
@@ -571,6 +583,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
 
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
 
+  grpc_mux_->start();
   // subscribe and unsubscribe (by not keeping the return watch) so that the type is known to envoy
   expectSendMessage(type_url, {"y"}, "");
   expectSendMessage(type_url, {}, "");

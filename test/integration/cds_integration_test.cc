@@ -56,6 +56,7 @@ public:
     // config that you use!
     setUpstreamCount(1);                                  // the CDS cluster
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2); // CDS uses gRPC uses HTTP2.
+
     // HttpIntegrationTest::initialize() does many things:
     // 1) It appends to fake_upstreams_ as many as you asked for via setUpstreamCount().
     // 2) It updates your bootstrap config with the ports your fake upstreams are actually listening
@@ -67,6 +68,7 @@ public:
     //    However, this test needs to defer all of that to later.
     defer_listener_finalization_ = true;
     HttpIntegrationTest::initialize();
+
     // Create the regular (i.e. not an xDS server) upstreams. We create them manually here after
     // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
     // cluster in the bootstrap config - which we don't want since we're testing dynamic CDS!
@@ -82,15 +84,19 @@ public:
     cluster2_ = ConfigHelper::buildCluster(
         ClusterName2, fake_upstreams_[UpstreamIndex2]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(ipVersion()));
+
     // Let Envoy establish its connection to the CDS server.
     acceptXdsConnection();
+
     // Do the initial compareDiscoveryRequest / sendDiscoveryResponse for cluster_1.
     // Split out into its own function so that DeltaCdsIntegrationTest can override it.
     giveInitialCluster();
+
     // We can continue the test once we're sure that Envoy's ClusterManager has made use of
     // the DiscoveryResponse describing cluster_1 that we sent.
     // 2 because the statically specified CDS server itself counts as a cluster.
     test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+
     // Wait for our statically specified listener to become ready, and register its port in the
     // test framework's downstream listener port map.
     test_server_->waitUntilListenersReady();
@@ -243,12 +249,14 @@ TEST_P(DeltaCdsIntegrationTest, CdsClusterUpDownUp) {
   // Calls CdsIntegrationTest::initialize(), which includes establishing a listener, route, and
   // cluster.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
+
   // Tell Envoy that cluster_1 is gone.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
   sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>({}, {ClusterName1}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse that says cluster_1 is gone.
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+
   // Now that cluster_1 is gone, the listener (with its routing to cluster_1) should 503.
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");

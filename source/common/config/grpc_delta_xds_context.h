@@ -154,12 +154,17 @@ public:
 
   // TODO TODO remove, GrpcMux impersonation. Basically combination of  addSubscription and
   // updateResources.
-  virtual GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
-                                    GrpcMuxCallbacks&) override {
+  GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
+                            GrpcMuxCallbacks&) override {
     // don't need any implementation here. only grpc_mux_subscription_impl ever calls it, and there
     // would never be a GrpcDeltaXdsContext held by one of those.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     return nullptr;
+  }
+  void start() override {
+    // don't need any implementation here. only grpc_mux_subscription_impl ever calls it, and there
+    // would never be a GrpcDeltaXdsContext held by one of those.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
 private:
