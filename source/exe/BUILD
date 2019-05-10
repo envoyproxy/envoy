@@ -67,14 +67,13 @@ envoy_cc_library(
     hdrs = ["main_common.h"],
     deps = [
         ":envoy_common_lib",
+        ":process_wide_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
-        "//source/common/http/http2:codec_lib",
         "//source/common/common:perf_annotation_lib",
         "//source/common/stats:fake_symbol_table_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
-        "//source/server:proto_descriptors_lib",
         "//source/server/config_validation:server_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],
@@ -82,7 +81,20 @@ envoy_cc_library(
             ":sigaction_lib",
             ":terminate_handler_lib",
         ],
-    }) + envoy_cc_platform_dep("platform_impl_lib") + envoy_google_grpc_external_deps(),
+    }) + envoy_cc_platform_dep("platform_impl_lib"),
+)
+
+envoy_cc_library(
+    name = "process_wide_lib",
+    srcs = ["process_wide.cc"],
+    hdrs = ["process_wide.h"],
+    external_deps = ["ares"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/event:libevent_lib",
+        "//source/common/http/http2:nghttp2_lib",
+        "//source/server:proto_descriptors_lib",
+    ] + envoy_google_grpc_external_deps(),
 )
 
 envoy_cc_posix_library(

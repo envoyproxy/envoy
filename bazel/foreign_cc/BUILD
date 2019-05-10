@@ -67,6 +67,7 @@ envoy_cmake_external(
     cache_entries = {
         "EVENT__DISABLE_OPENSSL": "on",
         "EVENT__DISABLE_REGRESS": "on",
+        "EVENT__DISABLE_TESTS": "on",
         "EVENT__LIBRARY_TYPE": "STATIC",
         "CMAKE_BUILD_TYPE": "Release",
     },

@@ -1,6 +1,7 @@
 #include "common/config/delta_subscription_state.h"
 
 #include "common/common/hash.h"
+#include "common/common/assert.h"
 
 namespace Envoy {
 namespace Config {

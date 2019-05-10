@@ -141,6 +141,10 @@ protected:
       EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
       EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
+      // Remove the pending HC flag. This is normally done by the health checker.
+      hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+      hosts[1]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+
       // Mark the hosts as healthy
       hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
       hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -480,7 +484,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
 
 // Verify that a host is removed if it is removed from discovery, stabilized, and then later
 // fails active HC.
-TEST_F(EdsTest, EndpoingRemovalAfterHcFail) {
+TEST_F(EdsTest, EndpointRemovalAfterHcFail) {
   envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
 
@@ -507,6 +511,10 @@ TEST_F(EdsTest, EndpoingRemovalAfterHcFail) {
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 2);
+
+    // Remove the pending HC flag. This is normally done by the health checker.
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    hosts[1]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
 
     // Mark the hosts as healthy
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -613,6 +621,10 @@ TEST_F(EdsTest, EndpointRemovalEdsFailButActiveHcSuccess) {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 2);
 
+    // Remove the pending HC flag. This is normally done by the health checker.
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    hosts[1]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+
     // Mark the hosts as healthy
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
     hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -677,6 +689,11 @@ TEST_F(EdsTest, EndpointRemovalClusterDrainOnHostRemoval) {
 
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+
+    // Remove the pending HC flag. This is normally done by the health checker.
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    hosts[1]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+
     // Mark the hosts as healthy
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
     hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -729,6 +746,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
     for (auto& host : hosts) {
       EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
       host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+      host->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
     }
   }
 
@@ -797,8 +815,9 @@ TEST_F(EdsTest, EndpointMoved) {
 
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_EQ(0, hosts[0]->priority());
-    // Mark the host as healthy
+    // Mark the host as healthy and remove the pending active hc flag.
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
   }
 
   {
@@ -807,8 +826,9 @@ TEST_F(EdsTest, EndpointMoved) {
 
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_EQ(1, hosts[0]->priority());
-    // Mark the host as healthy
+    // Mark the host as healthy and remove the pending active hc flag.
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
   }
 
   // Moves the endpoints between priorities

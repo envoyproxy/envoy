@@ -11,7 +11,7 @@ int main(int argc, char** argv) {
   Envoy::Validator v;
 
   try {
-    v.validate(options.jsonPath(), options.schemaType());
+    v.validate(options.configPath(), options.schemaType());
   } catch (const Envoy::EnvoyException& ex) {
     std::cerr << ex.what() << std::endl;
     return EXIT_FAILURE;

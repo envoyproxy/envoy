@@ -152,6 +152,11 @@ message DeltaDiscoveryRequest {
   // These two fields can be set for all types of DeltaDiscoveryRequests
   // (initial, ACK/NACK or spontaneous).
   //
+  // NOTE: the server must respond with all resources listed in resource_names_subscribe,
+  // even if it believes the client has the most recent version of them. The reason:
+  // the client may have dropped them, but then regained interest before it had a chance
+  // to send the unsubscribe message. See DeltaSubscriptionStateTest.RemoveThenAdd.
+  //
   // A list of Resource names to add to the list of tracked resources.
   repeated string resource_names_subscribe = 3;
 

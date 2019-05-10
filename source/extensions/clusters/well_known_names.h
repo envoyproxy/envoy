@@ -28,6 +28,9 @@ public:
   // Original destination (dynamic cluster that automatically adds hosts as needed based on the
   // original destination address of the downstream connection).
   const std::string OriginalDst = "envoy.cluster.original_dst";
+
+  // Redis cluster (cluster that reads host information using the redis cluster protocol).
+  const std::string Redis = "envoy.clusters.redis";
 };
 
 using ClusterTypes = ConstSingleton<ClusterTypeValues>;

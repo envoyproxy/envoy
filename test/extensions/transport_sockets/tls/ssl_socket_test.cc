@@ -538,13 +538,10 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        // TODO(htuch): remove std::string(..) wrappers when Google's string
-        // implementation converges with std::string.
-        std::string sni =
-            options.transportSocketOptions() != NULL &&
-                    options.transportSocketOptions()->serverNameOverride().has_value()
-                ? std::string(options.transportSocketOptions()->serverNameOverride().value())
-                : std::string(options.clientCtxProto().sni());
+        std::string sni = options.transportSocketOptions() != NULL &&
+                                  options.transportSocketOptions()->serverNameOverride().has_value()
+                              ? options.transportSocketOptions()->serverNameOverride().value()
+                              : options.clientCtxProto().sni();
         socket->setRequestedServerName(sni);
         Network::ConnectionPtr new_connection = dispatcher->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));

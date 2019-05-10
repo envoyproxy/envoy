@@ -203,7 +203,7 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
   std::unique_ptr<Protobuf::Message> collector_response =
       lightstep::Transporter::MakeCollectorResponse();
   EXPECT_NE(collector_response, nullptr);
-  msg->body() = Grpc::Common::serializeBody(*collector_response);
+  msg->body() = Grpc::Common::serializeToGrpcFrame(*collector_response);
 
   callback->onSuccess(std::move(msg));
 
