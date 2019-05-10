@@ -68,13 +68,11 @@ private:
           allocator->New(sizeof(BufferFragmentBundle) + length));
     }
 
-    Envoy::Buffer::BufferFragmentImpl& fragment() { return fragment_with_padding_.fragment_; }
-    // Wrap fragment in a nested struct so that it can be padded according to
-    // its alignment requirement: max_align_t. This ensures buffer to start at a
-    // max aligned address.
-    struct {
-      alignas(std::max_align_t) Envoy::Buffer::BufferFragmentImpl fragment_;
-    } fragment_with_padding_;
+    // TODO(danzh) fragment_ is not aligned in memory. This can cause extra
+    // read of memory when accessing MemSlice::data(). Investigate suggestion
+    // in https://github.com/envoyproxy/envoy/pull/6400/files#r277272709 to
+    // mitigate the extra cost if it stands out.
+    Envoy::Buffer::BufferFragmentImpl fragment_;
     char buffer_[];
   };
 
