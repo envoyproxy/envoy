@@ -20,7 +20,6 @@ public:
   int encodeQuery(std::string query, hsql::SQLParserResult& result) {
     Command mysql_cmd_encode{};
     Command mysql_cmd_decode{};
-    uint64_t offset = 0;
     int seq = 0;
     int len = 0;
     mysql_cmd_encode.setCmd(Command::Cmd::COM_QUERY);
@@ -29,10 +28,11 @@ public:
     std::string mysql_msg = BufferHelper::encodeHdr(data, 0);
 
     Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
-    if (BufferHelper::peekHdr(*decode_data, offset, len, seq) != MYSQL_SUCCESS) {
+    if (BufferHelper::peekHdr(*decode_data, len, seq) != MYSQL_SUCCESS) {
       return MYSQL_FAILURE;
     }
-    if (mysql_cmd_decode.decode(*decode_data, offset, seq, len) != MYSQL_SUCCESS) {
+    BufferHelper::consumeHdr(*decode_data);
+    if (mysql_cmd_decode.decode(*decode_data, seq, len) != MYSQL_SUCCESS) {
       return MYSQL_FAILURE;
     }
     hsql::SQLParser::parse(mysql_cmd_decode.getData(), &result);
