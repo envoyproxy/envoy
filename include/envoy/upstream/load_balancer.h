@@ -71,6 +71,11 @@ public:
    * ignored.
    */
   virtual uint32_t hostSelectionRetryCount() const PURE;
+
+  /**
+   * Returns the set of socket options which should be applied on upstream connections
+   */
+  virtual Network::Socket::OptionsSharedPtr upstreamSocketOptions() const PURE;
 };
 
 /**

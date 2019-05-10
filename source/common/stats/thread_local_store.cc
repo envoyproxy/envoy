@@ -29,7 +29,7 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(StatDataAllocator& alloc)
       null_histogram_(alloc.symbolTable()) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
-  ASSERT(shutting_down_);
+  ASSERT(shutting_down_ || !threading_ever_initialized_);
   default_scope_.reset();
   ASSERT(scopes_.empty());
   for (StatNameStorageSet* rejected_stats : rejected_stats_purgatory_) {
@@ -109,7 +109,7 @@ ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
   auto new_scope = std::make_unique<ScopeImpl>(*this, name);
   Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());
-  return std::move(new_scope);
+  return new_scope;
 }
 
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
@@ -148,6 +148,7 @@ std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
 
 void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                                                ThreadLocal::Instance& tls) {
+  threading_ever_initialized_ = true;
   main_thread_dispatcher_ = &main_thread_dispatcher;
   tls_ = tls.allocateSlot();
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {

@@ -134,6 +134,24 @@ parseHealthCheckFromV1Json(const std::string& json_string) {
   return health_check;
 }
 
+inline PrioritySet::UpdateHostsParams
+updateHostsParams(HostVectorConstSharedPtr hosts, HostsPerLocalityConstSharedPtr hosts_per_locality,
+                  HealthyHostVectorConstSharedPtr healthy_hosts,
+                  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality) {
+  return HostSetImpl::updateHostsParams(
+      hosts, hosts_per_locality, std::move(healthy_hosts), std::move(healthy_hosts_per_locality),
+      std::make_shared<const DegradedHostVector>(), HostsPerLocalityImpl::empty(),
+      std::make_shared<const ExcludedHostVector>(), HostsPerLocalityImpl::empty());
+}
+
+inline PrioritySet::UpdateHostsParams
+updateHostsParams(HostVectorConstSharedPtr hosts,
+                  HostsPerLocalityConstSharedPtr hosts_per_locality) {
+  return updateHostsParams(std::move(hosts), std::move(hosts_per_locality),
+                           std::make_shared<const HealthyHostVector>(),
+                           HostsPerLocalityImpl::empty());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -1146,8 +1146,8 @@ createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any&
 } // namespace
 
 PerFilterConfigs::PerFilterConfigs(
-    const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Any>& typed_configs,
-    const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
+    const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
+    const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
     Server::Configuration::FactoryContext& factory_context) {
   if (!typed_configs.empty() && !configs.empty()) {
     throw EnvoyException("Only one of typed_configs or configs can be specified");

@@ -70,7 +70,7 @@ TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
                             "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
 }
 
-TEST(HealthCheckerFactoryTest, createGrpc) {
+TEST(HealthCheckerFactoryTest, CreateGrpc) {
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   EXPECT_CALL(*cluster.info_, features())
@@ -81,6 +81,7 @@ TEST(HealthCheckerFactoryTest, createGrpc) {
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
 
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   EXPECT_NE(nullptr, dynamic_cast<GrpcHealthCheckerImpl*>(
                          HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster,
                                                       runtime, random, dispatcher, log_manager)
@@ -1195,6 +1196,28 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirst) {
 TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirstLogError) {
   setupNoServiceValidationHCAlwaysLogFailure();
   expectSuccessStartFailedFailFirst();
+}
+
+// Verify that removal during a failure callback works.
+TEST_F(HttpHealthCheckerImplTest, HttpFailRemoveHostInCallback) {
+  setupNoServiceValidationHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed))
+      .WillOnce(Invoke([&](HostSharedPtr host, HealthTransition) {
+        cluster_->prioritySet().getMockHostSet(0)->hosts_ = {};
+        cluster_->prioritySet().runUpdateCallbacks(0, {}, {host});
+      }));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_)).Times(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer()).Times(0);
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  respond(0, "503", false);
 }
 
 TEST_F(HttpHealthCheckerImplTest, HttpFail) {
@@ -2635,7 +2658,7 @@ public:
     serializeResponse(grpc::health::v1::HealthCheckResponse::ServingStatus status) {
       grpc::health::v1::HealthCheckResponse response;
       response.set_status(status);
-      const auto data = Grpc::Common::serializeBody(response);
+      const auto data = Grpc::Common::serializeToGrpcFrame(response);
       auto ret = std::vector<uint8_t>(data->length(), 0);
       data->copyOut(0, data->length(), &ret[0]);
       return ret;
@@ -2954,7 +2977,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessResponseSplitBetweenChunks) {
 
   grpc::health::v1::HealthCheckResponse response;
   response.set_status(grpc::health::v1::HealthCheckResponse::SERVING);
-  auto data = Grpc::Common::serializeBody(response);
+  auto data = Grpc::Common::serializeToGrpcFrame(response);
 
   const char* raw_data = static_cast<char*>(data->linearize(data->length()));
   const uint64_t chunk_size = data->length() / 5;
@@ -3053,6 +3076,8 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedSuccessFirst) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
+      Host::HealthFlag::PENDING_ACTIVE_HC);
 
   expectSessionCreate();
   expectHealthcheckStart(0);
@@ -3066,6 +3091,8 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedSuccessFirst) {
   EXPECT_CALL(*event_logger_, logAddHealthy(_, _, true));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::PENDING_ACTIVE_HC));
 }
 
 // Test host recovery after first failed check requires several successful checks.
@@ -3075,6 +3102,8 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedFailFirst) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
+      Host::HealthFlag::PENDING_ACTIVE_HC);
 
   expectSessionCreate();
   expectHealthcheckStart(0);
@@ -3082,11 +3111,14 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedFailFirst) {
 
   // Failing first disables fast success.
   expectHealthcheckStop(0);
-  // Host was unhealthy from the start, no state change.
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  // Host was unhealthy from the start, but we expect a state change due to the pending active hc
+  // flag changing.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::NOT_SERVING);
   expectHostHealthy(false);
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::PENDING_ACTIVE_HC));
 
   // Next successful healthcheck does not move host int healthy state (because we configured
   // healthchecker this way).
