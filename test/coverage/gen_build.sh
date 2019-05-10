@@ -38,7 +38,7 @@ fi
 if [ "${NO_GCOV}" != 1 ]
 then
   # Here we use the synthetic library target created by envoy_build_system.bzl
-  TARGETS="${TARGETS} ${REPOSITORY}//test/coverage/gcc_only_test:gcc_only_test__lib"
+  TARGETS="${TARGETS} ${REPOSITORY}//test/coverage/gcc_only_test:gcc_only_test_lib_INTERNAL_ONLY"
 fi
 
 (
