@@ -64,8 +64,9 @@ uint16_t Crc16::crc16(absl::string_view key) {
   uint64_t len = key.size();
   uint64_t counter;
   uint16_t crc = 0;
-  for (counter = 0; counter < len; counter++)
+  for (counter = 0; counter < len; counter++) {
     crc = (crc << 8) ^ crc16tab[((crc >> 8) ^ *buf++) & 0x00FF];
+  }
   return crc;
 }
 

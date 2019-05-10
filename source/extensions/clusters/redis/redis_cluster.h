@@ -90,7 +90,7 @@ typedef std::array<Upstream::HostSharedPtr, MAX_SLOT> SlotArray;
 
 class RedisCluster {
 public:
-  virtual ~RedisCluster(){};
+  virtual ~RedisCluster() = default;
   virtual const SlotArray& slotArray() const PURE;
 };
 

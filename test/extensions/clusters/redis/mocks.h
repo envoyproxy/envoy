@@ -15,7 +15,7 @@ namespace Redis {
 class MockRedisCluster : public RedisCluster, public Upstream::MockClusterMockPrioritySet {
 public:
   MockRedisCluster(Upstream::HostSharedPtr host);
-  ~MockRedisCluster(){};
+  ~MockRedisCluster() = default;
 
   MOCK_CONST_METHOD0(slotArray, const SlotArray&());
 

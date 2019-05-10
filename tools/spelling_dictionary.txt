@@ -814,5 +814,5 @@ zag
 zig
 zlib
 zxid
-xmodern
+xmodem
 citt

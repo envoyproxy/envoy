@@ -819,10 +819,5 @@ protected:
  */
 Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Cluster& cluster);
 
-/**
- * Utility function to get Dns from cluster.
- */
-Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Cluster& cluster);
-
 } // namespace Upstream
 } // namespace Envoy
