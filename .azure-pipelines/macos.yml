@@ -15,7 +15,7 @@ jobs:
   - script: ./ci/mac_ci_steps.sh
     displayName: 'Run Mac CI'
     env:
-      BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
+      BAZEL_REMOTE_CACHE: remotebuildexecution.googleapis.com
 
   - task: PublishTestResults@2
     inputs:
