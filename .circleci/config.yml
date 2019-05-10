@@ -203,4 +203,3 @@ workflows:
           filters:
             tags:
               only: /^v.*/
-      - mac
