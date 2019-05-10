@@ -257,6 +257,8 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
     }
   }
 
+  changed_state = clearPendingFlag(changed_state);
+
   if (degraded != host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
     if (degraded) {
       host_->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
@@ -307,6 +309,8 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
     }
   }
 
+  changed_state = clearPendingFlag(changed_state);
+
   if ((first_check_ || parent_.always_log_health_check_failures_) && parent_.event_logger_) {
     parent_.event_logger_->logUnhealthy(parent_.healthCheckerType(), host_, type, first_check_);
   }
@@ -334,6 +338,18 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(
   if (interval_timer_ != nullptr) {
     interval_timer_->enableTimer(parent_.interval(HealthState::Unhealthy, changed_state));
   }
+}
+
+HealthTransition
+HealthCheckerImplBase::ActiveHealthCheckSession::clearPendingFlag(HealthTransition changed_state) {
+  if (host_->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
+    host_->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    // Even though the health value of the host might have not changed, we set this to Changed to
+    // that the cluster can update its list of excluded hosts.
+    return HealthTransition::Changed;
+  }
+
+  return changed_state;
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {

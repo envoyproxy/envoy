@@ -21,6 +21,7 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::Eq;
 using testing::Invoke;
 using testing::Ref;
 using testing::Return;
@@ -80,7 +81,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
     response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
     response->set_overall_code(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT);
-    EXPECT_CALL(span_, setTag("ratelimit_status", "over_limit"));
+    EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("over_limit")));
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OverLimit, _));
     client_.onSuccess(std::move(response), span_);
   }
@@ -99,7 +100,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
     response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
     response->set_overall_code(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK);
-    EXPECT_CALL(span_, setTag("ratelimit_status", "ok"));
+    EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("ok")));
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _));
     client_.onSuccess(std::move(response), span_);
   }
