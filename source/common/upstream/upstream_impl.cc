@@ -621,6 +621,30 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
     eds_service_name_ = config.eds_cluster_config().service_name();
   }
 
+  if (!config.has_cluster_type()) {
+    switch (config.type()) {
+    case envoy::api::v2::Cluster::STATIC:
+      cluster_type_.set_name(Extensions::Clusters::ClusterTypes::get().Static);
+      break;
+    case envoy::api::v2::Cluster::STRICT_DNS:
+      cluster_type_.set_name(Extensions::Clusters::ClusterTypes::get().StrictDns);
+      break;
+    case envoy::api::v2::Cluster::LOGICAL_DNS:
+      cluster_type_.set_name(Extensions::Clusters::ClusterTypes::get().LogicalDns);
+      break;
+    case envoy::api::v2::Cluster::ORIGINAL_DST:
+      cluster_type_.set_name(Extensions::Clusters::ClusterTypes::get().OriginalDst);
+      break;
+    case envoy::api::v2::Cluster::EDS:
+      cluster_type_.set_name(Extensions::Clusters::ClusterTypes::get().Eds);
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  } else {
+    cluster_type_.CopyFrom(config.cluster_type());
+  }
+
   // TODO(htuch): Remove this temporary workaround when we have
   // https://github.com/lyft/protoc-gen-validate/issues/97 resolved. This just provides early
   // validation of sanity of fields that we should catch at config ingestion.

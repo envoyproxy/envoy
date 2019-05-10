@@ -21,6 +21,8 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "source/extensions/clusters/redis/redis_cluster.h"
+
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
@@ -66,6 +68,38 @@ private:
 
   typedef std::unique_ptr<ThreadLocalActiveClient> ThreadLocalActiveClientPtr;
 
+  class RequestRouter {
+  public:
+    virtual ~RequestRouter(){};
+
+    virtual Upstream::HostConstSharedPtr chooseHost(const std::string& key) PURE;
+  };
+
+  class SimpleClusterRequestRouter : public RequestRouter {
+  public:
+    SimpleClusterRequestRouter(InstanceImpl& parent, Upstream::ThreadLocalCluster& cluster);
+    ~SimpleClusterRequestRouter(){};
+
+    Upstream::HostConstSharedPtr chooseHost(const std::string& key) override;
+
+  private:
+    InstanceImpl& parent_;
+    Upstream::ThreadLocalCluster& cluster_;
+  };
+
+  class RedisClusterRouter : public RequestRouter {
+  public:
+    RedisClusterRouter(InstanceImpl& parent,
+                       const Envoy::Extensions::Clusters::Redis::RedisCluster& redis_cluster);
+    ~RedisClusterRouter() {}
+
+    Upstream::HostConstSharedPtr chooseHost(const std::string& key) override;
+
+  private:
+    InstanceImpl& parent_;
+    const Envoy::Extensions::Clusters::Redis::RedisCluster& redis_cluster_;
+  };
+
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
                            public Upstream::ClusterUpdateCallbacks {
     ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
@@ -93,15 +127,13 @@ private:
     std::unordered_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
     Envoy::Common::CallbackHandle* host_set_member_update_cb_handle_{};
     std::unordered_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
+    std::unique_ptr<RequestRouter> request_router_;
   };
 
   struct LbContextImpl : public Upstream::LoadBalancerContextBase {
-    LbContextImpl(const std::string& key, bool enabled_hashtagging)
-        : hash_key_(MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))) {}
+    LbContextImpl(const std::string& key, bool enabled_hashtagging);
 
     absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
-
-    absl::string_view hashtag(absl::string_view v, bool enabled);
 
     const absl::optional<uint64_t> hash_key_;
   };

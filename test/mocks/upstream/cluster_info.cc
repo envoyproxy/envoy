@@ -39,6 +39,7 @@ MockClusterInfo::MockClusterInfo()
       resource_manager_(new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1024, 1024, 1,
                                                           std::numeric_limits<uint64_t>::max(),
                                                           circuit_breakers_stats_)) {
+  cluster_type_.set_name(Extensions::Clusters::ClusterTypes::get().StrictDns);
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
@@ -62,6 +63,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, lbOriginalDstConfig()).WillByDefault(ReturnRef(lb_original_dst_config_));
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
   ON_CALL(*this, clusterSocketOptions()).WillByDefault(ReturnRef(cluster_socket_options_));
+  ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
 }
 
 MockClusterInfo::~MockClusterInfo() {}

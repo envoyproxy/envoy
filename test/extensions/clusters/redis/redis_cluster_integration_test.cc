@@ -227,12 +227,13 @@ TEST_P(RedisClusterIntegrationTest, SingleSlotMasterSlave) {
   on_server_init_function_ = [this]() {
     std::string cluster_slot_response = singleSlotMasterSlave(
         fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip());
-    expectCallClusterSlot(0, cluster_slot_response);
+    expectCallClusterSlot(random_index_, cluster_slot_response);
   };
 
   initialize();
 
-  simpleRequestAndResponse(random_index_, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+  // foo hashes to slot 12182 which is in upstream 0
+  simpleRequestAndResponse(0, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
 }
 
 // This test sends a simple "get foo" command from a fake
@@ -247,15 +248,16 @@ TEST_P(RedisClusterIntegrationTest, TwoSlot) {
   on_server_init_function_ = [this]() {
     std::string cluster_slot_response = twoSlots(fake_upstreams_[0]->localAddress()->ip(),
                                                  fake_upstreams_[1]->localAddress()->ip());
-    expectCallClusterSlot(0, cluster_slot_response);
+    expectCallClusterSlot(random_index_, cluster_slot_response);
   };
 
   initialize();
 
-  simpleRequestAndResponse(random_index_, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
-
-  // change the load balancer index and hit slot 2 master
-  ON_CALL(*mock_rng_, random()).WillByDefault(Return(1));
+  // foobar hashes to slot 12325 which is in upstream 1
+  simpleRequestAndResponse(1, makeBulkStringArray({"get", "foobar"}), "$3\r\nbar\r\n");
+  // bar hashes to slot 5061 which is in upstream 0
+  simpleRequestAndResponse(0, makeBulkStringArray({"get", "bar"}), "$3\r\nbar\r\n");
+  // foo hashes to slot 12182 which is in upstream 1
   simpleRequestAndResponse(1, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
 }
 

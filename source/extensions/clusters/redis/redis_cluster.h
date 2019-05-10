@@ -84,18 +84,25 @@ namespace Redis {
  * provide a fast lookup constant time lookup similar to Maglev. This will be used by the redis
  * proxy filter for load balancing purpose.
  */
+static const int MAX_SLOT = 16384;
 
-typedef std::array<Upstream::HostSharedPtr, 16384> SlotArray;
+typedef std::array<Upstream::HostSharedPtr, MAX_SLOT> SlotArray;
 
-class RedisCluster : public Upstream::BaseDynamicClusterImpl {
+class RedisCluster {
 public:
-  RedisCluster(const envoy::api::v2::Cluster& cluster,
-               const envoy::config::cluster::redis::RedisClusterConfig& redisCluster,
-               NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-               Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime,
-               Network::DnsResolverSharedPtr dns_resolver,
-               Server::Configuration::TransportSocketFactoryContext& factory_context,
-               Stats::ScopePtr&& stats_scope, bool added_via_api);
+  virtual ~RedisCluster(){};
+  virtual const SlotArray& slotArray() const PURE;
+};
+
+class RedisClusterImpl : public RedisCluster, public Upstream::BaseDynamicClusterImpl {
+public:
+  RedisClusterImpl(const envoy::api::v2::Cluster& cluster,
+                   const envoy::config::cluster::redis::RedisClusterConfig& redisCluster,
+                   NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
+                   Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime,
+                   Network::DnsResolverSharedPtr dns_resolver,
+                   Server::Configuration::TransportSocketFactoryContext& factory_context,
+                   Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   struct ClusterSlotsRequest : public Extensions::NetworkFilters::Common::Redis::RespValue {
   public:
@@ -112,6 +119,8 @@ public:
   };
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
+
+  const SlotArray& slotArray() const override { return cluster_slots_map_; }
 
 private:
   friend class RedisClusterTest;
@@ -146,7 +155,8 @@ private:
   class RedisHost : public Upstream::HostImpl {
   public:
     RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-              Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool master)
+              Network::Address::InstanceConstSharedPtr address, RedisClusterImpl& parent,
+              bool master)
         : Upstream::HostImpl(cluster, hostname, address, parent.lbEndpoint().metadata(),
                              parent.lbEndpoint().load_balancing_weight().value(),
                              parent.localityLbEndpoint().locality(),
@@ -164,7 +174,7 @@ private:
   // Resolves the discovery endpoint.
   struct DnsDiscoveryResolveTarget {
     DnsDiscoveryResolveTarget(
-        RedisCluster& parent, const std::string& dns_address, const uint32_t port,
+        RedisClusterImpl& parent, const std::string& dns_address, const uint32_t port,
         const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
         const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
 
@@ -172,7 +182,7 @@ private:
 
     void startResolve();
 
-    RedisCluster& parent_;
+    RedisClusterImpl& parent_;
     Network::ActiveDnsQuery* active_query_{};
     const std::string dns_address_;
     const uint32_t port_;
@@ -202,7 +212,7 @@ private:
   struct RedisDiscoverySession
       : public Extensions::NetworkFilters::Common::Redis::Client::Config,
         public Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks {
-    RedisDiscoverySession(RedisCluster& parent,
+    RedisDiscoverySession(RedisClusterImpl& parent,
                           NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
     ~RedisDiscoverySession();
@@ -232,7 +242,7 @@ private:
     bool onRedirection(const NetworkFilters::Common::Redis::RespValue&) override { return true; }
     void onUnexpectedResponse(const NetworkFilters::Common::Redis::RespValuePtr&);
 
-    RedisCluster& parent_;
+    RedisClusterImpl& parent_;
     Event::Dispatcher& dispatcher_;
     std::string current_host_address_;
     Extensions::NetworkFilters::Common::Redis::Client::PoolRequest* current_request_{};

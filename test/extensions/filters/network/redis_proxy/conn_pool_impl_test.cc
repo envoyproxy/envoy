@@ -6,6 +6,7 @@
 
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 
+#include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
@@ -378,6 +379,36 @@ TEST_F(RedisConnPoolImplTest, makeRequestToHost) {
   tls_.shutdownThread();
 }
 
+TEST_F(RedisConnPoolImplTest, MakeRequestToRedisCluster) {
+
+  envoy::api::v2::Cluster::CustomClusterType cluster_type;
+  cluster_type.set_name("envoy.clusters.redis");
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
+      .WillOnce(ReturnRef(cluster_type));
+
+  std::shared_ptr<Upstream::MockHost> host1(new Upstream::MockHost());
+  NiceMock<Clusters::Redis::MockRedisCluster> redis_cluster(host1);
+  Upstream::ClusterManager::ClusterInfoMap clusters_map;
+  clusters_map.emplace("fake_cluster", redis_cluster);
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(clusters_map));
+
+  setup();
+
+  Common::Redis::RespValue value;
+  Common::Redis::Client::MockPoolRequest active_request;
+  Common::Redis::Client::MockPoolCallbacks callbacks;
+  Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
+
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+  EXPECT_CALL(*host1, address()).WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(*client, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));
+  Common::Redis::Client::PoolRequest* request =
+      conn_pool_->makeRequest("hash_key", value, callbacks);
+  EXPECT_EQ(&active_request, request);
+
+  EXPECT_CALL(*client, close());
+  tls_.shutdownThread();
+};
 } // namespace ConnPool
 } // namespace RedisProxy
 } // namespace NetworkFilters

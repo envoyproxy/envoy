@@ -77,6 +77,17 @@ private:
   static inline uint64_t shift_mix(uint64_t v) { return v ^ (v >> 47); }
 };
 
+class Crc16 {
+public:
+  /**
+   * XMODEM CRC16 implementation according to CITT standards.
+   * Based on (https://github.com/antirez/redis/blob/unstable/src/crc16.c).
+   * @param key The string to hash.
+   * @return The CRC16 hash code.
+   */
+  static uint16_t crc16(absl::string_view key);
+};
+
 struct ConstCharStarHash {
   size_t operator()(const char* a) const { return HashUtil::xxHash64(a); }
 };

@@ -514,6 +514,9 @@ public:
   extensionProtocolOptions(const std::string& name) const override;
   LoadBalancerType lbType() const override { return lb_type_; }
   envoy::api::v2::Cluster::DiscoveryType type() const override { return type_; }
+  const envoy::api::v2::Cluster::CustomClusterType& clusterType() const override {
+    return cluster_type_;
+  }
   const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>&
   lbLeastRequestConfig() const override {
     return lb_least_request_config_;
@@ -594,6 +597,7 @@ private:
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
   absl::optional<std::string> eds_service_name_;
+  envoy::api::v2::Cluster::CustomClusterType cluster_type_;
 };
 
 /**

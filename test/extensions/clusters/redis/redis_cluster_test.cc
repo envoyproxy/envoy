@@ -77,7 +77,7 @@ protected:
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(), config);
 
-    cluster_.reset(new RedisCluster(
+    cluster_.reset(new RedisClusterImpl(
         cluster_config,
         MessageUtil::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
             config),
@@ -141,7 +141,7 @@ protected:
       EXPECT_CALL(*client_, addConnectionCallbacks(_));
       EXPECT_CALL(*client_, close());
     }
-    EXPECT_CALL(*client_, makeRequest(Ref(RedisCluster::ClusterSlotsRequest::instance_), _))
+    EXPECT_CALL(*client_, makeRequest(Ref(RedisClusterImpl::ClusterSlotsRequest::instance_), _))
         .WillOnce(Return(&pool_request_));
   }
 
@@ -391,7 +391,7 @@ protected:
   Extensions::NetworkFilters::Common::Redis::Client::MockClient* client_{};
   Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest pool_request_;
   Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks* pool_callbacks_{};
-  std::shared_ptr<RedisCluster> cluster_;
+  std::shared_ptr<RedisClusterImpl> cluster_;
 };
 
 typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>,
