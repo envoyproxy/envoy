@@ -215,6 +215,7 @@ HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
     : host_(host), parent_(parent),
       interval_timer_(parent.dispatcher_.createTimer([this]() -> void { onIntervalBase(); })),
       timeout_timer_(parent.dispatcher_.createTimer([this]() -> void { onTimeoutBase(); })) {
+
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent.incHealthy();
   }
