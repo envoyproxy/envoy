@@ -66,9 +66,10 @@ private:
 class RsaPrivateKeyMethodFactory : public Ssl::PrivateKeyMethodProviderInstanceFactory {
 public:
   // Ssl::PrivateKeyMethodProviderInstanceFactory
-  Ssl::PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProviderInstance(
-      const envoy::api::v2::auth::PrivateKeyMethod& message,
-      Server::Configuration::TransportSocketFactoryContext& private_key_method_provider_context) {
+  Ssl::PrivateKeyMethodProviderSharedPtr
+  createPrivateKeyMethodProviderInstance(const envoy::api::v2::auth::PrivateKeyMethod& message,
+                                         Server::Configuration::TransportSocketFactoryContext&
+                                             private_key_method_provider_context) override {
     return std::make_shared<RsaPrivateKeyMethodProvider>(message.config(),
                                                          private_key_method_provider_context);
   }
