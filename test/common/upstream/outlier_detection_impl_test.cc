@@ -764,11 +764,9 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
   EXPECT_CALL(checker_, check(hosts_[4]));
-  EXPECT_CALL(
-      *event_logger_,
-      logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]), _,
-               envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN,
-               true));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]), _,
+                       envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE, true));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.success_rate_stdev_factor", 1900))
       .WillByDefault(Return(1900));
@@ -1217,16 +1215,15 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
       .WillOnce(Return(0));
   EXPECT_CALL(*file,
               write(absl::string_view(
-                  "{\"type\":\"SUCCESS_RATE_EXTERNAL_ORIGIN\",\"cluster_name\":\"fake_cluster\","
+                  "{\"type\":\"SUCCESS_RATE\",\"cluster_name\":\"fake_cluster\","
                   "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
                   "\"num_ejections\":0,\"enforced\":false,\"eject_success_rate_event\":{"
                   "\"host_success_rate\":0,\"cluster_average_success_rate\":0,"
                   "\"cluster_success_rate_ejection_threshold\":0},"
                   "\"timestamp\":\"2018-12-18T09:00:00Z\",\"secs_since_last_action\":\"30\"}\n")))
       .WillOnce(SaveArg<0>(&log3));
-  event_logger.logEject(
-      host, detector,
-      envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN, false);
+  event_logger.logEject(host, detector,
+                        envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE, false);
   Json::Factory::loadFromString(log3);
 
   StringViewSaver log4;

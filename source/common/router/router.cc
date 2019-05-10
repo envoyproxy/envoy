@@ -674,6 +674,12 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
                    Http::Utility::resetReasonToString(reset_reason));
 
+  /*
+    TODO: The reset may also come from upstream over the wire. In this case it should be
+    treated as external origin error and distinguished from local origin error.
+    This matters only when running OutlierDetection with split_external_local_origin_errors config
+    param set to true.
+  */
   updateOutlierDetection(Upstream::Outlier::Result::CONNECT_FAILED, upstream_request,
                          absl::nullopt);
 

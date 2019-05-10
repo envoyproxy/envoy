@@ -38,7 +38,7 @@ DetectorHostMonitorImpl::DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> d
     : detector_(detector), host_(host),
       // add Success Rate monitors
       external_origin_SR_monitor_(std::make_unique<SuccessRateMonitor>(
-          envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN)),
+          envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE)),
       local_origin_SR_monitor_(std::make_unique<SuccessRateMonitor>(
           envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN)) {
   // Setup method to call when putResult is invoked. Depending on the config's
@@ -152,13 +152,13 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
   // level failed. Since it it similar to HTTP 5xx, map it to 5xx handler.
   case Result::REQUEST_FAILED:
     // map it to http code and call http handler.
-    return putHttpResponseCode(500);
+    return putHttpResponseCode(enumToInt(Http::Code::ServiceUnavailable));
     break;
   // REQUEST_SUCCESS is used to report that transaction with non-http server was completed
   // successfully. This means that connection and server level transactions were successful. Map it
   // to http code 200 OK and indicate that there was no errors on connection level.
   case Result::REQUEST_SUCCESS:
-    putHttpResponseCode(200);
+    putHttpResponseCode(enumToInt(Http::Code::OK));
     localOriginNoFailure();
     break;
   }
@@ -338,7 +338,7 @@ bool DetectorImpl::enforceEjection(envoy::data::cluster::v2alpha::OutlierEjectio
     return runtime_.snapshot().featureEnabled(
         "outlier_detection.enforcing_consecutive_gateway_failure",
         config_.enforcingConsecutiveGatewayFailure());
-  case envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN:
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE:
     return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_success_rate",
                                               config_.enforcingSuccessRate());
   case envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_LOCAL_ORIGIN_FAILURE:
@@ -361,7 +361,7 @@ void DetectorImpl::updateEnforcedEjectionStats(
     envoy::data::cluster::v2alpha::OutlierEjectionType type) {
   stats_.ejections_enforced_total_.inc();
   switch (type) {
-  case envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN:
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE:
     stats_.ejections_enforced_success_rate_.inc();
     break;
   case envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX:
@@ -385,7 +385,7 @@ void DetectorImpl::updateEnforcedEjectionStats(
 void DetectorImpl::updateDetectedEjectionStats(
     envoy::data::cluster::v2alpha::OutlierEjectionType type) {
   switch (type) {
-  case envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN:
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE:
     stats_.ejections_detected_success_rate_.inc();
     break;
   case envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX:
@@ -416,7 +416,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
   // for outlier detection to eject all hosts at any given priority level.
   if (ejected_percent < max_ejection_percent) {
     if (type == envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX ||
-        type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN) {
+        type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE) {
       // Deprecated counter, preserving old behaviour until it's removed.
       stats_.ejections_total_.inc();
     }
@@ -642,10 +642,10 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
 
   event.set_enforced(enforced);
 
-  if ((type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN) ||
+  if ((type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE) ||
       (type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN)) {
     const DetectorHostMonitor::SuccessRateMonitorType monitor_type =
-        (type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN)
+        (type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE)
             ? DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin
             : DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin;
     event.mutable_eject_success_rate_event()->set_cluster_average_success_rate(
