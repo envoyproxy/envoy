@@ -2,7 +2,6 @@
 
 #ifndef WIN32
 #include <sys/mman.h> // for mode_t
-
 #endif
 
 #include "envoy/api/os_sys_calls_common.h"
