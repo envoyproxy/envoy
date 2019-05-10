@@ -208,7 +208,7 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   // Now setup ADS if needed, this might rely on a primary cluster.
   // This is the only point where distinction between delta ADS and state-of-the-world ADS is made.
-  // After here, we just have an XdsGrpcContext interface held in xds_grpc_context_, which hides
+  // After here, we just have a GrpcMux interface held in ads_mux_, which hides
   // whether the backing implementation is delta or SotW.
   if (bootstrap.dynamic_resources().has_ads_config()) {
     if (bootstrap.dynamic_resources().ads_config().api_type() ==
@@ -217,7 +217,7 @@ ClusterManagerImpl::ClusterManagerImpl(
           bootstrap.dynamic_resources().has_ads_config()
               ? bootstrap.dynamic_resources().ads_config()
               : bootstrap.dynamic_resources().cds_config().api_config_source();
-      xds_grpc_context_ = std::make_shared<Config::GrpcDeltaXdsContext>(
+      ads_mux_ = std::make_shared<Config::GrpcDeltaXdsContext>(
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, api_config_source,
                                                          stats)
               ->create(),
@@ -229,7 +229,7 @@ ClusterManagerImpl::ClusterManagerImpl(
               bootstrap.dynamic_resources().ads_config()),
           local_info);
     } else {
-      xds_grpc_context_ = std::make_shared<Config::GrpcMuxImpl>(
+      ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info,
           Config::Utility::factoryForGrpcApiConfigSource(
               *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
@@ -242,7 +242,7 @@ ClusterManagerImpl::ClusterManagerImpl(
               bootstrap.dynamic_resources().ads_config()));
     }
   } else {
-    xds_grpc_context_ = std::make_unique<Config::NullGrpcMuxImpl>();
+    ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
   }
 
   // After ADS is initialized, load EDS static clusters as EDS config may potentially need ADS.

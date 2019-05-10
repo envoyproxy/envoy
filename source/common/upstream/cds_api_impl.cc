@@ -66,9 +66,9 @@ void CdsApiImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
-  cm_.xdsGrpcContext()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
+  cm_.adsMux()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
   Cleanup eds_resume(
-      [this] { cm_.xdsGrpcContext()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+      [this] { cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
 
   std::vector<std::string> exception_msgs;
   std::unordered_set<std::string> cluster_names;
@@ -102,10 +102,10 @@ void CdsApiImpl::onConfigUpdate(
                 // ever changes, we would need to correct the following logic.
                 if (state == ClusterManager::ClusterWarmingState::Starting &&
                     cm_.warmingClusterCount() == 1) {
-                  cm_.xdsGrpcContext()->pause(Config::TypeUrl::get().Cluster);
+                  cm_.adsMux()->pause(Config::TypeUrl::get().Cluster);
                 } else if (state == ClusterManager::ClusterWarmingState::Finished &&
                            cm_.warmingClusterCount() == 0) {
-                  cm_.xdsGrpcContext()->resume(Config::TypeUrl::get().Cluster);
+                  cm_.adsMux()->resume(Config::TypeUrl::get().Cluster);
                 }
               })) {
         ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster.name());

@@ -10,6 +10,7 @@
 
 #include "common/config/delta_subscription_impl.h"
 #include "common/config/filesystem_subscription_impl.h"
+#include "common/config/grpc_delta_xds_context.h"
 #include "common/config/grpc_mux_subscription_impl.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
@@ -99,7 +100,7 @@ public:
     }
     case envoy::api::v2::core::ConfigSource::kAds: {
       result = std::make_unique<GrpcMuxSubscriptionImpl>(
-          cm.xdsGrpcContext(), stats, type_url, dispatcher,
+          cm.adsMux(), stats, type_url, dispatcher,
           Utility::configSourceInitialFetchTimeout(config));
       break;
     }

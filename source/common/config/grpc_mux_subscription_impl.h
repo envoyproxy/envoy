@@ -20,7 +20,7 @@ class GrpcMuxSubscriptionImpl : public Subscription,
                                 GrpcMuxCallbacks,
                                 Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxSubscriptionImpl(std::shared_ptr<Config::XdsGrpcContext> grpc_mux, SubscriptionStats stats,
+  GrpcMuxSubscriptionImpl(std::shared_ptr<Config::GrpcMux> grpc_mux, SubscriptionStats stats,
                           absl::string_view type_url, Event::Dispatcher& dispatcher,
                           std::chrono::milliseconds init_fetch_timeout)
       : grpc_mux_(grpc_mux), stats_(stats), type_url_(type_url), dispatcher_(dispatcher),
@@ -96,7 +96,7 @@ private:
     }
   }
 
-  std::shared_ptr<Config::XdsGrpcContext> grpc_mux_;
+  std::shared_ptr<Config::GrpcMux> grpc_mux_;
   SubscriptionStats stats_;
   const std::string type_url_;
   SubscriptionCallbacks* callbacks_{};

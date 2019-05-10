@@ -13,21 +13,13 @@ MockGrpcMuxWatch::~MockGrpcMuxWatch() { cancel(); }
 MockGrpcMux::MockGrpcMux() {}
 MockGrpcMux::~MockGrpcMux() {}
 
-MockXdsGrpcContext::MockXdsGrpcContext() {}
-MockXdsGrpcContext::~MockXdsGrpcContext() {}
-GrpcMuxWatchPtr MockXdsGrpcContext::subscribe(const std::string& type_url,
+GrpcMuxWatchPtr MockGrpcMux::subscribe(const std::string& type_url,
                                               const std::set<std::string>& resources,
                                               GrpcMuxCallbacks& callbacks) {
   return GrpcMuxWatchPtr(subscribe_(type_url, resources, callbacks));
 }
 MockGrpcStreamCallbacks::MockGrpcStreamCallbacks() {}
 MockGrpcStreamCallbacks::~MockGrpcStreamCallbacks() {}
-
-GrpcMuxWatchPtr MockGrpcMux::subscribe(const std::string& type_url,
-                                       const std::set<std::string>& resources,
-                                       GrpcMuxCallbacks& callbacks) {
-  return GrpcMuxWatchPtr(subscribe_(type_url, resources, callbacks));
-}
 
 MockGrpcMuxCallbacks::MockGrpcMuxCallbacks() {
   ON_CALL(*this, resourceName(testing::_))

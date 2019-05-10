@@ -1,9 +1,8 @@
 #pragma once
 
 #include "envoy/config/subscription.h"
-#include "envoy/config/xds_grpc_context.h"
+#include "envoy/config/grpc_mux.h"
 
-#include "common/config/grpc_delta_xds_context.h"
 #include "common/config/utility.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
@@ -22,7 +21,7 @@ namespace Config {
 // TODO(fredlas) someday this class will be named SubscriptionImpl (without any changes to its code)
 class DeltaSubscriptionImpl : public Subscription {
 public:
-  DeltaSubscriptionImpl(std::shared_ptr<XdsGrpcContext> context, absl::string_view type_url,
+  DeltaSubscriptionImpl(std::shared_ptr<GrpcMux> context, absl::string_view type_url,
                         SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout)
       : context_(context), type_url_(type_url), stats_(stats),
         init_fetch_timeout_(init_fetch_timeout) {}
@@ -51,7 +50,7 @@ public:
   }
 
 private:
-  std::shared_ptr<XdsGrpcContext> context_;
+  std::shared_ptr<GrpcMux> context_;
   const std::string type_url_;
   SubscriptionStats stats_;
   const std::chrono::milliseconds init_fetch_timeout_;

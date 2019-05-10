@@ -36,7 +36,7 @@ public:
     grpc_mux_subscription_.updateResources(update_to_these_names);
   }
 
-  std::shared_ptr<Config::XdsGrpcContext> grpcMux() { return grpc_mux_; }
+  std::shared_ptr<Config::GrpcMux> grpcMux() { return grpc_mux_; }
 
 private:
   std::shared_ptr<Config::GrpcMuxImpl> grpc_mux_;

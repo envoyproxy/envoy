@@ -21,7 +21,6 @@ namespace Config {
  * ADS API implementation that fetches via gRPC.
  */
 class GrpcMuxImpl : public GrpcMux,
-                    public XdsGrpcContext,
                     public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
                     public Logger::Loggable<Logger::Id::config> {
 public:
@@ -34,7 +33,7 @@ public:
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
                             GrpcMuxCallbacks& callbacks) override;
 
-  // XdsGrpcContext
+  // GrpcMux
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
   void addSubscription(const std::set<std::string>&, const std::string&, SubscriptionCallbacks&,
@@ -118,7 +117,7 @@ private:
   std::queue<std::string> request_queue_;
 };
 
-class NullGrpcMuxImpl : public XdsGrpcContext,
+class NullGrpcMuxImpl : public GrpcMux,
                         GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
 public:
   GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
