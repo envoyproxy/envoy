@@ -15,7 +15,8 @@
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/singleton/manager_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "common/upstream/static_cluster.h"
+#include "common/upstream/strict_dns_cluster.h"
 
 #include "server/transport_socket_config_impl.h"
 

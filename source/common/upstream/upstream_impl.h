@@ -783,27 +783,6 @@ private:
 typedef std::unique_ptr<PriorityStateManager> PriorityStateManagerPtr;
 
 /**
- * Implementation of Upstream::Cluster for static clusters (clusters that have a fixed number of
- * hosts with resolved IP addresses).
- */
-class StaticClusterImpl : public ClusterImplBase {
-public:
-  StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                    Server::Configuration::TransportSocketFactoryContext& factory_context,
-                    Stats::ScopePtr&& stats_scope, bool added_via_api);
-
-  // Upstream::Cluster
-  InitializePhase initializePhase() const override { return InitializePhase::Primary; }
-
-private:
-  // ClusterImplBase
-  void startPreInit() override;
-
-  PriorityStateManagerPtr priority_state_manager_;
-  uint32_t overprovisioning_factor_;
-};
-
-/**
  * Base for all dynamic cluster types.
  */
 class BaseDynamicClusterImpl : public ClusterImplBase {
@@ -835,56 +814,6 @@ protected:
  * Utility function to get Dns from cluster.
  */
 Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Cluster& cluster);
-
-/**
- * Implementation of Upstream::Cluster that does periodic DNS resolution and updates the host
- * member set if the DNS members change.
- */
-class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
-public:
-  StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                       Network::DnsResolverSharedPtr dns_resolver,
-                       Server::Configuration::TransportSocketFactoryContext& factory_context,
-                       Stats::ScopePtr&& stats_scope, bool added_via_api);
-
-  // Upstream::Cluster
-  InitializePhase initializePhase() const override { return InitializePhase::Primary; }
-
-private:
-  struct ResolveTarget {
-    ResolveTarget(StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher,
-                  const std::string& url,
-                  const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-                  const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
-    ~ResolveTarget();
-    void startResolve();
-
-    StrictDnsClusterImpl& parent_;
-    Network::ActiveDnsQuery* active_query_{};
-    std::string dns_address_;
-    uint32_t port_;
-    Event::TimerPtr resolve_timer_;
-    HostVector hosts_;
-    const envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
-    const envoy::api::v2::endpoint::LbEndpoint lb_endpoint_;
-    HostMap all_hosts_;
-  };
-
-  typedef std::unique_ptr<ResolveTarget> ResolveTargetPtr;
-
-  void updateAllHosts(const HostVector& hosts_added, const HostVector& hosts_removed,
-                      uint32_t priority);
-
-  // ClusterImplBase
-  void startPreInit() override;
-
-  const LocalInfo::LocalInfo& local_info_;
-  Network::DnsResolverSharedPtr dns_resolver_;
-  std::list<ResolveTargetPtr> resolve_targets_;
-  const std::chrono::milliseconds dns_refresh_rate_ms_;
-  Network::DnsLookupFamily dns_lookup_family_;
-  uint32_t overprovisioning_factor_;
-};
 
 } // namespace Upstream
 } // namespace Envoy
