@@ -1464,7 +1464,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
   histogram1->used_ = true;
-  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
   EXPECT_CALL(*histogram1, cumulativeStatistics())
       .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
@@ -1524,7 +1524,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
   auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
   histogram1->used_ = true;
-  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
   EXPECT_CALL(*histogram1, cumulativeStatistics())
       .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
@@ -1571,7 +1571,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
   auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
   histogram1->used_ = false;
-  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
 
   {
