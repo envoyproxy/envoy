@@ -787,6 +787,7 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
   const size_t million = 1000 * 1000;
+  /*
   EXPECT_LT(end_mem - start_mem, 13 * million); // actual value: 12443472 as of Nov 7, 2018
 
   // HACK: doesn't like shutting down without threading having started.
@@ -795,6 +796,11 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   store->initializeThreading(main_thread_dispatcher, tls);
   store->shutdownThreading();
   tls.shutdownThread();
+  */
+
+
+  // EXPECT_LT(end_mem - start_mem, 20 * million); // actual value: 19601552 as of March 14, 2019
+  EXPECT_LT(end_mem - start_mem, 13 * million); // actual value: 12443472 as of March 14, 2019
 }
 
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {

@@ -9,6 +9,7 @@
 #include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
 #include "common/http/context_impl.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/socket_option_impl.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
@@ -71,8 +72,8 @@ public:
 
   Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, Http::Protocol,
-                   const Network::ConnectionSocket::OptionsSharedPtr&) override {
-    return Http::ConnectionPool::InstancePtr{allocateConnPool_(host)};
+                   const Network::ConnectionSocket::OptionsSharedPtr& options) override {
+    return Http::ConnectionPool::InstancePtr{allocateConnPool_(host, options)};
   }
 
   Tcp::ConnectionPool::InstancePtr
@@ -101,7 +102,9 @@ public:
 
   MOCK_METHOD1(clusterManagerFromProto_,
                ClusterManager*(const envoy::config::bootstrap::v2::Bootstrap& bootstrap));
-  MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(HostConstSharedPtr host));
+  MOCK_METHOD2(allocateConnPool_,
+               Http::ConnectionPool::Instance*(HostConstSharedPtr host,
+                                               Network::ConnectionSocket::OptionsSharedPtr));
   MOCK_METHOD1(allocateTcpConnPool_, Tcp::ConnectionPool::Instance*(HostConstSharedPtr host));
   MOCK_METHOD4(clusterFromProto_,
                ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
@@ -1203,7 +1206,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster")->info());
   EXPECT_EQ(1UL, cluster_manager_->clusters().size());
   Http::ConnectionPool::MockInstance* cp = new Http::ConnectionPool::MockInstance();
-  EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _)).WillOnce(Return(cp));
   EXPECT_EQ(cp, cluster_manager_->httpConnPoolForCluster("fake_cluster", ResourcePriority::Default,
                                                          Http::Protocol::Http11, nullptr));
 
@@ -1358,7 +1361,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
         }));
     create(parseBootstrapFromJson(json));
 
-    EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp1));
+    EXPECT_CALL(factory_, allocateConnPool_(_, _)).WillOnce(Return(cp1));
     cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
                                              Http::Protocol::Http11, nullptr);
 
@@ -1369,7 +1372,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     outlier_detector.runCallbacks(test_host);
 
-    EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp2));
+    EXPECT_CALL(factory_, allocateConnPool_(_, _)).WillOnce(Return(cp2));
     cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::High,
                                              Http::Protocol::Http11, nullptr);
   }
@@ -1625,7 +1628,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   EXPECT_CALL(initialized, ready());
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
-  EXPECT_CALL(factory_, allocateConnPool_(_))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _))
       .Times(4)
       .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
 
@@ -1789,7 +1792,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(initialized, ready());
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
-  EXPECT_CALL(factory_, allocateConnPool_(_))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _))
       .Times(4)
       .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
 
@@ -1979,7 +1982,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
 
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
 
-  EXPECT_CALL(factory_, allocateConnPool_(_))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _))
       .WillOnce(ReturnNew<Http::ConnectionPool::MockInstance>());
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
@@ -2056,7 +2059,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   MockConnPoolWithDestroy* mock_cp = new MockConnPoolWithDestroy();
-  EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(mock_cp));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _)).WillOnce(Return(mock_cp));
 
   MockTcpConnPoolWithDestroy* mock_tcp = new MockTcpConnPoolWithDestroy();
   EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(mock_tcp));
@@ -2121,7 +2124,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
 // Tests that all the HC/weight/metadata changes are delivered in one go, as long as
 // there's no hosts changes in between.
 // Also tests that if hosts are added/removed between mergeable updates, delivery will
-// happen and the scheduled update will be canceled.
+// happen and the scheduled update will be cancelled.
 TEST_F(ClusterManagerImplTest, MergedUpdates) {
   createWithLocalClusterUpdate();
 
@@ -2175,9 +2178,8 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   hosts_removed.push_back((*hosts)[0]);
   cluster.prioritySet().updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                     std::make_shared<const HealthyHostVector>(*hosts),
-                                     hosts_per_locality),
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
@@ -2187,15 +2189,13 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   hosts_removed.clear();
   cluster.prioritySet().updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                     std::make_shared<const HealthyHostVector>(*hosts),
-                                     hosts_per_locality),
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt);
   cluster.prioritySet().updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                     std::make_shared<const HealthyHostVector>(*hosts),
-                                     hosts_per_locality),
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
@@ -2212,9 +2212,8 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   hosts_added.push_back((*hosts)[0]);
   cluster.prioritySet().updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                     std::make_shared<const HealthyHostVector>(*hosts),
-                                     hosts_per_locality),
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
@@ -2226,25 +2225,22 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   (*hosts)[0]->metadata(buildMetadata("v1"));
   cluster.prioritySet().updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                     std::make_shared<const HealthyHostVector>(*hosts),
-                                     hosts_per_locality),
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt);
 
   (*hosts)[0]->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
   cluster.prioritySet().updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                     std::make_shared<const HealthyHostVector>(*hosts),
-                                     hosts_per_locality),
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt);
 
   (*hosts)[0]->weight(100);
   cluster.prioritySet().updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                     std::make_shared<const HealthyHostVector>(*hosts),
-                                     hosts_per_locality),
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt);
 
   // Updates not delivered yet.
@@ -2256,9 +2252,8 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   hosts_removed.push_back((*hosts)[0]);
   cluster.prioritySet().updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                     std::make_shared<const HealthyHostVector>(*hosts),
-                                     hosts_per_locality),
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt);
 
   EXPECT_EQ(3, factory_.stats_.counter("cluster_manager.cluster_updated").value());
@@ -2293,9 +2288,8 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
   time_system_.sleep(std::chrono::seconds(60));
   cluster.prioritySet().updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                     std::make_shared<const HealthyHostVector>(*hosts),
-                                     hosts_per_locality),
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
@@ -2321,9 +2315,8 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesInsideWindow) {
   time_system_.sleep(std::chrono::seconds(2));
   cluster.prioritySet().updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                     std::make_shared<const HealthyHostVector>(*hosts),
-                                     hosts_per_locality),
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
@@ -2357,9 +2350,8 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindowDisabled) {
   // and outside a merge window, merging is disabled.
   cluster.prioritySet().updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                     std::make_shared<const HealthyHostVector>(*hosts),
-                                     hosts_per_locality),
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
@@ -2424,9 +2416,8 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   hosts_removed.push_back((*hosts)[0]);
   cluster.prioritySet().updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                     std::make_shared<const HealthyHostVector>(*hosts),
-                                     hosts_per_locality),
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
@@ -2436,15 +2427,13 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   hosts_removed.clear();
   cluster.prioritySet().updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                     std::make_shared<const HealthyHostVector>(*hosts),
-                                     hosts_per_locality),
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt);
   cluster.prioritySet().updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                     std::make_shared<const HealthyHostVector>(*hosts),
-                                     hosts_per_locality),
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
       {}, hosts_added, hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
@@ -2485,6 +2474,75 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
 
   EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
   EXPECT_EQ(0, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
+}
+
+TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context;
+
+  Http::ConnectionPool::MockInstance* to_create = new Http::ConnectionPool::MockInstance();
+  Network::Socket::OptionsSharedPtr options_to_return =
+      Network::SocketOptionFactory::buildIpTransparentOptions();
+
+  EXPECT_CALL(context, upstreamSocketOptions()).WillOnce(Return(options_to_return));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _)).WillOnce(Return(to_create));
+
+  Http::ConnectionPool::Instance* cp = cluster_manager_->httpConnPoolForCluster(
+      "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, &context);
+
+  EXPECT_NE(nullptr, cp);
+}
+
+TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context1;
+  NiceMock<MockLoadBalancerContext> context2;
+
+  Http::ConnectionPool::MockInstance* to_create1 = new Http::ConnectionPool::MockInstance();
+  Http::ConnectionPool::MockInstance* to_create2 = new Http::ConnectionPool::MockInstance();
+  Network::Socket::OptionsSharedPtr options1 =
+      Network::SocketOptionFactory::buildIpTransparentOptions();
+  Network::Socket::OptionsSharedPtr options2 =
+      Network::SocketOptionFactory::buildSocketMarkOptions(3);
+
+  EXPECT_CALL(context1, upstreamSocketOptions()).WillRepeatedly(Return(options1));
+  EXPECT_CALL(context2, upstreamSocketOptions()).WillRepeatedly(Return(options2));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _)).WillOnce(Return(to_create1));
+
+  Http::ConnectionPool::Instance* cp1 = cluster_manager_->httpConnPoolForCluster(
+      "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, &context1);
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _)).WillOnce(Return(to_create2));
+  Http::ConnectionPool::Instance* cp2 = cluster_manager_->httpConnPoolForCluster(
+      "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, &context2);
+
+  Http::ConnectionPool::Instance* should_be_cp1 = cluster_manager_->httpConnPoolForCluster(
+      "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, &context1);
+  Http::ConnectionPool::Instance* should_be_cp2 = cluster_manager_->httpConnPoolForCluster(
+      "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, &context2);
+
+  // The different upstream options should lead to different hashKeys, thus different pools.
+  EXPECT_NE(cp1, cp2);
+
+  // Reusing the same options should lead to the same connection pools.
+  EXPECT_EQ(cp1, should_be_cp1);
+  EXPECT_EQ(cp2, should_be_cp2);
+}
+
+TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context;
+
+  Http::ConnectionPool::MockInstance* to_create = new Http::ConnectionPool::MockInstance();
+  Network::Socket::OptionsSharedPtr options_to_return = nullptr;
+
+  EXPECT_CALL(context, upstreamSocketOptions()).WillOnce(Return(options_to_return));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _)).WillOnce(Return(to_create));
+
+  Http::ConnectionPool::Instance* cp = cluster_manager_->httpConnPoolForCluster(
+      "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, &context);
+
+  EXPECT_NE(nullptr, cp);
 }
 
 class ClusterManagerInitHelperTest : public testing::Test {

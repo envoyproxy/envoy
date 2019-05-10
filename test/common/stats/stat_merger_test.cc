@@ -1,7 +1,11 @@
 #include <memory>
 
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/stat_merger.h"
+#include "common/stats/thread_local_store.h"
+
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -50,23 +54,6 @@ TEST_F(StatMergerTest, counterMerge) {
   stat_merger_.mergeStats(counter_deltas, empty_gauges_);
   EXPECT_EQ(11, store_.counter("draculaer").value());
   EXPECT_EQ(4, store_.counter("draculaer").latch());
-}
-
-// It should be fine for the parent to send us stats we haven't ourselves instantiated.
-// TODO(6756) This is how things currently work, but this is actually what 6756 is looking to avoid.
-TEST_F(StatMergerTest, newStatFromParent) {
-  Protobuf::Map<std::string, uint64_t> counter_values;
-  Protobuf::Map<std::string, uint64_t> counter_deltas;
-  Protobuf::Map<std::string, uint64_t> gauges;
-  counter_deltas["newcounter0"] = 0;
-  counter_deltas["newcounter1"] = 1;
-  gauges["newgauge"] = 5;
-  stat_merger_.mergeStats(counter_deltas, gauges);
-  EXPECT_EQ(0, store_.counter("newcounter0").value());
-  EXPECT_EQ(0, store_.counter("newcounter0").latch());
-  EXPECT_EQ(1, store_.counter("newcounter1").value());
-  EXPECT_EQ(1, store_.counter("newcounter1").latch());
-  EXPECT_EQ(5, store_.gauge("newgauge").value());
 }
 
 TEST_F(StatMergerTest, basicDefaultAccumulationImport) {
@@ -162,6 +149,39 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   EXPECT_FALSE(store_.gauge("anything.total_principals").used());
   EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_active").used());
   EXPECT_FALSE(store_.gauge("overload.something.pressure").used());
+}
+
+// When the parent sends us counters we haven't ourselves instantiated, they should be stored
+// temporarily, but then uninstantiated if hot restart ends without the child accessing them.
+TEST(StatMergerNonFixtureTest, newStatFromParent) {
+  FakeSymbolTableImpl symbol_table;
+  HeapStatDataAllocator alloc(symbol_table);
+  ThreadLocalStoreImpl store(alloc);
+  {
+    StatMerger stat_merger(store);
+
+    Protobuf::Map<std::string, uint64_t> counter_values;
+    Protobuf::Map<std::string, uint64_t> counter_deltas;
+    Protobuf::Map<std::string, uint64_t> gauges;
+    counter_deltas["newcounter0"] = 0;
+    counter_deltas["newcounter1"] = 1;
+    counter_deltas["newcounter2"] = 2;
+    gauges["newgauge1"] = 1;
+    gauges["newgauge2"] = 2;
+    stat_merger.mergeStats(counter_deltas, gauges);
+    EXPECT_EQ(0, store.counter("newcounter0").value());
+    EXPECT_EQ(0, store.counter("newcounter0").latch());
+    EXPECT_EQ(1, store.counter("newcounter1").value());
+    EXPECT_EQ(1, store.counter("newcounter1").latch());
+    EXPECT_EQ(1, store.gauge("newgauge1").value());
+  }
+  // We accessed 0 and 1 above, but not 2. Now that StatMerger has been destroyed,
+  // 2 should be gone.
+  EXPECT_TRUE(TestUtility::findCounter(store, "newcounter0"));
+  EXPECT_TRUE(TestUtility::findCounter(store, "newcounter1"));
+  EXPECT_FALSE(TestUtility::findCounter(store, "newcounter2"));
+  EXPECT_TRUE(TestUtility::findGauge(store, "newgauge1"));
+  EXPECT_FALSE(TestUtility::findGauge(store, "newgauge2"));
 }
 
 } // namespace

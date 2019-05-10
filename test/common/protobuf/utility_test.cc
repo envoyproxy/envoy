@@ -162,7 +162,7 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile) {
       ->mutable_source_address()
       ->set_address("1.1.1.1");
 
-  ProtobufTypes::String bootstrap_text;
+  std::string bootstrap_text;
   ASSERT_TRUE(Protobuf::TextFormat::PrintToString(bootstrap, &bootstrap_text));
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);

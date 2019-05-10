@@ -108,6 +108,59 @@ TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 }
 
+// Verifies that endpoints are ignored until health checked when configured to.
+TEST_P(EdsIntegrationTest, EndpointWarmingSuccessfulHc) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    // Switch predefined cluster_0 to EDS filesystem sourcing.
+    auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster_0->mutable_common_lb_config()->set_ignore_new_hosts_until_first_hc(true);
+  });
+
+  // Endpoints are initially excluded.
+  initializeTest(true);
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  setEndpoints(1, 0, 0, false);
+
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Wait for the first HC and verify the host is healthy and that it is no longer being excluded.
+  // The other endpoint should still be excluded.
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+}
+
+// Verifies that endpoints are ignored until health checked when configured to when the first
+// health check fails.
+TEST_P(EdsIntegrationTest, EndpointWarmingFailedHc) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    // Switch predefined cluster_0 to EDS filesystem sourcing.
+    auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster_0->mutable_common_lb_config()->set_ignore_new_hosts_until_first_hc(true);
+  });
+
+  // Endpoints are initially excluded.
+  initializeTest(true);
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  setEndpoints(1, 0, 0, false);
+
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Wait for the first HC and verify the host is healthy and that it is no longer being excluded.
+  // The other endpoint should still be excluded.
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+}
+
 // Validate that health status updates are consumed from EDS.
 TEST_P(EdsIntegrationTest, HealthUpdate) {
   initializeTest(false);
