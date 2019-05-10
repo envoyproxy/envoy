@@ -124,8 +124,8 @@ private:
   void incHealthy();
   void incDegraded();
   std::chrono::milliseconds interval(HealthState state, HealthTransition changed_state) const;
-  std::chrono::milliseconds
-  intervalWithJitter(uint64_t base_time_ms, const std::chrono::milliseconds interval_jitter) const;
+  std::chrono::milliseconds intervalWithJitter(uint64_t base_time_ms,
+                                               std::chrono::milliseconds interval_jitter) const;
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
   void refreshHealthyStat();
   void runCallbacks(HostSharedPtr host, HealthTransition changed_state);

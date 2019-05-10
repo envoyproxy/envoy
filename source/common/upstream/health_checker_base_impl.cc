@@ -105,12 +105,12 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
   } else {
     base_time_ms = no_traffic_interval_.count();
   }
-  return HealthCheckerImplBase::intervalWithJitter(base_time_ms, interval_jitter_);
+  return intervalWithJitter(base_time_ms, interval_jitter_);
 }
 
 std::chrono::milliseconds
 HealthCheckerImplBase::intervalWithJitter(uint64_t base_time_ms,
-                                          const std::chrono::milliseconds interval_jitter) const {
+                                          std::chrono::milliseconds interval_jitter) const {
   const uint64_t jitter_percent_mod = interval_jitter_percent_ * base_time_ms / 100;
   if (jitter_percent_mod > 0) {
     base_time_ms += random_.random() % jitter_percent_mod;
