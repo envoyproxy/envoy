@@ -41,16 +41,21 @@ public:
 
   void handleEstablishmentFailure() PURE;
 
-  // Will have been static_cast from GrpcStream's RequestProto type, and should be static_cast back before handing to GrpcStream::sendMessage.
+  // Will have been static_cast from GrpcStream's RequestProto type, and should be static_cast back
+  // before handing to GrpcStream::sendMessage.
   Protobuf::Message getNextRequestAckless() PURE;
-  // Will have been static_cast from GrpcStream's RequestProto type, and should be static_cast back before handing to GrpcStream::sendMessage.
+  // Will have been static_cast from GrpcStream's RequestProto type, and should be static_cast back
+  // before handing to GrpcStream::sendMessage.
   Protobuf::Message getNextRequestWithAck(const UpdateAck& ack) PURE;
 };
 
 class SubscriptionStateFactory {
 public:
-  SubscriptionState makeSubscriptionState(const std::string& type_url, const std::set<std::string>& resource_names,
-                         SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout, SubscriptionStats& stats) PURE;
+  SubscriptionState makeSubscriptionState(const std::string& type_url,
+                                          const std::set<std::string>& resource_names,
+                                          SubscriptionCallbacks& callbacks,
+                                          std::chrono::milliseconds init_fetch_timeout,
+                                          SubscriptionStats& stats) PURE;
 };
 
 } // namespace Config

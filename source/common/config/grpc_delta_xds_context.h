@@ -48,18 +48,27 @@ namespace Config {
 // for both non- and aggregated: if non-aggregated, you'll be the only holder of that shared_ptr. By
 // those two mechanisms, the single class (TODO rename) DeltaSubscriptionImpl handles all 4
 // delta/SotW and non-/aggregated combinations.
-class GrpcXdsContext : public GrpcMux,
+class GrpcDeltaXdsContext : public GrpcMux,
                             public GrpcStreamCallbacks<envoy::api::v2::DeltaDiscoveryResponse>,
                             Logger::Loggable<Logger::Id::config> {
 public:
+  GrpcDeltaXdsContext(Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
+                      const Protobuf::MethodDescriptor& service_method,
+                      Runtime::RandomGenerator& random, Stats::Scope& scope,
+                      const RateLimitSettings& rate_limit_settings,
+                      const LocalInfo::LocalInfo& local_info)
+      : dispatcher_(dispatcher), local_info_(local_info),
+        grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
+                     rate_limit_settings) {}
+
   void addSubscription(const std::set<std::string>& resources, const std::string& type_url,
                        SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
                        std::chrono::milliseconds init_fetch_timeout) override {
-    subscriptions_.emplace(std::make_pair(
-        type_url, subscription_factory_.makeSubscriptionState(type_url, resources, callbacks, local_info_,
-                                         init_fetch_timeout, dispatcher_, stats)));
+    subscriptions_.emplace(
+        std::make_pair(type_url, DeltaSubscriptionState(type_url, resources, callbacks, local_info_,
+                                                        init_fetch_timeout, dispatcher_, stats)));
     subscription_ordering_.emplace_back(type_url);
-    establishStream(); // (idempotent)
+    grpc_stream_.establishStream(); // (idempotent)
   }
 
   // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
@@ -77,7 +86,7 @@ public:
   }
 
   void removeSubscription(const std::string& type_url) override {
-    subscriptions_.erase(type_url); 
+    subscriptions_.erase(type_url);
     // And remove from the subscription_ordering_ list.
     auto it = subscription_ordering_.begin();
     while (it != subscription_ordering_.end()) {
@@ -143,26 +152,15 @@ public:
     trySendDiscoveryRequests();
   }
 
-  // TODO TODO remove, GrpcMux impersonation. Basically combination of  addSubscription and updateResources.
-  virtual GrpcMuxWatchPtr subscribe(const std::string&,
-                                    const std::set<std::string>& ,
-                                    GrpcMuxCallbacks& ) override {
-// don't need any implementation here. only grpc_mux_subscription_impl ever calls it, and there would never be a GrpcDeltaXdsContext held by one of those.
+  // TODO TODO remove, GrpcMux impersonation. Basically combination of  addSubscription and
+  // updateResources.
+  virtual GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
+                                    GrpcMuxCallbacks&) override {
+    // don't need any implementation here. only grpc_mux_subscription_impl ever calls it, and there
+    // would never be a GrpcDeltaXdsContext held by one of those.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     return nullptr;
   }
-  
-protected:
-  GrpcXdsContext(Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info)
-      : dispatcher_(dispatcher), local_info_(local_info) {}
-
-  // Everything related to GrpcStream must remain abstract. GrpcStream (and the gRPC-using classes that underlie it) are templated on protobufs. That means that a single implementation that supports different types of protobufs cannot use polymorphism to share code. The workaround: the GrpcStream will be owned by a derived class, and all code that would touch grpc_stream_ is seen here in the base class as abstract.
-  virtual void establishStream() PURE;
-  virtual void sendDiscoveryRequestWithAck(SubscriptionState* sub, UpdateAck ack) PURE;
-  virtual void sendDiscoveryRequestAckless(SubscriptionState* sub) PURE;
-  virtual void maybeUpdateQueueSizeStat(uint64_t size) PURE;
-  virtual bool grpcStreamAvailable() const PURE;
-  virtual bool checkRateLimitAllowsDrain() PURE;
 
 private:
   void trySendDiscoveryRequests() {
@@ -179,7 +177,9 @@ private:
       if (sub == subscriptions_.end()) {
         ENVOY_LOG(warn, "Not sending discovery request for non-existent subscription {}.",
                   next_request_type_url);
-        // It's safe to assume the front of the ACK queue is of this type, because that's the only way whoWantsToSendDiscoveryRequest() could return something for a non-existent subscription.
+        // It's safe to assume the front of the ACK queue is of this type, because that's the only
+        // way whoWantsToSendDiscoveryRequest() could return something for a non-existent
+        // subscription.
         ack_queue_.pop();
         continue;
       }
@@ -189,14 +189,15 @@ private:
       }
       // Get our subscription state to generate the appropriate DeltaDiscoveryRequest, and send.
       if (!ack_queue_.empty()) {
-        // Because ACKs take precedence over plain requests, if there is anything in the queue, it's safe to assume it's what we want to send here.
-        sendDiscoveryRequestWithAck(&sub->second, ack_queue_.front());
+        // Because ACKs take precedence over plain requests, if there is anything in the queue, it's
+        // safe to assume it's what we want to send here.
+        grpc_stream_.sendMessage(sub->second.getNextRequestWithAck(ack_queue_.front()));
         ack_queue_.pop();
       } else {
-        sendDiscoveryRequestAckless(&sub->second);
+        grpc_stream_.sendMessage(sub->second.getNextRequestAckless());
       }
     }
-    maybeUpdateQueueSizeStat(ack_queue_.size());
+    grpc_stream_.maybeUpdateQueueSizeStat(ack_queue_.size());
   }
 
   // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
@@ -205,10 +206,10 @@ private:
     if (sub->paused()) {
       ENVOY_LOG(trace, "API {} paused; discovery request on hold for now.", type_url);
       return false;
-    } else if (!grpcStreamAvailable()) {
+    } else if (!grpc_stream_.grpcStreamAvailable()) {
       ENVOY_LOG(trace, "No stream available to send a discovery request for {}.", type_url);
       return false;
-    } else if (!checkRateLimitAllowsDrain()) {
+    } else if (!grpc_stream_.checkRateLimitAllowsDrain()) {
       ENVOY_LOG(trace, "{} discovery request hit rate limit; will try later.", type_url);
       return false;
     }
@@ -225,7 +226,8 @@ private:
     if (!ack_queue_.empty()) {
       return ack_queue_.front().type_url_;
     }
-    // If we're looking to send multiple non-ACK requests, send them in the order that their subscriptions were initiated.
+    // If we're looking to send multiple non-ACK requests, send them in the order that their
+    // subscriptions were initiated.
     for (const auto& sub_type : subscription_ordering_) {
       auto sub = subscriptions_.find(sub_type);
       if (sub == subscriptions_.end()) {
@@ -247,43 +249,11 @@ private:
 
   // Map from type_url strings to a DeltaSubscriptionState for that type.
   std::unordered_map<std::string, DeltaSubscriptionState> subscriptions_;
-  SubscriptionStateFactory subscription_factory_;
-    
-  // Determines the order of initial discovery requests. (Assumes that subscriptions are added in the order of Envoy's dependency ordering).
+
+  // Determines the order of initial discovery requests. (Assumes that subscriptions are added in
+  // the order of Envoy's dependency ordering).
   std::list<std::string> subscription_ordering_;
-};
 
-class GrpcDeltaXdsContext : public GrpcXdsContext {
-public:
-  GrpcDeltaXdsContext(Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
-                      const Protobuf::MethodDescriptor& service_method,
-                      Runtime::RandomGenerator& random, Stats::Scope& scope,
-                      const RateLimitSettings& rate_limit_settings,
-                      const LocalInfo::LocalInfo& local_info) 
-  : GrpcXdsContext(dispatcher, local_info),
-  grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                rate_limit_settings) {}
-
-protected:
-  void establishStream() override {
-    grpc_stream_.establishStream();
-  }
-  void sendDiscoveryRequestWithAck(SubscriptionState* sub, UpdateAck ack) override {
-    grpc_stream_.sendMessage(static_cast<DeltaSubscriptionState*>(sub)->getNextRequestWithAck(ack));
-  }
-  void sendDiscoveryRequestAckless(SubscriptionState* sub) override {
-    grpc_stream_.sendMessage(static_cast<DeltaSubscriptionState*>(sub)->getNextRequestAckless());
-  }
-  void maybeUpdateQueueSizeStat(uint64_t size) override {
-    grpc_stream_.maybeUpdateQueueSizeStat(size);
-  }
-  bool grpcStreamAvailable() const override {
-    return grpc_stream_.grpcStreamAvailable();
-  }
-  bool checkRateLimitAllowsDrain() override {
-    return grpc_stream_.checkRateLimitAllowsDrain();
-  }
-private:
   GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>
       grpc_stream_;
 };

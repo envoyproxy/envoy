@@ -117,8 +117,7 @@ private:
   std::queue<std::string> request_queue_;
 };
 
-class NullGrpcMuxImpl : public GrpcMux,
-                        GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
+class NullGrpcMuxImpl : public GrpcMux, GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
 public:
   GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
                             GrpcMuxCallbacks&) override {

@@ -105,20 +105,5 @@ private:
   SubscriptionStats& stats_;
 };
 
-class DeltaSubscriptionStateFactory : public SubscriptionStateFactory {
-public:
-  DeltaSubscriptionStateFactory(Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info)
-      : dispatcher_(dispatcher), local_info_(local_info) {}
-      
-  SubscriptionState makeSubscriptionState(const std::string& type_url, const std::set<std::string>& resource_names,
-                         SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout, SubscriptionStats& stats) override {
-      return DeltaSubscriptionState(type_url, resources, callbacks, local_info_,
-                    init_fetch_timeout, dispatcher_, stats);
-  }
-private:
-  Event::Dispatcher& dispatcher_;
-  const LocalInfo::LocalInfo& local_info_;
-};
-
 } // namespace Config
 } // namespace Envoy

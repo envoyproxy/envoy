@@ -231,7 +231,7 @@ TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
     *remove2.Add() = "name2";
     deliverDiscoveryResponse(add1_3, remove2, "debugversion2");
     state_.markStreamFresh(); // simulate a stream reconnection
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAcklessAckless();
+    envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
     EXPECT_EQ("version1B", cur_request.initial_resource_versions().at("name1"));
     EXPECT_EQ(cur_request.initial_resource_versions().end(),
               cur_request.initial_resource_versions().find("name2"));
@@ -245,7 +245,7 @@ TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
     *remove1_3.Add() = "name3";
     deliverDiscoveryResponse({}, remove1_3, "debugversion3");
     state_.markStreamFresh(); // simulate a stream reconnection
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAcklessAckless();
+    envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
     EXPECT_TRUE(cur_request.initial_resource_versions().empty());
   }
 
