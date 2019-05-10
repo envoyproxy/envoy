@@ -182,6 +182,14 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
     health_status.set_failed_active_degraded_check(
         host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
     break;
+  case Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL:
+    health_status.set_pending_dynamic_removal(
+        host.healthFlagGet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+    break;
+  case Upstream::Host::HealthFlag::PENDING_ACTIVE_HC:
+    health_status.set_pending_active_hc(
+        host.healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC));
+    break;
   }
 }
 } // namespace

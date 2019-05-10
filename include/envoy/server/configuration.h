@@ -20,9 +20,9 @@ namespace Configuration {
 /**
  * Configuration for local disk runtime support.
  */
-class Runtime {
+class DiskRuntime {
 public:
-  virtual ~Runtime() {}
+  virtual ~DiskRuntime() {}
 
   /**
    * @return const std::string& the root symlink to watch for swapping.
@@ -136,9 +136,15 @@ public:
   virtual absl::optional<std::string> flagsPath() PURE;
 
   /**
-   * @return Runtime* the local disk runtime configuration or nullptr if there is no configuration.
+   * @return const ProtobufWkt::Struct& base runtime snapshot.
    */
-  virtual Runtime* runtime() PURE;
+  virtual const ProtobufWkt::Struct& baseRuntime() PURE;
+
+  /**
+   * @return DiskRuntime* the local disk runtime configuration or nullptr if there is no
+   * configuration.
+   */
+  virtual DiskRuntime* diskRuntime() PURE;
 };
 
 } // namespace Configuration

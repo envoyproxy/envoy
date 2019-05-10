@@ -64,13 +64,20 @@ public:
     return tag_extracted_name_.empty() ? name() : tag_extracted_name_;
   }
   StatName tagExtractedStatName() const override { return tag_extracted_stat_name_->statName(); }
+  void iterateTagStatNames(const TagStatNameIterFn& fn) const override;
+  void iterateTags(const TagIterFn& fn) const override;
 
   Test::Global<FakeSymbolTableImpl> symbol_table_; // Must outlive name_.
   MetricName name_;
-  std::vector<Tag> tags_;
+
+  void setTags(const std::vector<Tag>& tags);
+  void addTag(const Tag& tag);
 
 private:
+  std::vector<Tag> tags_;
+  std::vector<StatName> tag_names_and_values_;
   std::string tag_extracted_name_;
+  StatNamePool tag_pool_;
   std::unique_ptr<StatNameManagedStorage> tag_extracted_stat_name_;
 };
 
@@ -103,6 +110,8 @@ public:
   MOCK_METHOD1(sub, void(uint64_t amount));
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(value, uint64_t());
+  MOCK_CONST_METHOD0(cachedShouldImport, absl::optional<bool>());
+  MOCK_METHOD1(setShouldImport, void(bool should_import));
 
   bool used_;
   uint64_t value_;
@@ -184,7 +193,6 @@ public:
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
-  MOCK_CONST_METHOD0(statsOptions, const StatsOptions&());
 
   Counter& counterFromStatName(StatName name) override {
     return counter(symbol_table_->toString(name));
@@ -200,7 +208,6 @@ public:
   Test::Global<FakeSymbolTableImpl> symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
-  StatsOptionsImpl stats_options_;
 };
 
 /**

@@ -96,6 +96,30 @@ envoy_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "filter_manager_integration_proto",
+    srcs = [":filter_manager_integration_test.proto"],
+)
+
+envoy_cc_test(
+    name = "filter_manager_integration_test",
+    srcs = [
+        "filter_manager_integration_test.cc",
+        "filter_manager_integration_test.h",
+    ],
+    deps = [
+        ":filter_manager_integration_proto_cc",
+        ":http_integration_lib",
+        ":integration_lib",
+        "//source/extensions/filters/network/common:factory_base_lib",
+        "//source/extensions/filters/network/echo:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/server:utility_lib",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "custom_cluster_integration_test",
     srcs = ["custom_cluster_integration_test.cc"],
@@ -211,6 +235,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/test_common:utility_lib",
@@ -685,12 +710,8 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "h1_fuzz_lib",
-    srcs = [
-        "h1_fuzz.cc",
-    ],
-    hdrs = [
-        "h1_fuzz.h",
-    ],
+    srcs = ["h1_fuzz.cc"],
+    hdrs = ["h1_fuzz.h"],
     deps = [
         ":capture_fuzz_proto_cc",
         ":http_integration_lib",
@@ -704,22 +725,14 @@ envoy_cc_test_library(
 
 envoy_cc_fuzz_test(
     name = "h1_capture_fuzz_test",
-    srcs = [
-        "h1_capture_fuzz_test.cc",
-    ],
+    srcs = ["h1_capture_fuzz_test.cc"],
     corpus = "h1_corpus",
-    deps = [
-        ":h1_fuzz_lib",
-    ],
+    deps = [":h1_fuzz_lib"],
 )
 
 envoy_cc_fuzz_test(
     name = "h1_capture_direct_response_fuzz_test",
-    srcs = [
-        "h1_capture_direct_response_fuzz_test.cc",
-    ],
+    srcs = ["h1_capture_direct_response_fuzz_test.cc"],
     corpus = "h1_corpus",
-    deps = [
-        ":h1_fuzz_lib",
-    ],
+    deps = [":h1_fuzz_lib"],
 )

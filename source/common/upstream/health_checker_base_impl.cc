@@ -38,6 +38,11 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       });
 }
 
+HealthCheckerImplBase::~HealthCheckerImplBase() {
+  // Make sure that any sessions that were deferred deleted are cleared before we destruct.
+  dispatcher_.clearDeferredDeleteList();
+}
+
 void HealthCheckerImplBase::decHealthy() {
   ASSERT(local_process_healthy_ > 0);
   local_process_healthy_--;
@@ -135,6 +140,9 @@ void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
   for (const HostSharedPtr& host : hosts_removed) {
     auto session_iter = active_sessions_.find(host);
     ASSERT(active_sessions_.end() != session_iter);
+    // This deletion can happen inline in response to a host failure, so we deferred delete.
+    session_iter->second->onDeferredDeleteBase();
+    dispatcher_.deferredDelete(std::move(session_iter->second));
     active_sessions_.erase(session_iter);
   }
 }
@@ -220,6 +228,14 @@ HealthCheckerImplBase::ActiveHealthCheckSession::~ActiveHealthCheckSession() {
   }
 }
 
+void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
+  // The session is about to be deferred deleted. Make sure all timers are gone and any
+  // implementation specific state is destroyed.
+  interval_timer_.reset();
+  timeout_timer_.reset();
+  onDeferredDelete();
+}
+
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degraded) {
   // If we are healthy, reset the # of unhealthy to zero.
   num_unhealthy_ = 0;
@@ -240,6 +256,8 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
       changed_state = HealthTransition::ChangePending;
     }
   }
+
+  changed_state = clearPendingFlag(changed_state);
 
   if (degraded != host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
     if (degraded) {
@@ -291,6 +309,8 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
     }
   }
 
+  changed_state = clearPendingFlag(changed_state);
+
   if ((first_check_ || parent_.always_log_health_check_failures_) && parent_.event_logger_) {
     parent_.event_logger_->logUnhealthy(parent_.healthCheckerType(), host_, type, first_check_);
   }
@@ -310,8 +330,26 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(
     envoy::data::core::v2alpha::HealthCheckFailureType type) {
   HealthTransition changed_state = setUnhealthy(type);
-  timeout_timer_->disableTimer();
-  interval_timer_->enableTimer(parent_.interval(HealthState::Unhealthy, changed_state));
+  // It's possible that the previous call caused this session to be deferred deleted.
+  if (timeout_timer_ != nullptr) {
+    timeout_timer_->disableTimer();
+  }
+
+  if (interval_timer_ != nullptr) {
+    interval_timer_->enableTimer(parent_.interval(HealthState::Unhealthy, changed_state));
+  }
+}
+
+HealthTransition
+HealthCheckerImplBase::ActiveHealthCheckSession::clearPendingFlag(HealthTransition changed_state) {
+  if (host_->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
+    host_->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    // Even though the health value of the host might have not changed, we set this to Changed to
+    // that the cluster can update its list of excluded hosts.
+    return HealthTransition::Changed;
+  }
+
+  return changed_state;
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {

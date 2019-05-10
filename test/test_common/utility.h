@@ -16,13 +16,11 @@
 #include "envoy/thread/thread.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/block_memory_hash_set.h"
 #include "common/common/c_smart_ptr.h"
 #include "common/common/thread.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/fake_symbol_table_impl.h"
-#include "common/stats/raw_stat_data.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/printers.h"
@@ -211,11 +209,36 @@ public:
    *
    * @param lhs proto on LHS.
    * @param rhs proto on RHS.
+   * @param ignore_repeated_field_ordering if true, repeated field ordering will be ignored.
    * @return bool indicating whether the protos are equal.
    */
-  static bool protoEqual(const Protobuf::Message& lhs, const Protobuf::Message& rhs) {
-    return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
+  static bool protoEqual(const Protobuf::Message& lhs, const Protobuf::Message& rhs,
+                         bool ignore_repeated_field_ordering = false) {
+    Protobuf::util::MessageDifferencer differencer;
+    differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUIVALENT);
+    if (ignore_repeated_field_ordering) {
+      differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+    }
+    return differencer.Compare(lhs, rhs);
   }
+
+  static bool protoEqualIgnoringField(const Protobuf::Message& lhs, const Protobuf::Message& rhs,
+                                      const std::string& field_to_ignore) {
+    Protobuf::util::MessageDifferencer differencer;
+    const Protobuf::FieldDescriptor* ignored_field =
+        lhs.GetDescriptor()->FindFieldByName(field_to_ignore);
+    ASSERT(ignored_field != nullptr, "Field name to ignore not found.");
+    differencer.IgnoreField(ignored_field);
+    return differencer.Compare(lhs, rhs);
+  }
+
+  /**
+   * Symmetrically pad a string with '=' out to a desired length.
+   * @param to_pad the string being padded around.
+   * @param desired_length the length we want the padding to bring the string up to.
+   * @return the padded string.
+   */
+  static std::string addLeftAndRightPadding(absl::string_view to_pad, int desired_length = 80);
 
   /**
    * Split a string.
@@ -252,7 +275,7 @@ public:
     }
 
     for (int i = 0; i < lhs.size(); ++i) {
-      if (!TestUtility::protoEqual(lhs[i], rhs[i])) {
+      if (!TestUtility::protoEqual(lhs[i], rhs[i], /*ignore_repeated_field_ordering=*/false)) {
         return false;
       }
     }
@@ -495,48 +518,6 @@ makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& 
 
 } // namespace Http
 
-namespace Stats {
-
-/**
- * Implements a RawStatDataAllocator using a contiguous block of heap-allocated
- * memory, but is otherwise identical to the shared memory allocator in terms of
- * reference counting, data structures, etc.
- */
-class TestAllocator : public RawStatDataAllocator {
-public:
-  struct TestBlockMemoryHashSetOptions : public BlockMemoryHashSetOptions {
-    TestBlockMemoryHashSetOptions() {
-      capacity = 200;
-      num_slots = 131;
-    }
-  };
-
-  TestAllocator(const StatsOptions& stats_options, SymbolTable& symbol_table)
-      : RawStatDataAllocator(mutex_, hash_set_, stats_options, symbol_table),
-        block_memory_(std::make_unique<uint8_t[]>(
-            RawStatDataSet::numBytes(block_hash_options_, stats_options))),
-        hash_set_(block_hash_options_, true /* init */, block_memory_.get(), stats_options) {}
-  ~TestAllocator() { EXPECT_EQ(0, hash_set_.size()); }
-
-private:
-  FakeSymbolTableImpl symbol_table_;
-  Thread::MutexBasicLockable mutex_;
-  TestBlockMemoryHashSetOptions block_hash_options_;
-  std::unique_ptr<uint8_t[]> block_memory_;
-  RawStatDataSet hash_set_;
-};
-
-class MockedTestAllocator : public TestAllocator {
-public:
-  MockedTestAllocator(const StatsOptions& stats_options, SymbolTable& symbol_table);
-  virtual ~MockedTestAllocator();
-
-  MOCK_METHOD1(alloc, RawStatData*(absl::string_view name));
-  MOCK_METHOD1(free, void(RawStatData& data));
-};
-
-} // namespace Stats
-
 namespace Api {
 ApiPtr createApiForTest();
 ApiPtr createApiForTest(Stats::Store& stat_store);
@@ -548,17 +529,19 @@ MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
   const bool equal = TestUtility::headerMapEqualIgnoreOrder(*arg, *expected);
   if (!equal) {
     *result_listener << "\n"
-                     << "========================Expected header map:========================\n"
+                     << TestUtility::addLeftAndRightPadding("Expected header map:") << "\n"
                      << *expected
-                     << "-----------------is not equal to actual header map:-----------------\n"
-                     << *arg
-                     << "====================================================================\n";
+                     << TestUtility::addLeftAndRightPadding("is not equal to actual header map:")
+                     << "\n"
+                     << *arg << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
   }
   return equal;
 }
 
 MATCHER_P(ProtoEq, expected, "") {
-  const bool equal = TestUtility::protoEqual(arg, expected);
+  const bool equal =
+      TestUtility::protoEqual(arg, expected, /*ignore_repeated_field_ordering=*/false);
   if (!equal) {
     *result_listener << "\n"
                      << "==========================Expected proto:===========================\n"
@@ -570,15 +553,48 @@ MATCHER_P(ProtoEq, expected, "") {
   return equal;
 }
 
+MATCHER_P(ProtoEqIgnoreRepeatedFieldOrdering, expected, "") {
+  const bool equal =
+      TestUtility::protoEqual(arg, expected, /*ignore_repeated_field_ordering=*/true);
+  if (!equal) {
+    *result_listener << "\n"
+                     << TestUtility::addLeftAndRightPadding("Expected proto:") << "\n"
+                     << expected.DebugString()
+                     << TestUtility::addLeftAndRightPadding("is not equal to actual proto:") << "\n"
+                     << arg.DebugString()
+                     << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
+  }
+  return equal;
+}
+
+MATCHER_P2(ProtoEqIgnoringField, expected, ignored_field, "") {
+  const bool equal = TestUtility::protoEqualIgnoringField(arg, expected, ignored_field);
+  if (!equal) {
+    std::string but_ignoring = absl::StrCat("(but ignoring ", ignored_field, ")");
+    *result_listener << "\n"
+                     << TestUtility::addLeftAndRightPadding("Expected proto:") << "\n"
+                     << TestUtility::addLeftAndRightPadding(but_ignoring) << "\n"
+                     << expected.DebugString()
+                     << TestUtility::addLeftAndRightPadding("is not equal to actual proto:") << "\n"
+                     << arg.DebugString()
+                     << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
+  }
+  return equal;
+}
+
 MATCHER_P(RepeatedProtoEq, expected, "") {
   const bool equal = TestUtility::repeatedPtrFieldEqual(arg, expected);
   if (!equal) {
     *result_listener << "\n"
-                     << "=======================Expected repeated:===========================\n"
+                     << TestUtility::addLeftAndRightPadding("Expected repeated:") << "\n"
                      << RepeatedPtrUtil::debugString(expected) << "\n"
-                     << "-----------------is not equal to actual repeated:-------------------\n"
+                     << TestUtility::addLeftAndRightPadding("is not equal to actual repeated:")
+                     << "\n"
                      << RepeatedPtrUtil::debugString(arg) << "\n"
-                     << "====================================================================\n";
+                     << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
   }
   return equal;
 }
@@ -587,7 +603,7 @@ MATCHER_P(Percent, rhs, "") {
   envoy::type::FractionalPercent expected;
   expected.set_numerator(rhs);
   expected.set_denominator(envoy::type::FractionalPercent::HUNDRED);
-  return TestUtility::protoEqual(expected, arg);
+  return TestUtility::protoEqual(expected, arg, /*ignore_repeated_field_ordering=*/false);
 }
 
 } // namespace Envoy

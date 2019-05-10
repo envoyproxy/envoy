@@ -252,7 +252,7 @@ void Span::finish() {
   }
 }
 
-void Span::setTag(const std::string& name, const std::string& value) {
+void Span::setTag(absl::string_view name, absl::string_view value) {
   if (!name.empty() && !value.empty()) {
     addBinaryAnnotation(BinaryAnnotation(name, value));
   }

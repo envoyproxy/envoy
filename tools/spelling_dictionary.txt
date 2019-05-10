@@ -21,6 +21,7 @@ CHACHA
 CIDR
 CLA
 CLI
+CMSG
 CN
 CNAME
 CORS
@@ -150,6 +151,7 @@ MSVC
 MTLS
 MiB
 NACK
+NACKs
 NACKed
 NBF
 NBSP
@@ -157,6 +159,7 @@ NDEBUG
 NGHTTP
 NOLINT
 NOLINTNEXTLINE
+NONCES
 NS
 NUL
 Nilsson
@@ -174,6 +177,7 @@ OT
 OU
 PB
 PC
+PCC
 PDF
 PEM
 PERF
@@ -393,7 +397,9 @@ dereferencing
 deregistered
 deserialization
 deserialize
+deserialized
 deserializer
+deserializers
 dest
 destructor
 destructors
@@ -588,6 +594,7 @@ parameterizing
 params
 paren
 parentid
+parsers
 pcall
 pcap
 pclose
@@ -617,6 +624,7 @@ ptr
 ptrs
 pwd
 py
+qps
 quantile
 quantiles
 queueing
@@ -659,6 +667,7 @@ retriable
 rpcs
 rq
 rtrim
+rtt
 sanitization
 sanitizer
 scala
@@ -711,6 +720,7 @@ templating
 templatize
 templatized
 templatizing
+testee
 th
 thru
 tm
@@ -719,6 +729,7 @@ tokenize
 tokenizes
 tokenizing
 traceid
+transferral
 trie
 tuple
 tuples
@@ -726,6 +737,7 @@ typeid
 ucontext
 uint
 un
+unacked
 unary
 unconfigurable
 unconfigured
@@ -759,6 +771,7 @@ unreferenced
 unregister
 unregisters
 unresolvable
+unsubscription
 unterminated
 untruncated
 untrusted
