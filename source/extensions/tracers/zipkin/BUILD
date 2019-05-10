@@ -54,9 +54,11 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers:well_known_names",
+        "@com_github_apache_zipkinapi//:zipkin_cc",
     ],
 )
 

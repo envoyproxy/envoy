@@ -79,17 +79,21 @@ Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
     collector_endpoint = zipkin_config.collector_endpoint();
   }
 
+  const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion
+      collector_endpoint_version = zipkin_config.collector_endpoint_version();
+
   const bool trace_id_128bit = zipkin_config.trace_id_128bit();
 
   const bool shared_span_context = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       zipkin_config, shared_span_context, ZipkinCoreConstants::get().DEFAULT_SHARED_SPAN_CONTEXT);
 
-  tls_->set([this, collector_endpoint, &random_generator, trace_id_128bit, shared_span_context](
+  tls_->set([this, collector_endpoint, collector_endpoint_version, &random_generator,
+             trace_id_128bit, shared_span_context](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     TracerPtr tracer(new Tracer(local_info_.clusterName(), local_info_.address(), random_generator,
                                 trace_id_128bit, shared_span_context, time_source_));
-    tracer->setReporter(
-        ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector_endpoint));
+    tracer->setReporter(ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher),
+                                                  collector_endpoint, collector_endpoint_version));
     return ThreadLocal::ThreadLocalObjectSharedPtr{new TlsTracer(std::move(tracer), *this)};
   });
 }
@@ -123,8 +127,11 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
 }
 
 ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
-                           const std::string& collector_endpoint)
-    : driver_(driver), collector_endpoint_(collector_endpoint) {
+                           const std::string& collector_endpoint,
+                           const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion
+                               collector_endpoint_version)
+    : driver_(driver), span_buffer_(collector_endpoint_version),
+      collector_endpoint_(collector_endpoint) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
     flushSpans();
@@ -138,9 +145,13 @@ ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
   enableTimer();
 }
 
-ReporterPtr ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
-                                      const std::string& collector_endpoint) {
-  return ReporterPtr(new ReporterImpl(driver, dispatcher, collector_endpoint));
+ReporterPtr
+ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
+                          const std::string& collector_endpoint,
+                          const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion
+                              collector_endpoint_version) {
+  return ReporterPtr(
+      new ReporterImpl(driver, dispatcher, collector_endpoint, collector_endpoint_version));
 }
 
 // TODO(fabolive): Need to avoid the copy to improve performance.
@@ -165,16 +176,24 @@ void ReporterImpl::flushSpans() {
   if (span_buffer_.pendingSpans()) {
     driver_.tracerStats().spans_sent_.add(span_buffer_.pendingSpans());
 
-    const std::string request_body = span_buffer_.toStringifiedJsonArray();
     Http::MessagePtr message(new Http::RequestMessageImpl());
     message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
     message->headers().insertPath().value(collector_endpoint_);
     message->headers().insertHost().value(driver_.cluster()->name());
     message->headers().insertContentType().value().setReference(
-        Http::Headers::get().ContentTypeValues.Json);
+        span_buffer_.version() == envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO
+            ? Http::Headers::get().ContentTypeValues.Proto
+            : Http::Headers::get().ContentTypeValues.Json);
+
+    std::string payload;
+    if (span_buffer_.version() == envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO) {
+      span_buffer_.toProto().SerializeToString(&payload);
+    } else {
+      payload = span_buffer_.toStringifiedJsonArray();
+    }
 
     Buffer::InstancePtr body(new Buffer::OwnedImpl());
-    body->add(request_body);
+    body->add(payload);
     message->body() = std::move(body);
 
     const uint64_t timeout =

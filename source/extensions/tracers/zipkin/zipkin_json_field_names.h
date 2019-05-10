@@ -19,6 +19,9 @@ public:
   const std::string SPAN_DURATION = "duration";
   const std::string SPAN_ANNOTATIONS = "annotations";
   const std::string SPAN_BINARY_ANNOTATIONS = "binaryAnnotations";
+  const std::string SPAN_LOCAL_ENDPOINT = "localEndpoint";
+  const std::string SPAN_REMOTE_ENDPOINT = "remoteEndpoint";
+  const std::string SPAN_TAGS = "tags";
 
   const std::string ANNOTATION_ENDPOINT = "endpoint";
   const std::string ANNOTATION_TIMESTAMP = "timestamp";

@@ -162,8 +162,9 @@ public:
    * when making HTTP POST requests carrying spans. This value comes from the
    * Zipkin-related tracing configuration.
    */
-  ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
-               const std::string& collector_endpoint);
+  ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher, const std::string& collector_endpoint,
+               const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion
+                   collector_endpoint_version);
 
   /**
    * Implementation of Zipkin::Reporter::reportSpan().
@@ -190,8 +191,10 @@ public:
    *
    * @return Pointer to the newly-created ZipkinReporter.
    */
-  static ReporterPtr NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
-                                 const std::string& collector_endpoint);
+  static ReporterPtr
+  NewInstance(Driver& driver, Event::Dispatcher& dispatcher, const std::string& collector_endpoint,
+              const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion
+                  collector_endpoint_version);
 
 private:
   /**

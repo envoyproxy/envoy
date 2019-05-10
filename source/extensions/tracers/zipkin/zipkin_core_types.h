@@ -4,6 +4,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/config/trace/v2/trace.pb.h"
 #include "envoy/network/address.h"
 
 #include "common/common/hex.h"
@@ -12,6 +13,7 @@
 #include "extensions/tracers/zipkin/util.h"
 
 #include "absl/types/optional.h"
+#include "zipkin.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,7 +35,8 @@ public:
    * All classes defining Zipkin abstractions need to implement this method to convert
    * the corresponding abstraction to a Zipkin-compliant JSON.
    */
-  virtual const std::string toJson() PURE;
+  virtual const std::string
+  toJson(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion version) const PURE;
 };
 
 /**
@@ -91,7 +94,10 @@ public:
    *
    * @return a stringified JSON.
    */
-  const std::string toJson() override;
+  const std::string toJson(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion
+                               version) const override;
+
+  const zipkin::proto3::Endpoint toProto() const;
 
 private:
   std::string service_name_;
@@ -183,7 +189,8 @@ public:
    *
    * @return a stringified JSON.
    */
-  const std::string toJson() override;
+  const std::string toJson(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion
+                               version) const override;
 
 private:
   uint64_t timestamp_;
@@ -281,7 +288,8 @@ public:
    *
    * @return a stringified JSON.
    */
-  const std::string toJson() override;
+  const std::string toJson(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion
+                               version) const override;
 
 private:
   std::string key_;
@@ -515,7 +523,8 @@ public:
    *
    * @return a stringified JSON.
    */
-  const std::string toJson() override;
+  const std::string toJson(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion
+                               version) const override;
 
   /**
    * Associates a Tracer object with the span. The tracer's reportSpan() method is invoked
@@ -556,6 +565,8 @@ public:
    * @param event The annotation's value.
    */
   void log(SystemTime timestamp, const std::string& event);
+
+  const zipkin::proto3::Span toProto() const;
 
 private:
   static const std::string EMPTY_HEX_STRING_;

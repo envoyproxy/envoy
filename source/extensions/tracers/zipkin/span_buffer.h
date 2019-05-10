@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/trace/v2/trace.pb.h"
+
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
 namespace Envoy {
@@ -17,14 +19,19 @@ public:
    * Constructor that creates an empty buffer. Space needs to be allocated by invoking
    * the method allocateBuffer(size).
    */
-  SpanBuffer() {}
+  SpanBuffer(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion version)
+      : version_(version) {}
 
   /**
    * Constructor that initializes a buffer with the given size.
    *
    * @param size The desired buffer size.
    */
-  SpanBuffer(uint64_t size) { allocateBuffer(size); }
+  SpanBuffer(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion version,
+             uint64_t size)
+      : version_(version) {
+    allocateBuffer(size);
+  }
 
   /**
    * Allocates space for an empty buffer or resizes a previously-allocated one.
@@ -59,9 +66,14 @@ public:
    */
   std::string toStringifiedJsonArray();
 
+  const zipkin::proto3::ListOfSpans toProto();
+
+  envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion version() { return version_; }
+
 private:
   // We use a pre-allocated vector to improve performance
   std::vector<Span> span_buffer_;
+  const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion version_;
 };
 
 } // namespace Zipkin

@@ -10,6 +10,9 @@ OPENCENSUS_SHA256 = "4fd21cc6de63d7cb979fd749d8101ff425905aa0826fed26019d1c311fc
 PGV_RELEASE = "0.0.13"
 PGV_SHA256 = "dce6c8a43849d2abe4d5e40f16e9a476bca6b7a47e128db4458a52d748f4a5eb"
 
+ZIPKINAPI_RELEASE = "0.2.0"
+ZIPKINAPI_SHA256 = "cc34d57c51a52e8b9ea8ea5ca51e25016531eabc6c47be9b11d8fc29a5d266ae"
+
 GOOGLEAPIS_GIT_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411"  # May 23, 2018
 GOOGLEAPIS_SHA = "16f5b2e8bf1e747a32f9a62e211f8f33c94645492e9bbd72458061d9a9de1f63"
 
@@ -47,5 +50,10 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = OPENCENSUS_SHA256,
         strip_prefix = "opencensus-proto-" + OPENCENSUS_RELEASE + "/src/opencensus/proto/trace/v1",
         urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/v" + OPENCENSUS_RELEASE + ".tar.gz"],
+    ),
+    com_github_apache_zipkinapi = dict(
+        sha256 = ZIPKINAPI_SHA256,
+        strip_prefix = "incubator-zipkin-api-" + ZIPKINAPI_RELEASE,
+        urls = ["https://github.com/apache/incubator-zipkin-api/archive/" + ZIPKINAPI_RELEASE + ".tar.gz"],
     ),
 )

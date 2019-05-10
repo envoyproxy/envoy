@@ -12,7 +12,7 @@ namespace {
 
 TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
   DangerousDeprecatedTestTime test_time;
-  SpanBuffer buffer;
+  SpanBuffer buffer(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1);
 
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
@@ -65,7 +65,7 @@ TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
 
 TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
   DangerousDeprecatedTestTime test_time;
-  SpanBuffer buffer(2);
+  SpanBuffer buffer(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1, 2);
 
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
