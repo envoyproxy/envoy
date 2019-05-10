@@ -777,11 +777,6 @@ public:
    */
   virtual absl::optional<std::string> eds_service_name() const PURE;
 
-  /**
-   * @return whether to allow request hedging to this cluster to occur.
-   */
-  virtual bool allowRequestHedging() const PURE;
-
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.
