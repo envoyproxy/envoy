@@ -49,7 +49,7 @@ genrule(
     visibility = ["//visibility:private"],
 )
 
-# Use #pragma GCC diagnostic ignored in integration code to supress these errors.
+# Use #pragma GCC diagnostic ignored in integration code to suppress these errors.
 quiche_copt = [
     "-Wno-unused-parameter",
     # QUIC uses offsetof() to optimize memory usage in frames.

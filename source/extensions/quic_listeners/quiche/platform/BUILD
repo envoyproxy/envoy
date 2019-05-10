@@ -18,8 +18,8 @@ envoy_package()
 # and tests. In a monorepo, this would be enforced via visibility attribute, but
 # Bazel does not support limiting visibility to specific external dependencies.
 #
-# Very few of them are used by Envoy to interact with QUIC. What they do is
-# wrapping Envoy data type to QUIC data type.
+# Very few of them are used by Envoy to interact with QUIC. They are used as a shim
+# to match a non-virtualized API required by the external Quiche implementation.
 #
 # See a detailed description of QUIC platform API dependency model at:
 # https://quiche.googlesource.com/quiche/+/refs/heads/master/quic/platform/api/README.md
