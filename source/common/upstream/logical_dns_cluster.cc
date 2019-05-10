@@ -81,7 +81,7 @@ void LogicalDnsCluster::startResolve() {
           updateHosts(dns_address, std::move(response),
                       static_cast<std::function<Network::Address::InstanceConstSharedPtr(
                           const Network::Address::SrvInstanceConstSharedPtr&)>>(
-                          [this](const Network::Address::SrvInstanceConstSharedPtr& srv) {
+                          [](const Network::Address::SrvInstanceConstSharedPtr& srv) {
                             return srv->address();
                           }));
         });

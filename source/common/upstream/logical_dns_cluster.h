@@ -113,7 +113,7 @@ private:
   Event::TimerPtr resolve_timer_;
   std::string dns_url_;
   std::string hostname_;
-  bool srv_;
+  bool srv_{false};
   Network::Address::InstanceConstSharedPtr current_resolved_address_;
   LogicalHostSharedPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};

@@ -86,7 +86,7 @@ private:
     StrictDnsClusterImpl& parent_;
     Network::ActiveDnsQuery* active_query_{};
     std::string dns_address_;
-    bool srv_;
+    bool srv_{false};
     uint32_t port_;
     Event::TimerPtr resolve_timer_;
     HostVector hosts_;
