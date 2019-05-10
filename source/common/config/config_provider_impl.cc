@@ -120,8 +120,6 @@ ConfigProviderManagerImplBase::immutableConfigProviders(ConfigProviderInstanceTy
 
 void ConfigProviderManagerImplBase::bindImmutableConfigProvider(
     ImmutableConfigProviderBase* provider) {
-  ASSERT(provider->instanceType() == ConfigProviderInstanceType::Static ||
-         provider->instanceType() == ConfigProviderInstanceType::Inline);
   ConfigProviderMap::iterator it;
   if ((it = immutable_config_providers_map_.find(provider->instanceType())) ==
       immutable_config_providers_map_.end()) {
@@ -135,8 +133,6 @@ void ConfigProviderManagerImplBase::bindImmutableConfigProvider(
 
 void ConfigProviderManagerImplBase::unbindImmutableConfigProvider(
     ImmutableConfigProviderBase* provider) {
-  ASSERT(provider->instanceType() == ConfigProviderInstanceType::Static ||
-         provider->instanceType() == ConfigProviderInstanceType::Inline);
   auto it = immutable_config_providers_map_.find(provider->instanceType());
   ASSERT(it != immutable_config_providers_map_.end());
   it->second->erase(provider);

@@ -369,6 +369,31 @@ TEST_F(ConfigProviderImplTest, DuplicateConfigProto) {
   subscription.onConfigUpdate(untyped_dummy_configs, "1");
 }
 
+// An empty config provider tests on base class' constructor.
+class InlineDummyConfigProvider : public ImmutableConfigProviderBase {
+public:
+  InlineDummyConfigProvider(Server::Configuration::FactoryContext& factory_context,
+                            DummyConfigProviderManager& config_provider_manager,
+                            ConfigProviderInstanceType instance_type)
+      : ImmutableConfigProviderBase(factory_context, config_provider_manager, instance_type,
+                                    ApiType::Full) {}
+  ConfigConstSharedPtr getConfig() const override { return nullptr; }
+  std::string getConfigVersion() const override { return ""; }
+  const Protobuf::Message* getConfigProto() const override { return nullptr; }
+};
+
+TEST_F(ConfigProviderImplTest, AssertionFailureOnIncorrectInstanceType) {
+  initialize();
+
+  InlineDummyConfigProvider foo(factory_context_, *provider_manager_,
+                                ConfigProviderInstanceType::Inline);
+  InlineDummyConfigProvider bar(factory_context_, *provider_manager_,
+                                ConfigProviderInstanceType::Static);
+  EXPECT_DEATH(InlineDummyConfigProvider(factory_context_, *provider_manager_,
+                                         ConfigProviderInstanceType::Xds),
+               "");
+}
+
 // Tests that the base ConfigProvider*s are handling registration with the
 // /config_dump admin handler as well as generic bookkeeping such as timestamp
 // updates.
