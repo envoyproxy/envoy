@@ -81,6 +81,7 @@ public:
   createNetworkFilterChain(Network::Connection& connection,
                            const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager&) override { return true; }
+  bool createUdpListenerFilterChain(Network::UdpListenerFilterManager&) override { return true; }
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;

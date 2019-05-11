@@ -14,21 +14,29 @@ namespace Network {
 /**
  * libevent implementation of Network::Listener for UDP.
  */
-class UdpListenerImpl : public BaseListenerImpl {
+class UdpListenerImpl : public BaseListenerImpl,
+                        public virtual UdpListener,
+                        protected Logger::Loggable<Logger::Id::udp> {
 public:
   UdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, UdpListenerCallbacks& cb);
 
   ~UdpListenerImpl();
 
-  virtual void disable() override;
-  virtual void enable() override;
+  // Network::Listener Interface
+  void disable() override;
+  void enable() override;
+
+  // Network::UdpListener Interface
+  Event::Dispatcher& dispatcher() override;
+  const Address::InstanceConstSharedPtr& localAddress() const override;
+  void send(const UdpSendData& data) override;
 
   struct ReceiveResult {
     Api::SysCallIntResult result_;
     Buffer::InstancePtr buffer_;
   };
 
-  // Useful for testing/mocking.
+  // Test overrides for mocking
   virtual ReceiveResult doRecvFrom(sockaddr_storage& peer_addr, socklen_t& addr_len);
 
 protected:
@@ -39,6 +47,7 @@ protected:
 
 private:
   void onSocketEvent(short flags);
+  void writev(const Buffer::RawSlice* slices, uint64_t num_slice);
   Event::FileEventPtr file_event_;
 };
 

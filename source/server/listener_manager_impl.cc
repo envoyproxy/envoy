@@ -98,6 +98,30 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
   return ret;
 }
 
+std::vector<Network::UdpListenerFilterFactoryCb>
+ProdListenerComponentFactory::createListenerFilterFactoryList_(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::UdpListenerFilter>& filters,
+    Configuration::ListenerFactoryContext& context) {
+  std::vector<Network::UdpListenerFilterFactoryCb> ret;
+  for (ssize_t i = 0; i < filters.size(); i++) {
+    const auto& proto_config = filters[i];
+    const std::string& string_name = proto_config.name();
+    ENVOY_LOG(debug, "  filter #{}:", i);
+    ENVOY_LOG(debug, "    name: {}", string_name);
+    const Json::ObjectSharedPtr filter_config =
+        MessageUtil::getJsonObjectFromMessage(proto_config.config());
+    ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
+
+    // Now see if there is a factory that will accept the config.
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Configuration::NamedUdpListenerFilterConfigFactory>(
+            string_name);
+    auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
+    ret.push_back(factory.createFilterFactoryFromProto(*message, context));
+  }
+  return ret;
+}
+
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Address::SocketType socket_type,
     const Network::Socket::OptionsSharedPtr& options, bool bind_to_port) {
@@ -188,6 +212,11 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   if (!config.socket_options().empty()) {
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
+  }
+
+  if (!config.udp_listener_filters().empty()) {
+    udp_listener_filter_factories_ =
+        parent_.factory_.createUdpListenerFilterFactoryList(config.udp_listener_filters(), *this);
   }
 
   if (!config.listener_filters().empty()) {
@@ -613,6 +642,11 @@ bool ListenerImpl::createNetworkFilterChain(
 
 bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& manager) {
   return Configuration::FilterChainUtility::buildFilterChain(manager, listener_filter_factories_);
+}
+
+bool ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManager& manager) {
+  return Configuration::FilterChainUtility::buildFilterChain(manager,
+                                                             udp_listener_filter_factories_);
 }
 
 bool ListenerImpl::drainClose() const {

@@ -215,3 +215,17 @@ message ListenerFilter {
     google.protobuf.Any typed_config = 3;
   }
 }
+
+message UdpListenerFilter {
+  // The name of the udp filter to instantiate. The name must match a supported
+  // filter. There are currently no built-in filters.
+  string name = 1 [(validate.rules).string.min_bytes = 1];
+
+  // Filter specific configuration which depends on the filter being instantiated.
+  // See the supported filters for further documentation.
+  oneof config_type {
+    google.protobuf.Struct config = 2;
+
+    google.protobuf.Any typed_config = 3;
+  }
+}

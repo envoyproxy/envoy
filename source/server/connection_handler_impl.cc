@@ -18,7 +18,20 @@ ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Event::Disp
     : logger_(logger), dispatcher_(dispatcher), disable_listeners_(false) {}
 
 void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
-  ActiveListenerPtr l(new ActiveListener(*this, config));
+  ActiveListenerBasePtr l;
+  Network::Address::SocketType socket_type = config.socket().socketType();
+  // Network::Address::SocketType socket_type = Network::Address::SocketType::Stream;
+
+  if (socket_type == Network::Address::SocketType::Stream) {
+    ActiveTcpListenerPtr tcp(new ActiveTcpListener(*this, config));
+    l = std::move(tcp);
+  } else {
+    RELEASE_ASSERT(socket_type == Network::Address::SocketType::Datagram,
+                   "Only datagram/stream listener supported");
+    ActiveUdpListenerPtr udp(new ActiveUdpListener(*this, config));
+    l = std::move(udp);
+  }
+
   if (disable_listeners_) {
     l->listener_->disable();
   }
@@ -63,7 +76,7 @@ void ConnectionHandlerImpl::enableListeners() {
   }
 }
 
-void ConnectionHandlerImpl::ActiveListener::removeConnection(ActiveConnection& connection) {
+void ConnectionHandlerImpl::ActiveTcpListener::removeConnection(ActiveConnection& connection) {
   ENVOY_CONN_LOG_TO_LOGGER(parent_.logger_, debug, "adding to cleanup list",
                            *connection.connection_);
   ActiveConnectionPtr removed = connection.removeFromList(connections_);
@@ -72,23 +85,30 @@ void ConnectionHandlerImpl::ActiveListener::removeConnection(ActiveConnection& c
   parent_.num_connections_--;
 }
 
-ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
-                                                      Network::ListenerConfig& config)
-    : ActiveListener(
-          parent,
-          parent.dispatcher_.createListener(config.socket(), *this, config.bindToPort(),
-                                            config.handOffRestoredDestinationConnections()),
-          config) {}
-
-ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
-                                                      Network::ListenerPtr&& listener,
-                                                      Network::ListenerConfig& config)
+ConnectionHandlerImpl::ActiveListenerBase::ActiveListenerBase(ConnectionHandlerImpl& parent,
+                                                              Network::ListenerPtr&& listener,
+                                                              Network::ListenerConfig& config)
     : parent_(parent), listener_(std::move(listener)),
       stats_(generateStats(config.listenerScope())),
       listener_filters_timeout_(config.listenerFiltersTimeout()),
       listener_tag_(config.listenerTag()), config_(config) {}
 
-ConnectionHandlerImpl::ActiveListener::~ActiveListener() {
+ConnectionHandlerImpl::ActiveListenerBase::~ActiveListenerBase() {}
+
+ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImpl& parent,
+                                                            Network::ListenerConfig& config)
+    : ActiveTcpListener(
+          parent,
+          parent.dispatcher_.createListener(config.socket(), *this, config.bindToPort(),
+                                            config.handOffRestoredDestinationConnections()),
+          config) {}
+
+ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImpl& parent,
+                                                            Network::ListenerPtr&& listener,
+                                                            Network::ListenerConfig& config)
+    : ConnectionHandlerImpl::ActiveListenerBase(parent, std::move(listener), config) {}
+
+ConnectionHandlerImpl::ActiveTcpListener::~ActiveTcpListener() {
   // Purge sockets that have not progressed to connections. This should only happen when
   // a listener filter stops iteration and never resumes.
   while (!sockets_.empty()) {
@@ -105,18 +125,19 @@ ConnectionHandlerImpl::ActiveListener::~ActiveListener() {
 
 Network::Listener*
 ConnectionHandlerImpl::findListenerByAddress(const Network::Address::Instance& address) {
-  ActiveListener* listener = findActiveListenerByAddress(address);
+  ActiveListenerBase* listener = findActiveListenerByAddress(address);
   return listener ? listener->listener_.get() : nullptr;
 }
 
-ConnectionHandlerImpl::ActiveListener*
+ConnectionHandlerImpl::ActiveListenerBase*
 ConnectionHandlerImpl::findActiveListenerByAddress(const Network::Address::Instance& address) {
   // This is a linear operation, may need to add a map<address, listener> to improve performance.
   // However, linear performance might be adequate since the number of listeners is small.
   // We do not return stopped listeners.
   auto listener_it = std::find_if(
       listeners_.begin(), listeners_.end(),
-      [&address](const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>& p) {
+      [&address](
+          const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerBasePtr>& p) {
         return p.second->listener_ != nullptr && p.first->type() == Network::Address::Type::Ip &&
                *(p.first) == address;
       });
@@ -131,7 +152,8 @@ ConnectionHandlerImpl::findActiveListenerByAddress(const Network::Address::Insta
   // TODO(wattli): consolidate with previous search for more efficiency.
   listener_it = std::find_if(
       listeners_.begin(), listeners_.end(),
-      [&address](const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>& p) {
+      [&address](
+          const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerBasePtr>& p) {
         return p.second->listener_ != nullptr && p.first->type() == Network::Address::Type::Ip &&
                p.first->ip()->port() == address.ip()->port() && p.first->ip()->isAnyAddress();
       });
@@ -178,17 +200,19 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
     // Successfully ran all the accept filters.
 
     // Check if the socket may need to be redirected to another listener.
-    ActiveListener* new_listener = nullptr;
+    ActiveListenerBase* new_listener = nullptr;
 
     if (hand_off_restored_destination_connections_ && socket_->localAddressRestored()) {
       // Find a listener associated with the original destination address.
       new_listener = listener_.parent_.findActiveListenerByAddress(*socket_->localAddress());
     }
     if (new_listener != nullptr) {
+      ActiveTcpListener* tcp_listener = dynamic_cast<ActiveTcpListener*>(new_listener);
+      RELEASE_ASSERT(tcp_listener != nullptr, "ActiveSocket listner is expected to be tcp");
       // Hands off connections redirected by iptables to the listener associated with the
       // original destination address. Pass 'hand_off_restored_destination_connections' as false to
       // prevent further redirection.
-      new_listener->onAccept(std::move(socket_),
+      tcp_listener->onAccept(std::move(socket_),
                              false /* hand_off_restored_destination_connections */);
     } else {
       // Set default transport protocol if none of the listener filters did it.
@@ -207,7 +231,7 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
   }
 }
 
-void ConnectionHandlerImpl::ActiveListener::onAccept(
+void ConnectionHandlerImpl::ActiveTcpListener::onAccept(
     Network::ConnectionSocketPtr&& socket, bool hand_off_restored_destination_connections) {
   auto active_socket = std::make_unique<ActiveSocket>(*this, std::move(socket),
                                                       hand_off_restored_destination_connections);
@@ -224,7 +248,8 @@ void ConnectionHandlerImpl::ActiveListener::onAccept(
   }
 }
 
-void ConnectionHandlerImpl::ActiveListener::newConnection(Network::ConnectionSocketPtr&& socket) {
+void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
+    Network::ConnectionSocketPtr&& socket) {
   // Find matching filter chain.
   const auto filter_chain = config_.filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
@@ -252,7 +277,7 @@ void ConnectionHandlerImpl::ActiveListener::newConnection(Network::ConnectionSoc
   onNewConnection(std::move(new_connection));
 }
 
-void ConnectionHandlerImpl::ActiveListener::onNewConnection(
+void ConnectionHandlerImpl::ActiveTcpListener::onNewConnection(
     Network::ConnectionPtr&& new_connection) {
   ENVOY_CONN_LOG_TO_LOGGER(parent_.logger_, debug, "new connection", *new_connection);
 
@@ -265,7 +290,7 @@ void ConnectionHandlerImpl::ActiveListener::onNewConnection(
   }
 }
 
-ConnectionHandlerImpl::ActiveConnection::ActiveConnection(ActiveListener& listener,
+ConnectionHandlerImpl::ActiveConnection::ActiveConnection(ActiveTcpListener& listener,
                                                           Network::ConnectionPtr&& new_connection,
                                                           TimeSource& time_source)
     : listener_(listener), connection_(std::move(new_connection)),
@@ -286,6 +311,60 @@ ConnectionHandlerImpl::ActiveConnection::~ActiveConnection() {
 
 ListenerStats ConnectionHandlerImpl::generateStats(Stats::Scope& scope) {
   return {ALL_LISTENER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
+}
+
+ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImpl& parent,
+                                                            Network::ListenerConfig& config)
+    : ActiveUdpListener(parent, parent.dispatcher_.createUdpListener(config.socket(), *this),
+                        config) {}
+
+ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImpl& parent,
+                                                            Network::ListenerPtr&& listener,
+                                                            Network::ListenerConfig& config)
+    : ConnectionHandlerImpl::ActiveListenerBase(parent, std::move(listener), config) {
+  udp_listener_ = dynamic_cast<Network::UdpListener*>(listener_.get());
+  RELEASE_ASSERT(udp_listener_ != nullptr, "");
+
+  // Create the filter chain on creating a new udp listener
+  config_.filterChainFactory().createUdpListenerFilterChain(*this);
+
+  // If filter chain is empty, fail the creation of the listener
+  if (read_filters_.empty()) {
+    throw Network::CreateListenerException(
+        fmt::format("Cannot create listener as no read filters registered for the udp listener: {} "
+                    "at localAddress: {}",
+                    config_.name(), config_.socket().localAddress()->asString()));
+  }
+
+  // Initialize the filters so that they get a handle to the dispatcher and other global structures
+  // if needed.
+  for (auto&& read_filter : read_filters_) {
+    read_filter->initializeCallbacks(*this);
+  }
+}
+
+ConnectionHandlerImpl::ActiveUdpListener::~ActiveUdpListener() {}
+
+void ConnectionHandlerImpl::ActiveUdpListener::onData(Network::UdpRecvData& data) {
+  for (auto&& filter : read_filters_) {
+    filter->onData(data);
+  }
+}
+
+void ConnectionHandlerImpl::ActiveUdpListener::onWriteReady(const Network::Socket&) {}
+
+void ConnectionHandlerImpl::ActiveUdpListener::onError(
+    const Network::UdpListenerCallbacks::ErrorCode&, int) {
+  // TODO(sumukhs) - Determine what to do on error. Close the listener?
+}
+
+void ConnectionHandlerImpl::ActiveUdpListener::addReadFilter(
+    Network::UdpListenerReadFilterPtr&& filter) {
+  read_filters_.emplace_back(std::move(filter));
+}
+
+Network::UdpListener& ConnectionHandlerImpl::ActiveUdpListener::udpListener() {
+  return *udp_listener_;
 }
 
 } // namespace Server

@@ -140,13 +140,13 @@ public:
   MockUdpListenerCallbacks();
   ~MockUdpListenerCallbacks();
 
-  void onData(const UdpData& data) override { onData_(data); }
+  void onData(UdpRecvData& data) override { onData_(data); }
 
   void onWriteReady(const Socket& socket) override { onWriteReady_(socket); }
 
   void onError(const ErrorCode& err_code, int err) override { onError_(err_code, err); }
 
-  MOCK_METHOD1(onData_, void(const UdpData& data));
+  MOCK_METHOD1(onData_, void(UdpRecvData& data));
 
   MOCK_METHOD1(onWriteReady_, void(const Socket& socket));
 
@@ -207,6 +207,7 @@ public:
                bool(Connection& connection,
                     const std::vector<Network::FilterFactoryCb>& filter_factories));
   MOCK_METHOD1(createListenerFilterChain, bool(ListenerFilterManager& listener));
+  MOCK_METHOD1(createUdpListenerFilterChain, bool(UdpListenerFilterManager& listener));
 };
 
 class MockListenSocket : public Socket {
@@ -330,7 +331,6 @@ public:
 
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(addListener, void(ListenerConfig& config));
-  MOCK_METHOD1(addUdpListener, void(ListenerConfig& config));
   MOCK_METHOD1(findListenerByAddress,
                Network::Listener*(const Network::Address::Instance& address));
   MOCK_METHOD1(removeListeners, void(uint64_t listener_tag));

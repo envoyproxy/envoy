@@ -113,16 +113,26 @@ public:
  * TODO(conqerAtapple): Maybe this belongs inside the UdpListenerCallbacks
  * class.
  */
-struct UdpData {
-  Address::InstanceConstSharedPtr local_address_;
-  Address::InstanceConstSharedPtr peer_address_; // TODO(conquerAtapple): Fix ownership semantics.
+struct UdpRecvData {
+  Address::InstanceConstSharedPtr peer_address_;
   Buffer::InstancePtr buffer_;
+
   // TODO(conquerAtapple):
   // Add UdpReader here so that the callback handler can
   // then use the reader to do multiple reads(recvmmsg) once the OS notifies it
   // has data. We could also just return a `ReaderFactory` that returns either a
   // `recvfrom` reader (with peer information) or a `read/recvmmsg` reader. This
   // is still being flushed out (Jan, 2019).
+};
+
+/**
+ * Encapsulates the information needed to send a udp packet to a target
+ */
+struct UdpSendData {
+  Address::InstanceConstSharedPtr send_address_;
+  // The buffer is a reference so that it can be reused by the sender to send different
+  // messages
+  Buffer::Instance& buffer_;
 };
 
 /**
@@ -137,9 +147,9 @@ public:
   /**
    * Called whenever data is received by the underlying udp socket.
    *
-   * @param data UdpData from the underlying socket.
+   * @param data UdpRecvData from the underlying socket.
    */
-  virtual void onData(const UdpData& data) PURE;
+  virtual void onData(UdpRecvData& data) PURE;
 
   /**
    * Called when the underlying socket is ready for write.
@@ -178,6 +188,31 @@ public:
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;
+
+/**
+ * A Udp listener interface.
+ */
+class UdpListener : public virtual Listener {
+public:
+  virtual ~UdpListener() {}
+
+  /**
+   * @return Event::Dispatcher& the dispatcher backing this listener.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return the local address of the socket.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& localAddress() const PURE;
+
+  /**
+   * Send data through the underlying udp socket. If the send buffer of the socket FD is full, it is
+   * possible the write is dropped.
+   * @param data Supplies the data to send to a target using udp
+   */
+  virtual void send(const UdpSendData& data) PURE;
+};
 
 /**
  * Thrown when there is a runtime error creating/binding a listener.
