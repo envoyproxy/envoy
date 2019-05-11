@@ -946,12 +946,13 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
 }
 
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
-    const envoy::api::v2::route::VirtualCluster& virtual_cluster, Stats::StatNamePool& pool)
-    : pattern_(virtual_cluster.pattern()), name_(virtual_cluster.name()),
-      stat_name_(pool.add(name_)) {
+    const envoy::api::v2::route::VirtualCluster& virtual_cluster, Stats::StatNamePool& pool) {
   if (virtual_cluster.method() != envoy::api::v2::core::RequestMethod::METHOD_UNSPECIFIED) {
     method_ = envoy::api::v2::core::RequestMethod_Name(virtual_cluster.method());
   }
+  pattern_ = RegexUtil::parseRegex(virtual_cluster.pattern());
+  name_ = virtual_cluster.name();
+  stat_name_ = pool.add(name_);
 }
 
 const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }

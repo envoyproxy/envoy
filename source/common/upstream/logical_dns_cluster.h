@@ -76,8 +76,7 @@ private:
     RealHostDescription(Network::Address::InstanceConstSharedPtr address,
                         const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
                         const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
-                        HostConstSharedPtr logical_host,
-                        Stats::SymbolTable& symbol_table)
+                        HostConstSharedPtr logical_host, Stats::SymbolTable& symbol_table)
         : address_(address), logical_host_(logical_host),
           metadata_(std::make_shared<envoy::api::v2::core::Metadata>(lb_endpoint.metadata())),
           health_check_address_(

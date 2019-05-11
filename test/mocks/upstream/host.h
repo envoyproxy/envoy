@@ -147,7 +147,6 @@ public:
     return locality_zone_stat_name_->statName();
   }
 
-
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(healthCheckAddress, Network::Address::InstanceConstSharedPtr());
   MOCK_METHOD1(setHealthCheckAddress, void(Network::Address::InstanceConstSharedPtr));

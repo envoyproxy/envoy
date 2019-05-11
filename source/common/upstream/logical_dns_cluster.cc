@@ -93,12 +93,12 @@ void LogicalDnsCluster::startResolve() {
             // want to do better again later.
             switch (address_list.front()->ip()->version()) {
             case Network::Address::IpVersion::v4:
-              logical_host_.reset(new LogicalHost(
-                  info_, hostname_, Network::Utility::getIpv4AnyAddress(), *this));
+              logical_host_.reset(
+                  new LogicalHost(info_, hostname_, Network::Utility::getIpv4AnyAddress(), *this));
               break;
             case Network::Address::IpVersion::v6:
-              logical_host_.reset(new LogicalHost(
-                  info_, hostname_, Network::Utility::getIpv6AnyAddress(), *this));
+              logical_host_.reset(
+                  new LogicalHost(info_, hostname_, Network::Utility::getIpv6AnyAddress(), *this));
               break;
             }
             const auto& locality_lb_endpoint = localityLbEndpoint();
@@ -138,10 +138,9 @@ Upstream::Host::CreateConnectionData LogicalDnsCluster::LogicalHost::createConne
   ASSERT(data.current_resolved_address_);
   return {HostImpl::createConnection(dispatcher, *parent_.info_, data.current_resolved_address_,
                                      options, transport_socket_options),
-          HostDescriptionConstSharedPtr{
-              new RealHostDescription(data.current_resolved_address_, parent_.localityLbEndpoint(),
-                                      parent_.lbEndpoint(), shared_from_this(),
-                                      parent_.symbolTable())}};
+          HostDescriptionConstSharedPtr{new RealHostDescription(
+              data.current_resolved_address_, parent_.localityLbEndpoint(), parent_.lbEndpoint(),
+              shared_from_this(), parent_.symbolTable())}};
 }
 
 ClusterImplBaseSharedPtr LogicalDnsClusterFactory::createClusterImpl(

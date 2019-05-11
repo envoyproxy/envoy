@@ -213,7 +213,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/05/07  6794     49957               Stats for excluded hosts in cluster
   // 2019/04/27  6733     49431               Use SymbolTable API for HTTP codes
 
-  EXPECT_EQ(m_per_cluster, 49431);
+  EXPECT_EQ(m_per_cluster, 50213);
 }
 
 } // namespace

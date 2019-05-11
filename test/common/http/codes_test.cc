@@ -222,7 +222,7 @@ TEST_F(CodeUtilityTest, ResponseTimingTest) {
                                            pool_.add("vhost_name"),
                                            pool_.add("req_vcluster_name"),
                                            pool_.add("from_az"),
-                                            pool_.add("to_az")};
+                                           pool_.add("to_az")};
 
   EXPECT_CALL(cluster_scope, histogram("prefix.upstream_rq_time"));
   EXPECT_CALL(cluster_scope, deliverHistogramToSinks(

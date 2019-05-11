@@ -9,6 +9,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/router_ratelimit.h"
+
 //#include "common/stats/fake_symbol_table_impl.h"
 
 #include "test/mocks/http/mocks.h"
@@ -94,7 +95,7 @@ public:
     config_ = std::make_unique<ConfigImpl>(route_config, factory_context_, true);
   }
 
-  //Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  // Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::unique_ptr<ConfigImpl> config_;
   Http::TestHeaderMapImpl header_;

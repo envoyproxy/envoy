@@ -167,7 +167,7 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   }
 
   // Process message
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).Times(2);
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).Times(2).WillRepeatedly(Return(cluster_info_));
   hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
   // Check Correctness
