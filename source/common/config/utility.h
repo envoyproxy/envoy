@@ -236,7 +236,7 @@ public:
    * @param name string identifier for the particular implementation. Note: this is a proto string
    * because it is assumed that this value will be pulled directly from the configuration proto.
    */
-  template <class Factory> static Factory& getAndCheckFactory(const ProtobufTypes::String& name) {
+  template <class Factory> static Factory& getAndCheckFactory(const std::string& name) {
     if (name.empty()) {
       throw EnvoyException("Provided name for static registration lookup was empty.");
     }

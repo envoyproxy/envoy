@@ -418,6 +418,20 @@ public:
   // Note that HttpConnectionManager sanitization will *not* be performed on the
   // recreated stream, as it is assumed that sanitization has already been done.
   virtual bool recreateStream() PURE;
+
+  /**
+   * Adds socket options to be applied to any connections used for upstream requests. Note that
+   * unique values for the options will likely lead to many connection pools being created. The
+   * added options are appended to any previously added.
+   *
+   * @param options The options to be added.
+   */
+  virtual void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) PURE;
+
+  /**
+   * @return The socket options to be applied to the upstream request.
+   */
+  virtual Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const PURE;
 };
 
 /**

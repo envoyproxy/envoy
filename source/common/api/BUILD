@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_hot_restart",
 )
 
 envoy_package()
@@ -25,12 +26,12 @@ envoy_cc_library(
         "//bazel:linux_x86_64": ["os_sys_calls_impl_linux.cc"],
         "//bazel:linux_aarch64": ["os_sys_calls_impl_linux.cc"],
         "//conditions:default": [],
-    }),
+    }) + envoy_select_hot_restart(["os_sys_calls_impl_hot_restart.cc"]),
     hdrs = ["os_sys_calls_impl.h"] + select({
         "//bazel:linux_x86_64": ["os_sys_calls_impl_linux.h"],
         "//bazel:linux_aarch64": ["os_sys_calls_impl_linux.h"],
         "//conditions:default": [],
-    }),
+    }) + envoy_select_hot_restart(["os_sys_calls_impl_hot_restart.h"]),
     deps = [
         "//include/envoy/api:os_sys_calls_interface",
         "//source/common/singleton:threadsafe_singleton",

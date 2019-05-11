@@ -64,7 +64,7 @@ void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& reques
   Http::MessagePtr message = Grpc::Common::prepareHeaders(
       driver_.cluster()->name(), lightstep::CollectorServiceFullName(),
       lightstep::CollectorMethodName(), absl::optional<std::chrono::milliseconds>(timeout));
-  message->body() = Grpc::Common::serializeBody(request);
+  message->body() = Grpc::Common::serializeToGrpcFrame(request);
 
   active_request_ =
       driver_.clusterManager()

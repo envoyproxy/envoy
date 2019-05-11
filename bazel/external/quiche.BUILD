@@ -31,7 +31,6 @@ load(
     "envoy_cc_library",
     "envoy_cc_test",
     "envoy_cc_test_library",
-    "envoy_select_quiche",
 )
 
 src_files = glob([
@@ -72,26 +71,22 @@ envoy_cc_library(
     name = "http2_platform",
     hdrs = [
         "quiche/http2/platform/api/http2_arraysize.h",
+        "quiche/http2/platform/api/http2_bug_tracker.h",
         "quiche/http2/platform/api/http2_containers.h",
         "quiche/http2/platform/api/http2_estimate_memory_usage.h",
         "quiche/http2/platform/api/http2_export.h",
         "quiche/http2/platform/api/http2_flag_utils.h",
         "quiche/http2/platform/api/http2_flags.h",
+        "quiche/http2/platform/api/http2_logging.h",
         "quiche/http2/platform/api/http2_macros.h",
         "quiche/http2/platform/api/http2_optional.h",
         "quiche/http2/platform/api/http2_ptr_util.h",
         "quiche/http2/platform/api/http2_string.h",
         "quiche/http2/platform/api/http2_string_piece.h",
+        "quiche/http2/platform/api/http2_string_utils.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/http2/platform/api/http2_test_helpers.h",
-    ] + envoy_select_quiche(
-        [
-            "quiche/http2/platform/api/http2_bug_tracker.h",
-            "quiche/http2/platform/api/http2_logging.h",
-            "quiche/http2/platform/api/http2_string_utils.h",
-        ],
-        "@envoy",
-    ),
+    ],
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:http2_platform_impl_lib"],
@@ -101,23 +96,19 @@ envoy_cc_library(
     name = "spdy_platform",
     hdrs = [
         "quiche/spdy/platform/api/spdy_arraysize.h",
+        "quiche/spdy/platform/api/spdy_bug_tracker.h",
         "quiche/spdy/platform/api/spdy_containers.h",
         "quiche/spdy/platform/api/spdy_endianness_util.h",
         "quiche/spdy/platform/api/spdy_estimate_memory_usage.h",
         "quiche/spdy/platform/api/spdy_export.h",
         "quiche/spdy/platform/api/spdy_flags.h",
+        "quiche/spdy/platform/api/spdy_logging.h",
         "quiche/spdy/platform/api/spdy_mem_slice.h",
         "quiche/spdy/platform/api/spdy_ptr_util.h",
         "quiche/spdy/platform/api/spdy_string.h",
         "quiche/spdy/platform/api/spdy_string_piece.h",
-    ] + envoy_select_quiche(
-        [
-            "quiche/spdy/platform/api/spdy_bug_tracker.h",
-            "quiche/spdy/platform/api/spdy_logging.h",
-            "quiche/spdy/platform/api/spdy_string_utils.h",
-        ],
-        "@envoy",
-    ),
+        "quiche/spdy/platform/api/spdy_string_utils.h",
+    ],
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_impl_lib"],
@@ -247,6 +238,7 @@ envoy_cc_library(
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",
         "quiche/quic/platform/api/quic_arraysize.h",
+        "quiche/quic/platform/api/quic_bug_tracker.h",
         "quiche/quic/platform/api/quic_client_stats.h",
         "quiche/quic/platform/api/quic_containers.h",
         "quiche/quic/platform/api/quic_endian.h",
@@ -256,37 +248,30 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_flags.h",
         "quiche/quic/platform/api/quic_iovec.h",
+        "quiche/quic/platform/api/quic_logging.h",
         "quiche/quic/platform/api/quic_map_util.h",
         "quiche/quic/platform/api/quic_prefetch.h",
         "quiche/quic/platform/api/quic_ptr_util.h",
         "quiche/quic/platform/api/quic_reference_counted.h",
         "quiche/quic/platform/api/quic_server_stats.h",
+        "quiche/quic/platform/api/quic_stack_trace.h",
         "quiche/quic/platform/api/quic_str_cat.h",
         "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
         "quiche/quic/platform/api/quic_string_piece.h",
+        "quiche/quic/platform/api/quic_string_utils.h",
         "quiche/quic/platform/api/quic_uint128.h",
+        "quiche/quic/platform/api/quic_text_utils.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
-        # "quiche/quic/platform/api/quic_goog_cc_sender.h",
         # "quiche/quic/platform/api/quic_ip_address_family.h",
         # "quiche/quic/platform/api/quic_ip_address.h",
-        # "quiche/quic/platform/api/quic_lru_cache.h",
         # "quiche/quic/platform/api/quic_mem_slice.h",
         # "quiche/quic/platform/api/quic_mem_slice_span.h",
         # "quiche/quic/platform/api/quic_mem_slice_storage.h",
         # "quiche/quic/platform/api/quic_socket_address.h",
         # "quiche/quic/platform/api/quic_test_loopback.h",
         # "quiche/quic/platform/api/quic_test_mem_slice_vector.h",
-    ] + envoy_select_quiche(
-        [
-            "quiche/quic/platform/api/quic_bug_tracker.h",
-            "quiche/quic/platform/api/quic_logging.h",
-            "quiche/quic/platform/api/quic_stack_trace.h",
-            "quiche/quic/platform/api/quic_string_utils.h",
-            "quiche/quic/platform/api/quic_text_utils.h",
-        ],
-        "@envoy",
-    ),
+    ],
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
@@ -405,25 +390,19 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "spdy_platform_api_test",
-    srcs = envoy_select_quiche(
-        ["quiche/spdy/platform/api/spdy_string_utils_test.cc"],
-        "@envoy",
-    ),
+    srcs = ["quiche/spdy/platform/api/spdy_string_utils_test.cc"],
     repository = "@envoy",
     deps = [":spdy_platform"],
 )
 
 envoy_cc_test(
     name = "quic_platform_api_test",
-    srcs = envoy_select_quiche(
-        [
-            "quiche/quic/platform/api/quic_endian_test.cc",
-            "quiche/quic/platform/api/quic_reference_counted_test.cc",
-            "quiche/quic/platform/api/quic_string_utils_test.cc",
-            "quiche/quic/platform/api/quic_text_utils_test.cc",
-        ],
-        "@envoy",
-    ),
+    srcs = [
+        "quiche/quic/platform/api/quic_endian_test.cc",
+        "quiche/quic/platform/api/quic_reference_counted_test.cc",
+        "quiche/quic/platform/api/quic_string_utils_test.cc",
+        "quiche/quic/platform/api/quic_text_utils_test.cc",
+    ],
     repository = "@envoy",
     deps = [
         ":quic_platform",

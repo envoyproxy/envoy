@@ -1,0 +1,14 @@
+resources:
+  containers:
+  - container: envoy-build
+    image: envoyproxy/envoy-build:07f65995ece0b8a21bb2888d07a8c1d060e7daaa
+
+jobs:
+- job: BuildEnvoy
+  timeoutInMinutes: 360
+  pool:
+    vmImage: 'Ubuntu 16.04'
+  container: envoy-build
+  steps:
+  - script: bazel build //source/exe:envoy-static
+
