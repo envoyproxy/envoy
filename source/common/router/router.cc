@@ -903,6 +903,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
   // flight awaiting headers or scheduled retries. If so, exit to give them a
   // chance to return before returning a response downstream.
   if (could_not_retry && (numRequestsAwaitingHeaders() > 0 || pending_retries_ > 0)) {
+    upstream_request.upstream_host_->stats().rq_error_.inc();
     return;
   }
 
