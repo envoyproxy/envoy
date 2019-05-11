@@ -584,7 +584,7 @@ void Filter::onResponseTimeout() {
   for (auto& upstream_request : upstream_requests_) {
     // Don't record a timeout for upstream requests we've already seen headers
     // for.
-    if (!upstream_request->upstream_headers_) {
+    if (!upstream_request->seen_headers_) {
       cluster_->stats().upstream_rq_timeout_.inc();
       if (upstream_request->upstream_host_) {
         upstream_request->upstream_host_->stats().rq_timeout_.inc();
@@ -1133,7 +1133,7 @@ void Filter::doRetry() {
 uint32_t Filter::numRequestsAwaitingHeaders() {
   uint32_t ret = 0;
   for (auto& upstream_request : upstream_requests_) {
-    if (!upstream_request->upstream_headers_) {
+    if (!upstream_request->seen_headers_) {
       ret++;
     }
   }
@@ -1146,7 +1146,7 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
       stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSource()),
       calling_encode_headers_(false), upstream_canary_(false), decode_complete_(false),
       encode_complete_(false), encode_trailers_(false), retried_(false),
-      outlier_detection_timeout_recorded_(false),
+      seen_headers_(false), outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false) {
 
   if (parent_.config_.start_child_span_) {
@@ -1188,6 +1188,7 @@ void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool e
   upstream_timing_.onFirstUpstreamRxByteReceived(parent_.callbacks_->dispatcher().timeSource());
   maybeEndDecode(end_stream);
 
+  seen_headers_ = true;
   if (!parent_.config_.upstream_logs_.empty()) {
     upstream_headers_ = std::make_unique<Http::HeaderMapImpl>(*headers);
   }
