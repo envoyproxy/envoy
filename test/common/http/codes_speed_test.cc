@@ -22,16 +22,16 @@ class CodeUtilitySpeedTest {
 public:
   CodeUtilitySpeedTest()
       : global_store_(symbol_table_), cluster_scope_(symbol_table_), code_stats_(symbol_table_),
-        prefix_("prefix", symbol_table_) {}
+        pool_(symbol_table_), prefix_(pool_.add("prefix")) {}
 
   void addResponse(uint64_t code, bool canary, bool internal_request,
-                   const std::string& request_vhost_name = EMPTY_STRING,
-                   const std::string& request_vcluster_name = EMPTY_STRING,
-                   const std::string& from_az = EMPTY_STRING,
-                   const std::string& to_az = EMPTY_STRING) {
+                   Stats::StatName request_vhost_name = Stats::StatName(),
+                   Stats::StatName request_vcluster_name = Stats::StatName(),
+                   Stats::StatName from_az = Stats::StatName(),
+                   Stats::StatName to_az = Stats::StatName()) {
     Http::CodeStats::ResponseStatInfo info{global_store_,
                                            cluster_scope_,
-                                           prefix_.statName(),
+                                           prefix_,
                                            code,
                                            internal_request,
                                            request_vhost_name,
@@ -50,16 +50,18 @@ public:
     addResponse(501, false, true);
     addResponse(200, true, true);
     addResponse(300, false, false);
+    Stats::StatName empty_string;
     addResponse(500, true, false);
-    addResponse(200, false, false, "test-vhost", "test-cluster");
-    addResponse(200, false, false, "", "", "from_az", "to_az");
+    addResponse(200, false, false, pool_.add("test-vhost"), pool_.add("test-cluster"));
+    addResponse(200, false, false, empty_string, empty_string, pool_.add("from_az"),
+                pool_.add("to_az"));
   }
 
   void responseTiming() {
     Http::CodeStats::ResponseTimingInfo info{
-        global_store_, cluster_scope_, prefix_.statName(), std::chrono::milliseconds(5),
-        true,          true,           "vhost_name",       "req_vcluster_name",
-        "from_az",     "to_az"};
+        global_store_, cluster_scope_, prefix_,            std::chrono::milliseconds(5),
+        true,          true,           pool_.add("vhost_name"), pool_.add("req_vcluster_name"),
+        pool_.add("from_az"),     pool_.add("to_az")};
     code_stats_.chargeResponseTiming(info);
   }
 
@@ -67,7 +69,8 @@ public:
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
-  Stats::StatNameManagedStorage prefix_;
+  Stats::StatNamePool pool_;
+  Stats::StatName prefix_;
 };
 
 } // namespace Http

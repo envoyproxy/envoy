@@ -9,11 +9,13 @@
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/router_ratelimit.h"
+//#include "common/stats/fake_symbol_table_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/mocks.h"
+//#include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -92,8 +94,9 @@ public:
     config_ = std::make_unique<ConfigImpl>(route_config, factory_context_, true);
   }
 
-  std::unique_ptr<ConfigImpl> config_;
+  //Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  std::unique_ptr<ConfigImpl> config_;
   Http::TestHeaderMapImpl header_;
   const RouteEntry* route_;
   Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};

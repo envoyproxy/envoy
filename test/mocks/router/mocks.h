@@ -216,11 +216,11 @@ public:
   MOCK_METHOD0(retryHostPredicate, Upstream::RetryHostPredicateSharedPtr());
 
   Stats::StatName statName() const override {
-    stat_name_ = std::make_unique<Stats::StatNameManagedStorage>(name(), symbol_table_);
+    stat_name_ = std::make_unique<Stats::StatNameManagedStorage>(name(), *symbol_table_);
     return stat_name_->statName();
   }
 
-  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  mutable Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   std::string name_{"fake_vhost"};
   mutable std::unique_ptr<Stats::StatNameManagedStorage> stat_name_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;

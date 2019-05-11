@@ -138,6 +138,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   ASSERT(cluster_);
   state_ = State::Complete;
   using Filters::Common::ExtAuthz::CheckStatus;
+  Stats::StatName empty_string;
 
   switch (response->status) {
   case CheckStatus::OK:
@@ -153,10 +154,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                                            Stats::StatName(),
                                            enumToInt(response->status_code),
                                            true,
-                                           EMPTY_STRING,
-                                           EMPTY_STRING,
-                                           EMPTY_STRING,
-                                           EMPTY_STRING,
+                                           empty_string,
+                                           empty_string,
+                                           empty_string,
+                                           empty_string,
                                            false};
     config_->httpContext().codeStats().chargeResponseStat(info);
     break;

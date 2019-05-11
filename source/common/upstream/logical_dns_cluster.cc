@@ -91,15 +91,14 @@ void LogicalDnsCluster::startResolve() {
             // to show the friendly DNS name in that output, but currently there is no way to
             // express a DNS name inside of an Address::Instance. For now this is OK but we might
             // want to do better again later.
-            Stats::SymbolTable& symbol_table = info_->statsScope().symbolTable();
             switch (address_list.front()->ip()->version()) {
             case Network::Address::IpVersion::v4:
               logical_host_.reset(new LogicalHost(
-                  info_, hostname_, Network::Utility::getIpv4AnyAddress(), *this, symbol_table));
+                  info_, hostname_, Network::Utility::getIpv4AnyAddress(), *this));
               break;
             case Network::Address::IpVersion::v6:
               logical_host_.reset(new LogicalHost(
-                  info_, hostname_, Network::Utility::getIpv6AnyAddress(), *this, symbol_table));
+                  info_, hostname_, Network::Utility::getIpv6AnyAddress(), *this));
               break;
             }
             const auto& locality_lb_endpoint = localityLbEndpoint();
@@ -141,7 +140,8 @@ Upstream::Host::CreateConnectionData LogicalDnsCluster::LogicalHost::createConne
                                      options, transport_socket_options),
           HostDescriptionConstSharedPtr{
               new RealHostDescription(data.current_resolved_address_, parent_.localityLbEndpoint(),
-                                      parent_.lbEndpoint(), shared_from_this())}};
+                                      parent_.lbEndpoint(), shared_from_this(),
+                                      parent_.symbolTable())}};
 }
 
 ClusterImplBaseSharedPtr LogicalDnsClusterFactory::createClusterImpl(

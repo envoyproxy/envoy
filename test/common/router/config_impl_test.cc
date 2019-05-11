@@ -99,6 +99,7 @@ protected:
     ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
+  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 };

@@ -66,15 +66,14 @@ public:
       const envoy::api::v2::core::Metadata& metadata,
       const envoy::api::v2::core::Locality& locality,
       const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, Stats::SymbolTable& symbol_table)
+      uint32_t priority)
       : cluster_(cluster), hostname_(hostname), address_(dest_address),
         canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                                 Config::MetadataEnvoyLbKeys::get().CANARY)
                     .bool_value()),
         metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)), locality_(locality),
-        locality_zone_stat_name_(locality.zone(), symbol_table), stats_{ALL_HOST_STATS(
-                                                                     POOL_COUNTER(stats_store_),
-                                                                     POOL_GAUGE(stats_store_))},
+        locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
+        stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))},
         priority_(priority) {
     if (health_check_config.port_value() != 0 &&
         dest_address->type() != Network::Address::Type::Ip) {
@@ -174,10 +173,9 @@ public:
            const envoy::api::v2::core::Metadata& metadata, uint32_t initial_weight,
            const envoy::api::v2::core::Locality& locality,
            const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
-           uint32_t priority, const envoy::api::v2::core::HealthStatus health_status,
-           Stats::SymbolTable& symbol_table)
+           uint32_t priority, const envoy::api::v2::core::HealthStatus health_status)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
-                            priority, symbol_table),
+                            priority),
         used_(true) {
     setEdsHealthFlag(health_status);
     weight(initial_weight);
@@ -651,6 +649,7 @@ public:
   // and degraded hosts respectively.
   static std::pair<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr>
   partitionHostsPerLocality(const HostsPerLocality& hosts);
+  Stats::SymbolTable& symbolTable() { return symbol_table_; }
 
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }
@@ -710,6 +709,7 @@ private:
   bool initialization_started_{};
   std::function<void()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
+  Stats::SymbolTable& symbol_table_;
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;

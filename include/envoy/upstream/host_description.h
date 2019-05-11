@@ -108,6 +108,7 @@ public:
    * @return the human readable name of the host's locality zone as a StatName.
    */
   virtual Stats::StatName localityZoneStatName() const PURE;
+
   /**
    * @return the address used to health check the host.
    */

@@ -666,7 +666,8 @@ ClusterImplBase::ClusterImplBase(
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
-      init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime) {
+      init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
+      symbol_table_(stats_scope->symbolTable()) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
@@ -951,7 +952,7 @@ void PriorityStateManager::registerHostForPriority(
       new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
                    lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
                    lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
-                   lb_endpoint.health_status(), info_->statsScope().symbolTable()));
+                   lb_endpoint.health_status()));
   registerHostForPriority(host, locality_lb_endpoint);
 }
 
@@ -1395,8 +1396,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
               lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
               locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config(),
-              locality_lb_endpoint_.priority(), lb_endpoint_.health_status(),
-              info_->statsScope().symbolTable()));
+              locality_lb_endpoint_.priority(), lb_endpoint_.health_status()));
         }
 
         HostVector hosts_added;
