@@ -227,6 +227,11 @@ config_setting(
     values = {"cpu": "ios_arm64e"},
 )
 
+config_setting(
+    name = "manual_stamp",
+    values = {"define": "manual_stamp=manual_stamp"},
+)
+
 alias(
     name = "apple",
     actual = select(

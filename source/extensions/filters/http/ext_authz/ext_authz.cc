@@ -58,7 +58,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
             cfg_base.merge(cfg);
           });
 
-  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> context_extensions;
+  Protobuf::Map<std::string, std::string> context_extensions;
   if (maybe_merged_per_route_config) {
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
   }

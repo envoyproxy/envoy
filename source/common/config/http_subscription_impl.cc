@@ -44,16 +44,15 @@ void HttpSubscriptionImpl::start(const std::set<std::string>& resources,
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
 
-  Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_vector(resources.begin(),
-                                                                     resources.end());
+  Protobuf::RepeatedPtrField<std::string> resources_vector(resources.begin(), resources.end());
   request_.mutable_resource_names()->Swap(&resources_vector);
   callbacks_ = &callbacks;
   initialize();
 }
 
 void HttpSubscriptionImpl::updateResources(const std::set<std::string>& update_to_these_names) {
-  Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_vector(update_to_these_names.begin(),
-                                                                     update_to_these_names.end());
+  Protobuf::RepeatedPtrField<std::string> resources_vector(update_to_these_names.begin(),
+                                                           update_to_these_names.end());
   request_.mutable_resource_names()->Swap(&resources_vector);
 }
 

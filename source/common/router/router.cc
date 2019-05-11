@@ -217,7 +217,6 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
         internal_request_header && internal_request_header->value() == "true";
 
     Stats::StatName upstream_zone = upstreamZone(upstream_host);
-
     Http::CodeStats::ResponseStatInfo info{config_.scope_,
                                            cluster_->statsScope(),
                                            Stats::StatName(),
@@ -893,7 +892,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
     Http::CodeStats& code_stats = httpContext().codeStats();
     Http::CodeStats::ResponseTimingInfo info{config_.scope_,
                                              cluster_->statsScope(),
-                                             Stats::StatName(),
+                                             config_.empty_stat_name_,
                                              response_time,
                                              upstream_request.upstream_canary_,
                                              internal_request,
