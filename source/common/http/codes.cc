@@ -184,6 +184,9 @@ CodeStatsImpl::RequestCodeGroup::RequestCodeGroup(absl::string_view prefix,
   }
 
   // Pre-allocate response codes 200, 404, and 503, as those seem quite likely.
+  // We don't pre-allocate all the HTTP codes because the first 127 allocations
+  // are likely to be encoded in one byte, and we would rather spend those on
+  // common components of stat-names that appear frequently.
   statName(Code::OK);
   statName(Code::NotFound);
   statName(Code::ServiceUnavailable);

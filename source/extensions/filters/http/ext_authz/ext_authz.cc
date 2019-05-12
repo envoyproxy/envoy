@@ -151,7 +151,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     cluster_->statsScope().counter("ext_authz.denied").inc();
     Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                            cluster_->statsScope(),
-                                           Stats::StatName(),
+                                           empty_string,
                                            enumToInt(response->status_code),
                                            true,
                                            empty_string,

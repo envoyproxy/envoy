@@ -219,7 +219,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     Stats::StatName upstream_zone = upstreamZone(upstream_host);
     Http::CodeStats::ResponseStatInfo info{config_.scope_,
                                            cluster_->statsScope(),
-                                           Stats::StatName(),
+                                           config_.empty_stat_name_,
                                            response_status_code,
                                            internal_request,
                                            route_entry_->virtualHost().statName(),

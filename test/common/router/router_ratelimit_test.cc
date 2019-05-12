@@ -95,7 +95,6 @@ public:
     config_ = std::make_unique<ConfigImpl>(route_config, factory_context_, true);
   }
 
-  // Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::unique_ptr<ConfigImpl> config_;
   Http::TestHeaderMapImpl header_;
