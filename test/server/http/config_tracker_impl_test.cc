@@ -81,14 +81,17 @@ TEST_F(ConfigTrackerImplTest, OperationsWithinCallback) {
 }
 
 TEST_F(ConfigTrackerImplTest, ManagedConfigTest) {
-  tracker.addOrUpdateManagedConfig("test_key", test_msg());
-  EXPECT_EQ(1, tracker.getManagedConfigMap().size());
-  tracker.addOrUpdateManagedConfig("test_key_1", test_msg());
-  EXPECT_EQ(2, tracker.getManagedConfigMap().size());
-  tracker.addOrUpdateManagedConfig("test_key_1", test_msg());
-  EXPECT_EQ(2, tracker.getManagedConfigMap().size());
-  EXPECT_NE(nullptr, tracker.getManagedConfig("test_key_1"));
-  EXPECT_EQ(nullptr, tracker.getManagedConfig("test_key_2"));
+  tracker.addOrUpdateControlPlaneConfig(
+      "test_service", std::make_shared<envoy::admin::v2alpha::ControlPlaneConfigDump>());
+  EXPECT_EQ(1, tracker.getControlPlaneConfigMap().size());
+  tracker.addOrUpdateControlPlaneConfig(
+      "test_service_1", std::make_shared<envoy::admin::v2alpha::ControlPlaneConfigDump>());
+  EXPECT_EQ(2, tracker.getControlPlaneConfigMap().size());
+  tracker.addOrUpdateControlPlaneConfig(
+      "test_service_1", std::make_shared<envoy::admin::v2alpha::ControlPlaneConfigDump>());
+  EXPECT_EQ(2, tracker.getControlPlaneConfigMap().size());
+  EXPECT_NE(nullptr, tracker.getControlPlaneConfig("test_service_1"));
+  EXPECT_EQ(nullptr, tracker.getControlPlaneConfig("test_service_2"));
 }
 
 } // namespace Server

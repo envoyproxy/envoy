@@ -23,7 +23,7 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
       time_source_(dispatcher.timeSource()), config_tracker_(config_tracker) {
   grpc_service_.MergeFrom(grpc_service);
   Config::Utility::checkLocalInfo("ads", local_info);
-  config_tracker.addOrUpdateManagedConfig(
+  config_tracker.addOrUpdateControlPlaneConfig(
       xds_service_, std::make_shared<envoy::admin::v2alpha::ControlPlaneConfigDump>());
 }
 
@@ -223,13 +223,8 @@ void GrpcMuxImpl::onEstablishmentFailure() {
 void GrpcMuxImpl::updateControlPlaneConfigDump(const envoy::api::v2::DiscoveryResponse& message) {
   if (message.has_control_plane()) {
     Protobuf::util::MessageDifferencer message_differencer;
-    bool config_exists = false;
-    bool service_config_exists = false;
-    uint32_t service_index = -1;
-    uint32_t config_source_index = -1;
-    auto control_plane_config_dump =
-        MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ControlPlaneConfigDump&>(
-            *config_tracker_.getManagedConfig(xds_service_));
+    Server::ConfigTracker::ControlPlaneConfigPtr control_plane_config =
+        config_tracker_.getControlPlaneConfig(xds_service_);
 
     // Check if control plane information is already available for the xds service that points to
     // the grpc_service. If yes, either a new response might have come from the management server it
@@ -237,57 +232,53 @@ void GrpcMuxImpl::updateControlPlaneConfigDump(const envoy::api::v2::DiscoveryRe
     // is part of the cluster pointed to by grpc_service. In either case, we should update the
     // control_plane_identifier in the existing config_source_control_plane_info. Otherwise we
     // should create a new entry for config_source_control_plane pointing to this grpc_service.
-    for (auto& service_control_plane_info :
-         control_plane_config_dump.service_control_plane_info()) {
-      service_index++;
-      if (service_control_plane_info.xds_service() == xds_service_) {
-        service_config_exists = true;
-        for (auto& config_control_plane :
-             service_control_plane_info.config_source_control_plane()) {
-          config_source_index++;
-          if (message_differencer.Compare(grpc_service_, config_control_plane.grpc_service())) {
-            config_exists = true;
-            break;
-          }
-        }
-        if (config_exists) {
-          break;
-        }
-        config_source_index = -1;
-      }
-    }
-
-    // If service it self does not exist, this is the first time we are seeing it, so add it.
-    if (!service_config_exists) {
-      auto new_service_control_plane_info =
-          control_plane_config_dump.add_service_control_plane_info();
-      new_service_control_plane_info->set_xds_service(xds_service_);
-      auto new_config_source_control_info =
-          new_service_control_plane_info->add_config_source_control_plane();
+    auto service_control_plane_info =
+        control_plane_config->service_control_plane_info().find(xds_service_);
+    if (service_control_plane_info == control_plane_config->service_control_plane_info().end()) {
+      // If service it self does not exist, this is the first time we are seeing it, so add it.
+      ::envoy::admin::v2alpha::ControlPlaneConfigDump_ServiceControlPlaneInfo
+          new_service_control_plane_info;
+      auto* new_config_source_control_info =
+          new_service_control_plane_info.add_config_source_control_plane();
       populateControlPlaneIdentifier(new_config_source_control_info,
                                      message.control_plane().identifier());
       new_config_source_control_info->mutable_grpc_service()->MergeFrom(grpc_service_);
+      (*control_plane_config->mutable_service_control_plane_info())[xds_service_] =
+          new_service_control_plane_info;
+
     } else {
-      // If service exists, check if the config source exists, if it is theere update it else create
+      // If service exists, check if the config source exists, if it is there update it else create
       // a new config source.
-      auto existing_service_config =
-          control_plane_config_dump.mutable_service_control_plane_info(service_index);
+      int config_source_index = -1;
+      bool config_exists = false;
+      for (auto& config_control_plane :
+           service_control_plane_info->second.config_source_control_plane()) {
+        config_source_index++;
+        if (message_differencer.Compare(grpc_service_, config_control_plane.grpc_service())) {
+          config_exists = true;
+          break;
+        }
+      }
       if (!config_exists) {
-        auto new_config_source_control_info =
-            existing_service_config->add_config_source_control_plane();
+        // create a new config source with grpc_service and identifier.
+        auto* new_config_source_control_info =
+            (*control_plane_config->mutable_service_control_plane_info())[xds_service_]
+                .add_config_source_control_plane();
         populateControlPlaneIdentifier(new_config_source_control_info,
                                        message.control_plane().identifier());
+        new_config_source_control_info->mutable_grpc_service()->MergeFrom(grpc_service_);
       } else {
         // update the control plane identifier of existing grpc_service.
-        auto existing_config_source_control_info =
-            existing_service_config->mutable_config_source_control_plane(config_source_index);
+        auto* existing_config_source_control_info =
+            (*control_plane_config->mutable_service_control_plane_info())[xds_service_]
+                .mutable_config_source_control_plane(config_source_index);
         populateControlPlaneIdentifier(existing_config_source_control_info,
                                        message.control_plane().identifier());
       }
     }
-    config_tracker_.addOrUpdateManagedConfig(
+    config_tracker_.addOrUpdateControlPlaneConfig(
         xds_service_,
-        std::make_shared<envoy::admin::v2alpha::ControlPlaneConfigDump>(control_plane_config_dump));
+        std::make_shared<envoy::admin::v2alpha::ControlPlaneConfigDump>(*control_plane_config));
   }
 }
 

@@ -15,14 +15,15 @@ class ConfigTrackerImpl : public ConfigTracker {
 public:
   EntryOwnerPtr add(const std::string& key, Cb cb) override;
   const CbsMap& getCallbacksMap() const override;
-  void addOrUpdateManagedConfig(const std::string& key,
-                                ProtobufTypes::MessageSharedPtr message) override;
-  ProtobufTypes::MessageSharedPtr getManagedConfig(const std::string& key) const override;
-  const ManagedConfigMap& getManagedConfigMap() const override;
+  void addOrUpdateControlPlaneConfig(const std::string& service,
+                                     ControlPlaneConfigPtr control_plane_info) override;
+  ControlPlaneConfigPtr getControlPlaneConfig(const std::string& service) const override;
+  const ControlPlaneConfigMap& getControlPlaneConfigMap() const override;
 
 private:
   std::shared_ptr<CbsMap> map_{std::make_shared<CbsMap>()};
-  std::shared_ptr<ManagedConfigMap> managed_config_{std::make_shared<ManagedConfigMap>()};
+  std::shared_ptr<ControlPlaneConfigMap> control_plane_config_{
+      std::make_shared<ControlPlaneConfigMap>()};
 
   class EntryOwnerImpl : public ConfigTracker::EntryOwner {
   public:

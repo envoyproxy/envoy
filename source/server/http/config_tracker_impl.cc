@@ -21,23 +21,24 @@ ConfigTrackerImpl::EntryOwnerImpl::~EntryOwnerImpl() {
   ASSERT(erased == 1);
 }
 
-void ConfigTrackerImpl::addOrUpdateManagedConfig(const std::string& key,
-                                                 ProtobufTypes::MessageSharedPtr message) {
-  const auto existing_message = managed_config_->find(key);
-  if (existing_message != managed_config_->end()) {
-    (*managed_config_)[key] = message;
+void ConfigTrackerImpl::addOrUpdateControlPlaneConfig(const std::string& service,
+                                                      ControlPlaneConfigPtr control_plane_info) {
+  const auto existing_message = control_plane_config_->find(service);
+  if (existing_message != control_plane_config_->end()) {
+    (*control_plane_config_)[service] = control_plane_info;
   } else {
-    managed_config_->insert(std::make_pair(key, message));
+    control_plane_config_->insert(std::make_pair(service, control_plane_info));
   }
 }
 
-ProtobufTypes::MessageSharedPtr ConfigTrackerImpl::getManagedConfig(const std::string& key) const {
-  auto existing_message = managed_config_->find(key);
-  return existing_message != managed_config_->end() ? existing_message->second : nullptr;
+ConfigTracker::ControlPlaneConfigPtr
+ConfigTrackerImpl::getControlPlaneConfig(const std::string& service) const {
+  auto existing_message = control_plane_config_->find(service);
+  return existing_message != control_plane_config_->end() ? existing_message->second : nullptr;
 }
 
-const ConfigTracker::ManagedConfigMap& ConfigTrackerImpl::getManagedConfigMap() const {
-  return *managed_config_;
+const ConfigTracker::ControlPlaneConfigMap& ConfigTrackerImpl::getControlPlaneConfigMap() const {
+  return *control_plane_config_;
 }
 
 } // namespace Server

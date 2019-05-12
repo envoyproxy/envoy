@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/common/pure.h"
 
 #include "common/common/non_copyable.h"
@@ -23,7 +24,8 @@ class ConfigTracker {
 public:
   typedef std::function<ProtobufTypes::MessagePtr()> Cb;
   typedef std::map<std::string, Cb> CbsMap;
-  typedef std::map<std::string, ProtobufTypes::MessageSharedPtr> ManagedConfigMap;
+  typedef std::shared_ptr<envoy::admin::v2alpha::ControlPlaneConfigDump> ControlPlaneConfigPtr;
+  typedef std::map<std::string, ControlPlaneConfigPtr> ControlPlaneConfigMap;
 
   /**
    * EntryOwner supplies RAII semantics for entries in the map.
@@ -57,24 +59,24 @@ public:
 
   /**
    * Add or update a managed config to the config tracker under the given key
-   * @param key the map key for the configuration.
-   * @param message the message to be managed by config tracker.
+   * @param xds_service the service for which the configuration is being tracked.
+   * @param control_plane_config the message to be managed by config tracker.
    */
-  virtual void addOrUpdateManagedConfig(const std::string& key,
-                                        ProtobufTypes::MessageSharedPtr message) PURE;
+  virtual void addOrUpdateControlPlaneConfig(const std::string& xds_service,
+                                             ControlPlaneConfigPtr control_plane_config) PURE;
 
   /**
-   * Returns config managed by config tracker under the given key
-   * @param key the map key for the configuration.
-   * @return ProtobufTypes::MessageSharedPtr the message stored under the key.
+   * Returns config managed by config tracker under the given service
+   * @param xds_service the key for the configuration.
+   * @return ControlPlaneConfigPtr the config tracked for the service.
    */
-  virtual ProtobufTypes::MessageSharedPtr getManagedConfig(const std::string& key) const PURE;
+  virtual ControlPlaneConfigPtr getControlPlaneConfig(const std::string& xds_service) const PURE;
 
   /**
-   * Returns manged config map by config tracker.
-   * @return ManagedConfigMap the message map managed by config tracker.
+   * Returns control plane config map by config tracker.
+   * @return ControlPlaneConfigMap the message map managed by config tracker.
    */
-  virtual const ManagedConfigMap& getManagedConfigMap() const PURE;
+  virtual const ControlPlaneConfigMap& getControlPlaneConfigMap() const PURE;
 };
 
 } // namespace Server

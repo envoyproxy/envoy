@@ -107,14 +107,14 @@ public:
 
   // Server::ConfigTracker
   MOCK_CONST_METHOD0(getCallbacksMap, const CbsMap&());
-  MOCK_CONST_METHOD0(getManagedConfigMap, const ManagedConfigMap&());
-  MOCK_CONST_METHOD1(getManagedConfig, ProtobufTypes::MessageSharedPtr(const std::string&));
+  MOCK_CONST_METHOD0(getControlPlaneConfigMap, const ControlPlaneConfigMap&());
+  MOCK_CONST_METHOD1(getControlPlaneConfig, ControlPlaneConfigPtr(const std::string&));
 
   EntryOwnerPtr add(const std::string& key, Cb callback) override {
     return EntryOwnerPtr{add_(key, std::move(callback))};
   }
 
-  void addOrUpdateManagedConfig(const std::string&, ProtobufTypes::MessageSharedPtr) override {}
+  void addOrUpdateControlPlaneConfig(const std::string&, ControlPlaneConfigPtr) override {}
 
   std::unordered_map<std::string, Cb> config_tracker_callbacks_;
 };

@@ -49,6 +49,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:non_copyable",
         "//source/common/protobuf",
+        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
     ],
 )
 

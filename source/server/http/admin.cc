@@ -472,10 +472,10 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& resp
     any_message.PackFrom(*message);
   }
 
-  for (const auto& managed_config_pair : config_tracker_.getManagedConfigMap()) {
-    RELEASE_ASSERT(managed_config_pair.second, "");
+  for (const auto& control_plane_config_pair : config_tracker_.getControlPlaneConfigMap()) {
+    RELEASE_ASSERT(control_plane_config_pair.second, "");
     auto& any_message = *(dump.add_configs());
-    any_message.PackFrom(*managed_config_pair.second);
+    any_message.PackFrom(*control_plane_config_pair.second);
   }
 
   response_headers.insertContentType().value().setReference(

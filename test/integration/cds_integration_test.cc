@@ -242,9 +242,8 @@ TEST_P(CdsIntegrationTest, ControlPlaneConfigDump) {
   std::cerr << "Control Plane config dump " << response->body() << "\n";
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   const std::string control_plane_config_dump = R"EOF(
-   "service_control_plane_info": [
-    {
-     "xds_service": "envoy.api.v2.ClusterDiscoveryService",
+   "service_control_plane_info": {
+    "envoy.api.v2.ClusterDiscoveryService": {
      "config_source_control_plane": [
       {
        "grpc_service": {

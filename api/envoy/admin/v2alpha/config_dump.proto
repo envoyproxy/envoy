@@ -205,16 +205,13 @@ message ControlPlaneConfigDump {
   // connects to.
   message ServiceControlPlaneInfo {
 
-    // The xDS service this control plane information belongs to. For example
-    // envoy.api.v2.EndpointDiscoveryService represents control plane info that Envoy has been
-    // configured for EndpointDiscoveryService.
-    string xds_service = 1;
-
     // The list of control plane information that Envoy has been configured to connect with for this
     // service.
-    repeated ConfigSourceControlPlaneInfo config_source_control_plane = 2;
+    repeated ConfigSourceControlPlaneInfo config_source_control_plane = 1;
   }
 
-  // The list of all service specific control plane information.
-  repeated ServiceControlPlaneInfo service_control_plane_info = 1;
+  // Keys represent the xDS service this control plane information belongs to. For example
+  // envoy.api.v2.EndpointDiscoveryService represents control plane info that Envoy has been
+  // configured for EndpointDiscoveryService.
+  map<string, ServiceControlPlaneInfo> service_control_plane_info = 1;
 }

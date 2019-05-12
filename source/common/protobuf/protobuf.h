@@ -46,8 +46,6 @@ namespace ProtobufTypes {
 
 typedef std::unique_ptr<Protobuf::Message> MessagePtr;
 
-typedef std::shared_ptr<Protobuf::Message> MessageSharedPtr;
-
 typedef int64_t Int64;
 
 } // namespace ProtobufTypes
