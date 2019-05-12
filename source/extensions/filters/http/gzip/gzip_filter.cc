@@ -150,8 +150,8 @@ Http::FilterTrailersStatus GzipFilter::encodeTrailers(Http::HeaderMap&) {
   if (!skip_compression_) {
     Buffer::OwnedImpl empty_buffer;
     compressor_.compress(empty_buffer, Compressor::State::Finish);
+    config_->stats().total_compressed_bytes_.add(empty_buffer.length());
     encoder_callbacks_->addEncodedData(empty_buffer, true);
-    return Http::FilterTrailersStatus::Continue;
   }
   return Http::FilterTrailersStatus::Continue;
 }

@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "common/common/hex.h"
+#include "common/common/stack_array.h"
 #include "common/compressor/zlib_compressor_impl.h"
 #include "common/decompressor/zlib_decompressor_impl.h"
 #include "common/protobuf/utility.h"
@@ -69,7 +71,9 @@ protected:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  void verifyCompressedData() {
+  void verifyCompressedData(uint32_t content_length) {
+    // This makes sure we have a finished buffer before sending it to the client.
+    expectValidFinishedBuffer(content_length);
     decompressor_.decompress(data_, decompressed_data_);
     const std::string uncompressed_str{decompressed_data_.toString()};
     ASSERT_EQ(expected_str_.length(), uncompressed_str.length());
@@ -101,11 +105,42 @@ protected:
     EXPECT_EQ(Http::Headers::get().ContentEncodingValues.Gzip, headers.get_("content-encoding"));
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, !withTrailers));
     if (withTrailers) {
+      Buffer::OwnedImpl trailers_buffer;
+      EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
+          .WillOnce(Invoke([&](Buffer::Instance& data, bool) { data_.move(data); }));
       EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(headers));
     }
-    verifyCompressedData();
+    verifyCompressedData(content_length);
     drainBuffer();
     EXPECT_EQ(1U, stats_.counter("test.gzip.compressed").value());
+  }
+
+  void expectValidFinishedBuffer(const uint32_t content_length) {
+    uint64_t num_comp_slices = data_.getRawSlices(nullptr, 0);
+    STACK_ARRAY(compressed_slices, Buffer::RawSlice, num_comp_slices);
+    data_.getRawSlices(compressed_slices.begin(), num_comp_slices);
+
+    const std::string header_hex_str = Hex::encode(
+        reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
+    // HEADER 0x1f = 31 (window_bits)
+    EXPECT_EQ("1f8b", header_hex_str.substr(0, 4));
+    // CM 0x8 = deflate (compression method)
+    EXPECT_EQ("08", header_hex_str.substr(4, 2));
+
+    const std::string footer_bytes_str =
+        Hex::encode(reinterpret_cast<unsigned char*>(compressed_slices[num_comp_slices - 1].mem_),
+                    compressed_slices[num_comp_slices - 1].len_);
+
+    // A valid finished compressed buffer should have trailer with input size in it, i.e. equals to
+    // the value of content_length.
+    expectEqualInputSize(footer_bytes_str, content_length);
+  }
+
+  void expectEqualInputSize(const std::string& footer_bytes, const uint32_t input_size) {
+    const std::string size_bytes = footer_bytes.substr(footer_bytes.size() - 8, 8);
+    uint64_t size;
+    StringUtil::atoull(size_bytes.c_str(), size, 16);
+    EXPECT_EQ(TestUtility::flipOrder<uint32_t>(size), input_size);
   }
 
   void doResponseNoCompression(Http::TestHeaderMapImpl&& headers) {
