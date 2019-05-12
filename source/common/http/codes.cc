@@ -68,8 +68,6 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
 }
 
 void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
-  Stats::StatNamePool pool(symbol_table_);
-  // Stats::StatName prefix = pool.add(stripTrailingDot(info.prefix_));
   Code code = static_cast<Code>(info.response_status_code_);
 
   ASSERT(&info.cluster_scope_.symbolTable() == &symbol_table_);
@@ -120,9 +118,6 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
 }
 
 void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
-  Stats::StatNamePool pool(symbol_table_);
-  // Stats::StatName prefix = pool.add(stripTrailingDot(info.prefix_));
-
   uint64_t count = info.response_time_.count();
   recordHistogram(info.cluster_scope_, {info.prefix_, upstream_rq_time_}, count);
   if (info.upstream_canary_) {
