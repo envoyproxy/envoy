@@ -154,6 +154,11 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
       local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
+  onDeferredDelete();
+  ASSERT(client_ == nullptr);
+}
+
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onDeferredDelete() {
   if (client_) {
     // If there is an active request it will get reset, so make sure we ignore the reset.
     expect_reset_ = true;
@@ -349,7 +354,13 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
       receive_bytes_(TcpHealthCheckMatcher::loadProtoBytes(config.tcp_health_check().receive())) {}
 
 TcpHealthCheckerImpl::TcpActiveHealthCheckSession::~TcpActiveHealthCheckSession() {
+  onDeferredDelete();
+  ASSERT(client_ == nullptr);
+}
+
+void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onDeferredDelete() {
   if (client_) {
+    expect_close_ = true;
     client_->close(Network::ConnectionCloseType::NoFlush);
   }
 }
@@ -361,6 +372,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
     data.drain(data.length());
     handleSuccess(false);
     if (!parent_.reuse_connection_) {
+      expect_close_ = true;
       client_->close(Network::ConnectionCloseType::NoFlush);
     }
   } else {
@@ -369,12 +381,11 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::RemoteClose) {
-    handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
-  }
-
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    if (!expect_close_) {
+      handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
+    }
     parent_.dispatcher_.deferredDelete(std::move(client_));
   }
 
@@ -393,6 +404,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
     // TODO(mattklein123): In the case that a user configured bytes to write, they will not be
     // be written, since we currently have no way to know if the bytes actually get written via
     // the connection interface. We might want to figure out how to handle this better later.
+    expect_close_ = true;
     client_->close(Network::ConnectionCloseType::NoFlush);
     handleSuccess(false);
   }
@@ -406,6 +418,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
     client_->addConnectionCallbacks(*session_callbacks_);
     client_->addReadFilter(session_callbacks_);
 
+    expect_close_ = false;
     client_->connect();
     client_->noDelay(true);
   }
@@ -421,6 +434,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
+  expect_close_ = true;
   host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
   client_->close(Network::ConnectionCloseType::NoFlush);
 }
@@ -448,6 +462,11 @@ GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::GrpcActiveHealthCheckSessio
     : ActiveHealthCheckSession(parent, host), parent_(parent) {}
 
 GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::~GrpcActiveHealthCheckSession() {
+  onDeferredDelete();
+  ASSERT(client_ == nullptr);
+}
+
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onDeferredDelete() {
   if (client_) {
     // If there is an active request it will get reset, so make sure we ignore the reset.
     expect_reset_ = true;
@@ -571,7 +590,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
     request.set_service(parent_.service_name_.value());
   }
 
-  request_encoder_->encodeData(*Grpc::Common::serializeBody(request), true);
+  request_encoder_->encodeData(*Grpc::Common::serializeToGrpcFrame(request), true);
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::StreamResetReason,

@@ -317,6 +317,18 @@ void StatNameStorage::free(SymbolTable& table) {
   bytes_.reset();
 }
 
+void StatNamePool::clear() {
+  for (StatNameStorage& storage : storage_vector_) {
+    storage.free(symbol_table_);
+  }
+  storage_vector_.clear();
+}
+
+StatName StatNamePool::add(absl::string_view str) {
+  storage_vector_.push_back(Stats::StatNameStorage(str, symbol_table_));
+  return StatName(storage_vector_.back().bytes());
+}
+
 StatNameStorageSet::~StatNameStorageSet() {
   // free() must be called before destructing StatNameStorageSet to decrement
   // references to all symbols.

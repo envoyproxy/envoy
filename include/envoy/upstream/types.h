@@ -55,6 +55,8 @@ struct HealthyAvailability : PriorityAvailability {
 struct Healthy {};
 // Phantom type indicating that the type is related to degraded hosts.
 struct Degraded {};
+// Phantom type indicating that the type is related to excluded hosts.
+struct Excluded {};
 
 } // namespace Upstream
 } // namespace Envoy

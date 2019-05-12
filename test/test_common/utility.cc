@@ -182,6 +182,13 @@ TestUtility::parseBootstrapFromJson(const std::string& json_string) {
   return bootstrap;
 }
 
+std::string TestUtility::addLeftAndRightPadding(absl::string_view to_pad, int desired_length) {
+  int line_fill_len = desired_length - to_pad.length();
+  int first_half_len = line_fill_len / 2;
+  int second_half_len = line_fill_len - first_half_len;
+  return absl::StrCat(std::string(first_half_len, '='), to_pad, std::string(second_half_len, '='));
+}
+
 std::vector<std::string> TestUtility::split(const std::string& source, char split) {
   return TestUtility::split(source, std::string{split});
 }
