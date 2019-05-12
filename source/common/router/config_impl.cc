@@ -885,7 +885,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
                                                        virtual_host.response_headers_to_remove())),
       per_filter_configs_(virtual_host.typed_per_filter_config(), virtual_host.per_filter_config(),
                           factory_context),
-      include_attempt_count_(virtual_host.include_request_attempt_count()) {
+      include_attempt_count_(virtual_host.include_request_attempt_count()),
+      virtual_cluster_catch_all_(stat_name_pool_) {
 
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::route::VirtualHost::NONE:
@@ -1089,7 +1090,6 @@ RouteConstSharedPtr RouteMatcher::route(const Http::HeaderMap& headers,
   }
 }
 
-const VirtualHostImpl::CatchAllVirtualCluster VirtualHostImpl::VIRTUAL_CLUSTER_CATCH_ALL;
 const SslRedirector SslRedirectRoute::SSL_REDIRECTOR;
 const std::shared_ptr<const SslRedirectRoute> VirtualHostImpl::SSL_REDIRECT_ROUTE{
     new SslRedirectRoute()};
@@ -1107,7 +1107,7 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
   }
 
   if (!virtual_clusters_.empty()) {
-    return &VIRTUAL_CLUSTER_CATCH_ALL;
+    return &virtual_cluster_catch_all_;
   }
 
   return nullptr;

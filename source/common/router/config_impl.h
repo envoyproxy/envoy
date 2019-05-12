@@ -150,8 +150,8 @@ public:
                                           uint64_t random_value) const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
   const ConfigImpl& globalRouteConfig() const { return global_route_config_; }
-  const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
-  const HeaderParser& responseHeaderParser() const { return *response_headers_parser_; };
+  const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; }
+  const HeaderParser& responseHeaderParser() const { return *response_headers_parser_; }
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
@@ -185,18 +185,22 @@ private:
     Stats::StatName stat_name_;
   };
 
-  struct CatchAllVirtualCluster : public VirtualCluster {
-    // Router::VirtualCluster
-    const std::string& name() const override { return name_; }
-    Stats::StatName statName() const override {
-      ASSERT(false);
-      return Stats::StatName();
-    }
+  class CatchAllVirtualCluster : public VirtualCluster {
+   public:
+    explicit CatchAllVirtualCluster(Stats::StatNamePool& pool) : stat_name_(pool.add("other")) {}
 
+    // Router::VirtualCluster
+    const std::string& name() const override {
+      ASSERT(false);
+      return name_;
+    }
+    Stats::StatName statName() const override { return stat_name_; }
+
+   private:
     std::string name_{"other"};
+    Stats::StatName stat_name_;
   };
 
-  static const CatchAllVirtualCluster VIRTUAL_CLUSTER_CATCH_ALL;
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
   const std::string name_;
@@ -215,6 +219,7 @@ private:
   const bool include_attempt_count_;
   absl::optional<envoy::api::v2::route::RetryPolicy> retry_policy_;
   absl::optional<envoy::api::v2::route::HedgePolicy> hedge_policy_;
+  const CatchAllVirtualCluster virtual_cluster_catch_all_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
