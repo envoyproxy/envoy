@@ -71,7 +71,7 @@ protected:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  void verifyCompressedData(uint32_t content_length) {
+  void verifyCompressedData(const uint32_t content_length) {
     // This makes sure we have a finished buffer before sending it to the client.
     expectValidFinishedBuffer(content_length);
     decompressor_.decompress(data_, decompressed_data_);
