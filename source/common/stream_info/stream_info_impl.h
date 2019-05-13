@@ -128,7 +128,9 @@ struct StreamInfoImpl : public StreamInfo {
 
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
 
-  void setRouteName(absl::string_view route_name) override { route_name_ = std::string(route_name); }
+  void setRouteName(absl::string_view route_name) override {
+    route_name_ = std::string(route_name);
+  }
 
   const std::string& getRouteName() const override { return route_name_; }
 
