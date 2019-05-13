@@ -613,7 +613,7 @@ def envoy_proto_library(name, external_deps = [], **kwargs):
     if "api_httpbody_protos" in external_deps:
         external_cc_proto_deps.append("@googleapis//:api_httpbody_protos")
         external_proto_deps.append("@googleapis//:api_httpbody_protos_proto")
-    return api_proto_library(
+    api_proto_library(
         name,
         external_cc_proto_deps = external_cc_proto_deps,
         external_proto_deps = external_proto_deps,
