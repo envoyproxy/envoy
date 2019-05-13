@@ -483,7 +483,7 @@ void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& resp
       http_body.ParseFromZeroCopyStream(&stream);
       const auto& body = http_body.data();
 
-      data.add(body);
+      data.add(std::string(body));
 
       response_headers.insertContentType().value(http_body.content_type());
       response_headers.insertContentLength().value(body.size());
