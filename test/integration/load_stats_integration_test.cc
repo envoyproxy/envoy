@@ -465,16 +465,18 @@ TEST_P(LoadStatsIntegrationTest, LocalityWeighted) {
   waitForLoadStatsStream();
   std::cerr << "Waiting for load stats request." << std::endl;
   waitForLoadStatsRequest({});
+
   std::cerr << "Done waiting." << std::endl;
-
   loadstats_stream_->startGrpcStream();
-
+  std::cerr << "Starting response." << std::endl;
   requestLoadStatsResponse({"cluster_0"});
+  std::cerr << "Updating assignments." << std::endl;
 
   // Simple 33%/67% split between dragon/winter localities.
   // Even though there are more endpoints in the dragon locality, the winter locality gets the
   // expected weighting in the WRR locality schedule.
   updateClusterLoadAssignment({{0}, 2}, {{1, 2}, 1}, {}, {});
+  std::cerr << "Sending traffic." << std::endl;
 
   sendAndReceiveUpstream(0);
   sendAndReceiveUpstream(1);
