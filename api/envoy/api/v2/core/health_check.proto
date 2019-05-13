@@ -45,7 +45,8 @@ message HealthCheck {
   ];
 
   // An optional jitter amount in milliseconds. If specified, Envoy will start health
-  // checking after initial_jitter.
+  // checking after for a random time in ms between 0 and initial_jitter. This only
+  // applies to the first health check.
   google.protobuf.Duration initial_jitter = 20;
 
   // An optional jitter amount in milliseconds. If specified, during every
