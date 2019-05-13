@@ -5,6 +5,7 @@ load(
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_binary",
+    "envoy_cc_test_library",
     "envoy_directory_genrule",
     "envoy_package",
     "envoy_proto_library",
@@ -14,6 +15,11 @@ envoy_package()
 
 envoy_cc_test(
     name = "config_impl_test",
+    deps = [":config_impl_test_lib"],
+)
+
+envoy_cc_test_library(
+    name = "config_impl_test_lib",
     srcs = ["config_impl_test.cc"],
     deps = [
         ":route_fuzz_proto_cc",
@@ -99,7 +105,7 @@ envoy_proto_library(
 envoy_cc_test_binary(
     name = "config_impl_test_static",
     deps = [
-        "config_impl_test_lib",
+        ":config_impl_test_lib",
         "//test:main",
     ],
 )
