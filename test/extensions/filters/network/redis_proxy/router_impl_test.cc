@@ -41,6 +41,22 @@ envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes create
   return prefix_routes;
 }
 
+Common::Redis::RespValue createRespValue(std::string key) {
+  Common::Redis::RespValue value;
+  value.type(Common::Redis::RespType::BulkString);
+  value.asString() = key;
+  return value;
+}
+
+std::vector<Common::Redis::RespValue> createRespValues(std::vector<std::string> keys) {
+  std::vector<Common::Redis::RespValue> values(keys.size());
+  for (uint64_t i = 0; i < keys.size(); i++) {
+    values[i].type(Common::Redis::RespType::BulkString);
+    values[i].asString() = keys[i];
+  }
+  return values;
+}
+
 TEST(PrefixRoutesTest, MissingCatchAll) {
   Upstreams upstreams;
   upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
@@ -48,7 +64,7 @@ TEST(PrefixRoutesTest, MissingCatchAll) {
 
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams));
 
-  std::string key("c:bar");
+  Common::Redis::RespValue key = createRespValue("c:bar");
   EXPECT_EQ(nullptr, router.upstreamPool(key));
 }
 
@@ -65,7 +81,7 @@ TEST(PrefixRoutesTest, RoutedToCatchAll) {
 
   PrefixRoutes router(prefix_routes, std::move(upstreams));
 
-  std::string key("c:bar");
+  Common::Redis::RespValue key = createRespValue("c:bar");
   EXPECT_EQ(upstream_c, router.upstreamPool(key));
 }
 
@@ -78,7 +94,7 @@ TEST(PrefixRoutesTest, RoutedToLongestPrefix) {
 
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams));
 
-  std::string key("ab:bar");
+  Common::Redis::RespValue key = createRespValue("ab:bar");
   EXPECT_EQ(upstream_a, router.upstreamPool(key));
 }
 
@@ -94,7 +110,7 @@ TEST(PrefixRoutesTest, CaseUnsensitivePrefix) {
 
   PrefixRoutes router(prefix_routes, std::move(upstreams));
 
-  std::string key("AB:bar");
+  Common::Redis::RespValue key = createRespValue("AB:bar");
   EXPECT_EQ(upstream_a, router.upstreamPool(key));
 }
 
@@ -116,9 +132,9 @@ TEST(PrefixRoutesTest, RemovePrefix) {
 
   PrefixRoutes router(prefix_routes, std::move(upstreams));
 
-  std::string key("abc:bar");
+  Common::Redis::RespValue key = createRespValue("abc:bar");
   EXPECT_EQ(upstream_a, router.upstreamPool(key));
-  EXPECT_EQ(":bar", key);
+  EXPECT_EQ(":bar", key.asString());
 }
 
 TEST(PrefixRoutesTest, RoutedToShortestPrefix) {
@@ -130,9 +146,9 @@ TEST(PrefixRoutesTest, RoutedToShortestPrefix) {
 
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams));
 
-  std::string key("a:bar");
+  Common::Redis::RespValue key = createRespValue("a:bar");
   EXPECT_EQ(upstream_b, router.upstreamPool(key));
-  EXPECT_EQ("a:bar", key);
+  EXPECT_EQ("a:bar", key.asString());
 }
 
 TEST(PrefixRoutesTest, DifferentPrefixesSameUpstream) {
@@ -152,10 +168,10 @@ TEST(PrefixRoutesTest, DifferentPrefixesSameUpstream) {
 
   PrefixRoutes router(prefix_routes, std::move(upstreams));
 
-  std::string key1("a:bar");
+  Common::Redis::RespValue key1 = createRespValue("a:bar");
   EXPECT_EQ(upstream_b, router.upstreamPool(key1));
 
-  std::string key2("also_route_to_b:bar");
+  Common::Redis::RespValue key2 = createRespValue("also_route_to_b:bar");
   EXPECT_EQ(upstream_b, router.upstreamPool(key2));
 }
 

@@ -42,7 +42,12 @@ class PassthruRouter : public Router {
 public:
   PassthruRouter(ConnPool::InstanceSharedPtr conn_pool) : conn_pool_(conn_pool) {}
 
-  ConnPool::InstanceSharedPtr upstreamPool(std::string&) override { return conn_pool_; }
+  ConnPool::InstanceSharedPtr upstreamPool(Common::Redis::RespValue&) override {
+    return conn_pool_;
+  }
+  ConnPool::InstanceSharedPtr upstreamPool(std::vector<Common::Redis::RespValue>&) override {
+    return conn_pool_;
+  }
 
 private:
   ConnPool::InstanceSharedPtr conn_pool_;

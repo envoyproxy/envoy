@@ -147,7 +147,7 @@ SplitRequestPtr SimpleRequest::create(Router& router,
   std::unique_ptr<SimpleRequest> request_ptr{
       new SimpleRequest(callbacks, command_stats, time_source, latency_in_micros)};
 
-  auto conn_pool = router.upstreamPool(incoming_request->asArray()[1].asString());
+  auto conn_pool = router.upstreamPool(incoming_request->asArray()[1]);
   if (conn_pool) {
     request_ptr->conn_pool_ = conn_pool;
     request_ptr->handle_ = conn_pool->makeRequest(incoming_request->asArray()[1].asString(),
@@ -177,7 +177,18 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
   std::unique_ptr<EvalRequest> request_ptr{
       new EvalRequest(callbacks, command_stats, time_source, latency_in_micros)};
 
-  auto conn_pool = router.upstreamPool(incoming_request->asArray()[3].asString());
+  int key_count;
+  try {
+    key_count = std::stoi(incoming_request->asArray()[2].asString());
+  } catch (const std::invalid_argument& e) {
+    throw EnvoyException(e.what());
+  } catch (const std::out_of_range& e) {
+    throw EnvoyException(e.what());
+  }
+  auto keys_start = incoming_request->asArray().cbegin() + 3;
+  auto keys_end = keys_start + key_count;
+  std::vector<Common::Redis::RespValue> keys(keys_start, keys_end + 1);
+  auto conn_pool = router.upstreamPool(keys);
   if (conn_pool) {
     request_ptr->conn_pool_ = conn_pool;
     request_ptr->handle_ = conn_pool->makeRequest(incoming_request->asArray()[3].asString(),
@@ -243,7 +254,7 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
 
     single_mget.asArray()[1].asString() = incoming_request->asArray()[i].asString();
     ENVOY_LOG(debug, "redis: parallel get: '{}'", single_mget.toString());
-    auto conn_pool = router.upstreamPool(incoming_request->asArray()[i].asString());
+    auto conn_pool = router.upstreamPool(incoming_request->asArray()[i]);
     if (conn_pool) {
       pending_request.conn_pool_ = conn_pool;
       pending_request.handle_ = conn_pool->makeRequest(incoming_request->asArray()[i].asString(),
@@ -375,7 +386,7 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
     single_mset.asArray()[2].asString() = incoming_request->asArray()[i + 1].asString();
 
     ENVOY_LOG(debug, "redis: parallel set: '{}'", single_mset.toString());
-    auto conn_pool = router.upstreamPool(incoming_request->asArray()[i].asString());
+    auto conn_pool = router.upstreamPool(incoming_request->asArray()[i]);
     if (conn_pool) {
       pending_request.conn_pool_ = conn_pool;
       pending_request.handle_ = conn_pool->makeRequest(incoming_request->asArray()[i].asString(),
@@ -469,7 +480,7 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
     single_fragment.asArray()[1].asString() = incoming_request->asArray()[i].asString();
     ENVOY_LOG(debug, "redis: parallel {}: '{}'", incoming_request->asArray()[0].asString(),
               single_fragment.toString());
-    auto conn_pool = router.upstreamPool(incoming_request->asArray()[i].asString());
+    auto conn_pool = router.upstreamPool(incoming_request->asArray()[i]);
     if (conn_pool) {
       pending_request.conn_pool_ = conn_pool;
       pending_request.handle_ = conn_pool->makeRequest(incoming_request->asArray()[i].asString(),

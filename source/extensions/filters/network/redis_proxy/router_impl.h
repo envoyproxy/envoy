@@ -6,6 +6,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 #include "envoy/thread_local/thread_local.h"
@@ -29,7 +30,8 @@ public:
                    prefix_routes,
                Upstreams&& upstreams);
 
-  ConnPool::InstanceSharedPtr upstreamPool(std::string& key) override;
+  ConnPool::InstanceSharedPtr upstreamPool(Common::Redis::RespValue& key) override;
+  ConnPool::InstanceSharedPtr upstreamPool(std::vector<Common::Redis::RespValue>& keys) override;
 
 private:
   struct Prefix {

@@ -24,7 +24,9 @@ public:
   MockRouter();
   ~MockRouter();
 
-  MOCK_METHOD1(upstreamPool, ConnPool::InstanceSharedPtr(std::string& key));
+  MOCK_METHOD1(upstreamPool, ConnPool::InstanceSharedPtr(Common::Redis::RespValue& key));
+  MOCK_METHOD1(upstreamPool,
+               ConnPool::InstanceSharedPtr(std::vector<Common::Redis::RespValue>& key));
 };
 
 namespace ConnPool {

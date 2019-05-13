@@ -35,19 +35,47 @@ PrefixRoutes::PrefixRoutes(
   }
 }
 
-ConnPool::InstanceSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
+ConnPool::InstanceSharedPtr PrefixRoutes::upstreamPool(Common::Redis::RespValue& key) {
+  std::string& key_str = key.asString();
   PrefixPtr value = nullptr;
   if (case_insensitive_) {
-    std::string copy(key);
+    std::string copy(key_str);
     to_lower_table_.toLowerCase(copy);
     value = prefix_lookup_table_.findLongestPrefix(copy.c_str());
   } else {
-    value = prefix_lookup_table_.findLongestPrefix(key.c_str());
+    value = prefix_lookup_table_.findLongestPrefix(key_str.c_str());
   }
 
   if (value != nullptr) {
     if (value->remove_prefix) {
-      key.erase(0, value->prefix.length());
+      key_str.erase(0, value->prefix.length());
+    }
+    return value->upstream;
+  }
+
+  return catch_all_upstream_;
+}
+
+ConnPool::InstanceSharedPtr
+PrefixRoutes::upstreamPool(std::vector<Common::Redis::RespValue>& keys) {
+  if (keys.empty()) {
+    return catch_all_upstream_;
+  }
+
+  PrefixPtr value = nullptr;
+  if (case_insensitive_) {
+    std::string copy(keys[0].asString());
+    to_lower_table_.toLowerCase(copy);
+    value = prefix_lookup_table_.findLongestPrefix(copy.c_str());
+  } else {
+    value = prefix_lookup_table_.findLongestPrefix(keys[0].asString().c_str());
+  }
+
+  if (value != nullptr) {
+    if (value->remove_prefix) {
+      for (auto& key : keys) {
+        key.asString().erase(0, value->prefix.length());
+      }
     }
     return value->upstream;
   }
