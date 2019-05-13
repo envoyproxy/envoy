@@ -334,9 +334,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   const Http::HeaderEntry* request_alt_name = headers.EnvoyUpstreamAltStatName();
   if (request_alt_name) {
-    // NOTE: Note that converting this header value into a StatName requires taking
-    // a global symbol-table lock. Is this scenario common enough to raise concern?
-    // Or is this effectively a test hook?
+    // NOTE: converting this header value into a StatName requires taking a
+    // global symbol-table lock. Is this scenario common enough to raise
+    // concern?  Or is this effectively a test hook?
     alt_stat_prefix_ = std::make_unique<Stats::StatNameManagedStorage>(
         request_alt_name->value().getStringView(), config_.scope_.symbolTable());
     headers.removeEnvoyUpstreamAltStatName();

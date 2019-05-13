@@ -10,13 +10,10 @@
 #include "common/router/config_impl.h"
 #include "common/router/router_ratelimit.h"
 
-//#include "common/stats/fake_symbol_table_impl.h"
-
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/mocks.h"
-//#include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
