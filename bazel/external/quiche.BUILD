@@ -52,7 +52,7 @@ genrule(
 # Use #pragma GCC diagnostic ignored in integration code to suppress these errors.
 quiche_copt = [
     "-Wno-unused-parameter",
-    # QUIC uses offsetof() to optimize memory usage in frames.
+    # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
     "-Wno-invalid-offsetof",
 ]
 

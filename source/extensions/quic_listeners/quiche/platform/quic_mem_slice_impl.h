@@ -69,7 +69,7 @@ private:
     }
 
     // TODO(danzh) fragment_ is not aligned in memory. This can cause extra
-    // read of memory when accessing MemSlice::data(). Investigate suggestion
+    // CPU read when accessing MemSlice::data(). Investigate suggestion
     // in https://github.com/envoyproxy/envoy/pull/6400/files#r277272709 to
     // mitigate the extra cost if it stands out.
     Envoy::Buffer::BufferFragmentImpl fragment_;
