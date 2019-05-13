@@ -39,6 +39,24 @@ private:
   absl::string_view path_and_query_params_;
 };
 
+class PercentEncoding {
+public:
+  /**
+   * Encodes string view to its percent encoded representation.
+   * @param value supplies string to be encoded.
+   * @return std::string percent-encoded string based on
+   * https://tools.ietf.org/html/rfc3986#section-2.1.
+   */
+  static std::string encode(absl::string_view value);
+
+  /**
+   * Decodes string view from its percent encoded representation.
+   * @param encoded supplies string to be decoded.
+   * @return std::string decoded string https://tools.ietf.org/html/rfc3986#section-2.1.
+   */
+  static std::string decode(absl::string_view value);
+};
+
 /**
  * Append to x-forwarded-for header.
  * @param headers supplies the headers to append to.

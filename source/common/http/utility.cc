@@ -3,6 +3,8 @@
 #include <http_parser.h>
 
 #include <cstdint>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -322,8 +324,9 @@ void Utility::sendLocalReply(
              enumToInt(grpc_status ? grpc_status.value()
                                    : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
     if (!body_text.empty() && !is_head_request) {
-      // TODO: GrpcMessage should be percent-encoded
-      response_headers->insertGrpcMessage().value(body_text);
+      // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
+      // status.
+      response_headers->insertGrpcMessage().value(PercentEncoding::encode(body_text));
     }
     encode_headers(std::move(response_headers), true); // Trailers only response
     return;
@@ -560,6 +563,43 @@ void Utility::traversePerFilterConfigGeneric(
       cb(*maybe_weighted_cluster_config);
     }
   }
+}
+
+std::string Utility::PercentEncoding::encode(absl::string_view value) {
+  std::ostringstream encoded;
+  for (size_t i = 0; i < value.size(); ++i) {
+    char c = value[i];
+    // Unreserved characters. unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~".
+    // https://tools.ietf.org/html/rfc3986#section-2.3.
+    if (absl::ascii_isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+      encoded << c;
+      // TODO(dio): Check for ' ' and allow to encode it as '+' instead of '%20' if desired.
+    } else {
+      // For consistency, URI producers and normalizers should use uppercase hexadecimal digits for
+      // all percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
+      encoded << std::uppercase;
+      encoded << '%' << std::hex << std::setw(2) << std::setfill('0') << (c & 0xff) << std::dec;
+      encoded << std::nouppercase;
+    }
+  }
+  return encoded.str();
+}
+
+std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
+  std::ostringstream decoded;
+  for (size_t i = 0; i < encoded.size(); ++i) {
+    char c = encoded[i];
+    if (c == '%') {
+      int d;
+      std::istringstream captured(std::string(encoded.substr(i + 1, 2)));
+      captured >> std::hex >> d;
+      decoded << static_cast<char>(d);
+      i += 2;
+    } else {
+      decoded << c;
+    }
+  }
+  return decoded.str();
 }
 
 } // namespace Http
