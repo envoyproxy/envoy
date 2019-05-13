@@ -239,7 +239,6 @@ TEST_P(CdsIntegrationTest, ControlPlaneConfigDump) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/config_dump", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
-  std::cerr << "Control Plane config dump " << response->body() << "\n";
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   const std::string control_plane_config_dump = R"EOF(
    "service_control_plane_info": {

@@ -133,7 +133,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     return;
   }
 
-  updateControlPlaneConfigDump(*message);
+  updateControlPlaneConfig(*message);
 
   if (api_state_[type_url].watches_.empty()) {
     // update the nonce as we are processing this response.
@@ -220,12 +220,10 @@ void GrpcMuxImpl::onEstablishmentFailure() {
   }
 }
 
-void GrpcMuxImpl::updateControlPlaneConfigDump(const envoy::api::v2::DiscoveryResponse& message) {
+void GrpcMuxImpl::updateControlPlaneConfig(const envoy::api::v2::DiscoveryResponse& message) {
   if (message.has_control_plane()) {
-    Protobuf::util::MessageDifferencer message_differencer;
     Server::ConfigTracker::ControlPlaneConfigPtr control_plane_config =
         config_tracker_.getControlPlaneConfig(xds_service_);
-
     // Check if control plane information is already available for the xds service that points to
     // the grpc_service. If yes, either a new response might have come from the management server it
     // is already connected to or it is now connected to a different management server instance that
@@ -240,40 +238,28 @@ void GrpcMuxImpl::updateControlPlaneConfigDump(const envoy::api::v2::DiscoveryRe
           new_service_control_plane_info;
       auto* new_config_source_control_info =
           new_service_control_plane_info.add_config_source_control_plane();
-      populateControlPlaneIdentifier(new_config_source_control_info,
-                                     message.control_plane().identifier());
-      new_config_source_control_info->mutable_grpc_service()->MergeFrom(grpc_service_);
-      (*control_plane_config->mutable_service_control_plane_info())[xds_service_] =
-          new_service_control_plane_info;
-
+      populateControlPlaneConfigSource(control_plane_config.get(), new_config_source_control_info,
+                                       message.control_plane().identifier());
+      (*control_plane_config->mutable_service_control_plane_info())[xds_service_].MergeFrom(
+          new_service_control_plane_info);
     } else {
       // If service exists, check if the config source exists, if it is there update it else create
       // a new config source.
-      int config_source_index = -1;
-      bool config_exists = false;
-      for (auto& config_control_plane :
-           service_control_plane_info->second.config_source_control_plane()) {
-        config_source_index++;
-        if (message_differencer.Compare(grpc_service_, config_control_plane.grpc_service())) {
-          config_exists = true;
-          break;
-        }
-      }
-      if (!config_exists) {
+      if (!config_tracked_) {
         // create a new config source with grpc_service and identifier.
         auto* new_config_source_control_info =
             (*control_plane_config->mutable_service_control_plane_info())[xds_service_]
                 .add_config_source_control_plane();
-        populateControlPlaneIdentifier(new_config_source_control_info,
-                                       message.control_plane().identifier());
-        new_config_source_control_info->mutable_grpc_service()->MergeFrom(grpc_service_);
+        populateControlPlaneConfigSource(control_plane_config.get(), new_config_source_control_info,
+                                         message.control_plane().identifier());
       } else {
         // update the control plane identifier of existing grpc_service.
         auto* existing_config_source_control_info =
             (*control_plane_config->mutable_service_control_plane_info())[xds_service_]
-                .mutable_config_source_control_plane(config_source_index);
-        populateControlPlaneIdentifier(existing_config_source_control_info,
-                                       message.control_plane().identifier());
+                .mutable_config_source_control_plane(config_source_index_);
+        populateControlPlaneConfigSource(control_plane_config.get(),
+                                         existing_config_source_control_info,
+                                         message.control_plane().identifier());
       }
     }
     config_tracker_.addOrUpdateControlPlaneConfig(
@@ -282,9 +268,20 @@ void GrpcMuxImpl::updateControlPlaneConfigDump(const envoy::api::v2::DiscoveryRe
   }
 }
 
-void GrpcMuxImpl::populateControlPlaneIdentifier(
+void GrpcMuxImpl::populateControlPlaneConfigSource(
+    const envoy::admin::v2alpha::ControlPlaneConfigDump* control_plane_config,
     envoy::admin::v2alpha::ControlPlaneConfigDump_ConfigSourceControlPlaneInfo* config_source_info,
     const std::string& identifier) {
+  if (!config_tracked_) {
+    config_source_info->mutable_grpc_service()->MergeFrom(grpc_service_);
+    config_tracked_ = true;
+    auto service_control_plane_info =
+        control_plane_config->service_control_plane_info().find(xds_service_);
+    if (service_control_plane_info != control_plane_config->service_control_plane_info().end()) {
+      config_source_index_ =
+          service_control_plane_info->second.config_source_control_plane_size() - 1;
+    }
+  }
   config_source_info->mutable_control_plane()->set_identifier(identifier);
   TimestampUtil::systemClockToTimestamp(time_source_.systemTime(),
                                         *(config_source_info->mutable_last_updated()));

@@ -53,8 +53,9 @@ public:
 
 private:
   void setRetryTimer();
-  void updateControlPlaneConfigDump(const envoy::api::v2::DiscoveryResponse& message);
-  void populateControlPlaneIdentifier(
+  void updateControlPlaneConfig(const envoy::api::v2::DiscoveryResponse& message);
+  void populateControlPlaneConfigSource(
+      const envoy::admin::v2alpha::ControlPlaneConfigDump* control_plane_config,
       envoy::admin::v2alpha::ControlPlaneConfigDump_ConfigSourceControlPlaneInfo*
           config_source_info,
       const std::string& identifier);
@@ -111,6 +112,8 @@ private:
   TimeSource& time_source_;
   Server::ConfigTracker& config_tracker_;
   envoy::api::v2::core::GrpcService grpc_service_;
+  bool config_tracked_{false};
+  uint32_t config_source_index_{0};
 
   // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
   // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
