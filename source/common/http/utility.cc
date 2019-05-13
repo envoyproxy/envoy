@@ -575,8 +575,8 @@ std::string Utility::PercentEncoding::encode(absl::string_view value) {
       encoded << c;
       // TODO(dio): Check for ' ' and allow to encode it as '+' instead of '%20' if desired.
     } else {
-      // For consistency, URI producers and normalizers should use uppercase hexadecimal digits for
-      // all percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
+      // For consistency, URI producers should use uppercase hexadecimal digits for all
+      // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
       encoded << std::uppercase;
       encoded << '%' << std::hex << std::setw(2) << std::setfill('0') << (c & 0xff) << std::dec;
       encoded << std::nouppercase;
