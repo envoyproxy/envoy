@@ -63,12 +63,12 @@ TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
   AccessLogCallbacks* callbacks1;
   expectStreamStart(stream1, &callbacks1);
   EXPECT_CALL(local_info_, node());
-  EXPECT_CALL(stream1, sendMessageRaw(_, false));
+  EXPECT_CALL(stream1, sendMessageRaw_(_, false));
   envoy::service::accesslog::v2::StreamAccessLogsMessage message_log1;
   streamer_->send(message_log1, "log1");
 
   message_log1.Clear();
-  EXPECT_CALL(stream1, sendMessageRaw(_, false));
+  EXPECT_CALL(stream1, sendMessageRaw_(_, false));
   streamer_->send(message_log1, "log1");
 
   // Start a stream for the second log.
@@ -76,7 +76,7 @@ TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
   AccessLogCallbacks* callbacks2;
   expectStreamStart(stream2, &callbacks2);
   EXPECT_CALL(local_info_, node());
-  EXPECT_CALL(stream2, sendMessageRaw(_, false));
+  EXPECT_CALL(stream2, sendMessageRaw_(_, false));
   envoy::service::accesslog::v2::StreamAccessLogsMessage message_log2;
   streamer_->send(message_log2, "log2");
 
@@ -88,7 +88,7 @@ TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
   callbacks2->onRemoteClose(Grpc::Status::Internal, "bad");
   expectStreamStart(stream2, &callbacks2);
   EXPECT_CALL(local_info_, node());
-  EXPECT_CALL(stream2, sendMessageRaw(_, false));
+  EXPECT_CALL(stream2, sendMessageRaw_(_, false));
   streamer_->send(message_log2, "log2");
 }
 

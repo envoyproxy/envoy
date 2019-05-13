@@ -7,6 +7,7 @@
 #include "common/config/datasource.h"
 #include "common/grpc/common.h"
 #include "common/grpc/google_grpc_creds_impl.h"
+#include "common/grpc/google_grpc_utils.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "grpcpp/support/proto_buffer_reader.h"
@@ -141,7 +142,7 @@ GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
 }
 
 GoogleAsyncStreamImpl::PendingMessage::PendingMessage(Buffer::InstancePtr request, bool end_stream)
-    : buf_(Common::makeByteBuffer(std::move(request))), end_stream_(end_stream) {}
+    : buf_(GoogleGrpcUtils::makeByteBuffer(std::move(request))), end_stream_(end_stream) {}
 
 // TODO(htuch): figure out how to propagate "this request should be buffered for
 // retry" bit to Google gRPC library.
@@ -316,7 +317,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
   }
   case GoogleAsyncTag::Operation::Read: {
     ASSERT(ok);
-    if (!callbacks_.onReceiveMessageRaw(Common::makeBufferInstance(read_buf_))) {
+    if (!callbacks_.onReceiveMessageRaw(GoogleGrpcUtils::makeBufferInstance(read_buf_))) {
       // This is basically streamError in Grpc::AsyncClientImpl.
       notifyRemoteClose(Status::GrpcStatus::Internal, nullptr, EMPTY_STRING);
       resetStream();

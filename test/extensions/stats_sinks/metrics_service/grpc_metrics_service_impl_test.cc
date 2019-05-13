@@ -58,7 +58,7 @@ TEST_F(GrpcMetricsStreamerImplTest, BasicFlow) {
   MetricsServiceCallbacks* callbacks1;
   expectStreamStart(stream1, &callbacks1);
   EXPECT_CALL(local_info_, node());
-  EXPECT_CALL(stream1, sendMessageRaw(_, false));
+  EXPECT_CALL(stream1, sendMessageRaw_(_, false));
   envoy::service::metrics::v2::StreamMetricsMessage message_metrics1;
   streamer_->send(message_metrics1);
   // Verify that sending an empty response message doesn't do anything bad.

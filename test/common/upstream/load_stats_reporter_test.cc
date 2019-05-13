@@ -53,7 +53,7 @@ public:
     expected_request.mutable_node()->MergeFrom(local_info_.node());
     std::copy(expected_cluster_stats.begin(), expected_cluster_stats.end(),
               Protobuf::RepeatedPtrFieldBackInserter(expected_request.mutable_cluster_stats()));
-    EXPECT_CALL(async_stream_, sendMessageRaw(Grpc::ProtoBufferEq(expected_request), false));
+    EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));
   }
 
   void deliverLoadStatsResponse(const std::vector<std::string>& cluster_names) {
@@ -93,17 +93,17 @@ TEST_F(LoadStatsReporterTest, StreamCreationFailure) {
 
 TEST_F(LoadStatsReporterTest, TestPubSub) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
-  EXPECT_CALL(async_stream_, sendMessageRaw(_, _));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createLoadStatsReporter();
   deliverLoadStatsResponse({"foo"});
 
-  EXPECT_CALL(async_stream_, sendMessageRaw(_, _));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
   response_timer_cb_();
 
   deliverLoadStatsResponse({"bar"});
 
-  EXPECT_CALL(async_stream_, sendMessageRaw(_, _));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
   response_timer_cb_();
 }

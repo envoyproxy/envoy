@@ -130,6 +130,7 @@ envoy_cc_library(
     deps = [
         ":common_lib",
         ":google_grpc_creds_lib",
+        ":google_grpc_utils_lib",
         ":typed_async_client_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/grpc:google_grpc_creds_interface",

@@ -29,7 +29,10 @@ public:
   MockAsyncStream();
   ~MockAsyncStream();
 
-  MOCK_METHOD2_T(sendMessageRaw, void(Buffer::InstancePtr&& request, bool end_stream));
+  void sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) {
+    sendMessageRaw_(request, end_stream);
+  }
+  MOCK_METHOD2_T(sendMessageRaw_, void(Buffer::InstancePtr& request, bool end_stream));
   MOCK_METHOD0_T(closeStream, void());
   MOCK_METHOD0_T(resetStream, void());
   MOCK_METHOD0_T(isGrpcHeaderRequired, bool());
@@ -109,6 +112,22 @@ MATCHER_P(ProtoBufferEq, expected, "") {
                      << expected.DebugString()
                      << "------------------is not equal to actual proto:------------------\n"
                      << proto.DebugString()
+                     << "=================================================================\n";
+  }
+  return equal;
+}
+
+MATCHER_P2(ProtoBufferEqIgnoringField, expected, ignored_field, "") {
+  typename std::remove_const<decltype(expected)>::type proto;
+  proto.ParseFromArray(static_cast<char*>(arg->linearize(arg->length())), arg->length());
+  auto equal = ::Envoy::TestUtility::protoEqualIgnoringField(proto, expected, ignored_field);
+  if (!equal) {
+    std::string but_ignoring = absl::StrCat("(but ignoring ", ignored_field, ")");
+    *result_listener << "\n"
+                     << "=======================Expected proto:===========================\n"
+                     << expected.DebugString() << " " << but_ignoring
+                     << "------------------is not equal to actual proto:------------------\n"
+                     << proto.DebugString() << " " << but_ignoring
                      << "=================================================================\n";
   }
   return equal;

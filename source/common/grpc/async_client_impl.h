@@ -49,6 +49,8 @@ public:
 
   virtual void initialize(bool buffer_body_for_retry);
 
+  void sendMessage(const Protobuf::Message& request, bool end_stream);
+
   // Http::AsyncClient::StreamCallbacks
   void onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void onData(Buffer::Instance& data, bool end_stream) override;

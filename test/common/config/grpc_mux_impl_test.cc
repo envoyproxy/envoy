@@ -78,7 +78,7 @@ public:
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
     }
-    EXPECT_CALL(async_stream_, sendMessageRaw(Grpc::ProtoBufferEq(expected_request), false));
+    EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -398,7 +398,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
 
   setup();
 
-  EXPECT_CALL(async_stream_, sendMessageRaw(_, false)).Times(AtLeast(99));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)).Times(AtLeast(99));
   EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
 
   const auto onReceiveMessage = [&](uint64_t burst) {
@@ -451,7 +451,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSetti
   custom_rate_limit_settings.enabled_ = true;
   setup(custom_rate_limit_settings);
 
-  EXPECT_CALL(async_stream_, sendMessageRaw(_, false)).Times(AtLeast(99));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)).Times(AtLeast(99));
   EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
 
   const auto onReceiveMessage = [&](uint64_t burst) {
@@ -505,7 +505,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   custom_rate_limit_settings.fill_rate_ = 2;
   setup(custom_rate_limit_settings);
 
-  EXPECT_CALL(async_stream_, sendMessageRaw(_, false)).Times(AtLeast(260));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)).Times(AtLeast(260));
   EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
 
   const auto onReceiveMessage = [&](uint64_t burst) {

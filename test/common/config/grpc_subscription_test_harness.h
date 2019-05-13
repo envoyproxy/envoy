@@ -48,7 +48,7 @@ public:
         rate_limit_settings_, init_fetch_timeout);
   }
 
-  ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessageRaw(_, false)); }
+  ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)); }
 
   void expectSendMessage(const std::set<std::string>& cluster_names,
                          const std::string& version) override {
@@ -72,7 +72,7 @@ public:
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
     }
-    EXPECT_CALL(async_stream_, sendMessageRaw(Grpc::ProtoBufferEq(expected_request), false));
+    EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));
   }
 
   void startSubscription(const std::set<std::string>& cluster_names) override {

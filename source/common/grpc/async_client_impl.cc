@@ -179,6 +179,11 @@ void AsyncStreamImpl::sendMessage(const Protobuf::Message& request, bool end_str
   stream_->sendData(*Common::serializeToGrpcFrame(request), end_stream);
 }
 
+void AsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& buffer, bool end_stream) {
+  Common::prependGrpcFrameHeader(*buffer);
+  stream_->sendData(*buffer, end_stream);
+}
+
 void AsyncStreamImpl::closeStream() {
   Buffer::OwnedImpl empty_buffer;
   stream_->sendData(empty_buffer, true);

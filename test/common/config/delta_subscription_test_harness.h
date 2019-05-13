@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/config/delta_subscription_impl.h"
 
 #include "test/common/config/subscription_test_harness.h"
@@ -88,10 +89,13 @@ public:
       error_detail->set_message(error_message);
     }
     EXPECT_CALL(async_stream_,
-                sendMessageRaw(ProtoEqIgnoringField(expected_request, "response_nonce"), false))
-        .WillOnce([this](const Protobuf::Message& message, bool) {
-          const std::string nonce =
-              static_cast<const envoy::api::v2::DeltaDiscoveryRequest&>(message).response_nonce();
+                sendMessageRaw_(
+                    Grpc::ProtoBufferEqIgnoringField(expected_request, "response_nonce"), false))
+        .WillOnce([this](Buffer::InstancePtr& buffer, bool) {
+          Buffer::ZeroCopyInputStreamImpl stream(std::move(buffer));
+          envoy::api::v2::DeltaDiscoveryRequest message;
+          EXPECT_TRUE(message.ParseFromZeroCopyStream(&stream));
+          const std::string nonce = message.response_nonce();
           if (!nonce.empty()) {
             nonce_acks_sent_.push(nonce);
           }
