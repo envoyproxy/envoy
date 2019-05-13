@@ -415,6 +415,10 @@ absl::optional<SystemTime> SslSocket::expirationPeerCertificate() const {
 
 std::string SslSocket::sessionId() const {
   SSL_SESSION* session = SSL_get_session(ssl_.get());
+  if (session == nullptr) {
+    return "";
+  }
+
   unsigned int sessionIdLength = 0;
   const uint8_t* sessionId = nullptr;
 
