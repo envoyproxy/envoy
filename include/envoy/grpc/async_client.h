@@ -38,7 +38,7 @@ public:
 
   /**
    * Send request message to the stream.
-   * @param request serializalized message.
+   * @param request serialized message.
    * @param end_stream close the stream locally. No further methods may be invoked on the stream
    *                   object, but callbacks may still be received until the stream is closed
    *                   remotely.
@@ -128,7 +128,7 @@ public:
   /**
    * Called when the remote closes or an error occurs on the gRPC stream. The stream is
    * considered remotely closed after this invocation and no further callbacks will be
-  { * invoked. In addition, no further stream operations are permitted.
+   * invoked. In addition, no further stream operations are permitted.
    * @param status the gRPC status.
    * @param message the gRPC status message or empty string if not present.
    */
