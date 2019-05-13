@@ -44,16 +44,6 @@ SysCallSizeResult OsSysCallsImpl::recvfrom(int sockfd, void* buffer, size_t leng
   return {rc, errno};
 }
 
-SysCallIntResult OsSysCallsImpl::shmOpen(const char* name, int oflag, mode_t mode) {
-  const int rc = ::shm_open(name, oflag, mode);
-  return {rc, errno};
-}
-
-SysCallIntResult OsSysCallsImpl::shmUnlink(const char* name) {
-  const int rc = ::shm_unlink(name);
-  return {rc, errno};
-}
-
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
   const int rc = ::ftruncate(fd, length);
   return {rc, errno};

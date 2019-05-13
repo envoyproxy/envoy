@@ -187,7 +187,9 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
 
     // TODO(htuch): should this be under the config.userAgent() condition or in the outer scope?
     if (!local_info.nodeName().empty()) {
-      request_headers.insertEnvoyDownstreamServiceNode().value(local_info.nodeName());
+      // Following setReference() is safe because local info is constant for the life of the server.
+      request_headers.insertEnvoyDownstreamServiceNode().value().setReference(
+          local_info.nodeName());
     }
   }
 

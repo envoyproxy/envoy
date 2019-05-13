@@ -151,6 +151,7 @@ MSVC
 MTLS
 MiB
 NACK
+NACKs
 NACKed
 NBF
 NBSP
@@ -158,6 +159,7 @@ NDEBUG
 NGHTTP
 NOLINT
 NOLINTNEXTLINE
+NONCES
 NS
 NUL
 Nilsson
@@ -769,6 +771,7 @@ unreferenced
 unregister
 unregisters
 unresolvable
+unsubscription
 unterminated
 untruncated
 untrusted

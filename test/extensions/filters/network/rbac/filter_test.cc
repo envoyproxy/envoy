@@ -72,8 +72,8 @@ public:
     ON_CALL(stream_info_, setDynamicMetadata(NetworkFilterNames::get().Rbac, _))
         .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
           stream_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>(
-                  NetworkFilterNames::get().Rbac, obj));
+              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(NetworkFilterNames::get().Rbac,
+                                                                  obj));
         }));
   }
 
