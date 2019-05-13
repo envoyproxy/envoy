@@ -39,13 +39,12 @@ public:
     return *new_stat;
   }
 
-  const Base* get(StatName name) const {
+  absl::optional<std::reference_wrapper<const Base>> find(StatName name) const {
     auto stat = stats_.find(name);
     if (stat == stats_.end()) {
-      name.debugPrint();
-      return nullptr;
+      return absl::nullopt;
     }
-    return stat->second.get();
+    return std::cref(*stat->second.get());
   }
 
   std::vector<std::shared_ptr<Base>> toVector() const {
@@ -78,9 +77,16 @@ public:
     Histogram& histogram = histograms_.get(name);
     return histogram;
   }
-  const Counter* getCounter(StatName name) const override { return counters_.get(name); }
-  const Gauge* getGauge(StatName name) const override { return gauges_.get(name); }
-  const Histogram* getHistogram(StatName name) const override { return histograms_.get(name); }
+  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+    return counters_.find(name);
+  }
+  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+    return gauges_.find(name);
+  }
+  absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const override {
+    return histograms_.find(name);
+  }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }

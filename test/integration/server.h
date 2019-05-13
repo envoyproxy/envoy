@@ -106,17 +106,18 @@ public:
     return histogramFromStatName(storage.statName());
   }
 
-  const Counter* getCounter(StatName name) const override {
+  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->getCounter(name);
+    return wrapped_scope_->findCounter(name);
   }
-  const Gauge* getGauge(StatName name) const override {
+  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->getGauge(name);
+    return wrapped_scope_->findGauge(name);
   }
-  const Histogram* getHistogram(StatName name) const override {
+  absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->getHistogram(name);
+    return wrapped_scope_->findHistogram(name);
   }
 
   const SymbolTable& symbolTable() const override { return wrapped_scope_->symbolTable(); }
@@ -165,17 +166,18 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
   }
-  const Counter* getCounter(StatName name) const override {
+  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
-    return store_.getCounter(name);
+    return store_.findCounter(name);
   }
-  const Gauge* getGauge(StatName name) const override {
+  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
-    return store_.getGauge(name);
+    return store_.findGauge(name);
   }
-  const Histogram* getHistogram(StatName name) const override {
+  absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
-    return store_.getHistogram(name);
+    return store_.findHistogram(name);
   }
   const SymbolTable& symbolTable() const override { return store_.symbolTable(); }
   SymbolTable& symbolTable() override { return store_.symbolTable(); }

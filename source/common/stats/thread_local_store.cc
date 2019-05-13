@@ -328,11 +328,6 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   // If we have a TLS cache, insert the stat.
   if (tls_cache) {
     tls_cache->insert(std::make_pair((*central_ref)->statName(), *central_ref));
-    ENVOY_LOG_MISC(debug, "stat added to central cache map");
-    name.debugPrint();
-    ENVOY_LOG_MISC(debug, "central_cache_map = {}", static_cast<void*>(&central_cache_map));
-    ENVOY_LOG_MISC(debug, "this = {}", static_cast<const void*>(this));
-    ENVOY_LOG_MISC(debug, "parent_ = {}", static_cast<void*>(&parent_));
   }
 
   // Finally we return the reference.
@@ -342,46 +337,21 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 // TODO(ahedberg): This is largely duplicated from safeMakeStat and should
 // be cleaned up at some point.
 template <class StatType>
-const StatType* ThreadLocalStoreImpl::ScopeImpl::safeGetStat(
-    StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
-    StatMap<std::shared_ptr<StatType>>* tls_cache, StatNameHashSet* tls_rejected_stats) const {
-
-  if (tls_rejected_stats != nullptr &&
-      tls_rejected_stats->find(name) != tls_rejected_stats->end()) {
-    return nullptr;
-  }
-
-  // If we have a valid cache entry, return it.
-  if (tls_cache) {
-    auto pos = tls_cache->find(name);
-    if (pos != tls_cache->end()) {
-      return pos->second.get();
-    }
-  }
-
-  // We must now look in the central store so we must be locked. We grab a reference to the
-  // central store location. It might contain nothing. In this case, we return
-  // nullptr.
-  // already holding lock in parent
+absl::optional<std::reference_wrapper<const StatType>>
+ThreadLocalStoreImpl::ScopeImpl::safeFindStat(StatName name,
+                                              StatMap<std::shared_ptr<StatType>>& central_cache_map,
+                                              StatMap<std::shared_ptr<StatType>>* tls_cache) const {
   auto iter = central_cache_map.find(name);
   if (iter == central_cache_map.end()) {
-    // The stat doesn't exist in the central store, so return nullptr.
-    ENVOY_LOG_MISC(debug, "stat not in central cache map");
-    name.debugPrint();
-    ENVOY_LOG_MISC(debug, "central_cache_map = {}", static_cast<void*>(&central_cache_map));
-    ENVOY_LOG_MISC(debug, "this = {}", static_cast<const void*>(this));
-    ENVOY_LOG_MISC(debug, "parent_ = {}", static_cast<void*>(&parent_));
-    return nullptr;
+    return absl::nullopt;
   }
 
   std::shared_ptr<StatType>* central_ref = &(iter->second);
-  // If we have a TLS cache, insert the stat.
   if (tls_cache) {
     tls_cache->insert(std::make_pair((*central_ref)->statName(), *central_ref));
   }
 
-  // Finally we return the pointer to the stat.
-  return central_ref->get();
+  return std::cref(*central_ref->get());
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
@@ -522,9 +492,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name)
   return **central_ref;
 }
 
-const Counter* ThreadLocalStoreImpl::ScopeImpl::getCounter(StatName name) const {
+absl::optional<std::reference_wrapper<const Counter>>
+ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
   if (parent_.rejectsAll()) {
-    return nullptr;
+    return absl::nullopt;
   }
 
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
@@ -533,20 +504,18 @@ const Counter* ThreadLocalStoreImpl::ScopeImpl::getCounter(StatName name) const 
   StatName final_stat_name(final_name.get());
 
   StatMap<CounterSharedPtr>* tls_cache = nullptr;
-  StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
     tls_cache = &entry.counters_;
-    tls_rejected_stats = &entry.rejected_stats_;
   }
 
-  return safeGetStat<Counter>(final_stat_name, central_cache_.counters_, tls_cache,
-                              tls_rejected_stats);
+  return safeFindStat<Counter>(final_stat_name, central_cache_.counters_, tls_cache);
 }
 
-const Gauge* ThreadLocalStoreImpl::ScopeImpl::getGauge(StatName name) const {
+absl::optional<std::reference_wrapper<const Gauge>>
+ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
   if (parent_.rejectsAll()) {
-    return nullptr;
+    return absl::nullopt;
   }
 
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
@@ -555,19 +524,18 @@ const Gauge* ThreadLocalStoreImpl::ScopeImpl::getGauge(StatName name) const {
   StatName final_stat_name(final_name.get());
 
   StatMap<GaugeSharedPtr>* tls_cache = nullptr;
-  StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
     tls_cache = &entry.gauges_;
-    tls_rejected_stats = &entry.rejected_stats_;
   }
 
-  return safeGetStat<Gauge>(final_stat_name, central_cache_.gauges_, tls_cache, tls_rejected_stats);
+  return safeFindStat<Gauge>(final_stat_name, central_cache_.gauges_, tls_cache);
 }
 
-const Histogram* ThreadLocalStoreImpl::ScopeImpl::getHistogram(StatName name) const {
+absl::optional<std::reference_wrapper<const Histogram>>
+ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
   if (parent_.rejectsAll()) {
-    return nullptr;
+    return absl::nullopt;
   }
 
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
@@ -576,31 +544,23 @@ const Histogram* ThreadLocalStoreImpl::ScopeImpl::getHistogram(StatName name) co
   StatName final_stat_name(final_name.get());
 
   StatMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
-  StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
     tls_cache = &entry.parent_histograms_;
-    auto iter = tls_cache->find(final_stat_name);
-    if (iter != tls_cache->end()) {
-      return iter->second.get();
-    }
-    tls_rejected_stats = &entry.rejected_stats_;
-    if (tls_rejected_stats->find(final_stat_name) != tls_rejected_stats->end()) {
-      return nullptr;
-    }
   }
 
   auto iter = central_cache_.histograms_.find(final_stat_name);
-  ParentHistogramImplSharedPtr* central_ref = nullptr;
   if (iter == central_cache_.histograms_.end()) {
-    return nullptr;
+    return absl::nullopt;
   }
 
-  central_ref = &iter->second;
-  if (tls_cache != nullptr) {
+  ParentHistogramImplSharedPtr* central_ref = &(iter->second);
+  if (tls_cache) {
     tls_cache->insert(std::make_pair((*central_ref)->statName(), *central_ref));
   }
-  return central_ref->get();
+
+  std::shared_ptr<Histogram> histogram_ref(*central_ref);
+  return std::cref(*histogram_ref.get());
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,

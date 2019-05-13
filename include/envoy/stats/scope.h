@@ -1,11 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/symbol_table.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
@@ -86,24 +89,24 @@ public:
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
-   * @return a pointer to a counter within the scope's namespace, or nullptr if
-   * no counter with that name exists.
+   * @return a reference to a counter within the scope's namespace, if it exists.
    */
-  virtual const Counter* getCounter(StatName name) const PURE;
+  virtual absl::optional<std::reference_wrapper<const Counter>>
+  findCounter(StatName name) const PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
-   * @return a pointer to a gauge within the scope's namespace, or nullptr if
-   * no gauge with that name exists.
+   * @return a reference to a gauge within the scope's namespace, if it exists.
    */
-  virtual const Gauge* getGauge(StatName name) const PURE;
+  virtual absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
-   * @return a pointer to a histogram within the scope's namespace, or nullptr if
-   * no histogram with that name exists.
+   * @return a reference to a histogram within the scope's namespace, if it
+   * exists.
    */
-  virtual const Histogram* getHistogram(StatName name) const PURE;
+  virtual absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const PURE;
 
   /**
    * @return a reference to the symbol table.

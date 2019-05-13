@@ -35,9 +35,10 @@ public:
     return histogramFromStatName(storage.statName());
   }
 
-  const Counter* getCounter(StatName name) const override;
-  const Gauge* getGauge(StatName name) const override;
-  const Histogram* getHistogram(StatName name) const override;
+  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override;
+  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override;
+  absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const override;
 
   const SymbolTable& symbolTable() const override { return scope_.symbolTable(); }
   virtual SymbolTable& symbolTable() override { return scope_.symbolTable(); }
