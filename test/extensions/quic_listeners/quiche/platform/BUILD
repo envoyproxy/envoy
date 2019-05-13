@@ -27,7 +27,11 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "quic_platform_test",
-    srcs = ["quic_platform_test.cc"],
+    srcs = select({
+        "//bazel:linux_x86_64": ["quic_platform_test.cc"],
+        "//bazel:linux_aarch64": ["quic_platform_test.cc"],
+        "//conditions:default": [],
+    }),
     copts = ["-Wno-unused-parameter"],
     data = [
         "//test/extensions/transport_sockets/tls/test_data:certs",
