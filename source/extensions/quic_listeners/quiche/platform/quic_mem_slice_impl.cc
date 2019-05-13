@@ -12,7 +12,7 @@ namespace quic {
 
 Envoy::Buffer::BufferFragmentImpl*
 QuicMemSliceImpl::allocateBufferAndFragment(QuicBufferAllocator* allocator, size_t length) {
-  BufferFragmentBundle* bundle = BufferFragmentBundle::CreateBundleWithSize(allocator, length);
+  BufferFragmentBundle* bundle = BufferFragmentBundle::createBundleWithSize(allocator, length);
   Envoy::Buffer::BufferFragmentImpl& fragment = bundle->fragment_;
   return new (&fragment) Envoy::Buffer::BufferFragmentImpl(
       bundle->buffer_, length,

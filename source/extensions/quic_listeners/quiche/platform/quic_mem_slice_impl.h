@@ -62,7 +62,7 @@ public:
 private:
   // Used to align both fragment and buffer at max aligned address.
   struct BufferFragmentBundle {
-    static BufferFragmentBundle* CreateBundleWithSize(QuicBufferAllocator* allocator,
+    static BufferFragmentBundle* createBundleWithSize(QuicBufferAllocator* allocator,
                                                       size_t length) {
       return reinterpret_cast<BufferFragmentBundle*>(
           allocator->New(sizeof(BufferFragmentBundle) + length));
