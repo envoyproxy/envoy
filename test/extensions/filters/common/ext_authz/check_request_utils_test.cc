@@ -86,8 +86,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
 
   ExpectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, request_headers,
-                                     Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>(),
-                                     request_, size);
+                                     Protobuf::Map<std::string, std::string>(), request_, size);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ(request_.attributes().request().http().headers().end(),
@@ -103,8 +102,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
 
   ExpectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
-                                     Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>(),
-                                     request_, size);
+                                     Protobuf::Map<std::string, std::string>(), request_, size);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ("true", request_.attributes().request().http().headers().at(
@@ -118,8 +116,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
 
   ExpectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
-                                     Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>(),
-                                     request_, buffer_->length());
+                                     Protobuf::Map<std::string, std::string>(), request_,
+                                     buffer_->length());
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().body());
@@ -145,7 +143,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
 
-  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> context_extensions;
+  Protobuf::Map<std::string, std::string> context_extensions;
   context_extensions["key"] = "value";
 
   CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),

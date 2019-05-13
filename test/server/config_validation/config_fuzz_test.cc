@@ -22,8 +22,6 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
   TestComponentFactory component_factory;
   Fuzz::PerTestEnvironment test_env;
 
-  RELEASE_ASSERT(validateProtoDescriptors(), "");
-
   const std::string bootstrap_path = test_env.temporaryPath("bootstrap.pb_text");
   std::ofstream bootstrap_file(bootstrap_path);
   bootstrap_file << input.DebugString();

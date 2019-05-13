@@ -1,3 +1,5 @@
+#include <arpa/inet.h>
+
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
@@ -347,6 +349,19 @@ TEST(GrpcCommonTest, ValidateResponse) {
         {":status", "200"}, {"grpc-status", "4"}, {"grpc-message", "custom error"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "custom error");
   }
+}
+
+// Ensure that the correct gPRC header is constructed for a Buffer::Instance.
+TEST(GrpcCommonTest, PrependGrpcFrameHeader) {
+  auto buffer = std::make_unique<Buffer::OwnedImpl>();
+  buffer->add("test", 4);
+  std::array<char, 5> expected_header;
+  expected_header[0] = 0; // flags
+  const uint32_t nsize = htonl(4);
+  std::memcpy(&expected_header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
+  std::string header_string(&expected_header[0], 5);
+  Common::prependGrpcFrameHeader(*buffer);
+  EXPECT_EQ(buffer->toString(), header_string + "test");
 }
 
 } // namespace Grpc

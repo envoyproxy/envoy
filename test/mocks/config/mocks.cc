@@ -45,5 +45,12 @@ MockGrpcMuxCallbacks::MockGrpcMuxCallbacks() {
 
 MockGrpcMuxCallbacks::~MockGrpcMuxCallbacks() {}
 
+MockMutableConfigProviderBase::MockMutableConfigProviderBase(
+    std::shared_ptr<ConfigSubscriptionInstance>&& subscription,
+    ConfigProvider::ConfigConstSharedPtr, Server::Configuration::FactoryContext& factory_context)
+    : MutableConfigProviderBase(std::move(subscription), factory_context, ApiType::Full) {
+  subscription_->bindConfigProvider(this);
+}
+
 } // namespace Config
 } // namespace Envoy

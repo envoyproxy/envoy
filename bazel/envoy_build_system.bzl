@@ -613,7 +613,7 @@ def envoy_proto_library(name, external_deps = [], **kwargs):
     if "api_httpbody_protos" in external_deps:
         external_cc_proto_deps.append("@googleapis//:api_httpbody_protos")
         external_proto_deps.append("@googleapis//:api_httpbody_protos_proto")
-    return api_proto_library(
+    api_proto_library(
         name,
         external_cc_proto_deps = external_cc_proto_deps,
         external_proto_deps = external_proto_deps,
@@ -707,7 +707,3 @@ def envoy_select_boringssl(if_fips, default = None):
         "@envoy//bazel:boringssl_fips": if_fips,
         "//conditions:default": default or [],
     })
-
-# Selects the part of QUICHE that does not yet work with the current CI.
-def envoy_select_quiche(xs, repository = ""):
-    return xs

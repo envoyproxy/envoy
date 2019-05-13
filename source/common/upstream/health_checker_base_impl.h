@@ -63,6 +63,10 @@ protected:
     HostSharedPtr host_;
 
   private:
+    // Clears the pending flag if it is set. By clearing this flag we're marking the host as having
+    // been health checked.
+    // Returns the changed state to use following the flag update.
+    HealthTransition clearPendingFlag(HealthTransition changed_state);
     virtual void onInterval() PURE;
     void onIntervalBase();
     virtual void onTimeout() PURE;

@@ -209,10 +209,17 @@ public:
    *
    * @param lhs proto on LHS.
    * @param rhs proto on RHS.
+   * @param ignore_repeated_field_ordering if true, repeated field ordering will be ignored.
    * @return bool indicating whether the protos are equal.
    */
-  static bool protoEqual(const Protobuf::Message& lhs, const Protobuf::Message& rhs) {
-    return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
+  static bool protoEqual(const Protobuf::Message& lhs, const Protobuf::Message& rhs,
+                         bool ignore_repeated_field_ordering = false) {
+    Protobuf::util::MessageDifferencer differencer;
+    differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUIVALENT);
+    if (ignore_repeated_field_ordering) {
+      differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+    }
+    return differencer.Compare(lhs, rhs);
   }
 
   static bool protoEqualIgnoringField(const Protobuf::Message& lhs, const Protobuf::Message& rhs,
@@ -268,7 +275,7 @@ public:
     }
 
     for (int i = 0; i < lhs.size(); ++i) {
-      if (!TestUtility::protoEqual(lhs[i], rhs[i])) {
+      if (!TestUtility::protoEqual(lhs[i], rhs[i], /*ignore_repeated_field_ordering=*/false)) {
         return false;
       }
     }
@@ -533,7 +540,22 @@ MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
 }
 
 MATCHER_P(ProtoEq, expected, "") {
-  const bool equal = TestUtility::protoEqual(arg, expected);
+  const bool equal =
+      TestUtility::protoEqual(arg, expected, /*ignore_repeated_field_ordering=*/false);
+  if (!equal) {
+    *result_listener << "\n"
+                     << "==========================Expected proto:===========================\n"
+                     << expected.DebugString()
+                     << "------------------is not equal to actual proto:---------------------\n"
+                     << arg.DebugString()
+                     << "====================================================================\n";
+  }
+  return equal;
+}
+
+MATCHER_P(ProtoEqIgnoreRepeatedFieldOrdering, expected, "") {
+  const bool equal =
+      TestUtility::protoEqual(arg, expected, /*ignore_repeated_field_ordering=*/true);
   if (!equal) {
     *result_listener << "\n"
                      << TestUtility::addLeftAndRightPadding("Expected proto:") << "\n"
@@ -581,7 +603,7 @@ MATCHER_P(Percent, rhs, "") {
   envoy::type::FractionalPercent expected;
   expected.set_numerator(rhs);
   expected.set_denominator(envoy::type::FractionalPercent::HUNDRED);
-  return TestUtility::protoEqual(expected, arg);
+  return TestUtility::protoEqual(expected, arg, /*ignore_repeated_field_ordering=*/false);
 }
 
 } // namespace Envoy
