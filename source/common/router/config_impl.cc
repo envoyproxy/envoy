@@ -876,9 +876,9 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
                                  const ConfigImpl& global_route_config,
                                  Server::Configuration::FactoryContext& factory_context,
                                  bool validate_clusters)
-    : name_(virtual_host.name()), stat_name_pool_(factory_context.scope().symbolTable()),
-      stat_name_(stat_name_pool_.add(name_)), rate_limit_policy_(virtual_host.rate_limits()),
-      global_route_config_(global_route_config),
+    : stat_name_pool_(factory_context.scope().symbolTable()),
+      stat_name_(stat_name_pool_.add(virtual_host.name())),
+      rate_limit_policy_(virtual_host.rate_limits()), global_route_config_(global_route_config),
       request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add(),
                                                       virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
@@ -952,8 +952,7 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     method_ = envoy::api::v2::core::RequestMethod_Name(virtual_cluster.method());
   }
   pattern_ = RegexUtil::parseRegex(virtual_cluster.pattern());
-  name_ = virtual_cluster.name();
-  stat_name_ = pool.add(name_);
+  stat_name_ = pool.add(virtual_cluster.name());
 }
 
 const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }

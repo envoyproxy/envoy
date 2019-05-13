@@ -155,7 +155,6 @@ public:
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
-  const std::string& name() const override { return name_; }
   Stats::StatName statName() const override { return stat_name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
@@ -176,34 +175,26 @@ private:
                         Stats::StatNamePool& pool);
 
     // Router::VirtualCluster
-    const std::string& name() const override { return name_; }
     Stats::StatName statName() const override { return stat_name_; }
 
     std::regex pattern_;
     absl::optional<std::string> method_;
-    std::string name_;
     Stats::StatName stat_name_;
   };
 
   class CatchAllVirtualCluster : public VirtualCluster {
-   public:
+  public:
     explicit CatchAllVirtualCluster(Stats::StatNamePool& pool) : stat_name_(pool.add("other")) {}
 
     // Router::VirtualCluster
-    const std::string& name() const override {
-      ASSERT(false);
-      return name_;
-    }
     Stats::StatName statName() const override { return stat_name_; }
 
-   private:
-    std::string name_{"other"};
+  private:
     Stats::StatName stat_name_;
   };
 
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
-  const std::string name_;
   Stats::StatNamePool stat_name_pool_;
   Stats::StatName stat_name_;
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;

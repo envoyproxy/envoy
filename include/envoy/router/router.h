@@ -335,12 +335,6 @@ public:
    * @return the stat-name of the virtual cluster.
    */
   virtual Stats::StatName statName() const PURE;
-
- private:
-  /**
-   * @return the name of the virtual cluster.
-   */
-  virtual const std::string& name() const PURE;
 };
 
 class RateLimitPolicy;
@@ -403,12 +397,6 @@ public:
    * @return bool whether to include the request count header in upstream requests.
    */
   virtual bool includeAttemptCount() const PURE;
-
- private:
-  /**
-   * @return const std::string& the name of the virtual host.
-   */
-  virtual const std::string& name() const PURE;
 };
 
 /**

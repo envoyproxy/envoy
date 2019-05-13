@@ -506,13 +506,11 @@ virtual_hosts:
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides", "POST");
-    EXPECT_EQ("ride_request",
-              virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
+    EXPECT_EQ("ride_request", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides/123", "PUT");
-    EXPECT_EQ("update_ride",
-              virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
+    EXPECT_EQ("update_ride", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides/123/456", "POST");
@@ -544,8 +542,7 @@ virtual_hosts:
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/users/123", "PUT");
-    EXPECT_EQ("update_user",
-              virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
+    EXPECT_EQ("update_user", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/users/123/location", "POST");

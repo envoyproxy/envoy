@@ -144,8 +144,8 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
 
   if (tool_config.route_->routeEntry() != nullptr &&
       tool_config.route_->routeEntry()->virtualCluster(*tool_config.headers_) != nullptr) {
-    Stats::StatName stat_name = tool_config.route_->routeEntry()->
-                                virtualCluster(*tool_config.headers_)->statName();
+    Stats::StatName stat_name =
+        tool_config.route_->routeEntry()->virtualCluster(*tool_config.headers_)->statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
   return compareResults(actual, expected, "virtual_cluster_name");
