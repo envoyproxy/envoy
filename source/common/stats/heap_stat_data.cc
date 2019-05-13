@@ -1,7 +1,5 @@
 #include "common/stats/heap_stat_data.h"
 
-#include <iostream>
-
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"

@@ -187,7 +187,6 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
 
   std::vector<Stats::Tag> tags = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  // counter->symbol_table_ = &symbol_table;
   counter->name_ = "test_counter";
   counter->used_ = true;
   counter->latch_ = 1;
@@ -200,7 +199,6 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   counter->used_ = false;
 
   auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
-  // gauge->symbol_table_ = &symbol_table;
   gauge->name_ = "test_gauge";
   gauge->value_ = 1;
   gauge->used_ = true;
@@ -212,7 +210,6 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   sink.flush(source);
 
   NiceMock<Stats::MockHistogram> timer;
-  // timer.symbol_table_ = &symbol_table;
   timer.name_ = "test_timer";
   timer.setTags(tags);
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
