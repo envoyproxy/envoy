@@ -11,4 +11,3 @@ jobs:
   container: envoy-build
   steps:
   - script: bazel build //source/exe:envoy-static
-
