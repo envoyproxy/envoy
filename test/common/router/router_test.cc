@@ -2261,6 +2261,8 @@ TEST_F(RouterTest, Redirect) {
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+  absl::string_view route_name_view(route_name);
+  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
 
   Http::TestHeaderMapImpl response_headers{{":status", "301"}, {"location", "hello"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -2280,6 +2282,8 @@ TEST_F(RouterTest, RedirectFound) {
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+  absl::string_view route_name_view(route_name);
+  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
 
   Http::TestHeaderMapImpl response_headers{{":status", "302"}, {"location", "hello"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -2296,6 +2300,8 @@ TEST_F(RouterTest, DirectResponse) {
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
   EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+  absl::string_view route_name_view(route_name);
+  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -2315,6 +2321,8 @@ TEST_F(RouterTest, DirectResponseWithBody) {
   const std::string response_body("static response");
   EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(response_body));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+  absl::string_view route_name_view(route_name);
+  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "200"}, {"content-length", "15"}, {"content-type", "text/plain"}};

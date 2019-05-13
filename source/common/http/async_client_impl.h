@@ -277,7 +277,7 @@ private:
     Router::RouteEntry::UpgradeMap upgrade_map_;
     const std::string& cluster_name_;
     absl::optional<std::chrono::milliseconds> timeout_;
-    std::string route_name_{};
+    const std::string route_name_;
   };
 
   struct RouteImpl : public Router::Route {

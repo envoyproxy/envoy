@@ -78,7 +78,7 @@ public:
   const std::string& routeName() const override { return route_name_; }
 
 private:
-  std::string route_name_{};
+  const std::string route_name_;
 };
 
 class SslRedirectRoute : public Route {
@@ -659,7 +659,7 @@ private:
   const absl::optional<Http::Code> direct_response_code_;
   std::string direct_response_body_;
   PerFilterConfigs per_filter_configs_;
-  std::string route_name_;
+  const std::string route_name_;
   TimeSource& time_source_;
   InternalRedirectAction internal_redirect_action_;
 };

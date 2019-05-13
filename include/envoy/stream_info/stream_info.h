@@ -205,7 +205,7 @@ public:
   /**
    * @param std::string name denotes the name of the route.
    */
-  virtual void setRouteName(std::string name) PURE;
+  virtual void setRouteName(absl::string_view name) PURE;
 
   /**
    * @return std::string& the name of the route.
