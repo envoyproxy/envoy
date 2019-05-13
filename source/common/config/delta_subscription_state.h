@@ -6,7 +6,9 @@
 #include "envoy/grpc/status.h"
 #include "envoy/local_info/local_info.h"
 
+#include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/common/logger.h"
 
 namespace Envoy {
 namespace Config {

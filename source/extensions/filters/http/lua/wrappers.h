@@ -116,7 +116,7 @@ public:
 
 private:
   DynamicMetadataMapWrapper& parent_;
-  Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>::const_iterator current_;
+  Protobuf::Map<std::string, ProtobufWkt::Struct>::const_iterator current_;
 };
 
 /**

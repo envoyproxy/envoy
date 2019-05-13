@@ -4,6 +4,7 @@ Version history
 1.11.0 (Pending)
 ================
 * access log: added a new field for response code details in :ref:`file access logger<config_access_log_format_response_code_details>` and :ref:`gRPC access logger<envoy_api_field_data.accesslog.v2.HTTPResponseProperties.response_code_details>`.
+* api: track and report requests issued since last load report.
 * build: releases are built with Clang and linked with LLD.
 * dubbo_proxy: support the :ref:`Dubbo proxy filter <config_network_filters_dubbo_proxy>`.
 * eds: added support to specify max time for which endpoints can be used :ref:`gRPC filter <envoy_api_msg_ClusterLoadAssignment.Policy>`.
@@ -36,6 +37,9 @@ Version history
   it in a future update. This is a mechanism to work around a race condition in which an EDS
   implementation may remove a host before it has stopped passing active HC, thus causing the host
   to become stranded until a future update.
+* upstream: added :ref:`an option <envoy_api_field_Cluster.CommonLbConfig.ignore_new_hosts_until_first_hc>`
+  that allows ignoring new hosts for the purpose of load balancing calculations until they have
+  been health checked for the first time.
 * upstream: added runtime error checking to prevent setting dns type to STRICT_DNS or LOGICAL_DNS when custom resolver name is specified.
 * grpc-json: added support for :ref:`auto mapping
   <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.auto_mapping>`.

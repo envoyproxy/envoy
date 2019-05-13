@@ -177,7 +177,7 @@ void AsyncStreamImpl::onReset() {
 }
 
 void AsyncStreamImpl::sendMessage(const Protobuf::Message& request, bool end_stream) {
-  stream_->sendData(*Common::serializeBody(request), end_stream);
+  stream_->sendData(*Common::serializeToGrpcFrame(request), end_stream);
 }
 
 void AsyncStreamImpl::closeStream() {

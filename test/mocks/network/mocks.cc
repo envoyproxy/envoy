@@ -64,13 +64,26 @@ MockReadFilter::MockReadFilter() {
 
 MockReadFilter::~MockReadFilter() {}
 
-MockWriteFilter::MockWriteFilter() {}
+MockWriteFilterCallbacks::MockWriteFilterCallbacks() {
+  ON_CALL(*this, connection()).WillByDefault(ReturnRef(connection_));
+}
+
+MockWriteFilterCallbacks::~MockWriteFilterCallbacks() {}
+
+MockWriteFilter::MockWriteFilter() {
+  EXPECT_CALL(*this, initializeWriteFilterCallbacks(_))
+      .WillOnce(Invoke(
+          [this](WriteFilterCallbacks& callbacks) -> void { write_callbacks_ = &callbacks; }));
+}
 MockWriteFilter::~MockWriteFilter() {}
 
 MockFilter::MockFilter() {
   EXPECT_CALL(*this, initializeReadFilterCallbacks(_))
       .WillOnce(
           Invoke([this](ReadFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; }));
+  EXPECT_CALL(*this, initializeWriteFilterCallbacks(_))
+      .WillOnce(Invoke(
+          [this](WriteFilterCallbacks& callbacks) -> void { write_callbacks_ = &callbacks; }));
 }
 
 MockFilter::~MockFilter() {}

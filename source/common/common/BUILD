@@ -254,12 +254,12 @@ genrule(
 genrule(
     name = "generate_version_linkstamp",
     outs = ["lib/version_linkstamp.h"],
-    cmd = "$(location //source/common/common:generate_version_linkstamp.sh) >> $@",
+    cmd = "$(location :generate_version_linkstamp.sh) >> $@",
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     # Used here because generate_version_linkstamp.sh depends on the workspace status files.
     stamp = 1,
-    tools = ["//source/common/common:generate_version_linkstamp.sh"],
+    tools = [":generate_version_linkstamp.sh"],
 )
 
 genrule(
