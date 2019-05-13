@@ -223,8 +223,8 @@ modify different aspects of the server:
       "uptime_all_epochs": "6s"
     }
 
-See the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
-explanation of the output.
+  See the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
+  explanation of the output.
 
 .. http:get:: /readyz
 
@@ -237,8 +237,8 @@ explanation of the output.
 
     LIVE
 
-See the `state` field of the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
-explanation of the output.
+  See the `state` field of the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
+  explanation of the output.
 
 .. _operations_admin_interface_stats:
 
