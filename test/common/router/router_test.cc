@@ -1717,7 +1717,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 
-  // Now trigger a 503 n response to the second request.
+  // Now trigger a 503 in response to the second request.
   Http::HeaderMapPtr bad_response_headers1(new Http::TestHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
 
@@ -1727,7 +1727,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
-  // Now trigger a 502 n response to the first request.
+  // Now trigger a 502 in response to the first request.
   Http::HeaderMapPtr bad_response_headers2(new Http::TestHeaderMapImpl{{":status", "502"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(502));
 
@@ -1742,6 +1742,75 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
   response_decoder1->decodeHeaders(std::move(bad_response_headers2), true);
 
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
+}
+
+// Sequence: 1) per try timeout w/ hedge retry, 2) first request gets reset by upstream,
+// 3) 2nd request gets a 200 which should be sent downstream.
+TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
+  enableHedgeOnPerTryTimeout();
+
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder1 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder1 = &decoder;
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
+  router_.retry_state_->expectHedgedPerTryTimeoutRetry();
+  per_try_timeout_->callback_();
+
+  NiceMock<Http::MockStreamEncoder> encoder2;
+  Http::StreamDecoder* response_decoder2 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder2 = &decoder;
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  router_.retry_state_->callback_();
+
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+
+  // Now trigger an upstream reset in response to the first request.
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  EXPECT_CALL(encoder1.stream_, resetStream(_));
+  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // We should not call shouldRetryReset() because you never retry the same
+  // request twice.
+  EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(0);
+
+  // Now trigger a 200 in response to the second request.
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+
+  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _))
+      .WillOnce(Return(RetryStatus::No));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.Status()->value(), "200");
+      }));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  response_decoder2->decodeHeaders(std::move(response_headers), true);
+
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
 TEST_F(RouterTest, RetryNoneHealthy) {

@@ -584,7 +584,7 @@ void Filter::onResponseTimeout() {
   for (auto& upstream_request : upstream_requests_) {
     // Don't record a timeout for upstream requests we've already seen headers
     // for.
-    if (!upstream_request->seen_headers_) {
+    if (upstream_request->awaiting_headers_) {
       cluster_->stats().upstream_rq_timeout_.inc();
       if (upstream_request->upstream_host_) {
         upstream_request->upstream_host_->stats().rq_timeout_.inc();
@@ -719,8 +719,10 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
 bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
                              UpstreamRequest& upstream_request) {
-  // We don't retry if we already started the response.
-  if (downstream_response_started_ || !retry_state_) {
+  // We don't retry if we already started the response, don't have a retry policy defined,
+  // or if we've already retried this upstream request (currently only possible if a per
+  // try timeout occurred and hedge_on_per_try_timeout is enabled).
+  if (downstream_response_started_ || !retry_state_ || upstream_request.retried_) {
     return false;
   }
 
@@ -755,6 +757,13 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
 
   const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
   chargeUpstreamAbort(Http::Code::ServiceUnavailable, dropped, upstream_request);
+
+  // If there are other in-flight requests that might see an upstream response,
+  // don't return anything downstream.
+  if (numRequestsAwaitingHeaders() > 0 || pending_retries_ > 0) {
+    upstream_request.removeFromList(upstream_requests_);
+    return;
+  }
 
   const StreamInfo::ResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
   const std::string body =
@@ -904,6 +913,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
   // chance to return before returning a response downstream.
   if (could_not_retry && (numRequestsAwaitingHeaders() > 0 || pending_retries_ > 0)) {
     upstream_request.upstream_host_->stats().rq_error_.inc();
+      upstream_request.removeFromList(upstream_requests_);
     return;
   }
 
@@ -1134,7 +1144,7 @@ void Filter::doRetry() {
 uint32_t Filter::numRequestsAwaitingHeaders() {
   uint32_t ret = 0;
   for (auto& upstream_request : upstream_requests_) {
-    if (!upstream_request->seen_headers_) {
+    if (upstream_request->awaiting_headers_) {
       ret++;
     }
   }
@@ -1146,7 +1156,7 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
     : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
       stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSource()),
       calling_encode_headers_(false), upstream_canary_(false), decode_complete_(false),
-      encode_complete_(false), encode_trailers_(false), retried_(false), seen_headers_(false),
+      encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
       outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false) {
 
@@ -1189,7 +1199,7 @@ void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool e
   upstream_timing_.onFirstUpstreamRxByteReceived(parent_.callbacks_->dispatcher().timeSource());
   maybeEndDecode(end_stream);
 
-  seen_headers_ = true;
+  awaiting_headers_ = false;
   if (!parent_.config_.upstream_logs_.empty()) {
     upstream_headers_ = std::make_unique<Http::HeaderMapImpl>(*headers);
   }
