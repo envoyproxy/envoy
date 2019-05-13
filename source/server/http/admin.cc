@@ -653,9 +653,10 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
   case Init::Manager::State::Initializing:
     server_info.set_state(envoy::admin::v2alpha::ServerInfo::INITIALIZING);
     break;
-  default:
+  case Init::Manager::State::Initialized:
     server_info.set_state(server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
                                                       : envoy::admin::v2alpha::ServerInfo::LIVE);
+    break;
   }
   server_info.mutable_uptime_current_epoch()->set_seconds(current_time -
                                                           server_.startTimeCurrentEpoch());
@@ -680,9 +681,10 @@ Http::Code AdminImpl::handlerReadyz(absl::string_view, Http::HeaderMap&, Buffer:
   case Init::Manager::State::Initializing:
     state = envoy::admin::v2alpha::ServerInfo::INITIALIZING;
     break;
-  default:
+  case Init::Manager::State::Initialized:
     state = server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
                                         : envoy::admin::v2alpha::ServerInfo::LIVE;
+    break;
   }
 
   response.add(envoy::admin::v2alpha::ServerInfo_State_Name(state) + "\n");
