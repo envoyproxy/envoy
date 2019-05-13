@@ -1,5 +1,9 @@
 #include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
 
+#include "common/router/string_accessor_impl.h"
+
+#include "extensions/filters/http/common/empty_http_filter_config.h"
+#include "extensions/filters/http/common/pass_through_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
@@ -14,9 +18,50 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-std::string getFilterConfig(bool use_local_jwks) {
+const char HeaderToFilterStateFilterName[] = "envoy.filters.http.header_to_filter_state_for_test";
+
+// This filter extracts a string header from "header" and
+// save it into FilterState as name "state" as read-only Router::StringAccessor.
+class HeaderToFilterStateFilter : public Http::PassThroughDecoderFilter {
+public:
+  HeaderToFilterStateFilter(const std::string& header, const std::string& state)
+      : header_(header), state_(state) {}
+
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override {
+    const Http::HeaderEntry* entry = headers.get(header_);
+    if (entry) {
+      decoder_callbacks_->streamInfo().filterState().setData(
+          state_, std::make_unique<Router::StringAccessorImpl>(entry->value().getStringView()),
+          StreamInfo::FilterState::StateType::ReadOnly);
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+private:
+  Http::LowerCaseString header_;
+  std::string state_;
+};
+
+class HeaderToFilterStateFilterConfig : public Common::EmptyHttpFilterConfig {
+public:
+  HeaderToFilterStateFilterConfig()
+      : Common::EmptyHttpFilterConfig(HeaderToFilterStateFilterName) {}
+
+  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
+    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamDecoderFilter(
+          std::make_shared<HeaderToFilterStateFilter>("jwt_selector", "jwt_selector"));
+    };
+  }
+};
+
+// perform static registration
+REGISTER_FACTORY(HeaderToFilterStateFilterConfig,
+                 Server::Configuration::NamedHttpFilterConfigFactory);
+
+std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks) {
   JwtAuthentication proto_config;
-  MessageUtil::loadFromYaml(ExampleConfig, proto_config);
+  MessageUtil::loadFromYaml(config_str, proto_config);
 
   if (use_local_jwks) {
     auto& provider0 = (*proto_config.mutable_providers())[std::string(ProviderName)];
@@ -29,6 +74,10 @@ std::string getFilterConfig(bool use_local_jwks) {
   filter.set_name(HttpFilterNames::get().JwtAuthn);
   MessageUtil::jsonConvert(proto_config, *filter.mutable_config());
   return MessageUtil::getJsonStringFromMessage(filter);
+}
+
+std::string getFilterConfig(bool use_local_jwks) {
+  return getAuthFilterConfig(ExampleConfig, use_local_jwks);
 }
 
 typedef HttpProtocolIntegrationTest LocalJwksIntegrationTest;
@@ -62,7 +111,7 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 // With local Jwks, this test verifies a request is rejected with an expired Jwt token.
@@ -82,7 +131,25 @@ TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("401", response->headers().Status()->value().c_str());
+  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(LocalJwksIntegrationTest, MissingToken) {
+  config_helper_.addFilter(getFilterConfig(true));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
@@ -101,9 +168,9 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("401", response->headers().Status()->value().c_str());
-  EXPECT_STRNE("0", response->headers().ContentLength()->value().c_str());
-  EXPECT_STREQ("", response->body().c_str());
+  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
+  EXPECT_NE("0", response->headers().ContentLength()->value().getStringView());
+  EXPECT_THAT(response->body(), ::testing::IsEmpty());
 }
 
 // This test verifies a request is passed with a path that don't match any requirements.
@@ -125,7 +192,85 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+// This test verifies JwtRequirement specified from filer state rules
+TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
+  // A config with metadata rules.
+  const std::string auth_filter_conf = R"(
+  providers:
+    example_provider:
+      issuer: https://example.com
+      audiences:
+      - example_service
+  filter_state_rules:
+    name: jwt_selector
+    requires:
+      example_provider:
+        provider_name: example_provider
+)";
+
+  config_helper_.addFilter(getAuthFilterConfig(auth_filter_conf, true));
+  config_helper_.addFilter(absl::StrCat("name: ", HeaderToFilterStateFilterName));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  struct TestCase {
+    std::vector<std::pair<std::string, std::string>> extra_headers;
+    std::string expected_status;
+  };
+
+  const TestCase test_cases[] = {
+      // Case1: not set metadata, so Jwt is not required, expect 200
+      {
+          // Empty extra headers
+          {},
+          "200",
+      },
+
+      // Case2: requirement is set in the metadata, but missing token, expect 401
+      {
+          // selector header, but not token header
+          {
+              {"jwt_selector", "example_provider"},
+          },
+          "401",
+      },
+
+      // Case 3: requirement is set in the metadata, token is good, expect 200
+      {
+          // selector header, and token header
+          {
+              {"jwt_selector", "example_provider"},
+              {"Authorization", "Bearer " + std::string(GoodToken)},
+          },
+          "200",
+      },
+  };
+
+  for (const auto& test : test_cases) {
+    Http::TestHeaderMapImpl headers{
+        {":method", "GET"},
+        {":path", "/foo"},
+        {":scheme", "http"},
+        {":authority", "host"},
+    };
+    for (const auto& h : test.extra_headers) {
+      headers.addCopy(h.first, h.second);
+    }
+    auto response = codec_client_->makeHeaderOnlyRequest(headers);
+
+    if (test.expected_status == "200") {
+      waitForNextUpstreamRequest();
+      upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+    }
+
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ(test.expected_status, response->headers().Status()->value().getStringView());
+  }
 }
 
 // The test case with a fake upstream for remote Jwks server.
@@ -219,7 +364,7 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 
   cleanup();
 }
@@ -244,7 +389,7 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedJwks) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("401", response->headers().Status()->value().c_str());
+  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
 
   cleanup();
 }

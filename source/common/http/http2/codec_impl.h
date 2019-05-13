@@ -69,11 +69,6 @@ public:
 };
 
 /**
- * Setup nghttp2 trace-level logging for when debugging.
- */
-void initializeNghttp2Logging();
-
-/**
  * Base class for HTTP/2 client and server codecs.
  */
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
@@ -244,7 +239,7 @@ protected:
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
     void transformUpgradeFromH1toH2(HeaderMap& headers) override {
-      upgrade_type_ = headers.Upgrade()->value().c_str();
+      upgrade_type_ = std::string(headers.Upgrade()->value().getStringView());
       Http::Utility::transformUpgradeRequestFromH1toH2(headers);
     }
     void maybeTransformUpgradeFromH2ToH1() override {

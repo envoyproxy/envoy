@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_directory_genrule",
     "envoy_package",
     "envoy_proto_library",
@@ -94,6 +95,15 @@ envoy_proto_library(
     ],
 )
 
+# envoy_cc_test_binary is generating mostly static binary regardless of config
+envoy_cc_test_binary(
+    name = "config_impl_test_static",
+    deps = [
+        "config_impl_test_lib",
+        "//test:main",
+    ],
+)
+
 sh_binary(
     name = "corpus_from_config_impl_sh",
     srcs = ["corpus_from_config_impl.sh"],
@@ -105,11 +115,11 @@ envoy_directory_genrule(
     srcs = [
         # This is deliberately in srcs, since we run into host/target confusion
         # otherwise in oss-fuzz builds.
-        ":config_impl_test",
+        ":config_impl_test_static",
     ],
     cmd = " ".join([
         "$(location corpus_from_config_impl_sh)",
-        "$(location //test/common/router:config_impl_test)",
+        "$(location //test/common/router:config_impl_test_static)",
     ]),
     tools = [":corpus_from_config_impl_sh"],
 )
@@ -137,7 +147,7 @@ envoy_cc_test(
     srcs = ["router_ratelimit_test.cc"],
     deps = [
         "//source/common/http:header_map_lib",
-        "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/router:router_ratelimit_lib",
         "//test/mocks/http:http_mocks",
@@ -179,7 +189,6 @@ envoy_cc_test(
     external_deps = ["abseil_optional"],
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/common/config:filter_json_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:router_lib",
         "//source/common/upstream:upstream_includes",

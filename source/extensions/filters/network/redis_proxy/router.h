@@ -21,17 +21,12 @@ public:
   virtual ~Router() = default;
 
   /**
-   * Forwards the request to the connection pool that matches a route or uses the wildcard route
-   * when no match is found.
-   * @param key supplies the key of the current command.
-   * @param request supplies the RESP request to make.
-   * @param callbacks supplies the request callbacks.
-   * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
-   *         for some reason.
+   * Returns a connection pool that matches a given route. When no match is found, the catch all
+   * pool is used. When remove prefix is set to true, the prefix will be removed from the key.
+   * @param key mutable reference to the key of the current command.
+   * @return a handle to the connection pool.
    */
-  virtual Common::Redis::Client::PoolRequest*
-  makeRequest(const std::string& key, const Common::Redis::RespValue& request,
-              Common::Redis::Client::PoolCallbacks& callbacks) PURE;
+  virtual ConnPool::InstanceSharedPtr upstreamPool(std::string& key) PURE;
 };
 
 typedef std::unique_ptr<Router> RouterPtr;

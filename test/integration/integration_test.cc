@@ -84,12 +84,12 @@ TEST_P(IntegrationTest, RouterDirectResponse) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "direct.example.com");
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_STREQ("example-value", response->headers()
-                                    .get(Envoy::Http::LowerCaseString("x-additional-header"))
-                                    ->value()
-                                    .c_str());
-  EXPECT_STREQ("text/html", response->headers().ContentType()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("example-value", response->headers()
+                                 .get(Envoy::Http::LowerCaseString("x-additional-header"))
+                                 ->value()
+                                 .getStringView());
+  EXPECT_EQ("text/html", response->headers().ContentType()->value().getStringView());
   EXPECT_EQ(body, response->body());
 }
 
@@ -191,7 +191,7 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
 
@@ -206,7 +206,7 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response2->complete());
-  EXPECT_STREQ("200", response2->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response2->headers().Status()->value().getStringView());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
 }
@@ -291,6 +291,7 @@ TEST_P(IntegrationTest, Http10DisabledWithUpgrade) {
 
 // Turn HTTP/1.0 support on and verify 09 style requests work.
 TEST_P(IntegrationTest, Http09Enabled) {
+  useAccessLog();
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
   initialize();
@@ -304,6 +305,8 @@ TEST_P(IntegrationTest, Http09Enabled) {
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
   ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
+
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("HTTP/1.0"));
 }
 
 // Turn HTTP/1.0 support on and verify the request is proxied and the default host is sent upstream.
@@ -349,9 +352,11 @@ TEST_P(IntegrationTest, TestInlineHeaders) {
   EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
   EXPECT_EQ(upstream_headers->CacheControl()->value(), "public,123");
   ASSERT_TRUE(upstream_headers->get(Envoy::Http::LowerCaseString("foo")) != nullptr);
-  EXPECT_STREQ("bar", upstream_headers->get(Envoy::Http::LowerCaseString("foo"))->value().c_str());
+  EXPECT_EQ("bar",
+            upstream_headers->get(Envoy::Http::LowerCaseString("foo"))->value().getStringView());
   ASSERT_TRUE(upstream_headers->get(Envoy::Http::LowerCaseString("eep")) != nullptr);
-  EXPECT_STREQ("baz", upstream_headers->get(Envoy::Http::LowerCaseString("eep"))->value().c_str());
+  EXPECT_EQ("baz",
+            upstream_headers->get(Envoy::Http::LowerCaseString("eep"))->value().getStringView());
 }
 
 // Verify for HTTP/1.0 a keep-alive header results in no connection: close.
@@ -384,7 +389,7 @@ TEST_P(IntegrationTest, NoHost) {
   response->waitForEndStream();
 
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("400", response->headers().Status()->value().c_str());
+  EXPECT_EQ("400", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(IntegrationTest, BadPath) {
@@ -399,9 +404,9 @@ TEST_P(IntegrationTest, BadPath) {
 TEST_P(IntegrationTest, AbsolutePath) {
   // Configure www.redirect.com to send a redirect, and ensure the redirect is
   // encountered via absolute URL.
-  config_helper_.addRoute("www.redirect.com", "/", "cluster_0", true,
-                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::route::VirtualHost::ALL);
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
+  host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
 
   initialize();
@@ -415,9 +420,9 @@ TEST_P(IntegrationTest, AbsolutePath) {
 TEST_P(IntegrationTest, AbsolutePathWithPort) {
   // Configure www.namewithport.com:1234 to send a redirect, and ensure the redirect is
   // encountered via absolute URL with a port.
-  config_helper_.addRoute("www.namewithport.com:1234", "/", "cluster_0", true,
-                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::route::VirtualHost::ALL);
+  auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
+  host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
   initialize();
   std::string response;
@@ -432,9 +437,9 @@ TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
   // Set a matcher for www.namewithport.com:1234 and verify http://www.namewithport.com does not
   // match
-  config_helper_.addRoute("www.namewithport.com:1234", "/", "cluster_0", true,
-                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::route::VirtualHost::ALL);
+  auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
+  host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
   initialize();
   std::string response;
@@ -487,7 +492,7 @@ TEST_P(IntegrationTest, UpstreamProtocolError) {
   codec_client_->waitForDisconnect();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(IntegrationTest, TestHead) {
@@ -667,7 +672,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("413", response->headers().Status()->value().c_str());
+  EXPECT_EQ("413", response->headers().Status()->value().getStringView());
   // With no delayed close processing, Envoy will close the connection immediately after flushing
   // and this should instead return true.
   EXPECT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
@@ -773,8 +778,10 @@ TEST_P(IntegrationTest, NoConnectionPoolsFree) {
 
   response->waitForEndStream();
 
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
+
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_pool_overflow")->value(), 1);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,

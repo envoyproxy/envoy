@@ -95,21 +95,21 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
   counter->name_ = "test_counter";
   counter->used_ = true;
   counter->latch_ = 1;
-  counter->tags_ = tags;
+  counter->setTags(tags);
   source.counters_.push_back(counter);
 
   auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
   gauge->name_ = "test_gauge";
   gauge->value_ = 1;
   gauge->used_ = true;
-  gauge->tags_ = tags;
+  gauge->setTags(tags);
   source.gauges_.push_back(gauge);
 
   sink.flush(source);
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
-  timer.tags_ = tags;
+  timer.setTags(tags);
   sink.onHistogramComplete(timer, 5);
 
   EXPECT_EQ(fd, sink.getFdForTests());
@@ -189,7 +189,7 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   counter->name_ = "test_counter";
   counter->used_ = true;
   counter->latch_ = 1;
-  counter->tags_ = tags;
+  counter->setTags(tags);
   source.counters_.push_back(counter);
 
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
@@ -201,7 +201,7 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   gauge->name_ = "test_gauge";
   gauge->value_ = 1;
   gauge->used_ = true;
-  gauge->tags_ = tags;
+  gauge->setTags(tags);
   source.gauges_.push_back(gauge);
 
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
@@ -210,7 +210,7 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
-  timer.tags_ = tags;
+  timer.setTags(tags);
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_timer:5|ms|#key1:value1,key2:value2"));
   sink.onHistogramComplete(timer, 5);

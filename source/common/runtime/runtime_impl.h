@@ -24,7 +24,7 @@
 namespace Envoy {
 namespace Runtime {
 
-bool runtimeFeatureEnabled(const std::string& feature);
+bool runtimeFeatureEnabled(absl::string_view feature);
 
 using RuntimeSingleton = ThreadSafeSingleton<Loader>;
 
@@ -74,7 +74,7 @@ public:
 
   // Runtime::Snapshot
   bool deprecatedFeatureEnabled(const std::string& key) const override;
-  bool runtimeFeatureEnabled(const std::string& key) const override;
+  bool runtimeFeatureEnabled(absl::string_view key) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
                       uint64_t num_buckets) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value) const override;
@@ -89,10 +89,11 @@ public:
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
 
   static Entry createEntry(const std::string& value);
+  static Entry createEntry(const ProtobufWkt::Value& value);
 
   // Returns true and sets 'value' to the key if found.
   // Returns false if the key is not a boolean value.
-  bool getBoolean(const std::string& key, bool& value) const;
+  bool getBoolean(absl::string_view key, bool& value) const;
 
 private:
   static void resolveEntryType(Entry& entry) {
@@ -171,6 +172,17 @@ private:
 };
 
 /**
+ * Extension of OverrideLayerImpl that loads values from a proto Struct representation.
+ */
+class ProtoLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
+public:
+  ProtoLayer(const ProtobufWkt::Struct& proto);
+
+private:
+  void walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix);
+};
+
+/**
  * Implementation of Loader that provides Snapshots of values added via mergeValues().
  * A single snapshot is shared among all threads and referenced by shared_ptr such that
  * a new runtime can be swapped in by the main thread while workers are still using the previous
@@ -178,7 +190,8 @@ private:
  */
 class LoaderImpl : public Loader {
 public:
-  LoaderImpl(RandomGenerator& generator, Stats::Store& stats, ThreadLocal::SlotAllocator& tls);
+  LoaderImpl(const ProtobufWkt::Struct& base, RandomGenerator& generator, Stats::Store& stats,
+             ThreadLocal::SlotAllocator& tls);
 
   // Runtime::Loader
   Snapshot& snapshot() override;
@@ -189,8 +202,8 @@ protected:
   // loadSnapshot() themselves to create the initial snapshot, since loadSnapshot calls the virtual
   // function createNewSnapshot() and is therefore unsuitable for use in a superclass constructor.
   struct DoNotLoadSnapshot {};
-  LoaderImpl(DoNotLoadSnapshot /* unused */, RandomGenerator& generator, Stats::Store& stats,
-             ThreadLocal::SlotAllocator& tls);
+  LoaderImpl(DoNotLoadSnapshot /* unused */, const ProtobufWkt::Struct& base,
+             RandomGenerator& generator, Stats::Store& stats, ThreadLocal::SlotAllocator& tls);
 
   // Create a new Snapshot
   virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
@@ -200,6 +213,7 @@ protected:
   RandomGenerator& generator_;
   RuntimeStats stats_;
   AdminLayer admin_layer_;
+  const ProtobufWkt::Struct base_;
 
 private:
   RuntimeStats generateStats(Stats::Store& store);
@@ -214,9 +228,9 @@ private:
 class DiskBackedLoaderImpl : public LoaderImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
   DiskBackedLoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
-                       const std::string& root_symlink_path, const std::string& subdir,
-                       const std::string& override_dir, Stats::Store& store,
-                       RandomGenerator& generator, Api::Api& api);
+                       const ProtobufWkt::Struct& base, const std::string& root_symlink_path,
+                       const std::string& subdir, const std::string& override_dir,
+                       Stats::Store& store, RandomGenerator& generator, Api::Api& api);
 
 private:
   std::unique_ptr<SnapshotImpl> createNewSnapshot() override;

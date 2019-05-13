@@ -37,13 +37,13 @@ public:
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
   const std::vector<double>& supportedBuckets() const override;
   const std::vector<uint64_t>& computedBuckets() const override { return computed_buckets_; }
-  double sampleCount() const override { return sample_count_; }
+  uint64_t sampleCount() const override { return sample_count_; }
   double sampleSum() const override { return sample_sum_; }
 
 private:
   std::vector<double> computed_quantiles_;
   std::vector<uint64_t> computed_buckets_;
-  double sample_count_;
+  uint64_t sample_count_;
   double sample_sum_;
 };
 
@@ -52,40 +52,56 @@ private:
  */
 class HistogramImpl : public Histogram, public MetricImpl {
 public:
-  HistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
-                std::vector<Tag>&& tags)
-      : MetricImpl(std::move(tag_extracted_name), std::move(tags)), parent_(parent), name_(name) {}
+  HistogramImpl(StatName name, Store& parent, const std::string& tag_extracted_name,
+                const std::vector<Tag>& tags)
+      : MetricImpl(tag_extracted_name, tags, parent.symbolTable()),
+        name_(name, parent.symbolTable()), parent_(parent) {}
+  ~HistogramImpl() {
+    // We must explicitly free the StatName here using the SymbolTable reference
+    // we access via parent_. A pure RAII alternative would be to use
+    // StatNameManagedStorage rather than StatNameStorage, which will cost a total
+    // of 16 bytes per stat, counting the extra SymbolTable& reference here,
+    // plus the extra SymbolTable& reference in MetricImpl.
+    name_.free(symbolTable());
 
-  // Stats:;Metric
-  std::string name() const override { return name_; }
-  const char* nameCStr() const override { return name_.c_str(); }
+    // We must explicitly free the StatName here in order to supply the
+    // SymbolTable reference. An RAII alternative would be to store a
+    // reference to the SymbolTable in MetricImpl, which would cost 8 bytes
+    // per stat.
+    MetricImpl::clear();
+  }
 
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
   bool used() const override { return true; }
+  StatName statName() const override { return name_.statName(); }
+  const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
+  SymbolTable& symbolTable() override { return parent_.symbolTable(); }
 
 private:
+  StatNameStorage name_;
+
   // This is used for delivering the histogram data to sinks.
   Store& parent_;
-
-  const std::string name_;
 };
 
 /**
  * Null histogram implementation.
  * No-ops on all calls and requires no underlying metric or data.
  */
-class NullHistogramImpl : public Histogram {
+class NullHistogramImpl : public Histogram, NullMetricImpl {
 public:
-  NullHistogramImpl() {}
-  ~NullHistogramImpl() {}
-  std::string name() const override { return ""; }
-  const char* nameCStr() const override { return ""; }
-  const std::string& tagExtractedName() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
-  const std::vector<Tag>& tags() const override { CONSTRUCT_ON_FIRST_USE(std::vector<Tag>, {}); }
+  explicit NullHistogramImpl(SymbolTable& symbol_table) : NullMetricImpl(symbol_table) {}
+  ~NullHistogramImpl() {
+    // MetricImpl must be explicitly cleared() before destruction, otherwise it
+    // will not be able to access the SymbolTable& to free the symbols. An RAII
+    // alternative would be to store the SymbolTable reference in the
+    // MetricImpl, costing 8 bytes per stat.
+    MetricImpl::clear();
+  }
+
   void recordValue(uint64_t) override {}
-  bool used() const override { return false; }
 };
 
 } // namespace Stats

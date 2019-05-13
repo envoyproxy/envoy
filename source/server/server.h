@@ -29,13 +29,14 @@
 
 #include "server/configuration_impl.h"
 #include "server/http/admin.h"
+#include "server/listener_hooks.h"
 #include "server/listener_manager_impl.h"
 #include "server/overload_manager_impl.h"
-#include "server/test_hooks.h"
 #include "server/worker_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -144,7 +145,7 @@ public:
    * @throw EnvoyException if initialization fails.
    */
   InstanceImpl(const Options& options, Event::TimeSystem& time_system,
-               Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
+               Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
@@ -165,7 +166,6 @@ public:
   DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool fail) override;
-  void getParentStats(HotRestart::GetParentStatsInfo& info) override;
   HotRestart& hotRestart() override { return restarter_; }
   Init::Manager& initManager() override { return init_manager_; }
   ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
@@ -201,12 +201,12 @@ private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                  ComponentFactory& component_factory, TestHooks& hooks);
+                  ComponentFactory& component_factory, ListenerHooks& hooks);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
-  uint64_t numConnections();
   void startWorkers();
   void terminate();
-  void notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb = [] {});
+  void notifyCallbacksForStage(
+      Stage stage, Event::PostCb completion_cb = [] {});
 
   // init_manager_ must come before any member that participates in initialization, and destructed
   // only after referencing members are gone, since initialization continuation can potentially
@@ -260,8 +260,8 @@ private:
   Http::ContextImpl http_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   const std::thread::id main_thread_id_;
-  std::unordered_map<Stage, std::vector<StageCallback>> stage_callbacks_;
-  std::unordered_map<Stage, std::vector<StageCallbackWithCompletion>> stage_completable_callbacks_;
+  absl::flat_hash_map<Stage, std::vector<StageCallback>> stage_callbacks_;
+  absl::flat_hash_map<Stage, std::vector<StageCallbackWithCompletion>> stage_completable_callbacks_;
 };
 
 } // namespace Server

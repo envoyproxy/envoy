@@ -412,8 +412,8 @@ TEST(HeaderAddTest, HeaderAdd) {
   headers_to_add.iterate(
       [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
         TestHeaderMapImpl* headers = static_cast<TestHeaderMapImpl*>(context);
-        Http::LowerCaseString lower_key{entry.key().c_str()};
-        EXPECT_STREQ(entry.value().c_str(), headers->get(lower_key)->value().c_str());
+        Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
+        EXPECT_EQ(entry.value().getStringView(), headers->get(lower_key)->value().getStringView());
         return Http::HeaderMap::Iterate::Continue;
       },
       &headers);

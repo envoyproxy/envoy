@@ -4,7 +4,6 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
-#include "common/config/filter_json.h"
 #include "common/http/context_impl.h"
 #include "common/http/headers.h"
 
@@ -94,20 +93,6 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Http::ContextImpl http_context_;
 };
-
-TEST_F(HttpRateLimitFilterTest, BadConfig) {
-  const std::string filter_config = R"EOF(
-  {
-    "domain": "foo",
-    "route_key" : "my_route"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(filter_config);
-  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
-  EXPECT_THROW(Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config),
-               Json::Exception);
-}
 
 TEST_F(HttpRateLimitFilterTest, NoRoute) {
   SetUpTest(filter_config_);
@@ -401,6 +386,7 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
                     ->statsScope()
                     .counter("ratelimit.failure_mode_allowed")
                     .value());
+  EXPECT_EQ("rate_limiter_error", filter_callbacks_.details_);
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponse) {
@@ -433,6 +419,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
             filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.over_limit").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_429").value());
+  EXPECT_EQ("request_rate_limited", filter_callbacks_.details_);
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {

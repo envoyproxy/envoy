@@ -126,6 +126,20 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter response_format("RESPONSE_CODE_DETAILS");
+    absl::optional<std::string> rc_details;
+    EXPECT_CALL(stream_info, responseCodeDetails()).WillRepeatedly(ReturnRef(rc_details));
+    EXPECT_EQ("-", response_format.format(header, header, header, stream_info));
+  }
+
+  {
+    StreamInfoFormatter response_code_format("RESPONSE_CODE_DETAILS");
+    absl::optional<std::string> rc_details{"via_upstream"};
+    EXPECT_CALL(stream_info, responseCodeDetails()).WillRepeatedly(ReturnRef(rc_details));
+    EXPECT_EQ("via_upstream", response_code_format.format(header, header, header, stream_info));
+  }
+
+  {
     StreamInfoFormatter bytes_sent_format("BYTES_SENT");
     EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(1));
     EXPECT_EQ("1", bytes_sent_format.format(header, header, header, stream_info));

@@ -50,8 +50,8 @@ public:
 
 class PerFilterConfigs {
 public:
-  PerFilterConfigs(const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Any>& typed_configs,
-                   const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
+  PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
+                   const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
                    Server::Configuration::FactoryContext& factory_context);
 
   const RouteSpecificFilterConfig* get(const std::string& name) const;
@@ -227,6 +227,8 @@ public:
   const std::vector<uint32_t>& retriableStatusCodes() const override {
     return retriable_status_codes_;
   }
+  absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
+  absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
@@ -241,6 +243,8 @@ private:
   std::pair<std::string, ProtobufTypes::MessagePtr> retry_priority_config_;
   uint32_t host_selection_attempts_{1};
   std::vector<uint32_t> retriable_status_codes_;
+  absl::optional<std::chrono::milliseconds> base_interval_;
+  absl::optional<std::chrono::milliseconds> max_interval_;
 };
 
 /**
@@ -389,6 +393,9 @@ public:
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
     return max_grpc_timeout_;
   }
+  absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
+    return grpc_timeout_offset_;
+  }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
@@ -475,6 +482,9 @@ private:
       return parent_->idleTimeout();
     }
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
+      return parent_->maxGrpcTimeout();
+    }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
       return parent_->maxGrpcTimeout();
     }
     const MetadataMatchCriteria* metadataMatchCriteria() const override {
@@ -600,6 +610,7 @@ private:
   const std::chrono::milliseconds timeout_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
+  const absl::optional<std::chrono::milliseconds> grpc_timeout_offset_;
   Runtime::Loader& loader_;
   const absl::optional<RuntimeData> runtime_;
   const std::string scheme_redirect_;
@@ -622,8 +633,6 @@ private:
   const uint64_t total_cluster_weight_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaConstPtr metadata_match_criteria_;
-  HeaderParserPtr route_action_request_headers_parser_;
-  HeaderParserPtr route_action_response_headers_parser_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   envoy::api::v2::core::Metadata metadata_;
@@ -722,7 +731,14 @@ public:
 
 private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
-  const VirtualHostImpl* findWildcardVirtualHost(const std::string& host) const;
+
+  typedef std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>,
+                   std::greater<int64_t>>
+      WildcardVirtualHosts;
+  typedef std::function<std::string(const std::string&, int)> SubstringFunction;
+  const VirtualHostImpl* findWildcardVirtualHost(const std::string& host,
+                                                 const WildcardVirtualHosts& wildcard_virtual_hosts,
+                                                 SubstringFunction substring_function) const;
 
   std::unordered_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
@@ -734,8 +750,9 @@ private:
   // and climbs to about 110ns once there are any entries.
   //
   // The break-even is 4 entries.
-  std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>, std::greater<int64_t>>
-      wildcard_virtual_host_suffixes_;
+  WildcardVirtualHosts wildcard_virtual_host_suffixes_;
+  WildcardVirtualHosts wildcard_virtual_host_prefixes_;
+
   VirtualHostSharedPtr default_virtual_host_;
 };
 

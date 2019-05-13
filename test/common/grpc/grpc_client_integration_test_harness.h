@@ -35,6 +35,7 @@
 #include "test/test_common/utility.h"
 
 using testing::_;
+using testing::Eq;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
@@ -202,7 +203,7 @@ public:
     fake_stream_->startGrpcStream();
     helloworld::HelloReply reply;
     reply.set_message(HELLO_REPLY);
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().GrpcStatusCode, "0"));
+    EXPECT_CALL(*child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("0")));
     EXPECT_CALL(*this, onSuccess_(HelloworldReplyEq(HELLO_REPLY), _)).WillExitIfNeeded();
     EXPECT_CALL(*child_span_, finishSpan());
     dispatcher_helper_.setStreamEventPending();
@@ -271,7 +272,7 @@ public:
         *dispatcher_, fake_upstream_->localAddress(), nullptr,
         std::move(async_client_transport_socket_), nullptr);
     ON_CALL(*mock_cluster_info_, connectTimeout())
-        .WillByDefault(Return(std::chrono::milliseconds(1000)));
+        .WillByDefault(Return(std::chrono::milliseconds(10000)));
     EXPECT_CALL(*mock_cluster_info_, name()).WillRepeatedly(ReturnRef(fake_cluster_name_));
     EXPECT_CALL(cm_, get(_)).WillRepeatedly(Return(&thread_local_cluster_));
     EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_ptr_));
@@ -349,9 +350,9 @@ public:
     EXPECT_CALL(active_span, spawnChild_(_, "async fake_cluster egress", _))
         .WillOnce(Return(request->child_span_));
     EXPECT_CALL(*request->child_span_,
-                setTag(Tracing::Tags::get().UpstreamCluster, fake_cluster_name_));
+                setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(fake_cluster_name_)));
     EXPECT_CALL(*request->child_span_,
-                setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+                setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
     EXPECT_CALL(*request->child_span_, injectContext(_));
 
     request->grpc_request_ =

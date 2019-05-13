@@ -154,15 +154,12 @@ public:
 
   /**
    * Convert a string to an unsigned long, checking for error.
+   *
+   * Consider absl::SimpleAtoi instead if using base 10.
+   *
    * @param return true if successful, false otherwise.
    */
   static bool atoull(const char* str, uint64_t& out, int base = 10);
-
-  /**
-   * Convert a string to a long, checking for error.
-   * @param return true if successful, false otherwise.
-   */
-  static bool atoll(const char* str, int64_t& out, int base = 10);
 
   /**
    * Convert an unsigned integer to a base 10 string as fast as possible.
@@ -342,6 +339,8 @@ public:
    * @return true if strings are semantically the same and false otherwise.
    */
   struct CaseInsensitiveCompare {
+    // Enable heterogeneous lookup (https://abseil.io/tips/144)
+    using is_transparent = void;
     bool operator()(absl::string_view lhs, absl::string_view rhs) const;
   };
 
@@ -351,13 +350,15 @@ public:
    * @return uint64_t hash representation of the supplied string view.
    */
   struct CaseInsensitiveHash {
+    // Enable heterogeneous lookup (https://abseil.io/tips/144)
+    using is_transparent = void;
     uint64_t operator()(absl::string_view key) const;
   };
 
   /**
    * Definition of unordered set of case-insensitive std::string.
    */
-  typedef std::unordered_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>
+  typedef absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>
       CaseUnorderedSet;
 
   /**
@@ -572,14 +573,13 @@ template <class Value> struct TrieLookupTable {
    * exists.
    * @return false when a value already exists for the given key.
    */
-  bool add(const char* key, Value value, bool overwrite_existing = true) {
+  bool add(absl::string_view key, Value value, bool overwrite_existing = true) {
     TrieEntry<Value>* current = &root_;
-    while (uint8_t c = *key) {
+    for (uint8_t c : key) {
       if (!current->entries_[c]) {
         current->entries_[c] = std::make_unique<TrieEntry<Value>>();
       }
       current = current->entries_[c].get();
-      key++;
     }
     if (current->value_ && !overwrite_existing) {
       return false;
@@ -593,13 +593,11 @@ template <class Value> struct TrieLookupTable {
    * @param key the key used to find.
    * @return the value associated with the key.
    */
-  Value find(const char* key) const {
+  Value find(absl::string_view key) const {
     const TrieEntry<Value>* current = &root_;
-    while (uint8_t c = *key) {
+    for (uint8_t c : key) {
       current = current->entries_[c].get();
-      if (current) {
-        key++;
-      } else {
+      if (current == nullptr) {
         return nullptr;
       }
     }

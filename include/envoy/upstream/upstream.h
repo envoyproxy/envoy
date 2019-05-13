@@ -22,6 +22,7 @@
 #include "envoy/upstream/locality.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
+#include "envoy/upstream/types.h"
 
 #include "absl/types/optional.h"
 
@@ -50,7 +51,12 @@ public:
   /* The host is currently marked as degraded through active health checking. */ \
   m(DEGRADED_ACTIVE_HC, 0x08)                                                    \
   /* The host is currently marked as degraded by EDS. */                         \
-  m(DEGRADED_EDS_HEALTH, 0x10)
+  m(DEGRADED_EDS_HEALTH, 0x10)                                                   \
+  /* The host is pending removal from discovery but is stabilized due to */      \
+  /* active HC. */                                                               \
+  m(PENDING_DYNAMIC_REMOVAL, 0x20)                                               \
+  /* The host is pending its initial active health check. */                     \
+  m(PENDING_ACTIVE_HC, 0x40)
   // clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,
@@ -191,9 +197,16 @@ public:
 typedef std::shared_ptr<const Host> HostConstSharedPtr;
 
 typedef std::vector<HostSharedPtr> HostVector;
+typedef Phantom<HostVector, Healthy> HealthyHostVector;
+typedef Phantom<HostVector, Degraded> DegradedHostVector;
+typedef Phantom<HostVector, Excluded> ExcludedHostVector;
 typedef std::unordered_map<std::string, Upstream::HostSharedPtr> HostMap;
 typedef std::shared_ptr<HostVector> HostVectorSharedPtr;
 typedef std::shared_ptr<const HostVector> HostVectorConstSharedPtr;
+
+typedef std::shared_ptr<const HealthyHostVector> HealthyHostVectorConstSharedPtr;
+typedef std::shared_ptr<const DegradedHostVector> DegradedHostVectorConstSharedPtr;
+typedef std::shared_ptr<const ExcludedHostVector> ExcludedHostVectorConstSharedPtr;
 
 typedef std::unique_ptr<HostVector> HostListPtr;
 typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
@@ -221,20 +234,21 @@ public:
   virtual const std::vector<HostVector>& get() const PURE;
 
   /**
-   * Clone object with a filter predicate.
-   * @param predicate on Host entries.
-   * @return HostsPerLocalityConstSharedPtr clone of the HostsPerLocality with only
-   *         hosts according to predicate.
+   * Clone object with multiple filter predicates. Returns a vector of clones, each with host that
+   * match the provided predicates.
+   * @param predicates vector of predicates on Host entries.
+   * @return vector of HostsPerLocalityConstSharedPtr clones of the HostsPerLocality that match
+   *         hosts according to predicates.
    */
-  virtual std::shared_ptr<const HostsPerLocality>
-  filter(std::function<bool(const Host&)> predicate) const PURE;
+  virtual std::vector<std::shared_ptr<const HostsPerLocality>>
+  filter(const std::vector<std::function<bool(const Host&)>>& predicates) const PURE;
 
   /**
    * Clone object.
    * @return HostsPerLocalityConstSharedPtr clone of the HostsPerLocality.
    */
   std::shared_ptr<const HostsPerLocality> clone() const {
-    return filter([](const Host&) { return true; });
+    return filter({[](const Host&) { return true; }})[0];
   }
 };
 
@@ -250,6 +264,7 @@ typedef std::shared_ptr<const LocalityWeights> LocalityWeightsConstSharedPtr;
  * Base host set interface. This contains all of the endpoints for a given LocalityLbEndpoints
  * priority level.
  */
+// TODO(snowp): Remove the const ref accessors in favor of the shared_ptr ones.
 class HostSet {
 public:
   virtual ~HostSet() {}
@@ -260,12 +275,22 @@ public:
   virtual const HostVector& hosts() const PURE;
 
   /**
+   * @return a shared ptr to the vector returned by hosts().
+   */
+  virtual HostVectorConstSharedPtr hostsPtr() const PURE;
+
+  /**
    * @return all healthy hosts contained in the set at the current time. NOTE: This set is
    *         eventually consistent. There is a time window where a host in this set may become
    *         unhealthy and calling healthy() on it will return false. Code should be written to
    *         deal with this case if it matters.
    */
   virtual const HostVector& healthyHosts() const PURE;
+
+  /**
+   * @return a shared ptr to the vector returned by healthyHosts().
+   */
+  virtual HealthyHostVectorConstSharedPtr healthyHostsPtr() const PURE;
 
   /**
    * @return all degraded hosts contained in the set at the current time. NOTE: This set is
@@ -276,9 +301,30 @@ public:
   virtual const HostVector& degradedHosts() const PURE;
 
   /**
+   * @return a shared ptr to the vector returned by degradedHosts().
+   */
+  virtual DegradedHostVectorConstSharedPtr degradedHostsPtr() const PURE;
+
+  /*
+   * @return all excluded hosts contained in the set at the current time. Excluded hosts should be
+   * ignored when computing load balancing weights, but may overlap with hosts in hosts().
+   */
+  virtual const HostVector& excludedHosts() const PURE;
+
+  /**
+   * @return a shared ptr to the vector returned by excludedHosts().
+   */
+  virtual ExcludedHostVectorConstSharedPtr excludedHostsPtr() const PURE;
+
+  /**
    * @return hosts per locality.
    */
   virtual const HostsPerLocality& hostsPerLocality() const PURE;
+
+  /**
+   * @return a shared ptr to the HostsPerLocality returned by hostsPerLocality().
+   */
+  virtual HostsPerLocalityConstSharedPtr hostsPerLocalityPtr() const PURE;
 
   /**
    * @return same as hostsPerLocality but only contains healthy hosts.
@@ -286,9 +332,29 @@ public:
   virtual const HostsPerLocality& healthyHostsPerLocality() const PURE;
 
   /**
+   * @return a shared ptr to the HostsPerLocality returned by healthyHostsPerLocality().
+   */
+  virtual HostsPerLocalityConstSharedPtr healthyHostsPerLocalityPtr() const PURE;
+
+  /**
    * @return same as hostsPerLocality but only contains degraded hosts.
    */
   virtual const HostsPerLocality& degradedHostsPerLocality() const PURE;
+
+  /**
+   * @return a shared ptr to the HostsPerLocality returned by degradedHostsPerLocality().
+   */
+  virtual HostsPerLocalityConstSharedPtr degradedHostsPerLocalityPtr() const PURE;
+
+  /**
+   * @return same as hostsPerLocality but only contains excluded hosts.
+   */
+  virtual const HostsPerLocality& excludedHostsPerLocality() const PURE;
+
+  /**
+   * @return a shared ptr to the HostsPerLocality returned by excludedHostsPerLocality().
+   */
+  virtual HostsPerLocalityConstSharedPtr excludedHostsPerLocalityPtr() const PURE;
 
   /**
    * @return weights for each locality in the host set.
@@ -366,11 +432,13 @@ public:
    */
   struct UpdateHostsParams {
     HostVectorConstSharedPtr hosts;
-    HostVectorConstSharedPtr healthy_hosts;
-    HostVectorConstSharedPtr degraded_hosts;
+    HealthyHostVectorConstSharedPtr healthy_hosts;
+    DegradedHostVectorConstSharedPtr degraded_hosts;
+    ExcludedHostVectorConstSharedPtr excluded_hosts;
     HostsPerLocalityConstSharedPtr hosts_per_locality;
     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
+    HostsPerLocalityConstSharedPtr excluded_hosts_per_locality;
   };
 
   /**
@@ -480,6 +548,7 @@ public:
   COUNTER  (upstream_cx_protocol_error)                                                            \
   COUNTER  (upstream_cx_max_requests)                                                              \
   COUNTER  (upstream_cx_none_healthy)                                                              \
+  COUNTER  (upstream_cx_pool_overflow)                                                             \
   COUNTER  (upstream_rq_total)                                                                     \
   GAUGE    (upstream_rq_active)                                                                    \
   COUNTER  (upstream_rq_completed)                                                                 \
@@ -507,6 +576,7 @@ public:
   COUNTER  (membership_change)                                                                     \
   GAUGE    (membership_healthy)                                                                    \
   GAUGE    (membership_degraded)                                                                   \
+  GAUGE    (membership_excluded)                                                                   \
   GAUGE    (membership_total)                                                                      \
   COUNTER  (retry_or_shadow_abandoned)                                                             \
   COUNTER  (update_attempt)                                                                        \
@@ -514,6 +584,8 @@ public:
   COUNTER  (update_failure)                                                                        \
   COUNTER  (update_empty)                                                                          \
   COUNTER  (update_no_rebuild)                                                                     \
+  COUNTER  (assignment_timeout_received)                                                           \
+  COUNTER  (assignment_stale)                                                                      \
   GAUGE    (version)
 // clang-format on
 
@@ -761,6 +833,12 @@ public:
    *         after a host is removed from service discovery.
    */
   virtual bool drainConnectionsOnHostRemoval() const PURE;
+
+  /**
+   * @return true if this cluster is configured to ignore hosts for the purpose of load balancing
+   * computations until they have been health checked for the first time.
+   */
+  virtual bool warmHosts() const PURE;
 
   /**
    * @return eds cluster service_name of the cluster.

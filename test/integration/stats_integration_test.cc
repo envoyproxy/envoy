@@ -195,8 +195,24 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
 
   EXPECT_LT(start_mem, m1);
   EXPECT_LT(start_mem, m1001);
-  // As of 2019/03/20, m_per_cluster = 59015 (libstdc++)
-  EXPECT_LT(m_per_cluster, 59100);
+
+  // Note: if you are increasing this golden value because you are adding a
+  // stat, please confirm that this will be generally useful to most Envoy
+  // users. Otherwise you are adding to the per-cluster memory overhead, which
+  // will be significant for Envoy installations that are massively
+  // multi-tenant.
+  //
+  // History of golden values:
+  //
+  // Date        PR       Bytes Per Cluster   Notes
+  // ----------  -----    -----------------   -----
+  // 2019/03/20  6329     59015               Initial version
+  // 2019/04/12  6477     59576               Implementing Endpoint lease...
+  // 2019/04/23  6659     59512               Reintroduce dispatcher stats...
+  // 2019/04/24  6161     49415               Pack tags and tag extracted names
+  // 2019/05/07  6794     49957               Stats for excluded hosts in cluster
+
+  EXPECT_EQ(m_per_cluster, 49957);
 }
 
 } // namespace

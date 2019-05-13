@@ -50,8 +50,8 @@ namespace Server {
 
 class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdminStatsTest() : alloc_(options_, symbol_table_) {
-    store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_, alloc_);
+  AdminStatsTest() : alloc_(symbol_table_) {
+    store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(alloc_);
     store_->addSink(sink_);
   }
 
@@ -66,8 +66,7 @@ public:
   Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::StatsOptionsImpl options_;
-  Stats::MockedTestAllocator alloc_;
+  Stats::HeapStatDataAllocator alloc_;
   Stats::MockSink sink_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
 };
@@ -114,14 +113,11 @@ TEST_P(AdminStatsTest, StatsAsJson) {
 
   store_->mergeHistograms([]() -> void {});
 
-  EXPECT_CALL(alloc_, free(_));
-
-  std::map<std::string, uint64_t> all_stats;
-
   std::vector<Stats::ParentHistogramSharedPtr> histograms = store_->histograms();
   std::sort(histograms.begin(), histograms.end(),
             [](const Stats::ParentHistogramSharedPtr& a,
                const Stats::ParentHistogramSharedPtr& b) -> bool { return a->name() < b->name(); });
+  std::map<std::string, uint64_t> all_stats;
   std::string actual_json = statsAsJsonHandler(all_stats, histograms, false);
 
   const std::string expected_json = R"EOF({
@@ -263,10 +259,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
 
   store_->mergeHistograms([]() -> void {});
 
-  EXPECT_CALL(alloc_, free(_));
-
   std::map<std::string, uint64_t> all_stats;
-
   std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), true);
 
   // Expected JSON should not have h2 values as it is not used.
@@ -364,10 +357,7 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
 
   store_->mergeHistograms([]() -> void {});
 
-  EXPECT_CALL(alloc_, free(_));
-
   std::map<std::string, uint64_t> all_stats;
-
   std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), false,
                                                absl::optional<std::regex>{std::regex("[a-z]1")});
 
@@ -473,10 +463,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
 
   store_->mergeHistograms([]() -> void {});
 
-  EXPECT_CALL(alloc_, free(_));
-
   std::map<std::string, uint64_t> all_stats;
-
   std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), true,
                                                absl::optional<std::regex>{std::regex("h[12]")});
 
@@ -698,7 +685,7 @@ TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
   // just issue a warning, so that scripts using curl GET commands to mutate state can be fixed.
   EXPECT_LOG_CONTAINS("error",
                       "admin path \"" + path + "\" mutates state, method=GET rather than POST",
-                      EXPECT_EQ(Http::Code::BadRequest, getCallback(path, header_map, data)));
+                      EXPECT_EQ(Http::Code::MethodNotAllowed, getCallback(path, header_map, data)));
 }
 
 TEST_P(AdminInstanceTest, AdminBadProfiler) {
@@ -934,12 +921,11 @@ TEST_P(AdminInstanceTest, Runtime) {
   Runtime::MockLoader loader;
   auto layer1 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
   auto layer2 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
-  std::unordered_map<std::string, Runtime::Snapshot::Entry> entries2{
-      {"string_key", {"override", {}, {}, {}}}, {"extra_key", {"bar", {}, {}, {}}}};
-  std::unordered_map<std::string, Runtime::Snapshot::Entry> entries1{
-      {"string_key", {"foo", {}, {}, {}}},
-      {"int_key", {"1", 1, {}, {}}},
-      {"other_key", {"bar", {}, {}, {}}}};
+  Runtime::Snapshot::EntryMap entries2{{"string_key", {"override", {}, {}, {}}},
+                                       {"extra_key", {"bar", {}, {}, {}}}};
+  Runtime::Snapshot::EntryMap entries1{{"string_key", {"foo", {}, {}, {}}},
+                                       {"int_key", {"1", 1, {}, {}}},
+                                       {"other_key", {"bar", {}, {}, {}}}};
 
   ON_CALL(*layer1, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer1"}));
   ON_CALL(*layer1, values()).WillByDefault(testing::ReturnRef(entries1));
@@ -1073,6 +1059,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       .WillByDefault(Return(true));
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH))
       .WillByDefault(Return(true));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL))
+      .WillByDefault(Return(true));
 
   ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
   ON_CALL(*host, weight()).WillByDefault(Return(5));
@@ -1132,7 +1120,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       "eds_health_status": "DEGRADED",
       "failed_active_health_check": true,
       "failed_outlier_check": true,
-      "failed_active_degraded_check": true
+      "failed_active_degraded_check": true,
+      "pending_dynamic_removal": true
      },
      "success_rate": {
       "value": 43.2
@@ -1255,6 +1244,12 @@ public:
     }
   }
 
+  void setHistogramValuesWithCounts(const std::vector<std::pair<uint64_t, uint64_t>>& values) {
+    for (std::pair<uint64_t, uint64_t> cv : values) {
+      hist_insert_intscale(histogram_, cv.first, 0, cv.second);
+    }
+  }
+
 private:
   histogram_t* histogram_;
 };
@@ -1264,13 +1259,13 @@ protected:
   PrometheusStatsFormatterTest() : alloc_(symbol_table_) {}
 
   void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    std::string tname = std::string(name);
-    counters_.push_back(alloc_.makeCounter(name, std::move(tname), std::move(cluster_tags)));
+    Stats::StatNameManagedStorage storage(name, symbol_table_);
+    counters_.push_back(alloc_.makeCounter(storage.statName(), name, cluster_tags));
   }
 
   void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    std::string tname = std::string(name);
-    gauges_.push_back(alloc_.makeGauge(name, std::move(tname), std::move(cluster_tags)));
+    Stats::StatNameManagedStorage storage(name, symbol_table_);
+    gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags));
   }
 
   void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {
@@ -1278,7 +1273,6 @@ protected:
   }
 
   Stats::FakeSymbolTableImpl symbol_table_;
-  Stats::StatsOptionsImpl stats_options_;
   Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;
@@ -1403,6 +1397,59 @@ envoy_histogram1_count{} 0
   EXPECT_EQ(expected_output, response.toString());
 }
 
+TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
+  HistogramWrapper h1_cumulative;
+
+  // Force large counts to prove that the +Inf bucket doesn't overflow to scientific notation.
+  h1_cumulative.setHistogramValuesWithCounts(std::vector<std::pair<uint64_t, uint64_t>>({
+      {1, 100000},
+      {100, 1000000},
+      {1000, 100000000},
+  }));
+
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram->name_ = "histogram1";
+  histogram->used_ = true;
+  ON_CALL(*histogram, cumulativeStatistics())
+      .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
+
+  addHistogram(histogram);
+
+  Buffer::OwnedImpl response;
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  EXPECT_EQ(1UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
+envoy_histogram1_bucket{le="0.5"} 0
+envoy_histogram1_bucket{le="1"} 0
+envoy_histogram1_bucket{le="5"} 100000
+envoy_histogram1_bucket{le="10"} 100000
+envoy_histogram1_bucket{le="25"} 100000
+envoy_histogram1_bucket{le="50"} 100000
+envoy_histogram1_bucket{le="100"} 100000
+envoy_histogram1_bucket{le="250"} 1100000
+envoy_histogram1_bucket{le="500"} 1100000
+envoy_histogram1_bucket{le="1000"} 1100000
+envoy_histogram1_bucket{le="2500"} 101100000
+envoy_histogram1_bucket{le="5000"} 101100000
+envoy_histogram1_bucket{le="10000"} 101100000
+envoy_histogram1_bucket{le="30000"} 101100000
+envoy_histogram1_bucket{le="60000"} 101100000
+envoy_histogram1_bucket{le="300000"} 101100000
+envoy_histogram1_bucket{le="600000"} 101100000
+envoy_histogram1_bucket{le="1800000"} 101100000
+envoy_histogram1_bucket{le="3600000"} 101100000
+envoy_histogram1_bucket{le="+Inf"} 101100000
+envoy_histogram1_sum{} 105105105000
+envoy_histogram1_count{} 101100000
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
+}
+
 TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   addCounter("cluster.test_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
   addCounter("cluster.test_2.upstream_cx_total", {{"another_tag_name", "another_tag-value"}});
@@ -1417,7 +1464,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
   histogram1->used_ = true;
-  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
   EXPECT_CALL(*histogram1, cumulativeStatistics())
       .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
@@ -1477,7 +1524,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
   auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
   histogram1->used_ = true;
-  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
   EXPECT_CALL(*histogram1, cumulativeStatistics())
       .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
@@ -1524,7 +1571,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
   auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
   histogram1->used_ = false;
-  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
 
   {

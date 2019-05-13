@@ -23,11 +23,12 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::MessagePtr&& req
 
   ASSERT(!request->headers().Host()->value().empty());
   // Switch authority to add a shadow postfix. This allows upstream logging to make more sense.
-  auto parts = StringUtil::splitToken(request->headers().Host()->value().c_str(), ":");
-  ASSERT(parts.size() > 0 && parts.size() <= 2);
+  auto parts = StringUtil::splitToken(request->headers().Host()->value().getStringView(), ":");
+  ASSERT(!parts.empty() && parts.size() <= 2);
   request->headers().Host()->value(
-      parts.size() == 2 ? absl::StrJoin(parts, "-shadow:")
-                        : absl::StrCat(request->headers().Host()->value().c_str(), "-shadow"));
+      parts.size() == 2
+          ? absl::StrJoin(parts, "-shadow:")
+          : absl::StrCat(request->headers().Host()->value().getStringView(), "-shadow"));
   // This is basically fire and forget. We don't handle cancelling.
   cm_.httpAsyncClientForCluster(cluster).send(
       std::move(request), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout));

@@ -41,6 +41,17 @@ DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& 
 
 DispatcherImpl::~DispatcherImpl() {}
 
+void DispatcherImpl::initializeStats(Stats::Scope& scope, const std::string& prefix) {
+  // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
+  post([this, &scope, prefix] {
+    stats_prefix_ = prefix + "dispatcher";
+    stats_ = std::make_unique<DispatcherStats>(
+        DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
+    base_scheduler_.initializeStats(stats_.get());
+    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, run_tid_->debugString());
+  });
+}
+
 void DispatcherImpl::clearDeferredDeleteList() {
   ASSERT(isThreadSafe());
   std::vector<DeferredDeletablePtr>* to_delete = current_to_delete_;
@@ -164,12 +175,7 @@ void DispatcherImpl::run(RunType type) {
   // not guarantee that events are run in any particular order. So even if we post() and call
   // event_base_once() before some other event, the other event might get called first.
   runPostCallbacks();
-
-  if (type == RunType::NonBlock) {
-    base_scheduler_.nonBlockingLoop();
-  } else {
-    base_scheduler_.blockingLoop();
-  }
+  base_scheduler_.run(type);
 }
 
 void DispatcherImpl::runPostCallbacks() {

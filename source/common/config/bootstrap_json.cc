@@ -1,7 +1,5 @@
 #include "common/config/bootstrap_json.h"
 
-#include "envoy/stats/stats_options.h"
-
 #include "common/common/assert.h"
 #include "common/config/address_json.h"
 #include "common/config/cds_json.h"
@@ -17,8 +15,7 @@ namespace Envoy {
 namespace Config {
 
 void BootstrapJson::translateClusterManagerBootstrap(
-    const Json::Object& json_cluster_manager, envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-    const Stats::StatsOptions& stats_options) {
+    const Json::Object& json_cluster_manager, envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
   json_cluster_manager.validateSchema(Json::Schema::CLUSTER_MANAGER_SCHEMA);
 
   absl::optional<envoy::api::v2::core::ConfigSource> eds_config;
@@ -27,14 +24,13 @@ void BootstrapJson::translateClusterManagerBootstrap(
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters()->Add();
     Config::CdsJson::translateCluster(*json_sds->getObject("cluster"),
                                       absl::optional<envoy::api::v2::core::ConfigSource>(),
-                                      *cluster, stats_options);
+                                      *cluster);
   }
 
   if (json_cluster_manager.hasObject("cds")) {
     const auto json_cds = json_cluster_manager.getObject("cds");
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters()->Add();
-    Config::CdsJson::translateCluster(*json_cds->getObject("cluster"), eds_config, *cluster,
-                                      stats_options);
+    Config::CdsJson::translateCluster(*json_cds->getObject("cluster"), eds_config, *cluster);
     Config::Utility::translateCdsConfig(
         *json_cds, *bootstrap.mutable_dynamic_resources()->mutable_cds_config());
   }
@@ -42,7 +38,7 @@ void BootstrapJson::translateClusterManagerBootstrap(
   for (const Json::ObjectSharedPtr& json_cluster :
        json_cluster_manager.getObjectArray("clusters")) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters()->Add();
-    Config::CdsJson::translateCluster(*json_cluster, eds_config, *cluster, stats_options);
+    Config::CdsJson::translateCluster(*json_cluster, eds_config, *cluster);
   }
 
   auto* cluster_manager = bootstrap.mutable_cluster_manager();
@@ -54,12 +50,10 @@ void BootstrapJson::translateClusterManagerBootstrap(
 }
 
 void BootstrapJson::translateBootstrap(const Json::Object& json_config,
-                                       envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                       const Stats::StatsOptions& stats_options) {
+                                       envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
   json_config.validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
 
-  translateClusterManagerBootstrap(*json_config.getObject("cluster_manager"), bootstrap,
-                                   stats_options);
+  translateClusterManagerBootstrap(*json_config.getObject("cluster_manager"), bootstrap);
 
   if (json_config.hasObject("lds")) {
     auto* lds_config = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
@@ -68,7 +62,7 @@ void BootstrapJson::translateBootstrap(const Json::Object& json_config,
 
   for (const auto json_listener : json_config.getObjectArray("listeners")) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners()->Add();
-    Config::LdsJson::translateListener(*json_listener, *listener, stats_options);
+    Config::LdsJson::translateListener(*json_listener, *listener);
   }
 
   JSON_UTIL_SET_STRING(json_config, bootstrap, flags_path);

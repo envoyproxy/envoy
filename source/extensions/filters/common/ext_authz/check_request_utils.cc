@@ -76,7 +76,7 @@ std::string CheckRequestUtils::getHeaderStr(const Envoy::Http::HeaderEntry* entr
 void CheckRequestUtils::setHttpRequest(
     ::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-    const Envoy::Http::HeaderMap& headers) {
+    const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes) {
 
   // Set id
   // The streamId is not qualified as a const. Although it is as it does not modify the object.
@@ -107,29 +107,43 @@ void CheckRequestUtils::setHttpRequest(
   auto mutable_headers = httpreq.mutable_headers();
   headers.iterate(
       [](const Envoy::Http::HeaderEntry& e, void* ctx) {
-        Envoy::Protobuf::Map<Envoy::ProtobufTypes::String, Envoy::ProtobufTypes::String>*
-            mutable_headers = static_cast<
-                Envoy::Protobuf::Map<Envoy::ProtobufTypes::String, Envoy::ProtobufTypes::String>*>(
-                ctx);
-        (*mutable_headers)[std::string(e.key().getStringView())] =
-            std::string(e.value().getStringView());
+        // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
+        if (e.key().getStringView() != Http::Headers::get().EnvoyAuthPartialBody.get()) {
+          Envoy::Protobuf::Map<std::string, std::string>* mutable_headers =
+              static_cast<Envoy::Protobuf::Map<std::string, std::string>*>(ctx);
+          (*mutable_headers)[std::string(e.key().getStringView())] =
+              std::string(e.value().getStringView());
+        }
         return Envoy::Http::HeaderMap::Iterate::Continue;
       },
       mutable_headers);
+
+  // Set request body.
+  const Buffer::Instance* buffer = sdfc->decodingBuffer();
+  if (max_request_bytes > 0 && buffer != nullptr) {
+    const uint64_t length = std::min(buffer->length(), max_request_bytes);
+    std::string data(length, 0);
+    buffer->copyOut(0, length, &data[0]);
+    httpreq.set_body(std::move(data));
+
+    // Add in a header to detect when a partial body is used.
+    (*mutable_headers)[Http::Headers::get().EnvoyAuthPartialBody.get()] =
+        length != buffer->length() ? "true" : "false";
+  }
 }
 
 void CheckRequestUtils::setAttrContextRequest(
     ::envoy::service::auth::v2::AttributeContext_Request& req,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-    const Envoy::Http::HeaderMap& headers) {
-  setHttpRequest(*req.mutable_http(), callbacks, headers);
+    const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes) {
+  setHttpRequest(*req.mutable_http(), callbacks, headers, max_request_bytes);
 }
 
 void CheckRequestUtils::createHttpCheck(
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers,
-    Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>&& context_extensions,
-    envoy::service::auth::v2::CheckRequest& request) {
+    Protobuf::Map<std::string, std::string>&& context_extensions,
+    envoy::service::auth::v2::CheckRequest& request, uint64_t max_request_bytes) {
 
   auto attrs = request.mutable_attributes();
 
@@ -140,7 +154,7 @@ void CheckRequestUtils::createHttpCheck(
 
   setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false);
   setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), "", true);
-  setAttrContextRequest(*attrs->mutable_request(), callbacks, headers);
+  setAttrContextRequest(*attrs->mutable_request(), callbacks, headers, max_request_bytes);
 
   // Fill in the context extensions:
   (*attrs->mutable_context_extensions()) = std::move(context_extensions);

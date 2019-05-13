@@ -2,6 +2,7 @@
 
 #include "envoy/api/v2/eds.pb.validate.h"
 
+#include "common/common/utility.h"
 #include "common/config/subscription_factory.h"
 
 namespace Envoy {
@@ -18,16 +19,17 @@ EdsClusterImpl::EdsClusterImpl(
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()) {
   Config::Utility::checkLocalInfo("eds", local_info_);
-
-  const auto& eds_config = cluster.eds_cluster_config().eds_config();
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   Runtime::RandomGenerator& random = factory_context.random();
   Upstream::ClusterManager& cm = factory_context.clusterManager();
-  subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
-      envoy::api::v2::ClusterLoadAssignment>(
+  assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
+  const auto& eds_config = cluster.eds_cluster_config().eds_config();
+  subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
       eds_config, local_info_, dispatcher, cm, random, info_->statsScope(),
       "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-      "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints", factory_context.api());
+      "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints",
+      Grpc::Common::typeUrl(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
+      factory_context.api());
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }
@@ -97,7 +99,8 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   parent_.onPreInitComplete();
 }
 
-void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::string&) {
+void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                    const std::string&) {
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
     info_->stats().update_empty_.inc();
@@ -107,7 +110,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
   if (resources.size() != 1) {
     throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
   }
-  const auto& cluster_load_assignment = resources[0];
+  auto cluster_load_assignment =
+      MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[0]);
   MessageUtil::validate(cluster_load_assignment);
   // TODO(PiotrSikora): Remove this hack once fixed internally.
   if (!(cluster_load_assignment.cluster_name() == cluster_name_)) {
@@ -115,8 +119,81 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
                                      cluster_load_assignment.cluster_name()));
   }
 
+  // Disable timer (if enabled) as we have received new assignment.
+  if (assignment_timeout_->enabled()) {
+    assignment_timeout_->disableTimer();
+  }
+  // Check if endpoint_stale_after is set.
+  const uint64_t stale_after_ms =
+      PROTOBUF_GET_MS_OR_DEFAULT(cluster_load_assignment.policy(), endpoint_stale_after, 0);
+  if (stale_after_ms > 0) {
+    // Stat to track how often we receive valid assignment_timeout in response.
+    info_->stats().assignment_timeout_received_.inc();
+    assignment_timeout_->enableTimer(std::chrono::milliseconds(stale_after_ms));
+  }
+
   BatchUpdateHelper helper(*this, cluster_load_assignment);
   priority_set_.batchHostUpdate(helper);
+}
+
+void EdsClusterImpl::onAssignmentTimeout() {
+  // We can no longer use the assignments, remove them.
+  // TODO(vishalpowar) This is not going to work for incremental updates, and we
+  // need to instead change the health status to indicate the assignments are
+  // stale.
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+  envoy::api::v2::ClusterLoadAssignment resource;
+  resource.set_cluster_name(cluster_name_);
+  resources.Add()->PackFrom(resource);
+  onConfigUpdate(resources, "");
+  // Stat to track how often we end up with stale assignments.
+  info_->stats().assignment_stale_.inc();
+}
+
+void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
+  // Here we will see if we have a host that has been marked for deletion by service discovery
+  // but has been stabilized due to passing active health checking. If such a host is now
+  // failing active health checking we can remove it during this health check update.
+  HostSharedPtr host_to_exclude = host;
+  if (host_to_exclude != nullptr &&
+      host_to_exclude->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) &&
+      host_to_exclude->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL)) {
+    // Empty for clarity.
+  } else {
+    // Do not exclude and remove the host during the update.
+    host_to_exclude = nullptr;
+  }
+
+  const auto& host_sets = prioritySet().hostSetsPerPriority();
+  for (size_t priority = 0; priority < host_sets.size(); ++priority) {
+    const auto& host_set = host_sets[priority];
+
+    // Filter current hosts in case we need to exclude a host.
+    HostVectorSharedPtr hosts_copy(new HostVector());
+    std::copy_if(host_set->hosts().begin(), host_set->hosts().end(),
+                 std::back_inserter(*hosts_copy),
+                 [&host_to_exclude](const HostSharedPtr& host) { return host_to_exclude != host; });
+
+    // Setup a hosts to remove vector in case we need to exclude a host.
+    HostVector hosts_to_remove;
+    if (hosts_copy->size() != host_set->hosts().size()) {
+      ASSERT(hosts_copy->size() == host_set->hosts().size() - 1);
+      hosts_to_remove.emplace_back(host_to_exclude);
+    }
+
+    // Filter hosts per locality in case we need to exclude a host.
+    HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().filter(
+        {[&host_to_exclude](const Host& host) { return &host != host_to_exclude.get(); }})[0];
+
+    prioritySet().updateHosts(priority,
+                              HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
+                              host_set->localityWeights(), {}, hosts_to_remove, absl::nullopt);
+  }
+
+  if (host_to_exclude != nullptr) {
+    ASSERT(all_hosts_.find(host_to_exclude->address()->asString()) != all_hosts_.end());
+    all_hosts_.erase(host_to_exclude->address()->asString());
+  }
 }
 
 bool EdsClusterImpl::updateHostsPerLocality(

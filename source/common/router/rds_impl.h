@@ -93,15 +93,15 @@ class RdsRouteConfigProviderImpl;
  * A class that fetches the route configuration dynamically using the RDS API and updates them to
  * RDS config providers.
  */
-class RdsRouteConfigSubscription
-    : Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
-      Logger::Loggable<Logger::Id::router> {
+class RdsRouteConfigSubscription : Envoy::Config::SubscriptionCallbacks,
+                                   Logger::Loggable<Logger::Id::router> {
 public:
-  ~RdsRouteConfigSubscription();
+  ~RdsRouteConfigSubscription() override;
 
   // Config::SubscriptionCallbacks
   // TODO(fredlas) deduplicate
-  void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override;
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -123,9 +123,9 @@ private:
       const std::string& stat_prefix,
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
+  std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const std::string route_config_name_;
   Init::TargetImpl init_target_;
-  std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
   Stats::ScopePtr scope_;
   RdsStats stats_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;

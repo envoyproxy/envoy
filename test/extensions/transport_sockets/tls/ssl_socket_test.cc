@@ -563,13 +563,10 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        // TODO(htuch): remove std::string(..) wrappers when Google's string
-        // implementation converges with std::string.
-        std::string sni =
-            options.transportSocketOptions() != NULL &&
-                    options.transportSocketOptions()->serverNameOverride().has_value()
-                ? std::string(options.transportSocketOptions()->serverNameOverride().value())
-                : std::string(options.clientCtxProto().sni());
+        std::string sni = options.transportSocketOptions() != NULL &&
+                                  options.transportSocketOptions()->serverNameOverride().has_value()
+                              ? options.transportSocketOptions()->serverNameOverride().value()
+                              : options.clientCtxProto().sni();
         socket->setRequestedServerName(sni);
         Network::ConnectionPtr new_connection = dispatcher->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
@@ -2251,14 +2248,15 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
 
   // Verify that server sent list with 2 acceptable client certificate CA names.
   const SslSocket* ssl_socket = dynamic_cast<const SslSocket*>(client_connection->ssl());
-  SSL_set_cert_cb(ssl_socket->rawSslForTest(),
-                  [](SSL* ssl, void*) -> int {
-                    STACK_OF(X509_NAME)* list = SSL_get_client_CA_list(ssl);
-                    EXPECT_NE(nullptr, list);
-                    EXPECT_EQ(2U, sk_X509_NAME_num(list));
-                    return 1;
-                  },
-                  nullptr);
+  SSL_set_cert_cb(
+      ssl_socket->rawSslForTest(),
+      [](SSL* ssl, void*) -> int {
+        STACK_OF(X509_NAME)* list = SSL_get_client_CA_list(ssl);
+        EXPECT_NE(nullptr, list);
+        EXPECT_EQ(2U, sk_X509_NAME_num(list));
+        return 1;
+      },
+      nullptr);
 
   client_connection->connect();
 

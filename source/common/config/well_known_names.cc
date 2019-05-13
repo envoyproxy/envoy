@@ -106,6 +106,12 @@ TagNameValues::TagNameValues() {
 
   // mongo.(<stat_prefix>.)*
   addRegex(MONGO_PREFIX, "^mongo\\.((.*?)\\.)");
+
+  // http.[<stat_prefix>.]rds.(<route_config_name>.)<base_stat>
+  addRegex(RDS_ROUTE_CONFIG, "^http(?=\\.).*?\\.rds\\.((.*?)\\.)\\w+?$", ".rds.");
+
+  // listener_manager.(worker_<id>.)*
+  addRegex(WORKER_ID, "^listener_manager\\.((worker_\\d+)\\.)", "listener_manager.worker_");
 }
 
 void TagNameValues::addRegex(const std::string& name, const std::string& regex,

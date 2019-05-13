@@ -9,8 +9,10 @@
 #include "common/common/fmt.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/supported_commands.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
+#include "extensions/filters/network/redis_proxy/conn_pool.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
@@ -31,11 +33,7 @@ public:
 };
 
 class NullRouterImpl : public Router {
-  Common::Redis::Client::PoolRequest* makeRequest(const std::string&,
-                                                  const Common::Redis::RespValue&,
-                                                  Common::Redis::Client::PoolCallbacks&) override {
-    return nullptr;
-  }
+  ConnPool::InstanceSharedPtr upstreamPool(std::string&) override { return nullptr; }
 };
 
 class CommandLookUpSpeedTest {
@@ -53,15 +51,16 @@ public:
   }
 
   void makeRequests() {
-    Common::Redis::RespValue request;
     for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
-      makeBulkStringArray(request, {command, "hello"});
-      splitter_.makeRequest(request, callbacks_);
+      Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+      makeBulkStringArray(*request, {command, "hello"});
+      splitter_.makeRequest(std::move(request), callbacks_);
     }
 
     for (const std::string& command : Common::Redis::SupportedCommands::evalCommands()) {
-      makeBulkStringArray(request, {command, "hello"});
-      splitter_.makeRequest(request, callbacks_);
+      Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+      makeBulkStringArray(*request, {command, "hello"});
+      splitter_.makeRequest(std::move(request), callbacks_);
     }
   }
 
