@@ -913,7 +913,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
   // chance to return before returning a response downstream.
   if (could_not_retry && (numRequestsAwaitingHeaders() > 0 || pending_retries_ > 0)) {
     upstream_request.upstream_host_->stats().rq_error_.inc();
-      upstream_request.removeFromList(upstream_requests_);
+    upstream_request.removeFromList(upstream_requests_);
     return;
   }
 
@@ -1056,7 +1056,6 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
 }
 
 bool Filter::setupRetry() {
-  pending_retries_++;
   // If we responded before the request was complete we don't bother doing a retry. This may not
   // catch certain cases where we are in full streaming mode and we have a connect timeout or an
   // overflow of some kind. However, in many cases deployments will use the buffer filter before
@@ -1065,6 +1064,7 @@ bool Filter::setupRetry() {
   if (!downstream_end_stream_) {
     return false;
   }
+  pending_retries_++;
 
   ENVOY_STREAM_LOG(debug, "performing retry", *callbacks_);
 
@@ -1287,6 +1287,7 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
 void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason,
                                             absl::string_view transport_failure_reason) {
   clearRequestEncoder();
+  awaiting_headers_ = false;
   if (!calling_encode_headers_) {
     stream_info_.setResponseFlag(parent_.streamResetReasonToResponseFlag(reason));
     parent_.onUpstreamReset(reason, transport_failure_reason, *this);
