@@ -46,7 +46,7 @@ template <typename ResponseType>
 class CompositeDeserializerWith0Delegates : public Deserializer<ResponseType> {
 public:
   CompositeDeserializerWith0Delegates(){};
-  size_t feed(absl::string_view&) override { return 0; }
+  uint32_t feed(absl::string_view&) override { return 0; }
   bool ready() const override { return true; }
   ResponseType get() const override { return {}; }
 };
@@ -71,8 +71,8 @@ class CompositeDeserializerWith{{ field_count }}Delegates : public Deserializer<
 public:
   CompositeDeserializerWith{{ field_count }}Delegates(){};
 
-  size_t feed(absl::string_view& data) override {
-    size_t consumed = 0;
+  uint32_t feed(absl::string_view& data) override {
+    uint32_t consumed = 0;
     {% for field in range(1, field_count + 1) %}
     consumed += delegate{{ field }}_.feed(data);
     {% endfor %}

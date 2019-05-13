@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Stats {
 
-StatMerger::StatMerger(Stats::Store& target_store) : target_store_(target_store) {}
+StatMerger::StatMerger(Stats::Store& target_store) : temp_scope_(target_store.createScope("")) {}
 
 bool StatMerger::shouldImport(Gauge& gauge, const std::string& gauge_name) {
   absl::optional<bool> should_import = gauge.cachedShouldImport();
@@ -56,13 +56,13 @@ bool StatMerger::shouldImport(Gauge& gauge, const std::string& gauge_name) {
 
 void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas) {
   for (const auto& counter : counter_deltas) {
-    target_store_.counter(counter.first).add(counter.second);
+    temp_scope_->counter(counter.first).add(counter.second);
   }
 }
 
 void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges) {
   for (const auto& gauge : gauges) {
-    auto& gauge_ref = target_store_.gauge(gauge.first);
+    auto& gauge_ref = temp_scope_->gauge(gauge.first);
     uint64_t& parent_value_ref = parent_gauge_values_[gauge_ref.statName()];
     uint64_t old_parent_value = parent_value_ref;
     uint64_t new_parent_value = gauge.second;
@@ -79,12 +79,6 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
   }
 }
 
-// TODO(fredlas) the current implementation can "leak" obsolete parent stats into the child.
-// That is, the parent had stat "foo", the child doesn't care about "foo" and back in the
-// shared memory implementation would have dropped it, but the import causes it to be made into
-// a real stat that stays around forever. The initial mini-consensus approach will be to
-// track which stats are actually getting used by the child, and drop those that aren't when
-// the hot restart completes.
 void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
                             const Protobuf::Map<std::string, uint64_t>& gauges) {
   mergeCounters(counter_deltas);
