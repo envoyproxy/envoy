@@ -1801,8 +1801,7 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
   // Now trigger a 200 in response to the second request.
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
 
-  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _))
-      .WillOnce(Return(RetryStatus::No));
+  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.Status()->value(), "200");
