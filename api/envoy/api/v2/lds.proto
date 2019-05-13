@@ -178,10 +178,8 @@ message Listener {
 
   // Udp Listener filters can be specified when the protocol in the listener socket address in
   // :ref:`protocol <envoy_api_field_core.SocketAddress.protocol>` is :ref:'UDP
-  // <envoy_api_field_core.Protocol.UDP>`. (A runtime error is generated otherwise)
-  // Order matters as the filters are processed sequentially on receiving a packet on the udp
-  // socket.
-  // TODO(sumukhs): Temporarily allow only 1 filter at the max
+  // <envoy_api_field_core.Protocol.UDP>`. Order matters as the filters are processed sequentially
+  // on receiving a packet on the udp socket.
   repeated listener.UdpListenerFilter udp_listener_filters = 16
       [(validate.rules).repeated = {min_items: 0, max_items: 1}, (gogoproto.nullable) = false];
 }

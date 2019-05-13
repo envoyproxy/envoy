@@ -109,14 +109,15 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
     const Json::ObjectSharedPtr filter_config =
-        MessageUtil::getJsonObjectFromMessage(proto_config.config());
+        MessageUtil::getJsonObjectFromMessage(proto_config.typed_config());
     ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedUdpListenerFilterConfigFactory>(
             string_name);
-    auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
+
+    auto message = Config::Utility::translateTypedToFactoryConfig(proto_config, factory);
     ret.push_back(factory.createFilterFactoryFromProto(*message, context));
   }
   return ret;

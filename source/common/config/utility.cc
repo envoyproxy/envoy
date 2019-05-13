@@ -275,6 +275,15 @@ envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
 void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     const ProtobufWkt::Struct& config,
                                     Protobuf::Message& out_proto) {
+  translateOpaqueConfig(typed_config, out_proto);
+
+  if (!config.fields().empty()) {
+    MessageUtil::jsonConvert(config, out_proto);
+  }
+}
+
+void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+                                    Protobuf::Message& out_proto) {
   static const std::string& struct_type =
       ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
 
@@ -296,10 +305,6 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       typed_config.UnpackTo(&struct_config);
       MessageUtil::jsonConvert(struct_config, out_proto);
     }
-  }
-
-  if (!config.fields().empty()) {
-    MessageUtil::jsonConvert(config, out_proto);
   }
 }
 

@@ -20,14 +20,13 @@ ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Event::Disp
 void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   ActiveListenerBasePtr l;
   Network::Address::SocketType socket_type = config.socket().socketType();
-  // Network::Address::SocketType socket_type = Network::Address::SocketType::Stream;
 
   if (socket_type == Network::Address::SocketType::Stream) {
     ActiveTcpListenerPtr tcp(new ActiveTcpListener(*this, config));
     l = std::move(tcp);
   } else {
-    RELEASE_ASSERT(socket_type == Network::Address::SocketType::Datagram,
-                   "Only datagram/stream listener supported");
+    ASSERT(socket_type == Network::Address::SocketType::Datagram,
+           "Only datagram/stream listener supported");
     ActiveUdpListenerPtr udp(new ActiveUdpListener(*this, config));
     l = std::move(udp);
   }
@@ -92,8 +91,6 @@ ConnectionHandlerImpl::ActiveListenerBase::ActiveListenerBase(ConnectionHandlerI
       stats_(generateStats(config.listenerScope())),
       listener_filters_timeout_(config.listenerFiltersTimeout()),
       listener_tag_(config.listenerTag()), config_(config) {}
-
-ConnectionHandlerImpl::ActiveListenerBase::~ActiveListenerBase() {}
 
 ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImpl& parent,
                                                             Network::ListenerConfig& config)
@@ -343,10 +340,8 @@ ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImp
   }
 }
 
-ConnectionHandlerImpl::ActiveUdpListener::~ActiveUdpListener() {}
-
 void ConnectionHandlerImpl::ActiveUdpListener::onData(Network::UdpRecvData& data) {
-  for (auto&& filter : read_filters_) {
+  for (auto& filter : read_filters_) {
     filter->onData(data);
   }
 }

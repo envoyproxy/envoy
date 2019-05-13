@@ -176,9 +176,8 @@ public:
   virtual ~ListenerFilterConfigFactoryBase() {}
 
   /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
+   * @return ProtobufTypes::MessagePtr create empty config proto message. The filter
    *         config, which arrives in an opaque message, will be parsed into this empty proto.
-   *         Optional today, will be compulsory when v1 is deprecated.
    */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 

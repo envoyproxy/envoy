@@ -253,9 +253,9 @@ public:
 
   /**
    * Translate a nested config into a proto message provided by the implementation factory.
-   * @param enclosing_message proto that contains a field 'config'. Note: the enclosing proto is
-   * provided because for statically registered implementations, a custom config is generally
-   * optional, which means the conversion must be done conditionally.
+   * @param enclosing_message proto that contains a field 'config' and 'typed_config'. Note: the
+   * enclosing proto is provided because for statically registered implementations, a custom config
+   * is generally optional, which means the conversion must be done conditionally.
    * @param factory implementation factory with the method 'createEmptyConfigProto' to produce a
    * proto to be filled with the translated configuration.
    */
@@ -268,6 +268,27 @@ public:
     RELEASE_ASSERT(config != nullptr, "");
 
     translateOpaqueConfig(enclosing_message.typed_config(), enclosing_message.config(), *config);
+
+    return config;
+  }
+
+  /**
+   * Translate a typed config into a proto message provided by the implementation factory.
+   * @param enclosing_message proto that contains a field 'typed_config'. Note: the enclosing proto
+   * is provided because for statically registered implementations, a custom config is generally
+   * optional, which means the conversion must be done conditionally.
+   * @param factory implementation factory with the method 'createEmptyConfigProto' to produce a
+   * proto to be filled with the translated configuration.
+   */
+  template <class ProtoMessage, class Factory>
+  static ProtobufTypes::MessagePtr
+  translateTypedToFactoryConfig(const ProtoMessage& enclosing_message, Factory& factory) {
+    ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+
+    // Fail in an obvious way if a plugin does not return a proto.
+    RELEASE_ASSERT(config != nullptr, "");
+
+    translateOpaqueConfig(enclosing_message.typed_config(), *config);
 
     return config;
   }
@@ -315,6 +336,14 @@ public:
    */
   static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     const ProtobufWkt::Struct& config,
+                                    Protobuf::Message& out_proto);
+
+  /**
+   * Translate opaque config from google.protobuf.Any to defined proto message
+   * @param typed_config opaque config packed in google.protobuf.Any
+   * @param out_proto the proto message instantiated by extensions
+   */
+  static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     Protobuf::Message& out_proto);
 };
 

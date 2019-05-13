@@ -113,9 +113,6 @@ void UdpListenerImpl::handleReadCallback() {
 
     Address::InstanceConstSharedPtr local_address = socket_.localAddress();
 
-    RELEASE_ASSERT((local_address != nullptr),
-                   fmt::format("Unable to get local address for fd: {}", socket_.ioHandle().fd()));
-
     RELEASE_ASSERT(
         addr_len > 0,
         fmt::format(

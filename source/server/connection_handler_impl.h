@@ -85,7 +85,7 @@ private:
     ActiveListenerBase(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                        Network::ListenerConfig& config);
 
-    virtual ~ActiveListenerBase();
+    virtual ~ActiveListenerBase() {}
 
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;
@@ -106,8 +106,6 @@ private:
 
     ActiveUdpListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                       Network::ListenerConfig& config);
-
-    ~ActiveUdpListener();
 
     // Network::UdpListenerCallbacks
     void onData(Network::UdpRecvData& data) override;
