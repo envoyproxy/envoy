@@ -317,12 +317,9 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  ON_CALL(local_info_, nodeName()).WillByDefault(Return(canary_node_));
+  ON_CALL(local_info_, nodeName()).WillByDefault(ReturnRef(canary_node_));
   user_agent_ = "bar";
   TestHeaderMapImpl headers{{"user-agent", ""}, {"x-envoy-downstream-service-cluster", "foo"}};
-  EXPECT_CALL(local_info_, nodeName()).Times(2).WillRepeatedly(ReturnRef(canary_node_));
-  ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
-                                                 route_config_, random_, runtime_, local_info_);
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
             callMutateRequestHeaders(headers, Protocol::Http2));
@@ -446,8 +443,6 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
   user_agent_ = "bar";
   TestHeaderMapImpl headers{{"user-agent", "foo"}, {"x-envoy-downstream-service-cluster", "foo"}};
   EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(empty_node_));
-  ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
-                                                 route_config_, random_, runtime_, local_info_);
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
             callMutateRequestHeaders(headers, Protocol::Http2));
