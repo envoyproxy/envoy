@@ -498,18 +498,13 @@ ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
     return absl::nullopt;
   }
 
-  // See comments in counter(). There is no super clean way (via templates or otherwise) to
-  // share this code so I'm leaving it largely duplicated for now.
-  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
-  StatName final_stat_name(final_name.get());
-
   StatMap<CounterSharedPtr>* tls_cache = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
     tls_cache = &entry.counters_;
   }
 
-  return safeFindStat<Counter>(final_stat_name, central_cache_.counters_, tls_cache);
+  return safeFindStat<Counter>(name, central_cache_.counters_, tls_cache);
 }
 
 absl::optional<std::reference_wrapper<const Gauge>>
@@ -518,18 +513,13 @@ ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
     return absl::nullopt;
   }
 
-  // See comments in counter(). There is no super clean way (via templates or otherwise) to
-  // share this code so I'm leaving it largely duplicated for now.
-  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
-  StatName final_stat_name(final_name.get());
-
   StatMap<GaugeSharedPtr>* tls_cache = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
     tls_cache = &entry.gauges_;
   }
 
-  return safeFindStat<Gauge>(final_stat_name, central_cache_.gauges_, tls_cache);
+  return safeFindStat<Gauge>(name, central_cache_.gauges_, tls_cache);
 }
 
 absl::optional<std::reference_wrapper<const Histogram>>
@@ -538,18 +528,13 @@ ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
     return absl::nullopt;
   }
 
-  // See comments in counter(). There is no super clean way (via templates or otherwise) to
-  // share this code so I'm leaving it largely duplicated for now.
-  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
-  StatName final_stat_name(final_name.get());
-
   StatMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
     tls_cache = &entry.parent_histograms_;
   }
 
-  auto iter = central_cache_.histograms_.find(final_stat_name);
+  auto iter = central_cache_.histograms_.find(name);
   if (iter == central_cache_.histograms_.end()) {
     return absl::nullopt;
   }

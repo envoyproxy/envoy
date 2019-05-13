@@ -272,6 +272,9 @@ private:
 
     NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
 
+    // NOTE: The find methods assume that `name` is fully-qualified.
+    // Implementations will not add the scope prefix.
+    // TODO(ahedberg): Is there a way to conditionally prefix `name`?
     absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override;
     absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override;
     absl::optional<std::reference_wrapper<const Histogram>>
