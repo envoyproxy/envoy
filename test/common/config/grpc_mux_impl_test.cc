@@ -140,7 +140,6 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   expectSendMessage("bar", {}, "");
   expectSendMessage("baz", {"z"}, "");
   grpc_mux_->start();
-
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)).Times(3);
   EXPECT_CALL(random_, random());
   ASSERT_TRUE(timer != nullptr); // initialized from dispatcher mock.
@@ -148,7 +147,6 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
   EXPECT_EQ(0, stats_.gauge("control_plane.connected_state").value());
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-  grpc_mux_->start();
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
   expectSendMessage("baz", {"z"}, "");
@@ -165,6 +163,7 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
   auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
   grpc_mux_->pause("foo");
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
   expectSendMessage("foo", {"x", "y"}, "");
   grpc_mux_->resume("foo");
   grpc_mux_->pause("bar");

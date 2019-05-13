@@ -27,7 +27,7 @@ public:
         service_method_(service_method), control_plane_stats_(generateControlPlaneStats(scope)),
         random_(random), time_source_(dispatcher.timeSource()),
         rate_limiting_enabled_(rate_limit_settings.enabled_) {
-    retry_timer_ = dispatcher.createTimer([this]() -> void { establishStream(); });
+    retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
     if (rate_limiting_enabled_) {
       // Default Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
       limit_request_ = std::make_unique<TokenBucketImpl>(
@@ -38,13 +38,12 @@ public:
                                                                   RETRY_MAX_DELAY_MS, random_);
   }
 
-  void establishStream() {
-    if (stream_ != nullptr) {
-      ENVOY_LOG(debug, "gRPC bidi stream for {} already up and running",
-                service_method_.DebugString());
-      return; // idempotent
-    }
+  void establishNewStream() {
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
+    if (stream_ != nullptr) {
+      ENVOY_LOG(warn, "gRPC bidi stream for {} already exists!", service_method_.DebugString());
+      return;
+    }
     stream_ = async_client_->start(service_method_, *this);
     if (stream_ == nullptr) {
       ENVOY_LOG(warn, "Unable to establish new stream");

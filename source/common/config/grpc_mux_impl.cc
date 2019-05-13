@@ -28,7 +28,7 @@ GrpcMuxImpl::~GrpcMuxImpl() {
   }
 }
 
-void GrpcMuxImpl::start() { grpc_stream_.establishStream(); }
+void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
 void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   if (!grpc_stream_.grpcStreamAvailable()) {
@@ -90,8 +90,9 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
   // only send a single RDS/EDS update after the CDS/LDS update.
   queueDiscoveryRequest(type_url);
 
-  // This is idempotent, so it's fine to just always call when we have a new subscription.
-  grpc_stream_.establishStream();
+  // TODO TODO well, that takes fiddling with the tests... This is idempotent, so it's fine to just
+  // always call when we have a new subscription.
+  // TODO TODO well, that takes fiddling with the tests... grpc_stream_.establishNewStream();
 
   return watch;
 }

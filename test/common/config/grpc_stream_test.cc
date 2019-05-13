@@ -41,7 +41,7 @@ protected:
   GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse> grpc_stream_;
 };
 
-// Tests that establishStream() establishes it, a second call does nothing, and a third call
+// Tests that establishNewStream() establishes it, a second call does nothing, and a third call
 // after the stream was disconnected re-establishes it.
 TEST_F(GrpcStreamTest, EstablishStream) {
   EXPECT_FALSE(grpc_stream_.grpcStreamAvailable());
@@ -49,14 +49,14 @@ TEST_F(GrpcStreamTest, EstablishStream) {
   {
     EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
     EXPECT_CALL(callbacks_, onStreamEstablished());
-    grpc_stream_.establishStream();
+    grpc_stream_.establishNewStream();
     EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
   }
   // Idempotent
   {
     EXPECT_CALL(*async_client_, start(_, _)).Times(0);
     EXPECT_CALL(callbacks_, onStreamEstablished()).Times(0);
-    grpc_stream_.establishStream();
+    grpc_stream_.establishNewStream();
     EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
   }
   grpc_stream_.onRemoteClose(Grpc::Status::GrpcStatus::Ok, "");
@@ -65,7 +65,7 @@ TEST_F(GrpcStreamTest, EstablishStream) {
   {
     EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
     EXPECT_CALL(callbacks_, onStreamEstablished());
-    grpc_stream_.establishStream();
+    grpc_stream_.establishNewStream();
     EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
   }
 }
@@ -75,7 +75,7 @@ TEST_F(GrpcStreamTest, EstablishStream) {
 TEST_F(GrpcStreamTest, FailToEstablishNewStream) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks_, onEstablishmentFailure());
-  grpc_stream_.establishStream();
+  grpc_stream_.establishNewStream();
   EXPECT_FALSE(grpc_stream_.grpcStreamAvailable());
 }
 
@@ -83,7 +83,7 @@ TEST_F(GrpcStreamTest, FailToEstablishNewStream) {
 // machinery.
 TEST_F(GrpcStreamTest, SendMessage) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-  grpc_stream_.establishStream();
+  grpc_stream_.establishNewStream();
   envoy::api::v2::DiscoveryRequest request;
   request.set_response_nonce("grpc_stream_test_noncense");
   EXPECT_CALL(async_stream_, sendMessage(ProtoEq(request), false));

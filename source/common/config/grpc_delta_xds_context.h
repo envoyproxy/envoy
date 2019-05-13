@@ -68,7 +68,7 @@ public:
         std::make_pair(type_url, DeltaSubscriptionState(type_url, resources, callbacks, local_info_,
                                                         init_fetch_timeout, dispatcher_, stats)));
     subscription_ordering_.emplace_back(type_url);
-    grpc_stream_.establishStream(); // (idempotent)
+    grpc_stream_.establishNewStream(); // (idempotent) TODO TODO does print warning though...
   }
 
   // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
