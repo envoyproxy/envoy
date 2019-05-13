@@ -133,6 +133,27 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "vhds_integration_test",
+    srcs = ["vhds_integration_test.cc"],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:resources_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:discovery_cc",
+        "@envoy_api//envoy/api/v2:rds_cc",
+    ],
+)
+
 exports_files(["test_utility.sh"])
 
 envoy_sh_test(
