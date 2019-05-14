@@ -860,5 +860,11 @@ TEST(PercentEncoding, EncodeDecode) {
   validatePercentEncodingEncodeDecode("ok", "ok");
 }
 
+TEST(PercentEncoding, Trailing) {
+  EXPECT_EQ(Utility::PercentEncoding::decode("too%20lar%20"), "too lar ");
+  EXPECT_EQ(Utility::PercentEncoding::decode("too%20larg%e"), "too larg%e");
+  EXPECT_EQ(Utility::PercentEncoding::decode("too%20large%"), "too large%");
+}
+
 } // namespace Http
 } // namespace Envoy

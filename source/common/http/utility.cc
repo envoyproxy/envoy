@@ -589,7 +589,7 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
   std::ostringstream decoded;
   for (size_t i = 0; i < encoded.size(); ++i) {
     char c = encoded[i];
-    if (c == '%') {
+    if (c == '%' && i + 2 < encoded.size()) {
       int d;
       std::istringstream captured(std::string(encoded.substr(i + 1, 2)));
       captured >> std::hex >> d;
