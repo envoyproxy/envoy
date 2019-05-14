@@ -302,10 +302,6 @@ protected:
   // them in the port_map_.
   bool defer_listener_finalization_{false};
 
-  // Set true if you want the FactoryContext's api() call to return the Api
-  // object associated with test_server_'s stat store, rather than *api_.
-  bool use_test_server_stat_store_{false};
-
   // Member variables for xDS testing.
   FakeUpstream* xds_upstream_{};
   FakeHttpConnectionPtr xds_connection_;

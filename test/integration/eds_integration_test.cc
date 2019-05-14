@@ -165,7 +165,6 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
 }
 
 TEST_P(EdsIntegrationTest, StatsReadyFilter) {
-  //  use_test_server_stat_store_ = true;
   config_helper_.addFilter("name: eds-ready-filter");
   initialize();
 
@@ -178,12 +177,15 @@ TEST_P(EdsIntegrationTest, StatsReadyFilter) {
   EXPECT_EQ("EDS not ready", response->body());
 
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
 
   // 2/2 healthy endpoints.
   setEndpoints(2, 2, 0);
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-  testRouterHeaderOnlyRequestAndResponse();
+  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
+                                                downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("EDS is ready", response->body());
 
   cleanupUpstreamAndDownstream();
 }

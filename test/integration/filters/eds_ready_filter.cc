@@ -7,12 +7,14 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/stats/symbol_table_impl.h"
+
 #include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 
-// A test filter that rejects all requests if EDS isn't healthy yet.
+// A test filter that rejects all requests if EDS isn't healthy yet, and
+// responds OK to all requests if it is.
 class EdsReadyFilter : public Http::PassThroughFilter {
 public:
   EdsReadyFilter(const Stats::Scope& root_scope)
@@ -20,15 +22,21 @@ public:
         stat_name_("cluster.cluster_0.membership_healthy",
                    const_cast<Stats::SymbolTable&>(root_scope_.symbolTable())) {}
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override {
-    ENVOY_LOG_MISC(debug, "scope={}", static_cast<const void*>(&root_scope_));
-    // TODO(ahedberg): This seg-faults because it thinks this stat doesn't exist...because the test
-    // server and the API have different stats stores and symbol tables! :(
-    if (root_scope_.getGauge(stat_name_.statName())->value() == 0) {
+    absl::optional<std::reference_wrapper<const Stats::Gauge>> gauge =
+        root_scope_.findGauge(stat_name_.statName());
+    if (!gauge.has_value()) {
+      decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,
+                                         "Couldn't find stat", nullptr, absl::nullopt);
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+    if (gauge->get().value() == 0) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError, "EDS not ready",
                                          nullptr, absl::nullopt);
       return Http::FilterHeadersStatus::StopIteration;
     }
-    return Http::FilterHeadersStatus::Continue;
+    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "EDS is ready", nullptr,
+                                       absl::nullopt);
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
 private:

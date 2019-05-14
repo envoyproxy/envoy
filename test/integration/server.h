@@ -277,7 +277,6 @@ public:
   }
 
   Stats::GaugeSharedPtr gauge(const std::string& name) override {
-    ENVOY_LOG_MISC(debug, "stat_store={}", static_cast<void*>(&stat_store()));
     // When using the thread local store, only gauges() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
     return TestUtility::findGauge(stat_store(), name);

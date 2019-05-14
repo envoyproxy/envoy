@@ -46,22 +46,16 @@ Histogram& ScopePrefixer::histogramFromStatName(StatName name) {
 
 absl::optional<std::reference_wrapper<const Counter>>
 ScopePrefixer::findCounter(StatName name) const {
-  Stats::SymbolTable::StoragePtr stat_name_storage =
-      scope_.symbolTable().join({prefix_.statName(), name});
-  return scope_.findCounter(StatName(stat_name_storage.get()));
+  return scope_.findCounter(name);
 }
 
 absl::optional<std::reference_wrapper<const Gauge>> ScopePrefixer::findGauge(StatName name) const {
-  Stats::SymbolTable::StoragePtr stat_name_storage =
-      scope_.symbolTable().join({prefix_.statName(), name});
-  return scope_.findGauge(StatName(stat_name_storage.get()));
+  return scope_.findGauge(name);
 }
 
 absl::optional<std::reference_wrapper<const Histogram>>
 ScopePrefixer::findHistogram(StatName name) const {
-  Stats::SymbolTable::StoragePtr stat_name_storage =
-      scope_.symbolTable().join({prefix_.statName(), name});
-  return scope_.findHistogram(StatName(stat_name_storage.get()));
+  return scope_.findHistogram(name);
 }
 
 void ScopePrefixer::deliverHistogramToSinks(const Histogram& histograms, uint64_t val) {

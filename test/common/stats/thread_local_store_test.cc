@@ -374,11 +374,20 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   ScopePtr scope1 = store_->createScope("scope1.");
   Counter& c1 = scope1->counter("foo.bar");
   EXPECT_EQ("scope1.foo.bar", c1.name());
+  StatNameManagedStorage c1_name("scope1.foo.bar", symbol_table_);
+  auto found_counter = store_->findCounter(c1_name.statName());
+  ASSERT_TRUE(found_counter.has_value());
+  EXPECT_EQ(&c1, &found_counter->get());
 
   ScopePtr scope2 = scope1->createScope("foo.");
   Counter& c2 = scope2->counter("bar");
   EXPECT_NE(&c1, &c2);
   EXPECT_EQ("scope1.foo.bar", c2.name());
+  StatNameManagedStorage c2_name("scope1.foo.bar", symbol_table_);
+  auto found_counter2 = store_->findCounter(c2_name.statName());
+  ASSERT_TRUE(found_counter2.has_value());
+  // TODO(ahedberg): It's non-deterministic whether found_counter2 references c1
+  // or c2. Should we do change that?
 
   // Different allocations point to the same referenced counted backing memory.
   c1.inc();
