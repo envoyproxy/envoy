@@ -150,11 +150,26 @@ void SslSocket::complete(Envoy::Ssl::PrivateKeyMethodStatus status) {
     if (!handshake_complete_) {
       // It's possible that the async call comes in later, but the handshake has been retried from
       // doWrite or similar. */
-      doHandshake();
+      PostIoAction result = doHandshake();
+      // TODO(ipuustin): should there be a special event type for asynchronous close?
+      if (result != PostIoAction::KeepOpen) {
+        if (callbacks_->connection().state() == Network::Connection::State::Open) {
+          // The connection state machine thinks we are still connecting, but the second part of the
+          // private key method handshake failed.
+          ENVOY_CONN_LOG(debug, "async handshake completion error", callbacks_->connection());
+          drainErrorQueue();
+          // There's nobody to handle the SSL error for us, because this event is coming in
+          // asynchronously -- just close the connection. This will lead to
+          // Network::ConnectionEvent::LocalClose event.
+          callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+        }
+      }
     }
   } else {
+    // The private key method operation failed.
     ENVOY_CONN_LOG(debug, "async handshake failed", callbacks_->connection());
-    callbacks_->raiseEvent(Network::ConnectionEvent::LocalClose);
+    drainErrorQueue();
+    callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   }
 }
 
