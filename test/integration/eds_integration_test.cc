@@ -261,7 +261,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
 
 TEST_P(EdsIntegrationTest, StatsReadyFilter) {
   config_helper_.addFilter("name: eds-ready-filter");
-  initialize();
+  initializeTest(false);
 
   // Initial state: no healthy endpoints
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
