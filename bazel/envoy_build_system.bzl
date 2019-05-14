@@ -603,11 +603,6 @@ def envoy_sh_test(
         **kargs
     )
 
-def _proto_header(proto_path):
-    if proto_path.endswith(".proto"):
-        return proto_path[:-5] + "pb.h"
-    return None
-
 # Envoy proto targets should be specified with this function.
 def envoy_proto_library(name, external_deps = [], **kwargs):
     external_proto_deps = []
