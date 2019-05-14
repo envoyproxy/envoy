@@ -78,10 +78,6 @@ def envoy_copts(repository, test = False):
            }) + select({
                repository + "//bazel:enable_log_debug_assert_in_release": ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
                "//conditions:default": [],
-           }) + select({
-               # TCLAP command line parser needs this to support int64_t/uint64_t
-               repository + "//bazel:apple": ["-DHAVE_LONG_LONG"],
-               "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
            envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
            envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
