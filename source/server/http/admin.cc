@@ -640,38 +640,7 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
-                                        Buffer::Instance& response, AdminStream&) {
-  time_t current_time = time(nullptr);
-  envoy::admin::v2alpha::ServerInfo server_info;
-  server_info.set_version(VersionInfo::version());
-
-  switch (server_.initManager().state()) {
-  case Init::Manager::State::Uninitialized:
-    server_info.set_state(envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING);
-    break;
-  case Init::Manager::State::Initializing:
-    server_info.set_state(envoy::admin::v2alpha::ServerInfo::INITIALIZING);
-    break;
-  case Init::Manager::State::Initialized:
-    server_info.set_state(server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
-                                                      : envoy::admin::v2alpha::ServerInfo::LIVE);
-    break;
-  }
-  server_info.mutable_uptime_current_epoch()->set_seconds(current_time -
-                                                          server_.startTimeCurrentEpoch());
-  server_info.mutable_uptime_all_epochs()->set_seconds(current_time -
-                                                       server_.startTimeFirstEpoch());
-  envoy::admin::v2alpha::CommandLineOptions* command_line_options =
-      server_info.mutable_command_line_options();
-  *command_line_options = *server_.options().toCommandLineOptions();
-  response.add(MessageUtil::getJsonStringFromMessage(server_info, true, true));
-  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerReadyz(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
-                                    AdminStream&) {
+envoy::admin::v2alpha::ServerInfo::State AdminImpl::serverState() {
   envoy::admin::v2alpha::ServerInfo::State state;
 
   switch (server_.initManager().state()) {
@@ -686,6 +655,32 @@ Http::Code AdminImpl::handlerReadyz(absl::string_view, Http::HeaderMap&, Buffer:
                                         : envoy::admin::v2alpha::ServerInfo::LIVE;
     break;
   }
+
+  return state;
+}
+
+Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
+                                        Buffer::Instance& response, AdminStream&) {
+  time_t current_time = time(nullptr);
+  envoy::admin::v2alpha::ServerInfo server_info;
+  server_info.set_version(VersionInfo::version());
+  server_info.set_state(serverState());
+
+  server_info.mutable_uptime_current_epoch()->set_seconds(current_time -
+                                                          server_.startTimeCurrentEpoch());
+  server_info.mutable_uptime_all_epochs()->set_seconds(current_time -
+                                                       server_.startTimeFirstEpoch());
+  envoy::admin::v2alpha::CommandLineOptions* command_line_options =
+      server_info.mutable_command_line_options();
+  *command_line_options = *server_.options().toCommandLineOptions();
+  response.add(MessageUtil::getJsonStringFromMessage(server_info, true, true));
+  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
+  return Http::Code::OK;
+}
+
+Http::Code AdminImpl::handlerReadyz(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
+                                    AdminStream&) {
+  const envoy::admin::v2alpha::ServerInfo::State state = serverState();
 
   response.add(envoy::admin::v2alpha::ServerInfo_State_Name(state) + "\n");
   Http::Code code = state == envoy::admin::v2alpha::ServerInfo_State_LIVE
