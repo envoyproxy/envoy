@@ -71,7 +71,7 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& health_che
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
-            std::string(health_check_config.custom_health_check().name()));
+            health_check_config.custom_health_check().name());
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,
                                             std::move(event_logger)));
@@ -360,6 +360,7 @@ TcpHealthCheckerImpl::TcpActiveHealthCheckSession::~TcpActiveHealthCheckSession(
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onDeferredDelete() {
   if (client_) {
+    expect_close_ = true;
     client_->close(Network::ConnectionCloseType::NoFlush);
   }
 }
@@ -371,6 +372,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
     data.drain(data.length());
     handleSuccess(false);
     if (!parent_.reuse_connection_) {
+      expect_close_ = true;
       client_->close(Network::ConnectionCloseType::NoFlush);
     }
   } else {
@@ -379,12 +381,11 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::RemoteClose) {
-    handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
-  }
-
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    if (!expect_close_) {
+      handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
+    }
     parent_.dispatcher_.deferredDelete(std::move(client_));
   }
 
@@ -403,6 +404,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
     // TODO(mattklein123): In the case that a user configured bytes to write, they will not be
     // be written, since we currently have no way to know if the bytes actually get written via
     // the connection interface. We might want to figure out how to handle this better later.
+    expect_close_ = true;
     client_->close(Network::ConnectionCloseType::NoFlush);
     handleSuccess(false);
   }
@@ -416,6 +418,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
     client_->addConnectionCallbacks(*session_callbacks_);
     client_->addReadFilter(session_callbacks_);
 
+    expect_close_ = false;
     client_->connect();
     client_->noDelay(true);
   }
@@ -431,6 +434,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
+  expect_close_ = true;
   host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
   client_->close(Network::ConnectionCloseType::NoFlush);
 }
@@ -586,7 +590,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
     request.set_service(parent_.service_name_.value());
   }
 
-  request_encoder_->encodeData(*Grpc::Common::serializeBody(request), true);
+  request_encoder_->encodeData(*Grpc::Common::serializeToGrpcFrame(request), true);
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::StreamResetReason,

@@ -175,17 +175,6 @@ jobs:
        - run: docs/publish.sh
        - store_artifacts:
            path: generated/docs
-   mac:
-     macos:
-       xcode: "9.3.1"
-     environment:
-       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
-     steps:
-       - run: sudo ntpdate -vu time.apple.com
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - run: ci/mac_ci_setup.sh
-       - run: ci/mac_ci_steps.sh
 
 workflows:
   version: 2
@@ -214,4 +203,3 @@ workflows:
           filters:
             tags:
               only: /^v.*/
-      - mac

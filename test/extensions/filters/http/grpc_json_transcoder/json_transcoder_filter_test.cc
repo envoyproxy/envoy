@@ -97,7 +97,7 @@ protected:
     }
   }
 
-  void stripImports(FileDescriptorSet& descriptor_set, const ProtobufTypes::String& file_name) {
+  void stripImports(FileDescriptorSet& descriptor_set, const std::string& file_name) {
     FileDescriptorProto file_descriptor;
     // filter down descriptor_set to only contain one proto specified as file_name but none of its
     // dependencies
@@ -107,7 +107,7 @@ protected:
                        // return whether file.name() ends with file_name
                        return file.name().length() >= file_name.length() &&
                               0 == file.name().compare(file.name().length() - file_name.length(),
-                                                       ProtobufTypes::String::npos, file_name);
+                                                       std::string::npos, file_name);
                      });
     RELEASE_ASSERT(file_itr != descriptor_set.file().end(), "");
     file_descriptor = *file_itr;
@@ -413,7 +413,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   response.set_id(20);
   response.set_theme("Children");
 
-  auto response_data = Grpc::Common::serializeBody(response);
+  auto response_data = Grpc::Common::serializeToGrpcFrame(response);
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_.encodeData(*response_data, false));
@@ -477,7 +477,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithPackageServiceMetho
   response.set_id(20);
   response.set_theme("Children");
 
-  auto response_data = Grpc::Common::serializeBody(response);
+  auto response_data = Grpc::Common::serializeToGrpcFrame(response);
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_.encodeData(*response_data, false));
@@ -505,7 +505,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
   bookstore::CreateShelfRequest request;
   request.mutable_shelf()->set_theme("Children");
 
-  Buffer::InstancePtr request_data = Grpc::Common::serializeBody(request);
+  Buffer::InstancePtr request_data = Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(*request_data, true));
 
   Grpc::Decoder decoder;
@@ -540,7 +540,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
   response.set_id(20);
   response.set_theme("Children");
 
-  Buffer::InstancePtr response_data = Grpc::Common::serializeBody(response);
+  Buffer::InstancePtr response_data = Grpc::Common::serializeToGrpcFrame(response);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(*response_data, true));
 
   frames.clear();
@@ -664,7 +664,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutput) {
   response.set_content_type("text/html");
   response.set_data("<h1>Hello, world!</h1>");
 
-  auto response_data = Grpc::Common::serializeBody(response);
+  auto response_data = Grpc::Common::serializeToGrpcFrame(response);
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_.encodeData(*response_data, false));
@@ -698,7 +698,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutputAndSpli
   response.set_content_type("text/html");
   response.set_data("<h1>Hello, world!</h1>");
 
-  auto response_data = Grpc::Common::serializeBody(response);
+  auto response_data = Grpc::Common::serializeToGrpcFrame(response);
 
   // Firstly, the response data buffer is split into two parts.
   Buffer::OwnedImpl response_data_first_part;
@@ -761,7 +761,7 @@ TEST_P(GrpcJsonTranscoderFilterPrintTest, PrintOptions) {
   author.set_gender(bookstore::Author_Gender_MALE);
   author.set_last_name("Shakespeare");
 
-  const auto response_data = Grpc::Common::serializeBody(author);
+  const auto response_data = Grpc::Common::serializeToGrpcFrame(author);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_->encodeData(*response_data, false));
 
