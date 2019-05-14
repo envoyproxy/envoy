@@ -1028,7 +1028,7 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
 }
 
 MetadataMapVector& ConnectionManagerImpl::ActiveStream::addDecodedMetadata() {
-  return request_metadata_map_vector_;
+  return *getRequestMetadataMapVector();
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(HeaderMapPtr&& trailers) {
@@ -1098,7 +1098,7 @@ void ConnectionManagerImpl::ActiveStream::decodeMetadata(ActiveStreamDecoderFilt
     // metadata in case decodeHeaders returns StopAllIteration.
     if (!(*entry)->decode_headers_called_ || (*entry)->stoppedAll()) {
       Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-      (*entry)->saved_request_metadata_.emplace_back(std::move(metadata_map_ptr));
+      (*entry)->getSavedRequestMetadata()->emplace_back(std::move(metadata_map_ptr));
       return;
     }
 
@@ -1579,13 +1579,13 @@ void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
 }
 
 bool ConnectionManagerImpl::ActiveStream::processNewlyAddedMetadata() {
-  if (request_metadata_map_vector_.empty()) {
+  if (getRequestMetadataMapVector()->empty()) {
     return false;
   }
-  for (const auto& metadata_map : request_metadata_map_vector_) {
+  for (const auto& metadata_map : *getRequestMetadataMapVector()) {
     decodeMetadata(nullptr, *metadata_map);
   }
-  request_metadata_map_vector_.clear();
+  getRequestMetadataMapVector()->clear();
   return true;
 }
 
@@ -1911,7 +1911,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::handleMetadataAfterHeader
   iterate_from_current_filter_ = true;
   // If decodeHeaders() returns StopAllIteration, we should skip draining metadata, and wait
   // for doMetadata() to drain the metadata after iteration continues.
-  if (!stoppedAll() && !saved_request_metadata_.empty()) {
+  if (!stoppedAll() && !getSavedRequestMetadata()->empty()) {
     drainSavedRequestMetadata();
   }
   // Restores the original value of iterate_from_current_filter_.

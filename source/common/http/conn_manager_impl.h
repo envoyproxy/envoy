@@ -152,12 +152,26 @@ private:
       ASSERT(iteration_state_ != IterationState::Continue);
       iteration_state_ = IterationState::Continue;
     }
+    MetadataMapVector* getSavedRequestMetadata() {
+      if (saved_request_metadata_ == nullptr) {
+        saved_request_metadata_ = std::make_unique<MetadataMapVector>();
+      }
+      return saved_request_metadata_.get();
+    }
+    MetadataMapVector* getSavedResponseMetadata() {
+      if (saved_response_metadata_ == nullptr) {
+        saved_response_metadata_ = std::make_unique<MetadataMapVector>();
+      }
+      return saved_response_metadata_.get();
+    }
+
+
     // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
     // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
     // [de|en]codeHeaders() adds new metadata to [de|en]code, but we don't know
-    // [de|en]codeHeaders()'s return value yet.
-    MetadataMapVector saved_request_metadata_;
-    MetadataMapVector saved_response_metadata_;
+    // [de|en]codeHeaders()'s return value yet. The storage is created on demand.
+    std::unique_ptr<MetadataMapVector> saved_request_metadata_;
+    std::unique_ptr<MetadataMapVector> saved_response_metadata_;
     // The state of iteration.
     enum class IterationState {
       Continue,            // Iteration has not stopped for any frame type.
@@ -213,15 +227,15 @@ private:
                          ActiveStream::FilterIterationStartState::CanStartFromCurrent);
     }
     void doMetadata() override { drainSavedRequestMetadata(); }
-    MetadataMapVector& saved_metadata() override { return saved_request_metadata_; }
+    MetadataMapVector& saved_metadata() override { return *getSavedRequestMetadata(); }
     void doTrailers() override { parent_.decodeTrailers(this, *parent_.request_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.request_trailers_; }
 
     void drainSavedRequestMetadata() {
-      for (auto& metadata_map : saved_request_metadata_) {
+      for (auto& metadata_map : *getSavedRequestMetadata()) {
         parent_.decodeMetadata(this, *metadata_map);
       }
-      saved_request_metadata_.clear();
+      getSavedRequestMetadata()->clear();
     }
     // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
     void handleMetadataAfterHeadersCallback() override;
@@ -319,14 +333,14 @@ private:
                          ActiveStream::FilterIterationStartState::CanStartFromCurrent);
     }
     void drainSavedResponseMetadata() {
-      for (auto& metadata_map : saved_response_metadata_) {
+      for (auto& metadata_map : *getSavedResponseMetadata()) {
         parent_.encodeMetadata(this, std::move(metadata_map));
       }
-      saved_response_metadata_.clear();
+      getSavedResponseMetadata()->clear();
     }
 
     void doMetadata() override { drainSavedResponseMetadata(); }
-    MetadataMapVector& saved_metadata() override { return saved_response_metadata_; }
+    MetadataMapVector& saved_metadata() override { return *getSavedResponseMetadata(); }
     void doTrailers() override { parent_.encodeTrailers(this, *parent_.response_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.response_trailers_; }
 
@@ -522,6 +536,13 @@ private:
     // Per-stream request timeout callback
     void onRequestTimeout();
 
+    MetadataMapVector* getRequestMetadataMapVector() {
+      if (request_metadata_map_vector_ == nullptr) {
+        request_metadata_map_vector_ = std::make_unique<MetadataMapVector>();
+      }
+      return request_metadata_map_vector_.get();
+    }
+
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
     Tracing::SpanPtr active_span_;
@@ -549,9 +570,8 @@ private:
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_{};
     // Stores metadata added in the decoding filter that is being processed. Will be cleared before
-    // processing the next filter.
-    // TODO(soya3129): change this to creation on demand.
-    MetadataMapVector request_metadata_map_vector_;
+    // processing the next filter. The storage is created on demand.
+    std::unique_ptr<MetadataMapVector> request_metadata_map_vector_{nullptr};
     // Saves metadata if a filter has returned StopAllIteration.
     MetadataMapVector saved_request_metadata_when_stopall_;
     MetadataMapVector saved_response_metadata_when_stopall_;
