@@ -40,7 +40,7 @@ public:
    * @param data bytes to be processed, will be updated if any have been consumed.
    * @return number of bytes consumed (equal to change in 'data').
    */
-  virtual size_t feed(absl::string_view& data) PURE;
+  virtual uint32_t feed(absl::string_view& data) PURE;
 
   /**
    * Whether deserializer has consumed enough data to return result.
@@ -62,8 +62,8 @@ template <typename T> class IntDeserializer : public Deserializer<T> {
 public:
   IntDeserializer() : written_{0}, ready_(false){};
 
-  size_t feed(absl::string_view& data) override {
-    const size_t available = std::min<size_t>(sizeof(buf_) - written_, data.size());
+  uint32_t feed(absl::string_view& data) override {
+    const uint32_t available = std::min<uint32_t>(sizeof(buf_) - written_, data.size());
     memcpy(buf_ + written_, data.data(), available);
     written_ += available;
 
@@ -80,7 +80,7 @@ public:
 
 protected:
   char buf_[sizeof(T) / sizeof(char)];
-  size_t written_;
+  uint32_t written_;
   bool ready_{false};
 };
 
@@ -155,7 +155,7 @@ class BooleanDeserializer : public Deserializer<bool> {
 public:
   BooleanDeserializer(){};
 
-  size_t feed(absl::string_view& data) override { return buffer_.feed(data); }
+  uint32_t feed(absl::string_view& data) override { return buffer_.feed(data); }
 
   bool ready() const override { return buffer_.ready(); }
 
@@ -179,7 +179,7 @@ public:
   /**
    * Can throw EnvoyException if given string length is not valid.
    */
-  size_t feed(absl::string_view& data) override;
+  uint32_t feed(absl::string_view& data) override;
 
   bool ready() const override { return ready_; }
 
@@ -211,7 +211,7 @@ public:
   /**
    * Can throw EnvoyException if given string length is not valid.
    */
-  size_t feed(absl::string_view& data) override;
+  uint32_t feed(absl::string_view& data) override;
 
   bool ready() const override { return ready_; }
 
@@ -242,7 +242,7 @@ public:
   /**
    * Can throw EnvoyException if given bytes length is not valid.
    */
-  size_t feed(absl::string_view& data) override;
+  uint32_t feed(absl::string_view& data) override;
 
   bool ready() const override { return ready_; }
 
@@ -272,7 +272,7 @@ public:
   /**
    * Can throw EnvoyException if given bytes length is not valid.
    */
-  size_t feed(absl::string_view& data) override;
+  uint32_t feed(absl::string_view& data) override;
 
   bool ready() const override { return ready_; }
 
@@ -309,9 +309,9 @@ public:
   /**
    * Can throw EnvoyException if array length is invalid or if underlying deserializer can throw.
    */
-  size_t feed(absl::string_view& data) override {
+  uint32_t feed(absl::string_view& data) override {
 
-    const size_t length_consumed = length_buf_.feed(data);
+    const uint32_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
       // Break early: we still need to fill in length buffer.
       return length_consumed;
@@ -331,7 +331,7 @@ public:
       return length_consumed;
     }
 
-    size_t child_consumed{0};
+    uint32_t child_consumed{0};
     for (DeserializerType& child : children_) {
       child_consumed += child.feed(data);
     }
@@ -386,9 +386,9 @@ public:
   /**
    * Can throw EnvoyException if array length is invalid or if underlying deserializer can throw.
    */
-  size_t feed(absl::string_view& data) override {
+  uint32_t feed(absl::string_view& data) override {
 
-    const size_t length_consumed = length_buf_.feed(data);
+    const uint32_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
       // Break early: we still need to fill in length buffer.
       return length_consumed;
@@ -414,7 +414,7 @@ public:
       return length_consumed;
     }
 
-    size_t child_consumed{0};
+    uint32_t child_consumed{0};
     for (DeserializerType& child : children_) {
       child_consumed += child.feed(data);
     }
@@ -470,22 +470,40 @@ public:
   EncodingContext(int16_t api_version) : api_version_{api_version} {};
 
   /**
+   * Compute size of given reference, if it were to be encoded.
+   * @return serialized size of argument.
+   */
+  template <typename T> uint32_t computeSize(const T& arg) const;
+
+  /**
+   * Compute size of given array, if it were to be encoded.
+   * @return serialized size of argument.
+   */
+  template <typename T> uint32_t computeSize(const std::vector<T>& arg) const;
+
+  /**
+   * Compute size of given nullable array, if it were to be encoded.
+   * @return serialized size of argument.
+   */
+  template <typename T> uint32_t computeSize(const NullableArray<T>& arg) const;
+
+  /**
    * Encode given reference in a buffer.
    * @return bytes written
    */
-  template <typename T> size_t encode(const T& arg, Buffer::Instance& dst);
+  template <typename T> uint32_t encode(const T& arg, Buffer::Instance& dst);
 
   /**
    * Encode given array in a buffer.
    * @return bytes written
    */
-  template <typename T> size_t encode(const std::vector<T>& arg, Buffer::Instance& dst);
+  template <typename T> uint32_t encode(const std::vector<T>& arg, Buffer::Instance& dst);
 
   /**
    * Encode given nullable array in a buffer.
    * @return bytes written
    */
-  template <typename T> size_t encode(const NullableArray<T>& arg, Buffer::Instance& dst);
+  template <typename T> uint32_t encode(const NullableArray<T>& arg, Buffer::Instance& dst);
 
   int16_t apiVersion() const { return api_version_; }
 
@@ -494,10 +512,87 @@ private:
 };
 
 /**
+ * For non-primitive types, call `computeSize` on them, to delegate the work to the entity itself.
+ * The entity may use the information in context to decide which fields are included etc.
+ */
+template <typename T> inline uint32_t EncodingContext::computeSize(const T& arg) const {
+  return arg.computeSize(*this);
+}
+
+/**
+ * For primitive types, Kafka size == sizeof(x).
+ */
+#define COMPUTE_SIZE_OF_NUMERIC_TYPE(TYPE)                                                         \
+  template <> constexpr uint32_t EncodingContext::computeSize(const TYPE&) const {                 \
+    return sizeof(TYPE);                                                                           \
+  }
+
+COMPUTE_SIZE_OF_NUMERIC_TYPE(bool)
+COMPUTE_SIZE_OF_NUMERIC_TYPE(int8_t)
+COMPUTE_SIZE_OF_NUMERIC_TYPE(int16_t)
+COMPUTE_SIZE_OF_NUMERIC_TYPE(int32_t)
+COMPUTE_SIZE_OF_NUMERIC_TYPE(uint32_t)
+COMPUTE_SIZE_OF_NUMERIC_TYPE(int64_t)
+
+/**
+ * Template overload for string.
+ * Kafka String's size is INT16 for header + N bytes.
+ */
+template <> inline uint32_t EncodingContext::computeSize(const std::string& arg) const {
+  return sizeof(int16_t) + arg.size();
+}
+
+/**
+ * Template overload for nullable string.
+ * Kafka NullableString's size is INT16 for header + N bytes (N >= 0).
+ */
+template <> inline uint32_t EncodingContext::computeSize(const NullableString& arg) const {
+  return sizeof(int16_t) + (arg ? arg->size() : 0);
+}
+
+/**
+ * Template overload for byte array.
+ * Kafka byte array size is INT32 for header + N bytes.
+ */
+template <> inline uint32_t EncodingContext::computeSize(const Bytes& arg) const {
+  return sizeof(int32_t) + arg.size();
+}
+
+/**
+ * Template overload for nullable byte array.
+ * Kafka nullable byte array size is INT32 for header + N bytes (N >= 0).
+ */
+template <> inline uint32_t EncodingContext::computeSize(const NullableBytes& arg) const {
+  return sizeof(int32_t) + (arg ? arg->size() : 0);
+}
+
+/**
+ * Template overload for Array of T.
+ * The size of array is size of header and all of its elements.
+ */
+template <typename T>
+inline uint32_t EncodingContext::computeSize(const std::vector<T>& arg) const {
+  uint32_t result = sizeof(int32_t);
+  for (const T& el : arg) {
+    result += computeSize(el);
+  }
+  return result;
+}
+
+/**
+ * Template overload for NullableArray of T.
+ * The size of array is size of header and all of its elements.
+ */
+template <typename T>
+inline uint32_t EncodingContext::computeSize(const NullableArray<T>& arg) const {
+  return arg ? computeSize(*arg) : sizeof(int32_t);
+}
+
+/**
  * For non-primitive types, call `encode` on them, to delegate the serialization to the entity
  * itself.
  */
-template <typename T> inline size_t EncodingContext::encode(const T& arg, Buffer::Instance& dst) {
+template <typename T> inline uint32_t EncodingContext::encode(const T& arg, Buffer::Instance& dst) {
   return arg.encode(dst, *this);
 }
 
@@ -505,7 +600,7 @@ template <typename T> inline size_t EncodingContext::encode(const T& arg, Buffer
  * Template overload for int8_t.
  * Encode a single byte.
  */
-template <> inline size_t EncodingContext::encode(const int8_t& arg, Buffer::Instance& dst) {
+template <> inline uint32_t EncodingContext::encode(const int8_t& arg, Buffer::Instance& dst) {
   dst.add(&arg, sizeof(int8_t));
   return sizeof(int8_t);
 }
@@ -515,7 +610,7 @@ template <> inline size_t EncodingContext::encode(const int8_t& arg, Buffer::Ins
  * Encode a N-byte integer, converting to network byte-order.
  */
 #define ENCODE_NUMERIC_TYPE(TYPE, CONVERTER)                                                       \
-  template <> inline size_t EncodingContext::encode(const TYPE& arg, Buffer::Instance& dst) {      \
+  template <> inline uint32_t EncodingContext::encode(const TYPE& arg, Buffer::Instance& dst) {    \
     const TYPE val = CONVERTER(arg);                                                               \
     dst.add(&val, sizeof(TYPE));                                                                   \
     return sizeof(TYPE);                                                                           \
@@ -530,7 +625,7 @@ ENCODE_NUMERIC_TYPE(int64_t, htobe64);
  * Template overload for bool.
  * Encode boolean as a single byte.
  */
-template <> inline size_t EncodingContext::encode(const bool& arg, Buffer::Instance& dst) {
+template <> inline uint32_t EncodingContext::encode(const bool& arg, Buffer::Instance& dst) {
   int8_t val = arg;
   dst.add(&val, sizeof(int8_t));
   return sizeof(int8_t);
@@ -540,9 +635,9 @@ template <> inline size_t EncodingContext::encode(const bool& arg, Buffer::Insta
  * Template overload for std::string.
  * Encode string as INT16 length + N bytes.
  */
-template <> inline size_t EncodingContext::encode(const std::string& arg, Buffer::Instance& dst) {
+template <> inline uint32_t EncodingContext::encode(const std::string& arg, Buffer::Instance& dst) {
   int16_t string_length = arg.length();
-  size_t header_length = encode(string_length, dst);
+  uint32_t header_length = encode(string_length, dst);
   dst.add(arg.c_str(), string_length);
   return header_length + string_length;
 }
@@ -552,7 +647,7 @@ template <> inline size_t EncodingContext::encode(const std::string& arg, Buffer
  * Encode nullable string as INT16 length + N bytes (length = -1 for null).
  */
 template <>
-inline size_t EncodingContext::encode(const NullableString& arg, Buffer::Instance& dst) {
+inline uint32_t EncodingContext::encode(const NullableString& arg, Buffer::Instance& dst) {
   if (arg.has_value()) {
     return encode(*arg, dst);
   } else {
@@ -565,9 +660,9 @@ inline size_t EncodingContext::encode(const NullableString& arg, Buffer::Instanc
  * Template overload for Bytes.
  * Encode byte array as INT32 length + N bytes.
  */
-template <> inline size_t EncodingContext::encode(const Bytes& arg, Buffer::Instance& dst) {
+template <> inline uint32_t EncodingContext::encode(const Bytes& arg, Buffer::Instance& dst) {
   const int32_t data_length = arg.size();
-  const size_t header_length = encode(data_length, dst);
+  const uint32_t header_length = encode(data_length, dst);
   dst.add(arg.data(), arg.size());
   return header_length + data_length;
 }
@@ -576,7 +671,8 @@ template <> inline size_t EncodingContext::encode(const Bytes& arg, Buffer::Inst
  * Template overload for NullableBytes.
  * Encode nullable byte array as INT32 length + N bytes (length = -1 for null value).
  */
-template <> inline size_t EncodingContext::encode(const NullableBytes& arg, Buffer::Instance& dst) {
+template <>
+inline uint32_t EncodingContext::encode(const NullableBytes& arg, Buffer::Instance& dst) {
   if (arg.has_value()) {
     return encode(*arg, dst);
   } else {
@@ -590,7 +686,7 @@ template <> inline size_t EncodingContext::encode(const NullableBytes& arg, Buff
  * Each element of type T then serializes itself on its own.
  */
 template <typename T>
-size_t EncodingContext::encode(const std::vector<T>& arg, Buffer::Instance& dst) {
+uint32_t EncodingContext::encode(const std::vector<T>& arg, Buffer::Instance& dst) {
   const NullableArray<T> wrapped = {arg};
   return encode(wrapped, dst);
 }
@@ -600,11 +696,11 @@ size_t EncodingContext::encode(const std::vector<T>& arg, Buffer::Instance& dst)
  * Each element of type T then serializes itself on its own.
  */
 template <typename T>
-size_t EncodingContext::encode(const NullableArray<T>& arg, Buffer::Instance& dst) {
+uint32_t EncodingContext::encode(const NullableArray<T>& arg, Buffer::Instance& dst) {
   if (arg.has_value()) {
     const int32_t len = arg->size();
-    const size_t header_length = encode(len, dst);
-    size_t written{0};
+    const uint32_t header_length = encode(len, dst);
+    uint32_t written{0};
     for (const T& el : *arg) {
       // For each of array elements, resolve the correct method again.
       // Elements could be primitives or complex types, so calling encode() on object won't work.

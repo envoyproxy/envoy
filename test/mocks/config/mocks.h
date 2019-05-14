@@ -5,6 +5,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/config/xds_grpc_context.h"
 
+#include "common/config/config_provider_impl.h"
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
@@ -89,6 +90,20 @@ public:
   MOCK_METHOD1(onDiscoveryResponse,
                void(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message));
   MOCK_METHOD0(onWriteable, void());
+};
+
+class MockMutableConfigProviderBase : public MutableConfigProviderBase {
+public:
+  MockMutableConfigProviderBase(std::shared_ptr<ConfigSubscriptionInstance>&& subscription,
+                                ConfigProvider::ConfigConstSharedPtr initial_config,
+                                Server::Configuration::FactoryContext& factory_context);
+
+  MOCK_CONST_METHOD0(getConfig, ConfigConstSharedPtr());
+  MOCK_METHOD1(onConfigProtoUpdate, ConfigConstSharedPtr(const Protobuf::Message& config_proto));
+  MOCK_METHOD1(initialize, void(const ConfigConstSharedPtr& initial_config));
+  MOCK_METHOD1(onConfigUpdate, void(const ConfigConstSharedPtr& config));
+
+  ConfigSubscriptionCommonBase& subscription() { return *subscription_.get(); }
 };
 
 } // namespace Config

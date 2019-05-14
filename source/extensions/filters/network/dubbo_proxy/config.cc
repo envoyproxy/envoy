@@ -113,7 +113,7 @@ DeserializerPtr ConfigImpl::createDeserializer() {
 }
 
 void ConfigImpl::registerFilter(const DubboFilterConfig& proto_config) {
-  const ProtobufTypes::String& string_name = proto_config.name();
+  const std::string& string_name = proto_config.name();
 
   ENVOY_LOG(debug, "    dubbo filter #{}", filter_factories_.size());
   ENVOY_LOG(debug, "      name: {}", string_name);

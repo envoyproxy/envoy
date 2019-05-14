@@ -122,6 +122,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:backoff_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:token_bucket_impl_lib",
