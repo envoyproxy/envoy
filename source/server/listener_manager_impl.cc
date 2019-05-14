@@ -51,7 +51,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
   std::vector<Network::FilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
-    const ProtobufTypes::String string_name = proto_config.name();
+    const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
     const Json::ObjectSharedPtr filter_config =
@@ -81,7 +81,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
   std::vector<Network::ListenerFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
-    const ProtobufTypes::String string_name = proto_config.name();
+    const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
     const Json::ObjectSharedPtr filter_config =
@@ -185,7 +185,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         config.tcp_fast_open_queue_length().value()));
   }
 
-  if (config.socket_options().size() > 0) {
+  if (!config.socket_options().empty()) {
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
   }
@@ -220,6 +220,12 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
 
   for (const auto& filter_chain : config.filter_chains()) {
     const auto& filter_chain_match = filter_chain.filter_chain_match();
+    if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len() ||
+        filter_chain_match.source_prefix_ranges_size() || filter_chain_match.source_ports_size()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
+                                       "unimplemented fields",
+                                       address_->asString()));
+    }
     if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
       throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
                                        "the same matching rules are defined",
@@ -421,12 +427,11 @@ void ListenerImpl::addFilterChainForSourceTypes(
     const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (source_types_array[source_type] != nullptr) {
-    // We should never get here once all fields in FilterChainMatch are implemented. At this point,
-    // this can become an ASSERT. In principle, we could verify the various missing fields earlier,
-    // but best to have defense-in-depth here, since any mistake leads to potential
-    // heap-use-after-free when filter chains are unexpectedly destructed.
+    // If we got here and found already configured branch, then it means that this FilterChainMatch
+    // is a duplicate, and that there is some overlap in the repeated fields with already processed
+    // FilterChainMatches.
     throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
-                                     "effectively equivalent matching rules are defined",
+                                     "overlapping matching rules are defined",
                                      address_->asString()));
   }
   source_types_array[source_type] = filter_chain;
@@ -671,10 +676,13 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
 
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
-                                         WorkerFactory& worker_factory)
-    : server_(server), factory_(listener_factory), stats_(generateStats(server.stats())),
+                                         WorkerFactory& worker_factory,
+                                         bool enable_dispatcher_stats)
+    : server_(server), factory_(listener_factory),
+      scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
       config_tracker_entry_(server.admin().getConfigTracker().add(
-          "listeners", [this] { return dumpListenerConfigs(); })) {
+          "listeners", [this] { return dumpListenerConfigs(); })),
+      enable_dispatcher_stats_(enable_dispatcher_stats) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(worker_factory.createWorker(server.overloadManager()));
   }
@@ -718,9 +726,7 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
 }
 
 ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
-  const std::string final_prefix = "listener_manager.";
-  return {ALL_LISTENER_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
+  return {ALL_LISTENER_MANAGER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
 }
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config,
@@ -1006,12 +1012,16 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   ENVOY_LOG(info, "all dependencies initialized. starting workers");
   ASSERT(!workers_started_);
   workers_started_ = true;
+  uint32_t i = 0;
   for (const auto& worker : workers_) {
     ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
       addListenerToWorker(*worker, *listener);
     }
     worker->start(guard_dog);
+    if (enable_dispatcher_stats_) {
+      worker->initializeStats(*scope_, fmt::format("worker_{}.", i++));
+    }
   }
 }
 

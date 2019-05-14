@@ -44,7 +44,11 @@ public:
    */
   virtual SystemTime lastUpdated() const PURE;
 
+  /**
+   * Callback used to notify RouteConfigProvider about configuration changes.
+   */
   virtual void onConfigUpdate() PURE;
+
   virtual bool requestConfigUpdate(const std::string for_domain, std::function<void()> cb) PURE;
 };
 

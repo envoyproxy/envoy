@@ -50,7 +50,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     : scope_(scope), stats_(generateStats(scope)), time_source_(time_source),
       tls_max_version_(config.maxProtocolVersion()) {
   const auto tls_certificates = config.tlsCertificates();
-  tls_contexts_.resize(std::max(1UL, tls_certificates.size()));
+  tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));
 
   for (auto& ctx : tls_contexts_) {
     ctx.ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
@@ -767,13 +767,13 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     }
 
     if (!parsed_alpn_protocols_.empty()) {
-      SSL_CTX_set_alpn_select_cb(ctx.ssl_ctx_.get(),
-                                 [](SSL*, const unsigned char** out, unsigned char* outlen,
-                                    const unsigned char* in, unsigned int inlen, void* arg) -> int {
-                                   return static_cast<ServerContextImpl*>(arg)->alpnSelectCallback(
-                                       out, outlen, in, inlen);
-                                 },
-                                 this);
+      SSL_CTX_set_alpn_select_cb(
+          ctx.ssl_ctx_.get(),
+          [](SSL*, const unsigned char** out, unsigned char* outlen, const unsigned char* in,
+             unsigned int inlen, void* arg) -> int {
+            return static_cast<ServerContextImpl*>(arg)->alpnSelectCallback(out, outlen, in, inlen);
+          },
+          this);
     }
 
     if (!session_ticket_keys_.empty()) {

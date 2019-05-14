@@ -98,33 +98,6 @@ TEST(StringUtil, atoull) {
   EXPECT_EQ(18446744073709551615U, out);
 }
 
-TEST(StringUtil, atoll) {
-  int64_t out;
-  EXPECT_FALSE(StringUtil::atoll("-123b", out));
-  EXPECT_FALSE(StringUtil::atoll("", out));
-  EXPECT_FALSE(StringUtil::atoll("b123", out));
-
-  EXPECT_TRUE(StringUtil::atoll("123", out));
-  EXPECT_EQ(123, out);
-  EXPECT_TRUE(StringUtil::atoll("-123", out));
-  EXPECT_EQ(-123, out);
-  EXPECT_TRUE(StringUtil::atoll("+123", out));
-  EXPECT_EQ(123, out);
-
-  EXPECT_TRUE(StringUtil::atoll("  456", out));
-  EXPECT_EQ(456, out);
-
-  EXPECT_TRUE(StringUtil::atoll("00789", out));
-  EXPECT_EQ(789, out);
-
-  // INT64_MAX + 1
-  EXPECT_FALSE(StringUtil::atoll("9223372036854775808", out));
-
-  // INT64_MIN
-  EXPECT_TRUE(StringUtil::atoll("-9223372036854775808", out));
-  EXPECT_EQ(INT64_MIN, out);
-}
-
 TEST(DateUtil, All) {
   EXPECT_FALSE(DateUtil::timePointValid(SystemTime()));
   DangerousDeprecatedTestTime test_time;
@@ -826,6 +799,43 @@ TEST(DateFormatter, FromTimeSameWildcard) {
             DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%3f").fromTime(time1));
   EXPECT_EQ("2018-04-03T23:06:09.000Z114",
             DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%1f%2f").fromTime(time1));
+}
+
+TEST(TrieLookupTable, AddItems) {
+  TrieLookupTable<const char*> trie;
+  EXPECT_TRUE(trie.add("foo", "a"));
+  EXPECT_TRUE(trie.add("bar", "b"));
+  EXPECT_EQ("a", trie.find("foo"));
+  EXPECT_EQ("b", trie.find("bar"));
+
+  // overwrite_existing = false
+  EXPECT_FALSE(trie.add("foo", "c", false));
+  EXPECT_EQ("a", trie.find("foo"));
+
+  // overwrite_existing = true
+  EXPECT_TRUE(trie.add("foo", "c"));
+  EXPECT_EQ("c", trie.find("foo"));
+}
+
+TEST(TrieLookupTable, LongestPrefix) {
+  TrieLookupTable<const char*> trie;
+  EXPECT_TRUE(trie.add("foo", "a"));
+  EXPECT_TRUE(trie.add("bar", "b"));
+  EXPECT_TRUE(trie.add("baro", "c"));
+
+  EXPECT_EQ("a", trie.find("foo"));
+  EXPECT_EQ("a", trie.findLongestPrefix("foo"));
+  EXPECT_EQ("a", trie.findLongestPrefix("foosball"));
+
+  EXPECT_EQ("b", trie.find("bar"));
+  EXPECT_EQ("b", trie.findLongestPrefix("bar"));
+  EXPECT_EQ("b", trie.findLongestPrefix("baritone"));
+  EXPECT_EQ("c", trie.findLongestPrefix("barometer"));
+
+  EXPECT_EQ(nullptr, trie.find("toto"));
+  EXPECT_EQ(nullptr, trie.findLongestPrefix("toto"));
+  EXPECT_EQ(nullptr, trie.find(" "));
+  EXPECT_EQ(nullptr, trie.findLongestPrefix(" "));
 }
 
 } // namespace Envoy

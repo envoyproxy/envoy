@@ -156,7 +156,8 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   initial_metadata.iterate(
       [](const Http::HeaderEntry& header, void* ctxt) {
         auto* client_context = static_cast<grpc::ClientContext*>(ctxt);
-        client_context->AddMetadata(header.key().c_str(), header.value().c_str());
+        client_context->AddMetadata(std::string(header.key().getStringView()),
+                                    std::string(header.value().getStringView()));
         return Http::HeaderMap::Iterate::Continue;
       },
       &ctxt_);

@@ -114,11 +114,9 @@ message CommandLineOptions {
   // See :option:`--mode` for details.
   Mode mode = 19;
 
-  // See :option:`--max-stats` for details.
-  uint64 max_stats = 20;
-
-  // See :option:`--max-obj-name-len` for details.
-  uint64 max_obj_name_len = 21;
+  // max_stats and max_obj_name_len are now unused and have no effect.
+  uint64 max_stats = 20 [deprecated = true];
+  uint64 max_obj_name_len = 21 [deprecated = true];
 
   // See :option:`--disable-hot-restart` for details.
   bool disable_hot_restart = 22;

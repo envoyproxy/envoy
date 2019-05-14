@@ -45,8 +45,9 @@ envoy_cc_library(
     deps = [
         ":fake_symbol_table_lib",
         ":histogram_lib",
+        ":scope_prefixer_lib",
         ":stats_lib",
-        ":stats_options_lib",
+        ":store_impl_lib",
         "//include/envoy/stats:stats_macros",
         "//source/common/stats:heap_stat_data_lib",
     ],
@@ -54,6 +55,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "metric_impl_lib",
+    srcs = ["metric_impl.cc"],
     hdrs = ["metric_impl.h"],
     deps = [
         ":symbol_table_lib",
@@ -63,16 +65,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "raw_stat_data_lib",
-    srcs = ["raw_stat_data.cc"],
-    hdrs = ["raw_stat_data.h"],
+    name = "store_impl_lib",
+    hdrs = ["store_impl.h"],
     deps = [
-        ":stat_data_allocator_lib",
+        ":symbol_table_lib",
         "//include/envoy/stats:stats_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:block_memory_hash_set_lib",
-        "//source/common/common:hash_lib",
-        "//source/common/common:thread_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "scope_prefixer_lib",
+    srcs = ["scope_prefixer.cc"],
+    hdrs = ["scope_prefixer.h"],
+    deps = [
+        ":symbol_table_lib",
+        ":utility_lib",
+        "//include/envoy/stats:stats_interface",
     ],
 )
 
@@ -99,13 +107,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "stat_merger_lib",
+    srcs = ["stat_merger.cc"],
+    hdrs = ["stat_merger.h"],
+    deps = [
+        ":symbol_table_lib",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "stats_lib",
     deps = [
         ":histogram_lib",
         ":metric_impl_lib",
-        ":raw_stat_data_lib",
         ":source_impl_lib",
-        ":stats_options_lib",
         ":symbol_table_lib",
         ":tag_extractor_lib",
         ":utility_lib",
@@ -143,14 +160,6 @@ envoy_cc_library(
     name = "fake_symbol_table_lib",
     hdrs = ["fake_symbol_table_impl.h"],
     deps = [":symbol_table_lib"],
-)
-
-envoy_cc_library(
-    name = "stats_options_lib",
-    hdrs = ["stats_options_impl.h"],
-    deps = [
-        "//include/envoy/stats:stats_interface",
-    ],
 )
 
 envoy_cc_library(
@@ -195,6 +204,7 @@ envoy_cc_library(
     hdrs = ["thread_local_store.h"],
     deps = [
         ":heap_stat_data_lib",
+        ":scope_prefixer_lib",
         ":stats_lib",
         ":stats_matcher_lib",
         ":tag_producer_lib",

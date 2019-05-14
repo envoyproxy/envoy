@@ -10,6 +10,7 @@
 #include "common/common/hash.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/singleton/const_singleton.h"
 #include "common/upstream/load_balancer_impl.h"
 
 #include "extensions/filters/network/common/redis/client.h"
@@ -24,6 +25,13 @@ namespace Client {
 // TODO(mattklein123): Circuit breaking
 // TODO(rshriram): Fault injection
 
+struct RedirectionValues {
+  const std::string ASK = "ASK";
+  const std::string MOVED = "MOVED";
+};
+
+typedef ConstSingleton<RedirectionValues> RedirectionResponse;
+
 class ConfigImpl : public Config {
 public:
   ConfigImpl(
@@ -32,10 +40,18 @@ public:
   bool disableOutlierEvents() const override { return false; }
   std::chrono::milliseconds opTimeout() const override { return op_timeout_; }
   bool enableHashtagging() const override { return enable_hashtagging_; }
+  bool enableRedirection() const override { return enable_redirection_; }
+  uint32_t maxBufferSizeBeforeFlush() const override { return max_buffer_size_before_flush_; }
+  std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
+    return buffer_flush_timeout_;
+  }
 
 private:
   const std::chrono::milliseconds op_timeout_;
   const bool enable_hashtagging_;
+  const bool enable_redirection_;
+  const uint32_t max_buffer_size_before_flush_;
+  const std::chrono::milliseconds buffer_flush_timeout_;
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
@@ -52,6 +68,7 @@ public:
   }
   void close() override;
   PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) override;
+  void flushBufferAndResetTimer();
 
 private:
   struct UpstreamReadFilter : public Network::ReadFilterBaseImpl {
@@ -101,6 +118,7 @@ private:
   std::list<PendingRequest> pending_requests_;
   Event::TimerPtr connect_or_op_timer_;
   bool connected_{};
+  Event::TimerPtr flush_timer_;
 };
 
 class ClientFactoryImpl : public ClientFactory {

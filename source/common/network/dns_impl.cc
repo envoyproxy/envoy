@@ -25,11 +25,6 @@ DnsResolverImpl::DnsResolverImpl(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })) {
-  // This is also done in main(), to satisfy the requirement that c-ares is
-  // initialized prior to threading. The additional call to ares_library_init()
-  // here is a nop in normal execution, but exists for testing where we don't
-  // launch via main().
-  ares_library_init(ARES_LIB_INIT_ALL);
   ares_options options;
 
   initializeChannel(&options, 0);
@@ -41,7 +36,6 @@ DnsResolverImpl::DnsResolverImpl(
       // This should be an IP address (i.e. not a pipe).
       if (resolver->ip() == nullptr) {
         ares_destroy(channel_);
-        ares_library_cleanup();
         throw EnvoyException(
             fmt::format("DNS resolver '{}' is not an IP address", resolver->asString()));
       }
@@ -63,7 +57,6 @@ DnsResolverImpl::DnsResolverImpl(
 DnsResolverImpl::~DnsResolverImpl() {
   timer_->disableTimer();
   ares_destroy(channel_);
-  ares_library_cleanup();
 }
 
 void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
@@ -223,12 +216,12 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
 }
 
 void DnsResolverImpl::PendingResolution::getHostByName(int family) {
-  ares_gethostbyname(channel_, dns_name_.c_str(), family,
-                     [](void* arg, int status, int timeouts, hostent* hostent) {
-                       static_cast<PendingResolution*>(arg)->onAresHostCallback(status, timeouts,
-                                                                                hostent);
-                     },
-                     this);
+  ares_gethostbyname(
+      channel_, dns_name_.c_str(), family,
+      [](void* arg, int status, int timeouts, hostent* hostent) {
+        static_cast<PendingResolution*>(arg)->onAresHostCallback(status, timeouts, hostent);
+      },
+      this);
 }
 
 } // namespace Network

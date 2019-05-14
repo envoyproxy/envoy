@@ -6,12 +6,15 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/symbol_table.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
 
+class StatDataAllocator;
 struct Tag;
 
 /**
@@ -32,32 +35,77 @@ public:
   virtual std::string name() const PURE;
 
   /**
-   * Returns the full name of the Metric as a nul-terminated string. The
-   * intention is use this as a hash-map key, so that the stat name storage
-   * is not duplicated in every map. You cannot use name() above for this,
-   * as it returns a std::string by value, as not all stat implementations
-   * contain the name as a std::string.
-   *
-   * Note that in the future, the plan is to replace this method with one that
-   * returns a reference to a symbolized representation of the elaborated string
-   * (see source/common/stats/symbol_table_impl.h).
+   * Returns the full name of the Metric as an encoded array of symbols.
    */
-  virtual const char* nameCStr() const PURE;
+  virtual StatName statName() const PURE;
 
   /**
    * Returns a vector of configurable tags to identify this Metric.
    */
-  virtual const std::vector<Tag>& tags() const PURE;
+  virtual std::vector<Tag> tags() const PURE;
 
   /**
-   * Returns the name of the Metric with the portions designated as tags removed.
+   * Returns the name of the Metric with the portions designated as tags removed
+   * as a string. For example, The stat name "vhost.foo.vcluster.bar.c1" would
+   * have "foo" extracted as the value of tag "vhost" and "bar" extracted as the
+   * value of tag "vcluster". Thus the tagExtractedName is simply
+   * "vhost.vcluster.c1".
+   *
+   * @return The stat name with all tag values extracted.
    */
-  virtual const std::string& tagExtractedName() const PURE;
+  virtual std::string tagExtractedName() const PURE;
+
+  /**
+   * Returns the name of the Metric with the portions designated as tags
+   * removed as a StatName
+   */
+  virtual StatName tagExtractedStatName() const PURE;
+
+  // Function to be called from iterateTagStatNames passing name and value as StatNames.
+  using TagStatNameIterFn = std::function<bool(StatName, StatName)>;
+
+  /**
+   * Iterates over all tags, calling a functor for each name/value pair. The
+   * functor can return 'true' to continue or 'false' to stop the
+   * iteration.
+   *
+   * @param fn The functor to call for StatName pair.
+   */
+  virtual void iterateTagStatNames(const TagStatNameIterFn& fn) const PURE;
+
+  // Function to be called from iterateTags passing name and value as const Tag&.
+  using TagIterFn = std::function<bool(const Tag&)>;
+
+  /**
+   * Iterates over all tags, calling a functor for each one. The
+   * functor can return 'true' to continue or 'false' to stop the
+   * iteration.
+   *
+   * @param fn The functor to call for each Tag.
+   */
+  virtual void iterateTags(const TagIterFn& fn) const PURE;
 
   /**
    * Indicates whether this metric has been updated since the server was started.
    */
   virtual bool used() const PURE;
+
+  /**
+   * Flags:
+   * Used: used by all stats types to figure out whether they have been used.
+   * Logic...: used by gauges to cache how they should be combined with a parent's value.
+   */
+  struct Flags {
+    static const uint8_t Used = 0x01;
+    // TODO(fredlas) these logic flags should be removed if we move to indicating combine logic in
+    // the stat declaration macros themselves. (Now that stats no longer use shared memory, it's
+    // safe to mess with what these flag bits mean whenever we want).
+    static const uint8_t LogicAccumulate = 0x02;
+    static const uint8_t LogicNeverImport = 0x04;
+    static const uint8_t LogicCached = LogicAccumulate | LogicNeverImport;
+  };
+  virtual SymbolTable& symbolTable() PURE;
+  virtual const SymbolTable& symbolTable() const PURE;
 };
 
 /**
@@ -90,6 +138,16 @@ public:
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
   virtual uint64_t value() const PURE;
+
+  /**
+   * Returns the stat's combine logic, if known.
+   */
+  virtual absl::optional<bool> cachedShouldImport() const PURE;
+
+  /**
+   * Sets the value to be returned by cachedCombineLogic().
+   */
+  virtual void setShouldImport(bool should_import) PURE;
 };
 
 typedef std::shared_ptr<Gauge> GaugeSharedPtr;

@@ -21,6 +21,7 @@ CHACHA
 CIDR
 CLA
 CLI
+CMSG
 CN
 CNAME
 CORS
@@ -34,12 +35,16 @@ CREAT
 CRL
 CRLFs
 CRT
+CSRF
+CSRFPOLICY
 CSS
 CSV
 CTX
 CTXs
 CVC
+CVE
 CX
+CloseAterFlush
 DCHECK
 DER
 DESC
@@ -137,6 +142,7 @@ LC
 LDS
 LEV
 LHS
+LF
 MB
 MD
 MGET
@@ -145,19 +151,24 @@ MSVC
 MTLS
 MiB
 NACK
+NACKs
 NACKed
 NBF
+NBSP
 NDEBUG
 NGHTTP
 NOLINT
 NOLINTNEXTLINE
+NONCES
 NS
 NUL
 Nilsson
 OCSP
 OK
+OOB
 OOM
 OOMs
+ORCA
 OS
 OSI
 OSS
@@ -166,6 +177,7 @@ OT
 OU
 PB
 PC
+PCC
 PDF
 PEM
 PERF
@@ -177,6 +189,7 @@ POSTs
 PREBIND
 PRNG
 PROT
+QPS
 QUIC
 RAII
 RANLUX
@@ -185,6 +198,7 @@ RCU
 RDN
 RDS
 RDWR
+README
 REIMPLEMENT
 REQ
 RFC
@@ -213,12 +227,14 @@ SIGFPE
 SIGILL
 SIGSEGV
 SIGTERM
+SimpleAtoi
 SNI
 SPDY
 SPIFFE
 SPKI
 SQL
 SR
+SRDS
 SRV
 SS
 SSL
@@ -253,6 +269,7 @@ UTC
 UTF
 UUID
 UUIDs
+VC
 VH
 VHDS
 VLOG
@@ -262,6 +279,7 @@ WS
 Welford's
 Werror
 XDS
+vip
 xDSes
 XFCC
 XFF
@@ -279,6 +297,7 @@ accessors
 acls
 addr
 agg
+alignof
 alloc
 alloca
 allocator
@@ -318,8 +337,11 @@ broadcasted
 buf
 builtin
 cancellable
+canonicalization
 canonicalize
+canonicalizing
 canonicalized
+canonicalizer
 cardinality
 casted
 chrono
@@ -375,7 +397,9 @@ dereferencing
 deregistered
 deserialization
 deserialize
+deserialized
 deserializer
+deserializers
 dest
 destructor
 destructors
@@ -414,6 +438,7 @@ evbuffer
 evbuffers
 evconnlistener
 evthread
+evwatch
 exe
 execlp
 facto
@@ -421,6 +446,7 @@ favicon
 fd
 fds
 fileno
+fixup
 fld
 fmt
 fmtlib
@@ -568,6 +594,7 @@ parameterizing
 params
 paren
 parentid
+parsers
 pcall
 pcap
 pclose
@@ -597,6 +624,7 @@ ptr
 ptrs
 pwd
 py
+qps
 quantile
 quantiles
 queueing
@@ -639,6 +667,7 @@ retriable
 rpcs
 rq
 rtrim
+rtt
 sanitization
 sanitizer
 scala
@@ -683,6 +712,7 @@ symlinked
 sync
 sys
 sysctl
+sz
 tbl
 tcmalloc
 templated
@@ -690,6 +720,7 @@ templating
 templatize
 templatized
 templatizing
+testee
 th
 thru
 tm
@@ -698,6 +729,7 @@ tokenize
 tokenizes
 tokenizing
 traceid
+transferral
 trie
 tuple
 tuples
@@ -705,6 +737,7 @@ typeid
 ucontext
 uint
 un
+unacked
 unary
 unconfigurable
 unconfigured
@@ -715,7 +748,10 @@ undrained
 uneject
 unejected
 unejection
+unescape
 unescaped
+unescaping
+unindexed
 uninsantiated
 uninstantiated
 unix
@@ -735,10 +771,12 @@ unreferenced
 unregister
 unregisters
 unresolvable
+unsubscription
 unterminated
 untruncated
 untrusted
 untyped
+unwatched
 unweighted
 unzigzag
 upstreams
@@ -769,6 +807,8 @@ xhtml
 xid
 xxhash
 xxs
+xxxx
+xxxxx
 xyz
 zag
 zig

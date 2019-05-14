@@ -51,7 +51,8 @@ public:
         request_headers_.lookup(Http::LowerCaseString{key}, &entry);
     switch (lookup_result) {
     case Http::HeaderMap::Lookup::Found:
-      return opentracing::string_view{entry->value().c_str(), entry->value().size()};
+      return opentracing::string_view{entry->value().getStringView().data(),
+                                      entry->value().getStringView().length()};
     case Http::HeaderMap::Lookup::NotFound:
       return opentracing::make_unexpected(opentracing::key_not_found_error);
     case Http::HeaderMap::Lookup::NotSupported:
@@ -71,8 +72,10 @@ private:
   static Http::HeaderMap::Iterate headerMapCallback(const Http::HeaderEntry& header,
                                                     void* context) {
     OpenTracingCb* callback = static_cast<OpenTracingCb*>(context);
-    opentracing::string_view key{header.key().c_str(), header.key().size()};
-    opentracing::string_view value{header.value().c_str(), header.value().size()};
+    opentracing::string_view key{header.key().getStringView().data(),
+                                 header.key().getStringView().length()};
+    opentracing::string_view value{header.value().getStringView().data(),
+                                   header.value().getStringView().length()};
     if ((*callback)(key, value)) {
       return Http::HeaderMap::Iterate::Continue;
     } else {
@@ -88,12 +91,13 @@ OpenTracingSpan::OpenTracingSpan(OpenTracingDriver& driver,
 
 void OpenTracingSpan::finishSpan() { span_->FinishWithOptions(finish_options_); }
 
-void OpenTracingSpan::setOperation(const std::string& operation) {
-  span_->SetOperationName(operation);
+void OpenTracingSpan::setOperation(absl::string_view operation) {
+  span_->SetOperationName({operation.data(), operation.length()});
 }
 
-void OpenTracingSpan::setTag(const std::string& name, const std::string& value) {
-  span_->SetTag(name, value);
+void OpenTracingSpan::setTag(absl::string_view name, absl::string_view value) {
+  span_->SetTag({name.data(), name.length()},
+                opentracing::v2::string_view{value.data(), value.length()});
 }
 
 void OpenTracingSpan::log(SystemTime timestamp, const std::string& event) {
@@ -154,7 +158,8 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
   std::unique_ptr<opentracing::SpanContext> parent_span_ctx;
   if (propagation_mode == PropagationMode::SingleHeader && request_headers.OtSpanContext()) {
     opentracing::expected<std::unique_ptr<opentracing::SpanContext>> parent_span_ctx_maybe;
-    std::string parent_context = Base64::decode(request_headers.OtSpanContext()->value().c_str());
+    std::string parent_context =
+        Base64::decode(std::string(request_headers.OtSpanContext()->value().getStringView()));
 
     if (!parent_context.empty()) {
       InputConstMemoryStream istream{parent_context.data(), parent_context.size()};

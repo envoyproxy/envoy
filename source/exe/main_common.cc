@@ -6,26 +6,21 @@
 
 #include "common/common/compiler_requirements.h"
 #include "common/common/perf_annotation.h"
-#include "common/event/libevent.h"
-#include "common/http/http2/codec_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
 
 #include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"
 #include "server/hot_restart_nop_impl.h"
+#include "server/listener_hooks.h"
 #include "server/options_impl.h"
-#include "server/proto_descriptors.h"
 #include "server/server.h"
-#include "server/test_hooks.h"
 
 #include "absl/strings/str_split.h"
 
 #ifdef ENVOY_HOT_RESTART
 #include "server/hot_restart_impl.h"
 #endif
-
-#include "ares.h"
 
 namespace Envoy {
 
@@ -43,28 +38,23 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 }
 
 MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
-                               TestHooks& test_hooks, Server::ComponentFactory& component_factory,
+                               ListenerHooks& listener_hooks,
+                               Server::ComponentFactory& component_factory,
                                std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
                                Thread::ThreadFactory& thread_factory,
                                Filesystem::Instance& file_system)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
-      file_system_(file_system) {
-  Thread::ThreadFactorySingleton::set(&thread_factory_);
-  ares_library_init(ARES_LIB_INIT_ALL);
-  Event::Libevent::Global::initialize();
-  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
-  Http::Http2::initializeNghttp2Logging();
-
+      file_system_(file_system), stats_allocator_(symbol_table_) {
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
   case Server::Mode::Serve: {
 #ifdef ENVOY_HOT_RESTART
     if (!options.hotRestartDisabled()) {
-      restarter_ = std::make_unique<Server::HotRestartImpl>(options_, symbol_table_);
+      restarter_ = std::make_unique<Server::HotRestartImpl>(options_);
     }
 #endif
     if (restarter_ == nullptr) {
-      restarter_ = std::make_unique<Server::HotRestartNopImpl>(symbol_table_);
+      restarter_ = std::make_unique<Server::HotRestartNopImpl>();
     }
 
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
@@ -80,27 +70,21 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     // block or not.
     std::set_new_handler([]() { PANIC("out of memory"); });
 
-    stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
-                                                                 restarter_->statsAllocator());
+    stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
 
     server_ = std::make_unique<Server::InstanceImpl>(
-        options_, time_system, local_address, test_hooks, *restarter_, *stats_store_,
+        options_, time_system, local_address, listener_hooks, *restarter_, *stats_store_,
         access_log_lock, component_factory, std::move(random_generator), *tls_, thread_factory_,
         file_system_);
 
     break;
   }
   case Server::Mode::Validate:
-    restarter_ = std::make_unique<Server::HotRestartNopImpl>(symbol_table_);
+    restarter_ = std::make_unique<Server::HotRestartNopImpl>();
     logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
                                                          restarter_->logLock());
     break;
   }
-}
-
-MainCommonBase::~MainCommonBase() {
-  Thread::ThreadFactorySingleton::set(nullptr);
-  ares_library_cleanup();
 }
 
 void MainCommonBase::configureComponentLogLevels() {
@@ -142,20 +126,17 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
 
 MainCommon::MainCommon(int argc, const char* const* argv)
     : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
-      base_(options_, real_time_system_, default_test_hooks_, prod_component_factory_,
+      base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
             std::make_unique<Runtime::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
             platform_impl_.fileSystem()) {}
 
-std::string MainCommon::hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
-                                          bool hot_restart_enabled) {
+std::string MainCommon::hotRestartVersion(bool hot_restart_enabled) {
 #ifdef ENVOY_HOT_RESTART
   if (hot_restart_enabled) {
-    return Server::HotRestartImpl::hotRestartVersion(max_num_stats, max_stat_name_len);
+    return Server::HotRestartImpl::hotRestartVersion();
   }
 #else
   UNREFERENCED_PARAMETER(hot_restart_enabled);
-  UNREFERENCED_PARAMETER(max_num_stats);
-  UNREFERENCED_PARAMETER(max_stat_name_len);
 #endif
   return "disabled";
 }

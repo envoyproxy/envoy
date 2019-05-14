@@ -13,6 +13,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
+#include "common/network/filter_manager_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -63,6 +64,7 @@ public:
 
   MOCK_METHOD0(connection, Connection&());
   MOCK_METHOD0(continueReading, void());
+  MOCK_METHOD2(injectReadDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD0(upstreamHost, Upstream::HostDescriptionConstSharedPtr());
   MOCK_METHOD1(upstreamHost, void(Upstream::HostDescriptionConstSharedPtr host));
 
@@ -82,12 +84,26 @@ public:
   ReadFilterCallbacks* callbacks_{};
 };
 
+class MockWriteFilterCallbacks : public WriteFilterCallbacks {
+public:
+  MockWriteFilterCallbacks();
+  ~MockWriteFilterCallbacks();
+
+  MOCK_METHOD0(connection, Connection&());
+  MOCK_METHOD2(injectWriteDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
+
+  testing::NiceMock<MockConnection> connection_;
+};
+
 class MockWriteFilter : public WriteFilter {
 public:
   MockWriteFilter();
   ~MockWriteFilter();
 
   MOCK_METHOD2(onWrite, FilterStatus(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD1(initializeWriteFilterCallbacks, void(WriteFilterCallbacks& callbacks));
+
+  WriteFilterCallbacks* write_callbacks_{};
 };
 
 class MockFilter : public Filter {
@@ -99,8 +115,10 @@ public:
   MOCK_METHOD0(onNewConnection, FilterStatus());
   MOCK_METHOD2(onWrite, FilterStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(initializeReadFilterCallbacks, void(ReadFilterCallbacks& callbacks));
+  MOCK_METHOD1(initializeWriteFilterCallbacks, void(WriteFilterCallbacks& callbacks));
 
   ReadFilterCallbacks* callbacks_{};
+  WriteFilterCallbacks* write_callbacks_{};
 };
 
 class MockListenerCallbacks : public ListenerCallbacks {

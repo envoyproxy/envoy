@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -12,6 +13,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
+#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
@@ -31,7 +33,8 @@ bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
          absl::StartsWith(content_type->value().getStringView(),
                           Http::Headers::get().ContentTypeValues.Grpc) &&
          (content_type->value().size() == Http::Headers::get().ContentTypeValues.Grpc.size() ||
-          content_type->value().c_str()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
+          content_type->value()
+                  .getStringView()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }
 
 bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_stream) {
@@ -53,11 +56,11 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string&
   }
   cluster.statsScope()
       .counter(fmt::format("{}.{}.{}.{}", protocol, grpc_service, grpc_method,
-                           grpc_status->value().c_str()))
+                           grpc_status->value().getStringView()))
       .inc();
   uint64_t grpc_status_code;
-  const bool success =
-      StringUtil::atoull(grpc_status->value().c_str(), grpc_status_code) && grpc_status_code == 0;
+  const bool success = absl::SimpleAtoi(grpc_status->value().getStringView(), &grpc_status_code) &&
+                       grpc_status_code == 0;
   chargeStat(cluster, protocol, grpc_service, grpc_method, success);
 }
 
@@ -85,7 +88,7 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
   if (!grpc_status_header || grpc_status_header->value().empty()) {
     return absl::optional<Status::GrpcStatus>();
   }
-  if (!StringUtil::atoull(grpc_status_header->value().c_str(), grpc_status_code) ||
+  if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
       grpc_status_code > Status::GrpcStatus::MaximumValid) {
     return absl::optional<Status::GrpcStatus>(Status::GrpcStatus::InvalidCode);
   }
@@ -94,15 +97,15 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
 
 std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {
   const auto entry = trailers.GrpcMessage();
-  return entry ? entry->value().c_str() : EMPTY_STRING;
+  return entry ? std::string(entry->value().getStringView()) : EMPTY_STRING;
 }
 
 bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string* service,
                                      std::string* method) {
-  if (path == nullptr || path->value().c_str() == nullptr) {
+  if (path == nullptr) {
     return false;
   }
-  const auto parts = StringUtil::splitToken(path->value().c_str(), "/");
+  const auto parts = StringUtil::splitToken(path->value().getStringView(), "/");
   if (parts.size() != 2) {
     return false;
   }
@@ -111,9 +114,11 @@ bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string*
   return true;
 }
 
-Buffer::InstancePtr Common::serializeBody(const Protobuf::Message& message) {
+Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& message) {
   // http://www.grpc.io/docs/guides/wire.html
   // Reserve enough space for the entire message and the 5 byte header.
+  // NB: we do not use prependGrpcFrameHeader because that would add another BufferFragment and this
+  // (using a single BufferFragment) is more efficient.
   Buffer::InstancePtr body(new Buffer::OwnedImpl());
   const uint32_t size = message.ByteSize();
   const uint32_t alloc_size = size + 5;
@@ -133,13 +138,29 @@ Buffer::InstancePtr Common::serializeBody(const Protobuf::Message& message) {
   return body;
 }
 
+Buffer::InstancePtr Common::serializeMessage(const Protobuf::Message& message) {
+  auto body = std::make_unique<Buffer::OwnedImpl>();
+  const uint32_t size = message.ByteSize();
+  Buffer::RawSlice iovec;
+  body->reserve(size, &iovec, 1);
+  ASSERT(iovec.len_ >= size);
+  iovec.len_ = size;
+  uint8_t* current = reinterpret_cast<uint8_t*>(iovec.mem_);
+  Protobuf::io::ArrayOutputStream stream(current, size, -1);
+  Protobuf::io::CodedOutputStream codec_stream(&stream);
+  message.SerializeWithCachedSizes(&codec_stream);
+  body->commit(&iovec, 1);
+  return body;
+}
+
 std::chrono::milliseconds Common::getGrpcTimeout(Http::HeaderMap& request_headers) {
   std::chrono::milliseconds timeout(0);
   Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
   if (header_grpc_timeout_entry) {
     uint64_t grpc_timeout;
-    const char* unit =
-        StringUtil::strtoull(header_grpc_timeout_entry->value().c_str(), grpc_timeout);
+    // TODO(dnoe): Migrate to pure string_view (#6580)
+    std::string grpc_timeout_string(header_grpc_timeout_entry->value().getStringView());
+    const char* unit = StringUtil::strtoull(grpc_timeout_string.c_str(), grpc_timeout);
     if (unit != nullptr && *unit != '\0') {
       switch (*unit) {
       case 'H':
@@ -231,9 +252,7 @@ void Common::checkForHeaderOnlyError(Http::Message& http_response) {
     throw Exception(absl::optional<uint64_t>(), "bad grpc-status header");
   }
 
-  const Http::HeaderEntry* grpc_status_message = http_response.headers().GrpcMessage();
-  throw Exception(grpc_status_code.value(),
-                  grpc_status_message ? grpc_status_message->value().c_str() : EMPTY_STRING);
+  throw Exception(grpc_status_code.value(), Common::getGrpcMessage(http_response.headers()));
 }
 
 void Common::validateResponse(Http::Message& http_response) {
@@ -255,9 +274,7 @@ void Common::validateResponse(Http::Message& http_response) {
   }
 
   if (grpc_status_code.value() != 0) {
-    const Http::HeaderEntry* grpc_status_message = http_response.trailers()->GrpcMessage();
-    throw Exception(grpc_status_code.value(),
-                    grpc_status_message ? grpc_status_message->value().c_str() : EMPTY_STRING);
+    throw Exception(grpc_status_code.value(), Common::getGrpcMessage(*http_response.trailers()));
   }
 }
 
@@ -267,6 +284,14 @@ const std::string& Common::typeUrlPrefix() {
 
 std::string Common::typeUrl(const std::string& qualified_name) {
   return typeUrlPrefix() + "/" + qualified_name;
+}
+
+void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
+  std::array<char, 5> header;
+  header[0] = 0; // flags
+  const uint32_t nsize = htonl(buffer.length());
+  std::memcpy(&header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
+  buffer.prepend(absl::string_view(&header[0], 5));
 }
 
 } // namespace Grpc

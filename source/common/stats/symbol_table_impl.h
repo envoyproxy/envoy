@@ -132,7 +132,7 @@ public:
   bool lessThan(const StatName& a, const StatName& b) const override;
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
-  SymbolTable::StoragePtr join(const std::vector<StatName>& stat_names) const override;
+  StoragePtr join(const std::vector<StatName>& stat_names) const override;
   void populateList(const absl::string_view* names, uint32_t num_names,
                     StatNameList& list) override;
   StoragePtr encode(absl::string_view name) override;
@@ -251,7 +251,7 @@ private:
  * will fire to guard against symbol-table leaks.
  *
  * Thus this class is inconvenient to directly use as temp storage for building
- * a StatName from a string. Instead it should be used via StatNameTempStorage.
+ * a StatName from a string. Instead it should be used via StatNameManagedStorage.
  */
 class StatNameStorage {
 public:
@@ -286,6 +286,8 @@ public:
    * @return StatName a reference to the owned storage.
    */
   inline StatName statName() const;
+
+  uint8_t* bytes() { return bytes_.get(); }
 
 private:
   SymbolTable::StoragePtr bytes_;
@@ -353,9 +355,14 @@ public:
 #endif
 
   /**
-   * @return uint8_t* A pointer to the first byte of data (skipping over size bytes).
+   * @return A pointer to the first byte of data (skipping over size bytes).
    */
   const uint8_t* data() const { return size_and_data_ + StatNameSizeEncodingBytes; }
+
+  /**
+   * @return whether this is empty.
+   */
+  bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
 
 private:
   const uint8_t* size_and_data_;
@@ -367,25 +374,72 @@ StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
  * Contains the backing store for a StatName and enough context so it can
  * self-delete through RAII. This works by augmenting StatNameStorage with a
  * reference to the SymbolTable&, so it has an extra 8 bytes of footprint. It
- * is intended to be used in tests or as a scoped temp in a function, rather
- * than stored in a larger structure such as a map, where the redundant copies
- * of the SymbolTable& would be costly in aggregate.
+ * is intended to be used in cases where simplicity of implementation is more
+ * important than byte-savings, for example:
+ *   - outside the stats system
+ *   - in tests
+ *   - as a scoped temp in a function
+ * Due to the extra 8 bytes per instance, scalability should be taken into
+ * account before using this as (say) a value or key in a map. In those
+ * scenarios, it would be better to store the SymbolTable reference once
+ * for the entire map.
+ *
+ * In the stat structures, we generally use StatNameStorage to avoid the
+ * per-stat overhead.
  */
-class StatNameTempStorage : public StatNameStorage {
+class StatNameManagedStorage : public StatNameStorage {
 public:
   // Basic constructor for when you have a name as a string, and need to
   // generate symbols for it.
-  StatNameTempStorage(absl::string_view name, SymbolTable& table)
+  StatNameManagedStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
 
   // Obtains new backing storage for an already existing StatName.
-  StatNameTempStorage(StatName src, SymbolTable& table)
+  StatNameManagedStorage(StatName src, SymbolTable& table)
       : StatNameStorage(src, table), symbol_table_(table) {}
 
-  ~StatNameTempStorage() { free(symbol_table_); }
+  ~StatNameManagedStorage() { free(symbol_table_); }
+
+  SymbolTable& symbolTable() { return symbol_table_; }
+  const SymbolTable& symbolTable() const { return symbol_table_; }
 
 private:
   SymbolTable& symbol_table_;
+};
+
+/**
+ * Maintains storage for a collection of StatName objects. Like
+ * StatNameManagedStorage, this has an RAII usage model, taking
+ * care of decrementing ref-counts in the SymbolTable for all
+ * contained StatNames on destruction or on clear();
+ *
+ * Example usage:
+ *   StatNamePool pool(symbol_table);
+ *   StatName name1 = pool.add("name1");
+ *   StatName name2 = pool.add("name2");
+ */
+class StatNamePool {
+public:
+  explicit StatNamePool(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+  ~StatNamePool() { clear(); }
+
+  /**
+   * Removes all StatNames from the pool.
+   */
+  void clear();
+
+  /**
+   * @param name the name to add the container.
+   * @return the StatName held in the container for this name.
+   */
+  StatName add(absl::string_view name);
+
+private:
+  // We keep the stat names in a vector of StatNameStorage, storing the
+  // SymbolTable reference separately. This saves 8 bytes per StatName,
+  // at the cost of having a destructor that calls clear().
+  SymbolTable& symbol_table_;
+  std::vector<StatNameStorage> storage_vector_;
 };
 
 // Represents an ordered container of StatNames. The encoding for each StatName
@@ -474,6 +528,86 @@ struct StatNameLessThan {
   }
 
   const SymbolTable& symbol_table_;
+};
+
+struct HeterogeneousStatNameHash {
+  // Specifying is_transparent indicates to the library infrastructure that
+  // type-conversions should not be applied when calling find(), but instead
+  // pass the actual types of the contained and searched-for objects directly to
+  // these functors. See
+  // https://en.cppreference.com/w/cpp/utility/functional/less_void for an
+  // official reference, and https://abseil.io/tips/144 for a description of
+  // using it in the context of absl.
+  using is_transparent = void;
+
+  size_t operator()(StatName a) const { return a.hash(); }
+  size_t operator()(const StatNameStorage& a) const { return a.statName().hash(); }
+};
+
+struct HeterogeneousStatNameEqual {
+  // See description for HeterogeneousStatNameHash::is_transparent.
+  using is_transparent = void;
+
+  size_t operator()(StatName a, StatName b) const { return a == b; }
+  size_t operator()(const StatNameStorage& a, const StatNameStorage& b) const {
+    return a.statName() == b.statName();
+  }
+  size_t operator()(StatName a, const StatNameStorage& b) const { return a == b.statName(); }
+  size_t operator()(const StatNameStorage& a, StatName b) const { return a.statName() == b; }
+};
+
+// Encapsulates a set<StatNameStorage>. We use containment here rather than a
+// 'using' alias because we need to ensure that when the set is destructed,
+// StatNameStorage::free(symbol_table) is called on each entry. It is a little
+// easier at the call-sites in thread_local_store.cc to implement this an
+// explicit free() method, analogous to StatNameStorage::free(), compared to
+// storing a SymbolTable reference in the class and doing the free in the
+// destructor, like StatNameManagedStorage.
+class StatNameStorageSet {
+public:
+  using HashSet =
+      absl::flat_hash_set<StatNameStorage, HeterogeneousStatNameHash, HeterogeneousStatNameEqual>;
+  using iterator = HashSet::iterator;
+
+  ~StatNameStorageSet();
+
+  /**
+   * Releases all symbols held in this set. Must be called prior to destruction.
+   *
+   * @param symbol_table The symbol table that owns the symbols.
+   */
+  void free(SymbolTable& symbol_table);
+
+  /**
+   * @param storage The StatNameStorage to add to the set.
+   */
+  std::pair<HashSet::iterator, bool> insert(StatNameStorage&& storage) {
+    return hash_set_.insert(std::move(storage));
+  }
+
+  /**
+   * @param stat_name The stat_name to find.
+   * @return the iterator pointing to the stat_name, or end() if not found.
+   */
+  iterator find(StatName stat_name) { return hash_set_.find(stat_name); }
+
+  /**
+   * @return the end-marker.
+   */
+  iterator end() { return hash_set_.end(); }
+
+  /**
+   * @param set the storage set to swap with.
+   */
+  void swap(StatNameStorageSet& set) { hash_set_.swap(set.hash_set_); }
+
+  /**
+   * @return the number of elements in the set.
+   */
+  size_t size() const { return hash_set_.size(); }
+
+private:
+  HashSet hash_set_;
 };
 
 } // namespace Stats

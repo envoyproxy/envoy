@@ -52,7 +52,9 @@ private:
                               std::unordered_map<std::string, HostSharedPtr>& updated_hosts);
 
   // ClusterImplBase
+  void reloadHealthyHostsHelper(const HostSharedPtr& host) override;
   void startPreInit() override;
+  void onAssignmentTimeout();
 
   class BatchUpdateHelper : public PrioritySet::BatchUpdateCb {
   public:
@@ -74,6 +76,7 @@ private:
   const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
   HostMap all_hosts_;
+  Event::TimerPtr assignment_timeout_;
 };
 
 class EdsClusterFactory : public ClusterFactoryImplBase {

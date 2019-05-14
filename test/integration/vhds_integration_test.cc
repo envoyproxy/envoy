@@ -206,16 +206,19 @@ public:
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, VhdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
 
+// tests a scenario when:
+//  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts
+//  - the next spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
+//  - Upstream makes a request to an (now) unknown domain, which fails
 TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
   cleanupUpstreamAndDownstream();
   codec_client_->waitForDisconnect();
 
+  // A spontaneous VHDS DiscoveryResponse adds two virtual hosts
   sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(buildVirtualHost1(), {}, "2",
                                                                  vhds_stream_);
-  EXPECT_TRUE(
-      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 
@@ -226,13 +229,13 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   cleanupUpstreamAndDownstream();
   codec_client_->waitForDisconnect();
 
+  // A spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
   sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>({}, {"vhost_1", "vhost_2"}, "3",
                                                                  vhds_stream_);
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
-  EXPECT_TRUE(
-      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 
+  // an upstream request to an (now) unknown domain
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestHeaderMapImpl request_headers{{":method", "GET"},
                                           {":path", "/one"},
@@ -250,25 +253,31 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   response->waitForHeaders();
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 
   cleanupUpstreamAndDownstream();
 }
 
+// tests a scenario when:
+//  - an RDS exchange contains a non-empty virtual_hosts array
+//  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts
+//  - the next spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
+//  - Upstream makes a request to an (now) unknown domain, which fails
 TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
+  // RDS exchange with a non-empty virtual_hosts field
   useRdsWithVhosts();
 
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
   cleanupUpstreamAndDownstream();
   codec_client_->waitForDisconnect();
 
+  // A spontaneous VHDS DiscoveryResponse adds two virtual hosts
   sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(buildVirtualHost1(), {}, "2",
                                                                  vhds_stream_);
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
-  EXPECT_TRUE(
-      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 
+  // verify that rds-based virtual host can be resolved
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
   cleanupUpstreamAndDownstream();
   codec_client_->waitForDisconnect();
@@ -279,13 +288,13 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   cleanupUpstreamAndDownstream();
   codec_client_->waitForDisconnect();
 
+  // A spontaneous VHDS DiscoveryResponse removes virtual hosts added via vhds
   sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>({}, {"vhost_1", "vhost_2"}, "3",
                                                                  vhds_stream_);
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
-  EXPECT_TRUE(
-      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 
+  // verify rds-based virtual host is still present
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
   cleanupUpstreamAndDownstream();
   codec_client_->waitForDisconnect();
@@ -307,7 +316,7 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   response->waitForHeaders();
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 
   cleanupUpstreamAndDownstream();
 }

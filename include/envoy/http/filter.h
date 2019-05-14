@@ -33,7 +33,30 @@ enum class FilterHeadersStatus {
   StopIteration,
   // Continue iteration to remaining filters, but ignore any subsequent data or trailers. This
   // results in creating a header only request/response.
-  ContinueAndEndStream
+  ContinueAndEndStream,
+  // Do not iterate for headers as well as data and trailers for the current filter and the filters
+  // following, and buffer body data for later dispatching. ContinueDecoding() MUST
+  // be called if continued filter iteration is desired.
+  //
+  // Used when a filter wants to stop iteration on data and trailers while waiting for headers'
+  // iteration to resume.
+  //
+  // If buffering the request causes buffered data to exceed the configured buffer limit, a 413 will
+  // be sent to the user. On the response path exceeding buffer limits will result in a 500.
+  //
+  // TODO(soya3129): stop metadata parsing when StopAllIterationAndBuffer is set.
+  StopAllIterationAndBuffer,
+  // Do not iterate for headers as well as data and trailers for the current filter and the filters
+  // following, and buffer body data for later dispatching. continueDecoding() MUST
+  // be called if continued filter iteration is desired.
+  //
+  // Used when a filter wants to stop iteration on data and trailers while waiting for headers'
+  // iteration to resume.
+  //
+  // This will cause the flow of incoming data to cease until continueDecoding() function is called.
+  //
+  // TODO(soya3129): stop metadata parsing when StopAllIterationAndWatermark is set.
+  StopAllIterationAndWatermark,
 };
 
 /**
@@ -274,10 +297,12 @@ public:
    * @param modify_headers supplies an optional callback function that can modify the
    *                       response headers.
    * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
+   * @param details a string detailing why this local reply was sent.
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(HeaderMap& headers)> modify_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status) PURE;
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              absl::string_view details) PURE;
 
   /**
    * Called with 100-Continue headers to be encoded.
@@ -383,6 +408,20 @@ public:
   // Note that HttpConnectionManager sanitization will *not* be performed on the
   // recreated stream, as it is assumed that sanitization has already been done.
   virtual bool recreateStream() PURE;
+
+  /**
+   * Adds socket options to be applied to any connections used for upstream requests. Note that
+   * unique values for the options will likely lead to many connection pools being created. The
+   * added options are appended to any previously added.
+   *
+   * @param options The options to be added.
+   */
+  virtual void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) PURE;
+
+  /**
+   * @return The socket options to be applied to the upstream request.
+   */
+  virtual Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const PURE;
 };
 
 /**

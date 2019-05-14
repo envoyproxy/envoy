@@ -67,6 +67,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "route_config_update_impl_lib",
+    srcs = ["route_config_update_receiver_impl.cc"],
+    hdrs = ["route_config_update_receiver_impl.h"],
+    deps = [
+        ":config_lib",
+        "//include/envoy/router:rds_interface",
+        "//include/envoy/router:route_config_update_info_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "vhds_lib",
     srcs = ["vhds.cc"],
     hdrs = ["vhds.h"],
@@ -87,6 +101,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:route_config_update_impl_lib",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )
@@ -113,6 +128,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:route_config_update_impl_lib",
         "//source/common/router:vhds_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2:rds_cc",
@@ -172,6 +188,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:hash_lib",
         "//source/common/common:hex_lib",
+        "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/grpc:common_lib",

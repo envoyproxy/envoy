@@ -50,11 +50,21 @@ public:
 
   // Upstream::HostSet
   MOCK_CONST_METHOD0(hosts, const HostVector&());
+  MOCK_CONST_METHOD0(hostsPtr, HostVectorConstSharedPtr());
   MOCK_CONST_METHOD0(healthyHosts, const HostVector&());
+  MOCK_CONST_METHOD0(healthyHostsPtr, HealthyHostVectorConstSharedPtr());
   MOCK_CONST_METHOD0(degradedHosts, const HostVector&());
+  MOCK_CONST_METHOD0(degradedHostsPtr, DegradedHostVectorConstSharedPtr());
+  MOCK_CONST_METHOD0(excludedHosts, const HostVector&());
+  MOCK_CONST_METHOD0(excludedHostsPtr, ExcludedHostVectorConstSharedPtr());
   MOCK_CONST_METHOD0(hostsPerLocality, const HostsPerLocality&());
+  MOCK_CONST_METHOD0(hostsPerLocalityPtr, HostsPerLocalityConstSharedPtr());
   MOCK_CONST_METHOD0(healthyHostsPerLocality, const HostsPerLocality&());
+  MOCK_CONST_METHOD0(healthyHostsPerLocalityPtr, HostsPerLocalityConstSharedPtr());
   MOCK_CONST_METHOD0(degradedHostsPerLocality, const HostsPerLocality&());
+  MOCK_CONST_METHOD0(degradedHostsPerLocalityPtr, HostsPerLocalityConstSharedPtr());
+  MOCK_CONST_METHOD0(excludedHostsPerLocality, const HostsPerLocality&());
+  MOCK_CONST_METHOD0(excludedHostsPerLocalityPtr, HostsPerLocalityConstSharedPtr());
   MOCK_CONST_METHOD0(localityWeights, LocalityWeightsConstSharedPtr());
   MOCK_METHOD0(chooseHealthyLocality, absl::optional<uint32_t>());
   MOCK_METHOD0(chooseDegradedLocality, absl::optional<uint32_t>());
@@ -67,9 +77,11 @@ public:
   HostVector hosts_;
   HostVector healthy_hosts_;
   HostVector degraded_hosts_;
+  HostVector excluded_hosts_;
   HostsPerLocalitySharedPtr hosts_per_locality_{new HostsPerLocalityImpl()};
   HostsPerLocalitySharedPtr healthy_hosts_per_locality_{new HostsPerLocalityImpl()};
   HostsPerLocalitySharedPtr degraded_hosts_per_locality_{new HostsPerLocalityImpl()};
+  HostsPerLocalitySharedPtr excluded_hosts_per_locality_{new HostsPerLocalityImpl()};
   LocalityWeightsConstSharedPtr locality_weights_{{}};
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
   uint32_t priority_{};
@@ -95,11 +107,6 @@ public:
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
                                  absl::optional<uint32_t> overprovisioning_factor));
   MOCK_METHOD1(batchHostUpdate, void(BatchUpdateCb&));
-  MOCK_CONST_METHOD6(updateHosts,
-                     void(uint32_t priority, UpdateHostsParams&& update_hosts_params,
-                          LocalityWeightsConstSharedPtr locality_weights,
-                          const HostVector& hosts_added, const HostVector& hosts_removed,
-                          absl::optional<uint32_t> overprovisioning_factor));
 
   MockHostSet* getMockHostSet(uint32_t priority) {
     getHostSet(priority); // Ensure the host set exists.

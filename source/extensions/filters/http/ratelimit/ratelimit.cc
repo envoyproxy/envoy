@@ -17,6 +17,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
 
+struct RcDetailsValues {
+  // This request went above the configured limits for the rate limit filter.
+  const std::string RateLimited = "request_rate_limited";
+  // The rate limiter encountered a failure, and was configured to fail-closed.
+  const std::string RateLimitError = "rate_limiter_error";
+};
+typedef ConstSingleton<RcDetailsValues> RcDetails;
+
 void Filter::initiateCall(const Http::HeaderMap& headers) {
   bool is_internal_request =
       headers.EnvoyInternalRequest() && (headers.EnvoyInternalRequest()->value() == "true");
@@ -150,9 +158,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
-    callbacks_->sendLocalReply(Http::Code::TooManyRequests, "",
-                               [this](Http::HeaderMap& headers) { addHeaders(headers); },
-                               config_->rateLimitedGrpcStatus());
+    callbacks_->sendLocalReply(
+        Http::Code::TooManyRequests, "", [this](Http::HeaderMap& headers) { addHeaders(headers); },
+        config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
     if (config_->failureModeAllow()) {
@@ -162,7 +170,8 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       }
     } else {
       state_ = State::Responded;
-      callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt);
+      callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt,
+                                 RcDetails::get().RateLimitError);
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
     }
   } else if (!initiating_call_) {

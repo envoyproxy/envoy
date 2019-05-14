@@ -76,6 +76,7 @@ public:
   MOCK_METHOD0(listenerStats, ConnectionManagerListenerStats&());
   MOCK_CONST_METHOD0(proxy100Continue, bool());
   MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
+  MOCK_CONST_METHOD0(shouldNormalizePath, bool());
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
@@ -208,7 +209,7 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
 
   EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_STREQ("198.51.100.1", headers.ForwardedFor()->value().c_str());
+  EXPECT_EQ("198.51.100.1", headers.ForwardedFor()->value().getStringView());
 }
 
 // Verify internal request and XFF is set when we are using remote address and the address is
@@ -316,7 +317,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  ON_CALL(local_info_, nodeName()).WillByDefault(Return(canary_node_));
+  ON_CALL(local_info_, nodeName()).WillByDefault(ReturnRef(canary_node_));
   user_agent_ = "bar";
   TestHeaderMapImpl headers{{"user-agent", ""}, {"x-envoy-downstream-service-cluster", "foo"}};
 
@@ -441,7 +442,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
 
   user_agent_ = "bar";
   TestHeaderMapImpl headers{{"user-agent", "foo"}, {"x-envoy-downstream-service-cluster", "foo"}};
-  EXPECT_CALL(local_info_, nodeName()).WillOnce(Return(empty_node_));
+  EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(empty_node_));
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
             callMutateRequestHeaders(headers, Protocol::Http2));
@@ -1099,6 +1100,39 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
 
   EXPECT_FALSE(response_headers.has("keep-alive"));
   EXPECT_FALSE(response_headers.has("proxy-connection"));
+}
+
+// maybeNormalizePath() does nothing by default.
+TEST_F(ConnectionManagerUtilityTest, SanitizePathDefaultOff) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz/../a"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(original_headers, header_map);
+}
+
+// maybeNormalizePath() leaves already normal paths alone.
+TEST_F(ConnectionManagerUtilityTest, SanitizePathNormalPath) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(original_headers, header_map);
+}
+
+// maybeNormalizePath() normalizes relative paths.
+TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz/../abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
 }
 
 } // namespace Http

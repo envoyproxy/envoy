@@ -7,8 +7,6 @@ BROWSE
 .classpath
 .clwb/
 /ci/bazel-*
-/ci/prebuilt/thirdparty
-/ci/prebuilt/thirdparty_build
 compile_commands.json
 cscope.*
 .deps

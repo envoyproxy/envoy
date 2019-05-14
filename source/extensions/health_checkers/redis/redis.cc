@@ -25,6 +25,12 @@ RedisHealthChecker::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession
     : ActiveHealthCheckSession(parent, host), parent_(parent) {}
 
 RedisHealthChecker::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {
+  onDeferredDelete();
+  ASSERT(current_request_ == nullptr);
+  ASSERT(client_ == nullptr);
+}
+
+void RedisHealthChecker::RedisActiveHealthCheckSession::onDeferredDelete() {
   if (current_request_) {
     current_request_->cancel();
     current_request_ = nullptr;
@@ -97,6 +103,14 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
 void RedisHealthChecker::RedisActiveHealthCheckSession::onFailure() {
   current_request_ = nullptr;
   handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
+}
+
+bool RedisHealthChecker::RedisActiveHealthCheckSession::onRedirection(
+    const NetworkFilters::Common::Redis::RespValue&) {
+  // Treat any redirection error response from a Redis server as success.
+  current_request_ = nullptr;
+  handleSuccess();
+  return true;
 }
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onTimeout() {
