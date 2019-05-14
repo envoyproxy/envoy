@@ -529,10 +529,10 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,
-    const std::vector<std::string>& expected_resource_unsubscriptions,
+    const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
   envoy::api::v2::DeltaDiscoveryRequest request;
-  VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, request));
+  VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 
   EXPECT_TRUE(request.has_node());
   EXPECT_FALSE(request.node().id().empty());

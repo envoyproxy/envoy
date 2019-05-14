@@ -5,7 +5,7 @@ resources:
 
 jobs:
 - job: BuildEnvoy
-  timeoutInMinutes: 120
+  timeoutInMinutes: 360
   pool:
     vmImage: 'Ubuntu 16.04'
   container: envoy-build

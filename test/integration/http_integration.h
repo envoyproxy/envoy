@@ -145,7 +145,8 @@ protected:
   // Sends a simple header-only HTTP request, and waits for a response.
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
                                                     int upstream_index,
-                                                    const std::string& path = "/test/long/url");
+                                                    const std::string& path = "/test/long/url",
+                                                    const std::string& authority = "host");
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
 
@@ -154,7 +155,8 @@ protected:
                                             ConnectionCreationFunction* creator = nullptr);
   void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
                                               int upstream_index = 0,
-                                              const std::string& path = "/test/long/url");
+                                              const std::string& path = "/test/long/url",
+                                              const std::string& authority = "host");
   void testRequestAndResponseShutdownWithActiveConnection();
 
   // Disconnect tests

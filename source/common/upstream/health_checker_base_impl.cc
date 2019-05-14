@@ -24,6 +24,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
       event_logger_(std::move(event_logger)), interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
       no_traffic_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_interval, 60000)),
+      initial_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, initial_jitter, 0)),
       interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)),
       interval_jitter_percent_(config.interval_jitter_percent()),
       unhealthy_interval_(
@@ -104,14 +105,19 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
   } else {
     base_time_ms = no_traffic_interval_.count();
   }
+  return intervalWithJitter(base_time_ms, interval_jitter_);
+}
 
+std::chrono::milliseconds
+HealthCheckerImplBase::intervalWithJitter(uint64_t base_time_ms,
+                                          std::chrono::milliseconds interval_jitter) const {
   const uint64_t jitter_percent_mod = interval_jitter_percent_ * base_time_ms / 100;
   if (jitter_percent_mod > 0) {
     base_time_ms += random_.random() % jitter_percent_mod;
   }
 
-  if (interval_jitter_.count() > 0) {
-    base_time_ms += (random_.random() % interval_jitter_.count());
+  if (interval_jitter.count() > 0) {
+    base_time_ms += (random_.random() % interval_jitter.count());
   }
 
   const uint64_t min_interval = runtime_.snapshot().getInteger("health_check.min_interval", 0);
@@ -361,6 +367,15 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
 void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
   onTimeout();
   handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
+}
+
+void HealthCheckerImplBase::ActiveHealthCheckSession::onInitialInterval() {
+  if (parent_.initial_jitter_.count() == 0) {
+    onIntervalBase();
+  } else {
+    interval_timer_->enableTimer(
+        std::chrono::milliseconds(parent_.intervalWithJitter(0, parent_.initial_jitter_)));
+  }
 }
 
 void HealthCheckEventLoggerImpl::logEjectUnhealthy(

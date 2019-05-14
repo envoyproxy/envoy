@@ -67,6 +67,46 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "route_config_update_impl_lib",
+    srcs = ["route_config_update_receiver_impl.cc"],
+    hdrs = ["route_config_update_receiver_impl.h"],
+    deps = [
+        ":config_lib",
+        "//include/envoy/router:rds_interface",
+        "//include/envoy/router:route_config_update_info_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "vhds_lib",
+    srcs = ["vhds.cc"],
+    hdrs = ["vhds.h"],
+    deps = [
+        ":config_lib",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/router:rds_interface",
+        "//include/envoy/router:route_config_provider_manager_interface",
+        "//include/envoy/router:route_config_update_info_interface",
+        "//include/envoy/singleton:instance_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:rds_json_lib",
+        "//source/common/config:subscription_factory_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/init:target_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/router:route_config_update_impl_lib",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "rds_lib",
     srcs = ["rds_impl.cc"],
     hdrs = ["rds_impl.h"],
@@ -77,6 +117,7 @@ envoy_cc_library(
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/router:rds_interface",
         "//include/envoy/router:route_config_provider_manager_interface",
+        "//include/envoy/router:route_config_update_info_interface",
         "//include/envoy/server:admin_interface",
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/thread_local:thread_local_interface",
@@ -87,6 +128,8 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:route_config_update_impl_lib",
+        "//source/common/router:vhds_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2:rds_cc",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
