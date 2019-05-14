@@ -2201,7 +2201,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
                             "the same matching rules are defined");
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithEffectiveEquivalentMatch) {
+TEST_F(ListenerManagerImplWithRealFiltersTest,
+       MultipleFilterChainsWithSameMatchPlusUnimplementedFields) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
@@ -2219,8 +2220,29 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithEffective
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
                             EnvoyException,
+                            "error adding listener '127.0.0.1:1234': contains filter chains with "
+                            "unimplemented fields");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappingRules) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.listener.tls_inspector"
+      config: {}
+    filter_chains:
+    - filter_chain_match:
+        server_names: "example.com"
+    - filter_chain_match:
+        server_names: ["example.com", "www.example.com"]
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                            EnvoyException,
                             "error adding listener '127.0.0.1:1234': multiple filter chains with "
-                            "effectively equivalent matching rules are defined");
+                            "overlapping matching rules are defined");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TlsFilterChainWithoutTlsInspector) {
