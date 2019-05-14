@@ -420,9 +420,7 @@ std::string SslSocket::sessionId() const {
   }
 
   unsigned int session_id_length = 0;
-  const uint8_t* session_id = nullptr;
-
-  session_id = SSL_SESSION_get_id(session, &session_id_length);
+  const uint8_t* session_id = SSL_SESSION_get_id(session, &session_id_length);
   return Hex::encode(session_id, session_id_length);
 }
 
