@@ -566,7 +566,7 @@ void Utility::traversePerFilterConfigGeneric(
 std::string Utility::PercentEncoding::encode(absl::string_view value) {
   std::string encoded;
   for (size_t i = 0; i < value.size(); ++i) {
-    const char ch = value[i];
+    const char& ch = value[i];
     // Unreserved characters. unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~".
     // https://tools.ietf.org/html/rfc3986#section-2.3.
     if (absl::ascii_isalnum(ch) || ch == '-' || ch == '_' || ch == '.' || ch == '~') {
