@@ -25,7 +25,7 @@ public:
     uint32_t max_host_weight = 1;
     for (uint64_t i = 0; i < num_hosts; i++) {
       const bool should_weight = i < num_hosts * (weighted_subset_percent / 100.0);
-      uint32_t host_weight = should_weight ? weight : 1;
+      const uint32_t host_weight = should_weight ? weight : 1;
       hosts.push_back(
           makeTestHost(info_, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256), host_weight));
       max_host_weight = std::max(host_weight, max_host_weight);
