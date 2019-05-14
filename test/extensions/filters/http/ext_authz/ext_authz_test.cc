@@ -159,23 +159,6 @@ TEST_F(HttpFilterTest, MergeConfig) {
   EXPECT_EQ("value", merged_extensions.at("key"));
 }
 
-class HttpExtAuthzFilterTestBase : public HttpFilterTest {
-public:
-  void initConfig(envoy::config::filter::http::ext_authz::v2::ExtAuthz& proto_config) {
-    config_ = std::make_unique<FilterConfig>(proto_config, local_info_, stats_store_, runtime_,
-                                             http_context_);
-  }
-};
-
-class HttpExtAuthzFilterTest : public HttpExtAuthzFilterTestBase {
-public:
-  void initialize(const std::string yaml) {
-    envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
-    MessageUtil::loadFromYaml(yaml, proto_config);
-    initConfig(proto_config);
-  }
-};
-
 // Test when failure_mode_allow is NOT set and the response from the authorization service is Error
 // that the request is not allowed to continue.
 TEST_F(HttpFilterTest, ErrorFailClose) {

@@ -8,7 +8,6 @@
 
 #include "envoy/stats/stats.h"
 
-#include "common/common/empty_string.h"
 #include "common/http/codes.h"
 #include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/isolated_store_impl.h"
@@ -43,10 +42,10 @@ public:
     addResponse(501, false, true);
     addResponse(200, true, true);
     addResponse(300, false, false);
-    Stats::StatName empty_string;
+    Stats::StatName empty_stat_name;
     addResponse(500, true, false);
     addResponse(200, false, false, pool_.add("test-vhost"), pool_.add("test-cluster"));
-    addResponse(200, false, false, empty_string, empty_string, pool_.add("from_az"),
+    addResponse(200, false, false, empty_stat_name, empty_stat_name, pool_.add("from_az"),
                 pool_.add("to_az"));
   }
 
