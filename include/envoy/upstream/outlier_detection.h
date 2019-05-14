@@ -92,8 +92,14 @@ public:
    * @return the success rate of the host in the last calculated interval, in the range 0-100.
    *         -1 means that the host did not have enough request volume to calculate success rate
    *         or the cluster did not have enough hosts to run through success rate outlier ejection.
+   * @param type specifies for which Success Rate Monitor the success rate value should be returned.
+   If the outlier detector is configured not to split external and local origin errors,
+   ExternalOrigin type returns success rate for all types of errors: external and local origin and
+   LocalOrigin type returns -1. If the outlier detector is configured to split external and local
+   origin errors, ExternalOrigin type returns success rate for external origin errors and
+   LocalOrigin type returns success rate for local origin errors.
    */
-  virtual double successRate(SuccessRateMonitorType) const PURE;
+  virtual double successRate(SuccessRateMonitorType type) const PURE;
 };
 
 typedef std::unique_ptr<DetectorHostMonitor> DetectorHostMonitorPtr;
@@ -122,6 +128,7 @@ public:
    * interval.
    * @return the average success rate, or -1 if there were not enough hosts with enough request
    *         volume to proceed with success rate based outlier ejection.
+   * @param type - see DetectorHostMonitor::successRate.
    */
   virtual double successRateAverage(DetectorHostMonitor::SuccessRateMonitorType) const PURE;
 

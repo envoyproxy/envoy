@@ -111,8 +111,9 @@ Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
     http_code = Http::Code::InternalServerError;
     break;
   case Result::CONNECT_SUCCESS:
-    NOT_REACHED_GCOVR_EXCL_LINE; // SUCCESS is used to report connection level success, not
-                                 // transaction
+    // Must never happen - CONNECT_SUCCESS is not mapped to HTTP code.
+    // See DetectorHostMonitorImpl::putResultNoLocalExternalSplit
+    NOT_REACHED_GCOVR_EXCL_LINE;
     break;
   }
 
@@ -125,8 +126,10 @@ void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
                                                             absl::optional<uint64_t> code) {
   switch (result) {
   case Result::CONNECT_SUCCESS:
-    // SUCCESS means that connection to host was established, but not transaction still can fail.
-    // HTTP server may return 5xx or DB server may indicate error.
+    // CONNECT_SUCCESS is treated specially and is not mapped to HTTP code.
+    // It indicates that Envoy connected to upstream host. The upstream host will subsequently
+    // return HTTP code as part of the transaction. If CONNECT_SUCCESS was mapped
+    // to HTTP there would be 2 codes for each transaction.
     break;
   default:
     putHttpResponseCode(code ? code.value() : enumToInt(resultToHttpCode(result)));
