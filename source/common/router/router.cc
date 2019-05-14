@@ -216,10 +216,6 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     const bool internal_request =
         internal_request_header && internal_request_header->value() == "true";
 
-    // TODO(mattklein123): Remove copy when G string compat issues are fixed.
-    const std::string zone_name = config_.local_info_.zoneName();
-    const std::string upstream_zone = upstreamZone(upstream_host);
-
     Http::CodeStats::ResponseStatInfo info{config_.scope_,
                                            cluster_->statsScope(),
                                            EMPTY_STRING,
@@ -228,19 +224,24 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                            route_entry_->virtualHost().name(),
                                            request_vcluster_ ? request_vcluster_->name()
                                                              : EMPTY_STRING,
-                                           zone_name,
-                                           upstream_zone,
+                                           config_.local_info_.zoneName(),
+                                           upstreamZone(upstream_host),
                                            is_canary};
 
     Http::CodeStats& code_stats = httpContext().codeStats();
     code_stats.chargeResponseStat(info);
 
     if (!alt_stat_prefix_.empty()) {
-      Http::CodeStats::ResponseStatInfo info{config_.scope_,   cluster_->statsScope(),
-                                             alt_stat_prefix_, response_status_code,
-                                             internal_request, EMPTY_STRING,
-                                             EMPTY_STRING,     zone_name,
-                                             upstream_zone,    is_canary};
+      Http::CodeStats::ResponseStatInfo info{config_.scope_,
+                                             cluster_->statsScope(),
+                                             alt_stat_prefix_,
+                                             response_status_code,
+                                             internal_request,
+                                             EMPTY_STRING,
+                                             EMPTY_STRING,
+                                             config_.local_info_.zoneName(),
+                                             upstreamZone(upstream_host),
+                                             is_canary};
 
       code_stats.chargeResponseStat(info);
     }
@@ -884,9 +885,6 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
     const bool internal_request =
         internal_request_header && internal_request_header->value() == "true";
 
-    // TODO(mattklein123): Remove copy when G string compat issues are fixed.
-    const std::string zone_name = config_.local_info_.zoneName();
-
     Http::CodeStats& code_stats = httpContext().codeStats();
     Http::CodeStats::ResponseTimingInfo info{config_.scope_,
                                              cluster_->statsScope(),
@@ -897,7 +895,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
                                              route_entry_->virtualHost().name(),
                                              request_vcluster_ ? request_vcluster_->name()
                                                                : EMPTY_STRING,
-                                             zone_name,
+                                             config_.local_info_.zoneName(),
                                              upstreamZone(upstream_request.upstream_host_)};
 
     code_stats.chargeResponseTiming(info);
@@ -911,7 +909,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
                                                internal_request,
                                                EMPTY_STRING,
                                                EMPTY_STRING,
-                                               zone_name,
+                                               config_.local_info_.zoneName(),
                                                upstreamZone(upstream_request.upstream_host_)};
 
       code_stats.chargeResponseTiming(info);
@@ -1038,8 +1036,8 @@ Filter::UpstreamRequest::~UpstreamRequest() {
   stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
-    upstream_log->log(parent_.downstream_headers_, upstream_headers_, upstream_trailers_,
-                      stream_info_);
+    upstream_log->log(parent_.downstream_headers_, upstream_headers_.get(),
+                      upstream_trailers_.get(), stream_info_);
   }
 }
 
@@ -1053,7 +1051,9 @@ void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool e
   upstream_timing_.onFirstUpstreamRxByteReceived(parent_.callbacks_->dispatcher().timeSource());
   maybeEndDecode(end_stream);
 
-  upstream_headers_ = headers.get();
+  if (!parent_.config_.upstream_logs_.empty()) {
+    upstream_headers_ = std::make_unique<Http::HeaderMapImpl>(*headers);
+  }
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   stream_info_.response_code_ = static_cast<uint32_t>(response_code);
   parent_.onUpstreamHeaders(response_code, std::move(headers), *this, end_stream);
@@ -1067,7 +1067,9 @@ void Filter::UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream
 
 void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   maybeEndDecode(true);
-  upstream_trailers_ = trailers.get();
+  if (!parent_.config_.upstream_logs_.empty()) {
+    upstream_trailers_ = std::make_unique<Http::HeaderMapImpl>(*trailers);
+  }
   parent_.onUpstreamTrailers(std::move(trailers), *this);
 }
 

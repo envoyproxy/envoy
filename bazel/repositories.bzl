@@ -14,7 +14,7 @@ load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
 
 # go version for rules_go
-GO_VERSION = "1.10.4"
+GO_VERSION = "1.12.4"
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.

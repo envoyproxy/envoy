@@ -358,6 +358,7 @@ private:
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
   StatsMatcherPtr stats_matcher_;
+  std::atomic<bool> threading_ever_initialized_{};
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   HeapStatDataAllocator heap_allocator_;
@@ -378,6 +379,8 @@ private:
   std::vector<CounterSharedPtr> deleted_counters_;
   std::vector<GaugeSharedPtr> deleted_gauges_;
   std::vector<HistogramSharedPtr> deleted_histograms_;
+
+  absl::flat_hash_set<StatNameStorageSet*> rejected_stats_purgatory_ GUARDED_BY(lock_);
 };
 
 } // namespace Stats

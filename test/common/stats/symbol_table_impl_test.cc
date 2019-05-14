@@ -45,14 +45,13 @@ protected:
       table_ = std::move(table);
       break;
     }
+    pool_ = std::make_unique<StatNamePool>(*table_);
   }
+
   ~StatNameTest() override { clearStorage(); }
 
   void clearStorage() {
-    for (auto& stat_name_storage : stat_name_storage_) {
-      stat_name_storage.free(*table_);
-    }
-    stat_name_storage_.clear();
+    pool_->clear();
     EXPECT_EQ(0, table_->numSymbols());
   }
 
@@ -67,18 +66,12 @@ protected:
     return table_->toString(makeStat(stat_name));
   }
 
-  StatNameStorage makeStatStorage(absl::string_view name) { return StatNameStorage(name, *table_); }
-
-  StatName makeStat(absl::string_view name) {
-    stat_name_storage_.emplace_back(makeStatStorage(name));
-    return stat_name_storage_.back().statName();
-  }
+  StatName makeStat(absl::string_view name) { return pool_->add(name); }
 
   FakeSymbolTableImpl* fake_symbol_table_{nullptr};
   SymbolTableImpl* real_symbol_table_{nullptr};
   std::unique_ptr<SymbolTable> table_;
-
-  std::vector<StatNameStorage> stat_name_storage_;
+  std::unique_ptr<StatNamePool> pool_;
 };
 
 INSTANTIATE_TEST_CASE_P(StatNameTest, StatNameTest,
@@ -91,6 +84,12 @@ TEST_P(StatNameTest, TestArbitrarySymbolRoundtrip) {
   for (auto& stat_name : stat_names) {
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
+}
+
+TEST_P(StatNameTest, TestEmpty) {
+  EXPECT_TRUE(makeStat("").empty());
+  EXPECT_FALSE(makeStat("x").empty());
+  EXPECT_TRUE(StatName().empty());
 }
 
 TEST_P(StatNameTest, Test100KSymbolsRoundtrip) {
@@ -170,7 +169,7 @@ TEST_P(StatNameTest, TestSameValueOnPartialFree) {
   // This should hold true for components as well. Since "foo" persists even when "foo.bar" is
   // freed, we expect both instances of "foo" to have the same symbol.
   makeStat("foo");
-  StatNameStorage stat_foobar_1(makeStatStorage("foo.bar"));
+  StatNameStorage stat_foobar_1("foo.bar", *table_);
   SymbolVec stat_foobar_1_symbols = getSymbols(stat_foobar_1.statName());
   stat_foobar_1.free(*table_);
   StatName stat_foobar_2(makeStat("foo.bar"));
@@ -226,22 +225,26 @@ TEST_P(StatNameTest, TestShrinkingExpectation) {
   // ::size() is a public function, but should only be used for testing.
   size_t table_size_0 = table_->numSymbols();
 
-  StatNameStorage stat_a(makeStatStorage("a"));
+  auto make_stat_storage = [this](absl::string_view name) -> StatNameStorage {
+    return StatNameStorage(name, *table_);
+  };
+
+  StatNameStorage stat_a(make_stat_storage("a"));
   size_t table_size_1 = table_->numSymbols();
 
-  StatNameStorage stat_aa(makeStatStorage("a.a"));
+  StatNameStorage stat_aa(make_stat_storage("a.a"));
   EXPECT_EQ(table_size_1, table_->numSymbols());
 
-  StatNameStorage stat_ab(makeStatStorage("a.b"));
+  StatNameStorage stat_ab(make_stat_storage("a.b"));
   size_t table_size_2 = table_->numSymbols();
 
-  StatNameStorage stat_ac(makeStatStorage("a.c"));
+  StatNameStorage stat_ac(make_stat_storage("a.c"));
   size_t table_size_3 = table_->numSymbols();
 
-  StatNameStorage stat_acd(makeStatStorage("a.c.d"));
+  StatNameStorage stat_acd(make_stat_storage("a.c.d"));
   size_t table_size_4 = table_->numSymbols();
 
-  StatNameStorage stat_ace(makeStatStorage("a.c.e"));
+  StatNameStorage stat_ace(make_stat_storage("a.c.e"));
   size_t table_size_5 = table_->numSymbols();
   EXPECT_GE(table_size_5, table_size_4);
 

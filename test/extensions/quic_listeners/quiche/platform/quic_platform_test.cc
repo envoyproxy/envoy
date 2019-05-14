@@ -44,6 +44,7 @@
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
+#include "quiche/quic/platform/api/quic_pcc_sender.h"
 #include "quiche/quic/platform/api/quic_port_utils.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
@@ -565,21 +566,30 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   SetQuicRestartFlag(quic_testonly_default_false, true);
   EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_false));
 
-  EXPECT_EQ(200, GetQuicFlag(quic_time_wait_list_seconds));
-  SetQuicFlag(quic_time_wait_list_seconds, 100);
-  EXPECT_EQ(100, GetQuicFlag(quic_time_wait_list_seconds));
+  EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+  SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
+  EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
 
   flag_registry.ResetFlags();
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
-  EXPECT_EQ(200, GetQuicFlag(quic_time_wait_list_seconds));
+  EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
   flag_registry.FindFlag("quic_reloadable_flag_quic_testonly_default_false")
       ->SetValueFromString("true");
   flag_registry.FindFlag("quic_restart_flag_quic_testonly_default_true")->SetValueFromString("0");
   flag_registry.FindFlag("quic_time_wait_list_seconds")->SetValueFromString("100");
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
-  EXPECT_EQ(100, GetQuicFlag(quic_time_wait_list_seconds));
+  EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+}
+
+TEST_F(QuicPlatformTest, QuicPccSender) {
+  EXPECT_DEATH_LOG_TO_STDERR(quic::CreatePccSender(/*clock=*/nullptr, /*rtt_stats=*/nullptr,
+                                                   /*unacked_packets=*/nullptr, /*random=*/nullptr,
+                                                   /*stats=*/nullptr,
+                                                   /*initial_congestion_window=*/0,
+                                                   /*max_congestion_window=*/0),
+                             "PccSender is not supported.");
 }
 
 class FileUtilsTest : public testing::Test {

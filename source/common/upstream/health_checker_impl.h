@@ -75,6 +75,7 @@ private:
     // ActiveHealthCheckSession
     void onInterval() override;
     void onTimeout() override;
+    void onDeferredDelete() final;
 
     // Http::StreamDecoder
     void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
@@ -246,10 +247,14 @@ private:
     // ActiveHealthCheckSession
     void onInterval() override;
     void onTimeout() override;
+    void onDeferredDelete() final;
 
     TcpHealthCheckerImpl& parent_;
     Network::ClientConnectionPtr client_;
     std::shared_ptr<TcpSessionCallbacks> session_callbacks_;
+    // If true, stream close was initiated by us, not e.g. remote close or TCP reset.
+    // In this case healthcheck status already reported, only state cleanup required.
+    bool expect_close_{};
   };
 
   typedef std::unique_ptr<TcpActiveHealthCheckSession> TcpActiveHealthCheckSessionPtr;
@@ -292,6 +297,7 @@ private:
     // ActiveHealthCheckSession
     void onInterval() override;
     void onTimeout() override;
+    void onDeferredDelete() final;
 
     // Http::StreamDecoder
     void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}

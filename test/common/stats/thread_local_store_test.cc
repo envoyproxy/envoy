@@ -6,6 +6,7 @@
 #include "envoy/config/metrics/v2/stats.pb.h"
 
 #include "common/common/c_smart_ptr.h"
+#include "common/event/dispatcher_impl.h"
 #include "common/memory/stats.h"
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
@@ -451,33 +452,15 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
 
 class LookupWithStatNameTest : public testing::Test {
 public:
-  LookupWithStatNameTest() : alloc_(symbol_table_), store_(alloc_) {}
-  ~LookupWithStatNameTest() override {
-    store_.shutdownThreading();
-    clearStorage();
-  }
+  LookupWithStatNameTest() : alloc_(symbol_table_), store_(alloc_), pool_(symbol_table_) {}
+  ~LookupWithStatNameTest() override { store_.shutdownThreading(); }
 
-  void clearStorage() {
-    for (auto& stat_name_storage : stat_name_storage_) {
-      stat_name_storage.free(store_.symbolTable());
-    }
-    stat_name_storage_.clear();
-    EXPECT_EQ(0, store_.symbolTable().numSymbols());
-  }
-
-  StatName makeStatName(absl::string_view name) {
-    stat_name_storage_.emplace_back(makeStatStorage(name));
-    return stat_name_storage_.back().statName();
-  }
-
-  StatNameStorage makeStatStorage(absl::string_view name) {
-    return StatNameStorage(name, store_.symbolTable());
-  }
+  StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
   Stats::FakeSymbolTableImpl symbol_table_;
   HeapStatDataAllocator alloc_;
   ThreadLocalStoreImpl store_;
-  std::vector<StatNameStorage> stat_name_storage_;
+  StatNamePool pool_;
 };
 
 TEST_F(LookupWithStatNameTest, All) {
@@ -878,13 +861,6 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   EXPECT_LT(start_mem, end_mem);
   const size_t million = 1000 * 1000;
   EXPECT_LT(end_mem - start_mem, 20 * million); // actual value: 19601552 as of March 14, 2019
-
-  // HACK: doesn't like shutting down without threading having started.
-  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
-  NiceMock<ThreadLocal::MockInstance> tls;
-  store->initializeThreading(main_thread_dispatcher, tls);
-  store->shutdownThreading();
-  tls.shutdownThread();
 }
 
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
@@ -956,6 +932,19 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
   EXPECT_TRUE(merge_called);
   store_->shutdownThreading();
   tls_.shutdownThread();
+}
+
+TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
+  Stats::FakeSymbolTableImpl symbol_table;
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  NiceMock<ThreadLocal::MockInstance> tls;
+  HeapStatDataAllocator alloc(symbol_table);
+  ThreadLocalStoreImpl store(alloc);
+
+  store.initializeThreading(*dispatcher, tls);
+  { ScopePtr scope1 = store.createScope("scope1."); }
+  store.shutdownThreading();
 }
 
 // Histogram tests

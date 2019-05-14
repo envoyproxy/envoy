@@ -38,5 +38,6 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/http:headers_lib",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )

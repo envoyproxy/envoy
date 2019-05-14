@@ -29,9 +29,13 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(StatDataAllocator& alloc)
       null_histogram_(alloc.symbolTable()) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
-  ASSERT(shutting_down_);
+  ASSERT(shutting_down_ || !threading_ever_initialized_);
   default_scope_.reset();
   ASSERT(scopes_.empty());
+  for (StatNameStorageSet* rejected_stats : rejected_stats_purgatory_) {
+    rejected_stats->free(symbolTable());
+    delete rejected_stats;
+  }
 }
 
 void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
@@ -105,7 +109,7 @@ ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
   auto new_scope = std::make_unique<ScopeImpl>(*this, name);
   Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());
-  return std::move(new_scope);
+  return new_scope;
 }
 
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
@@ -144,6 +148,7 @@ std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
 
 void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                                                ThreadLocal::Instance& tls) {
+  threading_ever_initialized_ = true;
   main_thread_dispatcher_ = &main_thread_dispatcher;
   tls_ = tls.allocateSlot();
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
@@ -188,7 +193,7 @@ void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
 }
 
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
-  Thread::LockGuard lock(lock_);
+  Thread::ReleasableLockGuard lock(lock_);
   ASSERT(scopes_.count(scope) == 1);
   scopes_.erase(scope);
 
@@ -198,22 +203,40 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // reference elements of SharedStatNameStorageSet. So simply swap out the set
   // contents into a local that we can hold onto until the TLS cache is cleared
   // of all references.
+  //
+  // We use a raw pointer here as it's easier to capture it in in the lambda.
   auto rejected_stats = new StatNameStorageSet;
   rejected_stats->swap(scope->central_cache_.rejected_stats_);
-  const uint64_t scope_id = scope->scope_id_;
-  auto clean_central_cache = [this, rejected_stats]() {
-    rejected_stats->free(symbolTable());
-    delete rejected_stats;
-  };
 
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
+    const uint64_t scope_id = scope->scope_id_;
+
+    // We must delay the cleanup of the rejected stats storage until all the
+    // thread-local caches are cleared. This happens by post(), and it's
+    // possible that post() will not run, such as when an exception is thrown
+    // during startup. To avoid leaking memory and thus failing tests when
+    // this occurs, we hold the rejected stats in 'purgatory', so they can
+    // be cleared out in the ThreadLocalStoreImpl destructor. We'd prefer
+    // to release the memory immediately, however, in which case we remove
+    // the rejected stats set from purgatory.
+    rejected_stats_purgatory_.insert(rejected_stats);
+    auto clean_central_cache = [this, rejected_stats]() {
+      {
+        Thread::LockGuard lock(lock_);
+        rejected_stats_purgatory_.erase(rejected_stats);
+      }
+      rejected_stats->free(symbolTable());
+      delete rejected_stats;
+    };
+    lock.release();
     main_thread_dispatcher_->post([this, clean_central_cache, scope_id]() {
       clearScopeFromCaches(scope_id, clean_central_cache);
     });
   } else {
-    clean_central_cache();
+    rejected_stats->free(symbolTable());
+    delete rejected_stats;
   }
 }
 

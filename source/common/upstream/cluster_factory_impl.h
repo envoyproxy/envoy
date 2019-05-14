@@ -145,36 +145,6 @@ private:
 };
 
 /**
- * Factory for StaticClusterImpl cluster.
- */
-class StaticClusterFactory : public ClusterFactoryImplBase {
-public:
-  StaticClusterFactory()
-      : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().Static) {}
-
-private:
-  ClusterImplBaseSharedPtr
-  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                    Stats::ScopePtr&& stats_scope) override;
-};
-
-/**
- * Factory for StrictDnsClusterImpl
- */
-class StrictDnsClusterFactory : public ClusterFactoryImplBase {
-public:
-  StrictDnsClusterFactory()
-      : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().StrictDns) {}
-
-private:
-  ClusterImplBaseSharedPtr
-  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                    Stats::ScopePtr&& stats_scope) override;
-};
-
-/**
  * Common base class for custom cluster factory with custom configuration.
  * @param ConfigProto is the configuration protobuf.
  */
