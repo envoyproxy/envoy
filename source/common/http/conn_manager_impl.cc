@@ -1792,6 +1792,10 @@ StreamInfo::StreamInfo& ConnectionManagerImpl::ActiveStreamFilterBase::streamInf
   return parent_.stream_info_;
 }
 
+StreamInfo::StreamDebugInfo& ConnectionManagerImpl::ActiveStreamFilterBase::streamDebugInfo() {
+  return parent_.stream_debug_info_;
+}
+
 Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
   if (parent_.active_span_) {
     return *parent_.active_span_;

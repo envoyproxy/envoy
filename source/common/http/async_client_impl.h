@@ -29,6 +29,7 @@
 #include "common/common/linked_object.h"
 #include "common/http/message_impl.h"
 #include "common/router/router.h"
+#include "common/stream_info/stream_debug_info_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -308,6 +309,7 @@ private:
   void clearRouteCache() override {}
   uint64_t streamId() override { return stream_id_; }
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
+  StreamInfo::StreamDebugInfo& streamDebugInfo() override { return stream_debug_info_; }
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -362,6 +364,7 @@ private:
   const uint64_t stream_id_;
   Router::ProdFilter router_;
   StreamInfo::StreamInfoImpl stream_info_;
+  StreamInfo::StreamDebugInfoImpl stream_debug_info_;
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
   std::shared_ptr<RouteImpl> route_;

@@ -282,24 +282,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // that get handled by earlier filters.
   config_.stats_.rq_total_.inc();
 
-  // Extract `append_cluster_info` and `do_not_forward` from metadata. Start the `modify_headers`
-  // function off defined but empty (so we don't have to remember to check it against nullptr before
-  // calling it), and feed it behavior later if/when we have cluster info headers to append.
+  // Start the `modify_headers` function off defined but empty (so we don't have to remember to
+  // check it against nullptr before calling it), and feed it behavior later if/when we have cluster
+  // info headers to append.
   std::function<void(Http::HeaderMap&)> modify_headers = [](Http::HeaderMap&) {};
-  bool append_cluster_info = false, do_not_forward = false;
-  const auto& metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
-  const auto fields_it = metadata.find(Extensions::HttpFilters::HttpFilterNames::get().Router);
-  if (fields_it != metadata.end()) {
-    const auto& fields = fields_it->second.fields();
-
-    const auto append_cluster_info_it = fields.find("append_cluster_info");
-    append_cluster_info = append_cluster_info_it != fields.end() &&
-                          append_cluster_info_it->second.string_value() == "true";
-
-    const auto do_not_forward_it = fields.find("do_not_forward");
-    do_not_forward =
-        do_not_forward_it != fields.end() && do_not_forward_it->second.string_value() == "true";
-  }
 
   // Determine if there is a route entry or a direct response for the request.
   route_ = callbacks_->route();
@@ -335,7 +321,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // A route entry matches for the request.
   route_entry_ = route_->routeEntry();
-  if (append_cluster_info) {
+  if (callbacks_->streamDebugInfo().getAppendClusterInfo()) {
     // If we're asked to append cluster info, this is our first opportunity. The cluster name will
     // be appended to any local or upstream responses from this point.
     modify_headers = [this](Http::HeaderMap& headers) {
@@ -390,7 +376,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
-  if (append_cluster_info) {
+  if (callbacks_->streamDebugInfo().getAppendClusterInfo()) {
     // If we're asked to append cluster info, we now have some additional information to append
     // on top of the cluster name. The hostname and address will be appended to any local or
     // upstream responses from this point.
@@ -403,7 +389,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   // If we've been instructed not to forward the request upstream, send an empty local response.
-  if (do_not_forward) {
+  if (callbacks_->streamDebugInfo().getDoNotForward()) {
     callbacks_->sendLocalReply(Http::Code::NoContent, "", modify_headers, absl::nullopt);
     return Http::FilterHeadersStatus::StopIteration;
   }

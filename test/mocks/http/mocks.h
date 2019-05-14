@@ -120,6 +120,7 @@ class MockStreamFilterCallbacksBase {
 public:
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  testing::NiceMock<StreamInfo::MockStreamDebugInfo> stream_debug_info_;
   std::shared_ptr<Router::MockRoute> route_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_info_;
 };
@@ -139,6 +140,7 @@ public:
   MOCK_METHOD0(clearRouteCache, void());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
+  MOCK_METHOD0(streamDebugInfo, StreamInfo::StreamDebugInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(tracingConfig, Tracing::Config&());
   MOCK_METHOD0(onDecoderFilterAboveWriteBufferHighWatermark, void());
@@ -216,6 +218,7 @@ public:
   MOCK_METHOD0(clearRouteCache, void());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
+  MOCK_METHOD0(streamDebugInfo, StreamInfo::StreamDebugInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(tracingConfig, Tracing::Config&());
   MOCK_METHOD0(onEncoderFilterAboveWriteBufferHighWatermark, void());

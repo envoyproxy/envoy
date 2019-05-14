@@ -12,6 +12,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/stream_info/stream_debug_info.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -174,6 +175,11 @@ public:
    * put into the access log.
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * TODO(mergeconflict): document me
+   */
+  virtual StreamInfo::StreamDebugInfo& streamDebugInfo() PURE;
 
   /**
    * @return span context used for tracing purposes. Individual filters may add or modify

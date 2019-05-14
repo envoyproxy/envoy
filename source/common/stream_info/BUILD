@@ -19,6 +19,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "stream_debug_info_lib",
+    srcs = ["stream_debug_info_impl.cc"],
+    hdrs = ["stream_debug_info_impl.h"],
+    deps = [
+        "//include/envoy/stream_info:stream_debug_info_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_state_lib",
     srcs = ["filter_state_impl.cc"],
     hdrs = ["filter_state_impl.h"],
