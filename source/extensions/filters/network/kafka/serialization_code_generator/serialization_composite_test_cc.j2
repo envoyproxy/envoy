@@ -22,7 +22,7 @@ namespace Kafka {
 // Tests for composite deserializer with 0 fields (corner case).
 
 struct CompositeResultWith0Fields {
-  size_t encode(Buffer::Instance&, EncodingContext&) const { return 0; }
+  uint32_t encode(Buffer::Instance&, EncodingContext&) const { return 0; }
   bool operator==(const CompositeResultWith0Fields&) const { return true; }
 };
 
@@ -49,8 +49,8 @@ struct CompositeResultWith{{ field_count }}Fields {
   const std::string field{{ field }}_;
   {% endfor %}
 
-  size_t encode(Buffer::Instance& dst, EncodingContext& encoder) const {
-    size_t written{0};
+  uint32_t encode(Buffer::Instance& dst, EncodingContext& encoder) const {
+    uint32_t written{0};
     {% for field in range(1, field_count + 1) %}
     written += encoder.encode(field{{ field }}_, dst);
     {% endfor %}
