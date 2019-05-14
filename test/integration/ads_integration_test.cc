@@ -60,6 +60,7 @@ admin:
 class AdsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest, public HttpIntegrationTest {
 public:
   AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {
+    use_lds_ = false;
     create_xds_upstream_ = true;
     tls_xds_upstream_ = true;
   }
@@ -760,6 +761,7 @@ public:
   AdsFailIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {
     create_xds_upstream_ = true;
+    use_lds_ = false;
   }
 
   void TearDown() override {
@@ -800,6 +802,7 @@ public:
   AdsConfigIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {
     create_xds_upstream_ = true;
+    use_lds_ = false;
   }
 
   void TearDown() override {

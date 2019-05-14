@@ -50,6 +50,7 @@ public:
   // Overridden to insert this stuff into the initialize() at the very beginning of
   // HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse().
   void initialize() override {
+    use_lds_ = false;
     // Controls how many fake_upstreams_.emplace_back(new FakeUpstream) will happen in
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
     // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
@@ -219,7 +220,9 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
 class DeltaCdsIntegrationTest : public CdsIntegrationTest {
 public:
   DeltaCdsIntegrationTest()
-      : CdsIntegrationTest(ipVersion(), ConfigHelper::discoveredClustersBootstrap("DELTA_GRPC")) {}
+      : CdsIntegrationTest(ipVersion(), ConfigHelper::discoveredClustersBootstrap("DELTA_GRPC")) {
+    use_lds_ = false;
+  }
 
   void TearDown() override {
     cleanUpXdsConnection();

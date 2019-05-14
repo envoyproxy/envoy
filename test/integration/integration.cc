@@ -303,15 +303,8 @@ void BaseIntegrationTest::createEnvoy() {
 
   if (use_lds_) {
     ENVOY_LOG_MISC(debug, "Setting up file-based LDS");
-    envoy::api::v2::DiscoveryResponse lds;
-    lds.set_version_info("0");
-    for (auto& listener : config_helper_.bootstrap().static_resources().listeners()) {
-      ProtobufWkt::Any* resource = lds.add_resources();
-      resource->PackFrom(listener);
-    }
-    std::string lds_filename = TestUtility::uniqueFilename();
-    const std::string lds_path = TestEnvironment::writeStringToFileForTest(
-        lds_filename, MessageUtil::getJsonStringFromMessage(lds));
+    // Before finalization, set up a real lds path, replacing the default /dev/null
+    std::string lds_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
     config_helper_.addConfigModifier(
         [lds_path](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
           bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_path(lds_path);
@@ -325,8 +318,19 @@ void BaseIntegrationTest::createEnvoy() {
 
   envoy::config::bootstrap::v2::Bootstrap bootstrap = config_helper_.bootstrap();
   if (use_lds_) {
-    // The listeners have been written to the lds_file. Remove them from static
-    // resources or they will not be reloadable.
+    // After the config has been finalized, write the final listener config to the lds file.
+    const std::string lds_path = config_helper_.bootstrap().dynamic_resources().lds_config().path();
+    envoy::api::v2::DiscoveryResponse lds;
+    lds.set_version_info("0");
+    for (auto& listener : config_helper_.bootstrap().static_resources().listeners()) {
+      ProtobufWkt::Any* resource = lds.add_resources();
+      resource->PackFrom(listener);
+    }
+    TestEnvironment::writeStringToFileForTest(lds_path, MessageUtil::getJsonStringFromMessage(lds),
+                                              true);
+
+    // Now that the listeners have been written to the lds file, remove them from static resources
+    // or they will not be reloadable.
     bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
   }
   ENVOY_LOG_MISC(debug, "Running Envoy with configuration:\n{}",

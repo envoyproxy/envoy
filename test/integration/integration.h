@@ -309,8 +309,7 @@ protected:
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
   bool create_xds_upstream_{false};
   bool tls_xds_upstream_{false};
-  // TODO(alyssawilk) true by default.
-  bool use_lds_{false}; // Use the integration framework's LDS set up.
+  bool use_lds_{true}; // Use the integration framework's LDS set up.
 
 private:
   // The type for the Envoy-to-backend connection
