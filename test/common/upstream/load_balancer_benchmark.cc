@@ -64,6 +64,7 @@ class RoundRobinTester : public BaseTester {
 public:
   RoundRobinTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0)
       : BaseTester(num_hosts, weighted_subset_percent, weight) {}
+
   void initialize() {
     lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set_, &local_priority_set_, stats_,
                                                    runtime_, random_, common_config_);
@@ -78,7 +79,7 @@ void BM_RoundRobinLoadBalancerBuild(benchmark::State& state) {
     const uint64_t num_hosts = state.range(0);
     RoundRobinTester tester(num_hosts);
 
-    // We are only interested in timing the initial ring build.
+    // We are only interested in timing the initial build.
     state.ResumeTiming();
     tester.initialize();
     state.PauseTiming();
@@ -203,8 +204,8 @@ void BM_RoundRobinChooseHost(benchmark::State& state) {
     const uint64_t num_hosts = state.range(0);
     const uint64_t weighted_subset_percent = state.range(1);
     const uint64_t weight = state.range(2);
-    auto tester = std::make_unique<RoundRobinTester>(num_hosts, weighted_subset_percent, weight);
-    tester->initialize();
+    RoundRobinTester tester(num_hosts, weighted_subset_percent, weight);
+    tester.initialize();
 
     std::unordered_map<std::string, uint64_t> hit_counter;
     TestLoadBalancerContext context;
@@ -212,15 +213,17 @@ void BM_RoundRobinChooseHost(benchmark::State& state) {
 
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       // Note: To a certain extent this is benchmarking the performance of
-      // std::unordered_map. This is more of an issue for RoundRobin chooseHost.
-      hit_counter[tester->lb_->chooseHost(&context)->address()->asString()] += 1;
+      // std::unordered_map.
+      // TODO(antoniovicente): Consider removing the hit counter to avoid polluting the benchmark
+      //                       numbers.
+      hit_counter[tester.lb_->chooseHost(&context)->address()->asString()] += 1;
     }
 
     // Do not time computation of mean, standard deviation, and relative standard deviation.
     state.PauseTiming();
     computeHitStats(state, hit_counter);
-    tester = nullptr;
-    state.ResumeTiming();
+
+    // Exclude destructors from timing.
   }
 }
 BENCHMARK(BM_RoundRobinChooseHost)
@@ -484,6 +487,7 @@ void BM_RoundRobinLoadBalancerWeighted(benchmark::State& state) {
 
     RoundRobinTester tester(num_hosts, weighted_subset_percent, weight);
 
+    // We are only interested in timing the initial build.
     state.ResumeTiming();
     tester.initialize();
     state.PauseTiming();
