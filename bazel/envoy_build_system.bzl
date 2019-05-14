@@ -38,7 +38,6 @@ def envoy_copts(repository, test = False):
         "-Woverloaded-virtual",
         "-Wold-style-cast",
         "-Wvla",
-        "-DHAVE_LONG_LONG",
         "-std=c++14",
     ]
 

@@ -22,6 +22,8 @@ envoy_cc_test_library(
         "validator.h",
     ],
     external_deps = ["tclap"],
+    # TCLAP command line parser needs this to support int64_t/uint64_t in several build environments.
+    copts = ["-DHAVE_LONG_LONG"],
     deps = [
         "//include/envoy/api:api_interface",
         "//source/common/protobuf:utility_lib",

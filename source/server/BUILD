@@ -196,6 +196,8 @@ envoy_cc_library(
         "//conditions:default": [],
     }),
     external_deps = ["tclap"],
+    # TCLAP command line parser needs this to support int64_t/uint64_t in several build environments.
+    copts = ["-DHAVE_LONG_LONG"],
     deps = [
         "//include/envoy/network:address_interface",
         "//include/envoy/server:options_interface",
