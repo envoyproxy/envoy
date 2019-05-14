@@ -136,6 +136,10 @@ public:
 
   ScopedRdsConfigSubscription& subscription() { return *subscription_; }
 
+  // getConfig() is overloaded (const/non-const only). Make all base getConfig()s visible to avoid
+  // compiler warnings.
+  using DeltaMutableConfigProviderBase::getConfig;
+
   // Envoy::Config::DeltaMutableConfigProviderBase
   Envoy::Config::ConfigSharedPtr getConfig() override {
     return std::dynamic_pointer_cast<Envoy::Config::ConfigProvider::Config>(tls_->get());
