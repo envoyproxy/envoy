@@ -1131,10 +1131,13 @@ void Filter::doRetry() {
 
   ASSERT(response_timeout_ || timeout_.global_timeout_.count() == 0);
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(*this, *conn_pool);
+  UpstreamRequest* upstream_request_tmp = upstream_request.get();
   upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(!callbacks_->decodingBuffer() && !downstream_trailers_);
-  // It's possible we got immediately reset.
-  if (upstream_requests_.front()) {
+  // It's possible we got immediately reset which means the upstream request we just
+  // added to the front of the list might have been removed, so we need to check to make
+  // sure we don't encodeData on the wrong request.
+  if (!upstream_requests_.empty() && (upstream_requests_.front().get() == upstream_request_tmp)) {
     if (callbacks_->decodingBuffer()) {
       // If we are doing a retry we need to make a copy.
       Buffer::OwnedImpl copy(*callbacks_->decodingBuffer());

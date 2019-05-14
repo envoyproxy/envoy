@@ -1812,6 +1812,74 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
+// Sequence: 1) request with data hits per try timeout w/ hedge retry, 2)
+// second request is immediately reset 3) 1st request gets a 200.
+// The goal of this test is to ensure that the router can properly detect that an immediate
+// reset happens and that we don't accidentally write data twice on the first request.
+TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
+  enableHedgeOnPerTryTimeout();
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+
+  expectPerTryTimerCreate();
+  expectResponseTimerCreate();
+  Buffer::OwnedImpl body("test body");
+  EXPECT_CALL(encoder, encodeData(_, _)).Times(1);
+  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
+  router_.retry_state_->expectHedgedPerTryTimeoutRetry();
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, true));
+
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+  EXPECT_CALL(encoder.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
+  per_try_timeout_->callback_();
+
+  NiceMock<Http::MockStreamEncoder> encoder2;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+        callbacks.onPoolFailure(Http::ConnectionPool::PoolFailureReason::ConnectionFailure,
+                                absl::string_view(), cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _))
+      .WillOnce(Return(RetryStatus::NoRetryLimitExceeded));
+  ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
+  router_.retry_state_->callback_();
+
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // Now trigger a 200 in response to the first request.
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+
+  // The request was already retried when the per try timeout occured so it
+  // should't even consult the retry state.
+  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).Times(0);
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.Status()->value(), "200");
+      }));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+}
+
 TEST_F(RouterTest, RetryNoneHealthy) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
