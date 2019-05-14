@@ -1867,7 +1867,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
   // Now trigger a 200 in response to the first request.
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
 
-  // The request was already retried when the per try timeout occured so it
+  // The request was already retried when the per try timeout occurred so it
   // should't even consult the retry state.
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
