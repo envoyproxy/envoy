@@ -803,6 +803,11 @@ public:
    * @return const std::string the RouteConfiguration name.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return whether router configuration uses VHDS.
+   */
+  virtual bool usesVhds() const PURE;
 };
 
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;

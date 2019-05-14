@@ -207,16 +207,19 @@ bool EdsClusterImpl::updateHostsPerLocality(
   HostVector hosts_added;
   HostVector hosts_removed;
   // We need to trigger updateHosts with the new host vectors if they have changed. We also do this
-  // when the locality weight map changes.
+  // when the locality weight map or the overprovisioning factor. Note calling updateDynamicHostList
+  // is responsible for both determining whether there was a change and to perform the actual update
+  // to current_hosts_copy, so it must be called even if we know that we need to update (e.g. if the
+  // overprovisioning factor changes).
   // TODO(htuch): We eagerly update all the host sets here on weight changes, which isn't great,
   // since this has the knock on effect that we rebuild the load balancers and locality scheduler.
   // We could make this happen lazily, as we do for host-level weight updates, where as things age
   // out of the locality scheduler, we discover their new weights. We don't currently have a shared
   // object for locality weights that we can update here, we should add something like this to
   // improve performance and scalability of locality weight updates.
-  if (host_set.overprovisioningFactor() != overprovisioning_factor ||
-      updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
-                            updated_hosts, all_hosts_) ||
+  const bool hosts_updated = updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added,
+                                                   hosts_removed, updated_hosts, all_hosts_);
+  if (hosts_updated || host_set.overprovisioningFactor() != overprovisioning_factor ||
       locality_weights_map != new_locality_weights_map) {
     ASSERT(std::all_of(current_hosts_copy->begin(), current_hosts_copy->end(),
                        [&](const auto& host) { return host->priority() == priority; }));

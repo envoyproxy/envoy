@@ -11,6 +11,7 @@ Version history
 * event: added :ref:`loop duration and poll delay statistics <operations_performance>`.
 * ext_authz: added a `x-envoy-auth-partial-body` metadata header set to `false|true` indicating if there is a partial body sent in the authorization request message.
 * ext_authz: added option to `ext_authz` that allows the filter clearing route cache.
+* health check: added :ref:`initial jitter <envoy_api_field_core.HealthCheck.initial_jitter>` to add jitter to the first health check in order to prevent thundering herd on Envoy startup.
 * hot restart: stats are no longer shared between hot restart parent/child via shared memory, but rather by RPC. Hot restart version incremented to 11.
 * http: fixed a bug where large unbufferable responses were not tracked in stats and logs correctly.
 * http: fixed a crashing bug where gRPC local replies would cause segfaults when upstream access logging was on.
