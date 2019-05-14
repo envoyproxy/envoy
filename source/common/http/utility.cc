@@ -3,8 +3,6 @@
 #include <http_parser.h>
 
 #include <cstdint>
-#include <iomanip>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -566,40 +564,50 @@ void Utility::traversePerFilterConfigGeneric(
 }
 
 std::string Utility::PercentEncoding::encode(absl::string_view value) {
-  std::ostringstream encoded;
+  std::string encoded;
   for (size_t i = 0; i < value.size(); ++i) {
-    char c = value[i];
+    const char ch = value[i];
     // Unreserved characters. unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~".
     // https://tools.ietf.org/html/rfc3986#section-2.3.
-    if (absl::ascii_isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
-      encoded << c;
-      // TODO(dio): Check for ' ' and allow to encode it as '+' instead of '%20' if desired.
+    if (absl::ascii_isalnum(ch) || ch == '-' || ch == '_' || ch == '.' || ch == '~') {
+      encoded.push_back(ch);
+      // TODO(dio): check for absl::is_space(ch), to encode it as '+' if desired.
     } else {
+      encoded.push_back('%');
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
-      encoded << std::uppercase;
-      encoded << '%' << std::hex << std::setw(2) << std::setfill('0') << (c & 0xff) << std::dec;
-      encoded << std::nouppercase;
+      absl::StrAppend(&encoded, fmt::format("{:02X}", ch));
     }
   }
-  return encoded.str();
+  return encoded;
 }
 
 std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
-  std::ostringstream decoded;
+  std::string decoded;
+  decoded.reserve(encoded.size());
   for (size_t i = 0; i < encoded.size(); ++i) {
-    char c = encoded[i];
-    if (c == '%' && i + 2 < encoded.size()) {
-      int d;
-      std::istringstream captured(std::string(encoded.substr(i + 1, 2)));
-      captured >> std::hex >> d;
-      decoded << static_cast<char>(d);
+    char ch = encoded[i];
+    // TODO(dio): check for '+', to decode it as space if desired.
+    if (ch == '%' && i + 2 < encoded.size()) {
+      const char hi = encoded[i + 1];
+      const char lo = encoded[i + 2];
+      if (absl::ascii_isdigit(hi)) {
+        ch = hi - '0';
+      } else {
+        ch = absl::ascii_toupper(hi) - 'A' + 10;
+      }
+
+      ch *= 16;
+      if (absl::ascii_isdigit(lo)) {
+        ch += lo - '0';
+      } else {
+        ch += absl::ascii_toupper(lo) - 'A' + 10;
+      }
       i += 2;
-    } else {
-      decoded << c;
     }
+    decoded.push_back(ch);
   }
-  return decoded.str();
+  return decoded;
 }
 
 } // namespace Http

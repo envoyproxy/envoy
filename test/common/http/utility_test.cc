@@ -858,6 +858,9 @@ TEST(PercentEncoding, EncodeDecode) {
             "22Unauthorized%22%0A%20%20%20%20%7D%0A%7D%0A%20%20");
   validatePercentEncodingEncodeDecode("too large", "too%20large");
   validatePercentEncodingEncodeDecode("ok", "ok");
+
+  // Contains unreserved characters.
+  validatePercentEncodingEncodeDecode(".~-0_0-~.", ".~-0_0-~.");
 }
 
 TEST(PercentEncoding, Trailing) {
