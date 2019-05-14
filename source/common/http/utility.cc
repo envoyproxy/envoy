@@ -588,8 +588,8 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
     char ch = encoded[i];
     // TODO(dio): check for '+', to decode it as space if desired.
     if (ch == '%' && i + 2 < encoded.size()) {
-      const char hi = encoded[i + 1];
-      const char lo = encoded[i + 2];
+      const char& hi = encoded[i + 1];
+      const char& lo = encoded[i + 2];
       if (absl::ascii_isdigit(hi)) {
         ch = hi - '0';
       } else {
