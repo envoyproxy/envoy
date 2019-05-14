@@ -165,7 +165,6 @@ private:
       return saved_response_metadata_.get();
     }
 
-
     // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
     // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
     // [de|en]codeHeaders() adds new metadata to [de|en]code, but we don't know

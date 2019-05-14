@@ -559,6 +559,7 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
     return 0;
   }
 
+  // TODO(soya3129): Finish test in https://github.com/envoyproxy/envoy/pull/6842.
   if (stream != nullptr) {
     // nghttp2 returns error, and ConnectionManager will call resetAllStreams(). Null out
     // stream->decoder_ to avoid referring to it.
