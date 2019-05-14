@@ -195,22 +195,22 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
 
 FilterUtility::HedgingParams FilterUtility::finalHedgingParams(const RouteEntry& route,
                                                                Http::HeaderMap& request_headers) {
-  HedgingParams hedgingParams;
-  hedgingParams.hedge_on_per_try_timeout_ = route.hedgePolicy().hedgeOnPerTryTimeout();
+  HedgingParams hedging_params;
+  hedging_params.hedge_on_per_try_timeout_ = route.hedgePolicy().hedgeOnPerTryTimeout();
 
   Http::HeaderEntry* hedge_on_per_try_timeout_entry = request_headers.EnvoyHedgeOnPerTryTimeout();
   if (hedge_on_per_try_timeout_entry) {
     if (hedge_on_per_try_timeout_entry->value() == "true") {
-      hedgingParams.hedge_on_per_try_timeout_ = true;
+      hedging_params.hedge_on_per_try_timeout_ = true;
     }
     if (hedge_on_per_try_timeout_entry->value() == "false") {
-      hedgingParams.hedge_on_per_try_timeout_ = false;
+      hedging_params.hedge_on_per_try_timeout_ = false;
     }
 
     request_headers.removeEnvoyHedgeOnPerTryTimeout();
   }
 
-  return hedgingParams;
+  return hedging_params;
 }
 
 Filter::~Filter() {
@@ -495,6 +495,12 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
   ENVOY_STREAM_LOG(debug, "router decoding trailers:\n{}", *callbacks_, trailers);
+
+  // upstream_requests_.size() cannot be 0 because we add to it unconditionally
+  // in decodeHeaders(). It cannot be > 1 because that only happens when a per
+  // try timeout occurs with hedge_on_per_try_timeout enabled but the the per
+  // try timeout timer is not started until onUpstreamComplete().
+  ASSERT(upstream_requests_.size() == 1);
   downstream_trailers_ = &trailers;
   for (auto& upstream_request : upstream_requests_) {
     upstream_request->encodeTrailers(trailers);
