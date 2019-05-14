@@ -573,10 +573,9 @@ std::string Utility::PercentEncoding::encode(absl::string_view value) {
       encoded.push_back(ch);
       // TODO(dio): check for absl::is_space(ch), to encode it as '+' if desired.
     } else {
-      encoded.push_back('%');
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
-      absl::StrAppend(&encoded, fmt::format("{:02X}", ch));
+      absl::StrAppend(&encoded, fmt::format("%{:02X}", ch));
     }
   }
   return encoded;
