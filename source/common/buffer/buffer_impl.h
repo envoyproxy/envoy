@@ -100,10 +100,10 @@ public:
     if (available_size == 0) {
       return {nullptr, 0};
     }
-    size_t reservation_size = std::min(size, available_size);
+    uint64_t reservation_size = std::min(size, available_size);
     void* reservation = &(base_[reservable_]);
     reservation_outstanding_ = true;
-    return {reservation, reservation_size};
+    return {reservation, static_cast<size_t>(reservation_size)};
   }
 
   /**
