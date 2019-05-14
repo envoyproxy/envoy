@@ -60,7 +60,13 @@ static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* o
     return ssl_private_key_failure;
   }
 
+  if (ops->test_options_.method_error_) {
+    // Have an artificial test failure.
+    return ssl_private_key_failure;
+  }
+
   if (!ops->test_options_.sign_expected_) {
+    // TODO(ipuustin): throw exception, because a failure can be an expected result in some tests?
     return ssl_private_key_failure;
   }
 
@@ -141,7 +147,13 @@ static ssl_private_key_result_t privateKeyDecrypt(SSL* ssl, uint8_t* out, size_t
     return ssl_private_key_failure;
   }
 
+  if (ops->test_options_.method_error_) {
+    // Have an artificial test failure.
+    return ssl_private_key_failure;
+  }
+
   if (!ops->test_options_.decrypt_expected_) {
+    // TODO(ipuustin): throw exception, because a failure can be an expected result in some tests?
     return ssl_private_key_failure;
   }
 
@@ -188,7 +200,13 @@ static ssl_private_key_result_t privateKeyComplete(SSL* ssl, uint8_t* out, size_
     return ssl_private_key_retry;
   }
 
+  if (ops->test_options_.async_method_error_) {
+    OPENSSL_free(ops->out_);
+    return ssl_private_key_failure;
+  }
+
   if (ops->out_len_ > max_out) {
+    OPENSSL_free(ops->out_);
     return ssl_private_key_failure;
   }
 
@@ -247,6 +265,13 @@ RsaPrivateKeyMethodProvider::RsaPrivateKeyMethodProvider(
     }
     if (value_it.first == "crypto_error" && value.kind_case() == ProtobufWkt::Value::kBoolValue) {
       test_options_.crypto_error_ = value.bool_value();
+    }
+    if (value_it.first == "method_error" && value.kind_case() == ProtobufWkt::Value::kBoolValue) {
+      test_options_.method_error_ = value.bool_value();
+    }
+    if (value_it.first == "async_method_error" &&
+        value.kind_case() == ProtobufWkt::Value::kBoolValue) {
+      test_options_.async_method_error_ = value.bool_value();
     }
     if (value_it.first == "expected_operation" &&
         value.kind_case() == ProtobufWkt::Value::kStringValue) {

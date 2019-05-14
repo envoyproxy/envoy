@@ -13,10 +13,23 @@ namespace Extensions {
 namespace PrivateKeyMethodProvider {
 
 struct RsaPrivateKeyConnectionTestOptions {
+  // Return private key method value directly without asynchronous operation.
   bool sync_mode_{};
+
+  // The "decrypt" private key method is expected to he called.
   bool decrypt_expected_{};
+
+  // The "sign" private key method is expected to he called.
   bool sign_expected_{};
+
+  // Add a cryptographic error (invalid signature, incorrect decryption).
   bool crypto_error_{};
+
+  // Return an error from the private key method.
+  bool method_error_{};
+
+  // Return an error from the private key method completion function.
+  bool async_method_error_{};
 };
 
 // An example RSA private key method provider here for testing the decrypt() and sign()

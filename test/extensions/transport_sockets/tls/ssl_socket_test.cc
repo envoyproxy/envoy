@@ -99,7 +99,9 @@ public:
   TestUtilOptions(const std::string& client_ctx_yaml, const std::string& server_ctx_yaml,
                   bool expect_success, Network::Address::IpVersion version)
       : TestUtilOptionsBase(expect_success, version), client_ctx_yaml_(client_ctx_yaml),
-        server_ctx_yaml_(server_ctx_yaml), expect_no_cert_(false), expect_no_cert_chain_(false) {
+        server_ctx_yaml_(server_ctx_yaml), expect_no_cert_(false), expect_no_cert_chain_(false),
+        expect_private_key_method_(false),
+        expected_server_close_event_(Network::ConnectionEvent::RemoteClose) {
     if (expect_success) {
       setExpectedServerStats("ssl.handshake");
     } else {
@@ -208,13 +210,21 @@ public:
 
   bool expectedPrivateKeyMethod() const { return expect_private_key_method_; }
 
+  TestUtilOptions& setExpectedServerCloseEvent(Network::ConnectionEvent expected_event) {
+    expected_server_close_event_ = expected_event;
+    return *this;
+  }
+
+  Network::ConnectionEvent expectedServerCloseEvent() const { return expected_server_close_event_; }
+
 private:
   const std::string client_ctx_yaml_;
   const std::string server_ctx_yaml_;
 
   bool expect_no_cert_;
   bool expect_no_cert_chain_;
-  bool expect_private_key_method_{};
+  bool expect_private_key_method_;
+  Network::ConnectionEvent expected_server_close_event_;
   std::string expected_digest_;
   std::vector<std::string> expected_local_uri_;
   std::string expected_serial_number_;
@@ -385,7 +395,7 @@ void testUtil(const TestUtilOptions& options) {
   } else {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
-    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+    EXPECT_CALL(server_connection_callbacks, onEvent(options.expectedServerCloseEvent()))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
   }
 
@@ -4032,12 +4042,8 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
 //   success cases:
 //     * test multi-cert (does this require a ECDSA provider?)
 //   failure cases:
-//     * test private key method error return in
-//        * sign
-//        * decrypt
-//        * complete
+//     * test error return in complete() callback
 //     * test incorrect decryption
-//     * test returning failure in complete() function
 
 // Test asynchronous signing (ECDHE)
 TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
@@ -4225,6 +4231,132 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignFailure) {
   TestUtilOptions failing_test_options(failing_client_ctx_yaml, server_ctx_yaml, false, GetParam());
   testUtil(failing_test_options.setPrivateKeyMethodExpected(true).setExpectedServerStats(
       "ssl.connection_error"));
+}
+
+// Tet the sign operation return with an error.
+TEST_P(SslSocketTest, RsaPrivateKeyProviderSignFailure) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key_method:
+        provider_name: rsa_test
+        config:
+          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+          expected_operation: sign
+          method_error: true
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl"
+)EOF";
+  const std::string failing_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites:
+      - ECDHE-RSA-AES128-GCM-SHA256
+)EOF";
+
+  TestUtilOptions failing_test_options(failing_client_ctx_yaml, server_ctx_yaml, false, GetParam());
+  testUtil(failing_test_options.setPrivateKeyMethodExpected(true).setExpectedServerStats(
+      "ssl.connection_error"));
+}
+
+// Tet the decrypt operation return with an error.
+TEST_P(SslSocketTest, RsaPrivateKeyProviderDecryptFailure) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key_method:
+        provider_name: rsa_test
+        config:
+          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+          expected_operation: decrypt
+          method_error: true
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl"
+)EOF";
+  const std::string failing_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites:
+      - TLS_RSA_WITH_AES_128_GCM_SHA256
+)EOF";
+
+  TestUtilOptions failing_test_options(failing_client_ctx_yaml, server_ctx_yaml, false, GetParam());
+  testUtil(failing_test_options.setPrivateKeyMethodExpected(true).setExpectedServerStats(
+      "ssl.connection_error"));
+}
+
+// Tet the sign operation return with an error in complete.
+TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignCompleteFailure) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key_method:
+        provider_name: rsa_test
+        config:
+          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+          expected_operation: sign
+          async_method_error: true
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl"
+)EOF";
+  const std::string failing_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites:
+      - ECDHE-RSA-AES128-GCM-SHA256
+)EOF";
+
+  TestUtilOptions failing_test_options(failing_client_ctx_yaml, server_ctx_yaml, false, GetParam());
+  testUtil(failing_test_options.setPrivateKeyMethodExpected(true)
+               .setExpectedServerCloseEvent(Network::ConnectionEvent::LocalClose)
+               .setExpectedServerStats("ssl.connection_error"));
+}
+
+// Tet the decrypt operation return with an error in complete.
+TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptCompleteFailure) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key_method:
+        provider_name: rsa_test
+        config:
+          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+          expected_operation: decrypt
+          async_method_error: true
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl"
+)EOF";
+  const std::string failing_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites:
+      - TLS_RSA_WITH_AES_128_GCM_SHA256
+)EOF";
+
+  TestUtilOptions failing_test_options(failing_client_ctx_yaml, server_ctx_yaml, false, GetParam());
+  testUtil(failing_test_options.setPrivateKeyMethodExpected(true)
+               .setExpectedServerCloseEvent(Network::ConnectionEvent::LocalClose)
+               .setExpectedServerStats("ssl.connection_error"));
 }
 
 } // namespace Tls
