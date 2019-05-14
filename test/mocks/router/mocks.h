@@ -335,6 +335,17 @@ public:
   std::string operation_{"fake_operation"};
 };
 
+class MockRouteTracing : public RouteTracing {
+public:
+  MockRouteTracing();
+  ~MockRouteTracing();
+
+  // Router::RouteTracing
+  MOCK_CONST_METHOD0(getClientSampling, uint64_t());
+  MOCK_CONST_METHOD0(getRandomSampling, uint64_t());
+  MOCK_CONST_METHOD0(getOverallSampling, uint64_t());
+};
+
 class MockRoute : public Route {
 public:
   MockRoute();
@@ -344,10 +355,12 @@ public:
   MOCK_CONST_METHOD0(directResponseEntry, const DirectResponseEntry*());
   MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());
   MOCK_CONST_METHOD0(decorator, const Decorator*());
+  MOCK_CONST_METHOD0(tracingConfig, const RouteTracing*());
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
 
   testing::NiceMock<MockRouteEntry> route_entry_;
   testing::NiceMock<MockDecorator> decorator_;
+  testing::NiceMock<MockRouteTracing> route_tracing_;
 };
 
 class MockConfig : public Config {

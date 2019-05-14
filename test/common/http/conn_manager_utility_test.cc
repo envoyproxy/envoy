@@ -109,8 +109,9 @@ public:
     MutateRequestRet ret;
     ret.downstream_address_ =
         ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                       random_, runtime_, local_info_)
+                                                       random_, local_info_)
             ->asString();
+    ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
     ret.internal_ = headers.EnvoyInternalRequest() != nullptr;
     return ret;
   }
@@ -119,6 +120,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
+  NiceMock<Router::MockRoute> route_;
   absl::optional<std::string> user_agent_;
   NiceMock<Runtime::MockLoader> runtime_;
   Http::TracingConnectionManagerConfig tracing_config_;
@@ -986,6 +988,38 @@ TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
   EXPECT_EQ(UuidTraceStatus::Sampled,
+            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+}
+
+TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+      .WillOnce(Return(true));
+
+  Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+
+  EXPECT_EQ(UuidTraceStatus::Sampled,
+            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+}
+
+TEST_F(ConnectionManagerUtilityTest, SamplingWithRouteOverride) {
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 0, _, 10000))
+      .WillOnce(Return(false));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 0, _))
+      .WillOnce(Return(false));
+
+  NiceMock<Router::MockRouteTracing> tracingConfig;
+  EXPECT_CALL(route_, tracingConfig()).WillRepeatedly(Return(&tracingConfig));
+  EXPECT_CALL(tracingConfig, getClientSampling()).WillRepeatedly(Return(0));
+  EXPECT_CALL(tracingConfig, getRandomSampling()).WillRepeatedly(Return(0));
+  EXPECT_CALL(tracingConfig, getOverallSampling()).WillRepeatedly(Return(0));
+
+  Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+
+  EXPECT_EQ(UuidTraceStatus::NoTrace,
             UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
 }
 
