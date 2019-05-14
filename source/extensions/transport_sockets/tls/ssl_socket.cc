@@ -143,6 +143,9 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     }
   }
 
+  ENVOY_CONN_LOG(trace, "ssl read {} bytes into {} slices", callbacks_->connection(), bytes_read,
+                 read_buffer.getRawSlices(nullptr, 0));
+
   return {action, bytes_read, end_stream};
 }
 
