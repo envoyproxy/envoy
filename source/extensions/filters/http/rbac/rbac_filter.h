@@ -82,10 +82,6 @@ public:
     return Http::FilterTrailersStatus::Continue;
   }
 
-  Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap&) override {
-    return Http::FilterMetadataStatus::Continue;
-  }
-
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
   }

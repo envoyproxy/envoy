@@ -493,6 +493,12 @@ public:
    * Called with decoded metadata. Add new metadata to metadata_map directly. Do not call
    * StreamDecoderFilterCallbacks::addDecodedMetadata() to add new metadata.
    *
+   * Note: decodeMetadata() currently cannot stop the filter iteration, and always returns Continue.
+   * That means metadata will go through the complete filter chain at once, even if the other frame
+   * types return StopIteration. If metadata should not pass through all filters at once, users
+   * should consider using StopAllIterationAndBuffer or StopAllIterationAndWatermark in
+   * decodeHeaders() to prevent metadata passing to the following filters.
+   *
    * @param metadata supplies the decoded metadata.
    */
   virtual FilterMetadataStatus decodeMetadata(MetadataMap& /* metadata_map */) {

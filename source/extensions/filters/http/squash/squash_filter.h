@@ -80,9 +80,6 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override;
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override;
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override;
-  Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap&) override {
-    return Http::FilterMetadataStatus::Continue;
-  }
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:

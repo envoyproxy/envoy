@@ -353,9 +353,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  Http::ConnectionPool::Instance* conn_pool = nullptr;
   // Fetch a connection pool for the upstream cluster.
-  conn_pool = getConnPool();
+  Http::ConnectionPool::Instance* conn_pool = getConnPool();
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;

@@ -89,9 +89,6 @@ public:
     HttpTapConfigSharedPtr config = config_->currentConfig();
     tapper_ = config ? config->createPerRequestTapper(callbacks.streamId()) : nullptr;
   }
-  Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap&) override {
-    return Http::FilterMetadataStatus::Continue;
-  }
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
