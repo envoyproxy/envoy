@@ -1059,6 +1059,16 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
   }
+
+  // Try to match the host without the port appended
+  const std::string::size_type pos = host.find(":");
+  if (pos != std::string::npos) {
+    const auto& iter2 = virtual_hosts_.find(host.substr(0, pos));
+    if (iter2 != virtual_hosts_.end()) {
+      return iter2->second.get();
+    }
+  }
+
   if (!wildcard_virtual_host_suffixes_.empty()) {
     const VirtualHostImpl* vhost = findWildcardVirtualHost(
         host, wildcard_virtual_host_suffixes_,

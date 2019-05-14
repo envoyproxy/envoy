@@ -129,6 +129,14 @@ virtual_hosts:
       prefix: "/"
     route:
       cluster: www2
+- name: explicit_port
+  domains:
+  - www.lyft.com:9999
+  routes:
+  - match:
+      path: "/"
+    route:
+      cluster: www2_staging
 - name: www2_staging
   domains:
   - www-staging.lyft.net
@@ -482,6 +490,21 @@ virtual_hosts:
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/rewrote?bar=true", headers.get_(Http::Headers::get().Path));
+  }
+
+  // Should drop port and match the VH
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com:80", "/", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("root_www2", route->clusterName());
+    EXPECT_EQ("www2", route->virtualHost().name());
+  }
+  // Should prefer the explicit port match
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com:9999", "/", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("www2_staging", route->clusterName());
+    EXPECT_EQ("explicit_port", route->virtualHost().name());
   }
 
   // Virtual cluster testing.

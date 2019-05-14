@@ -11,4 +11,5 @@ When Envoy matches a route, it uses the following procedure:
    *in order*. If there is a match, the route is used and no further route checks are made.
 #. Independently, each :ref:`virtual cluster <envoy_api_msg_route.VirtualCluster>` in the
    virtual host is checked, *in order*. If there is a match, the virtual cluster is used and no
-   further virtual cluster checks are made.
+   further virtual cluster checks are made. If the *host* or *:authority* header contains a port, 
+   Envoy will first try to match with the full header value, and then it will try without the port.
