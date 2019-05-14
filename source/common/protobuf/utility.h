@@ -104,7 +104,7 @@ public:
 
 class RepeatedPtrUtil {
 public:
-  static std::string join(const Protobuf::RepeatedPtrField<ProtobufTypes::String>& source,
+  static std::string join(const Protobuf::RepeatedPtrField<std::string>& source,
                           const std::string& delimiter) {
     return StringUtil::join(std::vector<std::string>(source.begin(), source.end()), delimiter);
   }
@@ -126,7 +126,7 @@ public:
   static std::size_t hash(const Protobuf::RepeatedPtrField<ProtoType>& source) {
     // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
     // message doesn't hash to different values.
-    ProtobufTypes::String text;
+    std::string text;
     {
       // For memory safety, the StringOutputStream needs to be destroyed before
       // we read the string.
@@ -172,7 +172,7 @@ public:
   static std::size_t hash(const Protobuf::Message& message) {
     // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
     // message doesn't hash to different values.
-    ProtobufTypes::String text;
+    std::string text;
     {
       // For memory safety, the StringOutputStream needs to be destroyed before
       // we read the string.

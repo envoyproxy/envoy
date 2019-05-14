@@ -119,34 +119,5 @@ ClusterSharedPtr ClusterFactoryImplBase::create(const envoy::api::v2::Cluster& c
   return new_cluster;
 }
 
-ClusterImplBaseSharedPtr StaticClusterFactory::createClusterImpl(
-    const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-    Stats::ScopePtr&& stats_scope) {
-  return std::make_unique<StaticClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                             std::move(stats_scope), context.addedViaApi());
-}
-
-/**
- * Static registration for the static cluster factory. @see RegisterFactory.
- */
-REGISTER_FACTORY(StaticClusterFactory, ClusterFactory);
-
-ClusterImplBaseSharedPtr StrictDnsClusterFactory::createClusterImpl(
-    const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-    Stats::ScopePtr&& stats_scope) {
-  auto selected_dns_resolver = selectDnsResolver(cluster, context);
-
-  return std::make_unique<StrictDnsClusterImpl>(cluster, context.runtime(), selected_dns_resolver,
-                                                socket_factory_context, std::move(stats_scope),
-                                                context.addedViaApi());
-}
-
-/**
- * Static registration for the strict dns cluster factory. @see RegisterFactory.
- */
-REGISTER_FACTORY(StrictDnsClusterFactory, ClusterFactory);
-
 } // namespace Upstream
 } // namespace Envoy
