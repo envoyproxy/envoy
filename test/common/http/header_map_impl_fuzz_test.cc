@@ -17,10 +17,21 @@ namespace {
 // before we get to anything interesting.
 //
 // This method will replace any of those characters found with spaces.
-std::string filterInvalidCharacters(const std::string& s) {
-  std::string filtered(s);
-  for (const char c : {'\0', '\r', '\n'}) {
-    std::replace(filtered.begin(), filtered.end(), c, ' ');
+std::string filterInvalidCharacters(absl::string_view string) {
+  std::string filtered;
+  filtered.reserve(string.length());
+  for (const char& c : string) {
+    switch (c) {
+    case '\0':
+      FALLTHRU;
+    case '\r':
+      FALLTHRU;
+    case '\n':
+      filtered.push_back(' ');
+      break;
+    default:
+      filtered.push_back(c);
+    }
   }
   return filtered;
 }
