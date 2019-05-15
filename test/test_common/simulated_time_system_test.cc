@@ -201,7 +201,7 @@ TEST_F(SimulatedTimeSystemTest, DeleteTime) {
 TEST_F(SimulatedTimeSystemTest, DuplicateTimer) {
   // Set one alarm two times to test that pending does not get duplicated..
   std::chrono::milliseconds delay(0);
-  TimerPtr zero_timer = scheduler_->createTimer([this, delay]() { output_.append(1, '2'); });
+  TimerPtr zero_timer = scheduler_->createTimer([this]() { output_.append(1, '2'); });
   zero_timer->enableTimer(delay);
   zero_timer->enableTimer(delay);
   sleepMsAndLoop(1);
