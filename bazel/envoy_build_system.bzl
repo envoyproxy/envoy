@@ -78,10 +78,6 @@ def envoy_copts(repository, test = False):
            }) + select({
                repository + "//bazel:enable_log_debug_assert_in_release": ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
                "//conditions:default": [],
-           }) + select({
-               # TCLAP command line parser needs this to support int64_t/uint64_t
-               repository + "//bazel:apple": ["-DHAVE_LONG_LONG"],
-               "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
            envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
            envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
@@ -455,15 +451,17 @@ def envoy_cc_test(
     test_lib_tags = []
     if coverage:
         test_lib_tags.append("coverage_test_lib")
-    envoy_cc_test_library(
-        name = name + "_lib",
+    _envoy_cc_test_infrastructure_library(
+        name = name + "_lib_internal_only",
         srcs = srcs,
         data = data,
         external_deps = external_deps,
-        deps = deps,
+        deps = deps + [repository + "//test/test_common:printers_includes"],
         repository = repository,
         tags = test_lib_tags,
         copts = copts,
+        # Restrict only to the code coverage tools.
+        visibility = ["@envoy//test/coverage:__pkg__"],
     )
     native.cc_test(
         name = name,
@@ -472,7 +470,7 @@ def envoy_cc_test(
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
         deps = [
-            ":" + name + "_lib",
+            ":" + name + "_lib_internal_only",
             repository + "//test:main",
         ],
         # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
@@ -486,7 +484,7 @@ def envoy_cc_test(
 
 # Envoy C++ related test infrastructure (that want gtest, gmock, but may be
 # relied on by envoy_cc_test_library) should use this function.
-def envoy_cc_test_infrastructure_library(
+def _envoy_cc_test_infrastructure_library(
         name,
         srcs = [],
         hdrs = [],
@@ -496,7 +494,8 @@ def envoy_cc_test_infrastructure_library(
         repository = "",
         tags = [],
         include_prefix = None,
-        copts = []):
+        copts = [],
+        **kargs):
     native.cc_library(
         name = name,
         srcs = srcs,
@@ -511,7 +510,7 @@ def envoy_cc_test_infrastructure_library(
         include_prefix = include_prefix,
         alwayslink = 1,
         linkstatic = envoy_linkstatic(),
-        visibility = ["//visibility:public"],
+        **kargs
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified
@@ -526,11 +525,12 @@ def envoy_cc_test_library(
         repository = "",
         tags = [],
         include_prefix = None,
-        copts = []):
+        copts = [],
+        **kargs):
     deps = deps + [
         repository + "//test/test_common:printers_includes",
     ]
-    envoy_cc_test_infrastructure_library(
+    _envoy_cc_test_infrastructure_library(
         name,
         srcs,
         hdrs,
@@ -541,6 +541,8 @@ def envoy_cc_test_library(
         tags,
         include_prefix,
         copts,
+        visibility = ["//visibility:public"],
+        **kargs
     )
 
 # Envoy test binaries should be specified with this function.
@@ -600,11 +602,6 @@ def envoy_sh_test(
         args = srcs,
         **kargs
     )
-
-def _proto_header(proto_path):
-    if proto_path.endswith(".proto"):
-        return proto_path[:-5] + "pb.h"
-    return None
 
 # Envoy proto targets should be specified with this function.
 def envoy_proto_library(name, external_deps = [], **kwargs):
