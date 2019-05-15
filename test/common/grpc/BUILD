@@ -59,6 +59,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "google_grpc_utils_test",
+    srcs = envoy_select_google_grpc(["google_grpc_utils_test.cc"]),
+    deps = [
+        "//source/common/grpc:common_lib",
+        "//source/common/http:headers_lib",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/proto:helloworld_proto_cc",
+        "//test/test_common:utility_lib",
+    ] + envoy_select_google_grpc(["//source/common/grpc:google_grpc_utils_lib"]),
+)
+
+envoy_cc_test(
     name = "google_async_client_impl_test",
     srcs = envoy_select_google_grpc(["google_async_client_impl_test.cc"]),
     deps = [

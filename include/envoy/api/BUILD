@@ -28,6 +28,7 @@ envoy_cc_library(
     hdrs = [
         "os_sys_calls.h",
         "os_sys_calls_common.h",
+        "os_sys_calls_hot_restart.h",
         "os_sys_calls_linux.h",
     ],
 )

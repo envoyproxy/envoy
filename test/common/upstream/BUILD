@@ -368,8 +368,9 @@ envoy_cc_test(
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
-        "//source/common/upstream:upstream_includes",
-        "//source/common/upstream:upstream_lib",
+        # TODO(mattklein123): Split this into 2 tests for each cluster.
+        "//source/common/upstream:static_cluster_lib",
+        "//source/common/upstream:strict_dns_cluster_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "//test/mocks:common_lib",

@@ -18,8 +18,6 @@ public:
   SysCallSizeResult recvfrom(int sockfd, void* buffer, size_t length, int flags,
                              struct sockaddr* addr, socklen_t* addrlen) override;
   SysCallIntResult close(int fd) override;
-  SysCallIntResult shmOpen(const char* name, int oflag, mode_t mode) override;
-  SysCallIntResult shmUnlink(const char* name) override;
   SysCallIntResult ftruncate(int fd, off_t length) override;
   SysCallPtrResult mmap(void* addr, size_t length, int prot, int flags, int fd,
                         off_t offset) override;
