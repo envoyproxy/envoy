@@ -23,6 +23,7 @@
 
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
+#include "extensions/filters/network/common/redis/utility.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
 
 namespace Envoy {
@@ -74,6 +75,7 @@ private:
                            public Upstream::ClusterUpdateCallbacks {
     ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
     ~ThreadLocalPool();
+    ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);
     Common::Redis::Client::PoolRequest*
     makeRequest(const std::string& key, const Common::Redis::RespValue& request,
                 Common::Redis::Client::PoolCallbacks& callbacks);

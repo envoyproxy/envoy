@@ -22,9 +22,7 @@ ProxyFilterConfig::ProxyFilterConfig(
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
       stats_(generateStats(stat_prefix_, scope)),
       downstream_auth_password_(
-          Config::DataSource::read(config.downstream_auth_password(), true, api)) {
-  auth_required_ = !downstream_auth_password_.empty();
-}
+          Config::DataSource::read(config.downstream_auth_password(), true, api)) {}
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   return {
@@ -38,7 +36,7 @@ ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
       config_(config) {
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
-  connection_allowed_ = (!config_->auth_required_);
+  connection_allowed_ = config_->downstream_auth_password_.empty();
 }
 
 ProxyFilter::~ProxyFilter() {

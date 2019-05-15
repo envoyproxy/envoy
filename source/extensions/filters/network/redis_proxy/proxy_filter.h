@@ -59,7 +59,6 @@ public:
   const std::string stat_prefix_;
   const std::string redis_drain_close_runtime_key_{"redis.drain_close_enabled"};
   ProxyStats stats_;
-  bool auth_required_;
   const std::string downstream_auth_password_;
 
 private:

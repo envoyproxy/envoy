@@ -4,6 +4,7 @@
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "extensions/filters/network/common/redis/utility.h"
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
@@ -35,18 +36,6 @@ namespace NetworkFilters {
 namespace RedisProxy {
 namespace ConnPool {
 
-namespace {
-Common::Redis::RespValue makeAuthCommand(const std::string& password) {
-  Common::Redis::RespValue auth_command;
-  auth_command.type(Common::Redis::RespType::Array);
-  auth_command.asArray().resize(2);
-  auth_command.asArray()[0].type(Common::Redis::RespType::BulkString);
-  auth_command.asArray()[1].type(Common::Redis::RespType::BulkString);
-  auth_command.asArray()[0].asString() = "auth";
-  auth_command.asArray()[1].asString() = password;
-  return auth_command;
-}
-} // namespace
 class RedisConnPoolImplTest : public testing::Test, public Common::Redis::Client::ClientFactory {
 public:
   void setup(bool cluster_exists = true, bool hashtagging = true) {
@@ -154,7 +143,9 @@ TEST_F(RedisConnPoolImplTest, BasicWithAuthPassword) {
         return cm_.thread_local_cluster_.lb_.host_;
       }));
   EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
-  EXPECT_CALL(*client, makeRequest(Eq(makeAuthCommand(auth_password_)), _))
+  EXPECT_CALL(
+      *client,
+      makeRequest(Eq(NetworkFilters::Common::Redis::Utility::makeAuthCommand(auth_password_)), _))
       .WillOnce(Return(&auth_request));
   EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
       .WillRepeatedly(Return(test_address_));
@@ -453,7 +444,9 @@ TEST_F(RedisConnPoolImplTest, makeRequestToHostWithAuthPassword) {
   update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
 
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client1)));
-  EXPECT_CALL(*client1, makeRequest(Eq(makeAuthCommand(auth_password_)), _))
+  EXPECT_CALL(
+      *client1,
+      makeRequest(Eq(NetworkFilters::Common::Redis::Utility::makeAuthCommand(auth_password_)), _))
       .WillOnce(Return(&auth_request1));
   EXPECT_CALL(*client1, makeRequest(Ref(value), Ref(callbacks1)))
       .WillOnce(Return(&active_request1));
@@ -466,7 +459,9 @@ TEST_F(RedisConnPoolImplTest, makeRequestToHostWithAuthPassword) {
   // around it, while Envoy represents Address::Ipv6Instance addresses with square brackets around
   // the address.
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host2), Return(client2)));
-  EXPECT_CALL(*client2, makeRequest(Eq(makeAuthCommand(auth_password_)), _))
+  EXPECT_CALL(
+      *client2,
+      makeRequest(Eq(NetworkFilters::Common::Redis::Utility::makeAuthCommand(auth_password_)), _))
       .WillOnce(Return(&auth_request2));
   EXPECT_CALL(*client2, makeRequest(Ref(value), Ref(callbacks2)))
       .WillOnce(Return(&active_request2));

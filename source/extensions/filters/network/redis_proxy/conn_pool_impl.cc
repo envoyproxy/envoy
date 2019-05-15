@@ -17,20 +17,7 @@ namespace RedisProxy {
 namespace ConnPool {
 
 namespace {
-
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
-
-Common::Redis::RespValue makeAuthCommand(const std::string& password) {
-  Common::Redis::RespValue auth_command, value;
-  auth_command.type(Common::Redis::RespType::Array);
-  value.type(Common::Redis::RespType::BulkString);
-  value.asString() = "auth";
-  auth_command.asArray().push_back(value);
-  value.asString() = password;
-  auth_command.asArray().push_back(value);
-  return auth_command;
-}
-
 } // namespace
 
 InstanceImpl::InstanceImpl(
@@ -141,6 +128,23 @@ void InstanceImpl::ThreadLocalPool::onHostsRemoved(
   }
 }
 
+InstanceImpl::ThreadLocalActiveClientPtr&
+InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstSharedPtr host) {
+  ThreadLocalActiveClientPtr& client = client_map_[host];
+  if (!client) {
+    client = std::make_unique<ThreadLocalActiveClient>(*this);
+    client->host_ = host;
+    client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_);
+    client->redis_client_->addConnectionCallbacks(*client);
+    if (!auth_password_.empty()) {
+      // Send an AUTH command to the upstream server.
+      client->redis_client_->makeRequest(Common::Redis::Utility::makeAuthCommand(auth_password_),
+                                         null_pool_callbacks);
+    }
+  }
+  return client;
+}
+
 Common::Redis::Client::PoolRequest*
 InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
                                            const Common::Redis::RespValue& request,
@@ -157,17 +161,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
     return nullptr;
   }
 
-  ThreadLocalActiveClientPtr& client = client_map_[host];
-  if (!client) {
-    client = std::make_unique<ThreadLocalActiveClient>(*this);
-    client->host_ = host;
-    client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_);
-    client->redis_client_->addConnectionCallbacks(*client);
-    if (!auth_password_.empty()) {
-      // Send an AUTH command to the upstream server.
-      client->redis_client_->makeRequest(makeAuthCommand(auth_password_), null_pool_callbacks);
-    }
-  }
+  ThreadLocalActiveClientPtr& client = threadLocalActiveClient(host);
 
   // Keep host_address_map_ in sync with client_map_.
   auto host_cached_by_address = host_address_map_.find(host->address()->asString());
@@ -242,18 +236,7 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
     it = host_address_map_.find(host_address_map_key);
   }
 
-  ThreadLocalActiveClientPtr& client = client_map_[it->second];
-  if (!client) {
-    client = std::make_unique<ThreadLocalActiveClient>(*this);
-    client->host_ = it->second;
-    client->redis_client_ =
-        parent_.client_factory_.create(it->second, dispatcher_, parent_.config_);
-    client->redis_client_->addConnectionCallbacks(*client);
-    if (!auth_password_.empty()) {
-      // Send an AUTH command to the upstream server.
-      client->redis_client_->makeRequest(makeAuthCommand(auth_password_), null_pool_callbacks);
-    }
-  }
+  ThreadLocalActiveClientPtr& client = threadLocalActiveClient(it->second);
 
   return client->redis_client_->makeRequest(request, callbacks);
 }

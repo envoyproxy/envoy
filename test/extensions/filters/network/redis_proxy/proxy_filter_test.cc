@@ -77,7 +77,6 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
       parseProtoFromJson(json_string);
   ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_);
   EXPECT_EQ("redis.foo.", config.stat_prefix_);
-  EXPECT_EQ(config.auth_required_, false);
   EXPECT_TRUE(config.downstream_auth_password_.empty());
 }
 
@@ -105,7 +104,6 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthPasswordSet) {
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
       parseProtoFromJson(json_string);
   ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_);
-  EXPECT_EQ(config.auth_required_, true);
   EXPECT_EQ(config.downstream_auth_password_, "somepassword");
 }
 

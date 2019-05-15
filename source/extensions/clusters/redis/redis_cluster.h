@@ -57,6 +57,7 @@
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec.h"
+#include "extensions/filters/network/common/redis/utility.h"
 #include "extensions/filters/network/redis_proxy/config.h"
 
 namespace Envoy {

@@ -9,17 +9,6 @@ namespace Redis {
 
 namespace {
 Extensions::NetworkFilters::Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
-
-Extensions::NetworkFilters::Common::Redis::RespValue makeAuthCommand(const std::string& password) {
-  Extensions::NetworkFilters::Common::Redis::RespValue auth_command, value;
-  auth_command.type(Extensions::NetworkFilters::Common::Redis::RespType::Array);
-  value.type(Extensions::NetworkFilters::Common::Redis::RespType::BulkString);
-  value.asString() = "auth";
-  auth_command.asArray().push_back(value);
-  value.asString() = password;
-  auth_command.asArray().push_back(value);
-  return auth_command;
-}
 } // namespace
 
 RedisCluster::RedisCluster(
@@ -247,7 +236,9 @@ void RedisCluster::RedisDiscoverySession::startResolve() {
         Envoy::Config::DataSource::read(parent_.auth_password_datasource_, true, parent_.api_);
     if (!auth_password.empty()) {
       // Send an AUTH command to the upstream server.
-      client->client_->makeRequest(makeAuthCommand(auth_password), null_pool_callbacks);
+      client->client_->makeRequest(
+          Extensions::NetworkFilters::Common::Redis::Utility::makeAuthCommand(auth_password),
+          null_pool_callbacks);
     }
   }
 
