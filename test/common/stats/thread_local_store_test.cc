@@ -6,6 +6,7 @@
 #include "envoy/config/metrics/v2/stats.pb.h"
 
 #include "common/common/c_smart_ptr.h"
+#include "common/event/dispatcher_impl.h"
 #include "common/memory/stats.h"
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
@@ -33,22 +34,24 @@ using testing::Return;
 namespace Envoy {
 namespace Stats {
 
+const uint64_t MaxStatNameLength = 127;
+
 class StatsThreadLocalStoreTest : public testing::Test {
 public:
-  void SetUp() override {
-    alloc_ = std::make_unique<MockedTestAllocator>(options_);
-    resetStoreWithAlloc(*alloc_);
-  }
-
-  void resetStoreWithAlloc(StatDataAllocator& alloc) {
-    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, alloc);
+  StatsThreadLocalStoreTest()
+      : alloc_(symbol_table_), store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)) {
     store_->addSink(sink_);
   }
 
+  void resetStoreWithAlloc(StatDataAllocator& alloc) {
+    store_ = std::make_unique<ThreadLocalStoreImpl>(alloc);
+    store_->addSink(sink_);
+  }
+
+  Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  StatsOptionsImpl options_;
-  std::unique_ptr<MockedTestAllocator> alloc_;
+  HeapStatDataAllocator alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
 };
@@ -75,10 +78,10 @@ class HistogramTest : public testing::Test {
 public:
   using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 
-  HistogramTest() : alloc_(options_) {}
+  HistogramTest() : alloc_(symbol_table_) {}
 
   void SetUp() override {
-    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, alloc_);
+    store_ = std::make_unique<ThreadLocalStoreImpl>(alloc_);
     store_->addSink(sink_);
     store_->initializeThreading(main_thread_dispatcher_, tls_);
   }
@@ -86,8 +89,6 @@ public:
   void TearDown() override {
     store_->shutdownThreading();
     tls_.shutdownThread();
-    // Includes overflow stat.
-    EXPECT_CALL(alloc_, free(_));
   }
 
   NameHistogramMap makeHistogramMap(const std::vector<ParentHistogramSharedPtr>& hist_list) {
@@ -165,13 +166,10 @@ public:
     }
   }
 
-  MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
-  MOCK_METHOD1(free, void(RawStatData& data));
-
+  FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  StatsOptionsImpl options_;
-  MockedTestAllocator alloc_;
+  HeapStatDataAllocator alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
   InSequence s;
@@ -181,7 +179,6 @@ public:
 
 TEST_F(StatsThreadLocalStoreTest, NoTls) {
   InSequence s;
-  EXPECT_CALL(*alloc_, alloc(_)).Times(2);
 
   Counter& c1 = store_->counter("c1");
   EXPECT_EQ(&c1, &store_->counter("c1"));
@@ -197,15 +194,12 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
   store_->deliverHistogramToSinks(h1, 100);
 
-  EXPECT_EQ(2UL, store_->counters().size());
+  EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
   EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
-
-  // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(3);
 
   store_->shutdownThreading();
 }
@@ -213,8 +207,6 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 TEST_F(StatsThreadLocalStoreTest, Tls) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
-
-  EXPECT_CALL(*alloc_, alloc(_)).Times(2);
 
   Counter& c1 = store_->counter("c1");
   EXPECT_EQ(&c1, &store_->counter("c1"));
@@ -225,7 +217,7 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   Histogram& h1 = store_->histogram("h1");
   EXPECT_EQ(&h1, &store_->histogram("h1"));
 
-  EXPECT_EQ(2UL, store_->counters().size());
+  EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
   EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
@@ -235,15 +227,12 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   store_->shutdownThreading();
   tls_.shutdownThread();
 
-  EXPECT_EQ(2UL, store_->counters().size());
+  EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
   EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
-
-  // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(3);
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {
@@ -251,7 +240,6 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   ScopePtr scope1 = store_->createScope("scope1.");
-  EXPECT_CALL(*alloc_, alloc(_)).Times(4);
   Counter& c1 = store_->counter("c1");
   Counter& c2 = scope1->counter("c2");
   EXPECT_EQ("c1", c1.name());
@@ -275,9 +263,6 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   scope1->deliverHistogramToSinks(h1, 100);
   scope1->deliverHistogramToSinks(h2, 200);
   tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(5);
 }
 
 // Validate that we sanitize away bad characters in the stats prefix.
@@ -286,15 +271,11 @@ TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   ScopePtr scope1 = store_->createScope(std::string("scope1:\0:foo.", 13));
-  EXPECT_CALL(*alloc_, alloc(_));
   Counter& c1 = scope1->counter("c1");
   EXPECT_EQ("scope1___foo.c1", c1.name());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(2);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
@@ -302,30 +283,25 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   ScopePtr scope1 = store_->createScope("scope1.");
-  EXPECT_CALL(*alloc_, alloc(_));
   scope1->counter("c1");
-  EXPECT_EQ(2UL, store_->counters().size());
+  EXPECT_EQ(1UL, store_->counters().size());
   CounterSharedPtr c1 = TestUtility::findCounter(*store_, "scope1.c1");
   EXPECT_EQ("scope1.c1", c1->name());
   EXPECT_EQ(TestUtility::findByName(store_->source().cachedCounters(), "scope1.c1"), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
-  EXPECT_CALL(tls_, runOnAllThreads(_));
+  EXPECT_CALL(tls_, runOnAllThreads(_, _));
   scope1.reset();
-  EXPECT_EQ(1UL, store_->counters().size());
-  EXPECT_EQ(2UL, store_->source().cachedCounters().size());
-  store_->source().clearCache();
+  EXPECT_EQ(0UL, store_->counters().size());
   EXPECT_EQ(1UL, store_->source().cachedCounters().size());
+  store_->source().clearCache();
+  EXPECT_EQ(0UL, store_->source().cachedCounters().size());
 
-  EXPECT_CALL(*alloc_, free(_));
   EXPECT_EQ(1L, c1.use_count());
   c1.reset();
 
   store_->shutdownThreading();
   tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_));
 }
 
 TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
@@ -333,12 +309,10 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   ScopePtr scope1 = store_->createScope("scope1.");
-  EXPECT_CALL(*alloc_, alloc(_));
   Counter& c1 = scope1->counter("foo.bar");
   EXPECT_EQ("scope1.foo.bar", c1.name());
 
   ScopePtr scope2 = scope1->createScope("foo.");
-  EXPECT_CALL(*alloc_, alloc(_));
   Counter& c2 = scope2->counter("bar");
   EXPECT_NE(&c1, &c2);
   EXPECT_EQ("scope1.foo.bar", c2.name());
@@ -348,15 +322,11 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   EXPECT_EQ(1UL, c1.value());
   EXPECT_EQ(c1.value(), c2.value());
 
-  EXPECT_CALL(*alloc_, alloc(_));
   Gauge& g1 = scope2->gauge("some_gauge");
   EXPECT_EQ("scope1.foo.some_gauge", g1.name());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(4);
 }
 
 TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
@@ -369,7 +339,6 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   ScopePtr scope2 = store_->createScope("scope1.");
 
   // We will call alloc twice, but they should point to the same backing storage.
-  EXPECT_CALL(*alloc_, alloc(_)).Times(2);
   Counter& c1 = scope1->counter("c");
   Counter& c2 = scope2->counter("c");
   EXPECT_NE(&c1, &c2);
@@ -381,10 +350,9 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ(2UL, c2.value());
 
   // We should dedup when we fetch all counters to handle the overlapping case.
-  EXPECT_EQ(2UL, store_->counters().size());
+  EXPECT_EQ(1UL, store_->counters().size());
 
   // Gauges should work the same way.
-  EXPECT_CALL(*alloc_, alloc(_)).Times(2);
   Gauge& g1 = scope1->gauge("g");
   Gauge& g2 = scope2->gauge("g");
   EXPECT_NE(&g1, &g2);
@@ -397,93 +365,81 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ(1UL, store_->gauges().size());
 
   // Deleting scope 1 will call free but will be reference counted. It still leaves scope 2 valid.
-  EXPECT_CALL(*alloc_, free(_)).Times(2);
   scope1.reset();
   c2.inc();
   EXPECT_EQ(3UL, c2.value());
-  EXPECT_EQ(2UL, store_->counters().size());
+  EXPECT_EQ(1UL, store_->counters().size());
   g2.set(10);
   EXPECT_EQ(10UL, g2.value());
   EXPECT_EQ(1UL, store_->gauges().size());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(3);
 }
 
-TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
+class LookupWithStatNameTest : public testing::Test {
+public:
+  LookupWithStatNameTest() : alloc_(symbol_table_), store_(alloc_), pool_(symbol_table_) {}
+  ~LookupWithStatNameTest() override { store_.shutdownThreading(); }
 
-  EXPECT_CALL(*alloc_, alloc(absl::string_view("foo"))).WillOnce(Return(nullptr));
-  Counter& c1 = store_->counter("foo");
-  EXPECT_EQ(1UL, store_->counter("stats.overflow").value());
+  StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
-  c1.inc();
-  EXPECT_EQ(1UL, c1.value());
+  Stats::FakeSymbolTableImpl symbol_table_;
+  HeapStatDataAllocator alloc_;
+  ThreadLocalStoreImpl store_;
+  StatNamePool pool_;
+};
 
-  store_->shutdownThreading();
-  tls_.shutdownThread();
+TEST_F(LookupWithStatNameTest, All) {
+  ScopePtr scope1 = store_.createScope("scope1.");
+  Counter& c1 = store_.counterFromStatName(makeStatName("c1"));
+  Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
+  EXPECT_EQ("c1", c1.name());
+  EXPECT_EQ("scope1.c2", c2.name());
+  EXPECT_EQ("c1", c1.tagExtractedName());
+  EXPECT_EQ("scope1.c2", c2.tagExtractedName());
+  EXPECT_EQ(0, c1.tags().size());
+  EXPECT_EQ(0, c1.tags().size());
 
-  // Includes overflow but not the failsafe stat which we allocated from the heap.
-  EXPECT_CALL(*alloc_, free(_));
-}
+  Gauge& g1 = store_.gaugeFromStatName(makeStatName("g1"));
+  Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"));
+  EXPECT_EQ("g1", g1.name());
+  EXPECT_EQ("scope1.g2", g2.name());
+  EXPECT_EQ("g1", g1.tagExtractedName());
+  EXPECT_EQ("scope1.g2", g2.tagExtractedName());
+  EXPECT_EQ(0, g1.tags().size());
+  EXPECT_EQ(0, g1.tags().size());
 
-TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  Histogram& h1 = store_.histogramFromStatName(makeStatName("h1"));
+  Histogram& h2 = scope1->histogramFromStatName(makeStatName("h2"));
+  scope1->deliverHistogramToSinks(h2, 0);
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("scope1.h2", h2.name());
+  EXPECT_EQ("h1", h1.tagExtractedName());
+  EXPECT_EQ("scope1.h2", h2.tagExtractedName());
+  EXPECT_EQ(0, h1.tags().size());
+  EXPECT_EQ(0, h2.tags().size());
+  h1.recordValue(200);
+  h2.recordValue(200);
 
-  // First, with a successful RawStatData allocation:
-  const uint64_t max_name_length = options_.maxNameLength();
-  const std::string name_1(max_name_length + 1, 'A');
+  ScopePtr scope2 = scope1->createScope("foo.");
+  EXPECT_EQ("scope1.foo.bar", scope2->counterFromStatName(makeStatName("bar")).name());
 
-  EXPECT_CALL(*alloc_, alloc(_));
-  EXPECT_LOG_CONTAINS("warning", "is too long with", store_->counter(name_1));
+  // Validate that we sanitize away bad characters in the stats prefix.
+  ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
+  EXPECT_EQ("scope1.foo___.bar", scope3->counter("bar").name());
 
-  // The stats did not overflow yet.
-  EXPECT_EQ(0UL, store_->counter("stats.overflow").value());
-
-  // The name will be truncated, so we won't be able to find it with the entire name.
-  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
-
-  // But we can find it based on the expected truncation.
-  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
-
-  // The same should be true with heap allocation, which occurs when the default
-  // allocator fails.
-  const std::string name_2(max_name_length + 1, 'B');
-  EXPECT_CALL(*alloc_, alloc(_)).WillOnce(Return(nullptr));
-  store_->counter(name_2);
-
-  // Same deal: the name will be truncated, so we won't be able to find it with the entire name.
-  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
-
-  // But we can find it based on the expected truncation.
-  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
-
-  // Now the stats have overflowed.
-  EXPECT_EQ(1UL, store_->counter("stats.overflow").value());
-
-  store_->shutdownThreading();
-  tls_.shutdownThread();
-
-  // Includes overflow, and the first raw-allocated stat, but not the failsafe stat which we
-  // allocated from the heap.
-  EXPECT_CALL(*alloc_, free(_)).Times(2);
+  EXPECT_EQ(4UL, store_.counters().size());
+  EXPECT_EQ(2UL, store_.gauges().size());
 }
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
-  StatsMatcherTLSTest() : StatsThreadLocalStoreTest() {}
   envoy::config::metrics::v2::StatsConfig stats_config_;
 };
 
 TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   InSequence s;
-
-  EXPECT_CALL(*alloc_, alloc(_)).Times(0);
 
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
       "noop");
@@ -527,9 +483,6 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   Histogram& noop_histogram_2 = store_->histogram("noop_histogram_2");
   EXPECT_EQ(&noop_histogram, &noop_histogram_2);
 
-  // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(1);
-
   store_->shutdownThreading();
 }
 
@@ -539,7 +492,6 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   InSequence s;
 
   // Expected to alloc lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
-  EXPECT_CALL(*alloc_, alloc(_)).Times(4);
 
   // Will block all stats containing any capital alphanumeric letter.
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_regex(
@@ -615,34 +567,157 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   Histogram& invalid_histogram_2 = store_->histogram("also_INVALID_histogram");
   EXPECT_EQ(invalid_histogram_2.name(), "");
 
-  // Expected to free lowercase_counter, lowercase_gauge, valid_counter,
-  // valid_gauge, overflow.stats
-  EXPECT_CALL(*alloc_, free(_)).Times(5);
-
+  // Expected to free lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
   store_->shutdownThreading();
 }
 
-class HeapStatsThreadLocalStoreTest : public StatsThreadLocalStoreTest {
+// Tests the logic for caching the stats-matcher results, and in particular the
+// private impl method checkAndRememberRejection(). That method behaves
+// differently depending on whether TLS is enabled or not, so we parameterize
+// the test accordingly; GetParam()==true means we want a TLS cache. In either
+// case, we should never be calling the stats-matcher rejection logic more than
+// once on given stat name.
+class RememberStatsMatcherTest : public testing::TestWithParam<bool> {
 public:
-  void SetUp() override {
-    resetStoreWithAlloc(heap_alloc_);
-    // Note: we do not call StatsThreadLocalStoreTest::SetUp here as that
-    // sets up a thread_local_store with raw stat alloc.
-  }
-  void TearDown() override {
-    store_->shutdownThreading();
-    tls_.shutdownThread();
-    store_.reset(); // delete before the allocator.
+  RememberStatsMatcherTest()
+      : heap_alloc_(symbol_table_), store_(heap_alloc_), scope_(store_.createScope("scope.")) {
+    if (GetParam()) {
+      store_.initializeThreading(main_thread_dispatcher_, tls_);
+    }
   }
 
+  ~RememberStatsMatcherTest() override {
+    store_.shutdownThreading();
+    tls_.shutdownThread();
+  }
+
+  using LookupStatFn = std::function<std::string(const std::string&)>;
+
+  // Helper function to test the rejection cache. The goal here is to use
+  // mocks to ensure that we don't call rejects() more than once on any of the
+  // stats, even with 5 name-based lookups.
+  void testRememberMatcher(const LookupStatFn lookup_stat) {
+    InSequence s;
+
+    MockStatsMatcher* matcher = new MockStatsMatcher;
+    StatsMatcherPtr matcher_ptr(matcher);
+    store_.setStatsMatcher(std::move(matcher_ptr));
+
+    EXPECT_CALL(*matcher, rejects("scope.reject")).WillOnce(Return(true));
+    EXPECT_CALL(*matcher, rejects("scope.ok")).WillOnce(Return(false));
+
+    for (int j = 0; j < 5; ++j) {
+      EXPECT_EQ("", lookup_stat("reject"));
+      EXPECT_EQ("scope.ok", lookup_stat("ok"));
+    }
+  }
+
+  void testRejectsAll(const LookupStatFn lookup_stat) {
+    InSequence s;
+
+    MockStatsMatcher* matcher = new MockStatsMatcher;
+    matcher->rejects_all_ = true;
+    StatsMatcherPtr matcher_ptr(matcher);
+    store_.setStatsMatcher(std::move(matcher_ptr));
+
+    ScopePtr scope = store_.createScope("scope.");
+
+    for (int j = 0; j < 5; ++j) {
+      // Note: zero calls to reject() are made, as reject-all should short-circuit.
+      EXPECT_EQ("", lookup_stat("reject"));
+    }
+  }
+
+  void testAcceptsAll(const LookupStatFn lookup_stat) {
+    InSequence s;
+
+    MockStatsMatcher* matcher = new MockStatsMatcher;
+    matcher->accepts_all_ = true;
+    StatsMatcherPtr matcher_ptr(matcher);
+    store_.setStatsMatcher(std::move(matcher_ptr));
+
+    for (int j = 0; j < 5; ++j) {
+      // Note: zero calls to reject() are made, as accept-all should short-circuit.
+      EXPECT_EQ("scope.ok", lookup_stat("ok"));
+    }
+  }
+
+  LookupStatFn lookupCounterFn() {
+    return [this](const std::string& stat_name) -> std::string {
+      return scope_->counter(stat_name).name();
+    };
+  }
+
+  LookupStatFn lookupGaugeFn() {
+    return [this](const std::string& stat_name) -> std::string {
+      return scope_->gauge(stat_name).name();
+    };
+  }
+
+// TODO(jmarantz): restore BoolIndicator tests when https://github.com/envoyproxy/envoy/pull/6280
+// is reverted.
+#define HAS_BOOL_INDICATOR 0
+#if HAS_BOOL_INDICATOR
+  LookupStatFn lookupBoolIndicator() {
+    return [this](const std::string& stat_name) -> std::string {
+      return scope_->boolIndicator(stat_name).name();
+    };
+  }
+#endif
+
+  LookupStatFn lookupHistogramFn() {
+    return [this](const std::string& stat_name) -> std::string {
+      return scope_->histogram(stat_name).name();
+    };
+  }
+
+  Stats::FakeSymbolTableImpl symbol_table_;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
   HeapStatDataAllocator heap_alloc_;
+  ThreadLocalStoreImpl store_;
+  ScopePtr scope_;
 };
 
-TEST_F(HeapStatsThreadLocalStoreTest, RemoveRejectedStats) {
+INSTANTIATE_TEST_CASE_P(RememberStatsMatcherTest, RememberStatsMatcherTest,
+                        testing::ValuesIn({false, true}));
+
+// Tests that the logic for remembering rejected stats works properly, both
+// with and without threading.
+TEST_P(RememberStatsMatcherTest, CounterRejectOne) { testRememberMatcher(lookupCounterFn()); }
+
+TEST_P(RememberStatsMatcherTest, CounterRejectsAll) { testRejectsAll(lookupCounterFn()); }
+
+TEST_P(RememberStatsMatcherTest, CounterAcceptsAll) { testAcceptsAll(lookupCounterFn()); }
+
+TEST_P(RememberStatsMatcherTest, GaugeRejectOne) { testRememberMatcher(lookupGaugeFn()); }
+
+TEST_P(RememberStatsMatcherTest, GaugeRejectsAll) { testRejectsAll(lookupGaugeFn()); }
+
+TEST_P(RememberStatsMatcherTest, GaugeAcceptsAll) { testAcceptsAll(lookupGaugeFn()); }
+
+#if HAS_BOOL_INDICATOR
+TEST_P(RememberStatsMatcherTest, BoolIndicatorRejectOne) {
+  testRememberMatcher(lookupBoolIndicator());
+}
+
+TEST_P(RememberStatsMatcherTest, BoolIndicatorRejectsAll) { testRejectsAll(lookupBoolIndicator()); }
+
+TEST_P(RememberStatsMatcherTest, BoolIndicatorAcceptsAll) { testAcceptsAll(lookupBoolIndicator()); }
+#endif
+
+TEST_P(RememberStatsMatcherTest, HistogramRejectOne) { testRememberMatcher(lookupHistogramFn()); }
+
+TEST_P(RememberStatsMatcherTest, HistogramRejectsAll) { testRejectsAll(lookupHistogramFn()); }
+
+TEST_P(RememberStatsMatcherTest, HistogramAcceptsAll) { testAcceptsAll(lookupHistogramFn()); }
+
+TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
   Counter& counter = store_->counter("c1");
   Gauge& gauge = store_->gauge("g1");
   Histogram& histogram = store_->histogram("h1");
-  ASSERT_EQ(2, store_->counters().size()); // "stats.overflow" and "c1".
+  ASSERT_EQ(1, store_->counters().size()); // "c1".
   EXPECT_TRUE(&counter == store_->counters()[0].get() ||
               &counter == store_->counters()[1].get()); // counters() order is non-deterministic.
   ASSERT_EQ(1, store_->gauges().size());
@@ -666,74 +741,96 @@ TEST_F(HeapStatsThreadLocalStoreTest, RemoveRejectedStats) {
   gauge.inc();
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 42));
   histogram.recordValue(42);
+  store_->shutdownThreading();
+  tls_.shutdownThread();
 }
 
-TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
+TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   // Allocate a stat greater than the max name length.
-  const uint64_t max_name_length = options_.maxNameLength();
-  const std::string name_1(max_name_length + 1, 'A');
+  const std::string name_1(MaxStatNameLength + 1, 'A');
 
   store_->counter(name_1);
 
   // This works fine, and we can find it by its long name because heap-stats do not
   // get truncated.
   EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
+  store_->shutdownThreading();
+  tls_.shutdownThread();
 }
 
 // Tests how much memory is consumed allocating 100k stats.
-TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
+TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   if (!TestUtil::hasDeterministicMallocStats()) {
     return;
   }
 
+  MockSink sink;
+  Stats::FakeSymbolTableImpl symbol_table;
+  HeapStatDataAllocator alloc(symbol_table);
+  auto store = std::make_unique<ThreadLocalStoreImpl>(alloc);
+  store->addSink(sink);
+
   // Use a tag producer that will produce tags.
   envoy::config::metrics::v2::StatsConfig stats_config;
-  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+  store->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
 
-  const size_t million = 1000 * 1000;
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
   if (start_mem == 0) {
     // Skip this test for platforms where we can't measure memory.
     return;
   }
   TestUtil::forEachSampleStat(
-      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
+      1000, [&store](absl::string_view name) { store->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 28 * million); // actual value: 27203216 as of Oct 29, 2018
+  const size_t million = 1000 * 1000;
+  EXPECT_LT(end_mem - start_mem, 20 * million); // actual value: 19601552 as of March 14, 2019
+
+  // HACK: doesn't like shutting down without threading having started.
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  store->initializeThreading(main_thread_dispatcher, tls);
+  store->shutdownThreading();
+  tls.shutdownThread();
 }
 
-TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
+TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
   if (!TestUtil::hasDeterministicMallocStats()) {
     return;
   }
+  Stats::FakeSymbolTableImpl symbol_table;
+  HeapStatDataAllocator alloc(symbol_table);
+  auto store = std::make_unique<ThreadLocalStoreImpl>(alloc);
 
   // Use a tag producer that will produce tags.
   envoy::config::metrics::v2::StatsConfig stats_config;
-  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+  store->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
 
-  const size_t million = 1000 * 1000;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  store->initializeThreading(main_thread_dispatcher, tls);
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
   if (start_mem == 0) {
     // Skip this test for platforms where we can't measure memory.
     return;
   }
   TestUtil::forEachSampleStat(
-      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
+      1000, [&store](absl::string_view name) { store->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 31 * million); // actual value: 30482576 as of Oct 29, 2018
+  const size_t million = 1000 * 1000;
+  EXPECT_LT(end_mem - start_mem, 23 * million); // actual value: 22880912 as of March 14, 2019
+  store->shutdownThreading();
+  tls.shutdownThread();
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  EXPECT_CALL(*alloc_, alloc(_)).Times(4);
   store_->counter("c1");
   store_->gauge("g1");
   store_->shutdownThreading();
@@ -746,10 +843,8 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c2").use_count());
   EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g2").use_count());
 
+  store_->shutdownThreading();
   tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(5);
 }
 
 TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
@@ -769,10 +864,21 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
   store_->mergeHistograms([&merge_called]() -> void { merge_called = true; });
 
   EXPECT_TRUE(merge_called);
-
+  store_->shutdownThreading();
   tls_.shutdownThread();
+}
 
-  EXPECT_CALL(*alloc_, free(_));
+TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
+  Stats::FakeSymbolTableImpl symbol_table;
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  NiceMock<ThreadLocal::MockInstance> tls;
+  HeapStatDataAllocator alloc(symbol_table);
+  ThreadLocalStoreImpl store(alloc);
+
+  store.initializeThreading(*dispatcher, tls);
+  { ScopePtr scope1 = store.createScope("scope1."); }
+  store.shutdownThreading();
 }
 
 // Histogram tests
@@ -942,58 +1048,6 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   for (const ParentHistogramSharedPtr& histogram : store_->histograms()) {
     EXPECT_TRUE(histogram->used());
   }
-}
-
-class TruncatingAllocTest : public HeapStatsThreadLocalStoreTest {
-protected:
-  TruncatingAllocTest() : test_alloc_(options_), long_name_(options_.maxNameLength() + 1, 'A') {}
-
-  void SetUp() override {
-    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, test_alloc_);
-    // Do not call superclass SetUp.
-  }
-
-  TestAllocator test_alloc_;
-  std::string long_name_;
-};
-
-TEST_F(TruncatingAllocTest, CounterNotTruncated) {
-  EXPECT_NO_LOGS({
-    Counter& counter = store_->counter("simple");
-    EXPECT_EQ(&counter, &store_->counter("simple"));
-  });
-}
-
-TEST_F(TruncatingAllocTest, GaugeNotTruncated) {
-  EXPECT_NO_LOGS({
-    Gauge& gauge = store_->gauge("simple");
-    EXPECT_EQ(&gauge, &store_->gauge("simple"));
-  });
-}
-
-TEST_F(TruncatingAllocTest, CounterTruncated) {
-  Counter* counter = nullptr;
-  EXPECT_LOG_CONTAINS("warning", "is too long with", {
-    Counter& c = store_->counter(long_name_);
-    counter = &c;
-  });
-  EXPECT_NO_LOGS(EXPECT_EQ(counter, &store_->counter(long_name_)));
-}
-
-TEST_F(TruncatingAllocTest, GaugeTruncated) {
-  Gauge* gauge = nullptr;
-  EXPECT_LOG_CONTAINS("warning", "is too long with", {
-    Gauge& g = store_->gauge(long_name_);
-    gauge = &g;
-  });
-  EXPECT_NO_LOGS(EXPECT_EQ(gauge, &store_->gauge(long_name_)));
-}
-
-TEST_F(TruncatingAllocTest, HistogramWithLongNameNotTruncated) {
-  EXPECT_NO_LOGS({
-    Histogram& histogram = store_->histogram(long_name_);
-    EXPECT_EQ(&histogram, &store_->histogram(long_name_));
-  });
 }
 
 } // namespace Stats

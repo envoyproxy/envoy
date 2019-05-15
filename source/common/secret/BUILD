@@ -42,7 +42,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/init:init_interface",
+        "//include/envoy/init:manager_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/secret:secret_provider_interface",
@@ -52,6 +52,7 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/config:resources_lib",
         "//source/common/config:subscription_factory_lib",
+        "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",

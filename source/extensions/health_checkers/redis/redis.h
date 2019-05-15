@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 #include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
 
 #include "common/upstream/health_checker_base_impl.h"
@@ -48,9 +50,11 @@ private:
         public Network::ConnectionCallbacks {
     RedisActiveHealthCheckSession(RedisHealthChecker& parent, const Upstream::HostSharedPtr& host);
     ~RedisActiveHealthCheckSession();
+
     // ActiveHealthCheckSession
     void onInterval() override;
     void onTimeout() override;
+    void onDeferredDelete() final;
 
     // Extensions::NetworkFilters::Common::Redis::Client::Config
     bool disableOutlierEvents() const override { return true; }
@@ -59,10 +63,22 @@ private:
       return parent_.timeout_ * 2;
     }
     bool enableHashtagging() const override { return false; }
+    bool enableRedirection() const override {
+      return true;
+    } // Redirection errors are treated as check successes.
+
+    // Batching
+    unsigned int maxBufferSizeBeforeFlush() const override {
+      return 0;
+    } // Forces an immediate flush
+    std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
+      return std::chrono::milliseconds(1);
+    }
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
+    bool onRedirection(const NetworkFilters::Common::Redis::RespValue& value) override;
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;

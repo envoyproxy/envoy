@@ -10,6 +10,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/symbol_table.h"
 #include "envoy/stats/tag.h"
 
 #include "absl/strings/string_view.h"
@@ -22,6 +23,7 @@ namespace Stats {
  * be created utilizing a single fixed-size block suitable for
  * shared-memory, or in the heap, allowing for pointers and sharing of
  * substrings, with an opportunity for reduced memory consumption.
+ * TODO(fredlas) this interface can be deleted now that the shared memory version is gone.
  */
 class StatDataAllocator {
 public:
@@ -34,8 +36,8 @@ public:
    * @return CounterSharedPtr a counter, or nullptr if allocation failed, in which case
    *     tag_extracted_name and tags are not moved.
    */
-  virtual CounterSharedPtr makeCounter(absl::string_view name, std::string&& tag_extracted_name,
-                                       std::vector<Tag>&& tags) PURE;
+  virtual CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
+                                       const std::vector<Tag>& tags) PURE;
 
   /**
    * @param name the full name of the stat.
@@ -44,13 +46,11 @@ public:
    * @return GaugeSharedPtr a gauge, or nullptr if allocation failed, in which case
    *     tag_extracted_name and tags are not moved.
    */
-  virtual GaugeSharedPtr makeGauge(absl::string_view name, std::string&& tag_extracted_name,
-                                   std::vector<Tag>&& tags) PURE;
+  virtual GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
+                                   const std::vector<Tag>& tags) PURE;
 
-  /**
-   * Determines whether this stats allocator requires bounded stat-name size.
-   */
-  virtual bool requiresBoundedStatNameSize() const PURE;
+  virtual const SymbolTable& symbolTable() const PURE;
+  virtual SymbolTable& symbolTable() PURE;
 
   // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At
   // the moment, histograms don't fit the same pattern of counters and gauges

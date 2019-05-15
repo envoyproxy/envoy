@@ -18,11 +18,11 @@
 #include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats_options.h"
 #include "envoy/thread/thread.h"
 
 #include "common/http/context_impl.h"
 #include "common/secret/secret_manager_impl.h"
+#include "common/stats/fake_symbol_table_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -43,7 +43,6 @@
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -74,8 +73,6 @@ public:
   MOCK_CONST_METHOD0(serviceClusterName, const std::string&());
   MOCK_CONST_METHOD0(serviceNodeName, const std::string&());
   MOCK_CONST_METHOD0(serviceZone, const std::string&());
-  MOCK_CONST_METHOD0(maxStats, uint64_t());
-  MOCK_CONST_METHOD0(statsOptions, const Stats::StatsOptions&());
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
   MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
   MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
@@ -91,7 +88,6 @@ public:
   std::string service_zone_name_;
   spdlog::level::level_enum log_level_{spdlog::level::trace};
   std::string log_path_;
-  Stats::StatsOptionsImpl stats_options_;
   uint32_t concurrency_{1};
   uint64_t hot_restart_epoch_{};
   bool hot_restart_disabled_{};
@@ -198,10 +194,11 @@ public:
   // Server::HotRestart
   MOCK_METHOD0(drainParentListeners, void());
   MOCK_METHOD1(duplicateParentListenSocket, int(const std::string& address));
-  MOCK_METHOD1(getParentStats, void(GetParentStatsInfo& info));
+  MOCK_METHOD0(getParentStats, std::unique_ptr<envoy::HotRestartMessage>());
   MOCK_METHOD2(initialize, void(Event::Dispatcher& dispatcher, Server::Instance& server));
-  MOCK_METHOD1(shutdownParentAdmin, void(ShutdownParentAdminInfo& info));
-  MOCK_METHOD0(terminateParent, void());
+  MOCK_METHOD1(sendParentAdminShutdownRequest, void(time_t& original_start_time));
+  MOCK_METHOD0(sendParentTerminateRequest, void());
+  MOCK_METHOD1(mergeParentStatsIfAny, ServerStatsFromParent(Stats::StoreRoot& stats_store));
   MOCK_METHOD0(shutdown, void());
   MOCK_METHOD0(version, std::string());
   MOCK_METHOD0(logLock, Thread::BasicLockable&());
@@ -209,6 +206,7 @@ public:
   MOCK_METHOD0(statsAllocator, Stats::StatDataAllocator&());
 
 private:
+  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
   Stats::HeapStatDataAllocator stats_allocator_;
@@ -268,6 +266,7 @@ public:
   ~MockServerLifecycleNotifier();
 
   MOCK_METHOD2(registerCallback, void(Stage, StageCallback));
+  MOCK_METHOD2(registerCallback, void(Stage, StageCallbackWithCompletion));
 };
 
 class MockWorkerFactory : public WorkerFactory {
@@ -305,6 +304,7 @@ public:
   MOCK_METHOD2(removeListener,
                void(Network::ListenerConfig& listener, std::function<void()> completion));
   MOCK_METHOD1(start, void(GuardDog& guard_dog));
+  MOCK_METHOD2(initializeStats, void(Stats::Scope& scope, const std::string& prefix));
   MOCK_METHOD0(stop, void());
   MOCK_METHOD1(stopListener, void(Network::ListenerConfig& listener));
   MOCK_METHOD0(stopListeners, void());
@@ -344,7 +344,7 @@ public:
   MOCK_METHOD0(drainManager, DrainManager&());
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
   MOCK_METHOD1(failHealthcheck, void(bool fail));
-  MOCK_METHOD1(getParentStats, void(HotRestart::GetParentStatsInfo&));
+  MOCK_METHOD1(exportStatsToChild, void(envoy::HotRestartMessage::Reply::Stats*));
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(hotRestart, HotRestart&());
   MOCK_METHOD0(initManager, Init::Manager&());
@@ -457,14 +457,13 @@ public:
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
-  Stats::IsolatedStoreImpl scope_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
-  Tracing::HttpNullTracer null_tracer_;
   Http::ContextImpl http_context_;
   testing::NiceMock<Api::MockApi> api_;
 };

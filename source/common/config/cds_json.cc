@@ -15,8 +15,6 @@ void CdsJson::translateRingHashLbConfig(
     const Json::Object& json_ring_hash_lb_config,
     envoy::api::v2::Cluster::RingHashLbConfig& ring_hash_lb_config) {
   JSON_UTIL_SET_INTEGER(json_ring_hash_lb_config, ring_hash_lb_config, minimum_ring_size);
-  JSON_UTIL_SET_BOOL(json_ring_hash_lb_config, *ring_hash_lb_config.mutable_deprecated_v1(),
-                     use_std_hash);
 }
 
 void CdsJson::translateHealthCheck(const Json::Object& json_health_check,
@@ -101,12 +99,10 @@ void CdsJson::translateOutlierDetection(
 
 void CdsJson::translateCluster(const Json::Object& json_cluster,
                                const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
-                               envoy::api::v2::Cluster& cluster,
-                               const Stats::StatsOptions& stats_options) {
+                               envoy::api::v2::Cluster& cluster) {
   json_cluster.validateSchema(Json::Schema::CLUSTER_SCHEMA);
 
   const std::string name = json_cluster.getString("name");
-  Utility::checkObjNameLength("Invalid cluster name", name, stats_options);
   cluster.set_name(name);
 
   const std::string string_type = json_cluster.getString("type");

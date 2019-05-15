@@ -22,9 +22,11 @@ ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer) : span_(span)
 
 void ZipkinSpan::finishSpan() { span_.finish(); }
 
-void ZipkinSpan::setOperation(const std::string& operation) { span_.setName(operation); }
+void ZipkinSpan::setOperation(absl::string_view operation) {
+  span_.setName(std::string(operation));
+}
 
-void ZipkinSpan::setTag(const std::string& name, const std::string& value) {
+void ZipkinSpan::setTag(absl::string_view name, absl::string_view value) {
   span_.setTag(name, value);
 }
 
@@ -75,7 +77,7 @@ Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
   cluster_ = cm_.get(zipkin_config.collector_cluster())->info();
 
   std::string collector_endpoint = ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT;
-  if (zipkin_config.collector_endpoint().size() > 0) {
+  if (!zipkin_config.collector_endpoint().empty()) {
     collector_endpoint = zipkin_config.collector_endpoint();
   }
 
@@ -105,12 +107,13 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     auto ret_span_context = extractor.extractSpanContext(sampled);
     if (!ret_span_context.second) {
       // Create a root Zipkin span. No context was found in the headers.
-      new_zipkin_span =
-          tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time);
+      new_zipkin_span = tracer.startSpan(
+          config, std::string(request_headers.Host()->value().getStringView()), start_time);
       new_zipkin_span->setSampled(sampled);
     } else {
-      new_zipkin_span = tracer.startSpan(config, request_headers.Host()->value().c_str(),
-                                         start_time, ret_span_context.first);
+      new_zipkin_span =
+          tracer.startSpan(config, std::string(request_headers.Host()->value().getStringView()),
+                           start_time, ret_span_context.first);
     }
 
   } catch (const ExtractorException& e) {
@@ -118,7 +121,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
   }
 
   ZipkinSpanPtr active_span(new ZipkinSpan(*new_zipkin_span, tracer));
-  return std::move(active_span);
+  return active_span;
 }
 
 ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,

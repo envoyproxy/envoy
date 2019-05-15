@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <limits>
 #include <list>
 #include <memory>
 #include <string>
@@ -101,7 +102,7 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
   // Cluster socket_options trump cluster manager wide.
   if (bind_config.socket_options().size() + config.upstream_bind_config().socket_options().size() >
       0) {
-    auto socket_options = config.upstream_bind_config().socket_options().size() > 0
+    auto socket_options = !config.upstream_bind_config().socket_options().empty()
                               ? config.upstream_bind_config().socket_options()
                               : bind_config.socket_options();
     Network::Socket::appendOptions(
@@ -202,8 +203,11 @@ HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
   HostVector net_hosts;
   net_hosts.reserve(hosts.size());
 
-  std::set_difference(hosts.begin(), hosts.end(), excluded_hosts.begin(), excluded_hosts.end(),
-                      std::inserter(net_hosts, net_hosts.begin()));
+  for (const auto& host : hosts) {
+    if (excluded_hosts.find(host) == excluded_hosts.end()) {
+      net_hosts.emplace_back(host);
+    }
+  }
 
   return net_hosts;
 }
@@ -270,23 +274,39 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
 
 void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, std::min(128U, new_weight)); }
 
-HostsPerLocalityConstSharedPtr
-HostsPerLocalityImpl::filter(std::function<bool(const Host&)> predicate) const {
-  auto* filtered_clone = new HostsPerLocalityImpl();
-  HostsPerLocalityConstSharedPtr shared_filtered_clone{filtered_clone};
+std::vector<HostsPerLocalityConstSharedPtr> HostsPerLocalityImpl::filter(
+    const std::vector<std::function<bool(const Host&)>>& predicates) const {
+  // We keep two lists: one for being able to mutate the clone and one for returning to the caller.
+  // Creating them both at the start avoids iterating over the mutable values at the end to convert
+  // them to a const pointer.
+  std::vector<std::shared_ptr<HostsPerLocalityImpl>> mutable_clones;
+  std::vector<HostsPerLocalityConstSharedPtr> filtered_clones;
 
-  filtered_clone->local_ = local_;
-  for (const auto& hosts_locality : hosts_per_locality_) {
-    HostVector current_locality_hosts;
-    for (const auto& host : hosts_locality) {
-      if (predicate(*host)) {
-        current_locality_hosts.emplace_back(host);
-      }
-    }
-    filtered_clone->hosts_per_locality_.push_back(std::move(current_locality_hosts));
+  for (size_t i = 0; i < predicates.size(); ++i) {
+    mutable_clones.emplace_back(std::make_shared<HostsPerLocalityImpl>());
+    filtered_clones.emplace_back(mutable_clones.back());
+    mutable_clones.back()->local_ = local_;
   }
 
-  return shared_filtered_clone;
+  for (const auto& hosts_locality : hosts_per_locality_) {
+    std::vector<HostVector> current_locality_hosts;
+    current_locality_hosts.resize(predicates.size());
+
+    // Since # of hosts >> # of predicates, we iterate over the hosts in the outer loop.
+    for (const auto& host : hosts_locality) {
+      for (size_t i = 0; i < predicates.size(); ++i) {
+        if (predicates[i](*host)) {
+          current_locality_hosts[i].emplace_back(host);
+        }
+      }
+    }
+
+    for (size_t i = 0; i < predicates.size(); ++i) {
+      mutable_clones[i]->hosts_per_locality_.push_back(std::move(current_locality_hosts[0]));
+    }
+  }
+
+  return filtered_clones;
 }
 
 void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
@@ -305,12 +325,12 @@ void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_para
   degraded_hosts_per_locality_ = std::move(update_hosts_params.degraded_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
 
-  rebuildLocalityScheduler(locality_scheduler_, locality_entries_, *healthy_hosts_per_locality_,
-                           *healthy_hosts_, hosts_per_locality_, locality_weights_,
-                           overprovisioning_factor_);
-  rebuildLocalityScheduler(degraded_locality_scheduler_, degraded_locality_entries_,
-                           *degraded_hosts_per_locality_, *degraded_hosts_, hosts_per_locality_,
+  rebuildLocalityScheduler(healthy_locality_scheduler_, healthy_locality_entries_,
+                           *healthy_hosts_per_locality_, healthy_hosts_->get(), hosts_per_locality_,
                            locality_weights_, overprovisioning_factor_);
+  rebuildLocalityScheduler(degraded_locality_scheduler_, degraded_locality_entries_,
+                           *degraded_hosts_per_locality_, degraded_hosts_->get(),
+                           hosts_per_locality_, locality_weights_, overprovisioning_factor_);
 
   runUpdateCallbacks(hosts_added, hosts_removed);
 }
@@ -357,16 +377,25 @@ void HostSetImpl::rebuildLocalityScheduler(
   }
 }
 
-absl::optional<uint32_t> HostSetImpl::chooseLocality() {
-  if (locality_scheduler_ == nullptr) {
+absl::optional<uint32_t> HostSetImpl::chooseHealthyLocality() {
+  return chooseLocality(healthy_locality_scheduler_.get());
+}
+
+absl::optional<uint32_t> HostSetImpl::chooseDegradedLocality() {
+  return chooseLocality(degraded_locality_scheduler_.get());
+}
+
+absl::optional<uint32_t>
+HostSetImpl::chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler) {
+  if (locality_scheduler == nullptr) {
     return {};
   }
-  const std::shared_ptr<LocalityEntry> locality = locality_scheduler_->pick();
+  const std::shared_ptr<LocalityEntry> locality = locality_scheduler->pick();
   // We don't build a schedule if there are no weighted localities, so we should always succeed.
   ASSERT(locality != nullptr);
   // If we picked it before, its weight must have been positive.
   ASSERT(locality->effective_weight_ > 0);
-  locality_scheduler_->add(locality->effective_weight_, locality);
+  locality_scheduler->add(locality->effective_weight_, locality);
   return locality->index_;
 }
 
@@ -374,25 +403,27 @@ PrioritySet::UpdateHostsParams
 HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
                                HostsPerLocalityConstSharedPtr hosts_per_locality) {
   return updateHostsParams(std::move(hosts), std::move(hosts_per_locality),
-                           std::make_shared<const HostVector>(), HostsPerLocalityImpl::empty());
+                           std::make_shared<const HealthyHostVector>(),
+                           HostsPerLocalityImpl::empty());
 }
 
 PrioritySet::UpdateHostsParams
 HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
                                HostsPerLocalityConstSharedPtr hosts_per_locality,
-                               HostVectorConstSharedPtr healthy_hosts,
+                               HealthyHostVectorConstSharedPtr healthy_hosts,
                                HostsPerLocalityConstSharedPtr healthy_hosts_per_locality) {
   return updateHostsParams(std::move(hosts), std::move(hosts_per_locality),
                            std::move(healthy_hosts), std::move(healthy_hosts_per_locality),
-                           std::make_shared<const HostVector>(), HostsPerLocalityImpl::empty());
+                           std::make_shared<const DegradedHostVector>(),
+                           HostsPerLocalityImpl::empty());
 }
 
 PrioritySet::UpdateHostsParams
 HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
                                HostsPerLocalityConstSharedPtr hosts_per_locality,
-                               HostVectorConstSharedPtr healthy_hosts,
+                               HealthyHostVectorConstSharedPtr healthy_hosts,
                                HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
-                               HostVectorConstSharedPtr degraded_hosts,
+                               DegradedHostVectorConstSharedPtr degraded_hosts,
                                HostsPerLocalityConstSharedPtr degraded_hosts_per_locality) {
   return PrioritySet::UpdateHostsParams{std::move(hosts),
                                         std::move(healthy_hosts),
@@ -405,16 +436,15 @@ HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
 PrioritySet::UpdateHostsParams
 HostSetImpl::partitionHosts(HostVectorConstSharedPtr hosts,
                             HostsPerLocalityConstSharedPtr hosts_per_locality) {
-  auto healthy_hosts = ClusterImplBase::createHostList(*hosts, Host::Health::Healthy);
-  auto degraded_hosts = ClusterImplBase::createHostList(*hosts, Host::Health::Degraded);
-  auto healthy_hosts_per_locality =
-      ClusterImplBase::createHostLists(*hosts_per_locality, Host::Health::Healthy);
-  auto degraded_hosts_per_locality =
-      ClusterImplBase::createHostLists(*hosts_per_locality, Host::Health::Degraded);
+  auto healthy_and_degraded_hosts = ClusterImplBase::partitionHostList(*hosts);
+  auto healthy_and_degraded_hosts_per_locality =
+      ClusterImplBase::partitionHostsPerLocality(*hosts_per_locality);
 
   return updateHostsParams(std::move(hosts), std::move(hosts_per_locality),
-                           std::move(healthy_hosts), std::move(healthy_hosts_per_locality),
-                           std::move(degraded_hosts), std::move(degraded_hosts_per_locality));
+                           std::move(healthy_and_degraded_hosts.first),
+                           std::move(healthy_and_degraded_hosts_per_locality.first),
+                           std::move(healthy_and_degraded_hosts.second),
+                           std::move(healthy_and_degraded_hosts_per_locality.second));
 }
 
 double HostSetImpl::effectiveLocalityWeight(uint32_t index,
@@ -635,7 +665,8 @@ ClusterImplBase::ClusterImplBase(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
-    : runtime_(runtime), init_manager_(fmt::format("Cluster {}", cluster.name())) {
+    : init_manager_(fmt::format("Cluster {}", cluster.name())),
+      init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
@@ -664,21 +695,30 @@ ClusterImplBase::ClusterImplBase(
       });
 }
 
-HostVectorConstSharedPtr ClusterImplBase::createHostList(const HostVector& hosts,
-                                                         Host::Health health) {
-  HostVectorSharedPtr healthy_list(new HostVector());
+std::pair<HealthyHostVectorConstSharedPtr, DegradedHostVectorConstSharedPtr>
+ClusterImplBase::partitionHostList(const HostVector& hosts) {
+  auto healthy_list = std::make_shared<HealthyHostVector>();
+  auto degraded_list = std::make_shared<DegradedHostVector>();
+
   for (const auto& host : hosts) {
-    if (host->health() == health) {
-      healthy_list->emplace_back(host);
+    if (host->health() == Host::Health::Healthy) {
+      healthy_list->get().emplace_back(host);
+    }
+    if (host->health() == Host::Health::Degraded) {
+      degraded_list->get().emplace_back(host);
     }
   }
 
-  return healthy_list;
+  return {healthy_list, degraded_list};
 }
 
-HostsPerLocalityConstSharedPtr ClusterImplBase::createHostLists(const HostsPerLocality& hosts,
-                                                                Host::Health health) {
-  return hosts.filter([&health](const Host& host) { return host.health() == health; });
+std::pair<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr>
+ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
+  auto filtered_clones =
+      hosts.filter({[](const Host& host) { return host.health() == Host::Health::Healthy; },
+                    [](const Host& host) { return host.health() == Host::Health::Degraded; }});
+
+  return {std::move(filtered_clones[0]), std::move(filtered_clones[1])};
 }
 
 bool ClusterInfoImpl::maintenanceMode() const {
@@ -705,7 +745,7 @@ void ClusterImplBase::onPreInitComplete() {
   initialization_started_ = true;
 
   ENVOY_LOG(debug, "initializing secondary cluster {} completed", info()->name());
-  init_manager_.initialize([this]() { onInitDone(); });
+  init_manager_.initialize(init_watcher_);
 }
 
 void ClusterImplBase::onInitDone() {
@@ -737,7 +777,7 @@ void ClusterImplBase::finishInitialization() {
   initialization_complete_callback_ = nullptr;
 
   if (health_checker_ != nullptr) {
-    reloadHealthyHosts();
+    reloadHealthyHosts(nullptr);
   }
 
   if (snapped_callback != nullptr) {
@@ -750,11 +790,11 @@ void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_chec
   health_checker_ = health_checker;
   health_checker_->start();
   health_checker_->addHostCheckCompleteCb(
-      [this](HostSharedPtr, HealthTransition changed_state) -> void {
+      [this](const HostSharedPtr& host, HealthTransition changed_state) -> void {
         // If we get a health check completion that resulted in a state change, signal to
         // update the host sets on all threads.
         if (changed_state == HealthTransition::Changed) {
-          reloadHealthyHosts();
+          reloadHealthyHosts(host);
         }
       });
 }
@@ -765,10 +805,11 @@ void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outli
   }
 
   outlier_detector_ = outlier_detector;
-  outlier_detector_->addChangedStateCb([this](HostSharedPtr) -> void { reloadHealthyHosts(); });
+  outlier_detector_->addChangedStateCb(
+      [this](const HostSharedPtr& host) -> void { reloadHealthyHosts(host); });
 }
 
-void ClusterImplBase::reloadHealthyHosts() {
+void ClusterImplBase::reloadHealthyHosts(const HostSharedPtr& host) {
   // Every time a host changes Health Check state we cause a full healthy host recalculation which
   // for expensive LBs (ring, subset, etc.) can be quite time consuming. During startup, this
   // can also block worker threads by doing this repeatedly. There is no reason to do this
@@ -778,6 +819,10 @@ void ClusterImplBase::reloadHealthyHosts() {
     return;
   }
 
+  reloadHealthyHostsHelper(host);
+}
+
+void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
   const auto& host_sets = prioritySet().hostSetsPerPriority();
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
     const auto& host_set = host_sets[priority];
@@ -816,9 +861,16 @@ ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::Cluste
 }
 
 ClusterCircuitBreakersStats
-ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, const std::string& stat_prefix) {
+ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, const std::string& stat_prefix,
+                                              bool track_remaining) {
   std::string prefix(fmt::format("circuit_breakers.{}.", stat_prefix));
-  return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix))};
+  if (track_remaining) {
+    return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix),
+                                               POOL_GAUGE_PREFIX(scope, prefix))};
+  } else {
+    return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix),
+                                               NULL_POOL_GAUGE(scope))};
+  }
 }
 
 ResourceManagerImplPtr
@@ -830,6 +882,9 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
   uint64_t max_pending_requests = 1024;
   uint64_t max_requests = 1024;
   uint64_t max_retries = 3;
+  uint64_t max_connection_pools = std::numeric_limits<uint64_t>::max();
+
+  bool track_remaining = false;
 
   std::string priority_name;
   switch (priority) {
@@ -858,10 +913,14 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_pending_requests, max_pending_requests);
     max_requests = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_requests, max_requests);
     max_retries = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_retries, max_retries);
+    track_remaining = it->track_remaining();
+    max_connection_pools =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connection_pools, max_connection_pools);
   }
   return std::make_unique<ResourceManagerImpl>(
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
-      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name));
+      max_connection_pools,
+      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name, track_remaining));
 }
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
@@ -1075,6 +1134,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     auto existing_host = all_hosts.find(host->address()->asString());
     const bool existing_host_found = existing_host != all_hosts.end();
 
+    // Clear any pending deletion flag on an existing host in case it came back while it was
+    // being stabilized. We will set it again below if needed.
+    if (existing_host_found) {
+      existing_host->second->healthFlagClear(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+    }
+
     // Check if in-place host update should be skipped, i.e. when the following criteria are met
     // (currently there is only one criterion, but we might add more in the future):
     // - The cluster health checker is activated and a new host is matched with the existing one,
@@ -1119,6 +1184,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       // Did the priority change?
       if (host->priority() != existing_host->second->priority()) {
         existing_host->second->priority(host->priority());
+        hosts_added_to_current_priority.emplace_back(existing_host->second);
       }
 
       existing_host->second->weight(host->weight());
@@ -1162,19 +1228,23 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // The remaining hosts are hosts that are not referenced in the config update. We remove them from
   // the priority if any of the following is true:
   // - Active health checking is not enabled.
-  // - The removed hosts are failing active health checking.
+  // - The removed hosts are failing active health checking OR have been explicitly marked as
+  //   unhealthy by a previous EDS update. We do not count outlier as a reason to remove a host
+  //   or any other future health condition that may be added so we do not use the health() API.
   // - We have explicitly configured the cluster to remove hosts regardless of active health status.
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
     for (auto i = current_priority_hosts.begin(); i != current_priority_hosts.end();) {
-      if (!(*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+      if (!((*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
+            (*i)->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
         if ((*i)->weight() > max_host_weight) {
           max_host_weight = (*i)->weight();
         }
 
         final_hosts.push_back(*i);
         updated_hosts[(*i)->address()->asString()] = *i;
+        (*i)->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
         i = current_priority_hosts.erase(i);
       } else {
         i++;
@@ -1218,36 +1288,42 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       local_info_(factory_context.localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {
-  switch (cluster.dns_lookup_family()) {
-  case envoy::api::v2::Cluster::V6_ONLY:
-    dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
-    break;
-  case envoy::api::v2::Cluster::V4_ONLY:
-    dns_lookup_family_ = Network::DnsLookupFamily::V4Only;
-    break;
-  case envoy::api::v2::Cluster::AUTO:
-    dns_lookup_family_ = Network::DnsLookupFamily::Auto;
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-
+  std::list<ResolveTargetPtr> resolve_targets;
   const envoy::api::v2::ClusterLoadAssignment load_assignment(
       cluster.has_load_assignment() ? cluster.load_assignment()
                                     : Config::Utility::translateClusterHosts(cluster.hosts()));
   const auto& locality_lb_endpoints = load_assignment.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-      const auto& host = lb_endpoint.endpoint().address();
-      const std::string& url = fmt::format("tcp://{}:{}", host.socket_address().address(),
-                                           host.socket_address().port_value());
-      resolve_targets_.emplace_back(new ResolveTarget(*this, factory_context.dispatcher(), url,
-                                                      locality_lb_endpoint, lb_endpoint));
+      const auto& socket_address = lb_endpoint.endpoint().address().socket_address();
+      if (!socket_address.resolver_name().empty()) {
+        throw EnvoyException("STRICT_DNS clusters must NOT have a custom resolver name set");
+      }
+
+      const std::string& url =
+          fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
+      resolve_targets.emplace_back(new ResolveTarget(*this, factory_context.dispatcher(), url,
+                                                     locality_lb_endpoint, lb_endpoint));
     }
   }
+  resolve_targets_ = std::move(resolve_targets);
+  dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
+}
+
+Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Cluster& cluster) {
+  switch (cluster.dns_lookup_family()) {
+  case envoy::api::v2::Cluster::V6_ONLY:
+    return Network::DnsLookupFamily::V6Only;
+  case envoy::api::v2::Cluster::V4_ONLY:
+    return Network::DnsLookupFamily::V4Only;
+  case envoy::api::v2::Cluster::AUTO:
+    return Network::DnsLookupFamily::Auto;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 }
 
 void StrictDnsClusterImpl::startPreInit() {

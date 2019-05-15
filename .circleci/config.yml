@@ -4,7 +4,7 @@ executors:
   ubuntu-build:
     description: "A regular build executor based on ubuntu image"
     docker:
-      - image: envoyproxy/envoy-build:698009170e362f9ca0594f2b1927fbbee199bf98
+      - image: envoyproxy/envoy-build:cfc514546bc0284536893cca5fa43d7128edcd35
     resource_class: xlarge
     working_directory: /source
 
@@ -20,12 +20,26 @@ jobs:
            command:
              ci/do_circle_ci.sh bazel.release
            no_output_timeout: 60m
-       - setup_remote_docker
-       - run: ci/docker_push.sh
-       - run: ci/docker_tag.sh
+       - persist_to_workspace:
+           root: .
+           paths:
+             - build_release
+             - build_release_stripped
        - store_artifacts:
            path: /build/envoy/generated
            destination: /
+   docker:
+     docker:
+       - image: docker
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - attach_workspace:
+           at: .
+       - setup_remote_docker
+       - run: ci/docker_build.sh
+       - run: ci/docker_push.sh
+       - run: ci/docker_tag.sh
    asan:
      executor: ubuntu-build
      steps:
@@ -163,7 +177,7 @@ jobs:
            path: generated/docs
    mac:
      macos:
-       xcode: "9.3.0"
+       xcode: "9.3.1"
      environment:
        BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
@@ -178,6 +192,11 @@ workflows:
   all:
     jobs:
       - release:
+          filters:
+            tags:
+              only: /^v.*/
+      - docker:
+          requires: [release]
           filters:
             tags:
               only: /^v.*/

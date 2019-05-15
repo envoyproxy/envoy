@@ -675,6 +675,85 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
   makeSingleRequest();
 }
 
+// Regression test for the use-after-free crash when a listener awaiting an RDS update is destroyed
+// (#6116).
+TEST_P(AdsIntegrationTest, RdsAfterLdsInvalidated) {
+
+  initialize();
+
+  // STEP 1: Initial setup
+  // ---------------------
+
+  // Initial request for any cluster, respond with cluster_0 version 1
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+
+  // Initial request for load assignment for cluster_0, respond with version 1
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
+
+  // Request for updates to cluster_0 version 1, no response
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
+
+  // Initial request for any listener, respond with listener_0 version 1
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
+
+  // Request for updates to load assignment version 1, no response
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {"cluster_0"}));
+
+  // Initial request for route_config_0 (referenced by listener_0), respond with version 1
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}));
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "1");
+
+  // Wait for initial listener to be created successfully. Any subsequent listeners will then use
+  // the dynamic InitManager (see ListenerImpl::initManager).
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // STEP 2: Listener with dynamic InitManager
+  // -----------------------------------------
+
+  // Request for updates to listener_0 version 1, respond with version 2. Under the hood, this
+  // registers RdsRouteConfigSubscription's init target with the new ListenerImpl instance.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}));
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_1")}, "2");
+
+  // Request for updates to route_config_0 version 1, and initial request for route_config_1
+  // (referenced by listener_0), don't respond yet!
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {"route_config_0"}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1",
+                                      {"route_config_1", "route_config_0"}));
+
+  // STEP 3: "New listener, who dis?"
+  // --------------------------------
+
+  // Request for updates to listener_0 version 2, respond with version 3 (updated stats prefix).
+  // This should blow away the previous ListenerImpl instance, which is still waiting for
+  // route_config_1...
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "2", {}));
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_1", "omg")}, "3");
+
+  // Respond to prior request for route_config_1. Under the hood, this invokes
+  // RdsRouteConfigSubscription::runInitializeCallbackIfAny, which references the defunct
+  // ListenerImpl instance. We should not crash in this event!
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_1", "cluster_0")},
+      "1");
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+}
+
 class AdsFailIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                public HttpIntegrationTest {
 public:

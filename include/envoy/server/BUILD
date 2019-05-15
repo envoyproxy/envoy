@@ -80,6 +80,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/thread:thread_interface",
+        "//source/server:hot_restart_cc",
     ],
 )
 
@@ -99,7 +100,7 @@ envoy_cc_library(
         "//include/envoy/event:timer_interface",
         "//include/envoy/http:context_interface",
         "//include/envoy/http:query_params_interface",
-        "//include/envoy/init:init_interface",
+        "//include/envoy/init:manager_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/secret:secret_manager_interface",
@@ -151,7 +152,7 @@ envoy_cc_library(
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:context_interface",
         "//include/envoy/http:filter_interface",
-        "//include/envoy/init:init_interface",
+        "//include/envoy/init:manager_interface",
         "//include/envoy/json:json_object_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:drain_decision_interface",
@@ -171,6 +172,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "lifecycle_notifier_interface",
     hdrs = ["lifecycle_notifier.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -193,7 +197,7 @@ envoy_cc_library(
     hdrs = ["transport_socket_config.h"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/init:init_interface",
+        "//include/envoy/init:manager_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/runtime:runtime_interface",

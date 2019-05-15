@@ -208,6 +208,27 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoder) {
   EXPECT_EQ("bookstore.Bookstore.ListShelves", method_descriptor->full_name());
 }
 
+TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoderAutoMap) {
+  auto proto_config = getProtoConfig(
+      TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"), "bookstore.Bookstore");
+  proto_config.set_auto_mapping(true);
+
+  JsonTranscoderConfig config(proto_config, *api_);
+
+  Http::TestHeaderMapImpl headers{{":method", "POST"},
+                                  {":path", "/bookstore.Bookstore/DeleteShelf"}};
+
+  TranscoderInputStreamImpl request_in, response_in;
+  std::unique_ptr<Transcoder> transcoder;
+  const MethodDescriptor* method_descriptor;
+  auto status =
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
+
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(transcoder);
+  EXPECT_EQ("bookstore.Bookstore.DeleteShelf", method_descriptor->full_name());
+}
+
 TEST_F(GrpcJsonTranscoderConfigTest, InvalidQueryParameter) {
   JsonTranscoderConfig config(
       getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
@@ -571,13 +592,14 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryError) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false))
       .WillOnce(Invoke([](Http::HeaderMap& headers, bool end_stream) {
-        EXPECT_STREQ("400", headers.Status()->value().c_str());
+        EXPECT_EQ("400", headers.Status()->value().getStringView());
         EXPECT_FALSE(end_stream);
       }));
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
   EXPECT_EQ(0, request_data.length());
+  EXPECT_EQ(decoder_callbacks_.details_, "grpc_json_transcode_failure{INVALID_ARGUMENT}");
 }
 
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryTimeout) {

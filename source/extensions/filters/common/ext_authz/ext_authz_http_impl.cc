@@ -38,7 +38,8 @@ struct SuccessResponse {
           // UpstreamHeaderMatcher
           if (context->matchers_->matches(header.key().getStringView())) {
             context->response_->headers_to_add.emplace_back(
-                Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
+                Http::LowerCaseString{std::string(header.key().getStringView())},
+                std::string(header.value().getStringView()));
           }
           return Http::HeaderMap::Iterate::Continue;
         },
@@ -161,7 +162,17 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
-  Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(lengthZeroHeader());
+  Http::HeaderMapPtr headers;
+  const uint64_t request_length = request.attributes().request().http().body().size();
+  if (request_length > 0) {
+    headers =
+        std::make_unique<Http::HeaderMapImpl,
+                         std::initializer_list<std::pair<Http::LowerCaseString, std::string>>>(
+            {{Http::Headers::get().ContentLength, std::to_string(request_length)}});
+  } else {
+    headers = std::make_unique<Http::HeaderMapImpl>(lengthZeroHeader());
+  }
+
   for (const auto& header : request.attributes().request().http().headers()) {
     const Http::LowerCaseString key{header.first};
     if (config_->requestHeaderMatchers()->matches(key.get())) {
@@ -179,8 +190,14 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     headers->setReference(header_to_add.first, header_to_add.second);
   }
 
+  Http::MessagePtr message = std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
+  if (request_length > 0) {
+    message->body() =
+        std::make_unique<Buffer::OwnedImpl>(request.attributes().request().http().body());
+  }
+
   request_ = cm_.httpAsyncClientForCluster(config_->cluster())
-                 .send(std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers)), *this,
+                 .send(std::move(message), *this,
                        Http::AsyncClient::RequestOptions().setTimeout(config_->timeout()));
 }
 
@@ -199,7 +216,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::MessagePtr message) {
   // Set an error status if parsing status code fails. A Forbidden response is sent to the client
   // if the filter has not been configured with failure_mode_allow.
   uint64_t status_code{};
-  if (!StringUtil::atoull(message->headers().Status()->value().c_str(), status_code)) {
+  if (!absl::SimpleAtoi(message->headers().Status()->value().getStringView(), &status_code)) {
     ENVOY_LOG(warn, "ext_authz HTTP client failed to parse the HTTP status code.");
     return std::make_unique<Response>(errorResponse());
   }

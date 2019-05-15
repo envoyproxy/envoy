@@ -7,6 +7,7 @@ load(
     "envoy_cc_platform_dep",
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
+    "envoy_google_grpc_external_deps",
     "envoy_package",
 )
 load(
@@ -41,7 +42,7 @@ envoy_cc_library(
         "//source/server:drain_manager_lib",
         "//source/server:options_lib",
         "//source/server:server_lib",
-        "//source/server:test_hooks_lib",
+        "//source/server:listener_hooks_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_windows_extensions(),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
@@ -70,7 +71,7 @@ envoy_cc_library(
         "//source/common/common:compiler_requirements_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/common:perf_annotation_lib",
-        "//source/common/thread:thread_factory_singleton_lib",
+        "//source/common/stats:fake_symbol_table_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:proto_descriptors_lib",
@@ -81,14 +82,17 @@ envoy_cc_library(
             ":sigaction_lib",
             ":terminate_handler_lib",
         ],
-    }) + envoy_cc_platform_dep("platform_impl_lib"),
+    }) + envoy_cc_platform_dep("platform_impl_lib") + envoy_google_grpc_external_deps(),
 )
 
 envoy_cc_posix_library(
     name = "platform_impl_lib",
     hdrs = ["posix/platform_impl.h"],
     strip_include_prefix = "posix",
-    deps = ["//source/common/common:thread_lib"],
+    deps = [
+        "//source/common/common:thread_lib",
+        "//source/common/filesystem:filesystem_lib",
+    ],
 )
 
 envoy_cc_win32_library(
@@ -98,6 +102,7 @@ envoy_cc_win32_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
+        "//source/common/filesystem:filesystem_lib",
     ],
 )
 

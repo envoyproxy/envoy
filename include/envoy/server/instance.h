@@ -9,7 +9,7 @@
 #include "envoy/common/mutex_tracer.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/context.h"
-#include "envoy/init/init.h"
+#include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/runtime/runtime.h"
@@ -86,12 +86,6 @@ public:
    * Toggle whether the server fails or passes external healthchecks.
    */
   virtual void failHealthcheck(bool fail) PURE;
-
-  /**
-   * Fetch server stats specific to this process vs. global shared stats in a hot restart scenario.
-   * @param info supplies the stats structure to fill.
-   */
-  virtual void getParentStats(HotRestart::GetParentStatsInfo& info) PURE;
 
   /**
    * @return whether external healthchecks are currently failed or not.

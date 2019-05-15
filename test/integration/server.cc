@@ -14,6 +14,7 @@
 #include "server/hot_restart_nop_impl.h"
 #include "server/options_impl.h"
 
+#include "test/common/runtime/utility.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/runtime/mocks.h"
@@ -36,7 +37,6 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
   test_options.setFileFlushIntervalMsec(std::chrono::milliseconds(50));
   test_options.setDrainTime(std::chrono::seconds(1));
   test_options.setParentShutdownTime(std::chrono::seconds(2));
-  test_options.setMaxStats(16384u);
 
   return test_options;
 }
@@ -153,19 +153,30 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
                           lock, *this, std::move(random_generator));
 }
 
+void IntegrationTestServer::onRuntimeCreated() {
+  // Override runtime values to by default allow all disallowed features.
+  //
+  // Per #6288 we explicitly want to allow end to end testing of disallowed features until the code
+  // is removed from Envoy.
+  //
+  // This will revert as the runtime is torn down with the test Envoy server.
+  Runtime::RuntimeFeaturesPeer::setAllFeaturesAllowed();
+}
+
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
     OptionsImpl& options, Event::TimeSystem& time_system,
-    Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
+    Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
+  Stats::FakeSymbolTableImpl symbol_table;
   Server::HotRestartNopImpl restarter;
   ThreadLocal::InstanceImpl tls;
-  Stats::HeapStatDataAllocator stats_allocator;
-  Stats::ThreadLocalStoreImpl stat_store(options.statsOptions(), stats_allocator);
+  Stats::HeapStatDataAllocator stats_allocator(symbol_table);
+  Stats::ThreadLocalStoreImpl stat_store(stats_allocator);
 
   Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
                               access_log_lock, component_factory, std::move(random_generator), tls,
-                              Thread::threadFactoryForTest());
+                              Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
   // This is technically thread unsafe (assigning to a shared_ptr accessed
   // across threads), but because we synchronize below through serverReady(), the only
   // consumer on the main test thread in ~IntegrationTestServerImpl will not race.
@@ -188,7 +199,7 @@ IntegrationTestServerImpl::~IntegrationTestServerImpl() {
     BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
         admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
     EXPECT_TRUE(response->complete());
-    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   }
 }
 

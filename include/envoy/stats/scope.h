@@ -2,11 +2,10 @@
 
 #include <cstdint>
 #include <memory>
-#include <string>
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
-#include "envoy/stats/stats_options.h"
+#include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Stats {
@@ -15,7 +14,7 @@ class Counter;
 class Gauge;
 class Histogram;
 class Scope;
-class StatsOptions;
+class NullGaugeImpl;
 
 typedef std::unique_ptr<Scope> ScopePtr;
 typedef std::shared_ptr<Scope> ScopeSharedPtr;
@@ -42,25 +41,54 @@ public:
   virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;
 
   /**
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @return a counter within the scope's namespace.
+   */
+  virtual Counter& counterFromStatName(StatName name) PURE;
+
+  /**
+   * TODO(#6667): this variant is deprecated: use counterFromStatName.
+   * @param name The name, expressed as a string.
    * @return a counter within the scope's namespace.
    */
   virtual Counter& counter(const std::string& name) PURE;
 
   /**
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @return a gauge within the scope's namespace.
+   */
+  virtual Gauge& gaugeFromStatName(StatName name) PURE;
+
+  /**
+   * TODO(#6667): this variant is deprecated: use gaugeFromStatName.
+   * @param name The name, expressed as a string.
    * @return a gauge within the scope's namespace.
    */
   virtual Gauge& gauge(const std::string& name) PURE;
 
   /**
+   * @return a null gauge within the scope's namespace.
+   */
+  virtual NullGaugeImpl& nullGauge(const std::string& name) PURE;
+
+  /**
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @return a histogram within the scope's namespace with a particular value type.
+   */
+  virtual Histogram& histogramFromStatName(StatName name) PURE;
+
+  /**
+   * TODO(#6667): this variant is deprecated: use histogramFromStatName.
+   * @param name The name, expressed as a string.
    * @return a histogram within the scope's namespace with a particular value type.
    */
   virtual Histogram& histogram(const std::string& name) PURE;
 
   /**
-   * @return a reference to the top-level StatsOptions struct, containing information about the
-   * maximum allowable object name length and stat suffix length.
+   * @return a reference to the symbol table.
    */
-  virtual const Stats::StatsOptions& statsOptions() const PURE;
+  virtual const SymbolTable& symbolTable() const PURE;
+  virtual SymbolTable& symbolTable() PURE;
 };
 
 } // namespace Stats

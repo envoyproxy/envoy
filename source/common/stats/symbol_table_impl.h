@@ -15,6 +15,7 @@
 #include "common/common/hash.h"
 #include "common/common/lock_guard.h"
 #include "common/common/non_copyable.h"
+#include "common/common/stack_array.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 
@@ -36,67 +37,6 @@ constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65
 
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
-
-/**
- * Represents an 8-bit encoding of a vector of symbols, used as a transient
- * representation during encoding and prior to retained allocation.
- */
-class SymbolEncoding {
-public:
-  /**
-   * Before destructing SymbolEncoding, you must call moveToStorage. This
-   * transfers ownership, and in particular, the responsibility to call
-   * SymbolTable::clear() on all referenced symbols. If we ever wanted
-   * to be able to destruct a SymbolEncoding without transferring it
-   * we could add a clear(SymbolTable&) method.
-   */
-  ~SymbolEncoding();
-
-  /**
-   * Encodes a token into the vec.
-   *
-   * @param symbol the symbol to encode.
-   */
-  void addSymbol(Symbol symbol);
-
-  /**
-   * Encodes an entire string into the vec, on behalf of FakeSymbolTableImpl.
-   * TODO(jmarantz): delete this method when FakeSymbolTableImpl is deleted.
-   *
-   * @param str The string to encode.
-   */
-  void addStringForFakeSymbolTable(absl::string_view str);
-
-  /**
-   * Decodes a uint8_t array into a SymbolVec.
-   */
-  static SymbolVec decodeSymbols(const SymbolTable::Storage array, uint64_t size);
-
-  /**
-   * Returns the number of bytes required to represent StatName as a uint8_t
-   * array, including the encoded size.
-   */
-  uint64_t bytesRequired() const { return size() + StatNameSizeEncodingBytes; }
-
-  /**
-   * Returns the number of uint8_t entries we collected while adding symbols.
-   */
-  uint64_t size() const { return vec_.size(); }
-
-  /**
-   * Moves the contents of the vector into an allocated array. The array
-   * must have been allocated with bytesRequired() bytes.
-   *
-   * @param array destination memory to receive the encoded bytes.
-   * @return uint64_t the number of bytes transferred.
-   */
-  uint64_t moveToStorage(SymbolTable::Storage array);
-
-  void swap(SymbolEncoding& src) { vec_.swap(src.vec_); }
-
-private:
-  std::vector<uint8_t> vec_;
-};
 
 /**
  * SymbolTableImpl manages a namespace optimized for stats, which are typically
@@ -130,21 +70,94 @@ private:
  */
 class SymbolTableImpl : public SymbolTable {
 public:
+  /**
+   * Intermediate representation for a stat-name. This helps store multiple
+   * names in a single packed allocation. First we encode each desired name,
+   * then sum their sizes for the single packed allocation. This is used to
+   * store MetricImpl's tags and tagExtractedName.
+   */
+  class Encoding {
+  public:
+    /**
+     * Before destructing SymbolEncoding, you must call moveToStorage. This
+     * transfers ownership, and in particular, the responsibility to call
+     * SymbolTable::clear() on all referenced symbols. If we ever wanted
+     * to be able to destruct a SymbolEncoding without transferring it
+     * we could add a clear(SymbolTable&) method.
+     */
+    ~Encoding();
+
+    /**
+     * Encodes a token into the vec.
+     *
+     * @param symbol the symbol to encode.
+     */
+    void addSymbol(Symbol symbol);
+
+    /**
+     * Decodes a uint8_t array into a SymbolVec.
+     */
+    static SymbolVec decodeSymbols(const SymbolTable::Storage array, uint64_t size);
+
+    /**
+     * Returns the number of bytes required to represent StatName as a uint8_t
+     * array, including the encoded size.
+     */
+    uint64_t bytesRequired() const { return dataBytesRequired() + StatNameSizeEncodingBytes; }
+
+    /**
+     * @return the number of uint8_t entries we collected while adding symbols.
+     */
+    uint64_t dataBytesRequired() const { return vec_.size(); }
+
+    /**
+     * Moves the contents of the vector into an allocated array. The array
+     * must have been allocated with bytesRequired() bytes.
+     *
+     * @param array destination memory to receive the encoded bytes.
+     * @return uint64_t the number of bytes transferred.
+     */
+    uint64_t moveToStorage(SymbolTable::Storage array);
+
+  private:
+    std::vector<uint8_t> vec_;
+  };
+
   SymbolTableImpl();
   ~SymbolTableImpl() override;
 
   // SymbolTable
   std::string toString(const StatName& stat_name) const override;
-  SymbolEncoding encode(absl::string_view name) override;
   uint64_t numSymbols() const override;
   bool lessThan(const StatName& a, const StatName& b) const override;
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
-  SymbolTable::StoragePtr join(const std::vector<StatName>& stat_names) const override;
+  StoragePtr join(const std::vector<StatName>& stat_names) const override;
+  void populateList(const absl::string_view* names, uint32_t num_names,
+                    StatNameList& list) override;
+  StoragePtr encode(absl::string_view name) override;
+  void callWithStringView(StatName stat_name,
+                          const std::function<void(absl::string_view)>& fn) const override;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override;
 #endif
+
+  /**
+   * Saves the specified length into the byte array, returning the next byte.
+   * There is no guarantee that bytes will be aligned, so we can't cast to a
+   * uint16_t* and assign, but must individually copy the bytes.
+   *
+   * @param length the length in bytes to write. Must be < StatNameMaxSize.
+   * @param bytes the pointer into which to write the length.
+   * @return the pointer to the next byte for writing the data.
+   */
+  static inline uint8_t* writeLengthReturningNext(uint64_t length, uint8_t* bytes) {
+    ASSERT(length < StatNameMaxSize);
+    *bytes++ = length & 0xff;
+    *bytes++ = length >> 8;
+    return bytes;
+  }
 
 private:
   friend class StatName;
@@ -157,7 +170,7 @@ private:
     uint32_t ref_count_;
   };
 
-  // This must be called during both encode() and free().
+  // This must be held during both encode() and free().
   mutable Thread::MutexBasicLockable lock_;
 
   /**
@@ -187,8 +200,19 @@ private:
    */
   absl::string_view fromSymbol(Symbol symbol) const EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
-  // Stages a new symbol for use. To be called after a successful insertion.
+  /**
+   * Stages a new symbol for use. To be called after a successful insertion.
+   */
   void newSymbol();
+
+  /**
+   * Tokenizes name, finds or allocates symbols for each token, and adds them
+   * to encoding.
+   *
+   * @param name The name to tokenize.
+   * @param encoding The encoding to write to.
+   */
+  void addTokensToEncoding(absl::string_view name, Encoding& encoding);
 
   Symbol monotonicCounter() {
     Thread::LockGuard lock(lock_);
@@ -227,7 +251,7 @@ private:
  * will fire to guard against symbol-table leaks.
  *
  * Thus this class is inconvenient to directly use as temp storage for building
- * a StatName from a string. Instead it should be used via StatNameTempStorage.
+ * a StatName from a string. Instead it should be used via StatNameManagedStorage.
  */
 class StatNameStorage {
 public:
@@ -262,6 +286,8 @@ public:
    * @return StatName a reference to the owned storage.
    */
   inline StatName statName() const;
+
+  uint8_t* bytes() { return bytes_.get(); }
 
 private:
   SymbolTable::StoragePtr bytes_;
@@ -329,9 +355,14 @@ public:
 #endif
 
   /**
-   * @return uint8_t* A pointer to the first byte of data (skipping over size bytes).
+   * @return A pointer to the first byte of data (skipping over size bytes).
    */
   const uint8_t* data() const { return size_and_data_ + StatNameSizeEncodingBytes; }
+
+  /**
+   * @return whether this is empty.
+   */
+  bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
 
 private:
   const uint8_t* size_and_data_;
@@ -343,25 +374,72 @@ StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
  * Contains the backing store for a StatName and enough context so it can
  * self-delete through RAII. This works by augmenting StatNameStorage with a
  * reference to the SymbolTable&, so it has an extra 8 bytes of footprint. It
- * is intended to be used in tests or as a scoped temp in a function, rather
- * than stored in a larger structure such as a map, where the redundant copies
- * of the SymbolTable& would be costly in aggregate.
+ * is intended to be used in cases where simplicity of implementation is more
+ * important than byte-savings, for example:
+ *   - outside the stats system
+ *   - in tests
+ *   - as a scoped temp in a function
+ * Due to the extra 8 bytes per instance, scalability should be taken into
+ * account before using this as (say) a value or key in a map. In those
+ * scenarios, it would be better to store the SymbolTable reference once
+ * for the entire map.
+ *
+ * In the stat structures, we generally use StatNameStorage to avoid the
+ * per-stat overhead.
  */
-class StatNameTempStorage : public StatNameStorage {
+class StatNameManagedStorage : public StatNameStorage {
 public:
   // Basic constructor for when you have a name as a string, and need to
   // generate symbols for it.
-  StatNameTempStorage(absl::string_view name, SymbolTable& table)
+  StatNameManagedStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
 
   // Obtains new backing storage for an already existing StatName.
-  StatNameTempStorage(StatName src, SymbolTable& table)
+  StatNameManagedStorage(StatName src, SymbolTable& table)
       : StatNameStorage(src, table), symbol_table_(table) {}
 
-  ~StatNameTempStorage() { free(symbol_table_); }
+  ~StatNameManagedStorage() { free(symbol_table_); }
+
+  SymbolTable& symbolTable() { return symbol_table_; }
+  const SymbolTable& symbolTable() const { return symbol_table_; }
 
 private:
   SymbolTable& symbol_table_;
+};
+
+/**
+ * Maintains storage for a collection of StatName objects. Like
+ * StatNameManagedStorage, this has an RAII usage model, taking
+ * care of decrementing ref-counts in the SymbolTable for all
+ * contained StatNames on destruction or on clear();
+ *
+ * Example usage:
+ *   StatNamePool pool(symbol_table);
+ *   StatName name1 = pool.add("name1");
+ *   StatName name2 = pool.add("name2");
+ */
+class StatNamePool {
+public:
+  explicit StatNamePool(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+  ~StatNamePool() { clear(); }
+
+  /**
+   * Removes all StatNames from the pool.
+   */
+  void clear();
+
+  /**
+   * @param name the name to add the container.
+   * @return the StatName held in the container for this name.
+   */
+  StatName add(absl::string_view name);
+
+private:
+  // We keep the stat names in a vector of StatNameStorage, storing the
+  // SymbolTable reference separately. This saves 8 bytes per StatName,
+  // at the cost of having a destructor that calls clear().
+  SymbolTable& symbol_table_;
+  std::vector<StatNameStorage> storage_vector_;
 };
 
 // Represents an ordered container of StatNames. The encoding for each StatName
@@ -375,16 +453,6 @@ private:
 class StatNameList {
 public:
   ~StatNameList();
-
-  /**
-   * Populates the StatNameList from a list of encodings. This is not done at
-   * construction time to enable StatNameList to be instantiated directly in
-   * a class that doesn't have a live SymbolTable when it is constructed.
-   *
-   * @param encodings The list names to encode.
-   * @param symbol_table The symbol table in which to encode the names.
-   */
-  void populate(const std::vector<absl::string_view>& encodings, SymbolTable& symbol_table);
 
   /**
    * @return true if populate() has been called on this list.
@@ -411,7 +479,28 @@ public:
   void clear(SymbolTable& symbol_table);
 
 private:
-  std::unique_ptr<uint8_t[]> storage_;
+  friend class FakeSymbolTableImpl;
+  friend class SymbolTableImpl;
+
+  /**
+   * Moves the specified storage into the list. The storage format is an
+   * array of bytes, organized like this:
+   *
+   * [0] The number of elements in the list (must be < 256).
+   * [1] low order 8 bits of the number of symbols in the first element.
+   * [2] high order 8 bits of the number of symbols in the first element.
+   * [3...] the symbols in the first element.
+   * ...
+   *
+   *
+   * For FakeSymbolTableImpl, each symbol is a single char, casted into a
+   * uint8_t. For SymbolTableImpl, each symbol is 1 or more bytes, in a
+   * variable-length encoding. See SymbolTableImpl::Encoding::addSymbol for
+   * details.
+   */
+  void moveStorageIntoList(SymbolTable::StoragePtr&& storage) { storage_ = std::move(storage); }
+
+  SymbolTable::StoragePtr storage_;
 };
 
 // Helper class for constructing hash-tables with StatName keys.
@@ -439,6 +528,86 @@ struct StatNameLessThan {
   }
 
   const SymbolTable& symbol_table_;
+};
+
+struct HeterogeneousStatNameHash {
+  // Specifying is_transparent indicates to the library infrastructure that
+  // type-conversions should not be applied when calling find(), but instead
+  // pass the actual types of the contained and searched-for objects directly to
+  // these functors. See
+  // https://en.cppreference.com/w/cpp/utility/functional/less_void for an
+  // official reference, and https://abseil.io/tips/144 for a description of
+  // using it in the context of absl.
+  using is_transparent = void;
+
+  size_t operator()(StatName a) const { return a.hash(); }
+  size_t operator()(const StatNameStorage& a) const { return a.statName().hash(); }
+};
+
+struct HeterogeneousStatNameEqual {
+  // See description for HeterogeneousStatNameHash::is_transparent.
+  using is_transparent = void;
+
+  size_t operator()(StatName a, StatName b) const { return a == b; }
+  size_t operator()(const StatNameStorage& a, const StatNameStorage& b) const {
+    return a.statName() == b.statName();
+  }
+  size_t operator()(StatName a, const StatNameStorage& b) const { return a == b.statName(); }
+  size_t operator()(const StatNameStorage& a, StatName b) const { return a.statName() == b; }
+};
+
+// Encapsulates a set<StatNameStorage>. We use containment here rather than a
+// 'using' alias because we need to ensure that when the set is destructed,
+// StatNameStorage::free(symbol_table) is called on each entry. It is a little
+// easier at the call-sites in thread_local_store.cc to implement this an
+// explicit free() method, analogous to StatNameStorage::free(), compared to
+// storing a SymbolTable reference in the class and doing the free in the
+// destructor, like StatNameManagedStorage.
+class StatNameStorageSet {
+public:
+  using HashSet =
+      absl::flat_hash_set<StatNameStorage, HeterogeneousStatNameHash, HeterogeneousStatNameEqual>;
+  using iterator = HashSet::iterator;
+
+  ~StatNameStorageSet();
+
+  /**
+   * Releases all symbols held in this set. Must be called prior to destruction.
+   *
+   * @param symbol_table The symbol table that owns the symbols.
+   */
+  void free(SymbolTable& symbol_table);
+
+  /**
+   * @param storage The StatNameStorage to add to the set.
+   */
+  std::pair<HashSet::iterator, bool> insert(StatNameStorage&& storage) {
+    return hash_set_.insert(std::move(storage));
+  }
+
+  /**
+   * @param stat_name The stat_name to find.
+   * @return the iterator pointing to the stat_name, or end() if not found.
+   */
+  iterator find(StatName stat_name) { return hash_set_.find(stat_name); }
+
+  /**
+   * @return the end-marker.
+   */
+  iterator end() { return hash_set_.end(); }
+
+  /**
+   * @param set the storage set to swap with.
+   */
+  void swap(StatNameStorageSet& set) { hash_set_.swap(set.hash_set_); }
+
+  /**
+   * @return the number of elements in the set.
+   */
+  size_t size() const { return hash_set_.size(); }
+
+private:
+  HashSet hash_set_;
 };
 
 } // namespace Stats

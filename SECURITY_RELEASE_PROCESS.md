@@ -82,6 +82,12 @@ score](https://www.first.org/cvss/specification-document#i5)) the Fix Team can d
 release process down in the face of holidays, developer bandwidth, etc. These decisions must be
 discussed on the envoy-security mailing list.
 
+A two week window will be provided to members of the private distributor list from candidate patch
+availability until the security release date. It is expected that distributors will normally be able
+to perform a release within this time window. If there are exceptional circumstances, the Envoy
+security team will raise this window to four weeks. The release window will be reduced if the
+security issue is public or embargo is broken.
+
 ### Fix Disclosure Process
 
 With the fix development underway, the Fix Lead needs to come up with an overall communication plan
@@ -104,7 +110,7 @@ patches, understand exact mitigation steps, etc.
   to require early disclosure to distributors. Generally this Private Distributor Disclosure process
   should be reserved for remotely exploitable or privilege escalation issues. Otherwise, this
   process can be skipped.
-- The Fix Lead will email the patches to envoy-distributors-announce@googlegroups.com so
+- The Fix Lead will email the patches to cncf-envoy-distributors-announce@lists.cncf.io so
   distributors can prepare builds to be available to users on the day of the issue's announcement.
   Distributors should read about the [Private Distributors List](#private-distributors-list) to find
   out the requirements for being added to this list.
@@ -149,7 +155,7 @@ individuals to find out about security issues.
 
 ### Embargo Policy
 
-The information members receive on envoy-distributors-announce must not be made public, shared, nor
+The information members receive on cncf-envoy-distributors-announce must not be made public, shared, nor
 even hinted at anywhere beyond the need-to-know within your specific team except with the list's
 explicit approval. This holds true until the public disclosure date/time that was agreed upon by the
 list. Members of the list and others may not use the information for anything other than getting the
@@ -157,6 +163,11 @@ issue fixed for your respective distribution's users.
 
 Before any information from the list is shared with respective members of your team required to fix
 said issue, they must agree to the same terms and only find out information on a need-to-know basis.
+
+The embargo applies to information shared, source code and binary images. **It is a violation of the
+embargo policy to share binary distributions of the security fixes before the public release date.**
+This includes, but is not limited to, Envoy binaries and Docker images. It is expected that
+distributors have a method to stage and validate new binaries without exposing them publicly.
 
 In the unfortunate event you share the information beyond what is allowed by this policy, you _must_
 urgently inform the envoy-security@googlegroups.com mailing list of exactly what information leaked
@@ -185,23 +196,50 @@ could be in the form of the following:
 
 ### Membership Criteria
 
-To be eligible for the envoy-distributors-announce mailing list, your
+To be eligible for the cncf-envoy-distributors-announce mailing list, your
 distribution should:
 
-1. Be an actively maintained distribution of Envoy components OR offer Envoy as a publicly
-   available service in which the product clearly states that it is built on top of Envoy. E.g.,
-   "SuperAwesomeLinuxDistro" which offers Envoy pre-built packages OR
-   "SuperAwesomeCloudProvider's Envoy as a Service (EaaS)". A cloud service that uses Envoy for a
-   product but does not publicly say they are using Envoy does not qualify.
-2. Have a user base not limited to your own organization.
+1. Be either:
+   1. An actively maintained distribution of Envoy components. An example is
+      "SuperAwesomeLinuxDistro" which offers Envoy pre-built packages. Another
+      example is "SuperAwesomeServiceMesh" which offers a service mesh product
+      that includes Envoy as a component.
+
+   OR
+
+   2. Offer Envoy as a publicly available infrastructure or platform service, in
+      which the product clearly states (e.g. public documentation, blog posts,
+      marketing copy, etc.) that it is built on top of Envoy. E.g.,
+      "SuperAwesomeCloudProvider's Envoy as a Service (EaaS)". An infrastructure
+      service that uses Envoy for a product but does not publicly say they are
+      using Envoy does not qualify. This is essentially IaaS or PaaS, if you use
+      Envoy to support a SaaS, e.g. "SuperAwesomeCatVideoService", this does not
+      qualify.
+2. Have a user or customer base not limited to your own organization. We will use the size
+   of the user or customer base as part of the criteria to determine
+   eligibility.
 3. Have a publicly verifiable track record up to present day of fixing security
    issues.
 4. Not be a downstream or rebuild of another distribution.
 5. Be a participant and active contributor in the community.
-6. Accept the [Embargo Policy](#embargo-policy) that is outlined above.
+6. Accept the [Embargo Policy](#embargo-policy) that is outlined above. You must
+   have a way to privately stage and validate your updates that does not violate
+   the embargo.
 7. Be willing to [contribute back](#contributing-back) as outlined above.
-8. Have someone already on the list vouch for the person requesting membership
+8. Be able to perform a security release of your product within a two week window from candidate fix
+   patch availability.
+9. Have someone already on the list vouch for the person requesting membership
    on behalf of your distribution.
+10. Nominate an e-mail alias or list for your organization to receive updates. This should not be
+    an individual user address, but instead a list that can be maintained by your organization as
+    individuals come and go. A good example is envoy-security@seven.com, a bad example is
+    acidburn@seven.com. You must accept the invite sent to this address or you will not receive any
+    e-mail updates. This e-mail address will be [shared with the Envoy community](#Members).
+
+Note that Envoy maintainers are members of the Envoy security team. [Members of the Envoy security
+team](OWNERS.md#envoy-security-team) and the organizations that they represents are implicitly
+included in the private distributor list. These organizations do not need to meet the above list of
+criteria with the exception of the acceptance of the embargo policy.
 
 ### Requesting to Join
 
@@ -214,7 +252,7 @@ Here is a pseudo example:
 
 ```
 To: envoy-security@googlegroups.com
-Subject: Seven-Corp Membership to envoy-distributors-announce
+Subject: Seven-Corp Membership to cncf-envoy-distributors-announce
 
 Below are each criterion and why I think we, Seven-Corp, qualify.
 
@@ -224,10 +262,13 @@ Below are each criterion and why I think we, Seven-Corp, qualify.
 We distribute the "Seven" distribution of Envoy [link]. We have been doing
 this since 1999 before proxies were even cool.
 
-> 2. Have a user base not limited to your own organization.
+> 2. Have a user or customer base not limited to your own organization. Please specify an
+>    approximate size of your user or customer base, including the number of
+>    production deployments.
 
 Our user base spans of the extensive "Seven" community. We have a slack and
-GitHub repos and mailing lists where the community hangs out. [links]
+GitHub repos and mailing lists where the community hangs out. We have ~2000
+customers, of which approximately 400 are using Seven in production. [links]
 
 > 3. Have a publicly verifiable track record up to present day of fixing security
      issues.
@@ -245,7 +286,9 @@ Our members, Acidburn, Cereal, and ZeroCool are outstanding members and are well
 known throughout the Envoy community. Especially for their contributions
 in hacking the Gibson.
 
-> 6. Accept the Embargo Policy that is outlined above.
+> 6. Accept the Embargo Policy that is outlined above. You must
+     have a way to privately stage and validate your updates that does not violate
+     the embargo.
 
 We accept.
 
@@ -253,9 +296,34 @@ We accept.
 
 We are definitely willing to help!
 
-> 8. Have someone already on the list vouch for the person requesting membership
-     on behalf of your distribution.
+> 8. Be able to perform a security release of your product within a two week window from candidate fix
+     patch availability.
 
-CrashOverride will vouch for Acidburn joining the list on behalf of the "Seven"
-distribution.
+We affirm we can spin out new security releases within a 2 week window.
+
+> 9. Have someone already on the list vouch for the person requesting membership
+>    on behalf of your distribution.
+
+CrashOverride will vouch for the "Seven" distribution joining the distribution list.
+
+> 10. Nominate an e-mail alias or list for your organization to receive updates. This should not be
+      an individual user address, but instead a list that can be maintained by your organization as
+      individuals come and go. A good example is envoy-security@seven.com, a bad example is
+      acidburn@seven.com. You must accept the invite sent to this address or you will not receive any
+      e-mail updates. This e-mail address will be shared with the Envoy community.
 ```
+
+### Members
+
+| E-mail                                    | Organization  |
+|-------------------------------------------|:-------------:|
+| envoy-security-team@aspenmesh.io          | Aspen Mesh    |
+| aws-app-mesh-security@amazon.com          | AWS           |
+| security@cilium.io                        | Cilium        |
+| vulnerabilityreports@cloudfoundry.org     | Cloud Foundry |
+| secalert@datawire.io                      | Datawire      |
+| google-internal-envoy-security@google.com | Google        |
+| vulnerabilities@discuss.istio.io          | Istio         |
+| secalert@redhat.com                       | Red Hat       |
+| envoy-security@solo.io                    | solo.io       |
+| envoy-security@tetrate.io                 | Tetrate       |

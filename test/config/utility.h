@@ -86,6 +86,13 @@ public:
   // a string for a squash filter which can be used with addFilter()
   static const std::string DEFAULT_SQUASH_FILTER;
 
+  // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
+  // api_type should be REST, GRPC, or DELTA_GRPC.
+  static std::string discoveredClustersBootstrap(const std::string& api_type);
+  // Builds a standard Cluster config fragment, with a single endpoint (at loopback:port).
+  static envoy::api::v2::Cluster buildCluster(const std::string& name, int port,
+                                              const std::string& ip_version);
+
   // Run the final config modifiers, and then set the upstream ports based on upstream connections.
   // This is the last operation run on |bootstrap_| before it is handed to Envoy.
   // Ports are assigned by looping through clusters, hosts, and addresses in the
@@ -104,17 +111,10 @@ public:
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
-  // TODO(alyssawilk) this does not scale. Refactor.
-  // Add an additional route to the configuration.
-  void addRoute(const std::string& host, const std::string& route, const std::string& cluster,
-                bool validate_clusters,
-                envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
-                envoy::api::v2::route::VirtualHost::TlsRequirementType type =
-                    envoy::api::v2::route::VirtualHost::NONE,
-                envoy::api::v2::route::RetryPolicy retry_policy = {},
-                bool include_attempt_count_header = false, const absl::string_view upgrade = "",
-                const envoy::api::v2::route::RouteAction::InternalRedirectAction internal_action =
-                    envoy::api::v2::route::RouteAction::PASS_THROUGH_INTERNAL_REDIRECT);
+  envoy::api::v2::route::VirtualHost createVirtualHost(const char* host, const char* route = "/",
+                                                       const char* cluster = "cluster_0");
+
+  void addVirtualHost(const envoy::api::v2::route::VirtualHost& vhost);
 
   // Add an HTTP filter prior to existing filters.
   void addFilter(const std::string& filter_yaml);
@@ -127,6 +127,10 @@ public:
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);
   void addSslConfig() { addSslConfig({}); }
+
+  // Set the HTTP access log for the first HCM (if present) to a given file. The default is
+  // /dev/null.
+  bool setAccessLog(const std::string& filename);
 
   // Renames the first listener to the name specified.
   void renameListener(const std::string& name);

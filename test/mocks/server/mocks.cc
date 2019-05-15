@@ -28,8 +28,6 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, serviceZone()).WillByDefault(ReturnRef(service_zone_name_));
   ON_CALL(*this, logLevel()).WillByDefault(Return(log_level_));
   ON_CALL(*this, logPath()).WillByDefault(ReturnRef(log_path_));
-  ON_CALL(*this, maxStats()).WillByDefault(Return(1000));
-  ON_CALL(*this, statsOptions()).WillByDefault(ReturnRef(stats_options_));
   ON_CALL(*this, restartEpoch()).WillByDefault(ReturnPointee(&hot_restart_epoch_));
   ON_CALL(*this, hotRestartDisabled()).WillByDefault(ReturnPointee(&hot_restart_disabled_));
   ON_CALL(*this, signalHandlingEnabled()).WillByDefault(ReturnPointee(&signal_handling_enabled_));
@@ -72,7 +70,7 @@ MockGuardDog::MockGuardDog() : watch_dog_(new NiceMock<MockWatchDog>()) {
 }
 MockGuardDog::~MockGuardDog() = default;
 
-MockHotRestart::MockHotRestart() {
+MockHotRestart::MockHotRestart() : stats_allocator_(symbol_table_.get()) {
   ON_CALL(*this, logLock()).WillByDefault(ReturnRef(log_lock_));
   ON_CALL(*this, accessLogLock()).WillByDefault(ReturnRef(access_log_lock_));
   ON_CALL(*this, statsAllocator()).WillByDefault(ReturnRef(stats_allocator_));

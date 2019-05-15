@@ -31,15 +31,25 @@
 #include "common/router/shadow_writer_impl.h"
 #include "common/tcp/conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
-#include "common/upstream/conn_pool_map_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/original_dst_cluster.h"
+#include "common/upstream/priority_conn_pool_map_impl.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
 
 namespace Envoy {
 namespace Upstream {
+namespace {
+
+void addOptionsIfNotNull(Network::Socket::OptionsSharedPtr& options,
+                         const Network::Socket::OptionsSharedPtr& to_add) {
+  if (to_add != nullptr) {
+    Network::Socket::appendOptions(options, to_add);
+  }
+}
+
+} // namespace
 
 void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
   // See comments in ClusterManagerImpl::addOrUpdateCluster() for why this is only called during
@@ -678,8 +688,10 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
 
   // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
   HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
-  HostVectorConstSharedPtr healthy_hosts_copy(new HostVector(host_set->healthyHosts()));
-  HostVectorConstSharedPtr degraded_hosts_copy(new HostVector(host_set->degradedHosts()));
+  HealthyHostVectorConstSharedPtr healthy_hosts_copy(
+      new HealthyHostVector(host_set->healthyHosts()));
+  DegradedHostVectorConstSharedPtr degraded_hosts_copy(
+      new DegradedHostVector(host_set->degradedHosts()));
   HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_copy =
       host_set->healthyHostsPerLocality().clone();
@@ -1043,7 +1055,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
     if (!allocate) {
       return nullptr;
     }
-    ConnPoolsContainer container{thread_local_dispatcher_};
+    ConnPoolsContainer container{thread_local_dispatcher_, host};
     container_iter = host_http_conn_pool_map_.emplace(host, std::move(container)).first;
   }
 
@@ -1131,38 +1143,40 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     return nullptr;
   }
 
-  // Inherit socket options from downstream connection, if set.
-  std::vector<uint8_t> hash_key = {uint8_t(protocol), uint8_t(priority)};
+  std::vector<uint8_t> hash_key = {uint8_t(protocol)};
 
-  // Use downstream connection socket options for computing connection pool hash key, if any.
+  Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
+  if (context) {
+    // Inherit socket options from downstream connection, if set.
+    if (context->downstreamConnection()) {
+      addOptionsIfNotNull(upstream_options, context->downstreamConnection()->socketOptions());
+    }
+    addOptionsIfNotNull(upstream_options, context->upstreamSocketOptions());
+  }
+
+  // Use the socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with
   // different options are not pooled together.
-  bool have_options = false;
-  if (context && context->downstreamConnection()) {
-    const Network::ConnectionSocket::OptionsSharedPtr& options =
-        context->downstreamConnection()->socketOptions();
-    if (options) {
-      for (const auto& option : *options) {
-        have_options = true;
-        option->hashKey(hash_key);
-      }
-    }
+  for (const auto& option : *upstream_options) {
+    option->hashKey(hash_key);
   }
 
   ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this
   // function. Otherwise, we'd need to capture a few of these variables by value.
-  ConnPoolsContainer::ConnPools::OptPoolRef pool = container.pools_->getPool(hash_key, [&]() {
-    return parent_.parent_.factory_.allocateConnPool(
-        parent_.thread_local_dispatcher_, host, priority, protocol,
-        have_options ? context->downstreamConnection()->socketOptions() : nullptr);
-  });
-  // The Connection Pool tracking is a work in progress. We plan for it to eventually have the
-  // ability to fail, but until we add upper layer handling for failures, it should not. So, assert
-  // that we don't accidentally add conditions that could allow it to fail.
-  ASSERT(pool.has_value(), "Pool allocation should never fail");
-  return &(pool.value().get());
+  ConnPoolsContainer::ConnPools::OptPoolRef pool =
+      container.pools_->getPool(priority, hash_key, [&]() {
+        return parent_.parent_.factory_.allocateConnPool(
+            parent_.thread_local_dispatcher_, host, priority, protocol,
+            !upstream_options->empty() ? upstream_options : nullptr);
+      });
+
+  if (pool.has_value()) {
+    return &(pool.value().get());
+  } else {
+    return nullptr;
+  }
 }
 
 Tcp::ConnectionPool::Instance*

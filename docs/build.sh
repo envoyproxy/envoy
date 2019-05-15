@@ -16,18 +16,23 @@ then
     exit 1
   fi
   # Check the version_history.rst contains current release version.
-  grep --fixed-strings "$VERSION_NUMBER" docs/root/intro/version_history.rst
+  grep --fixed-strings "$VERSION_NUMBER" docs/root/intro/version_history.rst \
+    || (echo "Git tag not found in version_history.rst" && exit 1)
+
   # Now that we now there is a match, we can use the tag.
   export ENVOY_DOCS_VERSION_STRING="tag-$CIRCLE_TAG"
   export ENVOY_DOCS_RELEASE_LEVEL=tagged
+  export ENVOY_BLOB_SHA="$CIRCLE_TAG"
 else
   BUILD_SHA=$(git rev-parse HEAD)
   VERSION_NUM=$(cat VERSION)
   export ENVOY_DOCS_VERSION_STRING="${VERSION_NUM}"-"${BUILD_SHA:0:6}"
   export ENVOY_DOCS_RELEASE_LEVEL=pre-release
+  export ENVOY_BLOB_SHA="$BUILD_SHA"
 fi
 
 SCRIPT_DIR=$(dirname "$0")
+API_DIR=$(dirname "$dir")/api
 BUILD_DIR=build_docs
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
 [[ -z "${GENERATED_RST_DIR}" ]] && GENERATED_RST_DIR=generated/rst
@@ -42,7 +47,8 @@ source_venv "$BUILD_DIR"
 pip install -r "${SCRIPT_DIR}"/requirements.txt
 
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
-  tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED  --spawn_strategy=standalone
+  tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED \
+  --action_env=ENVOY_BLOB_SHA --spawn_strategy=standalone
 
 # These are the protos we want to put in docs, this list will grow.
 # TODO(htuch): Factor this out of this script.
@@ -71,12 +77,14 @@ PROTO_RST="
   /envoy/api/v2/cluster/circuit_breaker/envoy/api/v2/cluster/circuit_breaker.proto.rst
   /envoy/api/v2/rds/envoy/api/v2/rds.proto.rst
   /envoy/api/v2/route/route/envoy/api/v2/route/route.proto.rst
+  /envoy/api/v2/srds/envoy/api/v2/srds.proto.rst
   /envoy/api/v2/lds/envoy/api/v2/lds.proto.rst
   /envoy/api/v2/listener/listener/envoy/api/v2/listener/listener.proto.rst
   /envoy/api/v2/ratelimit/ratelimit/envoy/api/v2/ratelimit/ratelimit.proto.rst
   /envoy/config/accesslog/v2/als/envoy/config/accesslog/v2/als.proto.rst
   /envoy/config/accesslog/v2/file/envoy/config/accesslog/v2/file.proto.rst
   /envoy/config/bootstrap/v2/bootstrap/envoy/config/bootstrap/v2/bootstrap.proto.rst
+  /envoy/config/cluster/redis/redis_cluster/envoy/config/cluster/redis/redis_cluster.proto.rst
   /envoy/config/common/tap/v2alpha/common/envoy/config/common/tap/v2alpha/common.proto.rst
   /envoy/config/ratelimit/v2/rls/envoy/config/ratelimit/v2/rls.proto.rst
   /envoy/config/metrics/v2/metrics_service/envoy/config/metrics/v2/metrics_service.proto.rst
@@ -85,6 +93,7 @@ PROTO_RST="
   /envoy/config/filter/accesslog/v2/accesslog/envoy/config/filter/accesslog/v2/accesslog.proto.rst
   /envoy/config/filter/fault/v2/fault/envoy/config/filter/fault/v2/fault.proto.rst
   /envoy/config/filter/http/buffer/v2/buffer/envoy/config/filter/http/buffer/v2/buffer.proto.rst
+  /envoy/config/filter/http/csrf/v2/csrf/envoy/config/filter/http/csrf/v2/csrf.proto.rst
   /envoy/config/filter/http/ext_authz/v2/ext_authz/envoy/config/filter/http/ext_authz/v2/ext_authz.proto.rst
   /envoy/config/filter/http/fault/v2/fault/envoy/config/filter/http/fault/v2/fault.proto.rst
   /envoy/config/filter/http/gzip/v2/gzip/envoy/config/filter/http/gzip/v2/gzip.proto.rst
@@ -100,6 +109,9 @@ PROTO_RST="
   /envoy/config/filter/http/tap/v2alpha/tap/envoy/config/filter/http/tap/v2alpha/tap.proto.rst
   /envoy/config/filter/http/transcoder/v2/transcoder/envoy/config/filter/http/transcoder/v2/transcoder.proto.rst
   /envoy/config/filter/listener/original_src/v2alpha1/original_src/envoy/config/filter/listener/original_src/v2alpha1/original_src.proto.rst
+  /envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy/envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.proto.rst
+  /envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy/envoy/config/filter/network/dubbo_proxy/v2alpha1/route.proto.rst
+  /envoy/config/filter/dubbo/router/v2alpha1/router/envoy/config/filter/dubbo/router/v2alpha1/router.proto.rst
   /envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth/envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.proto.rst
   /envoy/config/filter/network/ext_authz/v2/ext_authz/envoy/config/filter/network/ext_authz/v2/ext_authz.proto.rst
   /envoy/config/filter/network/http_connection_manager/v2/http_connection_manager/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto.rst
@@ -150,6 +162,12 @@ do
   cp -f bazel-bin/external/envoy_api/"${p}" "$(dirname "${DEST}")"
   [ -n "${CPROFILE_ENABLED}" ] && cp -f bazel-bin/"${p}".profile "$(dirname "${DEST}")"
 done
+
+mkdir -p ${GENERATED_RST_DIR}/api-docs
+
+cp -f $API_DIR/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
+
+rsync -rav  $API_DIR/diagrams "${GENERATED_RST_DIR}/api-docs"
 
 rsync -av "${SCRIPT_DIR}"/root/ "${SCRIPT_DIR}"/conf.py "${GENERATED_RST_DIR}"
 

@@ -19,8 +19,7 @@ namespace Upstream {
 /**
  * Cluster implementation that reads host information from the Endpoint Discovery Service.
  */
-class EdsClusterImpl : public BaseDynamicClusterImpl,
-                       Config::SubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> {
+class EdsClusterImpl : public BaseDynamicClusterImpl, Config::SubscriptionCallbacks {
 
 public:
   EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
@@ -32,7 +31,8 @@ public:
 
   // Config::SubscriptionCallbacks
   // TODO(fredlas) deduplicate
-  void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override;
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -52,7 +52,9 @@ private:
                               std::unordered_map<std::string, HostSharedPtr>& updated_hosts);
 
   // ClusterImplBase
+  void reloadHealthyHostsHelper(const HostSharedPtr& host) override;
   void startPreInit() override;
+  void onAssignmentTimeout();
 
   class BatchUpdateHelper : public PrioritySet::BatchUpdateCb {
   public:
@@ -69,11 +71,12 @@ private:
   };
 
   const ClusterManager& cm_;
-  std::unique_ptr<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>> subscription_;
+  std::unique_ptr<Config::Subscription> subscription_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
   HostMap all_hosts_;
+  Event::TimerPtr assignment_timeout_;
 };
 
 class EdsClusterFactory : public ClusterFactoryImplBase {

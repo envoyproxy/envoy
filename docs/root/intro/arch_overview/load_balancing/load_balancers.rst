@@ -95,13 +95,13 @@ hash on.
 
 The table construction algorithm places each host in the table some number of times proportional
 to its weight, until the table is completely filled. For example, if host A has a weight of 1 and
-host B has a host of 2, then host A will have 21,846 entries and host B will have 43,691 entries
+host B has a weight of 2, then host A will have 21,846 entries and host B will have 43,691 entries
 (totaling 65,537 entries). The algorithm attempts to place each host in the table at least once,
 regardless of the configured host and locality weights, so in some extreme cases the actual
 proportions may differ from the configured weights. For example, if the total number of hosts is
 larger than the fixed table size, then some hosts will get 1 entry each and the rest will get 0,
 regardless of weight. Best practice is to monitor the :ref:`min_entries_per_host and
-max_entries_per_host gauges<config_cluster_manager_cluster_stats_maglev_lb>` to ensure no hosts
+max_entries_per_host gauges <config_cluster_manager_cluster_stats_maglev_lb>` to ensure no hosts
 are underrepresented or missing.
 
 In general, when compared to the ring hash ("ketama") algorithm, Maglev has substantially faster

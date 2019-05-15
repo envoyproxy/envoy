@@ -76,6 +76,11 @@ config_setting(
 )
 
 config_setting(
+    name = "asan_build",
+    values = {"define": "ENVOY_CONFIG_ASAN=1"},
+)
+
+config_setting(
     name = "coverage_build",
     values = {"define": "ENVOY_CONFIG_COVERAGE=1"},
 )
@@ -103,6 +108,11 @@ config_setting(
 config_setting(
     name = "disable_google_grpc",
     values = {"define": "google_grpc=disabled"},
+)
+
+config_setting(
+    name = "enable_path_normalization_by_default",
+    values = {"define": "path_normalization_by_default=true"},
 )
 
 cc_proto_library(
@@ -215,6 +225,11 @@ config_setting(
 config_setting(
     name = "ios_arm64e",
     values = {"cpu": "ios_arm64e"},
+)
+
+config_setting(
+    name = "manual_stamp",
+    values = {"define": "manual_stamp=manual_stamp"},
 )
 
 alias(

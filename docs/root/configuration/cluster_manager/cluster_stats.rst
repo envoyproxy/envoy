@@ -56,6 +56,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_rx_bytes_buffered, Gauge, Received connection bytes currently buffered
   upstream_cx_tx_bytes_total, Counter, Total sent connection bytes
   upstream_cx_tx_bytes_buffered, Gauge, Send connection bytes currently buffered
+  upstream_cx_pool_overflow, Counter, Total times that the cluster's connection pool circuit breaker overflowed
   upstream_cx_protocol_error, Counter, Total connection protocol errors
   upstream_cx_max_requests, Counter, Total connections closed due to maximum requests
   upstream_cx_none_healthy, Counter, Total times connection not established due to no healthy hosts
@@ -94,6 +95,8 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   version, Gauge, Hash of the contents from the last successful API fetch
   max_host_weight, Gauge, Maximum weight of any host in the cluster
   bind_errors, Counter, Total errors binding the socket to the configured source address
+  assignment_timeout_received, Counter, Total assignments received with endpoint lease information.
+  assignment_stale, Counter, Number of times the received assignments went stale before new assignments arrived.
 
 Health check statistics
 -----------------------
@@ -149,9 +152,14 @@ Circuit breakers statistics will be rooted at *cluster.<name>.circuit_breakers.<
   :widths: 1, 1, 2
 
   cx_open, Gauge, Whether the connection circuit breaker is closed (0) or open (1)
+  cx_pool_open, Gauge, Whether the connection pool circuit breaker is closed (0) or open (1)
   rq_pending_open, Gauge, Whether the pending requests circuit breaker is closed (0) or open (1)
   rq_open, Gauge, Whether the requests circuit breaker is closed (0) or open (1)
   rq_retry_open, Gauge, Whether the retry circuit breaker is closed (0) or open (1)
+  remaining_cx, Gauge, Number of remaining connections until the circuit breaker opens
+  remaining_pending, Gauge, Number of remaining pending requests until the circuit breaker opens
+  remaining_rq, Gauge, Number of remaining requests until the circuit breaker opens
+  remaining_retries, Gauge, Number of remaining retries until the circuit breaker opens
 
 .. _config_cluster_manager_cluster_stats_dynamic_http:
 

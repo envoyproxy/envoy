@@ -5,14 +5,15 @@
 
 #include "common/common/thread.h"
 #include "common/event/real_time_system.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "exe/platform_impl.h"
 
+#include "server/listener_hooks.h"
 #include "server/options_impl.h"
 #include "server/server.h"
-#include "server/test_hooks.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "exe/signal_action.h"
@@ -33,10 +34,10 @@ class MainCommonBase {
 public:
   // Consumer must guarantee that all passed references are alive until this object is
   // destructed.
-  MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system, TestHooks& test_hooks,
-                 Server::ComponentFactory& component_factory,
+  MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
+                 ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
                  std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
-                 Thread::ThreadFactory& thread_factory);
+                 Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
   ~MainCommonBase();
 
   bool run();
@@ -64,9 +65,11 @@ public:
 
 protected:
   const Envoy::OptionsImpl& options_;
-
+  Stats::FakeSymbolTableImpl symbol_table_;
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
+  Filesystem::Instance& file_system_;
+  Stats::HeapStatDataAllocator stats_allocator_;
 
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
@@ -101,8 +104,13 @@ public:
     base_.adminRequest(path_and_query, method, handler);
   }
 
-  static std::string hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
-                                       bool hot_restart_enabled);
+  static std::string hotRestartVersion(bool hot_restart_enabled);
+
+  /**
+   * @return a pointer to the server instance, or nullptr if initialized into
+   *         validation mode.
+   */
+  Server::Instance* server() { return base_.server(); }
 
 private:
 #ifdef ENVOY_HANDLE_SIGNALS
@@ -113,7 +121,7 @@ private:
   PlatformImpl platform_impl_;
   Envoy::OptionsImpl options_;
   Event::RealTimeSystem real_time_system_;
-  DefaultTestHooks default_test_hooks_;
+  DefaultListenerHooks default_listener_hooks_;
   ProdComponentFactory prod_component_factory_;
   MainCommonBase base_;
 };

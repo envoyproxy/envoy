@@ -9,8 +9,9 @@
 namespace Envoy {
 namespace Api {
 
-Impl::Impl(Thread::ThreadFactory& thread_factory, Stats::Store&, Event::TimeSystem& time_system)
-    : thread_factory_(thread_factory), time_system_(time_system) {}
+Impl::Impl(Thread::ThreadFactory& thread_factory, Stats::Store&, Event::TimeSystem& time_system,
+           Filesystem::Instance& file_system)
+    : thread_factory_(thread_factory), time_system_(time_system), file_system_(file_system) {}
 
 Event::DispatcherPtr Impl::allocateDispatcher() {
   return std::make_unique<Event::DispatcherImpl>(*this, time_system_);

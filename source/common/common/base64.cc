@@ -202,6 +202,10 @@ std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
 }
 
 std::string Base64::encode(const char* input, uint64_t length) {
+  return encode(input, length, true);
+}
+
+std::string Base64::encode(const char* input, uint64_t length, bool add_padding) {
   uint64_t output_length = (length + 2) / 3 * 4;
   std::string ret;
   ret.reserve(output_length);
@@ -213,7 +217,7 @@ std::string Base64::encode(const char* input, uint64_t length) {
     encodeBase(input[i], pos++, next_c, ret, CHAR_TABLE);
   }
 
-  encodeLast(pos, next_c, ret, CHAR_TABLE, true);
+  encodeLast(pos, next_c, ret, CHAR_TABLE, add_padding);
 
   return ret;
 }
