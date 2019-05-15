@@ -274,7 +274,6 @@ private:
 
     // NOTE: The find methods assume that `name` is fully-qualified.
     // Implementations will not add the scope prefix.
-    // TODO(ahedberg): Is there a way to conditionally prefix `name`?
     absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override;
     absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override;
     absl::optional<std::reference_wrapper<const Histogram>>
@@ -304,7 +303,9 @@ private:
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
     /**
-     * Looks up an existing stat, populating the local cache if necessary.
+     * Looks up an existing stat, populating the local cache if necessary. Does
+     * not check the TLS or rejects, and does not create a stat if it does not
+     * exist.
      *
      * @param name the full name of the stat (not tag extracted).
      * @param central_cache_map a map from name to the desired object in the central cache.
@@ -312,8 +313,8 @@ private:
      */
     template <class StatType>
     absl::optional<std::reference_wrapper<const StatType>>
-    safeFindStat(StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
-                 StatMap<std::shared_ptr<StatType>>* tls_cache) const;
+    findStat(StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
+             StatMap<std::shared_ptr<StatType>>* tls_cache) const;
 
     void extractTagsAndTruncate(StatName& name,
                                 std::unique_ptr<StatNameManagedStorage>& truncated_name_storage,

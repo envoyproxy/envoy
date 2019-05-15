@@ -387,8 +387,6 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   StatNameManagedStorage c2_name("scope1.foo.bar", symbol_table_);
   auto found_counter2 = store_->findCounter(c2_name.statName());
   ASSERT_TRUE(found_counter2.has_value());
-  // TODO(ahedberg): It's non-deterministic whether found_counter2 references c1
-  // or c2. Should we do change that?
 
   // Different allocations point to the same referenced counted backing memory.
   c1.inc();

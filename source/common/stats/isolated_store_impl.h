@@ -39,14 +39,6 @@ public:
     return *new_stat;
   }
 
-  absl::optional<std::reference_wrapper<const Base>> find(StatName name) const {
-    auto stat = stats_.find(name);
-    if (stat == stats_.end()) {
-      return absl::nullopt;
-    }
-    return std::cref(*stat->second.get());
-  }
-
   std::vector<std::shared_ptr<Base>> toVector() const {
     std::vector<std::shared_ptr<Base>> vec;
     vec.reserve(stats_.size());
@@ -58,6 +50,16 @@ public:
   }
 
 private:
+  friend class IsolatedStoreImpl;
+
+  absl::optional<std::reference_wrapper<const Base>> find(StatName name) const {
+    auto stat = stats_.find(name);
+    if (stat == stats_.end()) {
+      return absl::nullopt;
+    }
+    return std::cref(*stat->second.get());
+  }
+
   StatNameHashMap<std::shared_ptr<Base>> stats_;
   Allocator alloc_;
 };

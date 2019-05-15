@@ -357,13 +357,11 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   return **central_ref;
 }
 
-// TODO(ahedberg): This is largely duplicated from safeMakeStat and should
-// be cleaned up at some point.
 template <class StatType>
 absl::optional<std::reference_wrapper<const StatType>>
-ThreadLocalStoreImpl::ScopeImpl::safeFindStat(StatName name,
-                                              StatMap<std::shared_ptr<StatType>>& central_cache_map,
-                                              StatMap<std::shared_ptr<StatType>>* tls_cache) const {
+ThreadLocalStoreImpl::ScopeImpl::findStat(StatName name,
+                                          StatMap<std::shared_ptr<StatType>>& central_cache_map,
+                                          StatMap<std::shared_ptr<StatType>>* tls_cache) const {
   auto iter = central_cache_map.find(name);
   if (iter == central_cache_map.end()) {
     return absl::nullopt;
@@ -527,7 +525,7 @@ ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
     tls_cache = &entry.counters_;
   }
 
-  return safeFindStat<Counter>(name, central_cache_.counters_, tls_cache);
+  return findStat<Counter>(name, central_cache_.counters_, tls_cache);
 }
 
 absl::optional<std::reference_wrapper<const Gauge>>
@@ -542,7 +540,7 @@ ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
     tls_cache = &entry.gauges_;
   }
 
-  return safeFindStat<Gauge>(name, central_cache_.gauges_, tls_cache);
+  return findStat<Gauge>(name, central_cache_.gauges_, tls_cache);
 }
 
 absl::optional<std::reference_wrapper<const Histogram>>
