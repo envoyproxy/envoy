@@ -655,8 +655,7 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
 # Selects the given values if hot restart is enabled in the current build.
 def envoy_select_hot_restart(xs, repository = ""):
     return select({
-        repository + "//bazel:disable_hot_restart": [],
-        repository + "//bazel:apple": [],
+        repository + "//bazel:disable_hot_restart_or_apple": [],
         "//conditions:default": xs,
     })
 
