@@ -111,8 +111,38 @@ public:
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
-                           const std::string& version, bool accept,
-                           const std::string& response_code = "200") override {
+                           const std::string& version, bool accept) override {
+    std::string response_json = "{\"version_info\":\"" + version + "\",\"resources\":[";
+    for (const auto& cluster : cluster_names) {
+      response_json += "{\"@type\":\"type.googleapis.com/"
+                       "envoy.api.v2.ClusterLoadAssignment\",\"cluster_name\":\"" +
+                       cluster + "\"},";
+    }
+    response_json.pop_back();
+    response_json += "]}";
+    envoy::api::v2::DiscoveryResponse response_pb;
+    MessageUtil::loadFromJson(response_json, response_pb);
+    Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", response_code}}};
+    Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
+    message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
+    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response_pb.resources()), version))
+        .WillOnce(ThrowOnRejectedConfig(accept));
+    if (!accept) {
+      EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+    }
+    EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
+    EXPECT_CALL(*timer_, enableTimer(_));
+    http_callbacks_->onSuccess(std::move(message));
+    if (accept) {
+      version_ = version;
+    }
+    request_in_progress_ = false;
+    timerTick();
+  }
+
+  void deliverConfigUpdateWithCode(const std::vector<std::string>& cluster_names,
+                                   const std::string& version, bool accept,
+                                   const std::string& response_code = "200") override {
     std::string response_json = "{\"version_info\":\"" + version + "\",\"resources\":[";
     for (const auto& cluster : cluster_names) {
       response_json += "{\"@type\":\"type.googleapis.com/"

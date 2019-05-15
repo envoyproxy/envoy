@@ -49,8 +49,11 @@ TEST_F(HttpSubscriptionImplTest, ConfigNotModified) {
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   http_callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
   timerTick();
+  verifyStats(1, 0, 0, 1, 0);
+  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true, "200");
+  verifyStats(1, 1, 0, 1, 7148434200721666028);
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true, "304");
-  verifyStats(3, 1, 0, 1, 7148434200721666028);
+  verifyStats(2, 2, 0, 1, 7148434200721666028);
 }
 
 } // namespace
