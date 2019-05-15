@@ -113,7 +113,7 @@ message PrivateKeyMethod {
   oneof config_type {
     google.protobuf.Struct config = 2;
 
-    google.protobuf.Any typed_config = 4;
+    google.protobuf.Any typed_config = 3;
   }
 }
 
