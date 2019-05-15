@@ -1255,6 +1255,28 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
 }
 
+TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureBothKeyAndMethod) {
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
+      private_key_method:
+        provider_name: mock_provider
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            test_value: 100
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  EXPECT_THROW_WITH_MESSAGE(
+      ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
+      "Certificate configuration can't have both private_key and private_key_method");
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions
