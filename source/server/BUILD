@@ -185,6 +185,7 @@ envoy_cc_library(
     srcs = ["options_impl.cc"] + select({
         "//bazel:linux_x86_64": ["options_impl_platform_linux.cc"],
         "//bazel:linux_aarch64": ["options_impl_platform_linux.cc"],
+        "//bazel:linux_ppc": ["options_impl_platform_linux.cc"],
         "//conditions:default": ["options_impl_platform_default.cc"],
     }),
     hdrs = [
@@ -193,6 +194,7 @@ envoy_cc_library(
     ] + select({
         "//bazel:linux_x86_64": ["options_impl_platform_linux.h"],
         "//bazel:linux_aarch64": ["options_impl_platform_linux.h"],
+        "//bazel:linux_ppc": ["options_impl_platform_linux.h"],
         "//conditions:default": [],
     }),
     # TCLAP command line parser needs this to support int64_t/uint64_t in several build environments.
