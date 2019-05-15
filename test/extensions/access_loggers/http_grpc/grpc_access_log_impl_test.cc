@@ -362,9 +362,10 @@ http_logs:
       upstream_transport_failure_reason: "TLS error"
     request:
       request_method: "METHOD_UNSPECIFIED"
+      request_headers_bytes: 16
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
 
   {
@@ -417,9 +418,10 @@ http_logs:
         tls_session_id: D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B
     request:
       request_method: "METHOD_UNSPECIFIED"
+      request_headers_bytes: 16
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
 }
 
