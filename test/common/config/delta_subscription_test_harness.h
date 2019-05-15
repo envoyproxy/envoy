@@ -99,7 +99,8 @@ public:
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
-                           const std::string& version, bool accept) override {
+                           const std::string& version, bool accept,
+                           const std::string& response_code = "200") override {
     std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse> response(
         new envoy::api::v2::DeltaDiscoveryResponse());
 
