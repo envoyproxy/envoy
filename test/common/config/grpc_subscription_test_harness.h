@@ -83,8 +83,7 @@ public:
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
-                           const std::string& version, bool accept,
-                           const std::string& response_code = "200") override {
+                           const std::string& version, bool accept) override {
     std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
         new envoy::api::v2::DiscoveryResponse());
     response->set_version_info(version);
