@@ -678,8 +678,8 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerReadyz(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
-                                    AdminStream&) {
+Http::Code AdminImpl::handlerReady(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
+                                   AdminStream&) {
   const envoy::admin::v2alpha::ServerInfo::State state = serverState();
 
   response.add(envoy::admin::v2alpha::ServerInfo_State_Name(state) + "\n");
@@ -1171,8 +1171,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            MAKE_ADMIN_HANDLER(handlerResetCounters), false, true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
-          {"/readyz", "print server state, return 200 if LIVE, otherwise return 503",
-           MAKE_ADMIN_HANDLER(handlerReadyz), false, false},
+          {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
+           MAKE_ADMIN_HANDLER(handlerReady), false, false},
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
           {"/stats/prometheus", "print server stats in prometheus format",
            MAKE_ADMIN_HANDLER(handlerPrometheusStats), false, false},

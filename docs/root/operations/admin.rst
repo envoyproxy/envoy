@@ -226,7 +226,7 @@ modify different aspects of the server:
   See the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
   explanation of the output.
 
-.. http:get:: /readyz
+.. http:get:: /ready
 
   Outputs a string and error code reflecting the state of the server. 200 is returned for the LIVE state,
   and 503 otherwise. This can be used as a readiness check.
