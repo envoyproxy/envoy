@@ -1,14 +1,12 @@
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load(":envoy_binary.bzl", "envoy_cc_binary")
-load(
-    ":envoy_internal.bzl",
+load(":envoy_internal.bzl",
     _envoy_copts = "envoy_copts",
     _envoy_external_dep_path = "envoy_external_dep_path",
     _envoy_linkstatic = "envoy_linkstatic",
     _envoy_select_force_libcpp = "envoy_select_force_libcpp",
     _envoy_static_link_libstdcpp_linkopts = "envoy_static_link_libstdcpp_linkopts",
-    _tcmalloc_external_dep = "tcmalloc_external_dep",
-)
+    _tcmalloc_external_dep = "tcmalloc_external_dep")
 
 # Envoy C++ related test infrastructure (that want gtest, gmock, but may be
 # relied on by envoy_cc_test_library) should use this function.

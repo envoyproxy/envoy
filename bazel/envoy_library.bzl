@@ -1,9 +1,7 @@
-load(
-    ":envoy_internal.bzl",
-    "envoy_copts",
-    "envoy_external_dep_path",
-    "envoy_linkstatic",
-)
+load(":envoy_internal.bzl", 
+	"envoy_copts",
+	"envoy_external_dep_path",
+	"envoy_linkstatic")
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 
