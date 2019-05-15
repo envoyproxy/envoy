@@ -44,6 +44,10 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
     Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api)
     : TlsCertificateConfigImpl(config, api, true) {
   if (config.has_private_key_method()) {
+    if (config.has_private_key()) {
+      throw EnvoyException(fmt::format(
+          "Certificate configuration can't have both private_key and private_key_method"));
+    }
     private_key_method_ =
         factory_context.sslContextManager()
             .privateKeyMethodManager()
