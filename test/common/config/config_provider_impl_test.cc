@@ -382,7 +382,9 @@ public:
   const Protobuf::Message* getConfigProto() const override { return nullptr; }
 };
 
-TEST_F(ConfigProviderImplTest, AssertionFailureOnIncorrectInstanceType) {
+class ConfigProviderImplDeathTest : public ConfigProviderImplTest {};
+
+TEST_F(ConfigProviderImplDeathTest, AssertionFailureOnIncorrectInstanceType) {
   initialize();
 
   InlineDummyConfigProvider foo(factory_context_, *provider_manager_,
