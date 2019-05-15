@@ -268,8 +268,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     break;
   }
 
-  // It is possible for this session to have been deferred destroyed inline in handleFailure()
-  // above so make sure we still have a connection that we might need to close.
   if (shouldClose()) {
     client_->close();
   }
@@ -277,6 +275,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
   response_headers_.reset();
 }
 
+// It is possible for this session to have been deferred destroyed inline in handleFailure()
+// above so make sure we still have a connection that we might need to close.
 bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
   if (client_ == nullptr) {
     return false;
