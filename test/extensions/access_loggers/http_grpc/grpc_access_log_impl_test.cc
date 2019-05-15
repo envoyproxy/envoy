@@ -138,6 +138,35 @@ public:
             }));
   }
 
+  void expectLogRequestMethod(const std::string& request_method) {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+
+    Http::TestHeaderMapImpl request_headers{
+      {":method", request_method},
+    };
+
+    expectLog(fmt::format(R"EOF(
+    http_logs:
+      log_entry:
+        common_properties:
+          downstream_remote_address:
+            socket_address:
+              address: "127.0.0.1"
+              port_value: 0
+          downstream_local_address:
+            socket_address:
+              address: "127.0.0.2"
+              port_value: 0
+          start_time: {{}}
+        request:
+          request_method: {}
+          request_headers_bytes: {}
+        response: {{}}
+    )EOF", request_method, request_method.length() + 7));
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+  }
+
   AccessLog::MockFilter* filter_{new NiceMock<AccessLog::MockFilter>()};
   envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
   std::shared_ptr<MockGrpcAccessLogStreamer> streamer_{new MockGrpcAccessLogStreamer()};
@@ -304,39 +333,6 @@ http_logs:
       response_code_details: "via_upstream"
 )EOF");
     access_log_->log(&request_headers, &response_headers, nullptr, stream_info);
-  }
-
-  {
-      NiceMock<StreamInfo::MockStreamInfo> stream_info;
-      stream_info.host_ = nullptr;
-      stream_info.start_time_ = SystemTime(1h);
-      stream_info.upstream_transport_failure_reason_ = "TLS error";
-
-      Http::TestHeaderMapImpl request_headers{
-          {":method", "PATCH"},
-      };
-
-      expectLog(R"EOF(
-  http_logs:
-    log_entry:
-      common_properties:
-        downstream_remote_address:
-          socket_address:
-            address: "127.0.0.1"
-            port_value: 0
-        downstream_local_address:
-          socket_address:
-            address: "127.0.0.2"
-            port_value: 0
-        start_time:
-          seconds: 3600
-        upstream_transport_failure_reason: "TLS error"
-      request:
-        request_method: "PATCH"
-        request_headers_bytes: 12
-      response: {}
-  )EOF");
-      access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
 
   {
@@ -540,6 +536,19 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->set_stream_idle_timeout(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
+}
+
+TEST_F(HttpGrpcAccessLogTest, LogWithRequestMethod) {
+  InSequence s;
+  expectLogRequestMethod("GET");
+  expectLogRequestMethod("HEAD");
+  expectLogRequestMethod("POST");
+  expectLogRequestMethod("PUT");
+  expectLogRequestMethod("DELETE");
+  expectLogRequestMethod("CONNECT");
+  expectLogRequestMethod("OPTIONS");
+  expectLogRequestMethod("TRACE");
+  expectLogRequestMethod("PATCH");
 }
 
 } // namespace
