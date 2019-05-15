@@ -83,9 +83,9 @@ def _envoy_copts(repository, test = False):
                repository + "//bazel:apple": ["-DHAVE_LONG_LONG"],
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
-           _envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
+           _envoy_select_perf_annotation_internal(["-DENVOY_PERF_ANNOTATION"]) + \
            envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
-           _envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
+           _envoy_select_path_normalization_by_default_internal(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
 
 def _envoy_linkstatic():
     return select({
@@ -94,7 +94,7 @@ def _envoy_linkstatic():
     })
 
 def _envoy_static_link_libstdcpp_linkopts():
-    return _envoy_select_force_libcpp(
+    return _envoy_select_force_libcpp_internal(
         # TODO(PiotrSikora): statically link libc++ once that's possible.
         # See: https://reviews.llvm.org/D53238
         ["-stdlib=libc++"],
@@ -122,7 +122,7 @@ def _envoy_linkopts():
                    "-Wl,--hash-style=gnu",
                ],
            }) + _envoy_static_link_libstdcpp_linkopts() + \
-           _envoy_select_exported_symbols(["-Wl,-E"])
+           _envoy_select_exported_symbols_internal(["-Wl,-E"])
 
 def _envoy_stamped_linkopts():
     return select({
@@ -172,7 +172,7 @@ def _envoy_test_linkopts():
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
         "//conditions:default": ["-pthread", "-lrt", "-ldl"],
-    }) + _envoy_select_force_libcpp(["-lc++fs"], ["-lstdc++fs", "-latomic"])
+    }) + _envoy_select_force_libcpp_internal(["-lc++fs"], ["-lstdc++fs", "-latomic"])
 
 # References to Envoy external dependencies should be wrapped with this function.
 def _envoy_external_dep_path(dep):
@@ -669,19 +669,6 @@ def envoy_select_hot_restart(xs, repository = ""):
         "//conditions:default": xs,
     })
 
-# Select the given values if default path normalization is on in the current build.
-def _envoy_select_path_normalization_by_default(xs, repository = ""):
-    return select({
-        repository + "//bazel:enable_path_normalization_by_default": xs,
-        "//conditions:default": [],
-    })
-
-def _envoy_select_perf_annotation(xs):
-    return select({
-        "@envoy//bazel:enable_perf_annotation": xs,
-        "//conditions:default": [],
-    })
-
 # Selects the given values if Google gRPC is enabled in the current build.
 def envoy_select_google_grpc(xs, repository = ""):
     return select({
@@ -693,23 +680,36 @@ def envoy_select_google_grpc(xs, repository = ""):
 def envoy_google_grpc_external_deps():
     return envoy_select_google_grpc([_envoy_external_dep_path("grpc")])
 
+def envoy_select_boringssl(if_fips, default = None):
+    return select({
+        "@envoy//bazel:boringssl_fips": if_fips,
+        "//conditions:default": default or [],
+    })
+
+# Select the given values if default path normalization is on in the current build.
+def _envoy_select_path_normalization_by_default_internal(xs, repository = ""):
+    return select({
+        repository + "//bazel:enable_path_normalization_by_default": xs,
+        "//conditions:default": [],
+    })
+
+def _envoy_select_perf_annotation_internal(xs):
+    return select({
+        "@envoy//bazel:enable_perf_annotation": xs,
+        "//conditions:default": [],
+    })
+
 # Select the given values if exporting is enabled in the current build.
-def _envoy_select_exported_symbols(xs):
+def _envoy_select_exported_symbols_internal(xs):
     return select({
         "@envoy//bazel:enable_exported_symbols": xs,
         "//conditions:default": [],
     })
 
-def _envoy_select_force_libcpp(if_libcpp, default = None):
+def _envoy_select_force_libcpp_internal(if_libcpp, default = None):
     return select({
         "@envoy//bazel:force_libcpp": if_libcpp,
         "@envoy//bazel:apple": [],
         "@envoy//bazel:windows_x86_64": [],
-        "//conditions:default": default or [],
-    })
-
-def envoy_select_boringssl(if_fips, default = None):
-    return select({
-        "@envoy//bazel:boringssl_fips": if_fips,
         "//conditions:default": default or [],
     })
