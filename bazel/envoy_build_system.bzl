@@ -1,24 +1,30 @@
 load("@rules_foreign_cc//tools/build_defs:cmake.bzl", "cmake_external")
 load(":envoy_binary.bzl", _envoy_cc_binary = "envoy_cc_binary")
 load(":envoy_internal.bzl", "envoy_external_dep_path")
-load(":envoy_library.bzl",
+load(
+    ":envoy_library.bzl",
     _envoy_basic_cc_library = "envoy_basic_cc_library",
     _envoy_cc_library = "envoy_cc_library",
     _envoy_cc_posix_library = "envoy_cc_posix_library",
     _envoy_cc_win32_library = "envoy_cc_win32_library",
     _envoy_include_prefix = "envoy_include_prefix",
-    _envoy_proto_library = "envoy_proto_library")
-load(":envoy_select.bzl", 
+    _envoy_proto_library = "envoy_proto_library",
+)
+load(
+    ":envoy_select.bzl",
+    _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
-    _envoy_select_google_grpc = "envoy_select_google_grpc")
-load(":envoy_test.bzl",
+)
+load(
+    ":envoy_test.bzl",
     _envoy_cc_fuzz_test = "envoy_cc_fuzz_test",
     _envoy_cc_mock = "envoy_cc_mock",
     _envoy_cc_test = "envoy_cc_test",
     _envoy_cc_test_binary = "envoy_cc_test_binary",
     _envoy_cc_test_library = "envoy_cc_test_library",
     _envoy_py_test_binary = "envoy_py_test_binary",
-    _envoy_sh_test = "envoy_sh_test")
+    _envoy_sh_test = "envoy_sh_test",
+)
 
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
@@ -153,7 +159,6 @@ def envoy_select_boringssl(if_fips, default = None):
         "@envoy//bazel:boringssl_fips": if_fips,
         "//conditions:default": default or [],
     })
-
 
 # Here we create wrappers for each of the public targets within the separate bazel
 # files loaded above. This is necessary so that consumers who had previously used

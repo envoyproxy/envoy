@@ -1,8 +1,10 @@
-load(":envoy_internal.bzl",
-	"envoy_copts",
-	"envoy_external_dep_path",
-	"envoy_static_link_libstdcpp_linkopts",
-	"tcmalloc_external_dep")
+load(
+    ":envoy_internal.bzl",
+    "envoy_copts",
+    "envoy_external_dep_path",
+    "envoy_static_link_libstdcpp_linkopts",
+    "tcmalloc_external_dep",
+)
 
 # Envoy C++ binary targets should be specified with this function.
 def envoy_cc_binary(
