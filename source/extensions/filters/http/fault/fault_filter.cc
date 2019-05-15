@@ -26,6 +26,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 
+struct RcDetailsValues {
+  // The fault filter injected an abort for this request.
+  const std::string FaultAbort = "fault_filter_abort";
+};
+typedef ConstSingleton<RcDetailsValues> RcDetails;
+
 FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
   if (fault.has_abort()) {
     const auto& abort = fault.abort();
@@ -337,7 +343,8 @@ void FaultFilter::postDelayInjection() {
 void FaultFilter::abortWithHTTPStatus() {
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
   decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(abortHttpStatus()),
-                                     "fault filter abort", nullptr, absl::nullopt);
+                                     "fault filter abort", nullptr, absl::nullopt,
+                                     RcDetails::get().FaultAbort);
   recordAbortsInjectedStats();
 }
 
@@ -415,6 +422,16 @@ StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_da
 void StreamRateLimiter::onTokenTimer() {
   ENVOY_LOG(trace, "limiter: timer wakeup: buffered={}", buffer_.length());
   Buffer::OwnedImpl data_to_write;
+
+  if (!saw_data_) {
+    // The first time we see any data on this stream (via writeData()), reset the number of tokens
+    // to 1. This will ensure that we start pacing the data at the desired rate (and don't send a
+    // full 1s of data right away which might not introduce enough delay for a stream that doesn't
+    // have enough data to span more than 1s of rate allowance). Once we reset, we will subsequently
+    // allow for bursting within the second to account for our data provider being bursty.
+    token_bucket_.reset(1);
+    saw_data_ = true;
+  }
 
   // Compute the number of tokens needed (rounded up), try to obtain that many tickets, and then
   // figure out how many bytes to write given the number of tokens we actually got.

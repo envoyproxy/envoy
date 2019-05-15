@@ -90,6 +90,7 @@ MockConfig::MockConfig() : route_(new NiceMock<MockRoute>()) {
   ON_CALL(*this, route(_, _)).WillByDefault(Return(route_));
   ON_CALL(*this, internalOnlyHeaders()).WillByDefault(ReturnRef(internal_only_headers_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, usesVhds()).WillByDefault(Return(false));
 }
 
 MockConfig::~MockConfig() {}

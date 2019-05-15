@@ -14,6 +14,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1ReverseBridge {
 
+struct RcDetailsValues {
+  // The gRPC HTTP/1 reverse bridge failed because the body payload was too
+  // small to be a gRPC frame.
+  const std::string GrpcBridgeFailedTooSmall = "grpc_bridge_data_too_small";
+  // The gRPC HTTP/1 bridge encountered an unsupported content type.
+  const std::string GrpcBridgeFailedContentType = "grpc_bridge_content_type_wrong";
+};
+typedef ConstSingleton<RcDetailsValues> RcDetails;
+
 namespace {
 Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::HeaderMap& headers) {
   const auto http_response_status = Http::Utility::getResponseStatus(headers);
@@ -33,8 +42,7 @@ void adjustContentLength(Http::HeaderMap& headers,
   auto length_header = headers.ContentLength();
   if (length_header != nullptr) {
     uint64_t length;
-    const std::string length_header_string(length_header->value().getStringView());
-    if (StringUtil::atoull(length_header_string.c_str(), length)) {
+    if (absl::SimpleAtoi(length_header->value().getStringView(), &length)) {
       length_header->value(adjustment(length));
     }
   }
@@ -79,7 +87,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& buffer, bool) {
     // Fail the request if the body is too small to possibly contain a gRPC frame.
     if (buffer.length() < Grpc::GRPC_FRAME_HEADER_SIZE) {
       decoder_callbacks_->sendLocalReply(Http::Code::OK, "invalid request body", nullptr,
-                                         Grpc::Status::GrpcStatus::Unknown);
+                                         Grpc::Status::GrpcStatus::Unknown,
+                                         RcDetails::get().GrpcBridgeFailedTooSmall);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
@@ -108,6 +117,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) 
       headers.insertStatus().value(enumToInt(Http::Code::OK));
       content_type->value(content_type_);
 
+      decoder_callbacks_->streamInfo().setResponseCodeDetails(
+          RcDetails::get().GrpcBridgeFailedContentType);
       return Http::FilterHeadersStatus::ContinueAndEndStream;
     }
 

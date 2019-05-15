@@ -50,8 +50,8 @@ public:
 
 class PerFilterConfigs {
 public:
-  PerFilterConfigs(const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Any>& typed_configs,
-                   const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
+  PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
+                   const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
                    Server::Configuration::FactoryContext& factory_context);
 
   const RouteSpecificFilterConfig* get(const std::string& name) const;
@@ -227,6 +227,8 @@ public:
   const std::vector<uint32_t>& retriableStatusCodes() const override {
     return retriable_status_codes_;
   }
+  absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
+  absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
@@ -241,6 +243,8 @@ private:
   std::pair<std::string, ProtobufTypes::MessagePtr> retry_priority_config_;
   uint32_t host_selection_attempts_{1};
   std::vector<uint32_t> retriable_status_codes_;
+  absl::optional<std::chrono::milliseconds> base_interval_;
+  absl::optional<std::chrono::milliseconds> max_interval_;
 };
 
 /**
@@ -389,6 +393,9 @@ public:
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
     return max_grpc_timeout_;
   }
+  absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
+    return grpc_timeout_offset_;
+  }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
@@ -475,6 +482,9 @@ private:
       return parent_->idleTimeout();
     }
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
+      return parent_->maxGrpcTimeout();
+    }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
       return parent_->maxGrpcTimeout();
     }
     const MetadataMatchCriteria* metadataMatchCriteria() const override {
@@ -600,6 +610,7 @@ private:
   const std::chrono::milliseconds timeout_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
+  const absl::optional<std::chrono::milliseconds> grpc_timeout_offset_;
   Runtime::Loader& loader_;
   const absl::optional<RuntimeData> runtime_;
   const std::string scheme_redirect_;
@@ -768,12 +779,15 @@ public:
 
   const std::string& name() const override { return name_; }
 
+  bool usesVhds() const override { return uses_vhds_; }
+
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   const std::string name_;
+  const bool uses_vhds_;
 };
 
 /**
@@ -789,6 +803,7 @@ public:
   }
 
   const std::string& name() const override { return name_; }
+  bool usesVhds() const override { return false; }
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;

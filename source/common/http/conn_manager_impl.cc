@@ -403,7 +403,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::Timespan(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
-      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()) {
+      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()),
+      upstream_options_(std::make_shared<Network::Socket::Options>()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
   if (connection_manager_.codec_->protocol() == Protocol::Http2) {
@@ -494,9 +495,10 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
     connection_manager_.doEndStream(*this);
   } else {
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
-    sendLocalReply(
-        request_headers_ != nullptr && Grpc::Common::hasGrpcContentType(*request_headers_),
-        Http::Code::RequestTimeout, "stream timeout", nullptr, is_head_request_, absl::nullopt);
+    sendLocalReply(request_headers_ != nullptr &&
+                       Grpc::Common::hasGrpcContentType(*request_headers_),
+                   Http::Code::RequestTimeout, "stream timeout", nullptr, is_head_request_,
+                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
   }
 }
 
@@ -504,7 +506,7 @@ void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
   sendLocalReply(request_headers_ != nullptr && Grpc::Common::hasGrpcContentType(*request_headers_),
                  Http::Code::RequestTimeout, "request timeout", nullptr, is_head_request_,
-                 absl::nullopt);
+                 absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
@@ -594,7 +596,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
                    Http::Code::ServiceUnavailable, "envoy overloaded", nullptr, is_head_request_,
-                   absl::nullopt);
+                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().Overload);
     return;
   }
 
@@ -622,7 +624,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     stream_info_.protocol(protocol);
     if (!connection_manager_.config_.http1Settings().accept_http_10_) {
       // Send "Upgrade Required" if HTTP/1.0 support is not explicitly configured on.
-      sendLocalReply(false, Code::UpgradeRequired, "", nullptr, is_head_request_, absl::nullopt);
+      sendLocalReply(false, Code::UpgradeRequired, "", nullptr, is_head_request_, absl::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().LowVersion);
       return;
     } else {
       // HTTP/1.0 defaults to single-use connections. Make sure the connection
@@ -645,7 +648,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     } else {
       // Require host header. For HTTP/1.1 Host has already been translated to :authority.
       sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
-                     nullptr, is_head_request_, absl::nullopt);
+                     nullptr, is_head_request_, absl::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().MissingHost);
       return;
     }
   }
@@ -653,7 +657,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   ASSERT(connection_manager_.config_.maxRequestHeadersKb() > 0);
   if (request_headers_->byteSize() > (connection_manager_.config_.maxRequestHeadersKb() * 1024)) {
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
-                   Code::RequestHeaderFieldsTooLarge, "", nullptr, is_head_request_, absl::nullopt);
+                   Code::RequestHeaderFieldsTooLarge, "", nullptr, is_head_request_, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
     return;
   }
 
@@ -664,9 +669,13 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // :path because CONNECT does not have a path, and we don't support that currently.
   if (!request_headers_->Path() || request_headers_->Path()->value().getStringView().empty() ||
       request_headers_->Path()->value().getStringView()[0] != '/') {
+    const bool has_path =
+        request_headers_->Path() && !request_headers_->Path()->value().getStringView().empty();
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
-                   is_head_request_, absl::nullopt);
+                   is_head_request_, absl::nullopt,
+                   has_path ? StreamInfo::ResponseCodeDetails::get().AbsolutePath
+                            : StreamInfo::ResponseCodeDetails::get().MissingPath);
     return;
   }
 
@@ -674,12 +683,22 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   if (!ConnectionManagerUtility::maybeNormalizePath(*request_headers_,
                                                     connection_manager_.config_)) {
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
-                   nullptr, is_head_request_, absl::nullopt);
+                   nullptr, is_head_request_, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
   }
 
   if (protocol == Protocol::Http11 && request_headers_->Connection() &&
       absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
+                             Http::Headers::get().ConnectionValues.Close)) {
+    state_.saw_connection_close_ = true;
+  }
+  // Note: Proxy-Connection is not a standard header, but is supported here
+  // since it is supported by http-parser the underlying parser for http
+  // requests.
+  if (protocol != Protocol::Http2 && !state_.saw_connection_close_ &&
+      request_headers_->ProxyConnection() &&
+      absl::EqualsIgnoreCase(request_headers_->ProxyConnection()->value().getStringView(),
                              Http::Headers::get().ConnectionValues.Close)) {
     state_.saw_connection_close_ = true;
   }
@@ -704,7 +723,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       // Do not allow upgrades if the route does not support it.
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
       sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::Forbidden, "",
-                     nullptr, is_head_request_, absl::nullopt);
+                     nullptr, is_head_request_, absl::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
       return;
     }
     // Allow non websocket requests to go through websocket enabled routes.
@@ -781,8 +801,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
     // should be used to override the active span's operation.
     if (req_operation_override) {
       if (!req_operation_override->value().empty()) {
-        // TODO(dnoe): Migrate setOperation to take string_view (#6580)
-        active_span_->setOperation(std::string(req_operation_override->value().getStringView()));
+        active_span_->setOperation(req_operation_override->value().getStringView());
 
         // Clear the decorated operation so won't be used in the response header, as
         // it has been overridden by the inbound decorator operation request header.
@@ -1114,13 +1133,15 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     bool is_grpc_request, Code code, absl::string_view body,
     const std::function<void(HeaderMap& headers)>& modify_headers, bool is_head_request,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
   ASSERT(response_headers_ == nullptr);
   // For early error handling, do a best-effort attempt to create a filter chain
   // to ensure access logging.
   if (!state_.created_filter_chain_) {
     createFilterChain();
   }
+  stream_info_.setResponseCodeDetails(details);
   Utility::sendLocalReply(
       is_grpc_request,
       [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
@@ -1265,7 +1286,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     connection_manager_.stats_.named_.downstream_rq_response_before_rq_complete_.inc();
   }
 
-  if (connection_manager_.drain_state_ == DrainState::Closing &&
+  if (connection_manager_.drain_state_ != DrainState::NotDraining &&
       connection_manager_.codec_->protocol() != Protocol::Http2) {
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
     // Do not do this for H2 (which drains via GOAWAY) or Upgrade (as the upgrade
@@ -1292,7 +1313,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
       // should be used to override the active span's operation.
       if (resp_operation_override) {
         if (!resp_operation_override->value().empty() && active_span_) {
-          active_span_->setOperation(std::string(resp_operation_override->value().getStringView()));
+          active_span_->setOperation(resp_operation_override->value().getStringView());
         }
         // Remove header so not propagated to service.
         headers.removeEnvoyDecoratorOperation();
@@ -1875,7 +1896,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataTooLarge() {
   } else {
     parent_.connection_manager_.stats_.named_.downstream_rq_too_large_.inc();
     sendLocalReply(Code::PayloadTooLarge, CodeUtility::toString(Code::PayloadTooLarge), nullptr,
-                   absl::nullopt);
+                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
   }
 }
 
@@ -1980,9 +2001,12 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
       parent_.state_.encoder_filters_streaming_ = true;
       allowIteration();
 
+      parent_.stream_info_.setResponseCodeDetails(
+          StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
       Http::Utility::sendLocalReply(
           Grpc::Common::hasGrpcContentType(*parent_.request_headers_),
           [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
+            parent_.chargeStats(*response_headers);
             parent_.response_headers_ = std::move(response_headers);
             parent_.response_encoder_->encodeHeaders(*parent_.response_headers_, end_stream);
             parent_.state_.local_complete_ = end_stream;

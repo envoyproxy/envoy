@@ -201,6 +201,16 @@ public:
    * policy is enabled.
    */
   virtual const std::vector<uint32_t>& retriableStatusCodes() const PURE;
+
+  /**
+   * @return absl::optional<std::chrono::milliseconds> base retry interval
+   */
+  virtual absl::optional<std::chrono::milliseconds> baseInterval() const PURE;
+
+  /**
+   * @return absl::optional<std::chrono::milliseconds> maximum retry interval
+   */
+  virtual absl::optional<std::chrono::milliseconds> maxInterval() const PURE;
 };
 
 /**
@@ -612,6 +622,13 @@ public:
   virtual absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const PURE;
 
   /**
+   * @return absl::optional<std::chrono::milliseconds> the timeout offset to apply to the timeout
+   * provided by the 'grpc-timeout' header of a gRPC request. This value will be positive and should
+   * be subtracted from the value provided by the header.
+   */
+  virtual absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const PURE;
+
+  /**
    * Determine whether a specific request path belongs to a virtual cluster for use in stats, etc.
    * @param headers supplies the request headers.
    * @return the virtual cluster or nullptr if there is no match.
@@ -786,6 +803,11 @@ public:
    * @return const std::string the RouteConfiguration name.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return whether router configuration uses VHDS.
+   */
+  virtual bool usesVhds() const PURE;
 };
 
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;

@@ -350,8 +350,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     for (const auto& header : request_headers_to_log_) {
       const Http::HeaderEntry* entry = request_headers->get(header);
       if (entry != nullptr) {
-        logged_headers->insert(
-            {header.get(), ProtobufTypes::String(entry->value().getStringView())});
+        logged_headers->insert({header.get(), std::string(entry->value().getStringView())});
       }
     }
   }
@@ -361,6 +360,9 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   if (stream_info.responseCode()) {
     response_properties->mutable_response_code()->set_value(stream_info.responseCode().value());
   }
+  if (stream_info.responseCodeDetails()) {
+    response_properties->set_response_code_details(stream_info.responseCodeDetails().value());
+  }
   response_properties->set_response_headers_bytes(response_headers->byteSize());
   response_properties->set_response_body_bytes(stream_info.bytesSent());
   if (!response_headers_to_log_.empty()) {
@@ -369,8 +371,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     for (const auto& header : response_headers_to_log_) {
       const Http::HeaderEntry* entry = response_headers->get(header);
       if (entry != nullptr) {
-        logged_headers->insert(
-            {header.get(), ProtobufTypes::String(entry->value().getStringView())});
+        logged_headers->insert({header.get(), std::string(entry->value().getStringView())});
       }
     }
   }
@@ -381,8 +382,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     for (const auto& header : response_trailers_to_log_) {
       const Http::HeaderEntry* entry = response_trailers->get(header);
       if (entry != nullptr) {
-        logged_headers->insert(
-            {header.get(), ProtobufTypes::String(entry->value().getStringView())});
+        logged_headers->insert({header.get(), std::string(entry->value().getStringView())});
       }
     }
   }

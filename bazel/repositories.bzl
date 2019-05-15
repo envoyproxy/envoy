@@ -14,7 +14,7 @@ load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
 
 # go version for rules_go
-GO_VERSION = "1.10.4"
+GO_VERSION = "1.12.4"
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
@@ -319,6 +319,10 @@ def _com_github_madler_zlib():
     http_archive(
         name = "com_github_madler_zlib",
         build_file_content = BUILD_ALL_CONTENT,
+        # The patch is only needed due to https://github.com/madler/zlib/pull/420
+        # TODO(htuch): remove this when zlib #420 merges.
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
         **location
     )
     native.bind(
@@ -475,7 +479,14 @@ def _com_google_absl():
     )
 
 def _com_google_protobuf():
-    _repository_impl("com_google_protobuf")
+    _repository_impl(
+        "com_google_protobuf",
+        # The patch is only needed until
+        # https://github.com/protocolbuffers/protobuf/pull/5901 is available.
+        # TODO(htuch): remove this when > protobuf 3.7.1 is released.
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:protobuf.patch"],
+    )
 
     # Needed for cc_proto_library, Bazel doesn't support aliases today for repos,
     # see https://groups.google.com/forum/#!topic/bazel-discuss/859ybHQZnuI and
@@ -483,6 +494,11 @@ def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf_cc",
         repository_key = "com_google_protobuf",
+        # The patch is only needed until
+        # https://github.com/protocolbuffers/protobuf/pull/5901 is available.
+        # TODO(htuch): remove this when > protobuf 3.7.1 is released.
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:protobuf.patch"],
     )
     native.bind(
         name = "protobuf",

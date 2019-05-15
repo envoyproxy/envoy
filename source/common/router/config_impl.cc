@@ -96,6 +96,27 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
   for (auto code : retry_policy.retriable_status_codes()) {
     retriable_status_codes_.emplace_back(code);
   }
+
+  if (retry_policy.has_retry_back_off()) {
+    base_interval_ = std::chrono::milliseconds(
+        PROTOBUF_GET_MS_REQUIRED(retry_policy.retry_back_off(), base_interval));
+    if ((*base_interval_).count() < 1) {
+      base_interval_ = std::chrono::milliseconds(1);
+    }
+
+    max_interval_ = PROTOBUF_GET_OPTIONAL_MS(retry_policy.retry_back_off(), max_interval);
+    if (max_interval_) {
+      // Apply the same rounding to max interval in case both are set to sub-millisecond values.
+      if ((*max_interval_).count() < 1) {
+        max_interval_ = std::chrono::milliseconds(1);
+      }
+
+      if ((*max_interval_).count() < (*base_interval_).count()) {
+        throw EnvoyException(
+            "retry_policy.max_interval must greater than or equal to the base_interval");
+      }
+    }
+  }
 }
 
 std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPredicates() const {
@@ -316,6 +337,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), idle_timeout)),
       max_grpc_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), max_grpc_timeout)),
+      grpc_timeout_offset_(PROTOBUF_GET_OPTIONAL_MS(route.route(), grpc_timeout_offset)),
       loader_(factory_context.runtime()), runtime_(loadRuntimeData(route.match())),
       scheme_redirect_(route.redirect().scheme_redirect()),
       host_redirect_(route.redirect().host_redirect()),
@@ -927,8 +949,7 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     method_ = envoy::api::v2::core::RequestMethod_Name(virtual_cluster.method());
   }
 
-  const std::string pattern = virtual_cluster.pattern();
-  pattern_ = RegexUtil::parseRegex(pattern);
+  pattern_ = RegexUtil::parseRegex(virtual_cluster.pattern());
   name_ = virtual_cluster.name();
 }
 
@@ -1093,7 +1114,7 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
 ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
                        Server::Configuration::FactoryContext& factory_context,
                        bool validate_clusters_default)
-    : name_(config.name()) {
+    : name_(config.name()), uses_vhds_(config.has_vhds()) {
   route_matcher_ = std::make_unique<RouteMatcher>(
       config, *this, factory_context,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));
@@ -1124,8 +1145,8 @@ createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any&
 } // namespace
 
 PerFilterConfigs::PerFilterConfigs(
-    const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Any>& typed_configs,
-    const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
+    const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
+    const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
     Server::Configuration::FactoryContext& factory_context) {
   if (!typed_configs.empty() && !configs.empty()) {
     throw EnvoyException("Only one of typed_configs or configs can be specified");

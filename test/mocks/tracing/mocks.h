@@ -29,8 +29,8 @@ public:
   MockSpan();
   ~MockSpan();
 
-  MOCK_METHOD1(setOperation, void(const std::string& operation));
-  MOCK_METHOD2(setTag, void(const std::string& name, const std::string& value));
+  MOCK_METHOD1(setOperation, void(absl::string_view operation));
+  MOCK_METHOD2(setTag, void(absl::string_view name, absl::string_view value));
   MOCK_METHOD2(log, void(SystemTime timestamp, const std::string& event));
   MOCK_METHOD0(finishSpan, void());
   MOCK_METHOD1(injectContext, void(Http::HeaderMap& request_headers));

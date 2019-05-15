@@ -58,6 +58,26 @@ Example:
 EXPECT_THAT(response->headers(), HeaderMapEqualRef(expected_headers));
 ```
 
+### ProtoEq, ProtoEqIgnoringField, RepeatedProtoEq
+
+Tests equality of protobufs, with a variant that ignores the value (including
+presence) of a single named field. Another variant can be used to compare two
+instances of Protobuf::RepeatedPtrField element-by-element.
+
+Example:
+
+```cpp
+envoy::api::v2::DeltaDiscoveryRequest expected_request;
+// (not shown: set some fields of expected_request...)
+EXPECT_CALL(async_stream_, sendMessage(ProtoEqIgnoringField(expected_request, "response_nonce"), false));
+
+response->mutable_resources()->Add();
+response->mutable_resources()->Add();
+response->mutable_resources()->Add();
+// (not shown: do something to populate those empty added items...)
+EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response->resources()), version));
+```
+
 ### IsSubsetOfHeaders and IsSupersetOfHeaders
 
 Tests that one `HeaderMap` argument contains every header in another

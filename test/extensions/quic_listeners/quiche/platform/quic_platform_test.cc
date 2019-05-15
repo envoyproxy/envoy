@@ -12,7 +12,10 @@
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
 
+#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
+
 #include "test/common/stats/stat_test_utility.h"
+#include "test/extensions/quic_listeners/quiche/platform/quic_epoll_clock.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
@@ -23,6 +26,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/epoll_server/fake_simple_epoll_server.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
@@ -34,11 +38,13 @@
 #include "quiche/quic/platform/api/quic_expect_bug.h"
 #include "quiche/quic/platform/api/quic_exported_stats.h"
 #include "quiche/quic/platform/api/quic_file_utils.h"
+#include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
+#include "quiche/quic/platform/api/quic_pcc_sender.h"
 #include "quiche/quic/platform/api/quic_port_utils.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
@@ -46,6 +52,7 @@
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_stream_buffer_allocator.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
+#include "quiche/quic/platform/api/quic_system_event_loop.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
@@ -488,6 +495,103 @@ TEST_F(QuicPlatformTest, QuicTestOutput) {
                       QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
 }
 
+TEST_F(QuicPlatformTest, ApproximateNowInUsec) {
+  epoll_server::test::FakeSimpleEpollServer epoll_server;
+  QuicEpollClock clock(&epoll_server);
+
+  epoll_server.set_now_in_usec(1000000);
+  EXPECT_EQ(1000000, (clock.ApproximateNow() - QuicTime::Zero()).ToMicroseconds());
+  EXPECT_EQ(1u, clock.WallNow().ToUNIXSeconds());
+  EXPECT_EQ(1000000u, clock.WallNow().ToUNIXMicroseconds());
+
+  epoll_server.AdvanceBy(5);
+  EXPECT_EQ(1000005, (clock.ApproximateNow() - QuicTime::Zero()).ToMicroseconds());
+  EXPECT_EQ(1u, clock.WallNow().ToUNIXSeconds());
+  EXPECT_EQ(1000005u, clock.WallNow().ToUNIXMicroseconds());
+
+  epoll_server.AdvanceBy(10 * 1000000);
+  EXPECT_EQ(11u, clock.WallNow().ToUNIXSeconds());
+  EXPECT_EQ(11000005u, clock.WallNow().ToUNIXMicroseconds());
+}
+
+TEST_F(QuicPlatformTest, NowInUsec) {
+  epoll_server::test::FakeSimpleEpollServer epoll_server;
+  QuicEpollClock clock(&epoll_server);
+
+  epoll_server.set_now_in_usec(1000000);
+  EXPECT_EQ(1000000, (clock.Now() - QuicTime::Zero()).ToMicroseconds());
+
+  epoll_server.AdvanceBy(5);
+  EXPECT_EQ(1000005, (clock.Now() - QuicTime::Zero()).ToMicroseconds());
+}
+
+TEST_F(QuicPlatformTest, MonotonicityWithRealEpollClock) {
+  epoll_server::SimpleEpollServer epoll_server;
+  QuicEpollClock clock(&epoll_server);
+
+  quic::QuicTime last_now = clock.Now();
+  for (int i = 0; i < 1e5; ++i) {
+    quic::QuicTime now = clock.Now();
+
+    ASSERT_LE(last_now, now);
+
+    last_now = now;
+  }
+}
+
+TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
+  epoll_server::test::FakeSimpleEpollServer epoll_server;
+  QuicEpollClock clock(&epoll_server);
+
+  epoll_server.set_now_in_usec(100);
+  quic::QuicTime last_now = clock.Now();
+
+  epoll_server.set_now_in_usec(90);
+  quic::QuicTime now = clock.Now();
+
+  ASSERT_EQ(last_now, now);
+}
+
+TEST_F(QuicPlatformTest, QuicFlags) {
+  auto& flag_registry = quiche::FlagRegistry::GetInstance();
+  flag_registry.ResetFlags();
+
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
+  SetQuicReloadableFlag(quic_testonly_default_false, true);
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
+
+  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
+  SetQuicRestartFlag(quic_testonly_default_false, true);
+  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_false));
+
+  EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+  SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
+  EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+
+  flag_registry.ResetFlags();
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
+  EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+  flag_registry.FindFlag("quic_reloadable_flag_quic_testonly_default_false")
+      ->SetValueFromString("true");
+  flag_registry.FindFlag("quic_restart_flag_quic_testonly_default_true")->SetValueFromString("0");
+  flag_registry.FindFlag("quic_time_wait_list_seconds")->SetValueFromString("100");
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
+  EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+}
+
+TEST_F(QuicPlatformTest, QuicPccSender) {
+  EXPECT_DEATH_LOG_TO_STDERR(quic::CreatePccSender(/*clock=*/nullptr, /*rtt_stats=*/nullptr,
+                                                   /*unacked_packets=*/nullptr, /*random=*/nullptr,
+                                                   /*stats=*/nullptr,
+                                                   /*initial_congestion_window=*/0,
+                                                   /*max_congestion_window=*/0),
+                             "PccSender is not supported.");
+}
+
 class FileUtilsTest : public testing::Test {
 public:
   FileUtilsTest() : dir_path_(Envoy::TestEnvironment::temporaryPath("quic_file_util_test")) {
@@ -588,6 +692,13 @@ TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
   if (deterministic_stats) {
     EXPECT_EQ(start_mem, Envoy::Memory::Stats::totalCurrentlyAllocated());
   }
+}
+
+TEST_F(QuicPlatformTest, TestSystemEventLoop) {
+  // These two interfaces are no-op in Envoy. The test just makes sure they
+  // build.
+  QuicRunSystemEventLoopIteration();
+  QuicSystemEventLoop("dummy");
 }
 
 } // namespace

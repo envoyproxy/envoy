@@ -225,7 +225,7 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   if (always_print_primitive_fields) {
     json_options.always_print_primitive_fields = true;
   }
-  ProtobufTypes::String json;
+  std::string json;
   const auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
   // This should always succeed unless something crash-worthy such as out-of-memory.
   RELEASE_ASSERT(status.ok(), "");
@@ -236,7 +236,7 @@ void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message
   // TODO(htuch): Consolidate with the inflight cleanups here.
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
-  ProtobufTypes::String json;
+  std::string json;
   const auto status = Protobuf::util::MessageToJsonString(source, &json, json_options);
   if (!status.ok()) {
     throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
@@ -251,6 +251,49 @@ ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const st
   val.set_string_value(value);
   (*struct_obj.mutable_fields())[key] = val;
   return struct_obj;
+}
+
+// TODO(alyssawilk) see if we can get proto's CodeEnumToString made accessible
+// to avoid copying it. Otherwise change this to absl::string_view.
+std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
+  switch (code) {
+  case ProtobufUtil::error::OK:
+    return "OK";
+  case ProtobufUtil::error::CANCELLED:
+    return "CANCELLED";
+  case ProtobufUtil::error::UNKNOWN:
+    return "UNKNOWN";
+  case ProtobufUtil::error::INVALID_ARGUMENT:
+    return "INVALID_ARGUMENT";
+  case ProtobufUtil::error::DEADLINE_EXCEEDED:
+    return "DEADLINE_EXCEEDED";
+  case ProtobufUtil::error::NOT_FOUND:
+    return "NOT_FOUND";
+  case ProtobufUtil::error::ALREADY_EXISTS:
+    return "ALREADY_EXISTS";
+  case ProtobufUtil::error::PERMISSION_DENIED:
+    return "PERMISSION_DENIED";
+  case ProtobufUtil::error::UNAUTHENTICATED:
+    return "UNAUTHENTICATED";
+  case ProtobufUtil::error::RESOURCE_EXHAUSTED:
+    return "RESOURCE_EXHAUSTED";
+  case ProtobufUtil::error::FAILED_PRECONDITION:
+    return "FAILED_PRECONDITION";
+  case ProtobufUtil::error::ABORTED:
+    return "ABORTED";
+  case ProtobufUtil::error::OUT_OF_RANGE:
+    return "OUT_OF_RANGE";
+  case ProtobufUtil::error::UNIMPLEMENTED:
+    return "UNIMPLEMENTED";
+  case ProtobufUtil::error::INTERNAL:
+    return "INTERNAL";
+  case ProtobufUtil::error::UNAVAILABLE:
+    return "UNAVAILABLE";
+  case ProtobufUtil::error::DATA_LOSS:
+    return "DATA_LOSS";
+  default:
+    return "";
+  }
 }
 
 bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2) {

@@ -113,8 +113,7 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
   auto cluster_load_assignment =
       MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[0]);
   MessageUtil::validate(cluster_load_assignment);
-  // TODO(PiotrSikora): Remove this hack once fixed internally.
-  if (!(cluster_load_assignment.cluster_name() == cluster_name_)) {
+  if (cluster_load_assignment.cluster_name() != cluster_name_) {
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
                                      cluster_load_assignment.cluster_name()));
   }
@@ -150,6 +149,52 @@ void EdsClusterImpl::onAssignmentTimeout() {
   info_->stats().assignment_stale_.inc();
 }
 
+void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
+  // Here we will see if we have a host that has been marked for deletion by service discovery
+  // but has been stabilized due to passing active health checking. If such a host is now
+  // failing active health checking we can remove it during this health check update.
+  HostSharedPtr host_to_exclude = host;
+  if (host_to_exclude != nullptr &&
+      host_to_exclude->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) &&
+      host_to_exclude->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL)) {
+    // Empty for clarity.
+  } else {
+    // Do not exclude and remove the host during the update.
+    host_to_exclude = nullptr;
+  }
+
+  const auto& host_sets = prioritySet().hostSetsPerPriority();
+  for (size_t priority = 0; priority < host_sets.size(); ++priority) {
+    const auto& host_set = host_sets[priority];
+
+    // Filter current hosts in case we need to exclude a host.
+    HostVectorSharedPtr hosts_copy(new HostVector());
+    std::copy_if(host_set->hosts().begin(), host_set->hosts().end(),
+                 std::back_inserter(*hosts_copy),
+                 [&host_to_exclude](const HostSharedPtr& host) { return host_to_exclude != host; });
+
+    // Setup a hosts to remove vector in case we need to exclude a host.
+    HostVector hosts_to_remove;
+    if (hosts_copy->size() != host_set->hosts().size()) {
+      ASSERT(hosts_copy->size() == host_set->hosts().size() - 1);
+      hosts_to_remove.emplace_back(host_to_exclude);
+    }
+
+    // Filter hosts per locality in case we need to exclude a host.
+    HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().filter(
+        {[&host_to_exclude](const Host& host) { return &host != host_to_exclude.get(); }})[0];
+
+    prioritySet().updateHosts(priority,
+                              HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
+                              host_set->localityWeights(), {}, hosts_to_remove, absl::nullopt);
+  }
+
+  if (host_to_exclude != nullptr) {
+    ASSERT(all_hosts_.find(host_to_exclude->address()->asString()) != all_hosts_.end());
+    all_hosts_.erase(host_to_exclude->address()->asString());
+  }
+}
+
 bool EdsClusterImpl::updateHostsPerLocality(
     const uint32_t priority, const uint32_t overprovisioning_factor, const HostVector& new_hosts,
     LocalityWeightsMap& locality_weights_map, LocalityWeightsMap& new_locality_weights_map,
@@ -161,16 +206,19 @@ bool EdsClusterImpl::updateHostsPerLocality(
   HostVector hosts_added;
   HostVector hosts_removed;
   // We need to trigger updateHosts with the new host vectors if they have changed. We also do this
-  // when the locality weight map changes.
+  // when the locality weight map or the overprovisioning factor. Note calling updateDynamicHostList
+  // is responsible for both determining whether there was a change and to perform the actual update
+  // to current_hosts_copy, so it must be called even if we know that we need to update (e.g. if the
+  // overprovisioning factor changes).
   // TODO(htuch): We eagerly update all the host sets here on weight changes, which isn't great,
   // since this has the knock on effect that we rebuild the load balancers and locality scheduler.
   // We could make this happen lazily, as we do for host-level weight updates, where as things age
   // out of the locality scheduler, we discover their new weights. We don't currently have a shared
   // object for locality weights that we can update here, we should add something like this to
   // improve performance and scalability of locality weight updates.
-  if (host_set.overprovisioningFactor() != overprovisioning_factor ||
-      updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
-                            updated_hosts, all_hosts_) ||
+  const bool hosts_updated = updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added,
+                                                   hosts_removed, updated_hosts, all_hosts_);
+  if (hosts_updated || host_set.overprovisioningFactor() != overprovisioning_factor ||
       locality_weights_map != new_locality_weights_map) {
     ASSERT(std::all_of(current_hosts_copy->begin(), current_hosts_copy->end(),
                        [&](const auto& host) { return host->priority() == priority; }));

@@ -117,9 +117,9 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
   Http::HeaderMapPtr headers = buildHeadersFromTable(state, 2);
 
   uint64_t status;
-  const std::string status_string(headers->Status()->value().getStringView());
-  if (headers->Status() == nullptr || !StringUtil::atoull(status_string.c_str(), status) ||
-      status < 200 || status >= 600) {
+  if (headers->Status() == nullptr ||
+      !absl::SimpleAtoi(headers->Status()->value().getStringView(), &status) || status < 200 ||
+      status >= 600) {
     luaL_error(state, ":status must be between 200-599");
   }
 

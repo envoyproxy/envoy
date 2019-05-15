@@ -84,7 +84,7 @@ public:
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
         .WillOnce(Invoke([=](Http::HeaderMap& headers, bool) {
           uint64_t code;
-          StringUtil::atoull(std::string(headers.Status()->value().getStringView()).c_str(), code);
+          ASSERT_TRUE(absl::SimpleAtoi(headers.Status()->value().getStringView(), &code));
           EXPECT_EQ(static_cast<uint64_t>(expected_code), code);
         }));
     EXPECT_CALL(decoder_callbacks_, encodeData(_, _))
@@ -161,6 +161,7 @@ TEST_F(GrpcWebFilterTest, InvalidBase64) {
   request_buffer.add(&INVALID_B64_MESSAGE, INVALID_B64_MESSAGE_SIZE);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
             filter_.decodeData(request_buffer, true));
+  EXPECT_EQ(decoder_callbacks_.details_, "grpc_base_64_decode_failed");
 }
 
 TEST_F(GrpcWebFilterTest, Base64NoPadding) {
@@ -176,6 +177,7 @@ TEST_F(GrpcWebFilterTest, Base64NoPadding) {
   request_buffer.add(&B64_MESSAGE_NO_PADDING, B64_MESSAGE_NO_PADDING_SIZE);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
             filter_.decodeData(request_buffer, true));
+  EXPECT_EQ(decoder_callbacks_.details_, "grpc_base_64_decode_failed_bad_size");
 }
 
 TEST_P(GrpcWebFilterTest, StatsNoCluster) {
