@@ -22,11 +22,28 @@ struct {{ complex_type.name }} {
   // constructor used in versions: {{ constructor['versions'] }}
   {{ constructor['full_declaration'] }}{% endfor %}
 
+  {# For every field that's used in version, just compute its size using an encoder. #}
+  {% if complex_type.fields|length > 0 %}
+  uint32_t computeSize(const EncodingContext& encoder) const {
+    const int16_t api_version = encoder.apiVersion();
+    uint32_t written{0};{% for field in complex_type.fields %}
+    if (api_version >= {{ field.version_usage[0] }}
+      && api_version < {{ field.version_usage[-1] + 1 }}) {
+      written += encoder.computeSize({{ field.name }}_);
+    }{% endfor %}
+    return written;
+  }
+  {% else %}
+  uint32_t computeSize(const EncodingContext&) const {
+    return 0;
+  }
+  {% endif %}
+
   {# For every field that's used in version, just serialize it. #}
   {% if complex_type.fields|length > 0 %}
-  size_t encode(Buffer::Instance& dst, EncodingContext& encoder) const {
+  uint32_t encode(Buffer::Instance& dst, EncodingContext& encoder) const {
     const int16_t api_version = encoder.apiVersion();
-    size_t written{0};{% for field in complex_type.fields %}
+    uint32_t written{0};{% for field in complex_type.fields %}
     if (api_version >= {{ field.version_usage[0] }}
       && api_version < {{ field.version_usage[-1] + 1 }}) {
       written += encoder.encode({{ field.name }}_, dst);
@@ -34,7 +51,7 @@ struct {{ complex_type.name }} {
     return written;
   }
   {% else %}
-  size_t encode(Buffer::Instance&, EncodingContext&) const {
+  uint32_t encode(Buffer::Instance&, EncodingContext&) const {
     return 0;
   }
   {% endif %}

@@ -111,7 +111,6 @@ private:
     ConnectionCallbackImpl connection_callback_impl_{*this};
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
-    Http::StreamEncoder* request_encoder_{};
     Http::HeaderMapPtr response_headers_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
@@ -252,6 +251,9 @@ private:
     TcpHealthCheckerImpl& parent_;
     Network::ClientConnectionPtr client_;
     std::shared_ptr<TcpSessionCallbacks> session_callbacks_;
+    // If true, stream close was initiated by us, not e.g. remote close or TCP reset.
+    // In this case healthcheck status already reported, only state cleanup required.
+    bool expect_close_{};
   };
 
   typedef std::unique_ptr<TcpActiveHealthCheckSession> TcpActiveHealthCheckSessionPtr;

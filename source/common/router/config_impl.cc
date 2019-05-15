@@ -949,8 +949,7 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     method_ = envoy::api::v2::core::RequestMethod_Name(virtual_cluster.method());
   }
 
-  const std::string pattern = virtual_cluster.pattern();
-  pattern_ = RegexUtil::parseRegex(pattern);
+  pattern_ = RegexUtil::parseRegex(virtual_cluster.pattern());
   name_ = virtual_cluster.name();
 }
 
@@ -1115,7 +1114,7 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
 ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
                        Server::Configuration::FactoryContext& factory_context,
                        bool validate_clusters_default)
-    : name_(config.name()) {
+    : name_(config.name()), uses_vhds_(config.has_vhds()) {
   route_matcher_ = std::make_unique<RouteMatcher>(
       config, *this, factory_context,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));
@@ -1146,8 +1145,8 @@ createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any&
 } // namespace
 
 PerFilterConfigs::PerFilterConfigs(
-    const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Any>& typed_configs,
-    const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
+    const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
+    const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
     Server::Configuration::FactoryContext& factory_context) {
   if (!typed_configs.empty() && !configs.empty()) {
     throw EnvoyException("Only one of typed_configs or configs can be specified");

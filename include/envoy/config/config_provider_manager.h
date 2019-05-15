@@ -25,6 +25,17 @@ namespace Config {
  */
 class ConfigProviderManager {
 public:
+  class OptionalArg {
+  public:
+    virtual ~OptionalArg() = default;
+  };
+
+  class NullOptionalArg : public OptionalArg {
+  public:
+    NullOptionalArg() = default;
+    ~NullOptionalArg() override = default;
+  };
+
   virtual ~ConfigProviderManager() = default;
 
   /**
@@ -34,6 +45,7 @@ public:
    * @param config_source_proto supplies the proto containing the xDS API configuration.
    * @param factory_context is the context to use for the provider.
    * @param stat_prefix supplies the prefix to use for statistics.
+   * @param optarg supplies an optional argument with data specific to the concrete class.
    * @return ConfigProviderPtr a newly allocated dynamic config provider which shares underlying
    *                           data structures with other dynamic providers configured with the same
    *                           API source.
@@ -41,17 +53,42 @@ public:
   virtual ConfigProviderPtr
   createXdsConfigProvider(const Protobuf::Message& config_source_proto,
                           Server::Configuration::FactoryContext& factory_context,
-                          const std::string& stat_prefix) PURE;
+                          const std::string& stat_prefix, const OptionalArg& optarg) PURE;
 
   /**
    * Returns a ConfigProvider associated with a statically specified configuration.
    * @param config_proto supplies the configuration proto.
    * @param factory_context is the context to use for the provider.
+   * @param optarg supplies an optional argument with data specific to the concrete class.
    * @return ConfigProviderPtr a newly allocated static config provider.
    */
   virtual ConfigProviderPtr
   createStaticConfigProvider(const Protobuf::Message& config_proto,
-                             Server::Configuration::FactoryContext& factory_context) PURE;
+                             Server::Configuration::FactoryContext& factory_context,
+                             const OptionalArg& optarg) {
+    UNREFERENCED_PARAMETER(config_proto);
+    UNREFERENCED_PARAMETER(factory_context);
+    UNREFERENCED_PARAMETER(optarg);
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  /**
+   * Returns a ConfigProvider associated with a statically specified configuration. This is intended
+   * to be used when a set of configuration protos is required to build the full configuration.
+   * @param config_protos supplies a vector of configuration protos.
+   * @param factory_context is the context to use for the provider.
+   * @param optarg supplies an optional argument with data specific to the concrete class.
+   * @return ConfigProviderPtr a newly allocated static config provider.
+   */
+  virtual ConfigProviderPtr
+  createStaticConfigProvider(std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
+                             Server::Configuration::FactoryContext& factory_context,
+                             const OptionalArg& optarg) {
+    UNREFERENCED_PARAMETER(config_protos);
+    UNREFERENCED_PARAMETER(factory_context);
+    UNREFERENCED_PARAMETER(optarg);
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 };
 
 } // namespace Config
