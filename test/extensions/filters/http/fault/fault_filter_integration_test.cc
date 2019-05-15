@@ -12,9 +12,6 @@ class FaultIntegrationTest : public Event::TestUsingSimulatedTime,
                              public HttpProtocolIntegrationTest {
 public:
   void initializeFilter(const std::string& filter_config) {
-    // There's some deadlock issue with simtime where the alarm may be scheduled
-    // and will not fire. Waiting for the injected delay appears to help.
-    use_lds_ = false;
     config_helper_.addFilter(filter_config);
     initialize();
   }
