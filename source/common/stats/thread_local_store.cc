@@ -358,7 +358,8 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 }
 
 template <class StatType>
-absl::optional<std::reference_wrapper<const StatType>> ThreadLocalStoreImpl::ScopeImpl::findStat(
+absl::optional<std::reference_wrapper<const StatType>>
+ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
     StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map) const {
   auto iter = central_cache_map.find(name);
   if (iter == central_cache_map.end()) {
@@ -508,28 +509,16 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name)
 
 absl::optional<std::reference_wrapper<const Counter>>
 ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
-  if (parent_.rejectsAll()) {
-    return absl::nullopt;
-  }
-
-  return findStat<Counter>(name, central_cache_.counters_);
+  return findStatLockHeld<Counter>(name, central_cache_.counters_);
 }
 
 absl::optional<std::reference_wrapper<const Gauge>>
 ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
-  if (parent_.rejectsAll()) {
-    return absl::nullopt;
-  }
-
-  return findStat<Gauge>(name, central_cache_.gauges_);
+  return findStatLockHeld<Gauge>(name, central_cache_.gauges_);
 }
 
 absl::optional<std::reference_wrapper<const Histogram>>
 ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
-  if (parent_.rejectsAll()) {
-    return absl::nullopt;
-  }
-
   auto iter = central_cache_.histograms_.find(name);
   if (iter == central_cache_.histograms_.end()) {
     return absl::nullopt;
