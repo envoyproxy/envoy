@@ -221,11 +221,28 @@ public:
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions,
       const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+      const std::string& expected_error_message = "") {
+    return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_subscriptions,
+                                        expected_resource_unsubscriptions, xds_stream_,
+                                        expected_error_code, expected_error_message);
+  }
+
+  AssertionResult compareDeltaDiscoveryRequest(
+      const std::string& expected_type_url,
+      const std::vector<std::string>& expected_resource_subscriptions,
+      const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& stream,
+      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
       const std::string& expected_error_message = "");
   template <class T>
   void sendDeltaDiscoveryResponse(const std::vector<T>& added_or_updated,
                                   const std::vector<std::string>& removed,
                                   const std::string& version) {
+    sendDeltaDiscoveryResponse(added_or_updated, removed, version, xds_stream_);
+  }
+  template <class T>
+  void sendDeltaDiscoveryResponse(const std::vector<T>& added_or_updated,
+                                  const std::vector<std::string>& removed,
+                                  const std::string& version, FakeStreamPtr& stream) {
     envoy::api::v2::DeltaDiscoveryResponse response;
     response.set_system_version_info("system_version_info_this_is_a_test");
     for (const auto& message : added_or_updated) {
@@ -236,7 +253,7 @@ public:
     }
     *response.mutable_removed_resources() = {removed.begin(), removed.end()};
     response.set_nonce("noncense");
-    xds_stream_->sendGrpcMessage(response);
+    stream->sendGrpcMessage(response);
   }
 
 private:
