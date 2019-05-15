@@ -103,6 +103,12 @@ public:
   const Ip* ip() const override { return &ip_; }
   IoHandlePtr socket(SocketType type) const override;
 
+  // Network::Address::InstanceBase
+  const sockaddr* sockAddr() const override {
+    return reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_);
+  }
+  socklen_t sockAddrLen() const override { return sizeof(sockaddr_in); }
+
   /**
    * Convenience function to convert an IPv4 address to canonical string format.
    * @note This works similarly to inet_ntop() but is faster.
@@ -171,6 +177,12 @@ public:
   const Ip* ip() const override { return &ip_; }
   IoHandlePtr socket(SocketType type) const override;
 
+  // Network::Address::InstanceBase
+  const sockaddr* sockAddr() const override {
+    return reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_);
+  }
+  socklen_t sockAddrLen() const override { return sizeof(sockaddr_in6); }
+
 private:
   struct Ipv6Helper : public Ipv6 {
     Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
@@ -227,6 +239,15 @@ public:
   Api::SysCallIntResult connect(int fd) const override;
   const Ip* ip() const override { return nullptr; }
   IoHandlePtr socket(SocketType type) const override;
+
+  // Network::Address::InstanceBase
+  const sockaddr* sockAddr() const override { return reinterpret_cast<const sockaddr*>(&address_); }
+  socklen_t sockAddrLen() const override {
+    if (abstract_namespace_) {
+      return offsetof(struct sockaddr_un, sun_path) + address_length_;
+    }
+    return sizeof(address_);
+  }
 
 private:
   sockaddr_un address_;

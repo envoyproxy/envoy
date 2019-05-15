@@ -170,5 +170,20 @@ MockTransportSocketCallbacks::MockTransportSocketCallbacks() {
 }
 MockTransportSocketCallbacks::~MockTransportSocketCallbacks() {}
 
+MockUdpListener::MockUdpListener() {}
+MockUdpListener::~MockUdpListener() { onDestroy(); }
+
+MockUdpReadFilterCallbacks::MockUdpReadFilterCallbacks() {
+  ON_CALL(*this, udpListener()).WillByDefault(ReturnRef(udp_listener_));
+}
+
+MockUdpReadFilterCallbacks::~MockUdpReadFilterCallbacks() {}
+
+MockUdpListenerReadFilter::MockUdpListenerReadFilter() {}
+MockUdpListenerReadFilter::~MockUdpListenerReadFilter() {}
+
+MockUdpListenerFilterManager::MockUdpListenerFilterManager() {}
+MockUdpListenerFilterManager::~MockUdpListenerFilterManager() {}
+
 } // namespace Network
 } // namespace Envoy

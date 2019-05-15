@@ -646,8 +646,8 @@ bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& man
 }
 
 bool ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManager& manager) {
-  return Configuration::FilterChainUtility::buildFilterChain(manager,
-                                                             udp_listener_filter_factories_);
+  return Configuration::FilterChainUtility::buildUdpFilterChain(manager,
+                                                                udp_listener_filter_factories_);
 }
 
 bool ListenerImpl::drainClose() const {

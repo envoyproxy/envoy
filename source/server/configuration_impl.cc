@@ -43,7 +43,7 @@ bool FilterChainUtility::buildFilterChain(
   return true;
 }
 
-bool FilterChainUtility::buildFilterChain(
+bool FilterChainUtility::buildUdpFilterChain(
     Network::UdpListenerFilterManager& filter_manager,
     const std::vector<Network::UdpListenerFilterFactoryCb>& factories) {
   for (const Network::UdpListenerFilterFactoryCb& factory : factories) {

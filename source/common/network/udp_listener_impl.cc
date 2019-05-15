@@ -139,7 +139,7 @@ void UdpListenerImpl::handleReadCallback() {
                                peer_address->asString(), local_address->asString(),
                                recv_result.result_.rc_, addr_len));
 
-    UdpRecvData recvData = {peer_address, std::move(recv_result.buffer_)};
+    UdpRecvData recvData = {local_address, peer_address, std::move(recv_result.buffer_)};
     cb_.onData(recvData);
 
   } while (true);
@@ -162,10 +162,17 @@ void UdpListenerImpl::send(const UdpSendData& send_data) {
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
   buffer.getRawSlices(slices.begin(), num_slices);
-  writev(slices.begin(), num_slices);
+  Api::SysCallSizeResult send_result =
+      sendmessage(slices.begin(), num_slices, send_data.send_address_);
+
+  if (send_result.rc_ < 0) {
+    cb_.onError(UdpListenerCallbacks::ErrorCode::SyscallError, send_result.errno_);
+  }
 }
 
-void UdpListenerImpl::writev(const Buffer::RawSlice* slices, uint64_t num_slice) {
+Api::SysCallSizeResult
+UdpListenerImpl::sendmessage(const Buffer::RawSlice* slices, uint64_t num_slice,
+                             const Address::InstanceConstSharedPtr& to_address) {
   STACK_ARRAY(iov, iovec, num_slice);
   uint64_t num_slices_to_write = 0;
   uint64_t requested_send_size = 0;
@@ -179,24 +186,36 @@ void UdpListenerImpl::writev(const Buffer::RawSlice* slices, uint64_t num_slice)
   }
   if (num_slices_to_write == 0) {
     ENVOY_UDP_LOG(trace, "Nothing to send");
-    return;
+    return Api::SysCallSizeResult{0, 0};
   }
 
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result =
-      os_syscalls.writev(socket_.ioHandle().fd(), iov.begin(), num_slices_to_write);
+  struct msghdr message;
+  sockaddr* address = const_cast<sockaddr*>(to_address->sockAddr());
+  message.msg_name = reinterpret_cast<void*>(address);
+  message.msg_namelen = to_address->sockAddrLen();
+  message.msg_iov = iov.begin();
+  message.msg_iovlen = num_slices_to_write;
+  message.msg_control = nullptr;
+  message.msg_controllen = 0;
+  message.msg_flags = 0;
+
+  // TODO(sumukhs): Port sendmsg api to OsSysCalls
+  const ssize_t rc = ::sendmsg(socket_.ioHandle().fd(), &message, 0);
+  Api::SysCallSizeResult result{rc, errno};
+
   if (result.rc_ < 0) {
     if (result.errno_ == EAGAIN) {
-      ENVOY_UDP_LOG(debug, "writev dropped {} bytes", requested_send_size);
+      ENVOY_UDP_LOG(debug, "sendmsg dropped {} bytes", requested_send_size);
     } else {
-      ENVOY_UDP_LOG(debug, "writev failed errno:{} to send {} bytes", result.errno_,
+      ENVOY_UDP_LOG(debug, "sendmsg failed errno:{} to send {} bytes", result.errno_,
                     requested_send_size);
     }
 
-    return;
+    return result;
   }
 
-  ENVOY_UDP_LOG(trace, "send requested:{} writev:{}", requested_send_size, result.rc_);
+  ENVOY_UDP_LOG(trace, "sendmsg requested:{} sent:{}", requested_send_size, result.rc_);
+  return result;
 }
 
 } // namespace Network

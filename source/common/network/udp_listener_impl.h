@@ -47,7 +47,8 @@ protected:
 
 private:
   void onSocketEvent(short flags);
-  void writev(const Buffer::RawSlice* slices, uint64_t num_slice);
+  Api::SysCallSizeResult sendmessage(const Buffer::RawSlice* slices, uint64_t num_slice,
+                                     const Address::InstanceConstSharedPtr& to_address);
   Event::FileEventPtr file_event_;
 };
 

@@ -12,6 +12,8 @@
 namespace Envoy {
 namespace Network {
 
+class UdpListenerFilterManager;
+
 /**
  * A configuration for an individual listener.
  */
@@ -114,6 +116,7 @@ public:
  * class.
  */
 struct UdpRecvData {
+  Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr peer_address_;
   Buffer::InstancePtr buffer_;
 

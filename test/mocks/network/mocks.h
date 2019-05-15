@@ -161,12 +161,12 @@ public:
   MOCK_CONST_METHOD0(drainClose, bool());
 };
 
-class MockListenerFilter : public Network::ListenerFilter {
+class MockListenerFilter : public ListenerFilter {
 public:
   MockListenerFilter();
   ~MockListenerFilter();
 
-  MOCK_METHOD1(onAccept, Network::FilterStatus(Network::ListenerFilterCallbacks&));
+  MOCK_METHOD1(onAccept, Network::FilterStatus(ListenerFilterCallbacks&));
 };
 
 class MockListenerFilterManager : public ListenerFilterManager {
@@ -174,7 +174,7 @@ public:
   MockListenerFilterManager();
   ~MockListenerFilterManager();
 
-  void addAcceptFilter(Network::ListenerFilterPtr&& filter) override { addAcceptFilter_(filter); }
+  void addAcceptFilter(ListenerFilterPtr&& filter) override { addAcceptFilter_(filter); }
 
   MOCK_METHOD1(addAcceptFilter_, void(Network::ListenerFilterPtr&));
 };
@@ -369,6 +369,8 @@ public:
   MOCK_CONST_METHOD0(ip, Address::Ip*());
   MOCK_CONST_METHOD1(socket, IoHandlePtr(Address::SocketType));
   MOCK_CONST_METHOD0(type, Address::Type());
+  MOCK_CONST_METHOD0(sockAddr, sockaddr*());
+  MOCK_CONST_METHOD0(sockAddrLen, socklen_t());
 
   const std::string& asString() const override { return physical_; }
   const std::string& logicalName() const override { return logical_; }
@@ -417,6 +419,48 @@ public:
   MOCK_METHOD1(raiseEvent, void(ConnectionEvent));
 
   testing::NiceMock<MockConnection> connection_;
+};
+
+class MockUdpListener : public UdpListener {
+public:
+  MockUdpListener();
+  ~MockUdpListener();
+
+  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD0(enable, void());
+  MOCK_METHOD0(disable, void());
+  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
+  MOCK_CONST_METHOD0(localAddress, Address::InstanceConstSharedPtr&());
+  MOCK_METHOD1(send, void(const UdpSendData&));
+};
+
+class MockUdpReadFilterCallbacks : public UdpReadFilterCallbacks {
+public:
+  MockUdpReadFilterCallbacks();
+  ~MockUdpReadFilterCallbacks();
+
+  MOCK_METHOD0(udpListener, UdpListener&());
+
+  testing::NiceMock<MockUdpListener> udp_listener_;
+};
+
+class MockUdpListenerReadFilter : public UdpListenerReadFilter {
+public:
+  MockUdpListenerReadFilter();
+  ~MockUdpListenerReadFilter();
+
+  MOCK_METHOD1(onData, void(UdpRecvData&));
+  MOCK_METHOD1(initializeCallbacks, void(UdpReadFilterCallbacks& callbacks));
+};
+
+class MockUdpListenerFilterManager : public UdpListenerFilterManager {
+public:
+  MockUdpListenerFilterManager();
+  ~MockUdpListenerFilterManager();
+
+  void addReadFilter(UdpListenerReadFilterPtr&& filter) override { addReadFilter_(filter); }
+
+  MOCK_METHOD1(addReadFilter_, void(Network::UdpListenerReadFilterPtr&));
 };
 
 } // namespace Network

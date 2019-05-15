@@ -372,6 +372,8 @@ public:
   const Address::Ip* ip() const override { return instance_.ip(); }
   IoHandlePtr socket(Address::SocketType type) const override { return instance_.socket(type); }
   Address::Type type() const override { return instance_.type(); }
+  const sockaddr* sockAddr() const override { return instance_.sockAddr(); }
+  socklen_t sockAddrLen() const override { return instance_.sockAddrLen(); }
 
 private:
   std::string antagonistic_name_;

@@ -318,8 +318,9 @@ ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImp
 ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImpl& parent,
                                                             Network::ListenerPtr&& listener,
                                                             Network::ListenerConfig& config)
-    : ConnectionHandlerImpl::ActiveListenerBase(parent, std::move(listener), config) {
-  udp_listener_ = dynamic_cast<Network::UdpListener*>(listener_.get());
+    : ConnectionHandlerImpl::ActiveListenerBase(parent, std::move(listener), config),
+      udp_listener_(dynamic_cast<Network::UdpListener*>(listener_.get())) {
+
   RELEASE_ASSERT(udp_listener_ != nullptr, "");
 
   // Create the filter chain on creating a new udp listener
@@ -327,10 +328,9 @@ ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImp
 
   // If filter chain is empty, fail the creation of the listener
   if (read_filters_.empty()) {
-    throw Network::CreateListenerException(
-        fmt::format("Cannot create listener as no read filters registered for the udp listener: {} "
-                    "at localAddress: {}",
-                    config_.name(), config_.socket().localAddress()->asString()));
+    throw Network::CreateListenerException(fmt::format(
+        "Cannot create listener as no read filters registered for the udp listener: {} ",
+        config_.name()));
   }
 
   // Initialize the filters so that they get a handle to the dispatcher and other global structures
@@ -346,11 +346,17 @@ void ConnectionHandlerImpl::ActiveUdpListener::onData(Network::UdpRecvData& data
   }
 }
 
-void ConnectionHandlerImpl::ActiveUdpListener::onWriteReady(const Network::Socket&) {}
+void ConnectionHandlerImpl::ActiveUdpListener::onWriteReady(const Network::Socket&) {
+  // TODO(sumukhs): This is not used now. When write filters are implemented, this is a
+  // trigger to invoke the on write ready API on the filters which is when they can write
+  // data
+}
 
 void ConnectionHandlerImpl::ActiveUdpListener::onError(
     const Network::UdpListenerCallbacks::ErrorCode&, int) {
-  // TODO(sumukhs) - Determine what to do on error. Close the listener?
+  // TODO(sumukhs): Determine what to do on error. Close the listener?
+  // or would the filters need to know on error? Can't foresee a scenario where they
+  // would take an action
 }
 
 void ConnectionHandlerImpl::ActiveUdpListener::addReadFilter(
