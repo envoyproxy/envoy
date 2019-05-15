@@ -8,7 +8,6 @@
 #include "common/common/empty_string.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/json/json_loader.h"
-#include "common/memory/stats.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/transport_socket_options_impl.h"
