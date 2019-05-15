@@ -358,21 +358,14 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 }
 
 template <class StatType>
-absl::optional<std::reference_wrapper<const StatType>>
-ThreadLocalStoreImpl::ScopeImpl::findStat(StatName name,
-                                          StatMap<std::shared_ptr<StatType>>& central_cache_map,
-                                          StatMap<std::shared_ptr<StatType>>* tls_cache) const {
+absl::optional<std::reference_wrapper<const StatType>> ThreadLocalStoreImpl::ScopeImpl::findStat(
+    StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map) const {
   auto iter = central_cache_map.find(name);
   if (iter == central_cache_map.end()) {
     return absl::nullopt;
   }
 
-  std::shared_ptr<StatType>* central_ref = &(iter->second);
-  if (tls_cache) {
-    tls_cache->insert(std::make_pair((*central_ref)->statName(), *central_ref));
-  }
-
-  return std::cref(*central_ref->get());
+  return std::cref(*iter->second.get());
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
@@ -519,13 +512,7 @@ ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
     return absl::nullopt;
   }
 
-  StatMap<CounterSharedPtr>* tls_cache = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_) {
-    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
-    tls_cache = &entry.counters_;
-  }
-
-  return findStat<Counter>(name, central_cache_.counters_, tls_cache);
+  return findStat<Counter>(name, central_cache_.counters_);
 }
 
 absl::optional<std::reference_wrapper<const Gauge>>
@@ -534,13 +521,7 @@ ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
     return absl::nullopt;
   }
 
-  StatMap<GaugeSharedPtr>* tls_cache = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_) {
-    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
-    tls_cache = &entry.gauges_;
-  }
-
-  return findStat<Gauge>(name, central_cache_.gauges_, tls_cache);
+  return findStat<Gauge>(name, central_cache_.gauges_);
 }
 
 absl::optional<std::reference_wrapper<const Histogram>>
@@ -549,23 +530,12 @@ ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
     return absl::nullopt;
   }
 
-  StatMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_) {
-    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
-    tls_cache = &entry.parent_histograms_;
-  }
-
   auto iter = central_cache_.histograms_.find(name);
   if (iter == central_cache_.histograms_.end()) {
     return absl::nullopt;
   }
 
-  ParentHistogramImplSharedPtr* central_ref = &(iter->second);
-  if (tls_cache) {
-    tls_cache->insert(std::make_pair((*central_ref)->statName(), *central_ref));
-  }
-
-  std::shared_ptr<Histogram> histogram_ref(*central_ref);
+  std::shared_ptr<Histogram> histogram_ref(iter->second);
   return std::cref(*histogram_ref.get());
 }
 
