@@ -9,7 +9,7 @@ namespace OriginalSrc {
 class Config {
 public:
   Config() = default;
-  Config(const envoy::config::filter::http::original_src::v2alpha1::OriginalSrc& config);
+  explicit Config(const envoy::config::filter::http::original_src::v2alpha1::OriginalSrc& config);
 
   uint32_t mark() const { return mark_; }
 

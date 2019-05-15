@@ -17,14 +17,14 @@ Http::FilterHeadersStatus OriginalSrcFilter::decodeHeaders(Http::HeaderMap&, boo
   const auto downstream_address = callbacks_->streamInfo().downstreamRemoteAddress();
   ASSERT(downstream_address);
 
-  ENVOY_LOG(debug,
-            "Got a new connection in the original_src filter for address {}. Marking with {}",
-            downstream_address->asString(), config_.mark());
-
   if (downstream_address->type() != Network::Address::Type::Ip) {
     // Nothing we can do with this.
     return Http::FilterHeadersStatus::Continue;
   }
+
+  ENVOY_LOG(debug,
+            "Got a new connection in the original_src filter for address {}. Marking with {}",
+            downstream_address->asString(), config_.mark());
 
   const auto options_to_add = Filters::Common::OriginalSrc::buildOriginalSrcOptions(
       std::move(downstream_address), config_.mark());

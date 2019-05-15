@@ -19,7 +19,7 @@ namespace OriginalSrc {
 namespace {
 
 TEST(OriginalSrcHttpConfigFactoryTest, TestCreateFactory) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
     mark: 5
 )EOF";
 

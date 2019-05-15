@@ -34,7 +34,7 @@ public:
 
   std::unique_ptr<OriginalSrcFilter>
   makeFilterWithCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
-    Config default_config;
+    const Config default_config;
     auto filter = std::make_unique<OriginalSrcFilter>(default_config);
     filter->setDecoderFilterCallbacks(callbacks);
     return filter;
@@ -44,7 +44,7 @@ public:
     envoy::config::filter::http::original_src::v2alpha1::OriginalSrc proto_config;
     proto_config.set_mark(mark);
 
-    Config config(proto_config);
+    const Config config(proto_config);
     auto filter = std::make_unique<OriginalSrcFilter>(config);
     filter->setDecoderFilterCallbacks(callbacks_);
     return filter;
@@ -64,7 +64,7 @@ protected:
   findOptionDetails(const Network::Socket::Options& options, Network::SocketOptionName name,
                     envoy::api::v2::core::SocketOption::SocketState state) {
     for (const auto& option : options) {
-      auto details = option->getOptionDetails(socket_, state);
+      const auto details = option->getOptionDetails(socket_, state);
       if (details.has_value() && details->name_ == name) {
         return details;
       }
@@ -90,14 +90,12 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressAddsOption) {
 
   EXPECT_EQ(filter->decodeHeaders(headers_, false), Http::FilterHeadersStatus::Continue);
 
-  // Not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
-  // for now.
-  ASSERT_NE(options->at(0), nullptr);
-
   NiceMock<Network::MockConnectionSocket> socket;
   EXPECT_CALL(socket,
               setLocalAddress(PointeesEq(callbacks_.stream_info_.downstream_remote_address_)));
-  options->at(0)->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  for (const auto& option : *options) {
+    option->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  }
 }
 
 TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressUsesCorrectAddress) {
@@ -108,9 +106,10 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressUsesCorrectAddress) {
 
   filter->decodeHeaders(headers_, false);
   std::vector<uint8_t> key;
-  // Not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
-  // for now.
-  options->at(0)->hashKey(key);
+  for (const auto& option : *options) {
+    option->hashKey(key);
+  }
+
   std::vector<uint8_t> expected_key = {1, 2, 3, 4};
 
   EXPECT_EQ(key, expected_key);
@@ -126,11 +125,11 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressBleachesPort) {
 
   NiceMock<Network::MockConnectionSocket> socket;
   const auto expected_address = Network::Utility::parseInternetAddress("1.2.3.4");
-  EXPECT_CALL(socket, setLocalAddress(PointeesEq(expected_address)));
 
-  // Not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
-  // for now.
-  options->at(0)->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  EXPECT_CALL(socket, setLocalAddress(PointeesEq(expected_address)));
+  for (const auto& option : *options) {
+    option->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  }
 }
 
 TEST_F(OriginalSrcHttpTest, FilterAddsTransparentOption) {
@@ -146,8 +145,8 @@ TEST_F(OriginalSrcHttpTest, FilterAddsTransparentOption) {
 
   filter->decodeHeaders(headers_, false);
 
-  auto transparent_option = findOptionDetails(*options, ENVOY_SOCKET_IP_TRANSPARENT,
-                                              envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  const auto transparent_option = findOptionDetails(
+      *options, ENVOY_SOCKET_IP_TRANSPARENT, envoy::api::v2::core::SocketOption::STATE_PREBIND);
 
   EXPECT_TRUE(transparent_option.has_value());
 }
@@ -165,8 +164,8 @@ TEST_F(OriginalSrcHttpTest, FilterAddsMarkOption) {
 
   filter->decodeHeaders(headers_, false);
 
-  auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
-                                       envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  const auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
+                                             envoy::api::v2::core::SocketOption::STATE_PREBIND);
 
   ASSERT_TRUE(mark_option.has_value());
   uint32_t value = 1234;
@@ -187,8 +186,8 @@ TEST_F(OriginalSrcHttpTest, Mark0NotAdded) {
 
   filter->decodeHeaders(headers_, false);
 
-  auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
-                                       envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  const auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
+                                             envoy::api::v2::core::SocketOption::STATE_PREBIND);
 
   ASSERT_FALSE(mark_option.has_value());
 }
