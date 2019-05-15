@@ -43,6 +43,11 @@ public:
    * @return the last time this RouteConfigProvider was updated. Used for config dumps.
    */
   virtual SystemTime lastUpdated() const PURE;
+
+  /**
+   * Callback used to notify RouteConfigProvider about configuration changes.
+   */
+  virtual void onConfigUpdate() PURE;
 };
 
 typedef std::unique_ptr<RouteConfigProvider> RouteConfigProviderPtr;

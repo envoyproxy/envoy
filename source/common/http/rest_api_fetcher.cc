@@ -30,11 +30,10 @@ void RestApiFetcher::initialize() { refresh(); }
 
 void RestApiFetcher::onSuccess(Http::MessagePtr&& response) {
   uint64_t response_code = Http::Utility::getResponseStatus(response->headers());
-   if (response_code == enumToInt(Http::Code::NotModified)) {
+  if (response_code == enumToInt(Http::Code::NotModified)) {
     requestComplete();
     return;
   } else if (response_code != enumToInt(Http::Code::OK)) {
-  if (response_code != enumToInt(Http::Code::OK)) {
     onFailure(Http::AsyncClient::FailureReason::Reset);
     return;
   }
@@ -46,7 +45,7 @@ void RestApiFetcher::onSuccess(Http::MessagePtr&& response) {
   }
 
   requestComplete();
-}
+  }
 
 void RestApiFetcher::onFailure(Http::AsyncClient::FailureReason) {
   onFetchFailure(nullptr);

@@ -38,16 +38,16 @@ void serializeThenDeserializeAndCheckEqualityInOneGo(AT expected) {
 
   Buffer::OwnedImpl buffer;
   EncodingContext encoder{-1};
-  const size_t written = encoder.encode(expected, buffer);
+  const uint32_t written = encoder.encode(expected, buffer);
   // Insert garbage after serialized payload.
-  const size_t garbage_size = encoder.encode(Bytes(10000), buffer);
+  const uint32_t garbage_size = encoder.encode(Bytes(10000), buffer);
 
   // Tell parser that there is more data, it should never consume more than written.
   const absl::string_view orig_data = {getRawData(buffer), written + garbage_size};
   absl::string_view data = orig_data;
 
   // when
-  const size_t consumed = testee.feed(data);
+  const uint32_t consumed = testee.feed(data);
 
   // then
   ASSERT_EQ(consumed, written);
@@ -56,7 +56,7 @@ void serializeThenDeserializeAndCheckEqualityInOneGo(AT expected) {
   assertStringViewIncrement(data, orig_data, consumed);
 
   // when - 2
-  const size_t consumed2 = testee.feed(data);
+  const uint32_t consumed2 = testee.feed(data);
 
   // then - 2 (nothing changes)
   ASSERT_EQ(consumed2, 0);
@@ -73,18 +73,18 @@ void serializeThenDeserializeAndCheckEqualityWithChunks(AT expected) {
 
   Buffer::OwnedImpl buffer;
   EncodingContext encoder{-1};
-  const size_t written = encoder.encode(expected, buffer);
+  const uint32_t written = encoder.encode(expected, buffer);
   // Insert garbage after serialized payload.
-  const size_t garbage_size = encoder.encode(Bytes(10000), buffer);
+  const uint32_t garbage_size = encoder.encode(Bytes(10000), buffer);
 
   const absl::string_view orig_data = {getRawData(buffer), written + garbage_size};
 
   // when
   absl::string_view data = orig_data;
-  size_t consumed = 0;
-  for (size_t i = 0; i < written; ++i) {
+  uint32_t consumed = 0;
+  for (uint32_t i = 0; i < written; ++i) {
     data = {data.data(), 1}; // Consume data byte-by-byte.
-    size_t step = testee.feed(data);
+    uint32_t step = testee.feed(data);
     consumed += step;
     ASSERT_EQ(step, 1);
     ASSERT_EQ(data.size(), 0);
@@ -99,7 +99,7 @@ void serializeThenDeserializeAndCheckEqualityWithChunks(AT expected) {
 
   // when - 2
   absl::string_view more_data = {data.data(), garbage_size};
-  const size_t consumed2 = testee.feed(more_data);
+  const uint32_t consumed2 = testee.feed(more_data);
 
   // then - 2 (nothing changes)
   ASSERT_EQ(consumed2, 0);

@@ -117,7 +117,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   }
 
   PathMatcherBuilder<const Protobuf::MethodDescriptor*> pmb;
-  std::unordered_set<ProtobufTypes::String> ignored_query_parameters;
+  std::unordered_set<std::string> ignored_query_parameters;
   for (const auto& query_param : proto_config.ignored_query_parameters()) {
     ignored_query_parameters.insert(query_param);
   }
@@ -175,9 +175,9 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
                                 "Request headers has application/grpc content-type");
   }
-  const ProtobufTypes::String method(headers.Method()->value().getStringView());
-  ProtobufTypes::String path(headers.Path()->value().getStringView());
-  ProtobufTypes::String args;
+  const std::string method(headers.Method()->value().getStringView());
+  std::string path(headers.Path()->value().getStringView());
+  std::string args;
 
   const size_t pos = path.find('?');
   if (pos != std::string::npos) {
@@ -483,9 +483,7 @@ void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& resp
       http_body.ParseFromZeroCopyStream(&stream);
       const auto& body = http_body.data();
 
-      // TODO(mrice32): This string conversion is currently required because body has a different
-      // type within Google. Remove when the string types merge.
-      data.add(ProtobufTypes::String(body));
+      data.add(body);
 
       response_headers.insertContentType().value(http_body.content_type());
       response_headers.insertContentLength().value(body.size());

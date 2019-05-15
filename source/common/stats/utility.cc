@@ -21,5 +21,18 @@ std::string Utility::sanitizeStatsName(absl::string_view name) {
   return stats_name;
 }
 
+absl::optional<StatName> Utility::findTag(Metric& metric, StatName find_tag_name) {
+  absl::optional<StatName> value;
+  metric.iterateTagStatNames(
+      [&value, &find_tag_name](Stats::StatName tag_name, Stats::StatName tag_value) -> bool {
+        if (tag_name == find_tag_name) {
+          value = tag_value;
+          return false;
+        }
+        return true;
+      });
+  return value;
+}
+
 } // namespace Stats
 } // namespace Envoy

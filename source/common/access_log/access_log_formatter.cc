@@ -112,7 +112,7 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
     (*output_struct.mutable_fields())[pair.first] = string_value;
   }
 
-  ProtobufTypes::String log_line;
+  std::string log_line;
   const auto conversion_status = Protobuf::util::MessageToJsonString(output_struct, &log_line);
   if (!conversion_status.ok()) {
     log_line =
@@ -504,7 +504,7 @@ std::string MetadataFormatter::format(const envoy::api::v2::core::Metadata& meta
     }
     data = &val;
   }
-  ProtobufTypes::String json;
+  std::string json;
   const auto status = Protobuf::util::MessageToJsonString(*data, &json);
   RELEASE_ASSERT(status.ok(), "");
   if (max_length_ && json.length() > max_length_.value()) {
