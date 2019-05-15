@@ -96,9 +96,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
   if (buffer_data_) {
-    if (end_stream || isBufferFull()) {
-      ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request", *callbacks_);
-      initiateCall(*request_headers_);
+    const bool buffer_is_full = isBufferFull();
+    if (end_stream || buffer_is_full) {
+      if (filter_return_ != FilterReturn::StopDecoding) {
+        ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request since {}",
+                         *callbacks_, buffer_is_full ? "buffer is full" : "stream is ended");
+        initiateCall(*request_headers_);
+      }
       return filter_return_ == FilterReturn::StopDecoding
                  ? Http::FilterDataStatus::StopIterationAndWatermark
                  : Http::FilterDataStatus::Continue;
