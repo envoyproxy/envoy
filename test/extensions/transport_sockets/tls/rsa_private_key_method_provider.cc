@@ -38,7 +38,7 @@ void RsaPrivateKeyConnection::delayed_op() {
 
   timer_ = dispatcher_.createTimer([this]() -> void {
     finished_ = true;
-    this->cb_.complete(Envoy::Ssl::PrivateKeyMethodStatus::Success);
+    this->cb_.complete();
     return;
   });
   timer_->enableTimer(timeout_0ms);

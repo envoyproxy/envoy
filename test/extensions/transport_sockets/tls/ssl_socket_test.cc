@@ -232,7 +232,6 @@ private:
   std::string expected_local_subject_;
   std::string expected_peer_cert_;
   std::string expected_peer_cert_chain_;
-  std::string expected_private_key_path_;
   std::string expected_valid_from_peer_cert_;
   std::string expected_expiration_peer_cert_;
 };
@@ -4042,7 +4041,6 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
 //   success cases:
 //     * test multi-cert (does this require a ECDSA provider?)
 //   failure cases:
-//     * test error return in complete() callback
 //     * test incorrect decryption
 
 // Test asynchronous signing (ECDHE)
