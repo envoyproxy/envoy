@@ -72,6 +72,7 @@ SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
     int rc = SSL_read(ssl_.get(), mem, remaining);
     ENVOY_CONN_LOG(trace, "ssl read returns: {}", callbacks_->connection(), rc);
     if (rc > 0) {
+      ASSERT(rc <= remaining);
       mem += rc;
       remaining -= rc;
       result.commit_slice_ = true;
