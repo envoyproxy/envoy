@@ -268,20 +268,43 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     break;
   }
 
-  // It is possible for this session to have been deferred destroyed inline in handleFailure()
-  // above so make sure we still have a connection that we might need to close.
-  if (client_ != nullptr &&
-      ((response_headers_->Connection() &&
-        absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
-                               Http::Headers::get().ConnectionValues.Close)) ||
-       (response_headers_->ProxyConnection() && protocol_ != Http::Protocol::Http2 &&
-        absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
-                               Http::Headers::get().ConnectionValues.Close)) ||
-       !parent_.reuse_connection_)) {
+  if (shouldClose()) {
     client_->close();
   }
 
   response_headers_.reset();
+}
+
+// It is possible for this session to have been deferred destroyed inline in handleFailure()
+// above so make sure we still have a connection that we might need to close.
+bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
+  if (client_ == nullptr) {
+    return false;
+  }
+
+  if (response_headers_->Connection()) {
+    const bool close =
+        absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
+                               Http::Headers::get().ConnectionValues.Close);
+    if (close) {
+      return true;
+    }
+  }
+
+  if (response_headers_->ProxyConnection() && protocol_ != Http::Protocol::Http2) {
+    const bool close =
+        absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
+                               Http::Headers::get().ConnectionValues.Close);
+    if (close) {
+      return true;
+    }
+  }
+
+  if (!parent_.reuse_connection_) {
+    return true;
+  }
+
+  return false;
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
