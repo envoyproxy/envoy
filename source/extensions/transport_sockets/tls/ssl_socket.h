@@ -75,7 +75,7 @@ public:
   const Ssl::ConnectionInfo* ssl() const override { return this; }
 
   // Ssl::PrivateKeyConnectionCallbacks
-  void complete(Envoy::Ssl::PrivateKeyMethodStatus status) override;
+  void complete() override;
 
   SSL* rawSslForTest() const { return ssl_.get(); }
 
