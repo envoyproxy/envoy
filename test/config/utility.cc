@@ -607,15 +607,20 @@ void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
   });
 }
 
-envoy::api::v2::DiscoveryResponse
-ConfigHelper::createLdsResponse(absl::string_view version_info) const {
+void ConfigHelper::setLds(absl::string_view version_info) {
+  applyConfigModifiers();
+
   envoy::api::v2::DiscoveryResponse lds;
   lds.set_version_info(std::string(version_info));
   for (auto& listener : bootstrap_.static_resources().listeners()) {
     ProtobufWkt::Any* resource = lds.add_resources();
     resource->PackFrom(listener);
   }
-  return lds;
+
+  const std::string lds_filename = bootstrap().dynamic_resources().lds_config().path();
+  std::string file = TestEnvironment::writeStringToFileForTest(
+      "new_lds_file", MessageUtil::getJsonStringFromMessage(lds));
+  TestUtility::renameFile(file, lds_filename);
 }
 
 EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("eds.pb_text", "")) {

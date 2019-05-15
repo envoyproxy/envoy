@@ -12,6 +12,9 @@ class FaultIntegrationTest : public Event::TestUsingSimulatedTime,
                              public HttpProtocolIntegrationTest {
 public:
   void initializeFilter(const std::string& filter_config) {
+    // There's some deadlock issue with simtime where the alarm may be scheduled
+    // and will not fire. Waiting for the injected delay appears to help.
+    use_lds_ = false;
     config_helper_.addFilter(filter_config);
     initialize();
   }
@@ -101,10 +104,6 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
                                           {"x-envoy-fault-throughput-response", "1"}};
   const auto current_time = simTime().monotonicTime();
   IntegrationStreamDecoderPtr decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
-  // There's some deadlock issue with simtime where the alarm may be scheduled
-  // and will not fire.  Waiting for the injected delay appears to help.
-  test_server_->waitForCounterGe("http.config_test.fault.delays_injected", 1);
-  simTime().sleep(std::chrono::milliseconds(200));
   waitForNextUpstreamRequest();
 
   // At least 200ms of simulated time should have elapsed before we got the upstream request.
