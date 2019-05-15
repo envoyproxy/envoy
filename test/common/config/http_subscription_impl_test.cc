@@ -50,9 +50,9 @@ TEST_F(HttpSubscriptionImplTest, ConfigNotModified) {
   http_callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
   timerTick();
   verifyStats(1, 0, 0, 1, 0);
-  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true, "200");
+  deliverConfigUpdateWithCode({"cluster0", "cluster1"}, "0", true, "200");
   verifyStats(1, 1, 0, 1, 7148434200721666028);
-  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true, "304");
+  deliverConfigUpdateWithCode({"cluster0", "cluster1"}, "0", true, "304");
   verifyStats(2, 2, 0, 1, 7148434200721666028);
 }
 
