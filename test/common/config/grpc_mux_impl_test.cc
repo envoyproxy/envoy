@@ -617,6 +617,8 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
 }
 
 TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
+  envoy::api::v2::core::GrpcService grpc_service;
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("xds_cluster");
   EXPECT_CALL(local_info_, clusterName()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_THROW_WITH_MESSAGE(
       GrpcMuxImpl(
@@ -630,6 +632,8 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
 }
 
 TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
+  envoy::api::v2::core::GrpcService grpc_service;
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("xds_cluster");
   EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_THROW_WITH_MESSAGE(
       GrpcMuxImpl(
