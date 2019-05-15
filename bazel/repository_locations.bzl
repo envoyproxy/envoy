@@ -211,13 +211,6 @@ REPOSITORY_LOCATIONS = dict(
         # 2018-12-19
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/64d6ac985360b624d8e95105701b64a3814794cd.tar.gz"],
     ),
-    com_github_golang_protobuf = dict(
-        # TODO(sesmith177): Remove this dependency when:
-        #   1. There's a release of rules_go that includes golang/protobuf v1.3.1
-        sha256 = "3f3a6123054a9847093c119895f1660612f301fe95358f3a6a1a33fd0933e6cf",
-        strip_prefix = "protobuf-1.3.1",
-        urls = ["https://github.com/golang/protobuf/archive/v1.3.1.tar.gz"],
-    ),
     io_bazel_rules_go = dict(
         sha256 = "91b79f4758fd16f2c6426279ce00c1d2d8577d61c519db39675ed84657e1a95e",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.17.4/rules_go-0.17.4.tar.gz"],
