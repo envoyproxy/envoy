@@ -197,6 +197,7 @@ TEST_F(SimulatedTimeSystemTest, DeleteTime) {
   EXPECT_EQ("36", output_);
 }
 
+// Regression test for issues documented in https://github.com/envoyproxy/envoy/pull/6956
 TEST_F(SimulatedTimeSystemTest, DuplicateTimer) {
   // Set one alarm two times to test that pending does not get duplicated..
   std::chrono::milliseconds delay(0);
