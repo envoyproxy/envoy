@@ -174,7 +174,7 @@ public:
 
     router_->retry_state_->expectResetRetry();
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::TIMEOUT, _));
+                putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
     per_try_timeout_->callback_();
 
     // We expect this reset to kick off a new request.
@@ -185,7 +185,7 @@ public:
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
               EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
-                          putResult(Upstream::Outlier::Result::CONNECT_SUCCESS, _));
+                          putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _));
               callbacks.onPoolReady(encoder2, context_.cluster_manager_.conn_pool_.host_);
               return nullptr;
             }));

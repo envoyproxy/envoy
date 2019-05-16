@@ -557,7 +557,8 @@ void Filter::onResponseTimeout() {
       upstream_requests_.front()->upstream_host_->stats().rq_timeout_.inc();
     }
 
-    updateOutlierDetection(Upstream::Outlier::Result::TIMEOUT, *upstream_requests_.front().get(),
+    updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT,
+                           *upstream_requests_.front().get(),
                            absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
     upstream_requests_.front()->resetStream();
   }
@@ -567,7 +568,7 @@ void Filter::onResponseTimeout() {
 }
 
 void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
-  updateOutlierDetection(Upstream::Outlier::Result::TIMEOUT, upstream_request,
+  updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, upstream_request,
                          absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
 
   if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request)) {
@@ -680,7 +681,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
     This matters only when running OutlierDetection with split_external_local_origin_errors config
     param set to true.
   */
-  updateOutlierDetection(Upstream::Outlier::Result::CONNECT_FAILED, upstream_request,
+  updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, upstream_request,
                          absl::nullopt);
 
   if (maybeRetryReset(reset_reason, upstream_request)) {
@@ -1223,7 +1224,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host) {
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
 
-  host->outlierDetector().putResult(Upstream::Outlier::Result::CONNECT_SUCCESS);
+  host->outlierDetector().putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS);
 
   // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);

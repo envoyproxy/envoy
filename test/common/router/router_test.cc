@@ -896,9 +896,9 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   HttpTestUtility::addDefaultHeaders(headers);
   // First connection is successful and reset happens later on.
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_SUCCESS, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
   router_.decodeHeaders(headers, true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -935,7 +935,7 @@ TEST_F(RouterTest, UpstreamTimeout) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(0);
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
   response_timeout_->callback_();
 
   EXPECT_EQ(1U,
@@ -1067,7 +1067,7 @@ TEST_F(RouterTest, GrpcReset) {
   response_decoder->decodeHeaders(std::move(response_headers), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
   EXPECT_EQ(1UL, stats_store_.counter("test.rq_reset_after_downstream_response_started").value());
@@ -1155,8 +1155,9 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
   Http::TestHeaderMapImpl response_headers{{":status", "204"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(0);
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::TIMEOUT, absl::optional<uint64_t>(204)));
+  EXPECT_CALL(
+      cm_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(204)));
   response_timeout_->callback_();
 
   EXPECT_EQ(1U,
@@ -1202,8 +1203,9 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::TIMEOUT, absl::optional<uint64_t>(504)));
+  EXPECT_CALL(
+      cm_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
   per_try_timeout_->callback_();
 
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -1254,7 +1256,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutDelayedPoolReady) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
   per_try_timeout_->callback_();
 
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -1301,7 +1303,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
 
   EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
   EXPECT_CALL(*per_try_timeout_, disableTimer());
   EXPECT_CALL(*response_timeout_, disableTimer());
   EXPECT_CALL(callbacks_.stream_info_,
@@ -1342,7 +1344,7 @@ TEST_F(RouterTest, RetryRequestNotComplete) {
 
   router_.retry_state_->expectResetRetry();
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -1370,7 +1372,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
 
   router_.retry_state_->expectResetRetry();
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::LocalReset);
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _)).WillOnce(Return(nullptr));
@@ -1402,7 +1404,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
 
   router_.retry_state_->expectResetRetry();
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 
   // We expect this reset to kick off a new request.
@@ -1412,7 +1414,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-                    putResult(Upstream::Outlier::Result::CONNECT_SUCCESS, _));
+                    putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _));
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
       }));
@@ -1452,7 +1454,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
   router_.retry_state_->expectResetRetry();
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
   per_try_timeout_->callback_();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -1463,7 +1465,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-                    putResult(Upstream::Outlier::Result::CONNECT_SUCCESS, _));
+                    putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _));
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
       }));
@@ -1583,7 +1585,7 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
   absl::string_view rc_details2 = "upstream_reset_after_response_started{remote reset}";
   EXPECT_CALL(callbacks_.stream_info_, setResponseCodeDetails(rc_details2));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   // For normal HTTP, once we have a 200 we consider this a success, even if a
   // later reset occurs.
@@ -1617,7 +1619,7 @@ TEST_F(RouterTest, RetryUpstreamReset100ContinueResponseStarted) {
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 }
 
@@ -3139,7 +3141,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
 
   // This should not trigger a retry as the retry state has been deleted.
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_EQ(callbacks_.details_, "upstream_reset_before_response_started{remote reset}");
 }

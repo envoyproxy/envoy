@@ -98,20 +98,20 @@ Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
   Http::Code http_code = Http::Code::InternalServerError;
 
   switch (result) {
-  case Result::REQUEST_SUCCESS:
+  case Result::EXT_ORIGIN_REQUEST_SUCCESS:
     http_code = Http::Code::OK;
     break;
-  case Result::TIMEOUT:
+  case Result::LOCAL_ORIGIN_TIMEOUT:
     http_code = Http::Code::GatewayTimeout;
     break;
-  case Result::CONNECT_FAILED:
+  case Result::LOCAL_ORIGIN_CONNECT_FAILED:
     http_code = Http::Code::ServiceUnavailable;
     break;
-  case Result::REQUEST_FAILED:
+  case Result::EXT_ORIGIN_REQUEST_FAILED:
     http_code = Http::Code::InternalServerError;
     break;
-  case Result::CONNECT_SUCCESS:
-    // Must never happen - CONNECT_SUCCESS is not mapped to HTTP code.
+  case Result::LOCAL_ORIGIN_CONNECT_SUCCESS:
+    // Must never happen - LOCAL_ORIGIN_CONNECT_SUCCESS is not mapped to HTTP code.
     // See DetectorHostMonitorImpl::putResultNoLocalExternalSplit
     NOT_REACHED_GCOVR_EXCL_LINE;
     break;
@@ -125,12 +125,17 @@ Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
 void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
                                                             absl::optional<uint64_t> code) {
   switch (result) {
-  case Result::CONNECT_SUCCESS:
-    // CONNECT_SUCCESS is treated specially and is not mapped to HTTP code.
-    // It indicates that Envoy connected to upstream host. The upstream host will subsequently
-    // return HTTP code as part of the transaction. If CONNECT_SUCCESS was mapped
-    // to HTTP there would be 2 codes for each transaction.
-    break;
+  case Result::LOCAL_ORIGIN_CONNECT_SUCCESS:
+    // LOCAL_ORIGIN_CONNECT_SUCCESS is treated specially and may not be mapped to HTTP code.
+    // LOCAL_ORIGIN_CONNECT_SUCCESS indicates that Envoy connected to upstream host. The upstream
+    // host will subsequently return HTTP code as part of the transaction. If
+    // LOCAL_ORIGIN_CONNECT_SUCCESS was mapped to HTTP there would be 2 codes for each transaction.
+    // If caller wants LOCAL_ORIGIN_CONNECT_SUCCESS to be mapped to HTTP code then proceed,
+    // otherwise bail out here.
+    if (!code) {
+      return;
+    }
+    __attribute__((fallthrough));
   default:
     putHttpResponseCode(code ? code.value() : enumToInt(resultToHttpCode(result)));
     break;
@@ -145,22 +150,23 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
   switch (result) {
   // SUCCESS is used to report success for connection level. Server may still respond with
   // error, but connection to server was OK.
-  case Result::CONNECT_SUCCESS:
+  case Result::LOCAL_ORIGIN_CONNECT_SUCCESS:
     return localOriginNoFailure();
   // Connectivity related errors.
-  case Result::TIMEOUT:
-  case Result::CONNECT_FAILED:
+  case Result::LOCAL_ORIGIN_TIMEOUT:
+  case Result::LOCAL_ORIGIN_CONNECT_FAILED:
     return localOriginFailure();
-  // REQUEST_FAILED is used when connection to server was successful, but transaction on server
-  // level failed. Since it it similar to HTTP 5xx, map it to 5xx handler.
-  case Result::REQUEST_FAILED:
+  // EXT_ORIGIN_REQUEST_FAILED is used when connection to server was successful, but transaction on
+  // server level failed. Since it it similar to HTTP 5xx, map it to 5xx handler.
+  case Result::EXT_ORIGIN_REQUEST_FAILED:
     // map it to http code and call http handler.
     return putHttpResponseCode(enumToInt(Http::Code::ServiceUnavailable));
     break;
-  // REQUEST_SUCCESS is used to report that transaction with non-http server was completed
-  // successfully. This means that connection and server level transactions were successful. Map it
-  // to http code 200 OK and indicate that there was no errors on connection level.
-  case Result::REQUEST_SUCCESS:
+  // EXT_ORIGIN_REQUEST_SUCCESS is used to report that transaction with non-http server was
+  // completed successfully. This means that connection and server level transactions were
+  // successful. Map it to http code 200 OK and indicate that there was no errors on connection
+  // level.
+  case Result::EXT_ORIGIN_REQUEST_SUCCESS:
     putHttpResponseCode(enumToInt(Http::Code::OK));
     localOriginNoFailure();
     break;

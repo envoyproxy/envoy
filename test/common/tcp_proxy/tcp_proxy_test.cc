@@ -616,11 +616,11 @@ TEST_F(TcpProxyTest, ConnectAttemptsLimit) {
   setup(3, config);
 
   EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
   EXPECT_CALL(upstream_hosts_.at(1)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
   EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
 
@@ -642,16 +642,17 @@ TEST_F(TcpProxyTest, OutlierDetection) {
   setup(3, config);
 
   EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
   raiseEventUpstreamConnectFailed(0, Tcp::ConnectionPool::PoolFailureReason::Timeout);
 
   EXPECT_CALL(upstream_hosts_.at(1)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
   raiseEventUpstreamConnectFailed(1,
                                   Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::REQUEST_SUCCESS, _));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                        absl::optional<uint64_t>(enumToInt(Http::Code::OK))));
   raiseEventUpstreamConnected(2);
 }
 
