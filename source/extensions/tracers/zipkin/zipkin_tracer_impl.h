@@ -211,6 +211,7 @@ private:
   Event::TimerPtr flush_timer_;
   SpanBuffer span_buffer_;
   const std::string collector_endpoint_;
+  SpanSerializer span_serializer_;
 };
 } // namespace Zipkin
 } // namespace Tracers

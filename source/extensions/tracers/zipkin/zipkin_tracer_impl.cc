@@ -126,17 +126,29 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
   return active_span;
 }
 
+HTTPSpanSerializerV1::HTTPSpanSerializerV1() {}
+const std::string HTTPSpanSerializerV1::serialize(const Span& span) { return span.toJson(); }
+
+HTTPSpanSerializer::HTTPSpanSerializer() {}
+const std::string HTTPSpanSerializer::serialize(const Span& span) { return span.toJson(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON); }
+
+HTTPProtoSpanSerializer::HTTPProtoSpanSerializer() {}
+const std::string HTTPProtoSpanSerializer::serialize(const Span& span) { 
+  std::string payload;
+  span_buffer_.toProto().SerializeToString(&payload);
+  return payload;
+}
+
 ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
-                           const std::string& collector_endpoint,
-                           const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion
-                               collector_endpoint_version)
-    : driver_(driver), span_buffer_(collector_endpoint_version),
-      collector_endpoint_(collector_endpoint) {
+                           const std::string& collector_endpoint, SpanSerializer& span_serializer)
+    : driver_(driver), collector_endpoint_(collector_endpoint) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
     flushSpans();
     enableTimer();
   });
+
+  span_serializer_ = span_serializer;
 
   const uint64_t min_flush_spans =
       driver_.runtime().snapshot().getInteger("tracing.zipkin.min_flush_spans", 5U);
@@ -145,13 +157,25 @@ ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
   enableTimer();
 }
 
-ReporterPtr
-ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
-                          const std::string& collector_endpoint,
-                          const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion
-                              collector_endpoint_version) {
+ReporterPtr ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
+                                      const std::string& collector_endpoint,
+                                      const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion collector_endpoint_version) {
+  SpanSerializer span_serializer;
+
+  switch (collector_endpoint) {
+    case envoy::config::trace::v2::ZipkinConfig::HTTP_JSON
+      span_serializer = new HTTPSpanSerializer()
+    break;
+    case envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO
+      span_serializer = new HTTPProtoSpanSerializer()
+    break;
+    default:
+      span_serializer = new HTTPSpanSerializerV1();
+    break;
+  }
+
   return ReporterPtr(
-      new ReporterImpl(driver, dispatcher, collector_endpoint, collector_endpoint_version));
+      new ReporterImpl(driver, dispatcher, collector_endpoint, span_serializer));
 }
 
 // TODO(fabolive): Need to avoid the copy to improve performance.
@@ -176,6 +200,7 @@ void ReporterImpl::flushSpans() {
   if (span_buffer_.pendingSpans()) {
     driver_.tracerStats().spans_sent_.add(span_buffer_.pendingSpans());
 
+    const std::string request_body = span_buffer_.toStringifiedJsonArray(span_serializer_);
     Http::MessagePtr message(new Http::RequestMessageImpl());
     message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
     message->headers().insertPath().value(collector_endpoint_);

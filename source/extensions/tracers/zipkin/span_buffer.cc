@@ -38,6 +38,22 @@ std::string SpanBuffer::toStringifiedJsonArray() {
     for (uint64_t i = 1; i < size; i++) {
       stringified_json_array += ",";
       stringified_json_array += span_buffer_[i].toJson(version_);
+          }
+  }
+  stringified_json_array += "]";
+
+  return stringified_json_array;
+}
+
+std::string SpanBuffer::toStringifiedJsonArray(SpanSerializer& span_serialier) {
+  std::string stringified_json_array = "[";
+
+  if (pendingSpans()) {
+    stringified_json_array += span_serialier.serialize(span_buffer_[0]);
+    const uint64_t size = span_buffer_.size();
+    for (uint64_t i = 1; i < size; i++) {
+      stringified_json_array += ",";
+      stringified_json_array += span_serialier.serialize(span_buffer_[i]);
     }
   }
   stringified_json_array += "]";

@@ -2,6 +2,7 @@
 
 #include "envoy/config/trace/v2/trace.pb.h"
 
+#include "extensions/tracers/zipkin/span_serializer.h"
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
 namespace Envoy {
@@ -64,7 +65,7 @@ public:
    * @return the contents of the buffer as a stringified array of JSONs, where
    * each JSON in the array corresponds to one Zipkin span.
    */
-  std::string toStringifiedJsonArray();
+  std::string toStringifiedJsonArray(SpanSerializer& span_serializer);
 
   const zipkin::proto3::ListOfSpans toProto();
 
