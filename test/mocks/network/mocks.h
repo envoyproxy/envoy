@@ -372,6 +372,7 @@ public:
 
   const std::string& asString() const override { return physical_; }
   const std::string& logicalName() const override { return logical_; }
+  std::chrono::seconds ttl() const override { return std::chrono::seconds::max(); }
 
   const std::string logical_;
   const std::string physical_;

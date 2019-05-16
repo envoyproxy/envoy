@@ -55,9 +55,9 @@ enum record_type { A, AAAA };
 class TestDnsServerQuery {
 public:
   TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_A, const HostMap& hosts_AAAA,
-                     const CNameMap& cnames)
+                     const CNameMap& cnames, const std::chrono::seconds& record_ttl)
       : connection_(std::move(connection)), hosts_A_(hosts_A), hosts_AAAA_(hosts_AAAA),
-        cnames_(cnames) {
+        cnames_(cnames), record_ttl_(record_ttl) {
     connection_->addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
@@ -199,7 +199,7 @@ private:
           DNS_RR_SET_TYPE(cname_rr_fixed, T_CNAME);
           DNS_RR_SET_LEN(cname_rr_fixed, encodedCname.size() + 1);
           DNS_RR_SET_CLASS(cname_rr_fixed, C_IN);
-          DNS_RR_SET_TTL(cname_rr_fixed, 0);
+          DNS_RR_SET_TTL(cname_rr_fixed, parent_.record_ttl_.count());
           write_buffer.add(question, name_len);
           write_buffer.add(cname_rr_fixed, RRFIXEDSZ);
           write_buffer.add(encodedCname.c_str(), encodedCname.size() + 1);
@@ -215,7 +215,7 @@ private:
           DNS_RR_SET_LEN(response_rr_fixed, sizeof(in6_addr));
         }
         DNS_RR_SET_CLASS(response_rr_fixed, C_IN);
-        DNS_RR_SET_TTL(response_rr_fixed, 0);
+        DNS_RR_SET_TTL(response_rr_fixed, parent_.record_ttl_.count());
         if (ips != nullptr) {
           for (const auto& it : *ips) {
             write_buffer.add(ip_question, ip_name_len);
@@ -253,11 +253,12 @@ private:
   const HostMap& hosts_A_;
   const HostMap& hosts_AAAA_;
   const CNameMap& cnames_;
+  const std::chrono::seconds& record_ttl_;
 };
 
 class TestDnsServer : public ListenerCallbacks {
 public:
-  TestDnsServer(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+  TestDnsServer(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher), record_ttl_(0) {}
 
   void onAccept(ConnectionSocketPtr&& socket, bool) override {
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
@@ -266,8 +267,8 @@ public:
   }
 
   void onNewConnection(ConnectionPtr&& new_connection) override {
-    TestDnsServerQuery* query =
-        new TestDnsServerQuery(std::move(new_connection), hosts_A_, hosts_AAAA_, cnames_);
+    TestDnsServerQuery* query = new TestDnsServerQuery(std::move(new_connection), hosts_A_,
+                                                       hosts_AAAA_, cnames_, record_ttl_);
     queries_.emplace_back(query);
   }
 
@@ -283,12 +284,15 @@ public:
     cnames_[hostname] = cname;
   }
 
+  void setRecordTtl(const std::chrono::seconds& ttl) { record_ttl_ = ttl; }
+
 private:
   Event::Dispatcher& dispatcher_;
 
   HostMap hosts_A_;
   HostMap hosts_AAAA_;
   CNameMap cnames_;
+  std::chrono::seconds record_ttl_;
   // All queries are tracked so we can do resource reclamation when the test is
   // over.
   std::vector<std::unique_ptr<TestDnsServerQuery>> queries_;
@@ -372,6 +376,7 @@ public:
   const Address::Ip* ip() const override { return instance_.ip(); }
   IoHandlePtr socket(Address::SocketType type) const override { return instance_.socket(type); }
   Address::Type type() const override { return instance_.type(); }
+  std::chrono::seconds ttl() const override { return instance_.ttl(); }
 
 private:
   std::string antagonistic_name_;
@@ -746,6 +751,99 @@ TEST_P(DnsImplTest, Cancel) {
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(hasAddress(address_list, "201.134.56.7"));
+}
+
+// Validate working of querying ttl of resource record.
+TEST_P(DnsImplTest, RecordTtlLookup) {
+  if (GetParam() == Address::IpVersion::v4) {
+    EXPECT_EQ(nullptr, resolver_->resolve(
+                           "localhost", DnsLookupFamily::V4Only,
+                           [](const std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                             for (auto address : results) {
+                               // Default ttl is std::chrono::seconds::max()
+                               EXPECT_EQ(address->ttl(), std::chrono::seconds::max());
+                             }
+                           }));
+  }
+
+  if (GetParam() == Address::IpVersion::v6) {
+    EXPECT_EQ(nullptr, resolver_->resolve(
+                           "localhost", DnsLookupFamily::V6Only,
+                           [](const std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                             for (auto address : results) {
+                               // Default ttl is std::chrono::seconds::max()
+                               EXPECT_EQ(address->ttl(), std::chrono::seconds::max());
+                             }
+                           }));
+
+    EXPECT_EQ(nullptr, resolver_->resolve(
+                           "localhost", DnsLookupFamily::Auto,
+                           [](const std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                             for (auto address : results) {
+                               // Default ttl is std::chrono::seconds::max()
+                               EXPECT_EQ(address->ttl(), std::chrono::seconds::max());
+                             }
+                           }));
+  }
+
+  server_->addHosts("some.good.domain", {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, A);
+  server_->addHosts("some.good.domain", {"1::2", "1::2:3", "1::2:3:4"}, AAAA);
+  server_->setRecordTtl(std::chrono::seconds(300));
+
+  EXPECT_NE(nullptr, resolver_->resolve(
+                         "some.good.domain", DnsLookupFamily::V4Only,
+                         [&](const std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                           for (auto address : results) {
+                             EXPECT_EQ(address->ttl(), std::chrono::seconds(300));
+                           }
+
+                           dispatcher_->exit();
+                         }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_NE(nullptr, resolver_->resolve(
+                         "some.good.domain", DnsLookupFamily::Auto,
+                         [&](const std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                           for (auto address : results) {
+                             EXPECT_EQ(address->ttl(), std::chrono::seconds(300));
+                           }
+                           dispatcher_->exit();
+                         }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_NE(nullptr, resolver_->resolve(
+                         "some.good.domain", DnsLookupFamily::V6Only,
+                         [&](const std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                           for (auto address : results) {
+                             EXPECT_EQ(address->ttl(), std::chrono::seconds(300));
+                           }
+                           dispatcher_->exit();
+                         }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  std::list<Address::InstanceConstSharedPtr> address_list;
+
+  server_->addHosts("domain.onion", {"1.2.3.4"}, A);
+  server_->addHosts("domain.onion.", {"2.3.4.5"}, A);
+
+  // test onion domain
+  EXPECT_EQ(nullptr, resolver_->resolve(
+                         "domain.onion", DnsLookupFamily::V4Only,
+                         [&](const std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                           address_list = results;
+                           dispatcher_->exit();
+                         }));
+
+  EXPECT_EQ(nullptr, resolver_->resolve(
+                         "domain.onion.", DnsLookupFamily::V4Only,
+                         [&](const std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                           address_list = results;
+                           dispatcher_->exit();
+                         }));
+  EXPECT_TRUE(address_list.empty());
 }
 
 class DnsImplZeroTimeoutTest : public DnsImplTest {
