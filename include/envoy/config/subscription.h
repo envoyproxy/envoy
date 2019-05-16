@@ -83,7 +83,7 @@ public:
    */
   virtual void updateResources(const std::set<std::string>& update_to_these_names) PURE;
 
-  virtual void updateResourcesViaAliases(const std::vector<std::string>&) {
+  virtual void updateResourcesViaAliases(const std::set<std::string>&) {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 };

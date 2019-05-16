@@ -48,7 +48,8 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
       factory_context.api());
 }
 
-void VhdsSubscription::ondemandUpdate(const std::vector<std::string>& aliases) {
+void VhdsSubscription::ondemandUpdate(const std::set<std::string>& aliases) {
+  std::cout << "11111111111111111111111111111111111\n";
   subscription_->updateResourcesViaAliases(aliases);
 }
 

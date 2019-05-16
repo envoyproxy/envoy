@@ -138,7 +138,7 @@ void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
   init_target_.ready();
 }
 
-void RdsRouteConfigSubscription::ondemandUpdate(const std::vector<std::string>& aliases) {
+void RdsRouteConfigSubscription::ondemandUpdate(const std::set<std::string>& aliases) {
   if (vhds_subscription_.get() == nullptr)
     return;
   vhds_subscription_->ondemandUpdate(aliases);
@@ -149,7 +149,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     Server::Configuration::FactoryContext& factory_context)
     : subscription_(std::move(subscription)),
       config_update_info_(subscription_->routeConfigUpdate()), factory_context_(factory_context),
-      tls_(factory_context.threadLocal().allocateSlot(), config_update_callbacks_(factory_context.threadLocal().allocateSlot()) {
+      tls_(factory_context.threadLocal().allocateSlot()), config_update_callbacks_(factory_context.threadLocal().allocateSlot()) {
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {
     initial_config = std::make_shared<ConfigImpl>(config_update_info_->routeConfiguration(),
@@ -191,7 +191,15 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
   ConfigConstSharedPtr new_config(
       new ConfigImpl(config_update_info_->routeConfiguration(), factory_context_, false));
   tls_->runOnAllThreads(
-      [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
+      [this, new_config]() -> void {
+        tls_->getTyped<ThreadLocalConfig>().config_ = new_config;
+        auto callbacks = config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_;
+          if (!callbacks.empty()) {
+            auto cb = callbacks.front();
+            callbacks.pop();
+            cb();
+        }
+      });
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {

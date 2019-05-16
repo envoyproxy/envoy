@@ -42,6 +42,12 @@ void DeltaSubscriptionImpl::updateResources(const std::set<std::string>& update_
   trySendDiscoveryRequests();
 }
 
+void DeltaSubscriptionImpl::updateResourcesViaAliases(const std::set<std::string>& updates_to_these_aliases) {
+  state_->updateResourceInterestViaAliases(updates_to_these_aliases);
+  // Tell the server about our new interests, if there are any.
+  trySendDiscoveryRequests();
+}
+
 // Config::GrpcStreamCallbacks
 void DeltaSubscriptionImpl::onStreamEstablished() {
   state_->markStreamFresh();

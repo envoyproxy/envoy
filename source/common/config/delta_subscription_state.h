@@ -35,6 +35,7 @@ public:
 
   // Update which resources we're interested in subscribing to.
   void updateResourceInterest(const std::set<std::string>& update_to_these_names);
+  void updateResourceInterestViaAliases(const std::set<std::string>& updates_to_these_aliases);
 
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   bool subscriptionUpdatePending() const;
@@ -75,6 +76,8 @@ private:
   void setResourceVersion(const std::string& resource_name, const std::string& resource_version);
   void setResourceWaitingForServer(const std::string& resource_name);
   void setLostInterestInResource(const std::string& resource_name);
+  void populateDiscoveryRequest(envoy::api::v2::DeltaDiscoveryRequest &request);
+  void populateDiscoveryRequestWithAliases(envoy::api::v2::DeltaDiscoveryRequest &request);
 
   // A map from resource name to per-resource version. The keys of this map are exactly the resource
   // names we are currently interested in. Those in the waitingForServer state currently don't have
@@ -99,6 +102,7 @@ private:
   // Feel free to change to unordered if you can figure out how to make it work.
   std::set<std::string> names_added_;
   std::set<std::string> names_removed_;
+  std::set<std::string> aliases_added_;
 
   SubscriptionStats& stats_;
 };

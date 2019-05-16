@@ -76,10 +76,14 @@ void DeltaSubscriptionState::updateResourceInterest(
   }
 }
 
+void DeltaSubscriptionState::updateResourceInterestViaAliases(const std::set<std::string>& updates_to_these_aliases) {
+  aliases_added_.insert(updates_to_these_aliases.begin(), updates_to_these_aliases.end());
+}
+
 // Not having sent any requests yet counts as an "update pending" since you're supposed to resend
 // the entirety of your interest at the start of a stream, even if nothing has changed.
 bool DeltaSubscriptionState::subscriptionUpdatePending() const {
-  return !names_added_.empty() || !names_removed_.empty() ||
+  return !aliases_added_.empty() || !names_added_.empty() || !names_removed_.empty() ||
          !any_request_sent_yet_in_current_stream_;
 }
 
@@ -143,12 +147,32 @@ void DeltaSubscriptionState::handleEstablishmentFailure() {
 
 envoy::api::v2::DeltaDiscoveryRequest DeltaSubscriptionState::getNextRequest() {
   envoy::api::v2::DeltaDiscoveryRequest request;
+  if(!any_request_sent_yet_in_current_stream_) {
+    populateDiscoveryRequest(request);
+  } else if (!aliases_added_.empty()) {
+    populateDiscoveryRequestWithAliases(request);
+  } else {
+    populateDiscoveryRequest(request);
+  }
+
+  request.set_type_url(type_url_);
+  request.mutable_node()->MergeFrom(local_info_.node());
+  return request;
+}
+
+void DeltaSubscriptionState::populateDiscoveryRequestWithAliases(envoy::api::v2::DeltaDiscoveryRequest &request) {
+  std::copy(aliases_added_.begin(), aliases_added_.end(),
+            Protobuf::RepeatedFieldBackInserter(request.mutable_resource_names_subscribe()));
+  aliases_added_.clear();
+}
+
+void DeltaSubscriptionState::populateDiscoveryRequest(envoy::api::v2::DeltaDiscoveryRequest &request) {
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
     // initial_resource_versions "must be populated for first request in a stream".
     // Also, since this might be a new server, we must explicitly state *all* of our subscription
     // interest.
-    for (auto const& resource : resource_versions_) {
+    for (auto const &resource : resource_versions_) {
       // Populate initial_resource_versions with the resource versions we currently have.
       // Resources we are interested in, but are still waiting to get any version of from the
       // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
@@ -167,10 +191,6 @@ envoy::api::v2::DeltaDiscoveryRequest DeltaSubscriptionState::getNextRequest() {
             Protobuf::RepeatedFieldBackInserter(request.mutable_resource_names_unsubscribe()));
   names_added_.clear();
   names_removed_.clear();
-
-  request.set_type_url(type_url_);
-  request.mutable_node()->MergeFrom(local_info_.node());
-  return request;
 }
 
 void DeltaSubscriptionState::disableInitFetchTimeoutTimer() {

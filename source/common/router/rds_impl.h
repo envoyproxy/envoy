@@ -96,37 +96,6 @@ struct RdsStats {
 
 class RdsRouteConfigProviderImpl;
 
-class RdsConfigUpdateInfo : public RouteConfigUpdateInfo {
-public:
-  RdsConfigUpdateInfo(envoy::api::v2::RouteConfiguration& rc, SystemTime last_updated,
-                      absl::optional<LastConfigInfo> config_info)
-      : route_config_proto_(rc), last_updated_(last_updated), config_info_(std::move(config_info)) {
-  }
-
-  absl::optional<LastConfigInfo> configInfo() const override { return config_info_; }
-  envoy::api::v2::RouteConfiguration& routeConfiguration() override { return route_config_proto_; }
-  SystemTime lastUpdated() const override { return last_updated_; }
-
-private:
-  envoy::api::v2::RouteConfiguration& route_config_proto_;
-  SystemTime last_updated_;
-  absl::optional<LastConfigInfo> config_info_;
-};
-
-class VhdsConfigUpdateInfo : public RouteConfigUpdateInfo {
-public:
-  VhdsConfigUpdateInfo(RouteConfigUpdateInfo& subscription) : subscription_(subscription) {}
-
-  absl::optional<LastConfigInfo> configInfo() const override { return subscription_.configInfo(); }
-  envoy::api::v2::RouteConfiguration& routeConfiguration() override {
-    return subscription_.routeConfiguration();
-  }
-  SystemTime lastUpdated() const override { return subscription_.lastUpdated(); }
-
-private:
-  RouteConfigUpdateInfo& subscription_;
-};
-
 /**
  * A class that fetches the route configuration dynamically using the RDS API and updates them to
  * RDS config providers.
@@ -141,6 +110,7 @@ public:
   }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
 
+  void ondemandUpdate(const std::set<std::string>& aliases);
   // Config::SubscriptionCallbacks
   // TODO(fredlas) deduplicate
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -153,12 +123,6 @@ public:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
   }
-  absl::optional<LastConfigInfo> configInfo() const { return config_update_info_->configInfo(); }
-  void ondemandUpdate(const std::vector<std::string>& aliases);
-  envoy::api::v2::RouteConfiguration& routeConfiguration() {
-    return config_update_info_->routeConfiguration();
-  }
-  SystemTime lastUpdated() const { return config_update_info_->lastUpdated(); }
 
 private:
   RdsRouteConfigSubscription(
@@ -168,7 +132,6 @@ private:
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
-  Server::Configuration::FactoryContext& factory_context_;
   const std::string route_config_name_;
   Server::Configuration::FactoryContext& factory_context_;
   Init::TargetImpl init_target_;
@@ -201,6 +164,7 @@ public:
 
   RdsRouteConfigSubscription& subscription() { return *subscription_; }
   void onConfigUpdate() override;
+  bool requestConfigUpdate(const std::string for_domain, std::function<void()> cb);
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;
@@ -223,7 +187,6 @@ private:
   RdsRouteConfigSubscriptionSharedPtr subscription_;
   RouteConfigUpdatePtr& config_update_info_;
   Server::Configuration::FactoryContext& factory_context_;
-  SystemTime last_updated_;
   ThreadLocal::SlotPtr tls_;
   ThreadLocal::SlotPtr config_update_callbacks_;
 

@@ -38,6 +38,7 @@ public:
   // Config::Subscription
   void start(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks) override;
   void updateResources(const std::set<std::string>& update_to_these_names) override;
+  void updateResourcesViaAliases(const std::set<std::string>& updates_to_these_aliases) override;
 
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override;
@@ -46,14 +47,6 @@ public:
   onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override;
 
   void onWriteable() override;
-
-  void updateResourcesViaAliases(const std::vector<std::string>& aliases) override {
-    ResourceNameDiff diff;
-    std::copy(aliases.begin(), aliases.end(), std::inserter(diff.added_, diff.added_.begin()));
-    queueDiscoveryRequest(diff);
-    // sendDiscoveryRequest(diff);
-    stats_.update_attempt_.inc();
-  }
 
 private:
   void kickOffAck(UpdateAck ack);

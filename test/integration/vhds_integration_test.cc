@@ -187,6 +187,8 @@ public:
         compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
     sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>({buildVirtualHost()}, {}, "1",
                                                                    vhds_stream_);
+    EXPECT_TRUE(
+            compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 
     // Wait for our statically specified listener to become ready, and register its port in the
     // test framework's downstream listener port map.
@@ -220,7 +222,7 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(buildVirtualHost1(), {}, "2",
                                                                  vhds_stream_);
   EXPECT_TRUE(
-      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
+          compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/one", "vhost.first");
   cleanupUpstreamAndDownstream();
@@ -233,7 +235,8 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>({}, {"vhost_1", "vhost_2"}, "3",
                                                                  vhds_stream_);
   EXPECT_TRUE(
-      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
+          compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
+  ENVOY_LOG_MISC(debug, "3333333333333333333333333333333333333333333333333333333333333333");
 
   // an upstream request to an (now) unknown domain
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));

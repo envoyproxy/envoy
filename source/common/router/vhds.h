@@ -66,7 +66,7 @@ public:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
   }
-  void ondemandUpdate(const std::vector<std::string>& aliases);
+  void ondemandUpdate(const std::set<std::string>& aliases);
   void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
 
   RouteConfigUpdatePtr& config_update_info_;
