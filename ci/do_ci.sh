@@ -61,9 +61,13 @@ function bazel_binary_build() {
     COMPILE_TYPE=opt
   elif [[ "${BINARY_TYPE}" == "debug" ]]; then
     COMPILE_TYPE=dbg
+    BINARY_SUFFIX="-debug"
   elif [[ "${BINARY_TYPE}" == "sizeopt" ]]; then
     COMPILE_TYPE=opt
     COPT="-Os"
+  elif [[ "${BINARY_TYPE}" == "fastbuild" ]]; then
+    COMPILE_TYPE=fastbuild
+    BINARY_SUFFIX="-fastbuild"
   fi
 
   echo "Building..."
@@ -167,12 +171,8 @@ elif [[ "$1" == "bazel.dev" ]]; then
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel fastbuild build with tests..."
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild //source/exe:envoy-static
-  # Copy the envoy-static binary somewhere that we can access outside of the
-  # container for developers.
-  cp -f \
-    "${ENVOY_SRCDIR}"/bazel-bin/source/exe/envoy-static \
-    "${ENVOY_DELIVERY_DIR}"/envoy-fastbuild
+  bazel_binary_build fastbuild
+
   echo "Building and testing..."
   bazel test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/...
   exit 0
