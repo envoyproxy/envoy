@@ -1,0 +1,237 @@
+//
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+//
+syntax = "proto3";
+
+package zipkin.proto3;
+
+// In Java, the closest model type to this proto is in the "zipkin2" package
+option java_package = "zipkin2.proto3";
+option java_multiple_files = true;
+
+// A span is a single-host view of an operation. A trace is a series of spans
+// (often RPC calls) which nest to form a latency tree. Spans are in the same
+// trace when they share the same trace ID. The parent_id field establishes the
+// position of one span in the tree.
+//
+// The root span is where parent_id is Absent and usually has the longest
+// duration in the trace. However, nested asynchronous work can materialize as
+// child spans whose duration exceed the root span.
+//
+// Spans usually represent remote activity such as RPC calls, or messaging
+// producers and consumers. However, they can also represent in-process
+// activity in any position of the trace. For example, a root span could
+// represent a server receiving an initial client request. A root span could
+// also represent a scheduled job that has no remote context.
+//
+// Encoding notes:
+//
+// Epoch timestamp are encoded fixed64 as varint would also be 8 bytes, and more
+// expensive to encode and size. Duration is stored uint64, as often the numbers
+// are quite small.
+//
+// Default values are ok, as only natural numbers are used. For example, zero is
+// an invalid timestamp and an invalid duration, false values for debug or shared
+// are ignorable, and zero-length strings also coerce to null.
+//
+// The next id is 14.
+//
+// Note fields up to 15 take 1 byte to encode. Take care when adding new fields
+// https://developers.google.com/protocol-buffers/docs/proto3#assigning-tags
+message Span {
+  // Randomly generated, unique identifier for a trace, set on all spans within
+  // it.
+  //
+  // This field is required and encoded as 8 or 16 bytes, in big endian byte
+  // order.
+  bytes trace_id = 1;
+  // The parent span ID or absent if this the root span in a trace.
+  bytes parent_id = 2;
+  // Unique identifier for this operation within the trace.
+  //
+  // This field is required and encoded as 8 opaque bytes.
+  bytes id = 3;
+  // When present, kind clarifies timestamp, duration and remote_endpoint. When
+  // absent, the span is local or incomplete. Unlike client and server, there
+  // is no direct critical path latency relationship between producer and
+  // consumer spans.
+  enum Kind {
+    // Default value interpreted as absent.
+    SPAN_KIND_UNSPECIFIED = 0;
+    // The span represents the client side of an RPC operation, implying the
+    // following:
+    //
+    // timestamp is the moment a request was sent to the server.
+    // duration is the delay until a response or an error was received.
+    // remote_endpoint is the server.
+    CLIENT = 1;
+    // The span represents the server side of an RPC operation, implying the
+    // following:
+    //
+    // timestamp is the moment a client request was received.
+    // duration is the delay until a response was sent or an error.
+    // remote_endpoint is the client.
+    SERVER = 2;
+    // The span represents production of a message to a remote broker, implying
+    // the following:
+    //
+    // timestamp is the moment a message was sent to a destination.
+    // duration is the delay sending the message, such as batching.
+    // remote_endpoint is the broker.
+    PRODUCER = 3;
+    // The span represents consumption of a message from a remote broker, not
+    // time spent servicing it. For example, a message processor would be an
+    // in-process child span of a consumer. Consumer spans imply the following:
+    //
+    // timestamp is the moment a message was received from an origin.
+    // duration is the delay consuming the message, such as from backlog.
+    // remote_endpoint is the broker.
+    CONSUMER = 4;
+  }
+  // When present, used to interpret remote_endpoint
+  Kind kind = 4;
+  // The logical operation this span represents in lowercase (e.g. rpc method).
+  // Leave absent if unknown.
+  //
+  // As these are lookup labels, take care to ensure names are low cardinality.
+  // For example, do not embed variables into the name.
+  string name = 5;
+  // Epoch microseconds of the start of this span, possibly absent if
+  // incomplete.
+  //
+  // For example, 1502787600000000 corresponds to 2017-08-15 09:00 UTC
+  //
+  // This value should be set directly by instrumentation, using the most
+  // precise value possible. For example, gettimeofday or multiplying epoch
+  // millis by 1000.
+  //
+  // There are three known edge-cases where this could be reported absent.
+  // - A span was allocated but never started (ex not yet received a timestamp)
+  // - The span's start event was lost
+  // - Data about a completed span (ex tags) were sent after the fact
+  fixed64 timestamp = 6;
+  // Duration in microseconds of the critical path, if known. Durations of less
+  // than one are rounded up. Duration of children can be longer than their
+  // parents due to asynchronous operations.
+  //
+  // For example 150 milliseconds is 150000 microseconds.
+  uint64 duration = 7;
+  // The host that recorded this span, primarily for query by service name.
+  //
+  // Instrumentation should always record this. Usually, absent implies late
+  // data. The IP address corresponding to this is usually the site local or
+  // advertised service address. When present, the port indicates the listen
+  // port.
+  Endpoint local_endpoint = 8;
+  // When an RPC (or messaging) span, indicates the other side of the
+  // connection.
+  //
+  // By recording the remote endpoint, your trace will contain network context
+  // even if the peer is not tracing. For example, you can record the IP from
+  // the "X-Forwarded-For" header or the service name and socket of a remote
+  // peer.
+  Endpoint remote_endpoint = 9;
+  // Associates events that explain latency with the time they happened.
+  repeated Annotation annotations = 10;
+  // Tags give your span context for search, viewing and analysis.
+  //
+  // For example, a key "your_app.version" would let you lookup traces by
+  // version. A tag "sql.query" isn't searchable, but it can help in debugging
+  // when viewing a trace.
+  map<string, string> tags = 11;
+  // True is a request to store this span even if it overrides sampling policy.
+  //
+  // This is true when the "X-B3-Flags" header has a value of 1.
+  bool debug = 12;
+  // True if we are contributing to a span started by another tracer (ex on a
+  // different host).
+  bool shared = 13;
+}
+
+// The network context of a node in the service graph.
+//
+// The next id is 5.
+message Endpoint {
+  // Lower-case label of this node in the service graph, such as "favstar".
+  // Leave absent if unknown.
+  //
+  // This is a primary label for trace lookup and aggregation, so it should be
+  // intuitive and consistent. Many use a name from service discovery.
+  string service_name = 1;
+  // 4 byte representation of the primary IPv4 address associated with this
+  // connection. Absent if unknown.
+  bytes ipv4 = 2;
+  // 16 byte representation of the primary IPv6 address associated with this
+  // connection. Absent if unknown.
+  //
+  // Prefer using the ipv4 field for mapped addresses.
+  bytes ipv6 = 3;
+  // Depending on context, this could be a listen port or the client-side of a
+  // socket. Absent if unknown.
+  int32 port = 4;
+}
+
+// Associates an event that explains latency with a timestamp.
+// Unlike log statements, annotations are often codes. Ex. "ws" for WireSend
+//
+// The next id is 3.
+message Annotation {
+  // Epoch microseconds of this event.
+  //
+  // For example, 1502787600000000 corresponds to 2017-08-15 09:00 UTC
+  //
+  // This value should be set directly by instrumentation, using the most
+  // precise value possible. For example, gettimeofday or multiplying epoch
+  // millis by 1000.
+  fixed64 timestamp = 1;
+  // Usually a short tag indicating an event, like "error"
+  //
+  // While possible to add larger data, such as garbage collection details, low
+  // cardinality event names both keep the size of spans down and also are easy
+  // to search against.
+  string value = 2;
+}
+
+// A list of spans with possibly different trace ids, in no particular order.
+//
+// This is used for all transports: POST, Kafka messages etc. No other fields
+// are expected, This message facilitates the mechanics of encoding a list, as
+// a field number is required. The name of this type is the same in the OpenApi
+// aka Swagger specification. https://zipkin.io/zipkin-api/#/default/post_spans
+message ListOfSpans {
+  repeated Span spans = 1;
+}
+
+// Response for SpanService/Report RPC. This response currently does not return
+// any information beyond indicating that the request has finished. That said,
+// it may be extended in the future.
+message ReportResponse {
+}
+
+// SpanService allows reporting spans using gRPC, as opposed to HTTP POST 
+// reporting. Implementations are asynchronous and may drop spans for reasons 
+// of sampling or storage availability. While this is primarily used to store 
+// spans, other operations may take place such as aggregation of service 
+// dependencies or data cleaning.
+service SpanService {
+
+  // Report the provided spans to the collector. Analogous to the HTTP POST 
+  // /api/v2/spans endpoint. Spans are not required to be complete or belonging 
+  // to the same trace.
+  rpc Report(ListOfSpans) returns (ReportResponse) {}
+}
