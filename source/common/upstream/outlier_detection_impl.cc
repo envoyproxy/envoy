@@ -132,10 +132,12 @@ void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
     // LOCAL_ORIGIN_CONNECT_SUCCESS was mapped to HTTP there would be 2 codes for each transaction.
     // If caller wants LOCAL_ORIGIN_CONNECT_SUCCESS to be mapped to HTTP code then proceed,
     // otherwise bail out here.
-    if (!code) {
+    if (code) {
+      putHttpResponseCode(code.value())
+    } else {
       return;
     }
-    __attribute__((fallthrough));
+    break;
   default:
     putHttpResponseCode(code ? code.value() : enumToInt(resultToHttpCode(result)));
     break;
