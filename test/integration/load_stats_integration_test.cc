@@ -460,16 +460,23 @@ TEST_P(LoadStatsIntegrationTest, LocalityWeighted) {
   locality_weighted_lb_ = true;
   initialize();
 
+  // Debug logs for #6874
+  std::cerr << "Waiting for load stats stream." << std::endl;
   waitForLoadStatsStream();
+  std::cerr << "Waiting for load stats request." << std::endl;
   waitForLoadStatsRequest({});
-  loadstats_stream_->startGrpcStream();
 
+  std::cerr << "Done waiting." << std::endl;
+  loadstats_stream_->startGrpcStream();
+  std::cerr << "Starting response." << std::endl;
   requestLoadStatsResponse({"cluster_0"});
+  std::cerr << "Updating assignments." << std::endl;
 
   // Simple 33%/67% split between dragon/winter localities.
   // Even though there are more endpoints in the dragon locality, the winter locality gets the
   // expected weighting in the WRR locality schedule.
   updateClusterLoadAssignment({{0}, 2}, {{1, 2}, 1}, {}, {});
+  std::cerr << "Sending traffic." << std::endl;
 
   sendAndReceiveUpstream(0);
   sendAndReceiveUpstream(1);
@@ -479,8 +486,10 @@ TEST_P(LoadStatsIntegrationTest, LocalityWeighted) {
   sendAndReceiveUpstream(0);
 
   // Verify we get the expect request distribution.
+  std::cerr << "Waiting for load stats request 2." << std::endl;
   waitForLoadStatsRequest(
       {localityStats("winter", 4, 0, 0, 4), localityStats("dragon", 2, 0, 0, 2)});
+  std::cerr << "Done waiting." << std::endl;
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
   // On slow machines, more than one load stats response may be pushed while we are simulating load.

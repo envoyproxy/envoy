@@ -496,8 +496,7 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
   EXPECT_FALSE(discovery_request.node().id().empty());
   EXPECT_FALSE(discovery_request.node().cluster().empty());
 
-  // TODO(PiotrSikora): Remove this hack once fixed internally.
-  if (!(expected_type_url == discovery_request.type_url())) {
+  if (expected_type_url != discovery_request.type_url()) {
     return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
                                              discovery_request.type_url(), expected_type_url);
   }
@@ -517,8 +516,7 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
                fmt::join(expected_resource_names.begin(), expected_resource_names.end(), ","),
                discovery_request.DebugString());
   }
-  // TODO(PiotrSikora): Remove this hack once fixed internally.
-  if (!(expected_version == discovery_request.version_info())) {
+  if (expected_version != discovery_request.version_info()) {
     return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",
                                              discovery_request.version_info(), expected_version,
                                              discovery_request.DebugString());
@@ -538,8 +536,7 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
   EXPECT_FALSE(request.node().id().empty());
   EXPECT_FALSE(request.node().cluster().empty());
 
-  // TODO(PiotrSikora): Remove this hack once fixed internally.
-  if (!(expected_type_url == request.type_url())) {
+  if (expected_type_url != request.type_url()) {
     return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
                                              request.type_url(), expected_type_url);
   }
