@@ -46,6 +46,15 @@ function cp_binary_for_outside_access() {
     "${ENVOY_DELIVERY_DIR}"/${DELIVERY_LOCATION}
 }
 
+function cp_binary_for_image_build() {
+  # TODO(mattklein123): Replace this with caching and a different job which creates images.
+  echo "Copying size optimized binary for image build..."
+  mkdir -p "${ENVOY_SRCDIR}"/build_$1
+  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_$1
+  mkdir -p "${ENVOY_SRCDIR}"/build_$1_stripped
+  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_$1_stripped/envoy
+}
+
 function bazel_sizeopt_binary_build() {
   echo "Building..."
   bazel build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static --define optimize_binary_size=enabled
@@ -55,12 +64,7 @@ function bazel_sizeopt_binary_build() {
   # container.
   cp_binary_for_outside_access envoy
 
-  # TODO(mattklein123): Replace this with caching and a different job which creates images.
-  echo "Copying size optimized binary for image build..."
-  mkdir -p "${ENVOY_SRCDIR}"/build_sizeopt
-  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_sizeopt
-  mkdir -p "${ENVOY_SRCDIR}"/build_sizeopt_stripped
-  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_sizeopt_stripped/envoy
+  cp_binary_for_image_build sizeopt
 }
 
 function bazel_release_binary_build() {
@@ -72,12 +76,7 @@ function bazel_release_binary_build() {
   # container.
   cp_binary_for_outside_access envoy
 
-  # TODO(mattklein123): Replace this with caching and a different job which creates images.
-  echo "Copying release binary for image build..."
-  mkdir -p "${ENVOY_SRCDIR}"/build_release
-  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_release
-  mkdir -p "${ENVOY_SRCDIR}"/build_release_stripped
-  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_release_stripped/envoy
+  cp_binary_for_image_build release
 }
 
 function bazel_debug_binary_build() {
