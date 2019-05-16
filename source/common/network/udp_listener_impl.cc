@@ -64,6 +64,7 @@ UdpListenerImpl::ReceiveResult UdpListenerImpl::doRecvFrom(sockaddr_storage& pee
   ASSERT(num_slices == 1);
 
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+  // TODO(sumukhs) - Convert this to use the IOHandle interface rather than os_sys_calls
   const Api::SysCallSizeResult result =
       os_sys_calls.recvfrom(socket_.ioHandle().fd(), slice.mem_, read_length, 0,
                             reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
@@ -162,60 +163,23 @@ void UdpListenerImpl::send(const UdpSendData& send_data) {
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
   buffer.getRawSlices(slices.begin(), num_slices);
-  Api::SysCallSizeResult send_result =
-      sendmessage(slices.begin(), num_slices, send_data.send_address_);
+  Api::IoCallUint64Result send_result =
+      socket_.ioHandle().sendmsg(slices.begin(), num_slices, 0, *send_data.send_address_);
 
-  if (send_result.rc_ < 0) {
-    cb_.onError(UdpListenerCallbacks::ErrorCode::SyscallError, send_result.errno_);
-  }
-}
-
-Api::SysCallSizeResult
-UdpListenerImpl::sendmessage(const Buffer::RawSlice* slices, uint64_t num_slice,
-                             const Address::InstanceConstSharedPtr& to_address) {
-  STACK_ARRAY(iov, iovec, num_slice);
-  uint64_t num_slices_to_write = 0;
-  uint64_t requested_send_size = 0;
-  for (uint64_t i = 0; i < num_slice; i++) {
-    if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
-      iov[num_slices_to_write].iov_base = slices[i].mem_;
-      iov[num_slices_to_write].iov_len = slices[i].len_;
-      num_slices_to_write++;
-      requested_send_size += slices[i].len_;
-    }
-  }
-  if (num_slices_to_write == 0) {
-    ENVOY_UDP_LOG(trace, "Nothing to send");
-    return Api::SysCallSizeResult{0, 0};
-  }
-
-  struct msghdr message;
-  sockaddr* address = const_cast<sockaddr*>(to_address->sockAddr());
-  message.msg_name = reinterpret_cast<void*>(address);
-  message.msg_namelen = to_address->sockAddrLen();
-  message.msg_iov = iov.begin();
-  message.msg_iovlen = num_slices_to_write;
-  message.msg_control = nullptr;
-  message.msg_controllen = 0;
-  message.msg_flags = 0;
-
-  // TODO(sumukhs): Port sendmsg api to OsSysCalls
-  const ssize_t rc = ::sendmsg(socket_.ioHandle().fd(), &message, 0);
-  Api::SysCallSizeResult result{rc, errno};
-
-  if (result.rc_ < 0) {
-    if (result.errno_ == EAGAIN) {
-      ENVOY_UDP_LOG(debug, "sendmsg dropped {} bytes", requested_send_size);
+  if (send_result.ok()) {
+    ENVOY_UDP_LOG(trace, "sendmsg sent:{} bytes", send_result.rc_);
+  } else {
+    if (send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+      ENVOY_UDP_LOG(debug, "sendmsg dropped message");
     } else {
-      ENVOY_UDP_LOG(debug, "sendmsg failed errno:{} to send {} bytes", result.errno_,
-                    requested_send_size);
+      ENVOY_UDP_LOG(debug, "sendmsg failed with error {}",
+                    static_cast<int>(send_result.err_->getErrorCode()));
     }
 
-    return result;
+    // TODO(sumukhs) - Convert the OnError method to use IoErrors
+    cb_.onError(UdpListenerCallbacks::ErrorCode::SyscallError,
+                static_cast<int>(send_result.err_->getErrorCode()));
   }
-
-  ENVOY_UDP_LOG(trace, "sendmsg requested:{} sent:{}", requested_send_size, result.rc_);
-  return result;
 }
 
 } // namespace Network

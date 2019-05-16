@@ -151,13 +151,12 @@ public:
                                                                                     context);
             }));
     ON_CALL(listener_factory_, createUdpListenerFilterFactoryList(_, _))
-        .WillByDefault(
-            Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::UdpListenerFilter>&
-                          filters,
-                      Configuration::ListenerFactoryContext& context)
-                       -> std::vector<Network::UdpListenerFilterFactoryCb> {
-              return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
-                                                                                    context);
+        .WillByDefault(Invoke(
+            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+               Configuration::ListenerFactoryContext& context)
+                -> std::vector<Network::UdpListenerFilterFactoryCb> {
+              return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters,
+                                                                                       context);
             }));
 
     socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();

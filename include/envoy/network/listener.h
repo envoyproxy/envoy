@@ -117,7 +117,7 @@ public:
  */
 struct UdpRecvData {
   Address::InstanceConstSharedPtr local_address_;
-  Address::InstanceConstSharedPtr peer_address_;
+  Address::InstanceConstSharedPtr peer_address_; // TODO(conquerAtapple): Fix ownership semantics.
   Buffer::InstancePtr buffer_;
 
   // TODO(conquerAtapple):

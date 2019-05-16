@@ -81,7 +81,7 @@ public:
    * @return std::vector<Network::UdpListenerFilterFactoryCb> the list of filter factories.
    */
   virtual std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::UdpListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
 
   /**

@@ -99,8 +99,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
 }
 
 std::vector<Network::UdpListenerFilterFactoryCb>
-ProdListenerComponentFactory::createListenerFilterFactoryList_(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::UdpListenerFilter>& filters,
+ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
     Configuration::ListenerFactoryContext& context) {
   std::vector<Network::UdpListenerFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
@@ -109,7 +109,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
     const Json::ObjectSharedPtr filter_config =
-        MessageUtil::getJsonObjectFromMessage(proto_config.typed_config());
+        MessageUtil::getJsonObjectFromMessage(proto_config.config());
     ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
 
     // Now see if there is a factory that will accept the config.
@@ -205,25 +205,33 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   if (config.has_freebind()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpFreebindOptions());
   }
-  if (config.has_tcp_fast_open_queue_length()) {
-    addListenSocketOptions(Network::SocketOptionFactory::buildTcpFastOpenOptions(
-        config.tcp_fast_open_queue_length().value()));
-  }
-
   if (!config.socket_options().empty()) {
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
   }
 
-  if (!config.udp_listener_filters().empty()) {
-    udp_listener_filter_factories_ =
-        parent_.factory_.createUdpListenerFilterFactoryList(config.udp_listener_filters(), *this);
+  if (!config.listener_filters().empty()) {
+    switch (socket_type_) {
+    case Network::Address::SocketType::Datagram:
+      udp_listener_filter_factories_ =
+          parent_.factory_.createUdpListenerFilterFactoryList(config.listener_filters(), *this);
+      // TODO(sumukhs): Determine if returning here is the right thing to do as udp listeners are
+      // not expected to have other configs set.
+      return;
+    case Network::Address::SocketType::Stream:
+      listener_filter_factories_ =
+          parent_.factory_.createListenerFilterFactoryList(config.listener_filters(), *this);
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
   }
 
-  if (!config.listener_filters().empty()) {
-    listener_filter_factories_ =
-        parent_.factory_.createListenerFilterFactoryList(config.listener_filters(), *this);
+  if (config.has_tcp_fast_open_queue_length()) {
+    addListenSocketOptions(Network::SocketOptionFactory::buildTcpFastOpenOptions(
+        config.tcp_fast_open_queue_length().value()));
   }
+
   // Add original dst listener filter if 'use_original_dst' flag is set.
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)) {
     auto& factory =

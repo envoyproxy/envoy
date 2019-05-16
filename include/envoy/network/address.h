@@ -161,25 +161,6 @@ public:
    * @return the type of address.
    */
   virtual Type type() const PURE;
-
-  /**
-   * @return a pointer to the POSIX sockaddr struct associated with the address instance.
-   * Depending on the type() of address, this maps to either a sockaddr_in/sockaddr_in6/sockaddr_un
-   *
-   * This API is used when the caller has the address instance available and requires to
-   * provide the sockaddr parameter to a posix API.
-   */
-  virtual const sockaddr* sockAddr() const PURE;
-
-  /**
-   * @return the size of the underlying posix/linux structure associated with the address instance.
-   * Depending on the type() of address, this maps to the size of either a
-   * sockaddr_in/sockaddr_in6/sockaddr_un
-   *
-   * This API is used when the caller has the address instance available and requires to
-   * provide the socklen_t parameter to a posix API.
-   */
-  virtual socklen_t sockAddrLen() const PURE;
 };
 
 typedef std::shared_ptr<const Instance> InstanceConstSharedPtr;

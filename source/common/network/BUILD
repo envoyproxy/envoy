@@ -119,6 +119,7 @@ envoy_cc_library(
     deps = [
         ":io_socket_error_lib",
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/network:address_interface",
         "//include/envoy/network:io_handle_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",

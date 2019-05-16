@@ -71,6 +71,8 @@ public:
   /**
    * Given a ListenerFilterManager and a list of factories, create a new filter chain. Chain
    * creation will exit early if any filters immediately close the connection.
+   *
+   * TODO(sumukhs): Coalesce with the above as they are very similar
    */
   static bool buildFilterChain(Network::ListenerFilterManager& filter_manager,
                                const std::vector<Network::ListenerFilterFactoryCb>& factories);

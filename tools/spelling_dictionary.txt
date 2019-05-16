@@ -279,6 +279,7 @@ WS
 Welford's
 Werror
 XDS
+sendto
 vip
 xDSes
 XFCC

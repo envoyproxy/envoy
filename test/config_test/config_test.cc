@@ -89,11 +89,10 @@ public:
             }));
     ON_CALL(component_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
-            [&](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::UdpListenerFilter>&
-                    filters,
+            [&](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
                 Server::Configuration::ListenerFactoryContext& context)
                 -> std::vector<Network::UdpListenerFilterFactoryCb> {
-              return Server::ProdListenerComponentFactory::createListenerFilterFactoryList_(
+              return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
                   filters, context);
             }));
 

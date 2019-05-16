@@ -119,9 +119,9 @@ public:
     return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
   }
   std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::UdpListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
+    return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters, context);
   }
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
                                               Network::Address::SocketType,

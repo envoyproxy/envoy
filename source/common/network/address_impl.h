@@ -31,8 +31,8 @@ bool ipFamilySupported(int domain);
  * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
  * @return InstanceConstSharedPtr the address.
  */
-Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
-                                                    bool v6only = true);
+InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
+                                           bool v6only = true);
 
 /**
  * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
@@ -59,6 +59,9 @@ public:
   // Default logical name is the human-readable name.
   const std::string& logicalName() const override { return asString(); }
   Type type() const override { return type_; }
+
+  virtual const sockaddr* sockAddr() const PURE;
+  virtual socklen_t sockAddrLen() const PURE;
 
 protected:
   InstanceBase(Type type) : type_(type) {}

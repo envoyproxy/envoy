@@ -47,8 +47,8 @@ public:
   /**
    * Static worker for createUdpListenerFilterFactoryList() that can be used directly in tests.
    */
-  static std::vector<Network::UdpListenerFilterFactoryCb> createListenerFilterFactoryList_(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::UdpListenerFilter>& filters,
+  static std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList_(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context);
 
   // Server::ListenerComponentFactory
@@ -69,9 +69,9 @@ public:
     return createListenerFilterFactoryList_(filters, context);
   }
   std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::UdpListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    return createListenerFilterFactoryList_(filters, context);
+    return createUdpListenerFilterFactoryList_(filters, context);
   }
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
                                               Network::Address::SocketType socket_type,
