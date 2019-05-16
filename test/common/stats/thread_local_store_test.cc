@@ -788,13 +788,6 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   EXPECT_LT(start_mem, end_mem);
   const size_t million = 1000 * 1000;
   EXPECT_LT(end_mem - start_mem, 20 * million); // actual value: 19601552 as of March 14, 2019
-
-  // HACK: doesn't like shutting down without threading having started.
-  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
-  NiceMock<ThreadLocal::MockInstance> tls;
-  store->initializeThreading(main_thread_dispatcher, tls);
-  store->shutdownThreading();
-  tls.shutdownThread();
 }
 
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {

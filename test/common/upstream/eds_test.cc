@@ -141,6 +141,10 @@ protected:
       EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
       EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
+      // Remove the pending HC flag. This is normally done by the health checker.
+      hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+      hosts[1]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+
       // Mark the hosts as healthy
       hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
       hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -497,7 +501,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
 
 // Verify that a host is removed if it is removed from discovery, stabilized, and then later
 // fails active HC.
-TEST_F(EdsTest, EndpoingRemovalAfterHcFail) {
+TEST_F(EdsTest, EndpointRemovalAfterHcFail) {
   envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
 
@@ -524,6 +528,10 @@ TEST_F(EdsTest, EndpoingRemovalAfterHcFail) {
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 2);
+
+    // Remove the pending HC flag. This is normally done by the health checker.
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    hosts[1]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
 
     // Mark the hosts as healthy
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -630,6 +638,10 @@ TEST_F(EdsTest, EndpointRemovalEdsFailButActiveHcSuccess) {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 2);
 
+    // Remove the pending HC flag. This is normally done by the health checker.
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    hosts[1]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+
     // Mark the hosts as healthy
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
     hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -694,6 +706,11 @@ TEST_F(EdsTest, EndpointRemovalClusterDrainOnHostRemoval) {
 
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+
+    // Remove the pending HC flag. This is normally done by the health checker.
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    hosts[1]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+
     // Mark the hosts as healthy
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
     hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -746,6 +763,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
     for (auto& host : hosts) {
       EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
       host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+      host->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
     }
   }
 
@@ -814,8 +832,9 @@ TEST_F(EdsTest, EndpointMoved) {
 
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_EQ(0, hosts[0]->priority());
-    // Mark the host as healthy
+    // Mark the host as healthy and remove the pending active hc flag.
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
   }
 
   {
@@ -824,8 +843,9 @@ TEST_F(EdsTest, EndpointMoved) {
 
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_EQ(1, hosts[0]->priority());
-    // Mark the host as healthy
+    // Mark the host as healthy and remove the pending active hc flag.
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
   }
 
   // Moves the endpoints between priorities
@@ -864,6 +884,38 @@ TEST_F(EdsTest, EndpointMoved) {
     // around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   }
+}
+
+// Validates that we correctly update the host list when a new overprovisioning factor is set.
+TEST_F(EdsTest, EndpointAddedWithNewOverprovisioningFactor) {
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  cluster_load_assignment.mutable_policy()->mutable_overprovisioning_factor()->set_value(1000);
+
+  {
+    auto* endpoints = cluster_load_assignment.add_endpoints();
+    auto* locality = endpoints->mutable_locality();
+    locality->set_region("oceania");
+    locality->set_zone("hello");
+    locality->set_sub_zone("world");
+    endpoints->mutable_load_balancing_weight()->set_value(42);
+
+    auto* endpoint_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("1.2.3.4");
+    endpoint_address->set_port_value(80);
+  }
+
+  bool initialized = false;
+  cluster_->initialize([&initialized] { initialized = true; });
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized);
+
+  EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ("1.2.3.4:80",
+            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
 }
 
 // Validate that onConfigUpdate() updates the endpoint locality.

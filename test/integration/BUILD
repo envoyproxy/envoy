@@ -96,6 +96,30 @@ envoy_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "filter_manager_integration_proto",
+    srcs = [":filter_manager_integration_test.proto"],
+)
+
+envoy_cc_test(
+    name = "filter_manager_integration_test",
+    srcs = [
+        "filter_manager_integration_test.cc",
+        "filter_manager_integration_test.h",
+    ],
+    deps = [
+        ":filter_manager_integration_proto_cc",
+        ":http_integration_lib",
+        ":integration_lib",
+        "//source/extensions/filters/network/common:factory_base_lib",
+        "//source/extensions/filters/network/echo:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/server:utility_lib",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "custom_cluster_integration_test",
     srcs = ["custom_cluster_integration_test.cc"],
@@ -106,6 +130,27 @@ envoy_cc_test(
         "//test/integration/clusters:custom_static_cluster",
         "//test/test_common:network_utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
+    ],
+)
+
+envoy_cc_test(
+    name = "vhds_integration_test",
+    srcs = ["vhds_integration_test.cc"],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:resources_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:discovery_cc",
+        "@envoy_api//envoy/api/v2:rds_cc",
     ],
 )
 
