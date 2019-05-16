@@ -178,6 +178,21 @@ private:
   bool finalized_{false};
 };
 
+class CdsHelper {
+public:
+  CdsHelper();
+
+  // Set CDS contents on filesystem and wait for Envoy to pick this up.
+  void setCds(const std::vector<envoy::api::v2::Cluster>& cluster,
+              IntegrationTestServerStats& server_stats);
+  const std::string& cds_path() const { return cds_path_; }
+
+private:
+  const std::string cds_path_;
+  uint32_t cds_version_{};
+  uint32_t update_successes_{};
+};
+
 // Common code for tests that deliver EDS update via the filesystem.
 class EdsHelper {
 public:

@@ -67,6 +67,7 @@ const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
             config:
               path: /dev/null
           route_config:
+            validate_clusters: false
             virtual_hosts:
               name: integration
               routes:
@@ -316,7 +317,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
                             *cluster->mutable_transport_socket(), tls_config);
     }
   }
-  ASSERT(port_idx == ports.size() || eds_hosts || custom_cluster);
+  ASSERT(port_idx == ports.size() || eds_hosts || custom_cluster || true);
 
   if (!connect_timeout_set_) {
 #ifdef __APPLE__
@@ -596,6 +597,35 @@ void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
     function(hcm_config);
     storeHttpConnectionManager(hcm_config);
   });
+}
+
+CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {
+}
+
+void CdsHelper::setCds(const std::vector<envoy::api::v2::Cluster>& clusters,
+                       IntegrationTestServerStats& server_stats) {
+  // Write to file the DiscoveryResponse and trigger inotify watch.
+  envoy::api::v2::DiscoveryResponse cds_response;
+  cds_response.set_version_info(std::to_string(cds_version_++));
+  cds_response.set_type_url(Config::TypeUrl::get().Cluster);
+  for (const auto& cluster : clusters) {
+    cds_response.add_resources()->PackFrom(cluster);
+  }
+  // Past the initial write, need move semantics to trigger inotify move event that the
+  // FilesystemSubscriptionImpl is subscribed to.
+  std::string path =
+      TestEnvironment::writeStringToFileForTest("cds.update.pb_text", cds_response.DebugString());
+  TestUtility::renameFile(path, cds_path_);
+  // Make sure Envoy has consumed the update now that it is running.
+  // server_stats.waitForCounterGe("cluster_manager.cluster_added", 1);
+  // RELEASE_ASSERT(1 == server_stats.counter("cluster_manager.cluster_added")->value(), "");
+  // Make sure Envoy has consumed the update now that it is running.
+  server_stats.waitForCounterGe("cluster_manager.cluster_added", 1);
+  server_stats.waitForCounterGe("cluster_manager.cluster_updated", ++update_successes_ - 1);
+  std::cout << "added counter: " << server_stats.counter("cluster_manager.cluster_added")->value() << std::endl;
+  std::cout << "modified counter: " << server_stats.counter("cluster_manager.cluster_modified")->value() << std::endl;
+  RELEASE_ASSERT(
+      1  == server_stats.counter("cluster_manager.cluster_added")->value(), "");
 }
 
 EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("eds.pb_text", "")) {
