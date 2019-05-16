@@ -101,6 +101,7 @@ GLB
 GOAWAY
 GRPC
 GTEST
+GetHostbyName
 GiB
 HC
 HCM

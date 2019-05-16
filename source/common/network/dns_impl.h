@@ -37,11 +37,71 @@ public:
 
 private:
   friend class DnsResolverImplPeer;
+
+  class AresWrapper {
+  public:
+    typedef std::function<void(void* arg, int status, int timeouts, hostent* hostent,
+                               void* addrttls, int naddrttls)>
+        AresHostCallback;
+
+    /**
+     * wrapper function of call to ares_gethostbyname.
+     * @param channel ares_channel.
+     * @param name host name.
+     * @param family desired type of address for the resulting host entry.
+     * @param callback when the query is complete or has failed, the ares library will invoke
+     * callback.
+     * @param arg argument passed to callback.
+     */
+    void GetHostbyName(ares_channel channel, const std::string& name, int family,
+                       AresHostCallback callback, void* arg) const;
+
+  private:
+    struct HostQuery {
+      HostQuery(ares_channel channel, const std::string& name, const int want_family,
+                const int sent_family, AresHostCallback callback, void* arg, const char* lookups,
+                const int timeouts)
+          : channel_(channel), name_(name), callback_(callback), arg_(arg),
+            sent_family_(sent_family), want_family_(want_family), remaining_lookups_(lookups),
+            timeouts_(timeouts) {}
+
+      ares_channel channel_;
+      const std::string name_;
+      AresHostCallback callback_;
+      void* arg_;
+      int sent_family_;
+      int want_family_;
+      const char* remaining_lookups_;
+      int timeouts_;
+    };
+
+    // Lookup domain name.
+    static void nextLookup(HostQuery* hquery, int statusCode);
+
+    // Callback when the query is complete or has failed
+    static void hostCallback(void* arg, int status, int timeouts, unsigned char* abuf, int alen);
+
+    static void endHquery(HostQuery* hquery, int status, hostent* host, void* addrttls,
+                          int naddrttls);
+
+    // If the name looks like an IP address, fake up a host entry, end the query immediately, and
+    // return true. Otherwise return false.
+    static bool fakeHostent(const std::string& name, int family, AresHostCallback callback,
+                            void* arg);
+
+    // Check if domain is onion domain.
+    static bool isOnionDomain(const std::string& name);
+
+    // Maximum length of structure ares_addrttl (ares_addr6ttl for AF_INET6)
+    static const int addrttl_len_ = 32;
+  };
+
   struct PendingResolution : public ActiveDnsQuery {
     // Network::ActiveDnsQuery
     PendingResolution(ResolveCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
                       const std::string& dns_name)
-        : callback_(callback), dispatcher_(dispatcher), channel_(channel), dns_name_(dns_name) {}
+        : ares_wrapper_(), callback_(callback), dispatcher_(dispatcher), channel_(channel),
+          dns_name_(dns_name) {}
 
     void cancel() override {
       // c-ares only supports channel-wide cancellation, so we just allow the
@@ -50,18 +110,23 @@ private:
     }
 
     /**
-     * c-ares ares_gethostbyname() query callback.
-     * @param status return status of call to ares_gethostbyname.
+     * AresWrapper GetHostbyName query callback.
+     * @param status return status of call to GetHostbyName.
      * @param timeouts the number of times the request timed out.
      * @param hostent structure that stores information about a given host.
+     * @addrttls structure that  stores ares_addrttl (ares_addr6ttl for AF_INET6).
+     * @naddrttls number of ares_addrttl.
      */
-    void onAresHostCallback(int status, int timeouts, hostent* hostent);
+    void onAresHostCallback(int status, int timeouts, hostent* hostent, void* addrttls,
+                            int naddrttls);
+
     /**
-     * wrapper function of call to ares_gethostbyname.
+     * wrapper function of call to GetHostbyName.
      * @param family currently AF_INET and AF_INET6 are supported.
      */
     void getHostByName(int family);
 
+    const AresWrapper ares_wrapper_;
     // Caller supplied callback to invoke on query completion or error.
     const ResolveCb callback_;
     // Dispatcher to post any callback_ exceptions to.

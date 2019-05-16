@@ -6,6 +6,7 @@
 #include <sys/un.h>
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <string>
 
@@ -59,15 +60,18 @@ public:
   // Default logical name is the human-readable name.
   const std::string& logicalName() const override { return asString(); }
   Type type() const override { return type_; }
+  std::chrono::seconds ttl() const override { return addr_ttl_; }
+  void setAddrTtl(const std::chrono::seconds& ttl) { addr_ttl_ = ttl; }
 
 protected:
-  InstanceBase(Type type) : type_(type) {}
+  InstanceBase(Type type) : type_(type), addr_ttl_(std::chrono::seconds::max()) {}
   IoHandlePtr socketFromSocketType(SocketType type) const;
 
   std::string friendly_name_;
 
 private:
   const Type type_;
+  std::chrono::seconds addr_ttl_;
 };
 
 /**

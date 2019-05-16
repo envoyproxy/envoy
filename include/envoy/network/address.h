@@ -4,6 +4,7 @@
 #include <sys/types.h>
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -161,6 +162,11 @@ public:
    * @return the type of address.
    */
   virtual Type type() const PURE;
+
+  /**
+   * @return address ttl.
+   */
+  virtual std::chrono::seconds ttl() const PURE;
 };
 
 typedef std::shared_ptr<const Instance> InstanceConstSharedPtr;
