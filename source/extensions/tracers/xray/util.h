@@ -47,7 +47,7 @@ public:
    * Generate Random double value.
    * @return a randomly-generated double number from 0-1.
    */
-  static double generateRandomDouble(RealTimeSource& time_source);
+  static double generateRandomDouble(TimeSource& time_source);
 
   /**
    * Performs a case-insensitive wildcard match against two strings. This method works with

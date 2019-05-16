@@ -33,7 +33,7 @@ message Tracing {
     // - *envoy.zipkin*
     // - *envoy.dynamic.ot*
     // - *envoy.tracers.datadog*
-    // - *envoy.xray*
+    // - *envoy.tracers.xray*
     string name = 1 [(validate.rules).string.min_bytes = 1];
 
     // Trace driver specific configuration which depends on the driver being instantiated.

@@ -48,9 +48,9 @@ public:
    * @param random_generator Reference to the random-number generator to be used by the Tracer.
    */
   Tracer(const std::string& segment_name, Runtime::RandomGenerator& random_generator,
-         LocalizedSamplingStrategy& localized_sampling_strategy, TimeSource& time_source)
+         TimeSource& time_source, SamplingStrategyPtr sampling_strategy)
       : segment_name_(segment_name), reporter_(nullptr), random_generator_(random_generator),
-        localized_sampling_strategy_(localized_sampling_strategy), time_source_(time_source) {}
+        time_source_(time_source), sampling_strategy_(std::move(sampling_strategy)) {}
 
   /**
    * Creates a "root" XRay span.
@@ -93,10 +93,9 @@ public:
   Runtime::RandomGenerator& randomGenerator() { return random_generator_; }
 
   /**
-   *
-   * @return the instance of localized sampling strategy.
+   * @return the pointer of sampling strategy.
    */
-  LocalizedSamplingStrategy& localizedSamplingStrategy() { return localized_sampling_strategy_; }
+  SamplingStrategyPtr& samplingStrategy() { return sampling_strategy_; }
 
   /**
    * Generates A 96-bit identifier for the trace, globally unique, in 24 hexadecimal digits.
@@ -110,15 +109,15 @@ public:
   std::string generateTraceId();
 
 private:
-  const char* version_ = "1";
-  const char* delimiter_ = "-";
-  const char* hex_digits = "0123456789abcdef";
+  static const char version_[];
+  static const char delimiter_[];
+  static const char hex_digits_[];
 
   const std::string segment_name_;
   ReporterPtr reporter_;
   Runtime::RandomGenerator& random_generator_;
-  LocalizedSamplingStrategy localized_sampling_strategy_;
   TimeSource& time_source_;
+  SamplingStrategyPtr sampling_strategy_;
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

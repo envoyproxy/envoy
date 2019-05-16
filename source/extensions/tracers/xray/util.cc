@@ -56,7 +56,7 @@ uint64_t Util::generateRandom64(TimeSource& time_source) {
   return rand_64();
 }
 
-double Util::generateRandomDouble(RealTimeSource& time_source) {
+double Util::generateRandomDouble(TimeSource& time_source) {
   uint64_t seed = std::chrono::duration_cast<std::chrono::nanoseconds>(
                       time_source.systemTime().time_since_epoch())
                       .count();

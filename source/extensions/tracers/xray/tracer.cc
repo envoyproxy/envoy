@@ -13,6 +13,10 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
+const char Tracer::version_[] = "1";
+const char Tracer::delimiter_[] = "-";
+const char Tracer::hex_digits_[] = "0123456789abcdef";
+
 std::string Tracer::generateRandom96BitString() {
   char values[25] = {'\0'};
   uint64_t seed = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -21,7 +25,7 @@ std::string Tracer::generateRandom96BitString() {
   std::mt19937 mt_rand(seed);
 
   for (int i = 0; i < 24; i++) {
-    values[i] = hex_digits[mt_rand() % 16];
+    values[i] = hex_digits_[mt_rand() % 16];
   }
   return values;
 }
