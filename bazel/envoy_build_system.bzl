@@ -165,7 +165,7 @@ def envoy_select_boringssl(if_fips, default = None):
 # macros imported from envoy_build_system.bzl don't have to change their BUILD
 # files to reference the new location.
 
-# Select wrappers (from envoy_build.bzl)
+# Select wrappers (from envoy_select.bzl)
 envoy_select_hot_restart = _envoy_select_hot_restart
 envoy_select_google_grpc = _envoy_select_google_grpc
 
