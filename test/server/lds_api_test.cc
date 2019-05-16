@@ -17,6 +17,7 @@ using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
+using testing::ReturnRef;
 using testing::Throw;
 
 namespace Envoy {
@@ -290,7 +291,7 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type());
-  ON_CALL(local_info_, clusterName()).WillByDefault(Return(std::string()));
+  ON_CALL(local_info_, clusterName()).WillByDefault(ReturnRef(EMPTY_STRING));
   EXPECT_THROW_WITH_MESSAGE(
       LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_manager_, local_info_,
                  store_, listener_manager_, *api_),

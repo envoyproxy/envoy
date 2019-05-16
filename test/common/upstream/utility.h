@@ -126,14 +126,6 @@ parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
   return health_check;
 }
 
-inline envoy::api::v2::core::HealthCheck
-parseHealthCheckFromV1Json(const std::string& json_string) {
-  envoy::api::v2::core::HealthCheck health_check;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::CdsJson::translateHealthCheck(*json_object_ptr, health_check);
-  return health_check;
-}
-
 inline PrioritySet::UpdateHostsParams
 updateHostsParams(HostVectorConstSharedPtr hosts, HostsPerLocalityConstSharedPtr hosts_per_locality,
                   HealthyHostVectorConstSharedPtr healthy_hosts,

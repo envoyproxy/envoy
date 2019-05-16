@@ -869,6 +869,38 @@ TEST_F(EdsTest, EndpointMoved) {
   }
 }
 
+// Validates that we correctly update the host list when a new overprovisioning factor is set.
+TEST_F(EdsTest, EndpointAddedWithNewOverprovisioningFactor) {
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  cluster_load_assignment.mutable_policy()->mutable_overprovisioning_factor()->set_value(1000);
+
+  {
+    auto* endpoints = cluster_load_assignment.add_endpoints();
+    auto* locality = endpoints->mutable_locality();
+    locality->set_region("oceania");
+    locality->set_zone("hello");
+    locality->set_sub_zone("world");
+    endpoints->mutable_load_balancing_weight()->set_value(42);
+
+    auto* endpoint_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("1.2.3.4");
+    endpoint_address->set_port_value(80);
+  }
+
+  bool initialized = false;
+  cluster_->initialize([&initialized] { initialized = true; });
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized);
+
+  EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ("1.2.3.4:80",
+            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+}
+
 // Validate that onConfigUpdate() updates the endpoint locality.
 TEST_F(EdsTest, EndpointLocality) {
   envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
