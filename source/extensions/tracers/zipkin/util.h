@@ -48,6 +48,13 @@ public:
    * Returns a randomly-generated 64-bit integer number.
    */
   static uint64_t generateRandom64(TimeSource& time_source);
+
+  /**
+   * Returns byte string representation of an number.
+   * @param value Number that will be represented in byte string.
+   * @return std::string byte string representation of a number.
+   */
+  static std::string bytesOf(uint64_t value);
 };
 
 } // namespace Zipkin

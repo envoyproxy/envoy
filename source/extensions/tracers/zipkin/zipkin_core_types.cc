@@ -240,14 +240,16 @@ const std::string Span::toJson() {
 const zipkin::proto3::Span Span::toProtoSpan() const {
   zipkin::proto3::Span span;
 
-  // TODO(dio): pack ids.
-  span.set_id("id");
-  span.set_trace_id("traceid");
-  span.set_name(name_);
+  span.set_trace_id(trace_id_high_.has_value()
+                        ? Util::bytesOf(trace_id_high_.value()) + Util::bytesOf(trace_id_)
+                        : Util::bytesOf(trace_id_));
 
-  if (parent_id_ && parent_id_.has_value()) {
-    span.set_parent_id("parentid");
+  if (parent_id_ && parent_id_.value()) {
+    span.set_parent_id(Util::bytesOf(parent_id_.value()));
   }
+
+  span.set_id(Util::bytesOf(id_));
+  span.set_name(name_);
 
   if (timestamp_) {
     span.set_timestamp(timestamp_.value());
@@ -262,6 +264,7 @@ const zipkin::proto3::Span Span::toProtoSpan() const {
       if (annotation.value() == ZipkinCoreConstants::get().CLIENT_SEND) {
         span.mutable_local_endpoint()->MergeFrom(annotation.endpoint().toProtoEndpoint());
       } else if (annotation.value() == ZipkinCoreConstants::get().SERVER_RECV) {
+        span.set_kind(zipkin::proto3::Span::SERVER);
         span.mutable_remote_endpoint()->MergeFrom(annotation.endpoint().toProtoEndpoint());
       }
     }
