@@ -52,9 +52,33 @@ public:
   ClientType clientType() const override { return std::get<1>(GetParam()); }
 };
 
+class DeltaSotwIntegrationParamTest
+    : public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion, ClientType, SotwOrDelta>> {
+public:
+  ~DeltaSotwIntegrationParamTest() override = default;
+  static std::string
+  protocolTestParamsToString(const ::testing::TestParamInfo<
+                             std::tuple<Network::Address::IpVersion, ClientType, SotwOrDelta>>& p) {
+    return absl::StrCat(
+        (std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+        (std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc"),
+        (std::get<2>(p.param) == SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld"));
+  }
+  Network::Address::IpVersion ipVersion() const { return std::get<0>(GetParam()); }
+  ClientType clientType() const { return std::get<1>(GetParam()); }
+  SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
+};
+
 // Skip tests based on gRPC client type.
 #define SKIP_IF_GRPC_CLIENT(client_type)                                                           \
   if (clientType() == (client_type)) {                                                             \
+    return;                                                                                        \
+  }
+
+// Skip tests based on xDS delta vs state-of-the-world.
+#define SKIP_IF_XDS_IS(xds)                                                                        \
+  if (sotwOrDelta() == (xds)) {                                                                    \
     return;                                                                                        \
   }
 
@@ -62,11 +86,19 @@ public:
 #define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc))
+#define DELTA_INTEGRATION_PARAMS                                                                   \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),     \
+                   testing::Values(SotwOrDelta::Sotw, SotwOrDelta::Delta))
 #else
 #define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc))
-#endif
+#define DELTA_INTEGRATION_PARAMS                                                                   \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::Values(Grpc::ClientType::EnvoyGrpc),                                   \
+                   testing::Values(SotwOrDelta::Sotw, SotwOrDelta::Delta))
+#endif // ENVOY_GOOGLE_GRPC
 
 } // namespace Grpc
 } // namespace Envoy

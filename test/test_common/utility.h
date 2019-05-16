@@ -304,6 +304,13 @@ public:
   parseBootstrapFromJson(const std::string& json_string);
 
   /**
+   * Returns the closest thing to a sensible "name" field for the given xDS resource.
+   * @param resource the resource to extract the name of.
+   * @return the resource's name.
+   */
+  static std::string xdsResourceName(const ProtobufWkt::Any& resource);
+
+  /**
    * Returns a "novel" IPv4 loopback address, if available.
    * For many tests, we want a loopback address other than 127.0.0.1 where possible. For some
    * platforms such as macOS, only 127.0.0.1 is available for IPv4 loopback.
@@ -524,6 +531,9 @@ ApiPtr createApiForTest(Stats::Store& stat_store);
 ApiPtr createApiForTest(Event::TimeSystem& time_system);
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api
+
+// Support parameterizing over state-of-the-world xDS vs delta xDS.
+enum class SotwOrDelta { Sotw, Delta };
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
   const bool equal = TestUtility::headerMapEqualIgnoreOrder(*arg, *expected);
