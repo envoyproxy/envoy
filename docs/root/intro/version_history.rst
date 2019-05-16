@@ -3,6 +3,7 @@ Version history
 
 1.11.0 (Pending)
 ================
+* access log: added a new field for downstream TLS session ID to file and gRPC access logger.
 * access log: added a new field for response code details in :ref:`file access logger<config_access_log_format_response_code_details>` and :ref:`gRPC access logger<envoy_api_field_data.accesslog.v2.HTTPResponseProperties.response_code_details>`.
 * admin: the administration interface now includes a :ref:`/ready endpoint <operations_admin_interface>` for easier readiness checks.
 * api: track and report requests issued since last load report.
@@ -12,6 +13,8 @@ Version history
 * event: added :ref:`loop duration and poll delay statistics <operations_performance>`.
 * ext_authz: added a `x-envoy-auth-partial-body` metadata header set to `false|true` indicating if there is a partial body sent in the authorization request message.
 * ext_authz: added option to `ext_authz` that allows the filter clearing route cache.
+* grpc-json: added support for :ref:`auto mapping
+  <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.auto_mapping>`.
 * health check: added :ref:`initial jitter <envoy_api_field_core.HealthCheck.initial_jitter>` to add jitter to the first health check in order to prevent thundering herd on Envoy startup.
 * hot restart: stats are no longer shared between hot restart parent/child via shared memory, but rather by RPC. Hot restart version incremented to 11.
 * http: fixed a bug where large unbufferable responses were not tracked in stats and logs correctly.
@@ -43,8 +46,6 @@ Version history
   that allows ignoring new hosts for the purpose of load balancing calculations until they have
   been health checked for the first time.
 * upstream: added runtime error checking to prevent setting dns type to STRICT_DNS or LOGICAL_DNS when custom resolver name is specified.
-* grpc-json: added support for :ref:`auto mapping
-  <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.auto_mapping>`.
 
 1.10.0 (Apr 5, 2019)
 ====================
