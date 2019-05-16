@@ -18,5 +18,5 @@ The API tree can be found at two locations:
 
 * [API overview for developers](API_OVERVIEW.md)
 * [API overview for users](https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/v2_overview#)
-* [xDS protocol overview](XDS_PROTOCOL.md)
+* [xDS protocol overview](xds_protocol.rst)
 * [Contributing guide](CONTRIBUTING.md)
