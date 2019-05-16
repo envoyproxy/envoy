@@ -1075,12 +1075,22 @@ std::string AdminImpl::runtimeAsJson(
 }
 
 Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMap&,
-                                           Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+                                           Buffer::Instance& response, AdminStream& admin_stream) {
+  Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   if (params.empty()) {
-    response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
-    response.add("use an empty value to remove a previously added override");
-    return Http::Code::BadRequest;
+    // Check if the params are in the request's body. Ideally, the content-type
+    // header would be `application/x-www-form-urlencoded`, but there's no way to
+    // check.
+    if (admin_stream.getRequestBody() != nullptr) {
+      auto body = absl::string_view(admin_stream.getRequestBody()->toString());
+      params = parseFormBody(body);
+    }
+
+    if (params.empty()) {
+      response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
+      response.add("use an empty value to remove a previously added override");
+      return Http::Code::BadRequest;
+    }
   }
   std::unordered_map<std::string, std::string> overrides;
   overrides.insert(params.begin(), params.end());

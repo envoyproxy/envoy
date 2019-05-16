@@ -93,13 +93,22 @@ std::string Utility::createSslRedirectPath(const HeaderMap& headers) {
 }
 
 Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
-  QueryParams params;
   size_t start = url.find('?');
   if (start == std::string::npos) {
     return params;
   }
 
   start++;
+  return parseParameters(url, start);
+}
+
+Utility::QueryParams Utility::parseFormBody(absl::string_view body) {
+  return parseParameters(body, 0);
+}
+
+Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start) {
+  QueryParams params;
+
   while (start < url.size()) {
     size_t end = url.find('&', start);
     if (end == std::string::npos) {

@@ -997,6 +997,21 @@ TEST_P(AdminInstanceTest, RuntimeModify) {
   EXPECT_EQ("OK\n", response.toString());
 }
 
+TEST_P(AdminInstanceTest, RuntimeModifyParamsInBody) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  Runtime::MockLoader loader;
+  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
+
+  const std::string body = "numerator: 1\ndenominator: TEN_THOUSAND\n";
+  std::unordered_map<std::string, std::string> overrides;
+  overrides["routing.traffic_shift.foo"] = body;
+  EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
+  EXPECT_EQ(Http::Code::OK, admin_.request("/runtime_modify", "POST", header_map, body));
+  EXPECT_EQ("OK\n", response.toString());
+}
+
 TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
