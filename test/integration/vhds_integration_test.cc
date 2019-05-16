@@ -236,7 +236,6 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
                                                                  vhds_stream_);
   EXPECT_TRUE(
           compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
-  ENVOY_LOG_MISC(debug, "3333333333333333333333333333333333333333333333333333333333333333");
 
   // an upstream request to an (now) unknown domain
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));

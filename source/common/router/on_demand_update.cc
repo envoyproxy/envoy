@@ -13,10 +13,10 @@ void OnDemandRouteUpdate::requestRouteConfigUpdate() {
   if (callbacks_->route() != nullptr) {
     filter_return_ = FilterReturn::ContinueDecoding;
   } else {
-    auto configUpdateScheduled =
+    auto config_update_scheduled =
         callbacks_->requestRouteConfigUpdate([this]() -> void { onComplete(); });
     filter_return_ =
-        configUpdateScheduled ? FilterReturn::StopDecoding : FilterReturn::ContinueDecoding;
+        config_update_scheduled ? FilterReturn::StopDecoding : FilterReturn::ContinueDecoding;
   }
 }
 
@@ -33,8 +33,7 @@ Http::FilterDataStatus OnDemandRouteUpdate::decodeData(Buffer::Instance&, bool) 
 }
 
 Http::FilterTrailersStatus OnDemandRouteUpdate::decodeTrailers(Http::HeaderMap&) {
-  return filter_return_ == FilterReturn::StopDecoding ? Http::FilterTrailersStatus::StopIteration
-                                                      : Http::FilterTrailersStatus::Continue;
+  return Http::FilterTrailersStatus::Continue;
 }
 
 void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
