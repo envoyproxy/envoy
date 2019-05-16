@@ -55,38 +55,26 @@ function cp_binary_for_image_build() {
   strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_$1_stripped/envoy
 }
 
-function bazel_sizeopt_binary_build() {
+function bazel_binary_build() {
+  BINARY_TYPE=$1
+  if [[ "${BINARY_TYPE}" == "release" ]]; then
+    COMPILE_TYPE=opt
+  elif [[ "${BINARY_TYPE}" == "debug" ]]; then
+    COMPILE_TYPE=dbg
+  elif [[ "${BINARY_TYPE}" == "sizeopt" ]]; then
+    COMPILE_TYPE=opt
+    COPT="-Os"
+  fi
+
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static --define optimize_binary_size=enabled
-  collect_build_profile sizeopt_build
+  bazel build ${BAZEL_BUILD_OPTIONS} -c ${COMPILE_TYPE} //source/exe:envoy-static --copt="${COPT}"
+  collect_build_profile ${BINARY_TYPE}_build
 
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container.
   cp_binary_for_outside_access envoy
 
-  cp_binary_for_image_build sizeopt
-}
-
-function bazel_release_binary_build() {
-  echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} //source/exe:envoy-static
-  collect_build_profile release_build
-
-  # Copy the envoy-static binary somewhere that we can access outside of the
-  # container.
-  cp_binary_for_outside_access envoy
-
-  cp_binary_for_image_build release
-}
-
-function bazel_debug_binary_build() {
-  echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c dbg //source/exe:envoy-static
-  collect_build_profile debug_build
-
-  # Copy the envoy-static binary somewhere that we can access outside of the
-  # container.
-  cp_binary_for_outside_access envoy-debug
+  cp_binary_for_image_build ${BINARY_TYPE}
 }
 
 if [[ "$1" == "bazel.release" ]]; then
