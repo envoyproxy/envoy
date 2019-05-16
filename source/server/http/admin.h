@@ -195,7 +195,7 @@ private:
   std::vector<const UrlHandler*> sortedHandlers() const;
   static const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>
   sortedRuntime(const std::unordered_map<std::string, const Runtime::Snapshot::Entry>& entries);
-
+  envoy::admin::v2alpha::ServerInfo::State serverState();
   /**
    * URL handlers.
    */
@@ -241,6 +241,8 @@ private:
                                   AdminStream&);
   Http::Code handlerServerInfo(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
+  Http::Code handlerReady(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                          Buffer::Instance& response, AdminStream&);
   Http::Code handlerStats(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response, AdminStream&);
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,

@@ -95,6 +95,11 @@ public:
    *         considered valid after. Returns empty absl::optional if there is no peer certificate.
    **/
   virtual absl::optional<SystemTime> expirationPeerCertificate() const PURE;
+
+  /**
+   * @return std::string the hex-encoded TLS session ID as defined in rfc5246.
+   **/
+  virtual std::string sessionId() const PURE;
 };
 
 } // namespace Ssl

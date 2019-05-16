@@ -938,8 +938,7 @@ TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
 }
 
-// Test that access log fields %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% and
-// %DOWNSTREAM_LOCAL_ADDRESS% are correctly logged.
+// Test that access log fields %DOWNSTREAM_PEER_URI_SAN% is correctly logged.
 TEST_F(TcpProxyTest, AccessLogPeerUriSan) {
   filter_callbacks_.connection_.local_address_ =
       Network::Utility::resolveUrl("tcp://1.1.1.2:20000");
@@ -955,6 +954,25 @@ TEST_F(TcpProxyTest, AccessLogPeerUriSan) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "someSan");
+}
+
+// Test that access log fields %DOWNSTREAM_TLS_SESSION_ID% is correctly logged.
+TEST_F(TcpProxyTest, AccessLogTlsSessionId) {
+  filter_callbacks_.connection_.local_address_ =
+      Network::Utility::resolveUrl("tcp://1.1.1.2:20000");
+  filter_callbacks_.connection_.remote_address_ =
+      Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
+
+  const std::string tlsSessionId{
+      "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B"};
+  Ssl::MockConnectionInfo mockConnectionInfo;
+  EXPECT_CALL(mockConnectionInfo, sessionId()).WillOnce(Return(tlsSessionId));
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(&mockConnectionInfo));
+
+  setup(1, accessLogConfig("%DOWNSTREAM_TLS_SESSION_ID%"));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B");
 }
 
 // Test that access log fields %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% and
