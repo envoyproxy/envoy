@@ -273,6 +273,7 @@ private:
   HEADER_FUNC(AccessControlAllowCredentials)                                                       \
   HEADER_FUNC(AccessControlExposeHeaders)                                                          \
   HEADER_FUNC(AccessControlMaxAge)                                                                 \
+  HEADER_FUNC(Age)                                                                                 \
   HEADER_FUNC(Authorization)                                                                       \
   HEADER_FUNC(CacheControl)                                                                        \
   HEADER_FUNC(ClientTraceId)                                                                       \
@@ -310,6 +311,7 @@ private:
   HEADER_FUNC(EnvoyUpstreamServiceTime)                                                            \
   HEADER_FUNC(Etag)                                                                                \
   HEADER_FUNC(Expect)                                                                              \
+  HEADER_FUNC(Expires)                                                                             \
   HEADER_FUNC(ForwardedClientCert)                                                                 \
   HEADER_FUNC(ForwardedFor)                                                                        \
   HEADER_FUNC(ForwardedProto)                                                                      \

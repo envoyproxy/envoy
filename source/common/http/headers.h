@@ -24,6 +24,7 @@ public:
   const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
+  const LowerCaseString Age{"age"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
   const LowerCaseString ProxyAuthorization{"proxy-authorization"};
@@ -72,6 +73,7 @@ public:
   const LowerCaseString EnvoyDecoratorOperation{"x-envoy-decorator-operation"};
   const LowerCaseString Etag{"etag"};
   const LowerCaseString Expect{"expect"};
+  const LowerCaseString Expires{"expires"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
   const LowerCaseString ForwardedHost{"x-forwarded-host"};
