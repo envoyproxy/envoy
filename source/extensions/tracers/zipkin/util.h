@@ -51,6 +51,7 @@ public:
 
   /**
    * Returns byte string representation of an number.
+   *
    * @param value Number that will be represented in byte string.
    * @return std::string byte string representation of a number.
    */
