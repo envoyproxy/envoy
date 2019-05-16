@@ -852,15 +852,10 @@ TEST(PercentEncoding, EncodeDecode) {
     }
 }
   )EOF";
-  validatePercentEncodingEncodeDecode(
-      json, "%0A%7B%0A%20%20%20%20%22error%22%3A%20%7B%0A%20%20%20%20%20%20%20%20%"
-            "22code%22%3A%20401%2C%0A%20%20%20%20%20%20%20%20%22message%22%3A%20%"
-            "22Unauthorized%22%0A%20%20%20%20%7D%0A%7D%0A%20%20");
-  validatePercentEncodingEncodeDecode("too large", "too%20large");
-  validatePercentEncodingEncodeDecode("ok", "ok");
-
-  // Contains unreserved characters.
-  validatePercentEncodingEncodeDecode(".~-0_0-~.", ".~-0_0-~.");
+  validatePercentEncodingEncodeDecode(json, "%0A{%0A    \"error\": {%0A        \"code\": 401,%0A   "
+                                            "     \"message\": \"Unauthorized\"%0A    }%0A}%0A  ");
+  validatePercentEncodingEncodeDecode("too large", "too large");
+  validatePercentEncodingEncodeDecode("_-ok-_", "_-ok-_");
 }
 
 TEST(PercentEncoding, Trailing) {

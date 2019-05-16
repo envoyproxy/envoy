@@ -567,11 +567,9 @@ std::string Utility::PercentEncoding::encode(absl::string_view value) {
   std::string encoded;
   for (size_t i = 0; i < value.size(); ++i) {
     const char& ch = value[i];
-    // Unreserved characters. unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~".
-    // https://tools.ietf.org/html/rfc3986#section-2.3.
-    if (absl::ascii_isalnum(ch) || ch == '-' || ch == '_' || ch == '.' || ch == '~') {
+    // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses.
+    if ((ch >= ' ' && ch < '%') || (ch > '%' && ch < '~')) {
       encoded.push_back(ch);
-      // TODO(dio): check for absl::is_space(ch), to encode it as '+' if desired.
     } else {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
@@ -586,7 +584,6 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
   decoded.reserve(encoded.size());
   for (size_t i = 0; i < encoded.size(); ++i) {
     char ch = encoded[i];
-    // TODO(dio): check for '+', to decode it as space if desired.
     if (ch == '%' && i + 2 < encoded.size()) {
       const char& hi = encoded[i + 1];
       const char& lo = encoded[i + 2];
