@@ -154,7 +154,7 @@ envoy_directory_genrule(
 filegroup(
     name = "route_corpus",
     testonly = 1,
-    srcs = [":corpus_from_config_impl"] + native.glob(["route_corpus/**"]),
+    srcs = [":corpus_from_config_impl"] + glob(["route_corpus/**"]),
 )
 
 envoy_cc_fuzz_test(

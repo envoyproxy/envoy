@@ -490,6 +490,8 @@ private:
     // Per-stream request timeout callback
     void onRequestTimeout();
 
+    bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
+
     ConnectionManagerImpl& connection_manager_;
     Router::RouteConfigProvider& route_config_provider_;
     Router::ConfigConstSharedPtr snapped_route_config_;

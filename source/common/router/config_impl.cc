@@ -949,8 +949,7 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     method_ = envoy::api::v2::core::RequestMethod_Name(virtual_cluster.method());
   }
 
-  const std::string pattern = virtual_cluster.pattern();
-  pattern_ = RegexUtil::parseRegex(pattern);
+  pattern_ = RegexUtil::parseRegex(virtual_cluster.pattern());
   name_ = virtual_cluster.name();
 }
 

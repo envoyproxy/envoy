@@ -23,6 +23,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "clear_route_cache_filter_lib",
+    srcs = [
+        "clear_route_cache_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "modify_buffer_filter_config_lib",
     srcs = [
         "modify_buffer_filter.cc",
