@@ -1,3 +1,6 @@
+# Envoy select targets. This is in a separate file to avoid a circular 
+# dependency with envoy_build_system.bzl.
+
 # Selects the given values if hot restart is enabled in the current build.
 def envoy_select_hot_restart(xs, repository = ""):
     return select({

@@ -1,3 +1,5 @@
+# Envoy test targets. This includes both test library and test binary targets.
+
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load(":envoy_binary.bzl", "envoy_cc_binary")
 load(
