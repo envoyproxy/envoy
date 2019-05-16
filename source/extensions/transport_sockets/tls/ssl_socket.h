@@ -46,7 +46,7 @@ public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
             Network::TransportSocketOptionsSharedPtr transport_socket_options);
 
-  // Ssl::Connection
+  // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
   std::vector<std::string> uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
@@ -60,6 +60,7 @@ public:
   std::vector<std::string> dnsSansLocalCertificate() const override;
   absl::optional<SystemTime> validFromPeerCertificate() const override;
   absl::optional<SystemTime> expirationPeerCertificate() const override;
+  std::string sessionId() const override;
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
