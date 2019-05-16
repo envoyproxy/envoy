@@ -133,7 +133,7 @@ void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
     // If caller wants LOCAL_ORIGIN_CONNECT_SUCCESS to be mapped to HTTP code then proceed,
     // otherwise bail out here.
     if (code) {
-      putHttpResponseCode(code.value())
+      putHttpResponseCode(code.value());
     } else {
       return;
     }
