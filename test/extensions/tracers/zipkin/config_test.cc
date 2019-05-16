@@ -47,6 +47,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
       "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
       collector_cluster: fake_cluster
       collector_endpoint: /api/v1/spans
+      collector_endpoint_version: HTTP-PROTO
   )EOF";
 
   envoy::config::trace::v2::Tracing configuration;

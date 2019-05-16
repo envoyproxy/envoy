@@ -68,7 +68,9 @@ const zipkin::proto3::Endpoint Endpoint::toProtoEndpoint() const {
     } else {
       endpoint.set_ipv6(address_->ip()->addressAsString());
     }
+    endpoint.set_port(address_->ip()->port());
   }
+
   endpoint.set_service_name(service_name_);
   return endpoint;
 }

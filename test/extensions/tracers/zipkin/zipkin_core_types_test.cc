@@ -1,6 +1,8 @@
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/protobuf/utility.h"
+#include "common/common/base64.h"
 
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
@@ -15,11 +17,32 @@ namespace Tracers {
 namespace Zipkin {
 namespace {
 
+void expectValidEndpointProto(const Endpoint& endpoint) {
+  const auto addr = endpoint.address();
+  const auto version =
+      addr ? (addr->ip()->version() == Network::Address::IpVersion::v4 ? "ipv4" : "ipv6") : "ipv4";
+  const auto ip = addr ? Base64::encode(addr->ip()->addressAsString().c_str(),
+                                        addr->ip()->addressAsString().size(), false)
+                       : "";
+  const auto port = addr ? addr->ip()->port() : 0;
+  const std::string expected_yaml = fmt::format(
+      R"EOF(
+{}: {}
+port: {}
+serviceName: {}
+)EOF",
+      version, ip, port, endpoint.serviceName());
+  zipkin::proto3::Endpoint expected_msg;
+  MessageUtil::loadFromYaml(expected_yaml, expected_msg);
+  EXPECT_EQ(endpoint.toProtoEndpoint().DebugString(), expected_msg.DebugString());
+}
+
 TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   Endpoint ep;
 
   EXPECT_EQ("", ep.serviceName());
   EXPECT_EQ(R"({"ipv4":"","port":0,"serviceName":""})", ep.toJson());
+  expectValidEndpointProto(ep);
 
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddress("127.0.0.1");
@@ -34,8 +57,10 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   ep.setServiceName("my_service");
   EXPECT_EQ("my_service", ep.serviceName());
 
-  EXPECT_EQ(R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
-            ep.toJson());
+  const std::string expected_json =
+      R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})";
+  EXPECT_EQ(expected_json, ep.toJson());
+  expectValidEndpointProto(ep);
 }
 
 TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
@@ -52,6 +77,7 @@ TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
 
   EXPECT_EQ(R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
             ep.toJson());
+  expectValidEndpointProto(ep);
 }
 
 TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
@@ -65,6 +91,8 @@ TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
 
   EXPECT_EQ(ep1.serviceName(), ep2.serviceName());
   EXPECT_EQ(ep1.toJson(), ep2.toJson());
+  expectValidEndpointProto(ep1);
+  expectValidEndpointProto(ep2);
 }
 
 TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
@@ -78,6 +106,8 @@ TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
 
   EXPECT_EQ(ep1.serviceName(), ep2.serviceName());
   EXPECT_EQ(ep1.toJson(), ep2.toJson());
+  expectValidEndpointProto(ep1);
+  expectValidEndpointProto(ep2);
 }
 
 TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
