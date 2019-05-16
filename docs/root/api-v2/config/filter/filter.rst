@@ -11,3 +11,4 @@ Filters
   accesslog/v2/accesslog.proto
   fault/v2/fault.proto
   listener/listener
+  dubbo/dubbo

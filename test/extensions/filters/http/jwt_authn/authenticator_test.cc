@@ -42,10 +42,10 @@ public:
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
     raw_fetcher_ = new MockJwksFetcher;
     fetcher_.reset(raw_fetcher_);
-    auth_ = Authenticator::create(check_audience, provider, !provider,
-                                  filter_config_->getCache().getJwksCache(), filter_config_->cm(),
-                                  [this](Upstream::ClusterManager&) { return std::move(fetcher_); },
-                                  filter_config_->timeSource());
+    auth_ = Authenticator::create(
+        check_audience, provider, !provider, filter_config_->getCache().getJwksCache(),
+        filter_config_->cm(), [this](Upstream::ClusterManager&) { return std::move(fetcher_); },
+        filter_config_->timeSource());
     jwks_ = Jwks::createFrom(PublicKey, Jwks::JWKS);
     EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
   }

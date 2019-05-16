@@ -120,6 +120,7 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
+        "//include/envoy/config:xds_grpc_context_interface",
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:backoff_lib",
