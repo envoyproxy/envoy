@@ -205,34 +205,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "on_demand_update_lib",
-    srcs = ["on_demand_update.cc"],
-    hdrs = ["on_demand_update.h"],
-    deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/access_log:access_log_lib",
-        "//source/common/buffer:watermark_buffer_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:empty_string",
-        "//source/common/common:enum_to_int",
-        "//source/common/common:hash_lib",
-        "//source/common/common:hex_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/grpc:common_lib",
-        "//source/common/http:codes_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/http:headers_lib",
-        "//source/common/http:message_lib",
-        "//source/common/http:utility_lib",
-        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
-    ],
-)
-
-envoy_cc_library(
     name = "router_ratelimit_lib",
     srcs = ["router_ratelimit.cc"],
     hdrs = ["router_ratelimit.h"],

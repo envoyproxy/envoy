@@ -1,13 +1,13 @@
-#include "common/router/on_demand_update.h"
+#include "extensions/filters/http/on_demand/on_demand_update.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/http/codes.h"
 
-#include "extensions/filters/http/well_known_names.h"
-
 namespace Envoy {
-namespace Router {
+namespace Extensions {
+namespace HttpFilters {
+namespace OnDemand {
 
 void OnDemandRouteUpdate::requestRouteConfigUpdate() {
   if (callbacks_->route() != nullptr) {
@@ -53,5 +53,7 @@ void OnDemandRouteUpdate::onComplete() {
   callbacks_->continueDecoding();
 }
 
-} // namespace Router
+} // namespace OnDemand
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
