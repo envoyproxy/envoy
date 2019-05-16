@@ -260,5 +260,31 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
   EXPECT_EQ(1, member_update_count);
 }
 
+TEST_P(EdsIntegrationTest, StatsReadyFilter) {
+  config_helper_.addFilter("name: eds-ready-filter");
+  initializeTest(false);
+
+  // Initial state: no healthy endpoints
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("EDS not ready", response->body());
+
+  cleanupUpstreamAndDownstream();
+
+  // 2/2 healthy endpoints.
+  setEndpoints(2, 2, 0);
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
+                                                downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("EDS is ready", response->body());
+
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace
 } // namespace Envoy
