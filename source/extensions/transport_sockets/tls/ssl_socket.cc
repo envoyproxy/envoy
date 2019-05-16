@@ -67,12 +67,12 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
 SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
   ReadResult result;
   uint8_t* mem = static_cast<uint8_t*>(slice.mem_);
-  auto remaining = slice.len_;
+  size_t remaining = slice.len_;
   while (remaining > 0) {
     int rc = SSL_read(ssl_.get(), mem, remaining);
     ENVOY_CONN_LOG(trace, "ssl read returns: {}", callbacks_->connection(), rc);
     if (rc > 0) {
-      ASSERT(rc <= remaining);
+      ASSERT(static_cast<size_t>(rc) <= remaining);
       mem += rc;
       remaining -= rc;
       result.commit_slice_ = true;
