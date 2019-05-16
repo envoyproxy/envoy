@@ -31,6 +31,10 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
 }
 
 void Filter::initiateCall(const Http::HeaderMap& headers) {
+  if (filter_return_ == FilterReturn::StopDecoding) {
+    return;
+  }
+
   Router::RouteConstSharedPtr route = callbacks_->route();
   if (route == nullptr || route->routeEntry() == nullptr) {
     return;
@@ -98,11 +102,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
   if (buffer_data_) {
     const bool buffer_is_full = isBufferFull();
     if (end_stream || buffer_is_full) {
-      if (filter_return_ != FilterReturn::StopDecoding) {
-        ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request since {}",
-                         *callbacks_, buffer_is_full ? "buffer is full" : "stream is ended");
-        initiateCall(*request_headers_);
-      }
+      ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request since {}",
+                       *callbacks_, buffer_is_full ? "buffer is full" : "stream is ended");
+      initiateCall(*request_headers_);
       return filter_return_ == FilterReturn::StopDecoding
                  ? Http::FilterDataStatus::StopIterationAndWatermark
                  : Http::FilterDataStatus::Continue;
