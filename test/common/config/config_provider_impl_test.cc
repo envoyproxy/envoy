@@ -391,9 +391,9 @@ TEST_F(ConfigProviderImplDeathTest, AssertionFailureOnIncorrectInstanceType) {
                                 ConfigProviderInstanceType::Inline);
   InlineDummyConfigProvider bar(factory_context_, *provider_manager_,
                                 ConfigProviderInstanceType::Static);
-  EXPECT_DEATH(InlineDummyConfigProvider(factory_context_, *provider_manager_,
-                                         ConfigProviderInstanceType::Xds),
-               "");
+  EXPECT_DEBUG_DEATH(InlineDummyConfigProvider(factory_context_, *provider_manager_,
+                                               ConfigProviderInstanceType::Xds),
+                     "");
 }
 
 // Tests that the base ConfigProvider*s are handling registration with the
