@@ -76,9 +76,13 @@ Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
   Config::Utility::checkCluster(TracerNames::get().Zipkin, zipkin_config.collector_cluster(), cm_);
   cluster_ = cm_.get(zipkin_config.collector_cluster())->info();
 
-  std::string collector_endpoint = ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT;
+  CollectorInfo collector;
   if (!zipkin_config.collector_endpoint().empty()) {
-    collector_endpoint = zipkin_config.collector_endpoint();
+    collector.endpoint = zipkin_config.collector_endpoint();
+  }
+  if (zipkin_config.collector_endpoint_version() !=
+      envoy::config::trace::v2::ZipkinConfig::DEFAULT) {
+    collector.version = zipkin_config.collector_endpoint_version();
   }
 
   const bool trace_id_128bit = zipkin_config.trace_id_128bit();
@@ -86,12 +90,12 @@ Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
   const bool shared_span_context = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       zipkin_config, shared_span_context, ZipkinCoreConstants::get().DEFAULT_SHARED_SPAN_CONTEXT);
 
-  tls_->set([this, collector_endpoint, &random_generator, trace_id_128bit, shared_span_context](
+  tls_->set([this, collector, &random_generator, trace_id_128bit, shared_span_context](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     TracerPtr tracer(new Tracer(local_info_.clusterName(), local_info_.address(), random_generator,
                                 trace_id_128bit, shared_span_context, time_source_));
     tracer->setReporter(
-        ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector_endpoint));
+        ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector));
     return ThreadLocal::ThreadLocalObjectSharedPtr{new TlsTracer(std::move(tracer), *this)};
   });
 }
@@ -125,8 +129,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
 }
 
 ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
-                           const std::string& collector_endpoint)
-    : driver_(driver), collector_endpoint_(collector_endpoint) {
+                           const CollectorInfo& collector)
+    : driver_(driver), collector_(collector) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
     flushSpans();
@@ -141,8 +145,8 @@ ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
 }
 
 ReporterPtr ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
-                                      const std::string& collector_endpoint) {
-  return ReporterPtr(new ReporterImpl(driver, dispatcher, collector_endpoint));
+                                      const CollectorInfo& collector) {
+  return ReporterPtr(new ReporterImpl(driver, dispatcher, collector));
 }
 
 // TODO(fabolive): Need to avoid the copy to improve performance.
@@ -167,16 +171,24 @@ void ReporterImpl::flushSpans() {
   if (span_buffer_.pendingSpans()) {
     driver_.tracerStats().spans_sent_.add(span_buffer_.pendingSpans());
 
-    const std::string request_body = span_buffer_.toStringifiedJsonArray();
     Http::MessagePtr message(new Http::RequestMessageImpl());
     message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-    message->headers().insertPath().value(collector_endpoint_);
+    message->headers().insertPath().value(collector_.endpoint);
     message->headers().insertHost().value(driver_.cluster()->name());
-    message->headers().insertContentType().value().setReference(
-        Http::Headers::get().ContentTypeValues.Json);
+
+    std::string payload;
+    if (collector_.version == envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO) {
+      message->headers().insertContentType().value().setReference(
+          Http::Headers::get().ContentTypeValues.Protobuf);
+      span_buffer_.toProtoListOfSpans().SerializeToString(&payload);
+    } else {
+      message->headers().insertContentType().value().setReference(
+          Http::Headers::get().ContentTypeValues.Json);
+      payload = span_buffer_.toStringifiedJsonArray();
+    }
 
     Buffer::InstancePtr body(new Buffer::OwnedImpl());
-    body->add(request_body);
+    body->add(payload);
     message->body() = std::move(body);
 
     const uint64_t timeout =

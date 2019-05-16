@@ -32,6 +32,17 @@ std::string SpanBuffer::toStringifiedJsonArray() {
   return stringified_json_array;
 }
 
+const zipkin::proto3::ListOfSpans SpanBuffer::toProtoListOfSpans() const {
+  zipkin::proto3::ListOfSpans spans;
+  if (pendingSpans()) {
+    for (const auto& span : span_buffer_) {
+      auto* mutable_span = spans.add_spans();
+      mutable_span->MergeFrom(span.toProtoSpan());
+    }
+  }
+  return spans;
+}
+
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions

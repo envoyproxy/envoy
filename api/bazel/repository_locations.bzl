@@ -18,6 +18,9 @@ PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf391
 
 KAFKA_SOURCE_SHA = "ae7a1696c0a0302b43c5b21e515c37e6ecd365941f68a510a7e442eebddf39a1"  # 2.2.0-rc2
 
+ZIPKINAPI_RELEASE = "0.2.0"
+ZIPKINAPI_SHA256 = "cc34d57c51a52e8b9ea8ea5ca51e25016531eabc6c47be9b11d8fc29a5d266ae"
+
 REPOSITORY_LOCATIONS = dict(
     bazel_skylib = dict(
         sha256 = BAZEL_SKYLIB_SHA256,
@@ -53,5 +56,10 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = KAFKA_SOURCE_SHA,
         strip_prefix = "kafka-2.2.0-rc2/clients/src/main/resources/common/message",
         urls = ["https://github.com/apache/kafka/archive/2.2.0-rc2.zip"],
+    ),
+    com_github_apache_zipkinapi = dict(
+        sha256 = ZIPKINAPI_SHA256,
+        strip_prefix = "incubator-zipkin-api-" + ZIPKINAPI_RELEASE,
+        urls = ["https://github.com/apache/incubator-zipkin-api/archive/" + ZIPKINAPI_RELEASE + ".tar.gz"],
     ),
 )

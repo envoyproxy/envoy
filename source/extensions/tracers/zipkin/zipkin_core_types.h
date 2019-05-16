@@ -13,6 +13,7 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "zipkin.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -93,6 +94,13 @@ public:
    * @return a stringified JSON.
    */
   const std::string toJson() override;
+
+  /**
+   * Builds protobuf message representation of this endpoint.
+   *
+   * @return zipkin::proto3::Endpoint the protobuf message representation of this endpoint.
+   */
+  const zipkin::proto3::Endpoint toProtoEndpoint() const;
 
 private:
   std::string service_name_;
@@ -517,6 +525,13 @@ public:
    * @return a stringified JSON.
    */
   const std::string toJson() override;
+
+  /**
+   * Builds protobuf message representation of this span.
+   *
+   * @return zipkin::proto3::Span the protobuf message representation of this span.
+   */
+  const zipkin::proto3::Span toProtoSpan() const;
 
   /**
    * Associates a Tracer object with the span. The tracer's reportSpan() method is invoked

@@ -2,6 +2,8 @@
 
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
+#include "zipkin.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -51,13 +53,18 @@ public:
   /**
    * @return the number of spans currently buffered.
    */
-  uint64_t pendingSpans() { return span_buffer_.size(); }
+  uint64_t pendingSpans() const { return span_buffer_.size(); }
 
   /**
    * @return the contents of the buffer as a stringified array of JSONs, where
    * each JSON in the array corresponds to one Zipkin span.
    */
   std::string toStringifiedJsonArray();
+
+  /**
+   * @return the contents of the buffer as a zipkin::proto3::ListOfSpans.
+   */
+  const zipkin::proto3::ListOfSpans toProtoListOfSpans() const;
 
 private:
   // We use a pre-allocated vector to improve performance

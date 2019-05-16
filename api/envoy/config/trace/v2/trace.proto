@@ -80,6 +80,17 @@ message ZipkinConfig {
   // Determines whether client and server spans will shared the same span id.
   // The default value is true.
   google.protobuf.BoolValue shared_span_context = 4;
+
+  // Available zipkin collector endpoint versions.
+  enum CollectorEndpointVersion {
+    DEFAULT = 0;
+    HTTP_JSON_V1 = 1;
+    HTTP_PROTO = 2;
+  }
+
+  // Determines the selected collector endpoint version. By default, the ``HTTP_JSON_V1``` will be
+  // used.
+  CollectorEndpointVersion collector_endpoint_version = 6;
 }
 
 // DynamicOtConfig is used to dynamically load a tracer from a shared library

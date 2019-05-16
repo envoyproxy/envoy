@@ -1,5 +1,7 @@
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
+#include "common/common/byte_order.h"
+#include "common/common/empty_string.h"
 #include "common/common/utility.h"
 
 #include "extensions/tracers/zipkin/span_context.h"
@@ -53,6 +55,22 @@ const std::string Endpoint::toJson() {
   std::string json_string = s.GetString();
 
   return json_string;
+}
+
+const zipkin::proto3::Endpoint Endpoint::toProtoEndpoint() const {
+  zipkin::proto3::Endpoint endpoint;
+  if (!address_) {
+    endpoint.set_ipv4(EMPTY_STRING);
+    endpoint.set_port(0);
+  } else {
+    if (address_->ip()->version() == Network::Address::IpVersion::v4) {
+      endpoint.set_ipv4(address_->ip()->addressAsString());
+    } else {
+      endpoint.set_ipv6(address_->ip()->addressAsString());
+    }
+  }
+  endpoint.set_service_name(service_name_);
+  return endpoint;
 }
 
 Annotation::Annotation(const Annotation& ann) {
@@ -217,6 +235,44 @@ const std::string Span::toJson() {
                        ZipkinJsonFieldNames::get().SPAN_BINARY_ANNOTATIONS);
 
   return json_string;
+}
+
+const zipkin::proto3::Span Span::toProtoSpan() const {
+  zipkin::proto3::Span span;
+
+  // TODO(dio): pack ids.
+  span.set_id("id");
+  span.set_trace_id("traceid");
+  span.set_name(name_);
+
+  if (parent_id_ && parent_id_.has_value()) {
+    span.set_parent_id("parentid");
+  }
+
+  if (timestamp_) {
+    span.set_timestamp(timestamp_.value());
+  }
+
+  if (duration_) {
+    span.set_duration(duration_.value());
+  }
+
+  for (const auto& annotation : annotations_) {
+    if (annotation.isSetEndpoint()) {
+      if (annotation.value() == ZipkinCoreConstants::get().CLIENT_SEND) {
+        span.mutable_local_endpoint()->MergeFrom(annotation.endpoint().toProtoEndpoint());
+      } else if (annotation.value() == ZipkinCoreConstants::get().SERVER_RECV) {
+        span.mutable_remote_endpoint()->MergeFrom(annotation.endpoint().toProtoEndpoint());
+      }
+    }
+  }
+
+  for (const auto& binary_annotation : binary_annotations_) {
+    auto& tags = *span.mutable_tags();
+    tags[binary_annotation.key()] = binary_annotation.value();
+  }
+
+  return span;
 }
 
 void Span::finish() {
