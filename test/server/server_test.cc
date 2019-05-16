@@ -302,10 +302,14 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
 }
 
-// Validate server runtime is parsed from bootstrap.
+// Validate server runtime is parsed from bootstrap and that we can read from
+// service cluster specified disk-based overrides.
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
+  options_.service_cluster_name_ = "some_service";
   initialize("test/server/runtime_bootstrap.yaml");
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo"));
+  // This should access via the override/some_service overlay.
+  EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz"));
 }
 
 // Validate invalid runtime in bootstrap is rejected.

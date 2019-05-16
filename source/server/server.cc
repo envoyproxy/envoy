@@ -363,6 +363,8 @@ void InstanceImpl::initialize(const Options& options,
       component_factory.createRuntime(*this, initial_config));
   hooks.onRuntimeCreated();
 
+  // Initialize the dynamic runtime now that we have the static base runtime.
+
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ =
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_source_);
@@ -424,25 +426,10 @@ void InstanceImpl::startWorkers() {
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
-  if (!config.baseRuntime().fields().empty()) {
-    ENVOY_LOG(info, "non-empty base runtime layer specified in bootstrap");
-  }
-  if (config.diskRuntime()) {
-    ENVOY_LOG(info, "disk runtime symlink: {}", config.diskRuntime()->symlinkRoot());
-    ENVOY_LOG(info, "disk runtime subdirectory: {}", config.diskRuntime()->subdirectory());
-
-    std::string override_subdirectory =
-        config.diskRuntime()->overrideSubdirectory() + "/" + server.localInfo().clusterName();
-    ENVOY_LOG(info, "disk runtime override subdirectory: {}", override_subdirectory);
-
-    return std::make_unique<Runtime::DiskBackedLoaderImpl>(
-        server.dispatcher(), server.threadLocal(), config.baseRuntime(),
-        config.diskRuntime()->symlinkRoot(), config.diskRuntime()->subdirectory(),
-        override_subdirectory, server.stats(), server.random(), server.api());
-  } else {
-    return std::make_unique<Runtime::LoaderImpl>(config.baseRuntime(), server.random(),
-                                                 server.stats(), server.threadLocal());
-  }
+  ENVOY_LOG(info, "runtime layers: {}", config.runtime().DebugString());
+  return std::make_unique<Runtime::LoaderImpl>(server.dispatcher(), server.threadLocal(),
+                                               config.runtime(), server.localInfo().clusterName(),
+                                               server.stats(), server.random(), server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {

@@ -444,23 +444,19 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
   }
 }
 
-LoaderImpl::LoaderImpl(const ProtobufWkt::Struct& base, RandomGenerator& generator,
-                       Stats::Store& store, ThreadLocal::SlotAllocator& tls)
-    : LoaderImpl(DoNotLoadSnapshot{}, base, generator, store, tls) {
+LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
+                       const envoy::config::bootstrap::v2::LayeredRuntime& config,
+                       absl::string_view service_cluster, Stats::Store& store,
+                       RandomGenerator& generator, Api::Api& api)
+    : generator_(generator), stats_(generateStats(store)), admin_layer_(stats_),
+      tls_(tls.allocateSlot()), config_(config), service_cluster_(service_cluster), api_(api) {
+  if (!config.symlink_root().empty()) {
+    watcher_ = dispatcher.createFilesystemWatcher();
+    watcher_->addWatch(config.symlink_root(), Filesystem::Watcher::Events::MovedTo,
+                       [this](uint32_t) -> void { loadNewSnapshot(); });
+  }
+
   loadNewSnapshot();
-}
-
-LoaderImpl::LoaderImpl(DoNotLoadSnapshot /* unused */, const ProtobufWkt::Struct& base,
-                       RandomGenerator& generator, Stats::Store& store,
-                       ThreadLocal::SlotAllocator& tls)
-    : generator_(generator), stats_(generateStats(store)), admin_layer_(stats_), base_(base),
-      tls_(tls.allocateSlot()) {}
-
-std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
-  std::vector<Snapshot::OverrideLayerConstPtr> layers;
-  layers.emplace_back(std::make_unique<const ProtoLayer>(base_));
-  layers.emplace_back(std::make_unique<const AdminLayer>(admin_layer_));
-  return std::make_unique<SnapshotImpl>(generator_, stats_, std::move(layers));
 }
 
 void LoaderImpl::loadNewSnapshot() {
@@ -477,19 +473,6 @@ void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>&
   loadNewSnapshot();
 }
 
-DiskBackedLoaderImpl::DiskBackedLoaderImpl(
-    Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls, const ProtobufWkt::Struct& base,
-    const std::string& root_symlink_path, const std::string& subdir,
-    const std::string& override_dir, Stats::Store& store, RandomGenerator& generator, Api::Api& api)
-    : LoaderImpl(DoNotLoadSnapshot{}, base, generator, store, tls),
-      watcher_(dispatcher.createFilesystemWatcher()), root_path_(root_symlink_path + "/" + subdir),
-      override_path_(root_symlink_path + "/" + override_dir), api_(api) {
-  watcher_->addWatch(root_symlink_path, Filesystem::Watcher::Events::MovedTo,
-                     [this](uint32_t) -> void { loadNewSnapshot(); });
-
-  loadNewSnapshot();
-}
-
 RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   std::string prefix = "runtime.";
   RuntimeStats stats{
@@ -497,23 +480,52 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   return stats;
 }
 
-std::unique_ptr<SnapshotImpl> DiskBackedLoaderImpl::createNewSnapshot() {
+std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
   std::vector<Snapshot::OverrideLayerConstPtr> layers;
-  layers.emplace_back(std::make_unique<const ProtoLayer>(base_));
-  try {
-    layers.push_back(std::make_unique<DiskLayer>("root", root_path_, api_));
-    if (api_.fileSystem().directoryExists(override_path_)) {
-      layers.push_back(std::make_unique<DiskLayer>("override", override_path_, api_));
-      stats_.override_dir_exists_.inc();
-    } else {
-      stats_.override_dir_not_exists_.inc();
+  uint32_t disk_layers = 0;
+  uint32_t error_layers = 0;
+  for (const auto& layer : config_.layers()) {
+    switch (layer.layer_specifier_case()) {
+    case envoy::config::bootstrap::v2::RuntimeLayer::kStaticLayer:
+      layers.emplace_back(std::make_unique<const ProtoLayer>(layer.static_layer()));
+      break;
+    case envoy::config::bootstrap::v2::RuntimeLayer::kDiskLayer: {
+      std::string path = config_.symlink_root() + "/" + layer.disk_layer().subdirectory();
+      if (layer.disk_layer().append_service_cluster()) {
+        path += "/" + service_cluster_;
+      }
+      if (api_.fileSystem().directoryExists(path)) {
+        try {
+          layers.emplace_back(std::make_unique<DiskLayer>(layer.name(), path, api_));
+          ++disk_layers;
+        } catch (EnvoyException& e) {
+          ++error_layers;
+          ENVOY_LOG(debug, "error loading runtime values for layer {} from disk: {}",
+                    layer.DebugString(), e.what());
+        }
+      }
+      break;
     }
-  } catch (EnvoyException& e) {
-    layers.clear();
-    stats_.load_error_.inc();
-    ENVOY_LOG(debug, "error loading runtime values from disk: {}", e.what());
+    case envoy::config::bootstrap::v2::RuntimeLayer::kAdminLayer:
+      layers.push_back(std::make_unique<AdminLayer>(admin_layer_));
+      break;
+    default:
+      // Skip unimplemented layers.
+      ENVOY_LOG(warn, "unknown layer {}", layer.DebugString());
+      break;
+    }
   }
-  layers.push_back(std::make_unique<AdminLayer>(admin_layer_));
+  stats_.num_layers_.set(layers.size());
+  if (error_layers == 0) {
+    stats_.load_success_.inc();
+  } else {
+    stats_.load_error_.inc();
+  }
+  if (disk_layers > 1) {
+    stats_.override_dir_exists_.inc();
+  } else {
+    stats_.override_dir_not_exists_.inc();
+  }
   return std::make_unique<SnapshotImpl>(generator_, stats_, std::move(layers));
 }
 
