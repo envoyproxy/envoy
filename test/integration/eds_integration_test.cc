@@ -103,7 +103,8 @@ TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
 
   // Fail HC and verify the host is gone.
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
+  upstream_request_->encodeHeaders(
+      Http::TestHeaderMapImpl{{":status", "503"}, {"connection", "close"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 0);
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 }
