@@ -426,6 +426,11 @@ private:
 /**
  * An implementation of BufferFragment where a releasor callback is called when the data is
  * no longer needed.
+ * TODO(danzh) When BufferFragmentImpl is used as a wrapper of a newly allocated
+ * memory, bundling the memory and BufferFragmentImpl into one allocation save
+ * extra system call to allocate memory, i.e. QuicMemSliceImpl::BufferFragmentBundle.
+ * If similar use case appears again, it's better to provide a constructor which
+ * can allocate the memory requested in consecutive memory.
  */
 class BufferFragmentImpl : NonCopyable, public BufferFragment {
 public:

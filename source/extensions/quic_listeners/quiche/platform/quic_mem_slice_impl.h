@@ -72,6 +72,8 @@ private:
     // CPU read when accessing MemSlice::data(). Investigate suggestion
     // in https://github.com/envoyproxy/envoy/pull/6400/files#r277272709 to
     // mitigate the extra cost if it stands out.
+    // https://stackoverflow.com/questions/54049474/does-aligning-memory-on-particular-address-boundaries-in-c-c-still-improve-x86/54049733#54049733
+    // suggests that aligning on page boundary also benefits performance.
     Envoy::Buffer::BufferFragmentImpl fragment_;
     char buffer_[];
   };
