@@ -123,7 +123,7 @@ envoy_cmake_external(
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
     },
     copy_pdb = True,
-    lib_source = "@com_github_madler_zlib//:all",
+    lib_source = "@net_zlib//:all",
     pdb_name = "zlibstatic",
     static_libraries = select({
         "//bazel:windows_dbg_build": ["zlibstaticd.lib"],
