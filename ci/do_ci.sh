@@ -80,7 +80,7 @@ function bazel_binary_build() {
 if [[ "$1" == "bazel.release" ]]; then
   setup_clang_toolchain
   echo "bazel release build with tests..."
-  bazel_release_binary_build
+  bazel_binary_build release
 
   if [[ $# -gt 1 ]]; then
     shift
@@ -101,31 +101,31 @@ if [[ "$1" == "bazel.release" ]]; then
 elif [[ "$1" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel release build..."
-  bazel_release_binary_build
+  bazel_binary_build release
   exit 0
 elif [[ "$1" == "bazel.sizeopt.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel size optimized build..."
-  bazel_sizeopt_binary_build
+  bazel_binary_build sizeopt
   exit 0
 elif [[ "$1" == "bazel.sizeopt" ]]; then
   setup_clang_toolchain
   echo "bazel size optimized build with tests..."
-  bazel_sizeopt_binary_build
+  bazel_binary_build sizeopt
   echo "Testing..."
   bazel test ${BAZEL_TEST_OPTIONS} //test/... --config optimize_binary_size=enabled
   exit 0
 elif [[ "$1" == "bazel.debug" ]]; then
   setup_clang_toolchain
   echo "bazel debug build with tests..."
-  bazel_debug_binary_build
+  bazel_binary_build debug
   echo "Testing..."
   bazel test ${BAZEL_TEST_OPTIONS} -c dbg //test/...
   exit 0
 elif [[ "$1" == "bazel.debug.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel debug build..."
-  bazel_debug_binary_build
+  bazel_binary_build debug
   exit 0
 elif [[ "$1" == "bazel.asan" ]]; then
   setup_clang_toolchain
