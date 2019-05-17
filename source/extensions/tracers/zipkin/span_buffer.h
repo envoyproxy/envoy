@@ -62,19 +62,13 @@ public:
   uint64_t pendingSpans() { return span_buffer_.size(); }
 
   /**
-   * @return the contents of the buffer as a stringified array of JSONs, where
-   * each JSON in the array corresponds to one Zipkin span.
+   * @return the contents of the buffer as string
    */
-  std::string toStringifiedJsonArray(SpanSerializer& span_serializer);
+  std::string serialize(SpanSerializer& serializer)
 
-  const zipkin::proto3::ListOfSpans toProto();
-
-  envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion version() { return version_; }
-
-private:
-  // We use a pre-allocated vector to improve performance
-  std::vector<Span> span_buffer_;
-  const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion version_;
+      private :
+      // We use a pre-allocated vector to improve performance
+      std::vector<Span> span_buffer_;
 };
 
 } // namespace Zipkin

@@ -18,7 +18,9 @@ public:
    *
    * @param span The span that needs action.
    */
-  virtual std::string serialize(const Span& span);
+  virtual std::string serialize(std::vector<Span> spans);
+
+  virtual std::string contentType();
 };
 } // namespace Zipkin
 } // namespace Tracers

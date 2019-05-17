@@ -127,16 +127,61 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
 }
 
 HTTPSpanSerializerV1::HTTPSpanSerializerV1() {}
-const std::string HTTPSpanSerializerV1::serialize(const Span& span) { return span.toJson(); }
+const std::string HTTPSpanSerializerV1::serialize(std::vector<Span> spans) {
+  std::string stringified_json_array = "[";
+
+  if (pendingSpans()) {
+    stringified_json_array += spans[0].toJson(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1);
+    const uint64_t size = spans.size();
+    for (uint64_t i = 1; i < size; i++) {
+      stringified_json_array += ",";
+      stringified_json_array +=
+          spans[i].toJson(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1);
+    }
+  }
+  stringified_json_array += "]";
+
+  return stringified_json_array;
+}
+const std::string HTTPSpanSerializerV1::contentType() {
+  return Http::Headers::get().ContentTypeValues.Json;
+}
 
 HTTPSpanSerializer::HTTPSpanSerializer() {}
-const std::string HTTPSpanSerializer::serialize(const Span& span) { return span.toJson(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON); }
+const std::string HTTPSpanSerializer::serialize(std::vector<Span> spans) {
+  std::string stringified_json_array = "[";
+
+  if (pendingSpans()) {
+    stringified_json_array += spans[0].toJson(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON);
+    const uint64_t size = spans.size();
+    for (uint64_t i = 1; i < size; i++) {
+      stringified_json_array += ",";
+      stringified_json_array += spans[i].toJson(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON);
+    }
+  }
+  stringified_json_array += "]";
+
+  return stringified_json_array;
+}
+const std::string HTTPSpanSerializer::contentType() {
+  return Http::Headers::get().ContentTypeValues.Json;
+}
 
 HTTPProtoSpanSerializer::HTTPProtoSpanSerializer() {}
-const std::string HTTPProtoSpanSerializer::serialize(const Span& span) { 
+const std::string HTTPProtoSpanSerializer::serialize(std::vector<Span> spans) {
   std::string payload;
-  span_buffer_.toProto().SerializeToString(&payload);
-  return payload;
+  zipkin::proto3::ListOfSpans listOfSpans;
+  if (pendingSpans()) {
+    for (const auto& span : spans) {
+      auto* mutable_span = listOfSpans.add_spans();
+      mutable_span->MergeFrom(span.toProto());
+    }
+  }
+  listOfSpans.SerializeToString(&payload);
+  return payload
+}
+const std::string HTTPProtoSpanSerializer::contentType() {
+  return Http::Headers::get().ContentTypeValues.Proto;
 }
 
 ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
@@ -157,25 +202,24 @@ ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
   enableTimer();
 }
 
-ReporterPtr ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
-                                      const std::string& collector_endpoint,
-                                      const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion collector_endpoint_version) {
+ReporterPtr
+ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
+                          const std::string& collector_endpoint,
+                          const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion
+                              collector_endpoint_version) {
   SpanSerializer span_serializer;
 
   switch (collector_endpoint) {
-    case envoy::config::trace::v2::ZipkinConfig::HTTP_JSON
-      span_serializer = new HTTPSpanSerializer()
-    break;
-    case envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO
-      span_serializer = new HTTPProtoSpanSerializer()
-    break;
-    default:
-      span_serializer = new HTTPSpanSerializerV1();
+  case envoy::config::trace::v2::ZipkinConfig::HTTP_JSON span_serializer =
+      new HTTPSpanSerializer() break;
+      case envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO span_serializer =
+          new HTTPProtoSpanSerializer() break;
+      default:
+    span_serializer = new HTTPSpanSerializerV1();
     break;
   }
 
-  return ReporterPtr(
-      new ReporterImpl(driver, dispatcher, collector_endpoint, span_serializer));
+  return ReporterPtr(new ReporterImpl(driver, dispatcher, collector_endpoint, span_serializer));
 }
 
 // TODO(fabolive): Need to avoid the copy to improve performance.
@@ -200,22 +244,15 @@ void ReporterImpl::flushSpans() {
   if (span_buffer_.pendingSpans()) {
     driver_.tracerStats().spans_sent_.add(span_buffer_.pendingSpans());
 
-    const std::string request_body = span_buffer_.toStringifiedJsonArray(span_serializer_);
+    const std::string request_body = span_buffer_.serialize(span_serializer_);
     Http::MessagePtr message(new Http::RequestMessageImpl());
     message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
     message->headers().insertPath().value(collector_endpoint_);
     message->headers().insertHost().value(driver_.cluster()->name());
-    message->headers().insertContentType().value().setReference(
-        span_buffer_.version() == envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO
-            ? Http::Headers::get().ContentTypeValues.Proto
-            : Http::Headers::get().ContentTypeValues.Json);
+    message->headers().insertContentType().value().setReference(span_serializer_.contentType());
 
     std::string payload;
-    if (span_buffer_.version() == envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO) {
-      span_buffer_.toProto().SerializeToString(&payload);
-    } else {
-      payload = span_buffer_.toStringifiedJsonArray();
-    }
+    payload = span_buffer_.serialize(span_serializer_);
 
     Buffer::InstancePtr body(new Buffer::OwnedImpl());
     body->add(payload);

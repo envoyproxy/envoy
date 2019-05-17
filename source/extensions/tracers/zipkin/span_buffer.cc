@@ -18,47 +18,8 @@ bool SpanBuffer::addSpan(const Span& span) {
   return true;
 }
 
-const zipkin::proto3::ListOfSpans SpanBuffer::toProto() {
-  zipkin::proto3::ListOfSpans spans;
-  if (pendingSpans()) {
-    for (const auto& span : span_buffer_) {
-      auto* mutable_span = spans.add_spans();
-      mutable_span->MergeFrom(span.toProto());
-    }
-  }
-  return spans;
-}
-
-std::string SpanBuffer::toStringifiedJsonArray() {
-  std::string stringified_json_array = "[";
-
-  if (pendingSpans()) {
-    stringified_json_array += span_buffer_[0].toJson(version_);
-    const uint64_t size = span_buffer_.size();
-    for (uint64_t i = 1; i < size; i++) {
-      stringified_json_array += ",";
-      stringified_json_array += span_buffer_[i].toJson(version_);
-          }
-  }
-  stringified_json_array += "]";
-
-  return stringified_json_array;
-}
-
-std::string SpanBuffer::toStringifiedJsonArray(SpanSerializer& span_serialier) {
-  std::string stringified_json_array = "[";
-
-  if (pendingSpans()) {
-    stringified_json_array += span_serialier.serialize(span_buffer_[0]);
-    const uint64_t size = span_buffer_.size();
-    for (uint64_t i = 1; i < size; i++) {
-      stringified_json_array += ",";
-      stringified_json_array += span_serialier.serialize(span_buffer_[i]);
-    }
-  }
-  stringified_json_array += "]";
-
-  return stringified_json_array;
+std::string SpanBuffer::serialize(SpanSerializer& serializer) {
+  return serializer.serialize(span_buffer_);
 }
 
 } // namespace Zipkin
