@@ -198,6 +198,12 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
                                 server_->dispatcher().post(completion_cb);
                                 completion_done.Notify();
                               });
+    auto handle =
+        server_->registerCallback(ServerLifecycleNotifier::Stage::Startup, [&] { FAIL(); });
+    handle->unregister();
+    handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                                       [&](Event::PostCb) { FAIL(); });
+    handle->unregister();
     server_->run();
     server_ = nullptr;
     thread_local_ = nullptr;

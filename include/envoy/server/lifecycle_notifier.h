@@ -30,6 +30,15 @@ public:
     ShutdownExit
   };
 
+  // A handle to a registration that can be used to unregister.
+  class Handle {
+  public:
+    virtual ~Handle() = default;
+
+    virtual void unregister() PURE;
+  };
+  using HandlePtr = std::unique_ptr<Handle>;
+
   /**
    * Callback invoked when the server reaches a certain lifecycle stage.
    *
@@ -49,8 +58,8 @@ public:
    * The second version which takes a completion back is currently only supported
    * for the ShutdownExit stage.
    */
-  virtual void registerCallback(Stage stage, StageCallback callback) PURE;
-  virtual void registerCallback(Stage stage, StageCallbackWithCompletion callback) PURE;
+  virtual HandlePtr registerCallback(Stage stage, StageCallback callback) PURE;
+  virtual HandlePtr registerCallback(Stage stage, StageCallbackWithCompletion callback) PURE;
 };
 
 } // namespace Server
