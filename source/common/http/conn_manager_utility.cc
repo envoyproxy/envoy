@@ -52,7 +52,8 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
 
 Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequestHeaders(
     HeaderMap& request_headers, Network::Connection& connection, ConnectionManagerConfig& config,
-    const Router::Config& route_config, Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info) {
+    const Router::Config& route_config, Runtime::RandomGenerator& random,
+    const LocalInfo::LocalInfo& local_info) {
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
   if (Utility::isUpgrade(request_headers)) {
@@ -246,20 +247,17 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
   // Do not apply tracing transformations if we are currently tracing.
   if (UuidTraceStatus::NoTrace == UuidUtils::isTraceableUuid(x_request_id)) {
     if (request_headers.ClientTraceId() &&
-        runtime.snapshot().featureEnabled("tracing.client_enabled",
-                                          client_sampling)) {
+        runtime.snapshot().featureEnabled("tracing.client_enabled", client_sampling)) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
     } else if (request_headers.EnvoyForceTrace()) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
-    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling",
-                                                 random_sampling, result,
+    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", random_sampling, result,
                                                  10000)) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
     }
   }
 
-  if (!runtime.snapshot().featureEnabled("tracing.global_enabled",
-                                         overall_sampling, result)) {
+  if (!runtime.snapshot().featureEnabled("tracing.global_enabled", overall_sampling, result)) {
     UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::NoTrace);
   }
 

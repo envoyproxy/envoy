@@ -67,7 +67,8 @@ public:
    * Mutate request headers if request needs to be traced.
    */
   static void mutateTracingRequestHeader(HeaderMap& request_headers, Runtime::Loader& runtime,
-                                         ConnectionManagerConfig& config, const Router::Route* route);
+                                         ConnectionManagerConfig& config,
+                                         const Router::Route* route);
 
 private:
   static void mutateXfccRequestHeader(HeaderMap& request_headers, Network::Connection& connection,

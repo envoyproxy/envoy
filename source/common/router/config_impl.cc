@@ -325,9 +325,12 @@ void DecoratorImpl::apply(Tracing::Span& span) const {
 const std::string& DecoratorImpl::getOperation() const { return operation_; }
 
 RouteTracingImpl::RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing)
-    : client_sampling_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing, client_sampling, 100, 100)),
-    random_sampling_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing, random_sampling, 10000, 10000)),
-    overall_sampling_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing, overall_sampling, 100, 100)) {}
+    : client_sampling_(
+          PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing, client_sampling, 100, 100)),
+      random_sampling_(
+          PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing, random_sampling, 10000, 10000)),
+      overall_sampling_(
+          PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing, overall_sampling, 100, 100)) {}
 
 uint64_t RouteTracingImpl::getClientSampling() const { return client_sampling_; }
 
@@ -371,8 +374,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                                        route.response_headers_to_remove())),
       metadata_(route.metadata()), typed_metadata_(route.metadata()),
       match_grpc_(route.match().has_grpc()), opaque_config_(parseOpaqueConfig(route)),
-      decorator_(parseDecorator(route)),
-      routeTracing_(parseRouteTracing(route)),
+      decorator_(parseDecorator(route)), routeTracing_(parseRouteTracing(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route, factory_context.api())),
       per_filter_configs_(route.typed_per_filter_config(), route.per_filter_config(),
@@ -679,7 +681,8 @@ DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::api::v2::route
   return ret;
 }
 
-RouteTracingConstPtr RouteEntryImplBase::parseRouteTracing(const envoy::api::v2::route::Route& route) {
+RouteTracingConstPtr
+RouteEntryImplBase::parseRouteTracing(const envoy::api::v2::route::Route& route) {
   RouteTracingConstPtr ret;
   if (route.has_tracing()) {
     ret = RouteTracingConstPtr(new RouteTracingImpl(route.tracing()));
