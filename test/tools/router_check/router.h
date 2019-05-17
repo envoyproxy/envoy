@@ -10,6 +10,8 @@
 #include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
 
+#include "test/tools/router_check/validation.pb.h"
+
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -29,6 +31,13 @@ struct ToolConfig {
    * file.
    */
   static ToolConfig create(const Json::ObjectSharedPtr check_config);
+
+  /**
+   * @param check_config tool config proto object.
+   * @return ToolConfig a ToolConfig instance with member variables set by the tool config json
+   * file.
+   */
+  static ToolConfig create(const envoy::ToolSchema::ValidationItem& check_config);
 
   std::unique_ptr<Http::TestHeaderMapImpl> headers_;
   Router::RouteConstSharedPtr route_;
@@ -60,6 +69,12 @@ public:
   bool compareEntriesInJson(const std::string& expected_route_json);
 
   /**
+   * @param expected_route_json tool config json file.
+   * @return bool if all routes match what is expected.
+   */
+  bool compareEntries(const std::string& expected_route_json);
+
+  /**
    * Set whether to print out match case details.
    */
   void setShowDetails() { details_ = true; }
@@ -71,15 +86,23 @@ private:
       Api::ApiPtr api);
 
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
+  bool compareCluster(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected);
   bool compareVirtualCluster(ToolConfig& tool_config, const std::string& expected);
+  bool compareVirtualCluster(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected);
   bool compareVirtualHost(ToolConfig& tool_config, const std::string& expected);
+  bool compareVirtualHost(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected);
   bool compareRewriteHost(ToolConfig& tool_config, const std::string& expected);
+  bool compareRewriteHost(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected);
   bool compareRewritePath(ToolConfig& tool_config, const std::string& expected);
+  bool compareRewritePath(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected);
   bool compareRedirectPath(ToolConfig& tool_config, const std::string& expected);
+  bool compareRedirectPath(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected);
   bool compareHeaderField(ToolConfig& tool_config, const std::string& field,
                           const std::string& expected);
+  bool compareHeaderField(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected);
   bool compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
                                 const std::string& expected);
+  bool compareCustomHeaderField(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expecte);
   /**
    * Compare the expected and actual route parameter values. Print out match details if details_
    * flag is set.

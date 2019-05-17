@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package envoy.ToolSchema;
+
+message Validation {
+    repeated ValidationItem tests = 1;
+}
+
+message ValidationItem {
+    string test_name = 1;
+    ValidationInput input = 2;
+    ValidationAssert validate = 3;
+}
+
+message ValidationInput {
+    string authority = 1 [json_name=":authority"];
+    string path = 2 [json_name=":path"];
+    string method = 4;
+    int64 random_value = 5;
+    bool ssl = 6;
+    bool internal = 7;
+    repeated AdditionalHeader additional_headers = 8;
+}
+
+message AdditionalHeader {
+    string field = 1;
+    string value = 2;
+}
+
+message ValidationAssert {
+    string cluster_name = 1;
+    string virtual_cluster_name = 2;
+    string virtual_host_name = 3;
+    string host_rewrite = 4;
+    string path_rewrite = 5;
+    string path_redirect = 6;
+    repeated AdditionalHeader header_fields = 7;
+    repeated AdditionalHeader custom_header_fields = 8;
+}

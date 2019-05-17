@@ -33,5 +33,16 @@ envoy_cc_test_library(
         "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",
         "//test/tools/router_check/json:tool_config_schemas_lib",
+        "//test/tools/router_check:validation_cc"
     ],
+)
+
+cc_proto_library(
+    name = "validation_cc",
+    deps = [":validation_proto"],
+)
+
+proto_library(
+    name = "validation_proto",
+    srcs = ["validation.proto"],
 )
