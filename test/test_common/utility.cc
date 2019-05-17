@@ -23,6 +23,7 @@
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
 
@@ -198,6 +199,9 @@ std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
   }
   if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
     return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().VirtualHost) {
+    return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
   }
   throw EnvoyException(
       fmt::format("xdsResourceName does not know about type URL {}", resource.type_url()));
