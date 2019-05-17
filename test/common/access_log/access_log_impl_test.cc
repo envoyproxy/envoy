@@ -111,6 +111,7 @@ TEST_F(AccessLogImplTest, DownstreamDisconnect) {
             "\"10.0.0.5:1234\"\n",
             output_);
 }
+
 TEST_F(AccessLogImplTest, RouteName) {
   const std::string json = R"EOF(
   {

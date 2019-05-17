@@ -105,6 +105,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Ssl::ConnectionInfo* downstream_connection_info_{};
   std::string requested_server_name_;
+  std::string route_name_;
   std::string upstream_transport_failure_reason_;
 };
 
