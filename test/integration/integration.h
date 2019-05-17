@@ -193,6 +193,7 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
+  Api::ApiPtr api_for_server_stat_store_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
 
   // Functions for testing reloadable config (xDS)

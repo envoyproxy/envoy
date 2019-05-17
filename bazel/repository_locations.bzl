@@ -123,7 +123,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.4.2.tar.gz"],
     ),
     com_github_google_benchmark = dict(
-        # TODO (moderation) change back to tarball method on next benchmark release
+        # TODO(moderation) change back to tarball method on next benchmark release
         sha256 = "0de43b6eaddd356f1d6cd164f73f37faf2f6c96fd684e1f7ea543ce49c1d144e",
         strip_prefix = "benchmark-505be96ab23056580a3a2315abba048f4428b04e",
         urls = ["https://github.com/google/benchmark/archive/505be96ab23056580a3a2315abba048f4428b04e.tar.gz"],
@@ -137,7 +137,10 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "libevent-1cd8830de27c30c5324c75bfb6012c969c09ca2c",
         urls = ["https://github.com/libevent/libevent/archive/1cd8830de27c30c5324c75bfb6012c969c09ca2c.tar.gz"],
     ),
-    com_github_madler_zlib = dict(
+    net_zlib = dict(
+        # TODO(moderation): revert to com_github_madler_zlib name pending resolution of workaround
+        # in rules_go https://github.com/bazelbuild/rules_go/blob/master/go/private/repositories.bzl#L87-L101
+        # for issue in protocolbuffers/protobuf https://github.com/protocolbuffers/protobuf/issues/5472
         sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
         strip_prefix = "zlib-1.2.11",
         urls = ["https://github.com/madler/zlib/archive/v1.2.11.tar.gz"],
@@ -211,16 +214,9 @@ REPOSITORY_LOCATIONS = dict(
         # 2018-12-19
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/64d6ac985360b624d8e95105701b64a3814794cd.tar.gz"],
     ),
-    com_github_golang_protobuf = dict(
-        # TODO(sesmith177): Remove this dependency when:
-        #   1. There's a release of rules_go that includes golang/protobuf v1.3.1
-        sha256 = "3f3a6123054a9847093c119895f1660612f301fe95358f3a6a1a33fd0933e6cf",
-        strip_prefix = "protobuf-1.3.1",
-        urls = ["https://github.com/golang/protobuf/archive/v1.3.1.tar.gz"],
-    ),
     io_bazel_rules_go = dict(
-        sha256 = "91b79f4758fd16f2c6426279ce00c1d2d8577d61c519db39675ed84657e1a95e",
-        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.17.4/rules_go-0.17.4.tar.gz"],
+        sha256 = "3743a20704efc319070957c45e24ae4626a05ba4b1d6a8961e87520296f1b676",
+        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.18.4/rules_go-0.18.4.tar.gz"],
     ),
     rules_foreign_cc = dict(
         sha256 = "136470a38dcd00c7890230402b43004dc947bf1e3dd0289dd1bd2bfb1e0a3484",
