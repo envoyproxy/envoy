@@ -1006,16 +1006,15 @@ TEST_P(AdminInstanceTest, RuntimeModify) {
 }
 
 TEST_P(AdminInstanceTest, RuntimeModifyParamsInBody) {
-  const std::string key = "routing.traffic_shift.foo";
-  const std::string value = "numerator: 1\ndenominator: TEN_THOUSAND\n";
-  const std::string body = fmt::format("{}={}", key, value);
-
   Runtime::MockLoader loader;
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
 
+  const std::string key = "routing.traffic_shift.foo";
+  const std::string value = "numerator: 1\ndenominator: TEN_THOUSAND\n";
   const std::unordered_map<std::string, std::string> overrides = {{key, value}};
   EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
 
+  const std::string body = fmt::format("{}={}", key, value);
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, runCallback("/runtime_modify", header_map, response, "POST", body));
