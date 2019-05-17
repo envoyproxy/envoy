@@ -16,14 +16,11 @@ option java_package = "io.envoyproxy.envoy.config.common.tap.v2alpha";
 // Common configuration for all tap extensions.
 message CommonExtensionConfig {
 
-  // Only valid when discovery type is EDS.
   message TDSConfig {
     // Configuration for the source of EDS updates for this Cluster.
     envoy.api.v2.core.ConfigSource config_source = 1;
 
-    // Optional alternative to cluster name to present to EDS. This does not
-    // have the same restrictions as cluster name, i.e. it may be arbitrary
-    // length.
+    // Tap config to request from XDS server.
     string name = 2;
   }
 

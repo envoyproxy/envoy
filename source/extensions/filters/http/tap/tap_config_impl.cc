@@ -144,7 +144,8 @@ void HttpPerRequestTapperImpl::streamBufferedResponseBody() {
 
 void HttpPerRequestTapperImpl::streamEnd() {
   // send empty trace to signal the end of the stream. 
-  sink_handle_->submitTrace(std::move(makeTraceSegment()));
+  TapCommon::TraceWrapperPtr trace = makeTraceSegment();
+  sink_handle_->submitTrace(std::move(trace));
 }
 
 void HttpPerRequestTapperImpl::onResponseBody(const Buffer::Instance& data) {
