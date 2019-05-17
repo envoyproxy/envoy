@@ -564,16 +564,30 @@ void Utility::traversePerFilterConfigGeneric(
 }
 
 std::string Utility::PercentEncoding::encode(absl::string_view value) {
-  std::string encoded;
   for (size_t i = 0; i < value.size(); ++i) {
     const char& ch = value[i];
     // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses.
-    if ((ch >= ' ' && ch < '%') || (ch > '%' && ch < '~')) {
-      encoded.push_back(ch);
-    } else {
+    if (ch < ' ' || ch >= '~' || ch == '%') {
+      return PercentEncoding::encode(value, i);
+    }
+  }
+  return absl::StrCat(value);
+}
+
+std::string Utility::PercentEncoding::encode(absl::string_view value, const size_t index) {
+  std::string encoded;
+  if (index > 0) {
+    absl::StrAppend(&encoded, value.substr(0, index - 1));
+  }
+
+  for (size_t i = index; i < value.size(); ++i) {
+    const char& ch = value[i];
+    if (ch < ' ' || ch >= '~' || ch == '%') {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
       absl::StrAppend(&encoded, fmt::format("%{:02X}", ch));
+    } else {
+      encoded.push_back(ch);
     }
   }
   return encoded;
