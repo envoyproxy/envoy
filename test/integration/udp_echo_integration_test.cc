@@ -5,16 +5,16 @@
 
 namespace Envoy {
 
-std::string echo_config;
+std::string udp_echo_config;
 
 class UdpEchoIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                public BaseIntegrationTest {
 public:
-  UdpEchoIntegrationTest() : BaseIntegrationTest(GetParam(), echo_config) {}
+  UdpEchoIntegrationTest() : BaseIntegrationTest(GetParam(), udp_echo_config) {}
 
   // Called once by the gtest framework before any EchoIntegrationTests are run.
   static void SetUpTestSuite() {
-    echo_config = ConfigHelper::BASE_UDP_LISTENER_CONFIG + R"EOF(
+    udp_echo_config = ConfigHelper::BASE_UDP_LISTENER_CONFIG + R"EOF(
     listener_filters:
       name: envoy.listener.udpecho
     filter_chains:
