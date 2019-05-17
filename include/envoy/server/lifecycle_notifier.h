@@ -30,12 +30,10 @@ public:
     ShutdownExit
   };
 
-  // A handle to a registration that can be used to unregister.
+  // A handle to a callback registration. Deleting this handle will unregister the callback.
   class Handle {
   public:
     virtual ~Handle() = default;
-
-    virtual void unregister() PURE;
   };
   using HandlePtr = std::unique_ptr<Handle>;
 
