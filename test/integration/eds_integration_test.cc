@@ -135,7 +135,7 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
   RELEASE_ASSERT(result, result.message());
 
   // Respond with a health check. This will cause the previous cluster to be destroyed inline as
-  // part of handeling the response.
+  // part of processing the response.
   upstream_request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   EXPECT_EQ(0, test_server_->gauge("cluster_manager.warming_clusters")->value());
