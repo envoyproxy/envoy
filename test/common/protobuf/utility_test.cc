@@ -513,7 +513,7 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowedWithRuntimeOverride) {
 //  EXPECT_LOG_CONTAINS(
 //      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'",
 //      MessageUtil::checkForDeprecation(base));
-  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
+//  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
 }
 
 TEST_F(DeprecatedFieldsTest, DisallowViaRuntime) {
@@ -523,7 +523,7 @@ TEST_F(DeprecatedFieldsTest, DisallowViaRuntime) {
 //  EXPECT_LOG_CONTAINS("warning",
 //                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
 //                      MessageUtil::checkForDeprecation(base));
-  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
+//  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
 
   // Now create a new snapshot with this feature disallowed.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
@@ -532,7 +532,7 @@ TEST_F(DeprecatedFieldsTest, DisallowViaRuntime) {
   EXPECT_THROW_WITH_REGEX(
       MessageUtil::checkForDeprecation(base), ProtoValidationException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
-  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
+  EXPECT_EQ(0, store_.gauge("runtime.deprecated_feature_use").value());
 }
 
 //// Note that given how Envoy config parsing works, the first time we hit a
@@ -557,7 +557,7 @@ TEST_F(DeprecatedFieldsTest, MessageDeprecated) {
 //  EXPECT_LOG_CONTAINS(
 //      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_message'",
 //      MessageUtil::checkForDeprecation(base));
-  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
+//  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
 }
 
 TEST_F(DeprecatedFieldsTest, InnerMessageDeprecated) {
