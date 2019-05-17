@@ -122,9 +122,13 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolve() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+      [this](const std::list<Network::DnsResponseSharedPtr>&& response) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
+        std::list<Envoy::Network::Address::InstanceConstSharedPtr> address_list;
+        for_each(response.begin(), response.end(), [&](Envoy::Network::DnsResponseSharedPtr resp) {
+          address_list.emplace_back(resp->address_);
+        });
         parent_.redis_discovery_session_.registerDiscoveryAddress(address_list, port_);
         parent_.redis_discovery_session_.startResolve();
       });

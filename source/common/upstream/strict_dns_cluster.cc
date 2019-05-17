@@ -90,7 +90,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+      [this](const std::list<Network::DnsResponseSharedPtr>&& response) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
@@ -98,19 +98,20 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         std::unordered_map<std::string, HostSharedPtr> updated_hosts;
         HostVector new_hosts;
         std::chrono::seconds refresh_rate = std::chrono::seconds::max();
-        for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+        for (const Network::DnsResponseSharedPtr& resp : response) {
           // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
           // make a new address that has port in it. We need to both support IPv6 as well as
           // potentially move port handling into the DNS interface itself, which would work better
           // for SRV.
-          ASSERT(address != nullptr);
+          ASSERT(resp->address_ != nullptr);
           new_hosts.emplace_back(new HostImpl(
-              parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
+              parent_.info_, dns_address_,
+              Network::Utility::getAddressWithPort(*(resp->address_), port_),
               lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
               locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config(),
               locality_lb_endpoint_.priority(), lb_endpoint_.health_status()));
 
-          refresh_rate = min(refresh_rate, address->ttl());
+          refresh_rate = min(refresh_rate, resp->ttl_);
         }
 
         HostVector hosts_added;

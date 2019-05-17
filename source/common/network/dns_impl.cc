@@ -82,7 +82,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
     completed_ = true;
   }
 
-  std::list<Address::InstanceConstSharedPtr> address_list;
+  std::list<DnsResponseSharedPtr> address_list;
   if (status == ARES_SUCCESS) {
     if (hostent->h_addrtype == AF_INET) {
       auto addrttls_ = static_cast<ares_addrttl*>(addrttls);
@@ -101,16 +101,18 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
         address.sin_family = AF_INET;
         address.sin_port = 0;
         address.sin_addr = *reinterpret_cast<in_addr*>(hostent->h_addr_list[i]);
-        auto instance = new Address::Ipv4Instance(&address);
 
         char buffer[INET_ADDRSTRLEN];
         ares_inet_ntop(AF_INET, &(address.sin_addr), buffer, INET_ADDRSTRLEN);
+
+        auto addrttl = std::chrono::seconds::max();
         auto key = std::string(buffer);
         if (ttl.count(key)) {
-          instance->setAddrTtl(std::chrono::seconds(ttl[key]));
+          addrttl = ttl[key];
         }
 
-        address_list.emplace_back(Address::InstanceConstSharedPtr(instance));
+        address_list.emplace_back(DnsResponseSharedPtr(new DnsResponse(
+            Address::InstanceConstSharedPtr(new Address::Ipv4Instance(&address)), addrttl)));
       }
     } else if (hostent->h_addrtype == AF_INET6) {
       auto addrttls_ = static_cast<ares_addr6ttl*>(addrttls);
@@ -129,16 +131,18 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
         address.sin6_family = AF_INET6;
         address.sin6_port = 0;
         address.sin6_addr = *reinterpret_cast<in6_addr*>(hostent->h_addr_list[i]);
-        auto instance = new Address::Ipv6Instance(address);
 
         char buffer[INET6_ADDRSTRLEN];
         ares_inet_ntop(AF_INET6, &(address.sin6_addr), buffer, INET6_ADDRSTRLEN);
         auto key = std::string(buffer);
+
+        auto addrttl = std::chrono::seconds::max();
         if (ttl.count(key)) {
-          instance->setAddrTtl(std::chrono::seconds(ttl[key]));
+          addrttl = ttl[key];
         }
 
-        address_list.emplace_back(Address::InstanceConstSharedPtr(instance));
+        address_list.emplace_back(DnsResponseSharedPtr(new DnsResponse(
+            Address::InstanceConstSharedPtr(new Address::Ipv6Instance(address)), addrttl)));
       }
     }
     if (!address_list.empty()) {

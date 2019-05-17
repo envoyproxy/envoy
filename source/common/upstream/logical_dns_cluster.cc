@@ -74,24 +74,23 @@ void LogicalDnsCluster::startResolve() {
 
   active_dns_query_ = dns_resolver_->resolve(
       dns_address, dns_lookup_family_,
-      [this, dns_address](
-          const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+      [this, dns_address](const std::list<Network::DnsResponseSharedPtr>&& response) -> void {
         active_dns_query_ = nullptr;
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address);
         info_->stats().update_success_.inc();
 
-        if (!address_list.empty()) {
+        if (!response.empty()) {
           // TODO(mattklein123): Move port handling into the DNS interface.
-          ASSERT(address_list.front() != nullptr);
+          ASSERT(response.front()->address_ != nullptr);
           Network::Address::InstanceConstSharedPtr new_address =
-              Network::Utility::getAddressWithPort(*address_list.front(),
+              Network::Utility::getAddressWithPort(*(response.front()->address_),
                                                    Network::Utility::portFromTcpUrl(dns_url_));
           if (!logical_host_) {
             // TODO(mattklein123): The logical host is only used in /clusters admin output. We used
             // to show the friendly DNS name in that output, but currently there is no way to
             // express a DNS name inside of an Address::Instance. For now this is OK but we might
             // want to do better again later.
-            switch (address_list.front()->ip()->version()) {
+            switch (response.front()->address_->ip()->version()) {
             case Network::Address::IpVersion::v4:
               logical_host_.reset(
                   new LogicalHost(info_, hostname_, Network::Utility::getIpv4AnyAddress(), *this));

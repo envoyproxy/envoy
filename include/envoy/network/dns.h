@@ -24,6 +24,16 @@ public:
   virtual void cancel() PURE;
 };
 
+struct DnsResponse {
+  DnsResponse(Address::InstanceConstSharedPtr address, const std::chrono::seconds& ttl)
+      : address_(address), ttl_(ttl) {}
+
+  Address::InstanceConstSharedPtr address_;
+  std::chrono::seconds ttl_;
+};
+
+typedef std::shared_ptr<DnsResponse> DnsResponseSharedPtr;
+
 enum class DnsLookupFamily { V4Only, V6Only, Auto };
 
 /**
@@ -35,11 +45,10 @@ public:
 
   /**
    * Called when a resolution attempt is complete.
-   * @param address_list supplies the list of resolved IP addresses. The list will be empty if
+   * @param response supplies the list of resolved IP addresses and ttls. The list will be empty if
    *                     the resolution failed.
    */
-  typedef std::function<void(const std::list<Address::InstanceConstSharedPtr>&& address_list)>
-      ResolveCb;
+  typedef std::function<void(const std::list<DnsResponseSharedPtr>&& response)> ResolveCb;
 
   /**
    * Initiate an async DNS resolution.
