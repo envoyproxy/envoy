@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 #include <list>
 #include <memory>
@@ -32,7 +33,7 @@ struct DnsResponse {
   std::chrono::seconds ttl_;
 };
 
-typedef std::shared_ptr<DnsResponse> DnsResponseSharedPtr;
+typedef std::shared_ptr<const DnsResponse> DnsResponseSharedPtr;
 
 enum class DnsLookupFamily { V4Only, V6Only, Auto };
 
@@ -45,7 +46,7 @@ public:
 
   /**
    * Called when a resolution attempt is complete.
-   * @param response supplies the list of resolved IP addresses and ttls. The list will be empty if
+   * @param response supplies the list of resolved IP addresses and TTLs. The list will be empty if
    *                     the resolution failed.
    */
   typedef std::function<void(const std::list<DnsResponseSharedPtr>&& response)> ResolveCb;
