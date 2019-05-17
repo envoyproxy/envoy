@@ -39,10 +39,9 @@ This means that care should be taken if active health checking is used with DNS 
 to the same IPs: if an IP is repeated many times between DNS names it might cause undue load on the
 upstream host.
 
-Record TTLs and :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>` are used to 
-control DNS refresh rate. If the DNS resolution result includes record TTL, the TTL is used as the cluster's DNS 
-refresh rate; otherwise, DNS refresh rate is set to :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`. 
-If :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>` is not specified, the value defaults to 5000ms. 
+If respect_dns_ttl is enabled, DNS record TTLs and dns_refresh_rate are used to control DNS refresh rate. 
+If the DNS resolution response includes record TTL, the TTL is used as the cluster's DNS refresh rate; 
+otherwise, DNS refresh rate is set to dns_refresh_rate, whose default value is 5000ms if not specified.
 
 .. _arch_overview_service_discovery_types_logical_dns:
 
@@ -62,6 +61,10 @@ connection cycling, etc. Instead, with logical DNS, connections stay alive until
 When interacting with large scale web services, this is the best of all possible worlds:
 asynchronous/eventually consistent DNS resolution, long lived connections, and zero blocking in the
 forwarding path.
+
+If respect_dns_ttl is enabled, DNS record TTLs and dns_refresh_rate are used to control DNS refresh rate. 
+If the DNS resolution response includes record TTL, the TTL is used as the cluster's DNS refresh rate; 
+otherwise, DNS refresh rate is set to dns_refresh_rate, whose default value is 5000ms if not specified.
 
 .. _arch_overview_service_discovery_types_original_destination:
 
