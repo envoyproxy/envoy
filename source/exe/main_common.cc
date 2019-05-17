@@ -6,8 +6,6 @@
 
 #include "common/common/compiler_requirements.h"
 #include "common/common/perf_annotation.h"
-#include "common/event/libevent.h"
-#include "common/http/http2/codec_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
 
@@ -16,18 +14,12 @@
 #include "server/hot_restart_nop_impl.h"
 #include "server/listener_hooks.h"
 #include "server/options_impl.h"
-#include "server/proto_descriptors.h"
 #include "server/server.h"
 
 #include "absl/strings/str_split.h"
 
 #ifdef ENVOY_HOT_RESTART
 #include "server/hot_restart_impl.h"
-#endif
-
-#include "ares.h"
-#ifdef ENVOY_GOOGLE_GRPC
-#include "grpc/grpc.h"
 #endif
 
 namespace Envoy {
@@ -53,14 +45,6 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
                                Filesystem::Instance& file_system)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
       file_system_(file_system), stats_allocator_(symbol_table_) {
-#ifdef ENVOY_GOOGLE_GRPC
-  grpc_init();
-#endif
-  ares_library_init(ARES_LIB_INIT_ALL);
-  Event::Libevent::Global::initialize();
-  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
-  Http::Http2::initializeNghttp2Logging();
-
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
   case Server::Mode::Serve: {
@@ -101,13 +85,6 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
                                                          restarter_->logLock());
     break;
   }
-}
-
-MainCommonBase::~MainCommonBase() {
-  ares_library_cleanup();
-#ifdef ENVOY_GOOGLE_GRPC
-  grpc_shutdown();
-#endif
 }
 
 void MainCommonBase::configureComponentLogLevels() {

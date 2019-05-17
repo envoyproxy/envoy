@@ -11,9 +11,11 @@
 
 #include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 
-#define GetQuicFlagImpl(flag) quiche::FLAGS_##flag->value()
+// |flag| is the global flag variable, which is a pointer to TypedFlag<type>.
+#define GetQuicFlagImpl(flag) (quiche::flag)->value()
 
-#define SetQuicFlagImpl(flag, value) quiche::FLAGS_##flag->SetValue(value)
+// |flag| is the global flag variable, which is a pointer to TypedFlag<type>.
+#define SetQuicFlagImpl(flag, value) (quiche::flag)->SetValue(value)
 
 #define GetQuicReloadableFlagImpl(flag) quiche::FLAGS_quic_reloadable_flag_##flag->value()
 
@@ -31,12 +33,12 @@
 namespace quic {
 
 // TODO(mpwarres): implement. Lower priority since only used by QUIC command-line tools.
-std::vector<std::string> QuicParseCommandLineFlagsImpl(const char* /*usage*/, int /*argc*/,
-                                                       const char* const* /*argv*/) {
+inline std::vector<std::string> QuicParseCommandLineFlagsImpl(const char* /*usage*/, int /*argc*/,
+                                                              const char* const* /*argv*/) {
   return std::vector<std::string>();
 }
 
 // TODO(mpwarres): implement. Lower priority since only used by QUIC command-line tools.
-void QuicPrintCommandLineFlagHelpImpl(const char* /*usage*/) {}
+inline void QuicPrintCommandLineFlagHelpImpl(const char* /*usage*/) {}
 
 } // namespace quic

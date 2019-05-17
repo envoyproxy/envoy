@@ -249,9 +249,9 @@ TEST(MetadataMatcher, MetadataMatcher) {
   auto label = MessageUtil::keyValueStruct("label", "prod");
   envoy::api::v2::core::Metadata metadata;
   metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>("other", label));
+      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("other", label));
   metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>("rbac", label));
+      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", label));
 
   envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("rbac");

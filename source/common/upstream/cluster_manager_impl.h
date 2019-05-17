@@ -326,7 +326,7 @@ private:
     static void removeHosts(const std::string& name, const HostVector& hosts_removed,
                             ThreadLocal::Slot& tls);
     static void updateClusterMembership(const std::string& name, uint32_t priority,
-                                        PrioritySet::UpdateHostsParams&& update_hosts_params,
+                                        PrioritySet::UpdateHostsParams update_hosts_params,
                                         LocalityWeightsConstSharedPtr locality_weights,
                                         const HostVector& hosts_added,
                                         const HostVector& hosts_removed, ThreadLocal::Slot& tls,

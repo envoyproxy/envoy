@@ -242,6 +242,14 @@ private:
     uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
     bool recreateStream() override;
 
+    void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
+      Network::Socket::appendOptions(parent_.upstream_options_, options);
+    }
+
+    Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override {
+      return parent_.upstream_options_;
+    }
+
     // Each decoder filter instance checks if the request passed to the filter is gRPC
     // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
     // called here may change the content type, so we must check it before the call.
@@ -479,6 +487,8 @@ private:
     // Per-stream request timeout callback
     void onRequestTimeout();
 
+    bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
+
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
     Tracing::SpanPtr active_span_;
@@ -517,6 +527,7 @@ private:
     // Whether a filter has indicated that the response should be treated as a headers only
     // response.
     bool encoding_headers_only_{};
+    Network::Socket::OptionsSharedPtr upstream_options_;
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
