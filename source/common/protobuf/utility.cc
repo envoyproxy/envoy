@@ -176,7 +176,7 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
         double log_delay;
         time_t current_time = time(nullptr);
         log_delay = difftime(current_time, last_log_time);
-        printf("%d...%d...%f\n",last_log_time,current_time,log_delay);
+        printf("%ld...%ld...%f\n",last_log_time,current_time,log_delay);
         //It ensures that at least 30s is elapsed between two logs.
         if (log_delay > 30){
             ENVOY_LOG_MISC(warn, "{}", err);
