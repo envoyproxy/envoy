@@ -509,6 +509,7 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowedWithRuntimeOverride) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.deprecated_features.deprecated.proto:is_deprecated_fatal", "TrUe "}});
 
+  sleep(30);
   // Now the same deprecation check should only trigger a warning.
   EXPECT_LOG_CONTAINS(
       "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'",
@@ -520,6 +521,7 @@ TEST_F(DeprecatedFieldsTest, DisallowViaRuntime) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
 
+  sleep(30);
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
                       MessageUtil::checkForDeprecation(base));
@@ -542,6 +544,7 @@ TEST_F(DeprecatedFieldsTest, MixOfFatalAndWarnings) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
   base.set_is_deprecated_fatal("foo");
+  sleep(30);
   EXPECT_LOG_CONTAINS(
       "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'", {
         EXPECT_THROW_WITH_REGEX(
@@ -554,6 +557,7 @@ TEST_F(DeprecatedFieldsTest, MixOfFatalAndWarnings) {
 TEST_F(DeprecatedFieldsTest, MessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.mutable_deprecated_message();
+  sleep(30);
   EXPECT_LOG_CONTAINS(
       "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_message'",
       MessageUtil::checkForDeprecation(base));
@@ -568,6 +572,7 @@ TEST_F(DeprecatedFieldsTest, InnerMessageDeprecated) {
                           MessageUtil::checkForDeprecation(base));
 
   base.mutable_not_deprecated_message()->set_inner_deprecated("bar");
+  sleep(30);
   // Checks for a deprecated sub-message should result in a warning.
   EXPECT_LOG_CONTAINS(
       "warning",
@@ -582,6 +587,7 @@ TEST_F(DeprecatedFieldsTest, SubMessageDeprecated) {
   base.add_repeated_message()->set_inner_deprecated("foo");
   base.add_repeated_message();
 
+  sleep(30);
   // Fatal checks for a repeated deprecated sub-message should result in an exception.
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option "
@@ -594,6 +600,7 @@ TEST_F(DeprecatedFieldsTest, RepeatedMessageDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.add_deprecated_repeated_message();
 
+  sleep(30);
   // Fatal checks for a repeated deprecated sub-message should result in an exception.
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option "
