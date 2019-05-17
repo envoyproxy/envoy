@@ -432,6 +432,18 @@ test: a
                           EnvoyException, "test: Cannot find field");
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfigNoFilterChains) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                          EnvoyException, "no filter chains specified");
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterConfig) {
   const std::string yaml = R"EOF(
 address:

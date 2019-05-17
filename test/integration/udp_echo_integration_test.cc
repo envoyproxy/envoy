@@ -17,13 +17,6 @@ public:
     udp_echo_config = ConfigHelper::BASE_UDP_LISTENER_CONFIG + R"EOF(
     listener_filters:
       name: envoy.listener.udpecho
-    filter_chains:
-      filters:
-        name: envoy.ratelimit
-        config:
-          domain: foo
-          stats_prefix: name
-          descriptors: [{"key": "foo", "value": "bar"}]
       )EOF";
   }
 

@@ -60,8 +60,7 @@ message Listener {
   //
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
-  repeated listener.FilterChain filter_chains = 3
-      [(validate.rules).repeated .min_items = 1, (gogoproto.nullable) = false];
+  repeated listener.FilterChain filter_chains = 3 [(gogoproto.nullable) = false];
 
   // If a connection is redirected using *iptables*, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to

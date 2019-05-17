@@ -215,8 +215,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     case Network::Address::SocketType::Datagram:
       udp_listener_filter_factories_ =
           parent_.factory_.createUdpListenerFilterFactoryList(config.listener_filters(), *this);
-      // TODO(sumukhs): Determine if returning here is the right thing to do as udp listeners are
-      // not expected to have other configs set.
+      // Intentional return since udp filters do not need other configuration
       return;
     case Network::Address::SocketType::Stream:
       listener_filter_factories_ =
@@ -225,6 +224,12 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
+  }
+
+  if (config.filter_chains().empty()) {
+    // If we got here, this is a tcp listener, so ensure there is a filter chain specified
+    throw EnvoyException(fmt::format("error adding listener '{}': no filter chains specified",
+                                     address_->asString()));
   }
 
   if (config.has_tcp_fast_open_queue_length()) {
