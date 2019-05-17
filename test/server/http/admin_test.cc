@@ -599,8 +599,7 @@ public:
     admin_filter_.decodeHeaders(request_headers_, false);
 
     if (!body.empty()) {
-      Buffer::OwnedImpl data(body);
-      callbacks_.buffer_ = std::move(data);
+      callbacks_.buffer_.reset(new Buffer::OwnedImpl(body));
     }
 
     return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
@@ -1007,12 +1006,14 @@ TEST_P(AdminInstanceTest, RuntimeModify) {
 }
 
 TEST_P(AdminInstanceTest, RuntimeModifyParamsInBody) {
-  const std::string body = "numerator: 1\ndenominator: TEN_THOUSAND\n";
+  const std::string key = "routing.traffic_shift.foo";
+  const std::string value = "numerator: 1\ndenominator: TEN_THOUSAND\n";
+  const std::string body = fmt::format("{}={}", key, value);
 
   Runtime::MockLoader loader;
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
 
-  std::unordered_map<std::string, std::string> overrides = {{"routing.traffic_shift.foo", body}};
+  const std::unordered_map<std::string, std::string> overrides = {{key, value}};
   EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
 
   Http::HeaderMapImpl header_map;
