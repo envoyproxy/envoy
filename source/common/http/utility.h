@@ -72,7 +72,7 @@ QueryParams parseQueryString(absl::string_view url);
  * @param body supplies the body to parse.
  * @return QueryParams the parsed parameters, if any.
  */
-QueryParams parseFormBody(absl::string_view body);
+QueryParams parseFromBody(absl::string_view body);
 
 /**
  * Parse query parameters from a URL or body.

@@ -103,7 +103,7 @@ Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
   return parseParameters(url, start);
 }
 
-Utility::QueryParams Utility::parseFormBody(absl::string_view body) {
+Utility::QueryParams Utility::parseFromBody(absl::string_view body) {
   return parseParameters(body, 0);
 }
 

@@ -1081,7 +1081,7 @@ Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMa
     // Check if the params are in the request's body.
     // TODO(rgs1): check the content-type header in the request.
     if (admin_stream.getRequestBody() != nullptr) {
-      params = Http::Utility::parseFormBody(admin_stream.getRequestBody()->toString());
+      params = Http::Utility::parseFromBody(admin_stream.getRequestBody()->toString());
     }
 
     if (params.empty()) {
