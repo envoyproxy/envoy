@@ -67,6 +67,7 @@ envoy_cmake_external(
     cache_entries = {
         "EVENT__DISABLE_OPENSSL": "on",
         "EVENT__DISABLE_REGRESS": "on",
+        "EVENT__DISABLE_TESTS": "on",
         "EVENT__LIBRARY_TYPE": "STATIC",
         "CMAKE_BUILD_TYPE": "Release",
     },
@@ -122,7 +123,7 @@ envoy_cmake_external(
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
     },
     copy_pdb = True,
-    lib_source = "@com_github_madler_zlib//:all",
+    lib_source = "@net_zlib//:all",
     pdb_name = "zlibstatic",
     static_libraries = select({
         "//bazel:windows_dbg_build": ["zlibstaticd.lib"],

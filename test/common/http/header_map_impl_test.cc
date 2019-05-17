@@ -177,6 +177,60 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(16384U, string.size());
   }
 
+  // Copy, exactly filling inline capacity
+  //
+  // ASAN does not catch the clobber in the case where the code writes one past the
+  // end of the inline buffer. To ensure coverage the next block checks that setCopy
+  // is not introducing a NUL in a way that does not rely on an actual clobber getting
+  // detected.
+  {
+    HeaderString string;
+    std::string large(128, 'z');
+    string.setCopy(large.c_str(), large.size());
+    EXPECT_EQ(string.type(), HeaderString::Type::Inline);
+    EXPECT_EQ(string.getStringView(), large);
+  }
+
+  // Ensure setCopy does not add NUL.
+  {
+    HeaderString string;
+    std::string large(128, 'z');
+    string.setCopy(large.c_str(), large.size());
+    EXPECT_EQ(string.type(), HeaderString::Type::Inline);
+    EXPECT_EQ(string.getStringView(), large);
+    std::string small(1, 'a');
+    string.setCopy(small.c_str(), small.size());
+    EXPECT_EQ(string.type(), HeaderString::Type::Inline);
+    EXPECT_EQ(string.getStringView(), small);
+    // If we peek past the valid first character of the
+    // header string_view it should still be 'z' and not '\0'.
+    // We know this peek is OK since the memory is much larger
+    // than two bytes.
+    EXPECT_EQ(string.getStringView().data()[1], 'z');
+  }
+
+  // Copy, exactly filling dynamic capacity
+  //
+  // ASAN should catch a write one past the end of the dynamic buffer. This test
+  // forces a dynamic buffer with one copy and then fills it with the next.
+  {
+    HeaderString string;
+    // Force Dynamic with setCopy of inline buffer size + 1.
+    std::string large1(129, 'z');
+    string.setCopy(large1.c_str(), large1.size());
+    EXPECT_EQ(string.type(), HeaderString::Type::Dynamic);
+    const void* dynamic_buffer_address = string.getStringView().data();
+    // Dynamic capacity in setCopy is 2x required by the size.
+    // So to fill it exactly setCopy with a total of 258 chars.
+    std::string large2(258, 'z');
+    string.setCopy(large2.c_str(), large2.size());
+    EXPECT_EQ(string.type(), HeaderString::Type::Dynamic);
+    // The actual buffer address should be the same as it was after
+    // setCopy(large1), ensuring no reallocation occurred.
+    EXPECT_EQ(string.getStringView().data(), dynamic_buffer_address);
+    EXPECT_EQ(string.getStringView(), large2);
+  }
+
   // Append, small buffer to dynamic
   {
     HeaderString string;
@@ -230,6 +284,28 @@ TEST(HeaderStringTest, All) {
     string.append(large3.c_str(), large3.size());
     EXPECT_EQ((large + large2 + large3), string.getStringView());
     EXPECT_EQ(281U, string.size());
+  }
+
+  // Append, exactly filling dynamic capacity
+  //
+  // ASAN should catch a write one past the end of the dynamic buffer. This test
+  // forces a dynamic buffer with one copy and then fills it with the next.
+  {
+    HeaderString string;
+    // Force Dynamic with setCopy of inline buffer size + 1.
+    std::string large1(129, 'z');
+    string.setCopy(large1.c_str(), large1.size());
+    EXPECT_EQ(string.type(), HeaderString::Type::Dynamic);
+    const void* dynamic_buffer_address = string.getStringView().data();
+    // Dynamic capacity in setCopy is 2x required by the size.
+    // So to fill it exactly append 129 chars for a total of 258 chars.
+    std::string large2(129, 'z');
+    string.append(large2.c_str(), large2.size());
+    EXPECT_EQ(string.type(), HeaderString::Type::Dynamic);
+    // The actual buffer address should be the same as it was after
+    // setCopy(large1), ensuring no reallocation occurred.
+    EXPECT_EQ(string.getStringView().data(), dynamic_buffer_address);
+    EXPECT_EQ(string.getStringView(), large1 + large2);
   }
 
   // Set integer, inline
