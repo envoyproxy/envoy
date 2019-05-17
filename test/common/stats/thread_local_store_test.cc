@@ -182,12 +182,32 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 
   Counter& c1 = store_->counter("c1");
   EXPECT_EQ(&c1, &store_->counter("c1"));
+  StatNameManagedStorage c1_name("c1", symbol_table_);
+  c1.add(100);
+  auto found_counter = store_->findCounter(c1_name.statName());
+  ASSERT_TRUE(found_counter.has_value());
+  EXPECT_EQ(&c1, &found_counter->get());
+  EXPECT_EQ(100, found_counter->get().value());
+  c1.add(100);
+  EXPECT_EQ(200, found_counter->get().value());
 
   Gauge& g1 = store_->gauge("g1");
   EXPECT_EQ(&g1, &store_->gauge("g1"));
+  StatNameManagedStorage g1_name("g1", symbol_table_);
+  g1.set(100);
+  auto found_gauge = store_->findGauge(g1_name.statName());
+  ASSERT_TRUE(found_gauge.has_value());
+  EXPECT_EQ(&g1, &found_gauge->get());
+  EXPECT_EQ(100, found_gauge->get().value());
+  g1.set(0);
+  EXPECT_EQ(0, found_gauge->get().value());
 
   Histogram& h1 = store_->histogram("h1");
   EXPECT_EQ(&h1, &store_->histogram("h1"));
+  StatNameManagedStorage h1_name("h1", symbol_table_);
+  auto found_histogram = store_->findHistogram(h1_name.statName());
+  ASSERT_TRUE(found_histogram.has_value());
+  EXPECT_EQ(&h1, &found_histogram->get());
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
@@ -210,12 +230,32 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
 
   Counter& c1 = store_->counter("c1");
   EXPECT_EQ(&c1, &store_->counter("c1"));
+  StatNameManagedStorage c1_name("c1", symbol_table_);
+  c1.add(100);
+  auto found_counter = store_->findCounter(c1_name.statName());
+  ASSERT_TRUE(found_counter.has_value());
+  EXPECT_EQ(&c1, &found_counter->get());
+  EXPECT_EQ(100, found_counter->get().value());
+  c1.add(100);
+  EXPECT_EQ(200, found_counter->get().value());
 
   Gauge& g1 = store_->gauge("g1");
   EXPECT_EQ(&g1, &store_->gauge("g1"));
+  StatNameManagedStorage g1_name("g1", symbol_table_);
+  g1.set(100);
+  auto found_gauge = store_->findGauge(g1_name.statName());
+  ASSERT_TRUE(found_gauge.has_value());
+  EXPECT_EQ(&g1, &found_gauge->get());
+  EXPECT_EQ(100, found_gauge->get().value());
+  g1.set(0);
+  EXPECT_EQ(0, found_gauge->get().value());
 
   Histogram& h1 = store_->histogram("h1");
   EXPECT_EQ(&h1, &store_->histogram("h1"));
+  StatNameManagedStorage h1_name("h1", symbol_table_);
+  auto found_histogram = store_->findHistogram(h1_name.statName());
+  ASSERT_TRUE(found_histogram.has_value());
+  EXPECT_EQ(&h1, &found_histogram->get());
 
   EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
@@ -244,11 +284,27 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   Counter& c2 = scope1->counter("c2");
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
+  StatNameManagedStorage c1_name("c1", symbol_table_);
+  auto found_counter = store_->findCounter(c1_name.statName());
+  ASSERT_TRUE(found_counter.has_value());
+  EXPECT_EQ(&c1, &found_counter->get());
+  StatNameManagedStorage c2_name("scope1.c2", symbol_table_);
+  auto found_counter2 = store_->findCounter(c2_name.statName());
+  ASSERT_TRUE(found_counter2.has_value());
+  EXPECT_EQ(&c2, &found_counter2->get());
 
   Gauge& g1 = store_->gauge("g1");
   Gauge& g2 = scope1->gauge("g2");
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
+  StatNameManagedStorage g1_name("g1", symbol_table_);
+  auto found_gauge = store_->findGauge(g1_name.statName());
+  ASSERT_TRUE(found_gauge.has_value());
+  EXPECT_EQ(&g1, &found_gauge->get());
+  StatNameManagedStorage g2_name("scope1.g2", symbol_table_);
+  auto found_gauge2 = store_->findGauge(g2_name.statName());
+  ASSERT_TRUE(found_gauge2.has_value());
+  EXPECT_EQ(&g2, &found_gauge2->get());
 
   Histogram& h1 = store_->histogram("h1");
   Histogram& h2 = scope1->histogram("h2");
@@ -258,6 +314,14 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   h1.recordValue(100);
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 200));
   h2.recordValue(200);
+  StatNameManagedStorage h1_name("h1", symbol_table_);
+  auto found_histogram = store_->findHistogram(h1_name.statName());
+  ASSERT_TRUE(found_histogram.has_value());
+  EXPECT_EQ(&h1, &found_histogram->get());
+  StatNameManagedStorage h2_name("scope1.h2", symbol_table_);
+  auto found_histogram2 = store_->findHistogram(h2_name.statName());
+  ASSERT_TRUE(found_histogram2.has_value());
+  EXPECT_EQ(&h2, &found_histogram2->get());
 
   store_->shutdownThreading();
   scope1->deliverHistogramToSinks(h1, 100);
@@ -311,11 +375,18 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   ScopePtr scope1 = store_->createScope("scope1.");
   Counter& c1 = scope1->counter("foo.bar");
   EXPECT_EQ("scope1.foo.bar", c1.name());
+  StatNameManagedStorage c1_name("scope1.foo.bar", symbol_table_);
+  auto found_counter = store_->findCounter(c1_name.statName());
+  ASSERT_TRUE(found_counter.has_value());
+  EXPECT_EQ(&c1, &found_counter->get());
 
   ScopePtr scope2 = scope1->createScope("foo.");
   Counter& c2 = scope2->counter("bar");
   EXPECT_NE(&c1, &c2);
   EXPECT_EQ("scope1.foo.bar", c2.name());
+  StatNameManagedStorage c2_name("scope1.foo.bar", symbol_table_);
+  auto found_counter2 = store_->findCounter(c2_name.statName());
+  ASSERT_TRUE(found_counter2.has_value());
 
   // Different allocations point to the same referenced counted backing memory.
   c1.inc();

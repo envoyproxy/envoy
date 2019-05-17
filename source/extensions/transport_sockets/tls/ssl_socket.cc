@@ -64,6 +64,30 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   SSL_set_bio(ssl_.get(), bio, bio);
 }
 
+SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
+  ReadResult result;
+  uint8_t* mem = static_cast<uint8_t*>(slice.mem_);
+  size_t remaining = slice.len_;
+  while (remaining > 0) {
+    int rc = SSL_read(ssl_.get(), mem, remaining);
+    ENVOY_CONN_LOG(trace, "ssl read returns: {}", callbacks_->connection(), rc);
+    if (rc > 0) {
+      ASSERT(static_cast<size_t>(rc) <= remaining);
+      mem += rc;
+      remaining -= rc;
+      result.commit_slice_ = true;
+    } else {
+      result.error_ = absl::make_optional<int>(rc);
+      break;
+    }
+  }
+
+  if (result.commit_slice_) {
+    slice.len_ -= remaining;
+  }
+  return result;
+}
+
 Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   if (!handshake_complete_) {
     PostIoAction action = doHandshake();
@@ -85,15 +109,14 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     uint64_t slices_to_commit = 0;
     uint64_t num_slices = read_buffer.reserve(16384, slices, 2);
     for (uint64_t i = 0; i < num_slices; i++) {
-      int rc = SSL_read(ssl_.get(), slices[i].mem_, slices[i].len_);
-      ENVOY_CONN_LOG(trace, "ssl read returns: {}", callbacks_->connection(), rc);
-      if (rc > 0) {
-        slices[i].len_ = rc;
+      auto result = sslReadIntoSlice(slices[i]);
+      if (result.commit_slice_) {
         slices_to_commit++;
-        bytes_read += rc;
-      } else {
+        bytes_read += slices[i].len_;
+      }
+      if (result.error_.has_value()) {
         keep_reading = false;
-        int err = SSL_get_error(ssl_.get(), rc);
+        int err = SSL_get_error(ssl_.get(), result.error_.value());
         switch (err) {
         case SSL_ERROR_WANT_READ:
           break;
@@ -120,6 +143,9 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
       }
     }
   }
+
+  ENVOY_CONN_LOG(trace, "ssl read {} bytes into {} slices", callbacks_->connection(), bytes_read,
+                 read_buffer.getRawSlices(nullptr, 0));
 
   return {action, bytes_read, end_stream};
 }
