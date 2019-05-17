@@ -1539,6 +1539,9 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "minimum" : 0,
         "exclusiveMinimum" : true
       },
+      "respect_dns_ttl" : {
+        "type" : "boolean"
+      },
       "dns_resolvers": {
         "type" : "array",
         "items" : {"type" : "string"},

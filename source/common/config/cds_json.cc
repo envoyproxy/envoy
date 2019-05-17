@@ -217,6 +217,10 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
     translateOutlierDetection(*json_cluster.getObject("outlier_detection"),
                               *cluster.mutable_outlier_detection());
   }
+
+  if (json_cluster.hasObject("respect_dns_ttl")) {
+    cluster.set_respect_dns_ttl(json_cluster.getBoolean("respect_dns_ttl"));
+  }
 }
 
 } // namespace Config

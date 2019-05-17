@@ -26,8 +26,9 @@ LogicalDnsCluster::LogicalDnsCluster(
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
-      tls_(tls.allocateSlot()), resolve_timer_(factory_context.dispatcher().createTimer(
-                                    [this]() -> void { startResolve(); })),
+      respect_dns_ttl_(cluster.respect_dns_ttl()), tls_(tls.allocateSlot()),
+      resolve_timer_(
+          factory_context.dispatcher().createTimer([this]() -> void { startResolve(); })),
       local_info_(factory_context.localInfo()),
       load_assignment_(cluster.has_load_assignment()
                            ? cluster.load_assignment()
@@ -79,12 +80,18 @@ void LogicalDnsCluster::startResolve() {
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address);
         info_->stats().update_success_.inc();
 
+        auto refresh_rate = dns_refresh_rate_ms_;
         if (!response.empty()) {
           // TODO(mattklein123): Move port handling into the DNS interface.
           ASSERT(response.front()->address_ != nullptr);
           Network::Address::InstanceConstSharedPtr new_address =
               Network::Utility::getAddressWithPort(*(response.front()->address_),
                                                    Network::Utility::portFromTcpUrl(dns_url_));
+
+          if (respect_dns_ttl_ && response.front()->ttl_ != std::chrono::seconds::max()) {
+            refresh_rate = response.front()->ttl_;
+          }
+
           if (!logical_host_) {
             // TODO(mattklein123): The logical host is only used in /clusters admin output. We used
             // to show the friendly DNS name in that output, but currently there is no way to
@@ -126,7 +133,7 @@ void LogicalDnsCluster::startResolve() {
         }
 
         onPreInitComplete();
-        resolve_timer_->enableTimer(dns_refresh_rate_ms_);
+        resolve_timer_->enableTimer(refresh_rate);
       });
 }
 

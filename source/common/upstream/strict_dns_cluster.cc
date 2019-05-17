@@ -12,7 +12,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
                              added_via_api),
       local_info_(factory_context.localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
+      respect_dns_ttl_(cluster.respect_dns_ttl()) {
   std::list<ResolveTargetPtr> resolve_targets;
   const envoy::api::v2::ClusterLoadAssignment load_assignment(
       cluster.has_load_assignment() ? cluster.load_assignment()
@@ -136,13 +137,12 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         parent_.onPreInitComplete();
 
         auto refresh_rate_ms = parent_.dns_refresh_rate_ms_;
-        // avoid overflow
-        if (refresh_rate != std::chrono::seconds::max()) {
-          refresh_rate_ms = std::chrono::milliseconds(refresh_rate);
-        }
 
-        ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
-                  refresh_rate_ms.count());
+        if (parent_.respect_dns_ttl_ && refresh_rate != std::chrono::seconds::max()) {
+          refresh_rate_ms = refresh_rate;
+          ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
+                    refresh_rate_ms.count());
+        }
 
         resolve_timer_->enableTimer(refresh_rate_ms);
       });

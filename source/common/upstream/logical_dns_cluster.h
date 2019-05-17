@@ -145,6 +145,7 @@ private:
 
   Network::DnsResolverSharedPtr dns_resolver_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
+  const bool respect_dns_ttl_;
   Network::DnsLookupFamily dns_lookup_family_;
   ThreadLocal::SlotPtr tls_;
   Event::TimerPtr resolve_timer_;
