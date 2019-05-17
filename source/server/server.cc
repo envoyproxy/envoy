@@ -133,14 +133,54 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_->live_.set(!fail);
 }
 
-void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                       Stats::Source& source) {
-  for (const auto& sink : sinks) {
-    sink->flush(source);
+// fixfix comment
+class MetricSnapshotImpl : public Stats::MetricSnapshot {
+public:
+  MetricSnapshotImpl(Stats::Store& store) {
+    snapped_counters_ = store.counters();
+    counters_.reserve(snapped_counters_.size());
+    for (const auto& counter : snapped_counters_) {
+      counters_.push_back({counter->latch(), *counter});
+    }
+
+    snapped_gauges_ = store.gauges();
+    gauges_.reserve(snapped_gauges_.size());
+    for (const auto& gauge : snapped_gauges_) {
+      gauges_.push_back(*gauge);
+    }
+
+    snapped_histograms_ = store.histograms();
+    histograms_.reserve(snapped_histograms_.size());
+    for (const auto& histogram : snapped_histograms_) {
+      histograms_.push_back(*histogram);
+    }
   }
-  // TODO(mrice32): this reset should be called by the StoreRoot on stat construction/destruction so
-  // that it doesn't need to be reset when the set of stats isn't changing.
-  source.clearCache();
+
+  // Stats::MetricSnapshot
+  const std::vector<CounterSnapshot>& counters() override { return counters_; }
+  const std::vector<std::reference_wrapper<const Stats::Gauge>>& gauges() override {
+    return gauges_;
+  };
+  const std::vector<std::reference_wrapper<const Stats::ParentHistogram>>& histograms() override {
+    return histograms_;
+  }
+
+private:
+  std::vector<Stats::CounterSharedPtr> snapped_counters_;
+  std::vector<CounterSnapshot> counters_;
+  std::vector<Stats::GaugeSharedPtr> snapped_gauges_;
+  std::vector<std::reference_wrapper<const Stats::Gauge>> gauges_;
+  std::vector<Stats::ParentHistogramSharedPtr> snapped_histograms_;
+  std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
+};
+
+void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
+                                       Stats::Store& store) {
+  // fixfix comment about latching.
+  MetricSnapshotImpl snapshot(store);
+  for (const auto& sink : sinks) {
+    sink->flush(snapshot);
+  }
 }
 
 void InstanceImpl::flushStats() {
@@ -160,7 +200,7 @@ void InstanceImpl::flushStats() {
                                           parent_stats.parent_connections_);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
-    InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_.source());
+    InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
     if (stat_flush_timer_ != nullptr) {
       stat_flush_timer_->enableTimer(config_.statsFlushInterval());
