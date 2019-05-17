@@ -1082,8 +1082,7 @@ Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMa
     // header would be `application/x-www-form-urlencoded`, but there's no way to
     // check.
     if (admin_stream.getRequestBody() != nullptr) {
-      auto body = absl::string_view(admin_stream.getRequestBody()->toString());
-      params = parseFormBody(body);
+      params = parseFormBody(admin_stream.getRequestBody()->toString());
     }
 
     if (params.empty()) {
