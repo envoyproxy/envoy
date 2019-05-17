@@ -10,7 +10,7 @@
 
 namespace quiche {
 
-void dummy() {
+void dummy_for_clang_tidy() {
   do {
   } while (false);
 }
