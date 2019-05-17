@@ -140,8 +140,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
 }
 
+//last_log_time records the time of the last log
 time_t last_log_time;
-
 void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime::Loader* runtime) {
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   const Protobuf::Reflection* reflection = message.GetReflection();
@@ -176,8 +176,10 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
         double log_delay;
         time_t current_time = time(nullptr);
         log_delay = difftime(current_time, last_log_time);
+        //It ensures that at least 30s is elapsed between two logs.
         if (log_delay > 30){
             ENVOY_LOG_MISC(warn, "{}", err);
+            last_log_time = current_time;
         }else{
             printf("#####time too short");
         }
