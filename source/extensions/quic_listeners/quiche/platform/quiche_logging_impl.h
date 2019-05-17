@@ -7,3 +7,11 @@
 // porting layer for QUICHE.
 
 #include "extensions/quic_listeners/quiche/platform/quic_logging_impl.h"
+
+namespace quiche {
+
+void dummy() {
+  do {
+  } while (false);
+}
+} // namespace quiche
