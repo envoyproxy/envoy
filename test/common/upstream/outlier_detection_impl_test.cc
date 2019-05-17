@@ -293,6 +293,8 @@ TEST_F(OutlierDetectorImplTest, ConnectSuccessWithOptionalHTTP_OK) {
 
 /* Test verifies the EXT_ORIGIN_REQUEST_SUCCESS cancels EXT_ORIGIN_REQUEST_FAILED event in non-split
  * mode.
+ * EXT_ORIGIN_REQUEST_FAILED is mapped to 5xx code and EXT_ORIGIN_REQUEST_SUCCESS is mapped to 200
+ * code.
  */
 TEST_F(OutlierDetectorImplTest, ExternalOriginEventsNonSplit) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
