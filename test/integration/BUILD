@@ -469,6 +469,20 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "udp_echo_integration_test",
+    srcs = [
+        "udp_echo_integration_test.cc",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/common/network:listen_socket_lib",
+        "//source/extensions/filters/listener/udpecho:config",
+        "//test/server:utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "stats_integration_test",
     srcs = ["stats_integration_test.cc"],
     deps = [

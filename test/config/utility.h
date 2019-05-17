@@ -72,6 +72,9 @@ public:
   // A basic configuration (admin port, cluster_0, one listener) with no network filters.
   static const std::string BASE_CONFIG;
 
+  // A basic configuration (admin port, cluster_0, one udp listener) with no network filters.
+  static const std::string BASE_UDP_LISTENER_CONFIG;
+
   // A basic configuration for L4 proxying.
   static const std::string TCP_PROXY_CONFIG;
   // A basic configuration for L7 proxying.
