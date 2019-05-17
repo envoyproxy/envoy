@@ -187,6 +187,8 @@ public:
         compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
     sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>({buildVirtualHost()}, {}, "1",
                                                                    vhds_stream_);
+    EXPECT_TRUE(
+        compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 
     // Wait for our statically specified listener to become ready, and register its port in the
     // test framework's downstream listener port map.
