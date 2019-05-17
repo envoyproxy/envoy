@@ -506,9 +506,12 @@ public:
   OwnedImpl();
   OwnedImpl(absl::string_view data);
   OwnedImpl(const Instance& data);
+  OwnedImpl(const void* data, uint64_t size);
   // Only copy the data, not the internal state.
   OwnedImpl(const OwnedImpl& other);
-  OwnedImpl(const void* data, uint64_t size);
+  OwnedImpl(OwnedImpl&& other);
+  OwnedImpl& operator=(const OwnedImpl& other);
+  OwnedImpl& operator=(OwnedImpl&& other);
 
   // Buffer::Instance
   void add(const void* data, uint64_t size) override;

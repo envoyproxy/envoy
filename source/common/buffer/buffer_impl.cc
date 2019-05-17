@@ -6,6 +6,7 @@
 #include "common/common/assert.h"
 #include "common/common/stack_array.h"
 
+#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/source/common/buffer/_virtual_includes/buffer_lib/common/buffer/buffer_impl.h"
 #include "event2/buffer.h"
 
 namespace Envoy {
@@ -553,9 +554,30 @@ OwnedImpl::OwnedImpl(absl::string_view data) : OwnedImpl() { add(data); }
 
 OwnedImpl::OwnedImpl(const Instance& data) : OwnedImpl() { add(data); }
 
+OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, size); }
+
 OwnedImpl::OwnedImpl(const OwnedImpl& other) : OwnedImpl() { add(other); }
 
-OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, size); }
+OwnedImpl::OwnedImpl(OwnedImpl&& other)
+    : old_impl_(other.old_impl_), slices_(std::move(other.slices_)), length_(other.length_),
+      buffer_(std::move(other.buffer_)) {}
+
+OwnedImpl& OwnedImpl::operator=(const OwnedImpl& other) {
+  if (this != &other) {
+    add(other);
+  }
+  return *this;
+}
+
+OwnedImpl& OwnedImpl::operator=(OwnedImpl&& other) {
+  if (this != &other) {
+    old_impl_ = other.old_impl_;
+    slices_ = std::move(other.slices_);
+    length_ = other.length_;
+    buffer_ = std::move(other.buffer_);
+  }
+  return *this;
+}
 
 std::string OwnedImpl::toString() const {
   uint64_t num_slices = getRawSlices(nullptr, 0);

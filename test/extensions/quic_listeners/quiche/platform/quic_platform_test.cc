@@ -749,7 +749,7 @@ TEST_F(QuicPlatformTest, QuicMemSliceStorage) {
   SimpleBufferAllocator allocator;
   QuicMemSliceStorage storage(&iov, 1, &allocator, 1024);
   // Test copy constructor.
-  QuicMemSliceStorage other  = storage;
+  QuicMemSliceStorage other = storage;
   QuicMemSliceSpan span = storage.ToSpan();
   EXPECT_EQ(1u, span.NumSlices());
   EXPECT_EQ(str, span.GetData(0));
