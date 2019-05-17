@@ -29,7 +29,7 @@ void TimerImpl::enableTimer(const std::chrono::milliseconds& d) {
     // overflow is undefined behavior). If it would overflow, just use
     // the maximum duration which can be expressed in microseconds.
     std::chrono::microseconds us;
-    if (d > std::chrono::duration_values<std::chrono::microseconds>::max() / 1000) {
+    if (d.count() > std::chrono::microseconds::duration::max().count() / 1000) {
       us = std::chrono::duration_values<std::chrono::microseconds>::max();
     } else {
       us = std::chrono::duration_cast<std::chrono::microseconds>(d);
