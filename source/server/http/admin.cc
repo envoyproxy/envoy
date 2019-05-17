@@ -1078,9 +1078,8 @@ Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMa
                                            Buffer::Instance& response, AdminStream& admin_stream) {
   Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   if (params.empty()) {
-    // Check if the params are in the request's body. Ideally, the content-type
-    // header would be `application/x-www-form-urlencoded`, but there's no way to
-    // check.
+    // Check if the params are in the request's body.
+    // TODO(rgs1): check the content-type header in the request.
     if (admin_stream.getRequestBody() != nullptr) {
       params = parseFormBody(admin_stream.getRequestBody()->toString());
     }
