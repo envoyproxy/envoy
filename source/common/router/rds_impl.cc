@@ -130,6 +130,8 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
   if (!removed_resources.empty()) {
+    // TODO(#2500) when on-demand resource loading is supported, an RDS removal may make sense (see
+    // discussion in #6879), and so we should do something other than ignoring here.
     ENVOY_LOG(
         error,
         "Server sent a delta RDS update attempting to remove a resource (name: {}). Ignoring.",
