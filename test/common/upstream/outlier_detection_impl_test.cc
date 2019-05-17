@@ -282,7 +282,6 @@ TEST_F(OutlierDetectorImplTest, ConnectSuccessWithOptionalHTTP_OK) {
 
   // Make sure that in non-split mode LOCAL_ORIGIN_CONNECT_SUCCESS with optional HTTP code 200
   // cancels LOCAL_ORIGIN_CONNECT_FAILED.
-  // Make sure that EXT_ORIGIN_REQUEST_SUCCESS cancels LOCAL_ORIGIN_CONNECT_FAILED
   // such scenario is used by tcp_proxy.
   for (auto i = 0; i < 100; i++) {
     hosts_[0]->outlierDetector().putResult(Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
@@ -290,6 +289,38 @@ TEST_F(OutlierDetectorImplTest, ConnectSuccessWithOptionalHTTP_OK) {
     hosts_[0]->outlierDetector().putResult(Result::LOCAL_ORIGIN_CONNECT_FAILED);
   }
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+}
+
+/* Test verifies the EXT_ORIGIN_REQUEST_SUCCESS cancels EXT_ORIGIN_REQUEST_FAILED event in non-split
+ * mode.
+ */
+TEST_F(OutlierDetectorImplTest, ExternalOriginEventsNonSplit) {
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // Make sure that in non-split mode LOCAL_ORIGIN_CONNECT_SUCCESS with optional HTTP code 200
+  // cancels LOCAL_ORIGIN_CONNECT_FAILED.
+  // Make sure that EXT_ORIGIN_REQUEST_SUCCESS cancels LOCAL_ORIGIN_CONNECT_FAILED
+  // such scenario is used by tcp_proxy.
+  for (auto i = 0; i < 100; i++) {
+    hosts_[0]->outlierDetector().putResult(Result::EXT_ORIGIN_REQUEST_FAILED);
+    hosts_[0]->outlierDetector().putResult(Result::EXT_ORIGIN_REQUEST_SUCCESS);
+  }
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  // Now make sure that EXT_ORIGIN_REQUEST_FAILED ejects the host
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+                       envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX, true));
+  for (auto i = 0; i < 100; i++) {
+    hosts_[0]->outlierDetector().putResult(Result::EXT_ORIGIN_REQUEST_FAILED);
+  }
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 }
 
 TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaNonHttpCodes) {
@@ -522,6 +553,25 @@ TEST_F(OutlierDetectorImplTest, TimeoutWithHttpCode) {
                                            absl::optional<uint64_t>(200));
   }
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  // Report LOCAL_ORIGIN_TIMEOUT without explicit HTTP code mapping. It should be implicitly mapped
+  // to 5xx code and the node should be ejected.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+                       envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX, true));
+  EXPECT_CALL(
+      *event_logger_,
+      logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+               envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_GATEWAY_FAILURE,
+               false));
+  // Get the configured number of failures and simulate than number of connect failures.
+  n = runtime_.snapshot_.getInteger("outlier_detection.consecutive_gateway_failure",
+                                    detector->config().consecutiveGatewayFailure());
+  while (n--) {
+    hosts_[0]->outlierDetector().putResult(Result::LOCAL_ORIGIN_TIMEOUT);
+  }
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 }
 
 /**
@@ -856,6 +906,36 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
                     DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
   EXPECT_EQ(-1, detector->successRateEjectionThreshold(
                     DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
+}
+
+// Test verifies that EXT_ORIGIN_REQUEST_FAILED and EXT_ORIGIN_REQUEST_SUCCESS cancel
+// each other in split mode.
+TEST_F(OutlierDetectorImplTest, ExternalOriginEventsWithSplit) {
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"}, true);
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, outlier_detection_split_, dispatcher_, runtime_, time_system_, event_logger_));
+
+  for (auto i = 0; i < 100; i++) {
+    hosts_[0]->outlierDetector().putResult(Result::EXT_ORIGIN_REQUEST_FAILED);
+    hosts_[0]->outlierDetector().putResult(Result::EXT_ORIGIN_REQUEST_SUCCESS);
+  }
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  // Now make sure that EXT_ORIGIN_REQUEST_FAILED ejects the host
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+                       envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX, true));
+  EXPECT_CALL(
+      *event_logger_,
+      logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+               envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_GATEWAY_FAILURE,
+               false));
+  for (auto i = 0; i < 100; i++) {
+    hosts_[0]->outlierDetector().putResult(Result::EXT_ORIGIN_REQUEST_FAILED);
+  }
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 }
 
 TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
