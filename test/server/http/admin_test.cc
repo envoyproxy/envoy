@@ -592,9 +592,16 @@ public:
   }
 
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                         Buffer::Instance& response, absl::string_view method) {
+                         Buffer::Instance& response, absl::string_view method,
+                         absl::string_view body = absl::string_view()) {
     request_headers_.insertMethod().value(method.data(), method.size());
     admin_filter_.decodeHeaders(request_headers_, false);
+
+    if (body.size() > 0) {
+      Buffer::OwnedImpl data(body);
+      admin_filter_.decodeData(data, true);
+    }
+
     return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
   }
 
@@ -1008,7 +1015,7 @@ TEST_P(AdminInstanceTest, RuntimeModifyParamsInBody) {
   std::unordered_map<std::string, std::string> overrides;
   overrides["routing.traffic_shift.foo"] = body;
   EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
-  EXPECT_EQ(Http::Code::OK, admin_.request("/runtime_modify", "POST", header_map, body));
+  EXPECT_EQ(Http::Code::OK, runCallback("/runtime_modify", header_map, response, "POST", body));
   EXPECT_EQ("OK\n", response.toString());
 }
 
