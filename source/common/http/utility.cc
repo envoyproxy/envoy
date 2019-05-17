@@ -109,19 +109,19 @@ Utility::QueryParams Utility::parseFormBody(absl::string_view body) {
 Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start) {
   QueryParams params;
 
-  while (start < url.size()) {
-    size_t end = url.find('&', start);
+  while (start < data.size()) {
+    size_t end = data.find('&', start);
     if (end == std::string::npos) {
-      end = url.size();
+      end = data.size();
     }
-    absl::string_view param(url.data() + start, end - start);
+    absl::string_view param(data.data() + start, end - start);
 
     const size_t equal = param.find('=');
     if (equal != std::string::npos) {
-      params.emplace(StringUtil::subspan(url, start, start + equal),
-                     StringUtil::subspan(url, start + equal + 1, end));
+      params.emplace(StringUtil::subspan(data, start, start + equal),
+                     StringUtil::subspan(data, start + equal + 1, end));
     } else {
-      params.emplace(StringUtil::subspan(url, start, end), "");
+      params.emplace(StringUtil::subspan(data, start, end), "");
     }
 
     start = end + 1;
