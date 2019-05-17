@@ -1,8 +1,8 @@
+#include "common/common/base64.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/common/base64.h"
 
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
@@ -339,6 +339,20 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
             R"("annotations":[],"binaryAnnotations":[]})",
             span.toJson());
 
+  std::string expected_yaml = fmt::format(
+      R"EOF(
+traceId: {}
+parentId: {}
+id: {}
+)EOF",
+      Base64::encode(span.traceIdAsByteString().c_str(), span.traceIdAsByteString().size()),
+      Base64::encode(span.parentIdAsByteString().c_str(), span.parentIdAsByteString().size()),
+      Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()));
+
+  zipkin::proto3::Span expected_msg;
+  MessageUtil::loadFromYaml(expected_yaml, expected_msg);
+  EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());
+
   uint64_t id = Util::generateRandom64(test_time.timeSystem());
   std::string id_hex = Hex::uint64ToHex(id);
   span.setId(id);
@@ -427,6 +441,30 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
                 R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}]})",
             span.toJson());
 
+  expected_yaml = fmt::format(
+      R"EOF(
+traceId: {}
+parentId: {}
+id: {}
+kind: CLIENT
+name: span_name
+timestamp: {}
+duration: {}
+localEndpoint:
+  serviceName: my_service_name
+  ipv4: {}
+  port: 3306
+tags:
+  lc: my_component_name
+)EOF",
+      Base64::encode(span.traceIdAsByteString().c_str(), span.traceIdAsByteString().size()),
+      Base64::encode(span.parentIdAsByteString().c_str(), span.parentIdAsByteString().size()),
+      Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()), span.timestamp(),
+      /* duration= */ 3000, /* localEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11));
+
+  MessageUtil::loadFromYaml(expected_yaml, expected_msg);
+  EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());
+
   // Test the copy-semantics flavor of addAnnotation and addBinaryAnnotation
 
   ann.setValue(Zipkin::ZipkinCoreConstants::get().SERVER_SEND);
@@ -478,6 +516,36 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
                 R"("serviceName":"my_service_name"}}]})",
             span.toJson());
 
+  expected_yaml = fmt::format(
+      R"EOF(
+traceId: {}
+parentId: {}
+id: {}
+kind: SERVER
+name: span_name
+timestamp: {}
+duration: {}
+localEndpoint:
+  serviceName: my_service_name
+  ipv4: {}
+  port: 3306
+remoteEndpoint:
+  serviceName: my_service_name
+  ipv4: {}
+  port: 3306
+tags:
+  "http.return_code": "400"
+  lc: my_component_name
+)EOF",
+      Base64::encode(span.traceIdAsByteString().c_str(), span.traceIdAsByteString().size()),
+      Base64::encode(span.parentIdAsByteString().c_str(), span.parentIdAsByteString().size()),
+      Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()), span.timestamp(),
+      /* duration= */ 3000, /* localEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11),
+      /* remoteEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11));
+
+  MessageUtil::loadFromYaml(expected_yaml, expected_msg);
+  EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());
+
   // Test setSourceServiceName and setDestinationServiceName
 
   ann.setValue(Zipkin::ZipkinCoreConstants::get().CLIENT_RECV); // NOLINT(bugprone-use-after-move)
@@ -515,6 +583,36 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
                 R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
                 R"("serviceName":"my_service_name"}}]})",
             span.toJson());
+
+  expected_yaml = fmt::format(
+      R"EOF(
+traceId: {}
+parentId: {}
+id: {}
+kind: SERVER
+name: span_name
+timestamp: {}
+duration: {}
+localEndpoint:
+  serviceName: NEW_SERVICE_NAME
+  ipv4: {}
+  port: 3306
+remoteEndpoint:
+  serviceName: NEW_SERVICE_NAME
+  ipv4: {}
+  port: 3306
+tags:
+  "http.return_code": "400"
+  lc: my_component_name
+)EOF",
+      Base64::encode(span.traceIdAsByteString().c_str(), span.traceIdAsByteString().size()),
+      Base64::encode(span.parentIdAsByteString().c_str(), span.parentIdAsByteString().size()),
+      Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()), span.timestamp(),
+      /* duration= */ 3000, /* localEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11),
+      /* remoteEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11));
+
+  MessageUtil::loadFromYaml(expected_yaml, expected_msg);
+  EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());
 }
 
 TEST(ZipkinCoreTypesSpanTest, copyConstructor) {

@@ -452,6 +452,11 @@ public:
   const std::string idAsHexString() const { return Hex::uint64ToHex(id_); }
 
   /**
+   * @return the span's id as a byte string.
+   */
+  const std::string idAsByteString() const { return Util::bytesOf(id_); }
+
+  /**
    * @return the span's name.
    */
   const std::string& name() const { return name_; }
@@ -466,6 +471,13 @@ public:
    */
   const std::string parentIdAsHexString() const {
     return parent_id_ ? Hex::uint64ToHex(parent_id_.value()) : EMPTY_HEX_STRING_;
+  }
+
+  /**
+   * @return the span's parent id as a byte string.
+   */
+  const std::string parentIdAsByteString() const {
+    return parent_id_ ? Util::bytesOf(parent_id_.value()) : EMPTY_HEX_STRING_;
   }
 
   /**
@@ -500,6 +512,15 @@ public:
     return trace_id_high_.has_value()
                ? Hex::uint64ToHex(trace_id_high_.value()) + Hex::uint64ToHex(trace_id_)
                : Hex::uint64ToHex(trace_id_);
+  }
+
+  /**
+   * @return the span's trace id as a byte string.
+   */
+  const std::string traceIdAsByteString() const {
+    return trace_id_high_.has_value()
+               ? Util::bytesOf(trace_id_high_.value()) + Util::bytesOf(trace_id_)
+               : Util::bytesOf(trace_id_);
   }
 
   /**

@@ -241,16 +241,9 @@ const std::string Span::toJson() {
 
 const zipkin::proto3::Span Span::toProtoSpan() const {
   zipkin::proto3::Span span;
-
-  span.set_trace_id(trace_id_high_.has_value()
-                        ? Util::bytesOf(trace_id_high_.value()) + Util::bytesOf(trace_id_)
-                        : Util::bytesOf(trace_id_));
-
-  if (parent_id_ && parent_id_.value()) {
-    span.set_parent_id(Util::bytesOf(parent_id_.value()));
-  }
-
-  span.set_id(Util::bytesOf(id_));
+  span.set_trace_id(traceIdAsByteString());
+  span.set_parent_id(parentIdAsByteString());
+  span.set_id(idAsByteString());
   span.set_name(name_);
 
   if (timestamp_) {
@@ -264,6 +257,7 @@ const zipkin::proto3::Span Span::toProtoSpan() const {
   for (const auto& annotation : annotations_) {
     if (annotation.isSetEndpoint()) {
       if (annotation.value() == ZipkinCoreConstants::get().CLIENT_SEND) {
+        span.set_kind(zipkin::proto3::Span::CLIENT);
         span.mutable_local_endpoint()->MergeFrom(annotation.endpoint().toProtoEndpoint());
       } else if (annotation.value() == ZipkinCoreConstants::get().SERVER_RECV) {
         span.set_kind(zipkin::proto3::Span::SERVER);
@@ -272,8 +266,8 @@ const zipkin::proto3::Span Span::toProtoSpan() const {
     }
   }
 
+  auto& tags = *span.mutable_tags();
   for (const auto& binary_annotation : binary_annotations_) {
-    auto& tags = *span.mutable_tags();
     tags[binary_annotation.key()] = binary_annotation.value();
   }
 

@@ -180,6 +180,7 @@ void ReporterImpl::flushSpans() {
     if (collector_.version == envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO) {
       message->headers().insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Protobuf);
+      // TODO(dio): use grpc message serializer so no round trip to std::string is required.
       span_buffer_.toProtoListOfSpans().SerializeToString(&payload);
     } else {
       message->headers().insertContentType().value().setReference(
