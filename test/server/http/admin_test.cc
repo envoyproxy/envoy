@@ -599,7 +599,7 @@ public:
     admin_filter_.decodeHeaders(request_headers_, false);
 
     if (!body.empty()) {
-      callbacks_.buffer_.reset(new Buffer::OwnedImpl(body));
+      callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>(body);
     }
 
     return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
