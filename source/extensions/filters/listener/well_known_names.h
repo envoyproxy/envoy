@@ -22,8 +22,6 @@ public:
   const std::string ProxyProtocol = "envoy.listener.proxy_protocol";
   // TLS Inspector listener filter
   const std::string TlsInspector = "envoy.listener.tls_inspector";
-  // Udp Echo filter
-  const std::string UdpEcho = "envoy.listener.udpecho";
 };
 
 typedef ConstSingleton<ListenerFilterNameValues> ListenerFilterNames;
