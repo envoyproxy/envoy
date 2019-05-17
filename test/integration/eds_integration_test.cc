@@ -121,8 +121,7 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
   EXPECT_EQ(1, test_server_->gauge("cluster_manager.warming_clusters")->value());
 
-  // We need to do a bunch of work to get a hold of second hc connection. This is shamelessy stolen
-  // from waitForNextUpstreamRequest;
+  // We need to do a bunch of work to get a hold of second hc connection.
   FakeHttpConnectionPtr fake_upstream_connection;
   auto result = fake_upstreams_[0]->waitForHttpConnection(
       *dispatcher_, fake_upstream_connection, TestUtility::DefaultTimeout, max_request_headers_kb_);
