@@ -589,6 +589,7 @@ public:
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
     EXPECT_TRUE(admin_.setCurrentClientCertDetails().empty());
+    admin_filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
@@ -597,9 +598,9 @@ public:
     request_headers_.insertMethod().value(method.data(), method.size());
     admin_filter_.decodeHeaders(request_headers_, false);
 
-    if (body.size() > 0) {
+    if (!body.empty()) {
       Buffer::OwnedImpl data(body);
-      admin_filter_.decodeData(data, true);
+      callbacks_.buffer_ = std::move(data);
     }
 
     return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
@@ -624,6 +625,7 @@ public:
   AdminImpl admin_;
   Http::TestHeaderMapImpl request_headers_;
   Server::AdminFilter admin_filter_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
