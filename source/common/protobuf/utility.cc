@@ -179,7 +179,7 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
         if (log_delay > 30){
             ENVOY_LOG_MISC(warn, "{}", err);
         }else{
-            printf("#####time too short")
+            printf("#####time too short");
         }
       } else {
         const char fatal_error[] =
