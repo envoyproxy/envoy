@@ -571,7 +571,7 @@ std::string Utility::PercentEncoding::encode(absl::string_view value) {
       return PercentEncoding::encode(value, i);
     }
   }
-  return absl::StrCat(value);
+  return std::string(value);
 }
 
 std::string Utility::PercentEncoding::encode(absl::string_view value, const size_t index) {
