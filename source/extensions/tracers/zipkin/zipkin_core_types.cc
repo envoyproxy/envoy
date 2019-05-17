@@ -1,7 +1,6 @@
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
 #include "common/common/byte_order.h"
-#include "common/common/empty_string.h"
 #include "common/common/utility.h"
 
 #include "extensions/tracers/zipkin/span_context.h"
