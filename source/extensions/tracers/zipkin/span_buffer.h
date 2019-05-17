@@ -66,6 +66,11 @@ public:
    */
   const zipkin::proto3::ListOfSpans toProtoListOfSpans() const;
 
+  /**
+   * @return the current buffered spans.
+   */
+  std::vector<Span> spans() const { return span_buffer_; }
+
 private:
   // We use a pre-allocated vector to improve performance
   std::vector<Span> span_buffer_;
