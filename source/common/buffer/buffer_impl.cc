@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/source/common/buffer/_virtual_includes/buffer_lib/common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/stack_array.h"
 
@@ -552,6 +553,8 @@ OwnedImpl::OwnedImpl() : old_impl_(use_old_impl_) {
 OwnedImpl::OwnedImpl(absl::string_view data) : OwnedImpl() { add(data); }
 
 OwnedImpl::OwnedImpl(const Instance& data) : OwnedImpl() { add(data); }
+
+OwnedImpl::OwnedImpl(const OwnedImpl& other) : OwnedImpl() { add(other); }
 
 OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, size); }
 

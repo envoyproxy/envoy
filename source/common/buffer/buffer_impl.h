@@ -506,6 +506,8 @@ public:
   OwnedImpl();
   OwnedImpl(absl::string_view data);
   OwnedImpl(const Instance& data);
+  // Only copy the data, not the internal state.
+  OwnedImpl(const OwnedImpl& other);
   OwnedImpl(const void* data, uint64_t size);
 
   // Buffer::Instance

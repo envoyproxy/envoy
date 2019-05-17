@@ -43,6 +43,8 @@
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mem_slice.h"
+#include "quiche/quic/platform/api/quic_mem_slice_span.h"
+#include "quiche/quic/platform/api/quic_mem_slice_storage.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_pcc_sender.h"
@@ -740,5 +742,22 @@ TEST_F(QuicPlatformTest, ConstructMemSliceFromBuffer) {
   EXPECT_EQ(nullptr, slice2.data());
   EXPECT_TRUE(fragment_releaser_called);
 }
+
+TEST_F(QuicPlatformTest, QuicMemSliceStorage) {
+  std::string str(512, 'a');
+  struct iovec iov = {const_cast<char*>(str.data()), str.length()};
+  SimpleBufferAllocator allocator;
+  QuicMemSliceStorage storage(&iov, 1, &allocator, 1024);
+  // Test copy constructor.
+  QuicMemSliceStorage other  = storage;
+  QuicMemSliceSpan span = storage.ToSpan();
+  EXPECT_EQ(1u, span.NumSlices());
+  EXPECT_EQ(str, span.GetData(0));
+  QuicMemSliceSpan span_other = other.ToSpan();
+  EXPECT_EQ(1u, span_other.NumSlices());
+  EXPECT_EQ(str, span_other.GetData(0));
+  EXPECT_NE(span_other.GetData(0).data(), span.GetData(0).data());
+}
+
 } // namespace
 } // namespace quic
