@@ -62,10 +62,9 @@ public:
 private:
   // Used to align both fragment and buffer at max aligned address.
   struct BufferFragmentBundle {
-    static BufferFragmentBundle* createBundleWithSize(QuicBufferAllocator* allocator,
-                                                      size_t length) {
+    static BufferFragmentBundle* createBundleWithSize(size_t length) {
       return reinterpret_cast<BufferFragmentBundle*>(
-          allocator->New(sizeof(BufferFragmentBundle) + length));
+          new char[sizeof(BufferFragmentBundle) + length]);
     }
 
     // TODO(danzh) fragment_ is not aligned in memory. This can cause extra

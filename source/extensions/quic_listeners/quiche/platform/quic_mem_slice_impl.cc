@@ -11,14 +11,14 @@
 namespace quic {
 
 Envoy::Buffer::BufferFragmentImpl*
-QuicMemSliceImpl::allocateBufferAndFragment(QuicBufferAllocator* allocator, size_t length) {
-  BufferFragmentBundle* bundle = BufferFragmentBundle::createBundleWithSize(allocator, length);
+QuicMemSliceImpl::allocateBufferAndFragment(QuicBufferAllocator* /*allocator*/, size_t length) {
+  BufferFragmentBundle* bundle = BufferFragmentBundle::createBundleWithSize(length);
   Envoy::Buffer::BufferFragmentImpl& fragment = bundle->fragment_;
   return new (&fragment) Envoy::Buffer::BufferFragmentImpl(
       bundle->buffer_, length,
-      [allocator](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl* frag) {
+      [](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl* frag) {
         // Delete will deallocate the bundle of fragment and buffer.
-        allocator->Delete(const_cast<char*>(reinterpret_cast<const char*>(frag)));
+        delete[] const_cast<char*>(reinterpret_cast<const char*>(frag));
       });
 }
 
