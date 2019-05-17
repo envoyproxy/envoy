@@ -140,6 +140,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
 }
 
+time_t last_log_time;
+
 void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime::Loader* runtime) {
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   const Protobuf::Reflection* reflection = message.GetReflection();
@@ -171,7 +173,14 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
           "for details.",
           field->full_name(), filename);
       if (warn_only) {
-        ENVOY_LOG_MISC(warn, "{}", err);
+        double log_delay;
+        time_t current_time = time(nullptr);
+        log_delay = difftime(current_time, last_log_time);
+        if (log_delay > 30){
+            ENVOY_LOG_MISC(warn, "{}", err);
+        }else{
+            printf("#####time too short")
+        }
       } else {
         const char fatal_error[] =
             " If continued use of this field is absolutely necessary, see "
