@@ -103,7 +103,8 @@ TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
 
   // Fail HC and verify the host is gone.
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
+  upstream_request_->encodeHeaders(
+      Http::TestHeaderMapImpl{{":status", "503"}, {"connection", "close"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 0);
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 }
@@ -257,6 +258,32 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
   eds_helper_.setEds({cluster_load_assignment}, *test_server_);
 
   EXPECT_EQ(1, member_update_count);
+}
+
+TEST_P(EdsIntegrationTest, StatsReadyFilter) {
+  config_helper_.addFilter("name: eds-ready-filter");
+  initializeTest(false);
+
+  // Initial state: no healthy endpoints
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("EDS not ready", response->body());
+
+  cleanupUpstreamAndDownstream();
+
+  // 2/2 healthy endpoints.
+  setEndpoints(2, 2, 0);
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
+                                                downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("EDS is ready", response->body());
+
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace
