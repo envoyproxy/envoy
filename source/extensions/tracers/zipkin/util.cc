@@ -55,20 +55,6 @@ uint64_t Util::generateRandom64(TimeSource& time_source) {
   return rand_64();
 }
 
-std::string Util::bytesOf(uint64_t value) {
-  std::string data;
-  data.reserve(8);
-  data.push_back(value & 0x00000000000000FF);
-  data.push_back((value & 0x000000000000FF00) >> 8);
-  data.push_back((value & 0x0000000000FF0000) >> 16);
-  data.push_back((value & 0x00000000FF000000) >> 24);
-  data.push_back((value & 0x000000FF00000000) >> 32);
-  data.push_back((value & 0x0000FF0000000000) >> 40);
-  data.push_back((value & 0x00FF000000000000) >> 48);
-  data.push_back((value & 0xFF00000000000000) >> 56);
-  return data;
-}
-
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions

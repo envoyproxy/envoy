@@ -5,6 +5,8 @@
 
 #include "envoy/common/time.h"
 
+#include "common/common/byte_order.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -53,9 +55,13 @@ public:
    * Returns byte string representation of an number.
    *
    * @param value Number that will be represented in byte string.
+   * @param flip indicates to flip order or not.
    * @return std::string byte string representation of a number.
    */
-  static std::string bytesOf(uint64_t value);
+  template <typename Type> static std::string toByteString(Type value, bool flip = false) {
+    auto bytes = flip ? toEndianness<ByteOrder::BigEndian>(value) : value;
+    return std::string(reinterpret_cast<const char*>(&bytes), sizeof(Type));
+  }
 };
 
 } // namespace Zipkin

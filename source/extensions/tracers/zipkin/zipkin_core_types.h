@@ -455,7 +455,7 @@ public:
   /**
    * @return the span's id as a byte string.
    */
-  const std::string idAsByteString() const { return Util::bytesOf(id_); }
+  const std::string idAsByteString() const { return Util::toByteString(id_); }
 
   /**
    * @return the span's name.
@@ -478,7 +478,7 @@ public:
    * @return the span's parent id as a byte string.
    */
   const std::string parentIdAsByteString() const {
-    return parent_id_ ? Util::bytesOf(parent_id_.value()) : EMPTY_STRING;
+    return parent_id_ ? Util::toByteString(parent_id_.value()) : EMPTY_STRING;
   }
 
   /**
@@ -519,9 +519,11 @@ public:
    * @return the span's trace id as a byte string.
    */
   const std::string traceIdAsByteString() const {
-    return trace_id_high_.has_value()
-               ? Util::bytesOf(trace_id_high_.value()) + Util::bytesOf(trace_id_)
-               : Util::bytesOf(trace_id_);
+    // TODO(dio): Make sure this is the right interpretation of
+    // https://github.com/apache/incubator-zipkin-api/blob/v0.2.1/zipkin.proto#L60-L61.
+    return trace_id_high_.has_value() ? Util::toByteString(trace_id_high_.value(), true) +
+                                            Util::toByteString(trace_id_, true)
+                                      : Util::toByteString(trace_id_, true);
   }
 
   /**
