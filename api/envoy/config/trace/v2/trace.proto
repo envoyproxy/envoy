@@ -88,7 +88,7 @@ message ZipkinConfig {
     HTTP_PROTO = 2;
   }
 
-  // Determines the selected collector endpoint version. By default, the ``HTTP_JSON_V1``` will be
+  // Determines the selected collector endpoint version. By default, the ``HTTP_JSON_V1`` will be
   // used.
   CollectorEndpointVersion collector_endpoint_version = 6;
 }
