@@ -50,7 +50,8 @@ ToolConfig ToolConfig::create(const envoy::ToolSchema::ValidationItem& check_con
   }
 
   if (check_config.input().additional_headers().data()) {
-    for (const envoy::ToolSchema::AdditionalHeader& header_config : check_config.input().additional_headers()) {
+    for (const envoy::ToolSchema::AdditionalHeader& header_config :
+         check_config.input().additional_headers()) {
       headers->addCopy(header_config.field(), header_config.value());
     }
   }
@@ -155,7 +156,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_route_json) {
   envoy::ToolSchema::Validation validation_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
-  const std::string contents = api -> fileSystem().fileReadToEnd(expected_route_json);
+  const std::string contents = api->fileSystem().fileReadToEnd(expected_route_json);
   MessageUtil::loadFromFile(expected_route_json, validation_config, *api);
 
   bool no_failures = true;
@@ -169,23 +170,24 @@ bool RouterCheckTool::compareEntries(const std::string& expected_route_json) {
     }
     envoy::ToolSchema::ValidationAssert validate = check_config.validate();
 
-    using checkerFunc = std::function<bool(ToolConfig&, const envoy::ToolSchema::ValidationAssert&)>;
+    using checkerFunc =
+        std::function<bool(ToolConfig&, const envoy::ToolSchema::ValidationAssert&)>;
     checkerFunc checkers[] = {
-      [this](auto&... params) -> bool { return this->compareCluster(params...); },
-      [this](auto&... params) -> bool { return this->compareVirtualCluster(params...); },
-      [this](auto&... params) -> bool { return this->compareVirtualHost(params...); },
-      [this](auto&... params) -> bool { return this->compareRewritePath(params...); },
-      [this](auto&... params) -> bool { return this->compareRewriteHost(params...); },
-      [this](auto&... params) -> bool { return this->compareRedirectPath(params...); },
-      [this](auto&... params) -> bool { return this->compareHeaderField(params...); },
-      [this](auto&... params) -> bool { return this->compareCustomHeaderField(params...); },
+        [this](auto&... params) -> bool { return this->compareCluster(params...); },
+        [this](auto&... params) -> bool { return this->compareVirtualCluster(params...); },
+        [this](auto&... params) -> bool { return this->compareVirtualHost(params...); },
+        [this](auto&... params) -> bool { return this->compareRewritePath(params...); },
+        [this](auto&... params) -> bool { return this->compareRewriteHost(params...); },
+        [this](auto&... params) -> bool { return this->compareRedirectPath(params...); },
+        [this](auto&... params) -> bool { return this->compareHeaderField(params...); },
+        [this](auto&... params) -> bool { return this->compareCustomHeaderField(params...); },
     };
 
     // Call appropriate function for each match case.
     for (const auto& test : checkers) {
-      if(!test(tool_config, validate)) {
+      if (!test(tool_config, validate)) {
         no_failures = false;
-       }
+      }
     }
   }
 
@@ -201,7 +203,8 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string&
   return compareResults(actual, expected, "cluster_name");
 }
 
-bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareCluster(ToolConfig& tool_config,
+                                     const envoy::ToolSchema::ValidationAssert& expected) {
   if (tool_config.route_ == nullptr) {
     return compareResults("", expected.cluster_name(), "cluster_name");
   }
@@ -218,7 +221,8 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
   return compareResults(actual, expected, "virtual_cluster_name");
 }
 
-bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config,
+                                            const envoy::ToolSchema::ValidationAssert& expected) {
   if (tool_config.route_ == nullptr) {
     return compareResults("", expected.virtual_cluster_name(), "virtual_cluster_name");
   }
@@ -233,7 +237,8 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
   return compareResults(actual, expected, "virtual_host_name");
 }
 
-bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config,
+                                         const envoy::ToolSchema::ValidationAssert& expected) {
   if (tool_config.route_ == nullptr) {
     return compareResults("", expected.virtual_host_name(), "virtual_host_name");
   }
@@ -252,7 +257,8 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
   return compareResults(actual, expected, "path_rewrite");
 }
 
-bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config,
+                                         const envoy::ToolSchema::ValidationAssert& expected) {
   if (tool_config.route_ == nullptr) {
     return compareResults("", expected.path_rewrite(), "path_rewrite");
   }
@@ -271,7 +277,8 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
   return compareResults(actual, expected, "host_rewrite");
 }
 
-bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config,
+                                         const envoy::ToolSchema::ValidationAssert& expected) {
   if (tool_config.route_ == nullptr) {
     return compareResults("", expected.host_rewrite(), "host_rewrite");
   }
@@ -287,18 +294,20 @@ bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::st
   return compareResults(actual, expected, "path_redirect");
 }
 
-bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config,
+                                          const envoy::ToolSchema::ValidationAssert& expected) {
   if (tool_config.route_ == nullptr) {
     return compareResults("", expected.path_redirect(), "path_redirect");
   }
   return compareRedirectPath(tool_config, expected.path_redirect());
 }
 
-bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config,
+                                         const envoy::ToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
-  if(expected.header_fields().data()) {
-    for(const envoy::ToolSchema::AdditionalHeader& header: expected.header_fields()) {
-      if(!compareHeaderField(tool_config, header.field(), header.value())) {
+  if (expected.header_fields().data()) {
+    for (const envoy::ToolSchema::AdditionalHeader& header : expected.header_fields()) {
+      if (!compareHeaderField(tool_config, header.field(), header.value())) {
         no_failures = false;
       }
     }
@@ -326,11 +335,12 @@ bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const st
   return compareResults(actual, expected, "custom_header");
 }
 
-bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareCustomHeaderField(
+    ToolConfig& tool_config, const envoy::ToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
-  if(expected.custom_header_fields().data()) {
-    for(const envoy::ToolSchema::AdditionalHeader& header: expected.custom_header_fields()) {
-      if(!compareCustomHeaderField(tool_config, header.field(), header.value())) {
+  if (expected.custom_header_fields().data()) {
+    for (const envoy::ToolSchema::AdditionalHeader& header : expected.custom_header_fields()) {
+      if (!compareCustomHeaderField(tool_config, header.field(), header.value())) {
         no_failures = false;
       }
     }

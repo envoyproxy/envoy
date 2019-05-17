@@ -32,8 +32,8 @@ envoy_cc_test_library(
         "//test/mocks/server:server_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",
+        "//test/tools/router_check:validation_cc",
         "//test/tools/router_check/json:tool_config_schemas_lib",
-        "//test/tools/router_check:validation_cc"
     ],
 )
 
