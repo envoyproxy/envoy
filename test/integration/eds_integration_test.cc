@@ -98,8 +98,8 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersions, EdsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-// Verify that a host stabilized via active health checking which is first removed from EDS and
-// then fails health checking is removed.
+// Verifies that a new cluster can we warmed when using HTTP/2 health checking. Regression test
+// of the issue detailed in issue #6951.
 TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
   use_http2_hc_ = true;
   initializeTest(true);
