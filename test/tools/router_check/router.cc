@@ -160,7 +160,8 @@ bool RouterCheckTool::compareEntries(const std::string& expected_route_json) {
   MessageUtil::loadFromFile(expected_route_json, validation_config, *api);
 
   bool no_failures = true;
-  for (const envoy::RouterCheckToolSchema::ValidationItem& check_config : validation_config.tests()) {
+  for (const envoy::RouterCheckToolSchema::ValidationItem& check_config :
+       validation_config.tests()) {
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
@@ -203,8 +204,8 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string&
   return compareResults(actual, expected, "cluster_name");
 }
 
-bool RouterCheckTool::compareCluster(ToolConfig& tool_config,
-                                     const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareCluster(
+    ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   if (expected.cluster_name().empty()) {
     return true;
   }
@@ -224,8 +225,8 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
   return compareResults(actual, expected, "virtual_cluster_name");
 }
 
-bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config,
-                                            const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareVirtualCluster(
+    ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   if (expected.virtual_cluster_name().empty()) {
     return true;
   }
@@ -243,8 +244,8 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
   return compareResults(actual, expected, "virtual_host_name");
 }
 
-bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config,
-                                         const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareVirtualHost(
+    ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   if (expected.virtual_host_name().empty()) {
     return true;
   }
@@ -266,8 +267,8 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
   return compareResults(actual, expected, "path_rewrite");
 }
 
-bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config,
-                                         const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareRewritePath(
+    ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   if (expected.path_rewrite().empty()) {
     return true;
   }
@@ -289,9 +290,9 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
   return compareResults(actual, expected, "host_rewrite");
 }
 
-bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config,
-                                         const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
-  if(expected.host_rewrite().empty()) {
+bool RouterCheckTool::compareRewriteHost(
+    ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+  if (expected.host_rewrite().empty()) {
     return true;
   }
   if (tool_config.route_ == nullptr) {
@@ -309,8 +310,8 @@ bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::st
   return compareResults(actual, expected, "path_redirect");
 }
 
-bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config,
-                                          const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareRedirectPath(
+    ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   if (expected.path_redirect().empty()) {
     return true;
   }
@@ -320,8 +321,8 @@ bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config,
   return compareRedirectPath(tool_config, expected.path_redirect());
 }
 
-bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config,
-                                         const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareHeaderField(
+    ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
   if (expected.header_fields().data()) {
     for (const envoy::RouterCheckToolSchema::AdditionalHeader& header : expected.header_fields()) {
@@ -357,7 +358,8 @@ bool RouterCheckTool::compareCustomHeaderField(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
   if (expected.custom_header_fields().data()) {
-    for (const envoy::RouterCheckToolSchema::AdditionalHeader& header : expected.custom_header_fields()) {
+    for (const envoy::RouterCheckToolSchema::AdditionalHeader& header :
+         expected.custom_header_fields()) {
       if (!compareCustomHeaderField(tool_config, header.field(), header.value())) {
         no_failures = false;
       }

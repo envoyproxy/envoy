@@ -85,7 +85,8 @@ private:
       Api::ApiPtr api);
 
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
-  bool compareCluster(ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+  bool compareCluster(ToolConfig& tool_config,
+                      const envoy::RouterCheckToolSchema::ValidationAssert& expected);
   bool compareVirtualCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareVirtualCluster(ToolConfig& tool_config,
                              const envoy::RouterCheckToolSchema::ValidationAssert& expected);
