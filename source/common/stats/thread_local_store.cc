@@ -316,7 +316,6 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatMap<std::shared_ptr<StatType>>* tls_cache, StatNameHashSet* tls_rejected_stats,
     StatType& null_stat) {
 
-  // We do name-rejections on the full name, prior to truncation.
   if (tls_rejected_stats != nullptr &&
       tls_rejected_stats->find(name) != tls_rejected_stats->end()) {
     return null_stat;
@@ -356,6 +355,18 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 
   // Finally we return the reference.
   return **central_ref;
+}
+
+template <class StatType>
+absl::optional<std::reference_wrapper<const StatType>>
+ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
+    StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map) const {
+  auto iter = central_cache_map.find(name);
+  if (iter == central_cache_map.end()) {
+    return absl::nullopt;
+  }
+
+  return std::cref(*iter->second.get());
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
@@ -494,6 +505,27 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name)
     tls_cache->insert(std::make_pair((*central_ref)->statName(), *central_ref));
   }
   return **central_ref;
+}
+
+absl::optional<std::reference_wrapper<const Counter>>
+ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
+  return findStatLockHeld<Counter>(name, central_cache_.counters_);
+}
+
+absl::optional<std::reference_wrapper<const Gauge>>
+ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
+  return findStatLockHeld<Gauge>(name, central_cache_.gauges_);
+}
+
+absl::optional<std::reference_wrapper<const Histogram>>
+ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
+  auto iter = central_cache_.histograms_.find(name);
+  if (iter == central_cache_.histograms_.end()) {
+    return absl::nullopt;
+  }
+
+  std::shared_ptr<Histogram> histogram_ref(iter->second);
+  return std::cref(*histogram_ref.get());
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
