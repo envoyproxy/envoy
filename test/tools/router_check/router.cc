@@ -205,6 +205,9 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string&
 
 bool RouterCheckTool::compareCluster(ToolConfig& tool_config,
                                      const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+  if (expected.cluster_name().empty()) {
+    return true;
+  }
   if (tool_config.route_ == nullptr) {
     return compareResults("", expected.cluster_name(), "cluster_name");
   }
@@ -223,6 +226,9 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
 
 bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config,
                                             const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+  if (expected.virtual_cluster_name().empty()) {
+    return true;
+  }
   if (tool_config.route_ == nullptr) {
     return compareResults("", expected.virtual_cluster_name(), "virtual_cluster_name");
   }
@@ -239,6 +245,9 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config,
                                          const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+  if (expected.virtual_host_name().empty()) {
+    return true;
+  }
   if (tool_config.route_ == nullptr) {
     return compareResults("", expected.virtual_host_name(), "virtual_host_name");
   }
@@ -259,6 +268,9 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config,
                                          const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+  if (expected.path_rewrite().empty()) {
+    return true;
+  }
   if (tool_config.route_ == nullptr) {
     return compareResults("", expected.path_rewrite(), "path_rewrite");
   }
@@ -279,6 +291,9 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config,
                                          const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+  if(expected.host_rewrite().empty()) {
+    return true;
+  }
   if (tool_config.route_ == nullptr) {
     return compareResults("", expected.host_rewrite(), "host_rewrite");
   }
@@ -296,6 +311,9 @@ bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::st
 
 bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config,
                                           const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+  if (expected.path_redirect().empty()) {
+    return true;
+  }
   if (tool_config.route_ == nullptr) {
     return compareResults("", expected.path_redirect(), "path_redirect");
   }
