@@ -22,23 +22,20 @@ CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
     : stat_name_pool_(symbol_table), symbol_table_(symbol_table), canary_(makeStatName("canary")),
       canary_upstream_rq_time_(makeStatName("canary.upstream_rq_time")),
       external_(makeStatName("external")),
-      external_rq_time_(makeStatName("external.upstream_rq_time")),
       external_upstream_rq_time_(makeStatName("external.upstream_rq_time")),
       internal_(makeStatName("internal")),
-      internal_rq_time_(makeStatName("internal.upstream_rq_time")),
       internal_upstream_rq_time_(makeStatName("internal.upstream_rq_time")),
       upstream_rq_1xx_(makeStatName("upstream_rq_1xx")),
       upstream_rq_2xx_(makeStatName("upstream_rq_2xx")),
       upstream_rq_3xx_(makeStatName("upstream_rq_3xx")),
       upstream_rq_4xx_(makeStatName("upstream_rq_4xx")),
       upstream_rq_5xx_(makeStatName("upstream_rq_5xx")),
-      upstream_rq_unknown_(makeStatName("upstream_rq_Unknown")),
+      upstream_rq_unknown_(makeStatName("upstream_rq_unknown")), // Covers invalid http response
+                                                                 // codes e.g. 600.
       upstream_rq_completed_(makeStatName("upstream_rq_completed")),
       upstream_rq_time_(makeStatName("upstream_rq_time")), vcluster_(makeStatName("vcluster")),
       vhost_(makeStatName("vhost")), zone_(makeStatName("zone")),
-      canary_upstream_rq_("canary_upstream_rq_", *this),
-      external_upstream_rq_("external_upstream_rq_", *this),
-      internal_upstream_rq_("internal_upstream_rq_", *this), upstream_rq_("upstream_rq_", *this) {}
+      upstream_rq_("upstream_rq_", *this) {}
 
 void CodeStatsImpl::incCounter(Stats::Scope& scope,
                                const std::vector<Stats::StatName>& names) const {
@@ -96,24 +93,21 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
 
   // Handle request virtual cluster.
   if (!info.request_vcluster_name_.empty()) {
-    Stats::StatName vhost_name = info.request_vhost_name_;
-    Stats::StatName vcluster_name = info.request_vcluster_name_;
-
+    incCounter(info.global_scope_, {vhost_, info.request_vhost_name_, vcluster_,
+                                    info.request_vcluster_name_, upstream_rq_completed_});
+    incCounter(info.global_scope_, {vhost_, info.request_vhost_name_, vcluster_,
+                                    info.request_vcluster_name_, rq_group});
     incCounter(info.global_scope_,
-               {vhost_, vhost_name, vcluster_, vcluster_name, upstream_rq_completed_});
-    incCounter(info.global_scope_, {vhost_, vhost_name, vcluster_, vcluster_name, rq_group});
-    incCounter(info.global_scope_, {vhost_, vhost_name, vcluster_, vcluster_name, rq_code});
+               {vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_, rq_code});
   }
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
-    Stats::StatName from_zone = info.from_zone_;
-    Stats::StatName to_zone = info.to_zone_;
-
     incCounter(info.cluster_scope_,
-               {info.prefix_, zone_, from_zone, to_zone, upstream_rq_completed_});
-    incCounter(info.cluster_scope_, {info.prefix_, zone_, from_zone, to_zone, rq_group});
-    incCounter(info.cluster_scope_, {info.prefix_, zone_, from_zone, to_zone, rq_code});
+               {info.prefix_, zone_, info.from_zone_, info.to_zone_, upstream_rq_completed_});
+    incCounter(info.cluster_scope_,
+               {info.prefix_, zone_, info.from_zone_, info.to_zone_, rq_group});
+    incCounter(info.cluster_scope_, {info.prefix_, zone_, info.from_zone_, info.to_zone_, rq_code});
   }
 }
 
@@ -190,7 +184,9 @@ CodeStatsImpl::RequestCodeGroup::RequestCodeGroup(absl::string_view prefix,
 Stats::StatName CodeStatsImpl::RequestCodeGroup::statName(Code response_code) {
   // Take a lock only if we've never seen this response-code before.
   uint32_t rc_int = static_cast<uint32_t>(response_code);
-  RELEASE_ASSERT(rc_int < NumHttpCodes, absl::StrCat("Unexpected http code: ", rc_int));
+  if (rc_int >= NumHttpCodes) {
+    return code_stats_.upstream_rq_unknown_;
+  }
   std::atomic<uint8_t*>& atomic_ref = rc_stat_names_[rc_int];
   if (atomic_ref.load() == nullptr) {
     absl::MutexLock lock(&mutex_);

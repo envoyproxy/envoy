@@ -102,7 +102,6 @@ private:
   Stats::StatName external_rq_time_;
   Stats::StatName external_upstream_rq_time_;
   Stats::StatName internal_;
-  Stats::StatName internal_rq_time_;
   Stats::StatName internal_upstream_rq_time_;
   Stats::StatName upstream_;
   Stats::StatName upstream_rq_1xx_;
@@ -118,9 +117,6 @@ private:
   Stats::StatName vhost_;
   Stats::StatName zone_;
 
-  mutable RequestCodeGroup canary_upstream_rq_;
-  mutable RequestCodeGroup external_upstream_rq_;
-  mutable RequestCodeGroup internal_upstream_rq_;
   mutable RequestCodeGroup upstream_rq_;
 };
 
