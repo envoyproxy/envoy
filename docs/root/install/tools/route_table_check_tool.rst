@@ -66,7 +66,7 @@ Testing
     bazel test //test/tools/router_check/...
   
 Test schema
-  The tool deals with JSON objects internally. A recent feature has moved all internal schemas in the tool to proto3. 
-  This feature can be enabled by an extra optional parameter ``--useproto``. This needs a breaking change in the test
-   `schema <https://github.com/envoyproxy/envoy/blob/master/test/tools/router_check/validation.proto>`_. The json schema
-   will be deprecated in future realeases.
+  The tool deals with JSON objects internally. A recent feature moves all internal schemas in the tool to proto3. 
+  This feature can be enabled by an extra optional parameter ``--useproto``.
+  It introduces a breaking change in the test based on `schema <https://github.com/envoyproxy/envoy/blob/master/test/tools/router_check/validation.proto>`_.
+  The json schema will be deprecated in future realeases.
