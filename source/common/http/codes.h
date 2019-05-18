@@ -57,43 +57,12 @@ private:
   void recordHistogram(Stats::Scope& scope, const std::vector<Stats::StatName>& names,
                        uint64_t count) const;
 
-  class RequestCodeGroup {
-  public:
-    RequestCodeGroup(absl::string_view prefix, CodeStatsImpl& code_stats);
-
-    Stats::StatName statName(Code response_code);
-
-  private:
-    // Use an array of atomic pointers to hold StatNameStorage objects for
-    // every conceivable HTTP response code. In the hot-path we'll reference
-    // these with a null-check, and if we need to allocate a symbol for a
-    // new code, we'll take a mutex to avoid duplicate allocations and
-    // subsequent leaks. This is similar in principle to a ReaderMutexLock,
-    // but should be faster, as ReaderMutexLocks appear to be too expensive for
-    // fine-grained controls. Another option would be to use a lock per
-    // stat-name, which might have similar performance to atomics with default
-    // barrier policy.
-    //
-    // We don't allocate these all up front during construction because
-    // SymbolTable greedily encodes the first 128 names it discovers in one
-    // byte. We don't want those high-value single-byte codes to go to fully
-    // enumerating the 4 prefixes combined with HTTP codes that are seldom used,
-    // so we allocate these on demand.
-
-    static constexpr uint32_t NumHttpCodes = 1000;
-    std::atomic<uint8_t*> rc_stat_names_[NumHttpCodes];
-
-    CodeStatsImpl& code_stats_;
-    std::string prefix_;
-    absl::Mutex mutex_;
-    Stats::StatNamePool stat_name_pool_ GUARDED_BY(mutex_);
-  };
-
   static absl::string_view stripTrailingDot(absl::string_view prefix);
-  Stats::StatName makeStatName(absl::string_view name) { return stat_name_pool_.add(name); }
   Stats::StatName upstreamRqGroup(Code response_code) const;
+  Stats::StatName upstreamRqStatName(Code response_code) const;
 
-  Stats::StatNamePool stat_name_pool_;
+  mutable Stats::StatNamePool stat_name_pool_ GUARDED_BY(mutex_);
+  mutable absl::Mutex mutex_;
   Stats::SymbolTable& symbol_table_;
 
   Stats::StatName canary_;
@@ -117,7 +86,26 @@ private:
   Stats::StatName vhost_;
   Stats::StatName zone_;
 
-  mutable RequestCodeGroup upstream_rq_;
+  // Use an array of atomic pointers to hold StatNameStorage objects for
+  // every conceivable HTTP response code. In the hot-path we'll reference
+  // these with a null-check, and if we need to allocate a symbol for a
+  // new code, we'll take a mutex to avoid duplicate allocations and
+  // subsequent leaks. This is similar in principle to a ReaderMutexLock,
+  // but should be faster, as ReaderMutexLocks appear to be too expensive for
+  // fine-grained controls. Another option would be to use a lock per
+  // stat-name, which might have similar performance to atomics with default
+  // barrier policy.
+  //
+  // We don't allocate these all up front during construction because
+  // SymbolTable greedily encodes the first 128 names it discovers in one
+  // byte. We don't want those high-value single-byte codes to go to fully
+  // enumerating the 4 prefixes combined with HTTP codes that are seldom used,
+  // so we allocate these on demand.
+
+  static constexpr uint32_t NumHttpCodes = 1000;
+  mutable std::atomic<uint8_t*> rc_stat_names_[NumHttpCodes];
+
+  std::string prefix_;
 };
 
 /**

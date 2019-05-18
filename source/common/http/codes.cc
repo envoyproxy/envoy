@@ -19,23 +19,37 @@ namespace Envoy {
 namespace Http {
 
 CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
-    : stat_name_pool_(symbol_table), symbol_table_(symbol_table), canary_(makeStatName("canary")),
-      canary_upstream_rq_time_(makeStatName("canary.upstream_rq_time")),
-      external_(makeStatName("external")),
-      external_upstream_rq_time_(makeStatName("external.upstream_rq_time")),
-      internal_(makeStatName("internal")),
-      internal_upstream_rq_time_(makeStatName("internal.upstream_rq_time")),
-      upstream_rq_1xx_(makeStatName("upstream_rq_1xx")),
-      upstream_rq_2xx_(makeStatName("upstream_rq_2xx")),
-      upstream_rq_3xx_(makeStatName("upstream_rq_3xx")),
-      upstream_rq_4xx_(makeStatName("upstream_rq_4xx")),
-      upstream_rq_5xx_(makeStatName("upstream_rq_5xx")),
-      upstream_rq_unknown_(makeStatName("upstream_rq_unknown")), // Covers invalid http response
-                                                                 // codes e.g. 600.
-      upstream_rq_completed_(makeStatName("upstream_rq_completed")),
-      upstream_rq_time_(makeStatName("upstream_rq_time")), vcluster_(makeStatName("vcluster")),
-      vhost_(makeStatName("vhost")), zone_(makeStatName("zone")),
-      upstream_rq_("upstream_rq_", *this) {}
+    : stat_name_pool_(symbol_table), symbol_table_(symbol_table),
+      canary_(stat_name_pool_.add("canary")),
+      canary_upstream_rq_time_(stat_name_pool_.add("canary.upstream_rq_time")),
+      external_(stat_name_pool_.add("external")),
+      external_upstream_rq_time_(stat_name_pool_.add("external.upstream_rq_time")),
+      internal_(stat_name_pool_.add("internal")),
+      internal_upstream_rq_time_(stat_name_pool_.add("internal.upstream_rq_time")),
+      upstream_rq_1xx_(stat_name_pool_.add("upstream_rq_1xx")),
+      upstream_rq_2xx_(stat_name_pool_.add("upstream_rq_2xx")),
+      upstream_rq_3xx_(stat_name_pool_.add("upstream_rq_3xx")),
+      upstream_rq_4xx_(stat_name_pool_.add("upstream_rq_4xx")),
+      upstream_rq_5xx_(stat_name_pool_.add("upstream_rq_5xx")),
+      upstream_rq_unknown_(stat_name_pool_.add("upstream_rq_unknown")), // Covers invalid http
+                                                                        // response codes e.g. 600.
+      upstream_rq_completed_(stat_name_pool_.add("upstream_rq_completed")),
+      upstream_rq_time_(stat_name_pool_.add("upstream_rq_time")),
+      vcluster_(stat_name_pool_.add("vcluster")), vhost_(stat_name_pool_.add("vhost")),
+      zone_(stat_name_pool_.add("zone")) {
+
+  for (uint32_t i = 0; i < NumHttpCodes; ++i) {
+    rc_stat_names_[i] = nullptr;
+  }
+
+  // Pre-allocate response codes 200, 404, and 503, as those seem quite likely.
+  // We don't pre-allocate all the HTTP codes because the first 127 allocations
+  // are likely to be encoded in one byte, and we would rather spend those on
+  // common components of stat-names that appear frequently.
+  upstreamRqStatName(Code::OK);
+  upstreamRqStatName(Code::NotFound);
+  upstreamRqStatName(Code::ServiceUnavailable);
+}
 
 void CodeStatsImpl::incCounter(Stats::Scope& scope,
                                const std::vector<Stats::StatName>& names) const {
@@ -61,7 +75,7 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
   // Build a dynamic stat for the response code and increment it.
   incCounter(scope, prefix, upstream_rq_completed_);
   incCounter(scope, prefix, upstreamRqGroup(response_code));
-  incCounter(scope, prefix, upstream_rq_.statName(response_code));
+  incCounter(scope, prefix, upstreamRqStatName(response_code));
 }
 
 void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
@@ -71,7 +85,7 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
   chargeBasicResponseStat(info.cluster_scope_, info.prefix_, code);
 
   Stats::StatName rq_group = upstreamRqGroup(code);
-  Stats::StatName rq_code = upstream_rq_.statName(code);
+  Stats::StatName rq_code = upstreamRqStatName(code);
 
   auto write_category = [this, rq_group, rq_code, &info](Stats::StatName category) {
     incCounter(info.cluster_scope_, {info.prefix_, category, upstream_rq_completed_});
@@ -164,28 +178,11 @@ Stats::StatName CodeStatsImpl::upstreamRqGroup(Code response_code) const {
   return upstream_rq_unknown_;
 }
 
-CodeStatsImpl::RequestCodeGroup::RequestCodeGroup(absl::string_view prefix,
-                                                  CodeStatsImpl& code_stats)
-    : code_stats_(code_stats), prefix_(std::string(prefix)),
-      stat_name_pool_(code_stats_.symbol_table_) {
-  for (uint32_t i = 0; i < NumHttpCodes; ++i) {
-    rc_stat_names_[i] = nullptr;
-  }
-
-  // Pre-allocate response codes 200, 404, and 503, as those seem quite likely.
-  // We don't pre-allocate all the HTTP codes because the first 127 allocations
-  // are likely to be encoded in one byte, and we would rather spend those on
-  // common components of stat-names that appear frequently.
-  statName(Code::OK);
-  statName(Code::NotFound);
-  statName(Code::ServiceUnavailable);
-}
-
-Stats::StatName CodeStatsImpl::RequestCodeGroup::statName(Code response_code) {
+Stats::StatName CodeStatsImpl::upstreamRqStatName(Code response_code) const {
   // Take a lock only if we've never seen this response-code before.
   uint32_t rc_int = static_cast<uint32_t>(response_code);
   if (rc_int >= NumHttpCodes) {
-    return code_stats_.upstream_rq_unknown_;
+    return upstream_rq_unknown_;
   }
   std::atomic<uint8_t*>& atomic_ref = rc_stat_names_[rc_int];
   if (atomic_ref.load() == nullptr) {
@@ -194,8 +191,8 @@ Stats::StatName CodeStatsImpl::RequestCodeGroup::statName(Code response_code) {
     // Check again under lock as two threads might have raced to add a StatName
     // for the same code.
     if (atomic_ref.load() == nullptr) {
-      atomic_ref =
-          stat_name_pool_.addReturningStorage(absl::StrCat(prefix_, enumToInt(response_code)));
+      atomic_ref = stat_name_pool_.addReturningStorage(
+          absl::StrCat("upstream_rq_", enumToInt(response_code)));
     }
   }
   return Stats::StatName(atomic_ref.load());
