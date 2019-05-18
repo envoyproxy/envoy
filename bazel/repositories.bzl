@@ -154,7 +154,7 @@ def envoy_dependencies(skip_targets = []):
     _net_zlib()
 
     # Used for bundling gcovr into a relocatable .par file.
-    _repository_impl("com_github_google_subpar")
+    _repository_impl("subpar")
 
     _python_deps()
     _cc_deps()

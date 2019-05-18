@@ -227,7 +227,9 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
         urls = ["https://pypi.python.org/packages/source/s/six/six-1.10.0.tar.gz#md5=34eed507548117b2ab523ab14b2f8b55"],
     ),
-    com_github_google_subpar = dict(
+    # I'd love to name this `com_github_google_subpar`, but something in the Subpar
+    # code assumes its repository name is just `subpar`.
+    subpar = dict(
         sha256 = "b80297a1b8d38027a86836dbadc22f55dc3ecad56728175381aa6330705ac10f",
         strip_prefix = "subpar-2.0.0",
         urls = ["https://github.com/google/subpar/archive/2.0.0.tar.gz"],

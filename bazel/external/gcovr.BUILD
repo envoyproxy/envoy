@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 
-load("@com_github_google_subpar//:subpar.bzl", "par_binary")
+load("@subpar//:subpar.bzl", "par_binary")
 
 # gcovr is difficult to run from a CI environment because it has hard
 # assumptions about its local working directory, which interact poorly
