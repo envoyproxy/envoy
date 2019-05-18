@@ -3569,7 +3569,7 @@ virtual_hosts:
     EXPECT_EQ("meh", route_entry->typedMetadata().get<Baz>(baz_factory.name())->name);
     EXPECT_EQ("hello", route->decorator()->getOperation());
     EXPECT_EQ(1, route->tracingConfig()->getClientSampling());
-    EXPECT_EQ(2, route->tracingConfig()->getRandomSampling());
+    EXPECT_EQ(200, route->tracingConfig()->getRandomSampling());
     EXPECT_EQ(3, route->tracingConfig()->getOverallSampling());
 
     Http::TestHeaderMapImpl response_headers;
