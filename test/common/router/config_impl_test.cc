@@ -3472,6 +3472,13 @@ virtual_hosts:
         metadata: { filter_metadata: { com.bar.foo: { baz: test_value }, baz: {name: meh} } }
         decorator:
           operation: hello
+        tracing:
+          client_sampling:
+            value: 1
+          random_sampling:
+            value: 2
+          overall_sampling:
+            value: 3
         route:
           weighted_clusters:
             clusters:
@@ -3561,6 +3568,9 @@ virtual_hosts:
     EXPECT_EQ(nullptr, route_entry->typedMetadata().get<Foo>(baz_factory.name()));
     EXPECT_EQ("meh", route_entry->typedMetadata().get<Baz>(baz_factory.name())->name);
     EXPECT_EQ("hello", route->decorator()->getOperation());
+    EXPECT_EQ(1, route->tracingConfig()->getClientSampling());
+    EXPECT_EQ(2, route->tracingConfig()->getRandomSampling());
+    EXPECT_EQ(3, route->tracingConfig()->getOverallSampling());
 
     Http::TestHeaderMapImpl response_headers;
     StreamInfo::MockStreamInfo stream_info;
