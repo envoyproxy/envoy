@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.ToolSchema;
+package envoy.RouterCheckToolSchema;
 
 message Validation {
   repeated ValidationItem tests = 1;

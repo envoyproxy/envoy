@@ -3,6 +3,7 @@ Version history
 
 1.11.0 (Pending)
 ================
+* tool: added `proto <https://github.com/envoyproxy/envoy/blob/master/test/tools/router_check/validation.proto>`_ support for :ref:`router check tool <install_tools_route_table_check_tool>` tests.
 * access log: added a new field for downstream TLS session ID to file and gRPC access logger.
 * access log: added a new field for response code details in :ref:`file access logger<config_access_log_format_response_code_details>` and :ref:`gRPC access logger<envoy_api_field_data.accesslog.v2.HTTPResponseProperties.response_code_details>`.
 * admin: the administration interface now includes a :ref:`/ready endpoint <operations_admin_interface>` for easier readiness checks.
