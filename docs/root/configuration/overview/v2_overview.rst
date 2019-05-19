@@ -8,7 +8,7 @@ The Envoy v2 APIs are defined as `proto3
 <https://developers.google.com/protocol-buffers/>`_ in the `data plane API
 repository <https://github.com/envoyproxy/data-plane-api/tree/master/envoy/api>`_. They support
 
-* Streaming delivery of :repo:`xDS <api/XDS_PROTOCOL.md>` API updates via gRPC. This reduces
+* Streaming delivery of :repo:`xDS <api/xds_protocol.rst>` API updates via gRPC. This reduces
   resource requirements and can lower the update latency.
 * A new REST-JSON API in which the JSON/YAML formats are derived mechanically via the `proto3
   canonical JSON mapping
@@ -17,10 +17,10 @@ repository <https://github.com/envoyproxy/data-plane-api/tree/master/envoy/api>`
 * Advanced load balancing through an extended endpoint assignment API and load
   and resource utilization reporting to management servers.
 * :repo:`Stronger consistency and ordering properties
-  <api/XDS_PROTOCOL.md#eventual-consistency-considerations>`
+  <api/xds_protocol.rst#eventual-consistency-considerations>`
   when needed. The v2 APIs still maintain a baseline eventual consistency model.
 
-See the :repo:`xDS protocol description <api/XDS_PROTOCOL.md>` for
+See the :repo:`xDS protocol description <api/xds_protocol.rst>` for
 further details on aspects of v2 message exchange between Envoy and the management server.
 
 .. _config_overview_v2_bootstrap:
@@ -200,7 +200,7 @@ In the above example, the EDS management server could then return a proto encodi
 
 The versioning and type URL scheme that appear above are explained in more
 detail in the :repo:`streaming gRPC subscription protocol
-<api/XDS_PROTOCOL.md#streaming-grpc-subscriptions>`
+<api/xds_protocol.rst#streaming-grpc-subscriptions>`
 documentation.
 
 Dynamic
@@ -341,7 +341,7 @@ A v2 xDS management server will implement the below endpoints as required for
 gRPC and/or REST serving. In both streaming gRPC and
 REST-JSON cases, a :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` is sent and a
 :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` received following the
-:repo:`xDS protocol <api/XDS_PROTOCOL.md>`.
+:repo:`xDS protocol <api/xds_protocol.rst>`.
 
 .. _v2_grpc_streaming_endpoints:
 
@@ -525,7 +525,7 @@ server would deliver the CDS, EDS and then RDS updates on a single stream.
 
 ADS is only available for gRPC streaming (not REST) and is described more fully
 in :repo:`this
-<api/XDS_PROTOCOL.md#aggregated-discovery-services-ads>`
+<api/xds_protocol.rst#aggregated-discovery-services-ads>`
 document. The gRPC endpoint is:
 
 .. http:post:: /envoy.service.discovery.v2.AggregatedDiscoveryService/StreamAggregatedResources

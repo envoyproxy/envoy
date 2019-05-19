@@ -54,7 +54,7 @@ service RouteDiscoveryService {
 // will match an alias to a virtual host based on the content of :ref:`domains'
 // <envoy_api_msg_route.VirtualHost.domains>` field. The *resource_names_unsubscribe* field contains
 // a list of virtual host names that have been `unsubscribed
-// <https://github.com/envoyproxy/envoy/blob/master/api/XDS_PROTOCOL.md#unsubscribing-from-resources>`_
+// <https://github.com/envoyproxy/envoy/blob/master/api/xds_protocol.rst#unsubscribing-from-resources>`_
 // from the routing table associated with the RouteConfiguration.
 service VirtualHostDiscoveryService {
   rpc DeltaVirtualHosts(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
