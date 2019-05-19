@@ -123,10 +123,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.4.2.tar.gz"],
     ),
     com_github_google_benchmark = dict(
-        # TODO(moderation) change back to tarball method on next benchmark release
-        sha256 = "0de43b6eaddd356f1d6cd164f73f37faf2f6c96fd684e1f7ea543ce49c1d144e",
-        strip_prefix = "benchmark-505be96ab23056580a3a2315abba048f4428b04e",
-        urls = ["https://github.com/google/benchmark/archive/505be96ab23056580a3a2315abba048f4428b04e.tar.gz"],
+        sha256 = "feba1c44cbace01627435a675aa271f4b012068dbea9922443c58fedd56eb5eb",
+        strip_prefix = "benchmark-1.5",
+        urls = ["https://github.com/google/benchmark/archive/v1.5.tar.gz"],
     ),
     com_github_libevent_libevent = dict(
         sha256 = "ab3af422b7e4c6d9276b3637d87edb6cf628fd91c9206260b759778c3a28b330",
@@ -231,9 +230,9 @@ REPOSITORY_LOCATIONS = dict(
     # I'd love to name this `com_github_google_subpar`, but something in the Subpar
     # code assumes its repository name is just `subpar`.
     subpar = dict(
-        sha256 = "eddbfc920e9cd565500370114316757848b672deba06dc2336acfa81b4ac0e6d",
-        strip_prefix = "subpar-1.3.0",
-        urls = ["https://github.com/google/subpar/archive/1.3.0.tar.gz"],
+        sha256 = "b80297a1b8d38027a86836dbadc22f55dc3ecad56728175381aa6330705ac10f",
+        strip_prefix = "subpar-2.0.0",
+        urls = ["https://github.com/google/subpar/archive/2.0.0.tar.gz"],
     ),
     com_googlesource_quiche = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/7bf7c3c358eb954e463bde14ea27444f4bd8ea05.tar.gz
