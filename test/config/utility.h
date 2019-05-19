@@ -197,8 +197,10 @@ public:
   EdsHelper();
 
   // Set EDS contents on filesystem and wait for Envoy to pick this up.
-  void setEds(const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
-              IntegrationTestServerStats& server_stats, bool await_update = true);
+  void setEds(const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments);
+  void
+  setEdsAndWait(const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
+                IntegrationTestServerStats& server_stats);
   const std::string& eds_path() const { return eds_path_; }
 
 private:

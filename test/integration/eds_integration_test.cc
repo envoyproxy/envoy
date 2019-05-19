@@ -46,7 +46,12 @@ public:
                                         : envoy::api::v2::core::HealthStatus::UNKNOWN);
       }
     }
-    eds_helper_.setEds({cluster_load_assignment}, *test_server_, await_update);
+
+    if (await_update) {
+      eds_helper_.setEdsAndWait({cluster_load_assignment}, *test_server_);
+    } else {
+      eds_helper_.setEds({cluster_load_assignment});
+    }
   }
 
   void initializeTest(bool http_active_hc) {
@@ -309,7 +314,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
   auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
   setUpstreamAddress(1, *endpoint);
 
-  eds_helper_.setEds({cluster_load_assignment}, *test_server_);
+  eds_helper_.setEdsAndWait({cluster_load_assignment}, *test_server_);
 
   EXPECT_EQ(1, member_update_count);
 }

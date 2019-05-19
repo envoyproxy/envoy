@@ -623,8 +623,7 @@ EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("ed
 }
 
 void EdsHelper::setEds(
-    const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
-    IntegrationTestServerStats& server_stats, bool await_update) {
+    const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments) {
   // Write to file the DiscoveryResponse and trigger inotify watch.
   envoy::api::v2::DiscoveryResponse eds_response;
   eds_response.set_version_info(std::to_string(eds_version_++));
@@ -637,13 +636,16 @@ void EdsHelper::setEds(
   std::string path =
       TestEnvironment::writeStringToFileForTest("eds.update.pb_text", eds_response.DebugString());
   TestUtility::renameFile(path, eds_path_);
-  // Make sure Envoy has consumed the update now that it is running.
-  if (await_update) {
-    ++update_successes_;
-    server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
-    RELEASE_ASSERT(
-        update_successes_ == server_stats.counter("cluster.cluster_0.update_success")->value(), "");
-  }
 }
 
+void EdsHelper::setEdsAndWait(
+    const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
+    IntegrationTestServerStats& server_stats) {
+  setEds(cluster_load_assignments);
+  // Make sure Envoy has consumed the update now that it is running.
+  ++update_successes_;
+  server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
+  RELEASE_ASSERT(
+      update_successes_ == server_stats.counter("cluster.cluster_0.update_success")->value(), "");
+}
 } // namespace Envoy
