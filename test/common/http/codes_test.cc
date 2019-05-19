@@ -91,9 +91,17 @@ TEST_F(CodeUtilityTest, NoCanary) {
 }
 
 TEST_F(CodeUtilityTest, Canary) {
+  addResponse(100, true, true);
   addResponse(200, true, true);
   addResponse(300, false, false);
   addResponse(500, true, false);
+
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_1xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_100").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_1xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_100").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_1xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_100").value());
 
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_2xx").value());
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_200").value());
@@ -112,12 +120,25 @@ TEST_F(CodeUtilityTest, Canary) {
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_5xx").value());
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_500").value());
 
-  EXPECT_EQ(3U, cluster_scope_.counter("prefix.upstream_rq_completed").value());
+  EXPECT_EQ(4U, cluster_scope_.counter("prefix.upstream_rq_completed").value());
   EXPECT_EQ(2U, cluster_scope_.counter("prefix.external.upstream_rq_completed").value());
-  EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_completed").value());
-  EXPECT_EQ(2U, cluster_scope_.counter("prefix.canary.upstream_rq_completed").value());
+  EXPECT_EQ(2U, cluster_scope_.counter("prefix.internal.upstream_rq_completed").value());
+  EXPECT_EQ(3U, cluster_scope_.counter("prefix.canary.upstream_rq_completed").value());
 
-  EXPECT_EQ(20U, cluster_scope_.counters().size());
+  EXPECT_EQ(26U, cluster_scope_.counters().size());
+}
+
+TEST_F(CodeUtilityTest, UnknownResponseCodes) {
+  addResponse(23, true, true);
+  addResponse(600, false, false);
+  addResponse(1000000, false, true);
+
+  EXPECT_EQ(3U, cluster_scope_.counter("prefix.upstream_rq_unknown").value());
+  EXPECT_EQ(2U, cluster_scope_.counter("prefix.internal.upstream_rq_unknown").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_unknown").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.external.upstream_rq_unknown").value());
+
+  EXPECT_EQ(8U, cluster_scope_.counters().size());
 }
 
 TEST_F(CodeUtilityTest, All) {

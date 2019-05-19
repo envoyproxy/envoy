@@ -66,12 +66,9 @@ private:
   Stats::SymbolTable& symbol_table_;
 
   Stats::StatName canary_;
-  Stats::StatName canary_upstream_rq_time_;
+  Stats::StatName empty_; // Used for the group-name for invalid http codes.
   Stats::StatName external_;
-  Stats::StatName external_rq_time_;
-  Stats::StatName external_upstream_rq_time_;
   Stats::StatName internal_;
-  Stats::StatName internal_upstream_rq_time_;
   Stats::StatName upstream_;
   Stats::StatName upstream_rq_1xx_;
   Stats::StatName upstream_rq_2xx_;
@@ -109,7 +106,8 @@ private:
   //
   // The Codes object is global to the server.
 
-  static constexpr uint32_t NumHttpCodes = 1000;
+  static constexpr uint32_t NumHttpCodes = 500;
+  static constexpr uint32_t HttpCodeOffset = 100; // code 100 is at index 0.
   mutable std::atomic<uint8_t*> rc_stat_names_[NumHttpCodes];
 };
 

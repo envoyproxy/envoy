@@ -20,12 +20,8 @@ namespace Http {
 
 CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
     : stat_name_pool_(symbol_table), symbol_table_(symbol_table),
-      canary_(stat_name_pool_.add("canary")),
-      canary_upstream_rq_time_(stat_name_pool_.add("canary.upstream_rq_time")),
-      external_(stat_name_pool_.add("external")),
-      external_upstream_rq_time_(stat_name_pool_.add("external.upstream_rq_time")),
+      canary_(stat_name_pool_.add("canary")), external_(stat_name_pool_.add("external")),
       internal_(stat_name_pool_.add("internal")),
-      internal_upstream_rq_time_(stat_name_pool_.add("internal.upstream_rq_time")),
       upstream_rq_1xx_(stat_name_pool_.add("upstream_rq_1xx")),
       upstream_rq_2xx_(stat_name_pool_.add("upstream_rq_2xx")),
       upstream_rq_3xx_(stat_name_pool_.add("upstream_rq_3xx")),
@@ -74,7 +70,10 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
 
   // Build a dynamic stat for the response code and increment it.
   incCounter(scope, prefix, upstream_rq_completed_);
-  incCounter(scope, prefix, upstreamRqGroup(response_code));
+  Stats::StatName rq_group = upstreamRqGroup(response_code);
+  if (!rq_group.empty()) {
+    incCounter(scope, prefix, rq_group);
+  }
   incCounter(scope, prefix, upstreamRqStatName(response_code));
 }
 
@@ -89,7 +88,9 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
 
   auto write_category = [this, rq_group, rq_code, &info](Stats::StatName category) {
     incCounter(info.cluster_scope_, {info.prefix_, category, upstream_rq_completed_});
-    incCounter(info.cluster_scope_, {info.prefix_, category, rq_group});
+    if (!rq_group.empty()) {
+      incCounter(info.cluster_scope_, {info.prefix_, category, rq_group});
+    }
     incCounter(info.cluster_scope_, {info.prefix_, category, rq_code});
   };
 
@@ -129,13 +130,13 @@ void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
   const uint64_t count = info.response_time_.count();
   recordHistogram(info.cluster_scope_, {info.prefix_, upstream_rq_time_}, count);
   if (info.upstream_canary_) {
-    recordHistogram(info.cluster_scope_, {info.prefix_, canary_upstream_rq_time_}, count);
+    recordHistogram(info.cluster_scope_, {info.prefix_, canary_, upstream_rq_time_}, count);
   }
 
   if (info.internal_request_) {
-    recordHistogram(info.cluster_scope_, {info.prefix_, internal_upstream_rq_time_}, count);
+    recordHistogram(info.cluster_scope_, {info.prefix_, internal_, upstream_rq_time_}, count);
   } else {
-    recordHistogram(info.cluster_scope_, {info.prefix_, external_upstream_rq_time_}, count);
+    recordHistogram(info.cluster_scope_, {info.prefix_, external_, upstream_rq_time_}, count);
   }
 
   if (!info.request_vcluster_name_.empty()) {
@@ -173,16 +174,16 @@ Stats::StatName CodeStatsImpl::upstreamRqGroup(Code response_code) const {
   case 5:
     return upstream_rq_5xx_;
   }
-  return upstream_rq_unknown_;
+  return empty_; // Unknown codes do not go into a group.
 }
 
 Stats::StatName CodeStatsImpl::upstreamRqStatName(Code response_code) const {
   // Take a lock only if we've never seen this response-code before.
-  uint32_t rc_int = static_cast<uint32_t>(response_code);
-  if (rc_int >= NumHttpCodes) {
+  uint32_t rc_index = static_cast<uint32_t>(response_code) - HttpCodeOffset;
+  if (rc_index >= NumHttpCodes) {
     return upstream_rq_unknown_;
   }
-  std::atomic<uint8_t*>& atomic_ref = rc_stat_names_[rc_int];
+  std::atomic<uint8_t*>& atomic_ref = rc_stat_names_[rc_index];
   if (atomic_ref.load() == nullptr) {
     absl::MutexLock lock(&mutex_);
 
