@@ -2,6 +2,7 @@
 
 #include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/heap_stat_data.h"
+#include "common/stats/utility.h"
 
 #include "test/test_common/logging.h"
 
@@ -58,6 +59,14 @@ TEST_F(MetricImplTest, TwoTagsIterOnce) {
     return false; // Abort the iteration at first tag.
   });
   EXPECT_EQ(1, count);
+}
+
+TEST_F(MetricImplTest, FindTag) {
+  CounterSharedPtr counter = alloc_.makeCounter(makeStat("counter.name.value"), "counter",
+                                                {{"name1", "value1"}, {"name2", "value2"}});
+  EXPECT_EQ(makeStat("value1"), Utility::findTag(*counter, makeStat("name1")));
+  EXPECT_EQ(makeStat("value2"), Utility::findTag(*counter, makeStat("name2")));
+  EXPECT_FALSE(Utility::findTag(*counter, makeStat("name3")));
 }
 
 } // namespace

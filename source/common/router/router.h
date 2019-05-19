@@ -239,6 +239,10 @@ public:
     return retry_state_->hostSelectionMaxAttempts();
   }
 
+  Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
+    return callbacks_->getUpstreamSocketOptions();
+  }
+
   /**
    * Set a computed cookie to be sent with the downstream headers.
    * @param key supplies the size of the cookie
@@ -366,7 +370,7 @@ private:
 
   StreamInfo::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
-  static const std::string upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
+  static const std::string& upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
   void chargeUpstreamCode(uint64_t response_status_code, const Http::HeaderMap& response_headers,
                           Upstream::HostDescriptionConstSharedPtr upstream_host, bool dropped);
   void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host,

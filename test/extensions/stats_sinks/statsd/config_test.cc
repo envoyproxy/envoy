@@ -143,7 +143,7 @@ TEST(StatsConfigTest, TcpSinkCustomPrefix) {
   const std::string name = StatsSinkNames::get().Statsd;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
-  ProtobufTypes::String prefix = "prefixTest";
+  std::string prefix = "prefixTest";
   sink_config.set_tcp_cluster_name("fake_cluster");
   ASSERT_NE(sink_config.prefix(), prefix);
   sink_config.set_prefix(prefix);

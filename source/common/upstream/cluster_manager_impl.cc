@@ -40,6 +40,16 @@
 
 namespace Envoy {
 namespace Upstream {
+namespace {
+
+void addOptionsIfNotNull(Network::Socket::OptionsSharedPtr& options,
+                         const Network::Socket::OptionsSharedPtr& to_add) {
+  if (to_add != nullptr) {
+    Network::Socket::appendOptions(options, to_add);
+  }
+}
+
+} // namespace
 
 void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
   // See comments in ClusterManagerImpl::addOrUpdateCluster() for why this is only called during
@@ -676,29 +686,13 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
                                                       const HostVector& hosts_removed) {
   const auto& host_set = cluster.prioritySet().hostSetsPerPriority()[priority];
 
-  // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
-  HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
-  HealthyHostVectorConstSharedPtr healthy_hosts_copy(
-      new HealthyHostVector(host_set->healthyHosts()));
-  DegradedHostVectorConstSharedPtr degraded_hosts_copy(
-      new DegradedHostVector(host_set->degradedHosts()));
-  HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
-  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_copy =
-      host_set->healthyHostsPerLocality().clone();
-  HostsPerLocalityConstSharedPtr degraded_hosts_per_locality_copy =
-      host_set->degradedHostsPerLocality().clone();
-
-  tls_->runOnAllThreads([this, name = cluster.info()->name(), priority, hosts_copy,
-                         healthy_hosts_copy, degraded_hosts_copy, hosts_per_locality_copy,
-                         healthy_hosts_per_locality_copy, degraded_hosts_per_locality_copy,
+  tls_->runOnAllThreads([this, name = cluster.info()->name(), priority,
+                         update_params = HostSetImpl::updateHostsParams(*host_set),
                          locality_weights = host_set->localityWeights(), hosts_added, hosts_removed,
                          overprovisioning_factor = host_set->overprovisioningFactor()]() {
     ThreadLocalClusterManagerImpl::updateClusterMembership(
-        name, priority,
-        HostSetImpl::updateHostsParams(hosts_copy, hosts_per_locality_copy, healthy_hosts_copy,
-                                       healthy_hosts_per_locality_copy, degraded_hosts_copy,
-                                       degraded_hosts_per_locality_copy),
-        locality_weights, hosts_added, hosts_removed, *tls_, overprovisioning_factor);
+        name, priority, update_params, locality_weights, hosts_added, hosts_removed, *tls_,
+        overprovisioning_factor);
   });
 }
 
@@ -967,8 +961,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(const std::s
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
-    const std::string& name, uint32_t priority,
-    PrioritySet::UpdateHostsParams&& update_hosts_params,
+    const std::string& name, uint32_t priority, PrioritySet::UpdateHostsParams update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, ThreadLocal::Slot& tls, uint64_t overprovisioning_factor) {
 
@@ -1133,22 +1126,22 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     return nullptr;
   }
 
-  // Inherit socket options from downstream connection, if set.
   std::vector<uint8_t> hash_key = {uint8_t(protocol)};
 
-  // Use downstream connection socket options for computing connection pool hash key, if any.
+  Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
+  if (context) {
+    // Inherit socket options from downstream connection, if set.
+    if (context->downstreamConnection()) {
+      addOptionsIfNotNull(upstream_options, context->downstreamConnection()->socketOptions());
+    }
+    addOptionsIfNotNull(upstream_options, context->upstreamSocketOptions());
+  }
+
+  // Use the socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with
   // different options are not pooled together.
-  bool have_options = false;
-  if (context && context->downstreamConnection()) {
-    const Network::ConnectionSocket::OptionsSharedPtr& options =
-        context->downstreamConnection()->socketOptions();
-    if (options) {
-      for (const auto& option : *options) {
-        have_options = true;
-        option->hashKey(hash_key);
-      }
-    }
+  for (const auto& option : *upstream_options) {
+    option->hashKey(hash_key);
   }
 
   ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
@@ -1159,7 +1152,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
       container.pools_->getPool(priority, hash_key, [&]() {
         return parent_.parent_.factory_.allocateConnPool(
             parent_.thread_local_dispatcher_, host, priority, protocol,
-            have_options ? context->downstreamConnection()->socketOptions() : nullptr);
+            !upstream_options->empty() ? upstream_options : nullptr);
       });
 
   if (pool.has_value()) {

@@ -82,7 +82,7 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  */
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
-  using ContextExtensionsMap = Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>;
+  using ContextExtensionsMap = Protobuf::Map<std::string, std::string>;
 
   FilterConfigPerRoute(const envoy::config::filter::http::ext_authz::v2::ExtAuthzPerRoute& config)
       : context_extensions_(config.has_check_settings()

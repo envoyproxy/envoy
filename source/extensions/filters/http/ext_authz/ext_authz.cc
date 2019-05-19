@@ -13,6 +13,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
+struct RcDetailsValues {
+  // The ext_authz filter denied the downstream request.
+  const std::string AuthzDenied = "ext_authz_denied";
+  // The ext_authz filter encountered a failure, and was configured to fail-closed.
+  const std::string AuthzError = "ext_authz_error";
+};
+typedef ConstSingleton<RcDetailsValues> RcDetails;
+
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   disabled_ = other.disabled_;
   auto begin_it = other.context_extensions_.begin();
@@ -50,7 +58,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
             cfg_base.merge(cfg);
           });
 
-  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> context_extensions;
+  Protobuf::Map<std::string, std::string> context_extensions;
   if (maybe_merged_per_route_config) {
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
   }
@@ -162,6 +170,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   if (response->status == CheckStatus::Denied ||
       (response->status == CheckStatus::Error && !config_->failureModeAllow())) {
     ENVOY_STREAM_LOG(debug, "ext_authz filter rejected the request", *callbacks_);
+    const std::string& details = response->status == CheckStatus::Denied
+                                     ? RcDetails::get().AuthzDenied
+                                     : RcDetails::get().AuthzError;
     callbacks_->sendLocalReply(
         response->status_code, response->body,
         [& headers = response->headers_to_add,
@@ -174,7 +185,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
             ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, header.first.get(), header.second);
           }
         },
-        absl::nullopt);
+        absl::nullopt, details);
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService);
   } else {
     ENVOY_STREAM_LOG(debug, "ext_authz filter accepted the request", *callbacks_);
