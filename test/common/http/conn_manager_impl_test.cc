@@ -4197,7 +4197,6 @@ TEST_F(HttpConnectionManagerImplTest, ResetAllStreamsBeforeConnectionClose) {
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
-
         if (data.length() == input1.size()) {
           // Simulate the case where nghttp2 callback functions return error. In
           // this case, resetAllStreams() is called, and ActiveStreams will be
