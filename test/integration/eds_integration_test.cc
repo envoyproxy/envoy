@@ -86,7 +86,7 @@ public:
       health_check->mutable_http_health_check()->set_use_http2(use_http2_hc_);
     }
     setEndpoints(0, 0, 0, true, absl::nullopt, false);
-    cds_helper_.setCds({cluster_}, *test_server_);
+    cds_helper_.setCds({cluster_});
     initialize();
     test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   }
@@ -119,7 +119,7 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
   // Trigger a CDS update. This should cause a new cluster to require warming, blocked on the host
   // being health checked.
   cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
-  cds_helper_.setCds({cluster_}, *test_server_);
+  cds_helper_.setCds({cluster_});
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
   EXPECT_EQ(1, test_server_->gauge("cluster_manager.warming_clusters")->value());
 
