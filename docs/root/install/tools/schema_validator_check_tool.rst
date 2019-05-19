@@ -14,7 +14,7 @@ Input
   1. The schema type to check the passed in configuration against. The supported types are:
 
     * `route` - for :ref:`route configuration<envoy_api_msg_RouteConfiguration>` validation.
-    * `discovery_response` for :ref:`discovery response<envoy_api_msg_DiscoveryRespons>` validation.
+    * `discovery_response` for :ref:`discovery response<envoy_api_msg_DiscoveryResponse>` validation.
 
   2. The path to the configuration file.
 
