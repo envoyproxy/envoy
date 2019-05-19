@@ -101,11 +101,16 @@ private:
   // byte. We don't want those high-value single-byte codes to go to fully
   // enumerating the 4 prefixes combined with HTTP codes that are seldom used,
   // so we allocate these on demand.
+  //
+  // There can be multiple symbol tables in a server. The one passed into the
+  // Codes constructor should be the same as the one passed to
+  // Stats::ThreadLocalStore. Note that additional symbol tables can be created
+  // from IsolatedStoreImpl's default constructor.
+  //
+  // The Codes object is global to the server.
 
   static constexpr uint32_t NumHttpCodes = 1000;
   mutable std::atomic<uint8_t*> rc_stat_names_[NumHttpCodes];
-
-  std::string prefix_;
 };
 
 /**

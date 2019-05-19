@@ -126,7 +126,7 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
 }
 
 void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
-  uint64_t count = info.response_time_.count();
+  const uint64_t count = info.response_time_.count();
   recordHistogram(info.cluster_scope_, {info.prefix_, upstream_rq_time_}, count);
   if (info.upstream_canary_) {
     recordHistogram(info.cluster_scope_, {info.prefix_, canary_upstream_rq_time_}, count);
@@ -139,19 +139,17 @@ void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
   }
 
   if (!info.request_vcluster_name_.empty()) {
-    Stats::StatName vhost_name = info.request_vhost_name_;
-    Stats::StatName vcluster_name = info.request_vcluster_name_;
     recordHistogram(info.global_scope_,
-                    {vhost_, vhost_name, vcluster_, vcluster_name, upstream_rq_time_}, count);
+                    {vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_,
+                     upstream_rq_time_},
+                    count);
   }
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
-    Stats::StatName from_zone = info.from_zone_;
-    Stats::StatName to_zone = info.to_zone_;
-
     recordHistogram(info.cluster_scope_,
-                    {info.prefix_, zone_, from_zone, to_zone, upstream_rq_time_}, count);
+                    {info.prefix_, zone_, info.from_zone_, info.to_zone_, upstream_rq_time_},
+                    count);
   }
 }
 
