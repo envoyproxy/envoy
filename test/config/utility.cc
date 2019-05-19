@@ -601,8 +601,7 @@ void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
 
 CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {}
 
-void CdsHelper::setCds(const std::vector<envoy::api::v2::Cluster>& clusters,
-                       IntegrationTestServerStats& server_stats) {
+void CdsHelper::setCds(const std::vector<envoy::api::v2::Cluster>& clusters) {
   // Write to file the DiscoveryResponse and trigger inotify watch.
   envoy::api::v2::DiscoveryResponse cds_response;
   cds_response.set_version_info(std::to_string(cds_version_++));
@@ -615,12 +614,6 @@ void CdsHelper::setCds(const std::vector<envoy::api::v2::Cluster>& clusters,
   std::string path =
       TestEnvironment::writeStringToFileForTest("cds.update.pb_text", cds_response.DebugString());
   TestUtility::renameFile(path, cds_path_);
-  // Make sure Envoy has consumed the initial update.
-  server_stats.waitForCounterGe("cluster_manager.cluster_added", 1);
-  server_stats.waitForCounterGe("cluster_manager.cluster_updated", ++update_successes_ - 1);
-  RELEASE_ASSERT(1 == server_stats.counter("cluster_manager.cluster_added")->value(), "");
-  // Note that we don't block for the update, as callers may want to observe the warming process of
-  // the cluster.
 }
 
 EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("eds.pb_text", "")) {
@@ -631,7 +624,7 @@ EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("ed
 
 void EdsHelper::setEds(
     const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
-    IntegrationTestServerStats& server_stats) {
+    IntegrationTestServerStats& server_stats, bool await_update) {
   // Write to file the DiscoveryResponse and trigger inotify watch.
   envoy::api::v2::DiscoveryResponse eds_response;
   eds_response.set_version_info(std::to_string(eds_version_++));
@@ -645,9 +638,12 @@ void EdsHelper::setEds(
       TestEnvironment::writeStringToFileForTest("eds.update.pb_text", eds_response.DebugString());
   TestUtility::renameFile(path, eds_path_);
   // Make sure Envoy has consumed the update now that it is running.
-  server_stats.waitForCounterGe("cluster.cluster_0.update_success", ++update_successes_);
-  RELEASE_ASSERT(
-      update_successes_ == server_stats.counter("cluster.cluster_0.update_success")->value(), "");
+  if (await_update) {
+    ++update_successes_;
+    server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
+    RELEASE_ASSERT(
+        update_successes_ == server_stats.counter("cluster.cluster_0.update_success")->value(), "");
+  }
 }
 
 } // namespace Envoy

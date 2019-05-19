@@ -22,7 +22,8 @@ public:
   // filesystem delivery to simplify test mechanics.
   void setEndpoints(uint32_t total_endpoints, uint32_t healthy_endpoints,
                     uint32_t degraded_endpoints, bool remaining_unhealthy = true,
-                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) {
+                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
+                    bool await_update = true) {
     ASSERT(total_endpoints >= healthy_endpoints + degraded_endpoints);
     envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("cluster_0");
@@ -45,7 +46,7 @@ public:
                                         : envoy::api::v2::core::HealthStatus::UNKNOWN);
       }
     }
-    eds_helper_.setEds({cluster_load_assignment}, *test_server_);
+    eds_helper_.setEds({cluster_load_assignment}, *test_server_, await_update);
   }
 
   void initializeTest(bool http_active_hc) {
@@ -84,9 +85,10 @@ public:
       health_check->mutable_http_health_check()->set_path("/healthcheck");
       health_check->mutable_http_health_check()->set_use_http2(use_http2_hc_);
     }
-    initialize();
+    setEndpoints(0, 0, 0, true, absl::nullopt, false);
     cds_helper_.setCds({cluster_}, *test_server_);
-    setEndpoints(0, 0, 0);
+    initialize();
+    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   }
 
   bool use_http2_hc_{};

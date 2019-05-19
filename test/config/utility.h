@@ -182,9 +182,8 @@ class CdsHelper {
 public:
   CdsHelper();
 
-  // Set CDS contents on filesystem and wait for Envoy to pick this up.
-  void setCds(const std::vector<envoy::api::v2::Cluster>& cluster,
-              IntegrationTestServerStats& server_stats);
+  // Set CDS contents on filesystem.
+  void setCds(const std::vector<envoy::api::v2::Cluster>& cluster);
   const std::string& cds_path() const { return cds_path_; }
 
 private:
@@ -200,7 +199,7 @@ public:
 
   // Set EDS contents on filesystem and wait for Envoy to pick this up.
   void setEds(const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
-              IntegrationTestServerStats& server_stats);
+              IntegrationTestServerStats& server_stats, bool await_update = true);
   const std::string& eds_path() const { return eds_path_; }
 
 private:
