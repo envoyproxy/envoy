@@ -189,7 +189,6 @@ public:
 private:
   const std::string cds_path_;
   uint32_t cds_version_{};
-  uint32_t update_successes_{};
 };
 
 // Common code for tests that deliver EDS update via the filesystem.
