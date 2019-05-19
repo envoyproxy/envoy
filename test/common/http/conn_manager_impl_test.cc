@@ -4170,5 +4170,59 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnEncodingPat
   expectOnDestroy();
   encoder_filters_[1]->callbacks_->continueEncoding();
 }
+
+// Tests the case where after streams are closed, connection manager keeps
+// processing data, and referring to the closed streams causes crash.
+TEST_F(HttpConnectionManagerImplTest, ResetAllStreamsBeforeConnectionClose) {
+  setup(false, "envoy-custom-server", false);
+  filter_callbacks_.connection_.dispatcher_.delete_without_delay_ = true;
+  std::string input1 = "1234";
+  std::string input2 = "123456";
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_)).Times(1);
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .Times(1)
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+      }));
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+
+  StreamDecoder* decoder = nullptr;
+  NiceMock<MockStreamEncoder> encoder;
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .Times(2)
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+
+        if (data.length() == input1.size()) {
+          // Simulate the case where nghttp2 callback functions return error. In
+          // this case, resetAllStreams() is called, and ActiveStreams will be
+          // deleted.
+          decoder = &conn_manager_->newStream(encoder);
+          HeaderMapPtr headers{
+              new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+          decoder->decodeHeaders(std::move(headers), false);
+          throw CodecProtocolException("error");
+
+        } else {
+          // If connection manager keeps receiving and parsing data, referring
+          // to the deleted stream will cause crash.
+          ASSERT(data.length() == input2.size());
+          Buffer::OwnedImpl fake_data("hello");
+          ASSERT_DEATH(decoder->decodeData(fake_data, false), "");
+        }
+
+        data.drain(data.length());
+      }));
+
+  Buffer::OwnedImpl fake_input(input1);
+  conn_manager_->onData(fake_input, false);
+  Buffer::OwnedImpl fake_input1(input2);
+  conn_manager_->onData(fake_input1, false);
+}
 } // namespace Http
 } // namespace Envoy

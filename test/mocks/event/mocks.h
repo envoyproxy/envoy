@@ -74,6 +74,10 @@ public:
 
   void deferredDelete(DeferredDeletablePtr&& to_delete) override {
     deferredDelete_(to_delete.get());
+    if (delete_without_delay_) {
+      to_delete = nullptr;
+      return;
+    }
     if (to_delete) {
       to_delete_.push_back(std::move(to_delete));
     }
@@ -118,6 +122,7 @@ public:
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
   MockBufferFactory buffer_factory_;
+  bool delete_without_delay_ = false;
 };
 
 class MockTimer : public Timer {
