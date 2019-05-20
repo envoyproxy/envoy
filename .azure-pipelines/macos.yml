@@ -1,5 +1,6 @@
 # Azure Pipelines
 trigger: none
+pr: none
 
 jobs:
 - job: macOS
