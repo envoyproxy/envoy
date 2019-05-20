@@ -133,7 +133,7 @@ protected:
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
+        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
@@ -151,7 +151,7 @@ protected:
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
+        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
@@ -404,7 +404,7 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
           Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest())),
+          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr)),
       EnvoyException, "At least one of --config-path and --config-yaml should be non-empty");
 }
 

@@ -13,6 +13,7 @@
 
 #include "server/hot_restart_nop_impl.h"
 #include "server/options_impl.h"
+#include "server/process_context_impl.h"
 
 #include "test/common/runtime/utility.h"
 #include "test/integration/integration.h"
@@ -174,9 +175,11 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
   Stats::HeapStatDataAllocator stats_allocator(symbol_table);
   Stats::ThreadLocalStoreImpl stat_store(stats_allocator);
 
+  auto context_for_test = absl::make_unique<ProcessContextImpl>(nullptr);
   Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
                               access_log_lock, component_factory, std::move(random_generator), tls,
-                              Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
+                              Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+                              std::move(context_for_test));
   // This is technically thread unsafe (assigning to a shared_ptr accessed
   // across threads), but because we synchronize below through serverReady(), the only
   // consumer on the main test thread in ~IntegrationTestServerImpl will not race.

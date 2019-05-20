@@ -363,6 +363,7 @@ public:
   MOCK_METHOD0(startTimeFirstEpoch, time_t());
   MOCK_METHOD0(stats, Stats::Store&());
   MOCK_METHOD0(httpContext, Http::Context&());
+  MOCK_METHOD0(processContext, ProcessContext&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
@@ -445,6 +446,7 @@ public:
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Http::Context& httpContext() override { return http_context_; }
+  MOCK_METHOD0(processContext, ProcessContext&());
   MOCK_METHOD0(api, Api::Api&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
