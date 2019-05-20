@@ -4246,7 +4246,7 @@ TEST_F(HttpConnectionManagerImplTest, ResetAllStreamsBeforeConnectionClose) {
           // to the deleted stream will cause crash.
           ASSERT(data.length() == input2.size());
           Buffer::OwnedImpl fake_data("hello");
-          ASSERT_DEATH(decoder->decodeData(fake_data, false), "");
+          ASSERT_DEATH_IF_SUPPORTED(decoder->decodeData(fake_data, false), "");
         }
 
         data.drain(data.length());
