@@ -37,7 +37,7 @@ public:
   CdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
                             ConfigHelper::discoveredClustersBootstrap(
-                                sotwOrDelta() == SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
     sotw_or_delta_ = sotwOrDelta();
   }
 
@@ -219,7 +219,7 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
 // Tests that when Envoy's delta xDS stream dis/reconnects, Envoy can inform the server of the
 // resources it already has: the reconnected stream need not start with a state-of-the-world update.
 TEST_P(CdsIntegrationTest, VersionsRememberedAfterReconnect) {
-  SKIP_IF_XDS_IS(SotwOrDelta::Sotw);
+  SKIP_IF_XDS_IS(Grpc::SotwOrDelta::Sotw);
 
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");

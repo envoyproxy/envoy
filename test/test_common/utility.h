@@ -532,9 +532,6 @@ ApiPtr createApiForTest(Event::TimeSystem& time_system);
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api
 
-// Support parameterizing over state-of-the-world xDS vs delta xDS.
-enum class SotwOrDelta { Sotw, Delta };
-
 MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
   const bool equal = TestUtility::headerMapEqualIgnoreOrder(*arg, *expected);
   if (!equal) {

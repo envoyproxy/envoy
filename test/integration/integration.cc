@@ -491,7 +491,7 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::vector<std::string>& expected_resource_names_added,
     const std::vector<std::string>& expected_resource_names_removed,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
-  if (sotw_or_delta_ == SotwOrDelta::Sotw) {
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
     return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
                                        expected_error_code, expected_error_message);
   } else {

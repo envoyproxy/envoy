@@ -7,6 +7,7 @@
 
 #include "common/http/codec_client.h"
 
+#include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"
@@ -216,7 +217,7 @@ public:
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version) {
-    if (sotw_or_delta_ == SotwOrDelta::Sotw) {
+    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
       sendSotwDiscoveryResponse(type_url, state_of_the_world, version);
     } else {
       sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version);
@@ -354,7 +355,7 @@ protected:
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
   bool create_xds_upstream_{false}; // TODO(alyssawilk) true by default.
   bool tls_xds_upstream_{false};
-  SotwOrDelta sotw_or_delta_{SotwOrDelta::Sotw};
+  Grpc::SotwOrDelta sotw_or_delta_{Grpc::SotwOrDelta::Sotw};
 
 private:
   // The type for the Envoy-to-backend connection
