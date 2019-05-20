@@ -105,12 +105,6 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
 void ScopedRdsConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
-  if (resources.empty()) {
-    ENVOY_LOG(debug, "Empty resources in scoped RDS onConfigUpdate()");
-    stats_.update_empty_.inc();
-    ConfigSubscriptionCommonBase::onConfigUpdateFailed();
-    return;
-  }
   std::vector<envoy::api::v2::ScopedRouteConfiguration> scoped_routes;
   for (const auto& resource_any : resources) {
     scoped_routes.emplace_back(
@@ -158,6 +152,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   for (const auto& scoped_route : scoped_routes_to_remove) {
     const std::string scoped_route_name = scoped_route.first;
     ENVOY_LOG(debug, "srds: remove scoped route '{}'", scoped_route_name);
+    scoped_config_manager_.removeRoutingScope(scoped_route_name);
     applyDeltaConfigUpdate([scoped_route_name](const ConfigProvider::ConfigConstSharedPtr& config) {
       auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
           static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));

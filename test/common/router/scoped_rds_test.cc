@@ -168,17 +168,6 @@ key:
   EXPECT_THROW(subscription.onConfigUpdate(resources3, "1"), ProtoValidationException);
 }
 
-// Tests that an empty config update will update the corresponding stat.
-TEST_F(ScopedRdsTest, EmptyResource) {
-  setup();
-
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
-  subscription().onConfigUpdate(resources, "1");
-  EXPECT_EQ(
-      1UL,
-      factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.update_empty").value());
-}
-
 // Tests that multiple uniquely named resources are allowed in config updates.
 TEST_F(ScopedRdsTest, MultipleResources) {
   setup();
@@ -266,13 +255,11 @@ scoped_rds:
 TEST_F(ScopedRdsTest, ConfigUpdateFailure) {
   setup();
 
-  ScopedRdsConfigSubscription& subscription =
-      dynamic_cast<ScopedRdsConfigProvider&>(*provider_).subscription();
   const auto time = std::chrono::milliseconds(1234567891234);
   timeSystem().setSystemTime(time);
   const EnvoyException ex(fmt::format("config failure"));
   // Verify the failure updates the lastUpdated() timestamp.
-  subscription.onConfigUpdateFailed(&ex);
+  subscription().onConfigUpdateFailed(&ex);
   EXPECT_EQ(std::chrono::time_point_cast<std::chrono::milliseconds>(provider_->lastUpdated())
                 .time_since_epoch(),
             time);
@@ -420,6 +407,37 @@ dynamic_scoped_route_configs:
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   EXPECT_EQ(expected_config_dump.DebugString(), scoped_routes_config_dump3.DebugString());
+
+  resources.Clear();
+  subscription.onConfigUpdate(resources, "2");
+  MessageUtil::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+  - name: foo-scoped-routes
+    scoped_route_configs:
+     - name: foo
+       route_configuration_name: foo-route-config
+       key:
+         fragments: { string_key: "172.10.10.10" }
+     - name: foo2
+       route_configuration_name: foo-route-config2
+       key:
+         fragments: { string_key: "172.10.10.20" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_scoped_route_configs:
+  - name: foo-dynamic-scoped-routes
+    last_updated:
+      seconds: 1234567891
+      nanos: 567000000
+    version_info: "2"
+)EOF",
+                            expected_config_dump);
+  message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
+  const auto& scoped_routes_config_dump4 =
+      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+          *message_ptr);
+  EXPECT_EQ(expected_config_dump.DebugString(), scoped_routes_config_dump4.DebugString());
 }
 
 using ScopedRoutesConfigProviderManagerDeathTest = ScopedRoutesConfigProviderManagerTest;

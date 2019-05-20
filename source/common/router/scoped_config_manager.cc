@@ -15,10 +15,7 @@ ScopedRouteInfoConstSharedPtr ScopedConfigManager::addOrUpdateRoutingScope(
 }
 
 bool ScopedConfigManager::removeRoutingScope(const std::string& name) {
-  if (scoped_route_map_.erase(name) == 0) {
-    throw EnvoyException(fmt::format("could not find {} in scoped route map for removal", name));
-  }
-  return true;
+  return scoped_route_map_.erase(name) == 0;
 }
 
 } // namespace Router
