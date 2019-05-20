@@ -559,9 +559,8 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
   }
 
   if (stream != nullptr) {
-    // nghttp2 returns error, and ConnectionManager will call resetAllStreams(). Null out
-    // stream->decoder_ to avoid referring to it.
-    stream->decoder_ = nullptr;
+    ENVOY_CONN_LOG(warn, "Referring the stream later may cause crash. See #6842. id: {}, error: {}",
+                   connection_, stream_id, nghttp2_strerror(error_code));
   }
 
   // Cause dispatch to return with an error code.

@@ -4246,9 +4246,11 @@ TEST_F(HttpConnectionManagerImplTest, ResetAllStreamsBeforeConnectionClose) {
           // to the deleted stream will cause crash.
           ASSERT(data.length() == input2.size());
           Buffer::OwnedImpl fake_data("hello");
-          ASSERT_DEATH_IF_SUPPORTED(decoder->decodeData(fake_data, false), "");
+          // ASSERT_DEATH doesn't work in MacOS.
+#ifndef __APPLE__
+          ASSERT_DEATH(decoder->decodeData(fake_data, false), "");
+#endif
         }
-
         data.drain(data.length());
       }));
 
