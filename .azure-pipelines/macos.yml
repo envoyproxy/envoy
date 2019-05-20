@@ -1,10 +1,8 @@
 # Azure Pipelines
-trigger:
-- master
+trigger: none
 
 jobs:
 - job: macOS
-  trigger: none
   timeoutInMinutes: 360
   pool:
     vmImage: 'macos-latest'
