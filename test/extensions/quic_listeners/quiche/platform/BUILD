@@ -64,6 +64,7 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche/platform:flags_impl_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+        "@com_googlesource_quiche//:spdy_platform",
         "@com_googlesource_quiche//:spdy_platform_test_helpers",
     ],
 )
