@@ -269,16 +269,9 @@ private:
   public:
     LifecycleCallbackHandle(T& callbacks, typename T::iterator it)
         : callbacks_(callbacks), it_(it) {}
-    ~LifecycleCallbackHandle() override { unregister(); }
+    ~LifecycleCallbackHandle() override { callbacks_.erase(it_); }
 
   private:
-    void unregister() {
-      ASSERT(!unregistered_);
-      unregistered_ = true;
-      callbacks_.erase(it_);
-    }
-
-    bool unregistered_ = false;
     T& callbacks_;
     typename T::iterator it_;
   };
