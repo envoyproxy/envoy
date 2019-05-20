@@ -182,7 +182,7 @@ public:
    * Convert a string list of IP addresses into a list of network addresses usable for DNS
    * response testing.
    */
-  static std::list<Network::DnsResponseSharedPtr>
+  static std::list<Network::DnsResponseConstSharedPtr>
   makeDnsResponse(const std::list<std::string>& addresses,
                   const std::chrono::seconds& = std::chrono::seconds::max());
 

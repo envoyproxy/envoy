@@ -148,14 +148,14 @@ Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::str
   return findByName(store.gauges(), name);
 }
 
-std::list<Network::DnsResponseSharedPtr>
+std::list<Network::DnsResponseConstSharedPtr>
 TestUtility::makeDnsResponse(const std::list<std::string>& addresses,
                              const std::chrono::seconds& ttl) {
-  std::list<Network::DnsResponseSharedPtr> ret;
+  std::list<Network::DnsResponseConstSharedPtr> ret;
   for (const auto& address : addresses) {
 
-    ret.emplace_back(Network::DnsResponseSharedPtr(
-        new Network::DnsResponse(Network::Utility::parseInternetAddress(address), ttl)));
+    ret.emplace_back(
+        new Network::DnsResponse(Network::Utility::parseInternetAddress(address), ttl));
   }
   return ret;
 }

@@ -26,14 +26,14 @@ public:
 };
 
 struct DnsResponse {
-  DnsResponse(Address::InstanceConstSharedPtr address, const std::chrono::seconds& ttl)
+  DnsResponse(Address::InstanceConstSharedPtr address, const std::chrono::seconds ttl)
       : address_(address), ttl_(ttl) {}
 
   Address::InstanceConstSharedPtr address_;
   std::chrono::seconds ttl_;
 };
 
-typedef std::shared_ptr<const DnsResponse> DnsResponseSharedPtr;
+typedef std::shared_ptr<const DnsResponse> DnsResponseConstSharedPtr;
 
 enum class DnsLookupFamily { V4Only, V6Only, Auto };
 
@@ -49,7 +49,7 @@ public:
    * @param response supplies the list of resolved IP addresses and TTLs. The list will be empty if
    *                     the resolution failed.
    */
-  typedef std::function<void(const std::list<DnsResponseSharedPtr>&& response)> ResolveCb;
+  typedef std::function<void(const std::list<DnsResponseConstSharedPtr>&& response)> ResolveCb;
 
   /**
    * Initiate an async DNS resolution.

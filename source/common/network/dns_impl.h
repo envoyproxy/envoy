@@ -52,7 +52,7 @@ private:
      * callback.
      * @param arg argument passed to callback.
      */
-    void GetHostbyName(ares_channel channel, const std::string& name, int family,
+    void getHostbyName(ares_channel channel, const std::string& name, int family,
                        const AresHostCallback& callback, void* arg) const;
 
   private:
@@ -109,8 +109,8 @@ private:
     }
 
     /**
-     * AresWrapper GetHostbyName query callback.
-     * @param status return status of call to GetHostbyName.
+     * AresWrapper getHostbyName query callback.
+     * @param status return status of call to getHostbyName.
      * @param timeouts the number of times the request timed out.
      * @param hostent structure that stores information about a given host.
      * @addrttls structure that  stores ares_addrttl (ares_addr6ttl for AF_INET6).
@@ -120,7 +120,7 @@ private:
                             int naddrttls);
 
     /**
-     * wrapper function of call to GetHostbyName.
+     * wrapper function of call to getHostbyName.
      * @param family currently AF_INET and AF_INET6 are supported.
      */
     void getHostByName(int family);

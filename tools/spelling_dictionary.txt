@@ -101,7 +101,6 @@ GLB
 GOAWAY
 GRPC
 GTEST
-GetHostbyName
 GiB
 HC
 HCM
@@ -281,6 +280,7 @@ WS
 Welford's
 Werror
 XDS
+getHostbyName
 vip
 xDSes
 XFCC

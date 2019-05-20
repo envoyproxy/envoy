@@ -17,6 +17,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "absl/strings/match.h"
 #include "ares.h"
 
 namespace Envoy {
@@ -82,16 +83,16 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
     completed_ = true;
   }
 
-  std::list<DnsResponseSharedPtr> address_list;
+  std::list<DnsResponseConstSharedPtr> address_list;
   if (status == ARES_SUCCESS) {
     if (hostent->h_addrtype == AF_INET) {
-      auto addrttls_ = static_cast<ares_addrttl*>(addrttls);
-      std::unordered_map<std::string, std::chrono::seconds> ttl;
+      auto aresaddrttls = static_cast<ares_addrttl*>(addrttls);
+      absl::flat_hash_map<std::string, std::chrono::seconds> ttls;
 
       for (int i = 0; i < naddrttls; ++i) {
         char buffer[INET_ADDRSTRLEN];
-        ares_inet_ntop(AF_INET, &(addrttls_[i].ipaddr), buffer, INET_ADDRSTRLEN);
-        ttl[std::string(buffer)] = std::chrono::seconds(addrttls_[i].ttl);
+        ares_inet_ntop(AF_INET, &(aresaddrttls[i].ipaddr), buffer, INET_ADDRSTRLEN);
+        ttls[absl::string_view(buffer)] = std::chrono::seconds(aresaddrttls[i].ttl);
       }
 
       for (int i = 0; hostent->h_addr_list[i] != nullptr; ++i) {
@@ -107,21 +108,21 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
 
         auto addrttl = std::chrono::seconds::max();
         auto key = std::string(buffer);
-        if (ttl.count(key)) {
-          addrttl = ttl[key];
+        if (ttls.count(key)) {
+          addrttl = ttls[key];
         }
 
-        address_list.emplace_back(DnsResponseSharedPtr(new DnsResponse(
-            Address::InstanceConstSharedPtr(new Address::Ipv4Instance(&address)), addrttl)));
+        address_list.emplace_back(new DnsResponse(
+            Address::InstanceConstSharedPtr(new Address::Ipv4Instance(&address)), addrttl));
       }
     } else if (hostent->h_addrtype == AF_INET6) {
-      auto addrttls_ = static_cast<ares_addr6ttl*>(addrttls);
-      std::unordered_map<std::string, std::chrono::seconds> ttl;
+      auto aresaddrttls = static_cast<ares_addr6ttl*>(addrttls);
+      absl::flat_hash_map<std::string, std::chrono::seconds> ttls;
 
       for (int i = 0; i < naddrttls; ++i) {
         char buffer[INET6_ADDRSTRLEN];
-        ares_inet_ntop(AF_INET6, &(addrttls_[i].ip6addr), buffer, INET6_ADDRSTRLEN);
-        ttl[std::string(buffer)] = std::chrono::seconds(addrttls_[i].ttl);
+        ares_inet_ntop(AF_INET6, &(aresaddrttls[i].ip6addr), buffer, INET6_ADDRSTRLEN);
+        ttls[absl::string_view(buffer)] = std::chrono::seconds(aresaddrttls[i].ttl);
       }
 
       for (int i = 0; hostent->h_addr_list[i] != nullptr; ++i) {
@@ -137,12 +138,12 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
         auto key = std::string(buffer);
 
         auto addrttl = std::chrono::seconds::max();
-        if (ttl.count(key)) {
-          addrttl = ttl[key];
+        if (ttls.count(key)) {
+          addrttl = ttls[key];
         }
 
-        address_list.emplace_back(DnsResponseSharedPtr(new DnsResponse(
-            Address::InstanceConstSharedPtr(new Address::Ipv6Instance(address)), addrttl)));
+        address_list.emplace_back(new DnsResponse(
+            Address::InstanceConstSharedPtr(new Address::Ipv6Instance(address)), addrttl));
       }
     }
     if (!address_list.empty()) {
@@ -259,7 +260,7 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
 }
 
 void DnsResolverImpl::PendingResolution::getHostByName(int family) {
-  ares_wrapper_.GetHostbyName(
+  ares_wrapper_.getHostbyName(
       channel_, dns_name_, family,
       [](void* arg, int status, int timeouts, hostent* hostent, void* addrttls, int naddrttls) {
         static_cast<PendingResolution*>(arg)->onAresHostCallback(status, timeouts, hostent,
@@ -268,7 +269,7 @@ void DnsResolverImpl::PendingResolution::getHostByName(int family) {
       this);
 }
 
-void DnsResolverImpl::AresWrapper::GetHostbyName(ares_channel channel, const std::string& name,
+void DnsResolverImpl::AresWrapper::getHostbyName(ares_channel channel, const std::string& name,
                                                  int family, const AresHostCallback& callback,
                                                  void* arg) const {
   // Right now we only know how to look up Internet addresses.
@@ -465,19 +466,7 @@ bool DnsResolverImpl::AresWrapper::fakeHostent(const std::string& name, int fami
 }
 
 bool DnsResolverImpl::AresWrapper::isOnionDomain(const std::string& name) {
-  auto endWith = [&](const std::string& suffix) -> bool {
-    int i = name.size(), j = suffix.size();
-    while (i >= 0 && j >= 0) {
-      if (std::tolower(name[i]) != suffix[j]) {
-        return false;
-      }
-      i--;
-      j--;
-    }
-    return i >= 0;
-  };
-
-  if (endWith(".onion") || endWith(".onion.")) {
+  if (absl::EndsWith(name, ".onion") || absl::EndsWith(name, ".onion.")) {
     return true;
   }
 
