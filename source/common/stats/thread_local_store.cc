@@ -32,9 +32,9 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_ || !threading_ever_initialized_);
   default_scope_.reset();
   ASSERT(scopes_.empty());
-  for (StatNameStorageSet* rejected_stats : rejected_stats_purgatory_) {
-    rejected_stats->free(symbolTable());
-    delete rejected_stats;
+  for (StatNameStorageSet* stats : stats_purgatory_) {
+    stats->free(symbolTable());
+    delete stats;
   }
 }
 
@@ -206,7 +206,15 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   //
   // We use a raw pointer here as it's easier to capture it in in the lambda.
   auto rejected_stats = new StatNameStorageSet;
+  auto hot_path_stats = new StatNameStorageSet;
   rejected_stats->swap(scope->central_cache_.rejected_stats_);
+  hot_path_stats->swap(scope->central_cache_.hot_path_stats_);
+  auto cleanup_stats = [rejected_stats, hot_path_stats, this]() {
+    rejected_stats->free(symbolTable());
+    hot_path_stats->free(symbolTable());
+    delete rejected_stats;
+    delete hot_path_stats;
+  };
 
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
@@ -221,22 +229,22 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
     // be cleared out in the ThreadLocalStoreImpl destructor. We'd prefer
     // to release the memory immediately, however, in which case we remove
     // the rejected stats set from purgatory.
-    rejected_stats_purgatory_.insert(rejected_stats);
-    auto clean_central_cache = [this, rejected_stats]() {
+    stats_purgatory_.insert(rejected_stats);
+    stats_purgatory_.insert(hot_path_stats);
+    auto clean_central_cache = [this, rejected_stats, hot_path_stats, cleanup_stats]() {
       {
         Thread::LockGuard lock(lock_);
-        rejected_stats_purgatory_.erase(rejected_stats);
+        stats_purgatory_.erase(rejected_stats);
+        stats_purgatory_.erase(hot_path_stats);
       }
-      rejected_stats->free(symbolTable());
-      delete rejected_stats;
+      cleanup_stats();
     };
     lock.release();
     main_thread_dispatcher_->post([this, clean_central_cache, scope_id]() {
       clearScopeFromCaches(scope_id, clean_central_cache);
     });
   } else {
-    rejected_stats->free(symbolTable());
-    delete rejected_stats;
+    cleanup_stats();
   }
 }
 
@@ -505,6 +513,42 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name)
     tls_cache->insert(std::make_pair((*central_ref)->statName(), *central_ref));
   }
   return **central_ref;
+}
+
+StatName
+ThreadLocalStoreImpl::ScopeImpl::fastMemoryIntensiveStatNameLookup(absl::string_view name) {
+  absl::optional<StatName> stat_name;
+
+  // Try to populate stat_name from the TLS cache, without taking any locks.
+  StringStatNameMap* tls_cache = nullptr;
+  if (!parent_.shutting_down_ && parent_.tls_) {
+    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
+    tls_cache = &entry.hot_path_stats_map_;
+    stat_name = tls_cache->find(name, symbolTable());
+    if (stat_name) {
+      return *stat_name;
+    }
+  }
+
+  // If that doesn't work, try the central cache.
+  Thread::LockGuard lock(parent_.lock_);
+  stat_name = central_cache_.hot_path_stats_map_.find(name, symbolTable());
+  if (!stat_name) {
+    StatNameStorage storage(name, symbolTable());
+    auto insertion = central_cache_.hot_path_stats_.insert(std::move(storage));
+    stat_name = insertion.first->statName();
+    if (insertion.second) {
+      central_cache_.hot_path_stats_map_.insert(*stat_name, symbolTable());
+    } else {
+      // A race between threads can cause two threads to simultaneously
+      // try to insert the same name.
+      storage.free(symbolTable());
+    }
+  }
+  if (tls_cache != nullptr) {
+    tls_cache->insert(*stat_name, symbolTable());
+  }
+  return *stat_name;
 }
 
 absl::optional<std::reference_wrapper<const Counter>>

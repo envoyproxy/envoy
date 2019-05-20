@@ -207,12 +207,16 @@ public:
     return histogram(symbol_table_->toString(name));
   }
 
+  StatName fastMemoryIntensiveStatNameLookup(absl::string_view name) override;
+
   SymbolTable& symbolTable() override { return symbol_table_.get(); }
   const SymbolTable& symbolTable() const override { return symbol_table_.get(); }
 
   Test::Global<FakeSymbolTableImpl> symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
+  StatNameStorageSet stat_name_set_;
+  StringStatNameMap string_stat_name_map_;
 };
 
 /**

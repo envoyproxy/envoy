@@ -160,6 +160,10 @@ public:
   }
   Histogram& histogram(const std::string& name) override { return default_scope_->histogram(name); }
   NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
+  StatName fastMemoryIntensiveStatNameLookup(absl::string_view name) override {
+    return default_scope_->fastMemoryIntensiveStatNameLookup(name);
+  }
+
   const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   const TagProducer& tagProducer() const { return *tag_producer_; }
@@ -232,6 +236,12 @@ private:
     // symbol-table lock. We keep this StatName set here in the TLS cache to
     // avoid taking a lock to compute rejection.
     StatNameHashSet rejected_stats_;
+
+    // We keep a TLS cache of names that can only be discovered on the hot-path,
+    // that we need to turn into stats. StringStatNameMap contains only
+    // references to separately maintained stats, and the backing store for this
+    // is in CentralAcacheEntry.hot_path_stats_.
+    StringStatNameMap hot_path_stats_map_;
   };
 
   struct CentralCacheEntry {
@@ -239,10 +249,8 @@ private:
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
     StatNameStorageSet rejected_stats_;
-
-    // Strings should in most cases be converted to symbols at construction
-    // time. However, for a
-    absl::flat_hash_map<std::string, StatName> hot_path_symbols_;
+    StatNameStorageSet hot_path_stats_; // Backing store for TlsCacheEntry.hot_path_stats_map_.
+    StringStatNameMap hot_path_stats_map_;
   };
 
   struct ScopeImpl : public TlsScope {
@@ -323,6 +331,8 @@ private:
                                 std::unique_ptr<StatNameManagedStorage>& truncated_name_storage,
                                 std::vector<Tag>& tags, std::string& tag_extracted_name);
 
+    StatName fastMemoryIntensiveStatNameLookup(absl::string_view name) override;
+
     static std::atomic<uint64_t> next_scope_id_;
 
     const uint64_t scope_id_;
@@ -384,7 +394,7 @@ private:
   std::vector<GaugeSharedPtr> deleted_gauges_;
   std::vector<HistogramSharedPtr> deleted_histograms_;
 
-  absl::flat_hash_set<StatNameStorageSet*> rejected_stats_purgatory_ GUARDED_BY(lock_);
+  absl::flat_hash_set<StatNameStorageSet*> stats_purgatory_ GUARDED_BY(lock_);
 };
 
 } // namespace Stats

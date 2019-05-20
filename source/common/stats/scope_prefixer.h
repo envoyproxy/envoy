@@ -45,9 +45,12 @@ public:
 
   NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }
 
+  StatName fastMemoryIntensiveStatNameLookup(absl::string_view name) override;
+
 private:
   Scope& scope_;
   StatNameStorage prefix_;
+  std::string prefix_string_;
 };
 
 } // namespace Stats

@@ -5,14 +5,18 @@
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Stats {
 
 ScopePrefixer::ScopePrefixer(absl::string_view prefix, Scope& scope)
-    : scope_(scope), prefix_(Utility::sanitizeStatsName(prefix), symbolTable()) {}
+    : scope_(scope), prefix_(Utility::sanitizeStatsName(prefix), symbolTable()),
+      prefix_string_(std::string(prefix)) {}
 
 ScopePrefixer::ScopePrefixer(StatName prefix, Scope& scope)
-    : scope_(scope), prefix_(prefix, symbolTable()) {}
+    : scope_(scope), prefix_(prefix, symbolTable()),
+      prefix_string_(symbolTable().toString(prefix)) {}
 
 ScopePrefixer::~ScopePrefixer() { prefix_.free(symbolTable()); }
 
@@ -60,6 +64,10 @@ ScopePrefixer::findHistogram(StatName name) const {
 
 void ScopePrefixer::deliverHistogramToSinks(const Histogram& histograms, uint64_t val) {
   scope_.deliverHistogramToSinks(histograms, val);
+}
+
+StatName ScopePrefixer::fastMemoryIntensiveStatNameLookup(absl::string_view name) {
+  return scope_.fastMemoryIntensiveStatNameLookup(absl::StrCat(prefix_string_, name));
 }
 
 } // namespace Stats

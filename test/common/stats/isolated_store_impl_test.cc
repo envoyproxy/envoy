@@ -109,6 +109,9 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
 
   EXPECT_EQ(4UL, store_.counters().size());
   EXPECT_EQ(2UL, store_.gauges().size());
+
+  StatName fast_lookup = store_.fastMemoryIntensiveStatNameLookup("fast.lookup");
+  EXPECT_EQ("fast.lookup", store_.symbolTable().toString(fast_lookup));
 }
 
 TEST_F(StatsIsolatedStoreImplTest, LongStatName) {

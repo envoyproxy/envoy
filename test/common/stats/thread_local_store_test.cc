@@ -221,6 +221,9 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
 
+  StatName fast_lookup = store_->fastMemoryIntensiveStatNameLookup("fast.lookup");
+  EXPECT_EQ("fast.lookup", symbol_table_.toString(fast_lookup));
+
   store_->shutdownThreading();
 }
 
@@ -273,6 +276,9 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
+
+  StatName fast_lookup = store_->fastMemoryIntensiveStatNameLookup("fast.lookup");
+  EXPECT_EQ("fast.lookup", symbol_table_.toString(fast_lookup));
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {

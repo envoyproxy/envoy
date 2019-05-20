@@ -623,15 +623,13 @@ struct StringViewVectorHash {
 
 class StringStatNameMap {
 public:
-  explicit StringStatNameMap(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
-
   /**
    * This does not take a lock in the symbol table.
    */
-  absl::optional<StatName> find(absl::string_view name) const {
+  absl::optional<StatName> find(absl::string_view name, const SymbolTable& symbol_table) const {
     absl::optional<StatName> ret;
 
-    StringViewVector v = symbol_table_.splitString(name);
+    StringViewVector v = symbol_table.splitString(name);
     auto iter = string_vector_stat_name_map_.find(v);
     if (iter != string_vector_stat_name_map_.end()) {
       ret = iter->second;
@@ -645,8 +643,8 @@ public:
    *
    * Note: this take a lock in the symbol table, so it's useful to call find() first.
    */
-  void insert(StatName stat_name) {
-    StringViewVector v = symbol_table_.statNameToStringVector(stat_name);
+  void insert(StatName stat_name, const SymbolTable& symbol_table) {
+    StringViewVector v = symbol_table.statNameToStringVector(stat_name);
     string_vector_stat_name_map_[v] = stat_name;
   }
 
@@ -655,7 +653,6 @@ private:
       absl::flat_hash_map<StringViewVector, StatName, StringViewVectorHash>;
 
   StringVectorStatNameMap string_vector_stat_name_map_;
-  SymbolTable& symbol_table_;
 };
 
 } // namespace Stats

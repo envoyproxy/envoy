@@ -125,6 +125,17 @@ MockStore::MockStore() : StoreImpl(*fake_symbol_table_) {
 }
 MockStore::~MockStore() {}
 
+StatName MockStore::fastMemoryIntensiveStatNameLookup(absl::string_view name) {
+  absl::optional<StatName> stat_name = string_stat_name_map_.find(name, symbolTable());
+  if (!stat_name) {
+    StatNameStorage storage(name, symbolTable());
+    auto insertion = stat_name_set_.insert(std::move(storage));
+    ASSERT(insertion.second); // If the name is not in the map, it should not be in the set.
+    stat_name = insertion.first->statName();
+  }
+  return *stat_name;
+}
+
 MockIsolatedStatsStore::MockIsolatedStatsStore()
     : IsolatedStoreImpl(Test::Global<Stats::FakeSymbolTableImpl>::get()) {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() {}

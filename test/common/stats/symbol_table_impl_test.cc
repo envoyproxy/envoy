@@ -540,10 +540,10 @@ TEST_P(StatNameTest, SharedStatNameStorageSetSwap) {
 TEST_P(StatNameTest, StatNameStringMap) {
   StatNameManagedStorage foo_bar("foo.bar", *table_); // Must outlive the map.
   {
-    StringStatNameMap map(*table_);
-    EXPECT_FALSE(map.find("foo.bar"));
-    map.insert(foo_bar.statName());
-    EXPECT_EQ(map.find("foo.bar"), foo_bar.statName());
+    StringStatNameMap map;
+    EXPECT_FALSE(map.find("foo.bar", *table_));
+    map.insert(foo_bar.statName(), *table_);
+    EXPECT_EQ(map.find("foo.bar", *table_), foo_bar.statName());
   }
 }
 

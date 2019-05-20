@@ -113,6 +113,21 @@ public:
    */
   virtual const SymbolTable& symbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
+
+  /**
+   * Performs fast conversion of string to StatName in the hot-path, at the
+   * expense of significant per-name-per-thread memory overhead. This incurs
+   * a lock only the first time this string is referenced from a thread. It
+   * should only be used names that cannot be determined during startup or xDS
+   * update. Forthose names that can be determined at that time, the StatNames
+   * should be collected via StatNamePool or StatNameManagedStorage once, and
+   * then used later on in the hot-path to compose fully elaborated StatName
+   * objects via SYmbolTable::join(), which is lock-free.
+   *
+   * @param name The name of the stat or fragment of stat.
+   * @return the stat name allocated from symbolTable().
+   */
+  virtual StatName fastMemoryIntensiveStatNameLookup(absl::string_view name) PURE;
 };
 
 } // namespace Stats

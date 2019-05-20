@@ -36,8 +36,21 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       }),
       null_gauge_(symbol_table) {}
 
+IsolatedStoreImpl::~IsolatedStoreImpl() { stat_name_set_.free(symbolTable()); }
+
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
   return std::make_unique<ScopePrefixer>(name, *this);
+}
+
+StatName IsolatedStoreImpl::fastMemoryIntensiveStatNameLookup(absl::string_view name) {
+  absl::optional<StatName> stat_name = string_stat_name_map_.find(name, symbolTable());
+  if (!stat_name) {
+    StatNameStorage storage(name, symbolTable());
+    auto insertion = stat_name_set_.insert(std::move(storage));
+    ASSERT(insertion.second); // If the name is not in the map, it should not be in the set.
+    stat_name = insertion.first->statName();
+  }
+  return *stat_name;
 }
 
 } // namespace Stats

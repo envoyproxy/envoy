@@ -68,6 +68,7 @@ class IsolatedStoreImpl : public StoreImpl {
 public:
   IsolatedStoreImpl();
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
+  ~IsolatedStoreImpl() override;
 
   // Stats::Scope
   Counter& counterFromStatName(StatName name) override { return counters_.get(name); }
@@ -110,6 +111,8 @@ public:
     return histogramFromStatName(storage.statName());
   }
 
+  StatName fastMemoryIntensiveStatNameLookup(absl::string_view name) override;
+
 private:
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
 
@@ -119,6 +122,8 @@ private:
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
   NullGaugeImpl null_gauge_;
+  StatNameStorageSet stat_name_set_;
+  StringStatNameMap string_stat_name_map_;
 };
 
 } // namespace Stats
