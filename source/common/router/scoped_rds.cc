@@ -18,11 +18,13 @@ using Envoy::Config::ConfigProviderPtr;
 namespace Envoy {
 namespace Router {
 
-ConfigProviderPtr ScopedRoutesConfigProviderUtil::maybeCreate(
-    const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-        config,
-    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-    ConfigProviderManager& scoped_routes_config_provider_manager) {
+namespace ScopedRoutesConfigProviderUtil {
+
+ConfigProviderPtr
+create(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+           config,
+       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+       ConfigProviderManager& scoped_routes_config_provider_manager) {
   ASSERT(config.route_specifier_case() == envoy::config::filter::network::http_connection_manager::
                                               v2::HttpConnectionManager::kScopedRoutes);
 
@@ -62,6 +64,8 @@ ConfigProviderPtr ScopedRoutesConfigProviderUtil::maybeCreate(
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
+
+} // namespace ScopedRoutesConfigProviderUtil
 
 InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
     ProtobufTypes::ConstMessagePtrVector&& config_protos, std::string name,
