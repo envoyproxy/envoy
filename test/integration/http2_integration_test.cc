@@ -63,6 +63,14 @@ TEST_P(Http2IntegrationTest, Retry) { testRetry(); }
 
 TEST_P(Http2IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
 
+TEST_P(Http2IntegrationTest, ExcludeForwardedProto) { testExcludeForwardedProtoHeader(); }
+
+TEST_P(Http2IntegrationTest, SetForwardedProto) { testSetForwardedProtoHeader(); }
+
+TEST_P(Http2IntegrationTest, DefaultForwardedProto) { testDefaultForwardedProtoHeader(); }
+
+TEST_P(Http2IntegrationTest, IncludeForwardedProto) { testIncludeForwardedProtoHeader(); }
+
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
 config: {}

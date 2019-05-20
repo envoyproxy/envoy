@@ -644,6 +644,140 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
   EXPECT_EQ(512U, response->body().size());
 }
 
+// Tests that the 'x-forwarded-proto' header is hidden on the upstream request
+// when exclude_request_forwarded_proto is set to true
+void HttpIntegrationTest::testExcludeForwardedProtoHeader() {
+  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
+                          envoy::api::v2::route::RouteAction::NOT_FOUND,
+                          envoy::api::v2::route::VirtualHost::NONE, {}, true);
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.set_exclude_request_forwarded_proto(true);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test_retry"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                                 {"x-envoy-retry-on", "5xx"}},
+                                         1024);
+  waitForNextUpstreamRequest();
+  ASSERT(upstream_request_->headers().ForwardedProto() == nullptr);
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+  response->waitForEndStream();
+}
+
+// Tests to check 'x-forwarded-proto' header is available on the upstream request despite setting
+// exclude_request_forwarded_proto to true when the header is explicitly configured by the client
+void HttpIntegrationTest::testSetForwardedProtoHeader() {
+  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
+                          envoy::api::v2::route::RouteAction::NOT_FOUND,
+                          envoy::api::v2::route::VirtualHost::NONE, {}, true);
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.set_exclude_request_forwarded_proto(true);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test_retry"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                                 {"x-envoy-retry-on", "5xx"},
+                                                                 {"x-forwarded-proto", "http"}},
+                                         1024);
+  waitForNextUpstreamRequest();
+  ASSERT(upstream_request_->headers().ForwardedProto() != nullptr);
+  EXPECT_EQ("http", upstream_request_->headers().ForwardedProto()->value().getStringView());
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+  response->waitForEndStream();
+}
+
+// Tests that the 'x-forwarded-proto' header is available by default on the upstream request
+// when exclude_request_forwarded_proto is not configured by default.
+// Tests header preservation behavior of envoy when 'x-forwarded-proto' is
+// explicitly configured by the client.
+void HttpIntegrationTest::testDefaultForwardedProtoHeader() {
+  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
+                          envoy::api::v2::route::RouteAction::NOT_FOUND,
+                          envoy::api::v2::route::VirtualHost::NONE, {}, true);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test_retry"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                                 {"x-envoy-retry-on", "5xx"},
+                                                                 {"x-forwarded-proto", "https"}},
+                                         1024);
+  waitForNextUpstreamRequest();
+  ASSERT(upstream_request_->headers().ForwardedProto() != nullptr);
+  EXPECT_EQ("https", upstream_request_->headers().ForwardedProto()->value().getStringView());
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+  response->waitForEndStream();
+}
+
+// Tests that the 'x-forwarded-proto' header is available by on the upstream request
+// when exclude_request_forwarded_proto is set to false
+void HttpIntegrationTest::testIncludeForwardedProtoHeader() {
+  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
+                          envoy::api::v2::route::RouteAction::NOT_FOUND,
+                          envoy::api::v2::route::VirtualHost::NONE, {}, true);
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.set_exclude_request_forwarded_proto(false);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test_retry"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                                 {"x-envoy-retry-on", "5xx"}},
+                                         1024);
+  waitForNextUpstreamRequest();
+  ASSERT(upstream_request_->headers().ForwardedProto() != nullptr);
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+  response->waitForEndStream();
+}
+
 void HttpIntegrationTest::testGrpcRetry() {
   Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"grpc-status", "0"}};
   initialize();

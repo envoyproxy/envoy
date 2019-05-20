@@ -176,6 +176,10 @@ protected:
   void testRetry();
   void testRetryHittingBufferLimit();
   void testRetryAttemptCountHeader();
+  void testExcludeForwardedProtoHeader();
+  void testSetForwardedProtoHeader();
+  void testDefaultForwardedProtoHeader();
+  void testIncludeForwardedProtoHeader();
   void testGrpcRetry();
 
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,

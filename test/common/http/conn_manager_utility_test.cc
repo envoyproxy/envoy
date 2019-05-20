@@ -76,6 +76,7 @@ public:
   MOCK_METHOD0(tracingConfig, const Http::TracingConnectionManagerConfig*());
   MOCK_METHOD0(listenerStats, ConnectionManagerListenerStats&());
   MOCK_CONST_METHOD0(proxy100Continue, bool());
+  MOCK_CONST_METHOD0(excludeRequestForwardedProto, bool());
   MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
   MOCK_CONST_METHOD0(shouldNormalizePath, bool());
 
@@ -1203,6 +1204,35 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
   HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
+}
+
+// Verify 'x-forwarded-proto' is absent when 'exclude_request_forwarded_proto_' is set to true
+TEST_F(ConnectionManagerUtilityTest, ExcludeRequestForwardedProtoTrue) {
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  ON_CALL(config_, excludeRequestForwardedProto()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers;
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_FALSE(headers.has(Headers::get().ForwardedProto));
+}
+
+// Verify 'x-forwarded-proto' is present when 'exclude_request_forwarded_proto_' is set to false
+TEST_F(ConnectionManagerUtilityTest, ExcludeRequestForwardedProtoFalse) {
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  ON_CALL(config_, excludeRequestForwardedProto()).WillByDefault(Return(false));
+  TestHeaderMapImpl headers;
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.has(Headers::get().ForwardedProto));
+}
+
+// Verify 'x-forwarded-proto' is present by default
+TEST_F(ConnectionManagerUtilityTest, ExcludeRequestForwardedProtoDefault) {
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  TestHeaderMapImpl headers;
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.has(Headers::get().ForwardedProto));
 }
 
 } // namespace Http

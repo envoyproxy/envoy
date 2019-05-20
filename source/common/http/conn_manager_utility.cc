@@ -106,8 +106,11 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
         Utility::appendXff(request_headers, *connection.remoteAddress());
       }
     }
-    request_headers.insertForwardedProto().value().setReference(
+    // Hide the x-forwarded-proto header only when 'exclude_request_forwarded_proto_' is true
+    if (!config.excludeRequestForwardedProto()) {
+      request_headers.insertForwardedProto().value().setReference(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
+    }
   } else {
     // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF.
     // If we find one, it will be used as the downstream address for logging. It may or may not be
@@ -117,11 +120,14 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     single_xff_address = ret.single_address_;
   }
 
-  // If we didn't already replace x-forwarded-proto because we are using the remote address, and
-  // remote hasn't set it (trusted proxy), we set it, since we then use this for setting scheme.
-  if (!request_headers.ForwardedProto()) {
-    request_headers.insertForwardedProto().value().setReference(
+  // Hide the x-forwarded-proto header only when 'exclude_request_forwarded_proto_' is true
+  if (!config.excludeRequestForwardedProto()) {
+    // If we didn't already replace x-forwarded-proto because we are using the remote address, and
+    // remote hasn't set it (trusted proxy), we set it, since we then use this for setting scheme.
+    if (!request_headers.ForwardedProto()) {
+      request_headers.insertForwardedProto().value().setReference(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
+    }
   }
 
   // At this point we can determine whether this is an internal or external request. The

@@ -337,6 +337,12 @@ public:
   virtual bool proxy100Continue() const PURE;
 
   /**
+   * @return bool supplies if the HttpConnectionManager should disable adding the x-forwarded-proto
+   *              header
+   */
+  virtual bool excludeRequestForwardedProto() const PURE;
+
+  /**
    * @return supplies the http1 settings.
    */
   virtual const Http::Http1Settings& http1Settings() const PURE;
