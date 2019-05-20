@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_proto_library",
     "envoy_select_hot_restart",
 )
 
@@ -107,11 +108,17 @@ envoy_cc_library(
     ],
 )
 
+envoy_proto_library(
+    name = "hot_restart",
+    srcs = ["hot_restart.proto"],
+)
+
 envoy_cc_library(
-    name = "hot_restart_lib",
-    srcs = envoy_select_hot_restart(["hot_restart_impl.cc"]),
-    hdrs = envoy_select_hot_restart(["hot_restart_impl.h"]),
+    name = "hot_restarting_base",
+    srcs = envoy_select_hot_restart(["hot_restarting_base.cc"]),
+    hdrs = envoy_select_hot_restart(["hot_restarting_base.h"]),
     deps = [
+        ":hot_restart_cc",
         "//include/envoy/api:os_sys_calls_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
@@ -120,11 +127,47 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:utility_lib",
-        "//source/common/stats:raw_stat_data_lib",
-        "//source/common/stats:stats_options_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "hot_restarting_child",
+    srcs = envoy_select_hot_restart(["hot_restarting_child.cc"]),
+    hdrs = envoy_select_hot_restart(["hot_restarting_child.h"]),
+    deps = [
+        ":hot_restarting_base",
+        "//source/common/stats:stat_merger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "hot_restarting_parent",
+    srcs = envoy_select_hot_restart(["hot_restarting_parent.cc"]),
+    hdrs = envoy_select_hot_restart(["hot_restarting_parent.h"]),
+    deps = [
+        ":hot_restarting_base",
+        "//source/common/memory:stats_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "hot_restart_lib",
+    srcs = envoy_select_hot_restart(["hot_restart_impl.cc"]),
+    hdrs = envoy_select_hot_restart(["hot_restart_impl.h"]),
+    deps = [
+        ":hot_restarting_child",
+        ":hot_restarting_parent",
+        "//include/envoy/api:os_sys_calls_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:file_event_interface",
+        "//include/envoy/server:hot_restart_interface",
+        "//include/envoy/server:instance_interface",
+        "//include/envoy/server:options_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/stats:heap_stat_data_lib",
     ],
 )
 
@@ -142,6 +185,7 @@ envoy_cc_library(
     srcs = ["options_impl.cc"] + select({
         "//bazel:linux_x86_64": ["options_impl_platform_linux.cc"],
         "//bazel:linux_aarch64": ["options_impl_platform_linux.cc"],
+        "//bazel:linux_ppc": ["options_impl_platform_linux.cc"],
         "//conditions:default": ["options_impl_platform_default.cc"],
     }),
     hdrs = [
@@ -150,8 +194,11 @@ envoy_cc_library(
     ] + select({
         "//bazel:linux_x86_64": ["options_impl_platform_linux.h"],
         "//bazel:linux_aarch64": ["options_impl_platform_linux.h"],
+        "//bazel:linux_ppc": ["options_impl_platform_linux.h"],
         "//conditions:default": [],
     }),
+    # TCLAP command line parser needs this to support int64_t/uint64_t in several build environments.
+    copts = ["-DHAVE_LONG_LONG"],
     external_deps = ["tclap"],
     deps = [
         "//include/envoy/network:address_interface",
@@ -244,10 +291,8 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/api/v2:lds_cc",
         "@envoy_api//envoy/api/v2:rds_cc",
-        "@envoy_api//envoy/service/accesslog/v2:als_cc",
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
         "@envoy_api//envoy/service/discovery/v2:hds_cc",
-        "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
         "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )
@@ -269,8 +314,8 @@ envoy_cc_library(
         ":configuration_lib",
         ":connection_handler_lib",
         ":guarddog_lib",
+        ":listener_hooks_lib",
         ":listener_manager_lib",
-        ":test_hooks_lib",
         ":worker_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:signal_interface",
@@ -314,8 +359,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "test_hooks_lib",
-    hdrs = ["test_hooks.h"],
+    name = "listener_hooks_lib",
+    hdrs = ["listener_hooks.h"],
 )
 
 envoy_cc_library(
@@ -336,7 +381,7 @@ envoy_cc_library(
     hdrs = ["worker_impl.h"],
     deps = [
         ":connection_handler_lib",
-        ":test_hooks_lib",
+        ":listener_hooks_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",

@@ -83,8 +83,8 @@ Compressor::ZlibCompressorImpl::CompressionStrategy GzipFilterConfig::compressio
   }
 }
 
-StringUtil::CaseUnorderedSet GzipFilterConfig::contentTypeSet(
-    const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& types) {
+StringUtil::CaseUnorderedSet
+GzipFilterConfig::contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types) {
   return types.empty() ? StringUtil::CaseUnorderedSet(defaultContentEncoding().begin(),
                                                       defaultContentEncoding().end())
                        : StringUtil::CaseUnorderedSet(types.cbegin(), types.cend());
@@ -211,9 +211,8 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
 bool GzipFilter::isContentTypeAllowed(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type && !config_->contentTypeValues().empty()) {
-    // TODO(dnoe): Eliminate std:string construction with Swiss table (#6580)
-    const std::string value{
-        StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"))};
+    const absl::string_view value =
+        StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
     return config_->contentTypeValues().find(value) != config_->contentTypeValues().end();
   }
 
@@ -232,10 +231,9 @@ bool GzipFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* content_length = headers.ContentLength();
   if (content_length) {
     uint64_t length;
-    // TODO(dnoe): Make StringUtil::atoull and friends string_view friendly.
-    const std::string content_length_str(content_length->value().getStringView());
-    const bool is_minimum_content_length = StringUtil::atoull(content_length_str.c_str(), length) &&
-                                           length >= config_->minimumLength();
+    const bool is_minimum_content_length =
+        absl::SimpleAtoi(content_length->value().getStringView(), &length) &&
+        length >= config_->minimumLength();
     if (!is_minimum_content_length) {
       config_->stats().content_length_too_small_.inc();
     }

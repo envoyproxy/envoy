@@ -50,7 +50,7 @@ public:
    * This method sets the operation name on the span.
    * @param operation the operation name
    */
-  void setOperation(const std::string& operation) override;
+  void setOperation(absl::string_view operation) override;
 
   /**
    * This function adds a Zipkin "string" binary annotation to this span.
@@ -60,7 +60,7 @@ public:
    * Note that Tracing::HttpTracerUtility::finalizeSpan() makes several calls to this function,
    * associating several key-value pairs with this span.
    */
-  void setTag(const std::string& name, const std::string& value) override;
+  void setTag(absl::string_view name, absl::string_view value) override;
 
   void log(SystemTime timestamp, const std::string& event) override;
 

@@ -76,6 +76,11 @@ config_setting(
 )
 
 config_setting(
+    name = "asan_build",
+    values = {"define": "ENVOY_CONFIG_ASAN=1"},
+)
+
+config_setting(
     name = "coverage_build",
     values = {"define": "ENVOY_CONFIG_COVERAGE=1"},
 )
@@ -98,6 +103,15 @@ config_setting(
 config_setting(
     name = "disable_hot_restart",
     values = {"define": "hot_restart=disabled"},
+)
+
+# Used to avoid conflicting selects https://github.com/bazelbuild/bazel/issues/8323
+alias(
+    name = "disable_hot_restart_or_apple",
+    actual = select({
+        ":apple": ":apple",
+        "//conditions:default": ":disable_hot_restart",
+    }),
 )
 
 config_setting(
@@ -220,6 +234,11 @@ config_setting(
 config_setting(
     name = "ios_arm64e",
     values = {"cpu": "ios_arm64e"},
+)
+
+config_setting(
+    name = "manual_stamp",
+    values = {"define": "manual_stamp=manual_stamp"},
 )
 
 alias(

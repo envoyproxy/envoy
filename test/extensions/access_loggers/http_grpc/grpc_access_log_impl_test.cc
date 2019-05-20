@@ -227,6 +227,7 @@ http_logs:
     stream_info.addBytesReceived(10);
     stream_info.addBytesSent(20);
     stream_info.response_code_ = 200;
+    stream_info.response_code_details_ = "via_upstream";
     ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
 
@@ -300,6 +301,7 @@ http_logs:
         value: 200
       response_headers_bytes: 10
       response_body_bytes: 20
+      response_code_details: "via_upstream"
 )EOF");
     access_log_->log(&request_headers, &response_headers, nullptr, stream_info);
   }
@@ -348,6 +350,8 @@ http_logs:
     ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return(localSans));
     ON_CALL(connection_info, subjectPeerCertificate()).WillByDefault(Return("peerSubject"));
     ON_CALL(connection_info, subjectLocalCertificate()).WillByDefault(Return("localSubject"));
+    ON_CALL(connection_info, sessionId())
+        .WillByDefault(Return("D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B"));
     stream_info.setDownstreamSslConnection(&connection_info);
     stream_info.requested_server_name_ = "sni";
 
@@ -381,6 +385,7 @@ http_logs:
           - uri: peerSan1
           - uri: peerSan2
           subject: peerSubject
+        tls_session_id: D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B
     request:
       request_method: "METHOD_UNSPECIFIED"
     response: {}

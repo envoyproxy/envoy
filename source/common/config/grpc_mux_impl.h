@@ -31,7 +31,7 @@ public:
   ~GrpcMuxImpl();
 
   void start() override;
-  GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::vector<std::string>& resources,
+  GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
                             GrpcMuxCallbacks& callbacks) override;
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
@@ -53,7 +53,7 @@ private:
   void setRetryTimer();
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
-    GrpcMuxWatchImpl(const std::vector<std::string>& resources, GrpcMuxCallbacks& callbacks,
+    GrpcMuxWatchImpl(const std::set<std::string>& resources, GrpcMuxCallbacks& callbacks,
                      const std::string& type_url, GrpcMuxImpl& parent)
         : resources_(resources), callbacks_(callbacks), type_url_(type_url), parent_(parent),
           inserted_(true) {
@@ -68,7 +68,7 @@ private:
         }
       }
     }
-    std::vector<std::string> resources_;
+    std::set<std::string> resources_;
     GrpcMuxCallbacks& callbacks_;
     const std::string type_url_;
     GrpcMuxImpl& parent_;
@@ -110,7 +110,7 @@ private:
 class NullGrpcMuxImpl : public GrpcMux {
 public:
   void start() override {}
-  GrpcMuxWatchPtr subscribe(const std::string&, const std::vector<std::string>&,
+  GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
                             GrpcMuxCallbacks&) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }

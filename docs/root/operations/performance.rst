@@ -16,12 +16,23 @@ Envoy exposes two statistics to monitor performance of the event loops on all th
 
 * **Poll delay:** On each iteration of the event loop, the event dispatcher polls for I/O events
   and "wakes up" either when some I/O events are ready to be processed or when a timeout fires,
-  whichever occurs first. In the case of a timeout, we can measure the difference between the expected
-  wakeup time and the actual wakeup time after polling; this difference is called the "poll delay."
-  It's normal to see some small poll delay, usually equal to the kernel scheduler's "time slice" or
-  "quantum"---this depends on the specific operating system on which Envoy is running---but if this
-  number elevates substantially above its normal observed baseline, it likely indicates kernel
-  scheduler delays.
+  whichever occurs first. In the case of a timeout, we can measure the difference between the
+  expected wakeup time and the actual wakeup time after polling; this difference is called the "poll
+  delay." It's normal to see some small poll delay, usually equal to the kernel scheduler's "time
+  slice" or "quantum"---this depends on the specific operating system on which Envoy is
+  running---but if this number elevates substantially above its normal observed baseline, it likely
+  indicates kernel scheduler delays.
+
+These statistics can be enabled by setting :ref:`enable_dispatcher_stats <envoy_api_field_config.bootstrap.v2.Bootstrap.enable_dispatcher_stats>`
+to true.
+
+.. warning::
+
+  Note that enabling dispatcher stats records a value for each iteration of the event loop on every
+  thread. This should normally be minimal overhead, but when using
+  :ref:`statsd <envoy_api_msg_config.metrics.v2.StatsdSink>`, it will send each observed value over
+  the wire individually because the statsd protocol doesn't have any way to represent a histogram
+  summary. Be aware that this can be a very large volume of data.
 
 Statistics
 ----------

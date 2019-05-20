@@ -1,0 +1,20 @@
+{#
+  Template for top-level structure representing a request in Kafka protocol (e.g. ProduceRequest).
+  Rendered templates for each request in Kafka protocol will be put into 'requests.h' file.
+
+  This template handles binding the top-level structure deserializer
+  (e.g. ProduceRequestV0Deserializer) with RequestDataParser. These parsers are then used by
+  RequestParserResolver instance depending on received Kafka api key & api version
+  (see 'kafka_request_resolver_cc.j2').
+#}
+
+{% for version in complex_type.versions %}class {{ complex_type.name }}V{{ version }}Parser:
+  public RequestDataParser<
+    {{ complex_type.name }}, {{ complex_type.name }}V{{ version }}Deserializer>
+{
+public:
+  {{ complex_type.name }}V{{ version }}Parser(RequestContextSharedPtr ctx) :
+    RequestDataParser{ctx} {};
+};
+
+{% endfor %}

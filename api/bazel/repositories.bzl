@@ -30,6 +30,11 @@ def api_dependencies():
         name = "opencensus_proto",
         locations = REPOSITORY_LOCATIONS,
     )
+    envoy_http_archive(
+        name = "kafka_source",
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = KAFKASOURCE_BUILD_CONTENT,
+    )
 
 GOOGLEAPIS_BUILD_CONTENT = """
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
@@ -114,6 +119,7 @@ cc_proto_library(
     ],
     default_runtime = "@com_google_protobuf//:protobuf",
     protoc = "@com_google_protobuf//:protoc",
+    linkstatic = 1,
     deps = ["@com_google_protobuf//:cc_wkt_protos"],
     visibility = ["//visibility:public"],
 )
@@ -173,7 +179,7 @@ go_proto_library(
     proto = ":rpc_status_protos_lib",
     visibility = ["//visibility:public"],
     deps = [
-      "@com_github_golang_protobuf//ptypes/any:go_default_library",
+      "@io_bazel_rules_go//proto/wkt:any_go_proto",
     ],
 )
 
@@ -263,4 +269,36 @@ go_proto_library(
     proto = ":client_model",
     visibility = ["//visibility:public"],
 )
+"""
+
+OPENCENSUSTRACE_BUILD_CONTENT = """
+load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
+load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+
+api_proto_library(
+    name = "trace_model",
+    srcs = [
+        "trace.proto",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+go_proto_library(
+    name = "trace_model_go_proto",
+    importpath = "trace_model",
+    proto = ":trace_model",
+    visibility = ["//visibility:public"],
+)
+"""
+
+KAFKASOURCE_BUILD_CONTENT = """
+
+filegroup(
+    name = "request_protocol_files",
+    srcs = glob([
+        "*Request.json",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
 """

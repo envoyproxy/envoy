@@ -239,6 +239,10 @@ public:
     return retry_state_->hostSelectionMaxAttempts();
   }
 
+  Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
+    return callbacks_->getUpstreamSocketOptions();
+  }
+
   /**
    * Set a computed cookie to be sent with the downstream headers.
    * @param key supplies the size of the cookie
@@ -348,20 +352,25 @@ private:
     Tracing::SpanPtr span_;
     StreamInfo::StreamInfoImpl stream_info_;
     StreamInfo::UpstreamTiming upstream_timing_;
-    Http::HeaderMap* upstream_headers_{};
-    Http::HeaderMap* upstream_trailers_{};
+    // Copies of upstream headers/trailers. These are only set if upstream
+    // access logging is configured.
+    Http::HeaderMapPtr upstream_headers_;
+    Http::HeaderMapPtr upstream_trailers_;
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;
     bool encode_complete_ : 1;
     bool encode_trailers_ : 1;
+    // Tracks whether we deferred a per try timeout because the downstream request
+    // had not been completed yet.
+    bool create_per_try_timeout_on_request_complete_ : 1;
   };
 
   typedef std::unique_ptr<UpstreamRequest> UpstreamRequestPtr;
 
   StreamInfo::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
-  static const std::string upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
+  static const std::string& upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
   void chargeUpstreamCode(uint64_t response_status_code, const Http::HeaderMap& response_headers,
                           Upstream::HostDescriptionConstSharedPtr upstream_host, bool dropped);
   void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host,
@@ -379,14 +388,15 @@ private:
   void onPerTryTimeout(UpstreamRequest& upstream_request);
   void onRequestComplete();
   void onResponseTimeout();
-  void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers);
+  void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers,
+                                    UpstreamRequest& upstream_request);
   // Handle an upstream request aborted due to a local timeout.
-  void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag);
+  void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag, absl::string_view details);
   // Handle an "aborted" upstream request, meaning we didn't see response
   // headers (e.g. due to a reset). Handles recording stats and responding
   // downstream if appropriate.
   void onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flag,
-                       absl::string_view body, bool dropped);
+                       absl::string_view body, bool dropped, absl::string_view details);
   void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
                          UpstreamRequest& upstream_request, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request, bool end_stream);

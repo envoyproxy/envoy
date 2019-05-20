@@ -47,7 +47,7 @@ public:
   NiceMock<MockOverloadManager> overload_manager_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  DefaultTestHooks hooks_;
+  DefaultListenerHooks hooks_;
   Event::TimerPtr no_exit_timer_;
   WorkerImpl worker_;
 };
@@ -72,7 +72,8 @@ TEST_F(WorkerImplTest, BasicFlow) {
   });
 
   NiceMock<Stats::MockStore> store;
-  worker_.start(guard_dog_, store, "test");
+  worker_.start(guard_dog_);
+  worker_.initializeStats(store, "test");
   ci.waitReady();
 
   // After a worker is started adding/stopping/removing a listener happens on the worker thread.
@@ -141,8 +142,7 @@ TEST_F(WorkerImplTest, ListenerException) {
       .WillOnce(Throw(Network::CreateListenerException("failed")));
   worker_.addListener(listener, [](bool success) -> void { EXPECT_FALSE(success); });
 
-  NiceMock<Stats::MockStore> store;
-  worker_.start(guard_dog_, store, "test");
+  worker_.start(guard_dog_);
   worker_.stop();
 }
 

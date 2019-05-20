@@ -162,6 +162,16 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+.. _config_access_log_format_response_code_details:
+
+%RESPONSE_CODE_DETAILS%
+  HTTP
+    HTTP response code details provides additional information about the response code, such as
+    who set it (the upstream or envoy) and why.
+
+  TCP
+    Not implemented ("-")
+
 %BYTES_SENT%
   HTTP
     Body bytes sent. For WebSocket connection it will also include response header bytes.
@@ -347,4 +357,9 @@ The following command operators are supported:
   TCP
     The subject present in the peer certificate used to establish the downstream TLS connection.
 
+%DOWNSTREAM_TLS_SESSION_ID%
+  HTTP
+    The session ID for the established downstream TLS connection.
+  TCP
+    The session ID for the established downstream TLS connection.
 

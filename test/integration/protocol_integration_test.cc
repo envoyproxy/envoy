@@ -509,7 +509,8 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
 
 // Test hitting the dynamo filter with too many response bytes to buffer. Given the request headers
 // are sent on early, the stream/connection will be reset.
-TEST_P(DownstreamProtocolIntegrationTest, HittingEncoderFilterLimit) {
+TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
+  useAccessLog();
   config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
@@ -530,11 +531,19 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingEncoderFilterLimit) {
   // be buffered, the stream will be reset, and the connection will disconnect.
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   upstream_request_->encodeData(1024 * 65, false);
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  }
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("500"));
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_5xx", 1);
 }
 
 TEST_P(ProtocolIntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }

@@ -60,16 +60,6 @@ public:
   virtual SysCallIntResult close(int fd) PURE;
 
   /**
-   * @see shm_open (man 3 shm_open)
-   */
-  virtual SysCallIntResult shmOpen(const char* name, int oflag, mode_t mode) PURE;
-
-  /**
-   * @see shm_unlink (man 3 shm_unlink)
-   */
-  virtual SysCallIntResult shmUnlink(const char* name) PURE;
-
-  /**
    * @see man 2 ftruncate
    */
   virtual SysCallIntResult ftruncate(int fd, off_t length) PURE;
