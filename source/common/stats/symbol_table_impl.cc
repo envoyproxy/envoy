@@ -118,7 +118,7 @@ void SymbolTableImpl::addTokensToEncoding(const absl::string_view name, Encoding
 
   // We want to hold the lock for the minimum amount of time, so we do the
   // string-splitting and prepare a temp vector of Symbol first.
-  StringViewVector tokens = absl::StrSplit(name, '.');
+  std::vector<absl::string_view> tokens = absl::StrSplit(name, '.');
   std::vector<Symbol> symbols;
   symbols.reserve(tokens.size());
 
@@ -156,12 +156,14 @@ std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
   return absl::StrJoin(decodeSymbolVecTokens(symbols), ".");
 }
 
-StringViewVector SymbolTableImpl::statNameToStringVector(const StatName& stat_name) const {
+std::vector<absl::string_view>
+SymbolTableImpl::statNameToStringVector(const StatName& stat_name) const {
   return decodeSymbolVecTokens(Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize()));
 }
 
-StringViewVector SymbolTableImpl::decodeSymbolVecTokens(const SymbolVec& symbols) const {
-  StringViewVector name_tokens;
+std::vector<absl::string_view>
+SymbolTableImpl::decodeSymbolVecTokens(const SymbolVec& symbols) const {
+  std::vector<absl::string_view> name_tokens;
   name_tokens.reserve(symbols.size());
   {
     // Hold the lock only while decoding symbols.
@@ -435,7 +437,7 @@ void StatNameList::clear(SymbolTable& symbol_table) {
   storage_.reset();
 }
 
-size_t StringViewVectorHash::operator()(const StringViewVector& a) const {
+size_t StringViewVectorHash::operator()(const std::vector<absl::string_view>& a) const {
   uint64_t hash = 0;
   for (absl::string_view sv : a) {
     hash = 63 * hash + HashUtil::xxHash64(sv);
@@ -447,17 +449,24 @@ absl::optional<StatName> StringStatNameMap::find(absl::string_view name,
                                                  const SymbolTable& symbol_table) const {
   absl::optional<StatName> ret;
 
-  StringViewVector v = symbol_table.splitString(name);
-  auto iter = string_vector_stat_name_map_.find(v);
-  if (iter != string_vector_stat_name_map_.end()) {
+  // TODO(jmarantz)(: change the hash/compare mechanism to avoid needing to
+  // allocate memory during the find() operation. We should be able to
+  // iterate over the "."-separated tokens to compute the hash-value without
+  // having to have the allocated split vector first. Similar for compare.
+  //
+  // The only nuance -- and the reason to leave this as is for now, is that
+  // when using FakeSymbolTable, there is no actual splitting by token.
+  std::vector<absl::string_view> v = symbol_table.splitString(name);
+  auto iter = map_.find(v);
+  if (iter != map_.end()) {
     ret = iter->second;
   }
   return ret;
 }
 
 void StringStatNameMap::insert(StatName stat_name, const SymbolTable& symbol_table) {
-  StringViewVector v = symbol_table.statNameToStringVector(stat_name);
-  string_vector_stat_name_map_[v] = stat_name;
+  std::vector<absl::string_view> v = symbol_table.statNameToStringVector(stat_name);
+  map_[v] = stat_name;
 }
 
 } // namespace Stats

@@ -123,6 +123,10 @@ public:
   const SymbolTable& symbolTable() const override { return wrapped_scope_->symbolTable(); }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
 
+  StatName fastMemoryIntensiveStatNameLookup(absl::string_view name) override {
+    return wrapped_scope_->fastMemoryIntensiveStatNameLookup(name);
+  }
+
 private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
@@ -195,6 +199,11 @@ public:
   std::vector<ParentHistogramSharedPtr> histograms() const override {
     Thread::LockGuard lock(lock_);
     return store_.histograms();
+  }
+
+  StatName fastMemoryIntensiveStatNameLookup(absl::string_view name) override {
+    Thread::LockGuard lock(lock_);
+    return store_.fastMemoryIntensiveStatNameLookup(name);
   }
 
   // Stats::StoreRoot

@@ -16,7 +16,7 @@ ScopePrefixer::ScopePrefixer(absl::string_view prefix, Scope& scope)
 
 ScopePrefixer::ScopePrefixer(StatName prefix, Scope& scope)
     : scope_(scope), prefix_(prefix, symbolTable()),
-      prefix_string_(symbolTable().toString(prefix)) {}
+      prefix_string_(symbolTable().toString(prefix) + ".") {}
 
 ScopePrefixer::~ScopePrefixer() { prefix_.free(symbolTable()); }
 

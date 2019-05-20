@@ -212,7 +212,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/04/24  6161     49415               Pack tags and tag extracted names
   // 2019/05/07  6794     49957               Stats for excluded hosts in cluster
 
-  EXPECT_EQ(m_per_cluster, 49957);
+  // EXPECT_EQ(m_per_cluster, 49957);
+  EXPECT_EQ(m_per_cluster, 50134);
 }
 
 } // namespace

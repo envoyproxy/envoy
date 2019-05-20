@@ -22,8 +22,6 @@ class StatName;
 
 class StatNameList;
 
-using StringViewVector = std::vector<absl::string_view>;
-
 /**
  * SymbolTable manages a namespace optimized for stat names, exploiting their
  * typical composition from "."-separated tokens, with a significant overlap
@@ -192,13 +190,14 @@ private:
    * SymbolTable as long as a reference to the symbols is retained. This takes
    * a lock on the symbol table.
    */
-  virtual StringViewVector statNameToStringVector(const StatName& stat_name) const PURE;
+  virtual std::vector<absl::string_view>
+  statNameToStringVector(const StatName& stat_name) const PURE;
 
   /**
    * Splits a string_view into multple symbols. This does not require a lock on
    * the symbol table.
    */
-  virtual StringViewVector splitString(absl::string_view) const PURE;
+  virtual std::vector<absl::string_view> splitString(absl::string_view) const PURE;
 };
 
 using SharedSymbolTable = std::shared_ptr<SymbolTable>;

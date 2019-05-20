@@ -125,10 +125,10 @@ public:
     fn(toStringView(stat_name));
   }
 
-  StringViewVector statNameToStringVector(const StatName& stat_name) const override {
+  std::vector<absl::string_view> statNameToStringVector(const StatName& stat_name) const override {
     return {toStringView(stat_name)};
   }
-  StringViewVector splitString(absl::string_view s) const override { return {s}; }
+  std::vector<absl::string_view> splitString(absl::string_view s) const override { return {s}; }
 
 private:
   absl::string_view toStringView(const StatName& stat_name) const {

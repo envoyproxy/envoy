@@ -139,8 +139,8 @@ public:
   void callWithStringView(StatName stat_name,
                           const std::function<void(absl::string_view)>& fn) const override;
 
-  StringViewVector statNameToStringVector(const StatName& stat_name) const override;
-  StringViewVector splitString(absl::string_view s) const override {
+  std::vector<absl::string_view> statNameToStringVector(const StatName& stat_name) const override;
+  std::vector<absl::string_view> splitString(absl::string_view s) const override {
     return absl::StrSplit(s, '.');
   }
 
@@ -188,7 +188,7 @@ private:
    * @return std::string the retrieved stat name.
    */
   std::string decodeSymbolVec(const SymbolVec& symbols) const;
-  StringViewVector decodeSymbolVecTokens(const SymbolVec& symbols) const;
+  std::vector<absl::string_view> decodeSymbolVecTokens(const SymbolVec& symbols) const;
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
@@ -549,7 +549,6 @@ struct HeterogeneousStatNameEqual {
   // See description for HeterogeneousStatNameHash::is_transparent.
   using is_transparent = void;
 
-  // size_t operator()(StatName a, StatName b) const { return a == b; }
   size_t operator()(const StatNameStorage& a, const StatNameStorage& b) const {
     return a.statName() == b.statName();
   }
@@ -612,13 +611,21 @@ private:
 };
 
 struct StringViewVectorHash {
-  size_t operator()(const StringViewVector& a) const;
+  size_t operator()(const std::vector<absl::string_view>& a) const;
 };
 
+// Captures a map from string_view to StatName. The backing store for both of
+// these must be separately managed, and live beyond the map.
+//
+// This is intended for use as a TLS cache in thread_local_store.cc, with the
+// backing store held in sets in the CentralCacheEntry.
 class StringStatNameMap {
 public:
   /**
    * This does not take a lock in the symbol table.
+   * @param name the string stat-name to find.
+   * @param symbol_table the symbol-table used to help split the string into tokens.
+   * @return the StatName, if found.
    */
   absl::optional<StatName> find(absl::string_view name, const SymbolTable& symbol_table) const;
 
@@ -626,15 +633,16 @@ public:
    * Inserts stat_name into the StatNameStorageMap. Caller must guarantee that
    * the backing-store for StatName lasts longer than the StatNameStorageMap.
    *
-   * Note: this take a lock in the symbol table, so it's useful to call find() first.
+   * Note: this takes a lock in the symbol table, in order to do
+   * symbol-string-lookups in its lock-protected symbol map.
+   *
+   * @param stat_name the name to insert.
+   * @param symbol_table the symbol-table used to find stable strings for the tokens in stat names.
    */
   void insert(StatName stat_name, const SymbolTable& symbol_table);
 
 private:
-  using StringVectorStatNameMap =
-      absl::flat_hash_map<StringViewVector, StatName, StringViewVectorHash>;
-
-  StringVectorStatNameMap string_vector_stat_name_map_;
+  absl::flat_hash_map<std::vector<absl::string_view>, StatName, StringViewVectorHash> map_;
 };
 
 } // namespace Stats
