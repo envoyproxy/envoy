@@ -76,9 +76,6 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:disable_signal_trace": [],
                "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
            }) + select({
-               repository + "//bazel:optimize_bin_size": ["-Os"],
-               "//conditions:default": [],
-           }) + select({
                repository + "//bazel:enable_log_debug_assert_in_release": ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \

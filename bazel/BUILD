@@ -232,13 +232,6 @@ config_setting(
     values = {"define": "manual_stamp=manual_stamp"},
 )
 
-config_setting(
-    name = "optimize_bin_size",
-    values = {
-        "define": "optimize_binary_size=enabled",
-    },
-)
-
 alias(
     name = "apple",
     actual = select(

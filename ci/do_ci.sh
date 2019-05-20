@@ -64,14 +64,14 @@ function bazel_binary_build() {
     BINARY_SUFFIX="-debug"
   elif [[ "${BINARY_TYPE}" == "sizeopt" ]]; then
     COMPILE_TYPE=opt
-    COPT="-Os"
+    CONFIG_ARGS="--config=sizeopt"
   elif [[ "${BINARY_TYPE}" == "fastbuild" ]]; then
     COMPILE_TYPE=fastbuild
     BINARY_SUFFIX="-fastbuild"
   fi
 
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c ${COMPILE_TYPE} //source/exe:envoy-static --copt="${COPT}"
+  bazel build ${BAZEL_BUILD_OPTIONS} -c ${COMPILE_TYPE} //source/exe:envoy-static ${CONFIG_ARGS}
   collect_build_profile ${BINARY_TYPE}_build
 
   # Copy the envoy-static binary somewhere that we can access outside of the
@@ -171,6 +171,7 @@ elif [[ "$1" == "bazel.dev" ]]; then
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel fastbuild build with tests..."
   echo "Building..."
+  bazel_binary_build fastbuild
   bazel_binary_build fastbuild
 
   echo "Building and testing..."
