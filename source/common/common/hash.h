@@ -82,7 +82,7 @@ struct ConstCharStarHash {
 };
 
 struct ConstCharStarEqual {
-  size_t operator()(const char* a, const char* b) const { return strcmp(a, b) == 0; }
+  bool operator()(const char* a, const char* b) const { return strcmp(a, b) == 0; }
 };
 
 template <class Value>
@@ -111,10 +111,10 @@ struct HeterogeneousStringEqual {
   // See description for HeterogeneousStringHash::is_transparent.
   using is_transparent = void;
 
-  size_t operator()(absl::string_view a, absl::string_view b) const { return a == b; }
-  size_t operator()(const SharedString& a, const SharedString& b) const { return *a == *b; }
-  size_t operator()(absl::string_view a, const SharedString& b) const { return a == *b; }
-  size_t operator()(const SharedString& a, absl::string_view b) const { return *a == b; }
+  bool operator()(absl::string_view a, absl::string_view b) const { return a == b; }
+  bool operator()(const SharedString& a, const SharedString& b) const { return *a == *b; }
+  bool operator()(absl::string_view a, const SharedString& b) const { return a == *b; }
+  bool operator()(const SharedString& a, absl::string_view b) const { return *a == b; }
 };
 
 // We use heterogeneous hash/equal functors to do a find() without constructing

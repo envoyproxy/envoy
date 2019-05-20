@@ -22,6 +22,8 @@ class StatName;
 
 class StatNameList;
 
+using StringViewVector = std::vector<absl::string_view>;
+
 /**
  * SymbolTable manages a namespace optimized for stat names, exploiting their
  * typical composition from "."-separated tokens, with a significant overlap
@@ -146,6 +148,7 @@ private:
   friend struct HeapStatData;
   friend class StatNameStorage;
   friend class StatNameList;
+  friend class StringStatNameMap;
 
   // The following methods are private, but are called by friend classes
   // StatNameStorage and StatNameList, which must be friendly with SymbolTable
@@ -182,6 +185,20 @@ private:
    *
    */
   virtual StoragePtr encode(absl::string_view name) PURE;
+
+  /**
+   * Returns a vector of absl:string_view containing the symbols in the
+   * StatName. The string_view elements reference memory that is held in the
+   * SymbolTable as long as a reference to the symbols is retained. This takes
+   * a lock on the symbol table.
+   */
+  virtual StringViewVector statNameToStringVector(const StatName& stat_name) const PURE;
+
+  /**
+   * Splits a string_view into multple symbols. This does not require a lock on
+   * the symbol table.
+   */
+  virtual StringViewVector splitString(absl::string_view) const PURE;
 };
 
 using SharedSymbolTable = std::shared_ptr<SymbolTable>;

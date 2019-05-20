@@ -227,10 +227,10 @@ private:
 
     // We keep a TLS cache of rejected stat names. This costs memory, but
     // reduces runtime overhead running the matcher. Moreover, once symbol
-    // tables are integrated, rejection will need the fully elaborated string,
-    // and it we need to take a global symbol-table lock to run. We keep this
-    // StatName set here in the TLS cache to avoid taking a lock to compute
-    // rejection.
+    // tables are integrated, checking rejection without a cache would require
+    // the fully elaborated string, requiring acquisition of the global
+    // symbol-table lock. We keep this StatName set here in the TLS cache to
+    // avoid taking a lock to compute rejection.
     StatNameHashSet rejected_stats_;
   };
 
@@ -239,6 +239,10 @@ private:
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
     StatNameStorageSet rejected_stats_;
+
+    // Strings should in most cases be converted to symbols at construction
+    // time. However, for a
+    absl::flat_hash_map<std::string, StatName> hot_path_symbols_;
   };
 
   struct ScopeImpl : public TlsScope {

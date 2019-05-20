@@ -118,7 +118,7 @@ void SymbolTableImpl::addTokensToEncoding(const absl::string_view name, Encoding
 
   // We want to hold the lock for the minimum amount of time, so we do the
   // string-splitting and prepare a temp vector of Symbol first.
-  std::vector<absl::string_view> tokens = absl::StrSplit(name, '.');
+  StringViewVector tokens = absl::StrSplit(name, '.');
   std::vector<Symbol> symbols;
   symbols.reserve(tokens.size());
 
@@ -153,7 +153,11 @@ void SymbolTableImpl::callWithStringView(StatName stat_name,
 }
 
 std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
-  std::vector<absl::string_view> name_tokens;
+  return absl::StrJoin(decodeSymbolVecTokens(symbols), ".");
+}
+
+StringViewVector SymbolTableImpl::decodeSymbolVecTokens(const SymbolVec& symbols) const {
+  StringViewVector name_tokens;
   name_tokens.reserve(symbols.size());
   {
     // Hold the lock only while decoding symbols.
@@ -162,7 +166,7 @@ std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
       name_tokens.push_back(fromSymbol(symbol));
     }
   }
-  return absl::StrJoin(name_tokens, ".");
+  return name_tokens;
 }
 
 void SymbolTableImpl::incRefCount(const StatName& stat_name) {
@@ -426,6 +430,38 @@ void StatNameList::clear(SymbolTable& symbol_table) {
   });
   storage_.reset();
 }
+
+size_t StringViewVectorHash::operator()(const StringViewVector& a) const {
+  uint64_t hash = 0;
+  for (absl::string_view sv : a) {
+    hash = 63 * hash + HashUtil::xxHash64(sv);
+  }
+  return hash;
+}
+
+StringViewVector SymbolTableImpl::statNameToStringVector(const StatName& stat_name) const {
+  return decodeSymbolVecTokens(Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize()));
+}
+
+/*struct StringViewVectorCompare {
+  size_t operator()(const StringViewVector& a, const StringViewVector& b) const;
+};
+
+
+bool StringViewVectorCompare operator()(const StringViewVector& a,
+                                        const StringViewVector& b) const {
+  return
+  if (a.size() != b.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < a.size(); ++i) {
+    if (a[i] != b[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+*/
 
 } // namespace Stats
 } // namespace Envoy

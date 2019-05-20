@@ -139,6 +139,11 @@ public:
   void callWithStringView(StatName stat_name,
                           const std::function<void(absl::string_view)>& fn) const override;
 
+  StringViewVector statNameToStringVector(const StatName& stat_name) const override;
+  StringViewVector splitString(absl::string_view s) const override {
+    return absl::StrSplit(s, '.');
+  }
+
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override;
 #endif
@@ -183,6 +188,7 @@ private:
    * @return std::string the retrieved stat name.
    */
   std::string decodeSymbolVec(const SymbolVec& symbols) const;
+  StringViewVector decodeSymbolVecTokens(const SymbolVec& symbols) const;
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
@@ -542,13 +548,14 @@ struct HeterogeneousStatNameHash {
 
   size_t operator()(StatName a) const { return a.hash(); }
   size_t operator()(const StatNameStorage& a) const { return a.statName().hash(); }
+  size_t operator()(absl::string_view str) const;
 };
 
 struct HeterogeneousStatNameEqual {
   // See description for HeterogeneousStatNameHash::is_transparent.
   using is_transparent = void;
 
-  size_t operator()(StatName a, StatName b) const { return a == b; }
+  // size_t operator()(StatName a, StatName b) const { return a == b; }
   size_t operator()(const StatNameStorage& a, const StatNameStorage& b) const {
     return a.statName() == b.statName();
   }
@@ -608,6 +615,47 @@ public:
 
 private:
   HashSet hash_set_;
+};
+
+struct StringViewVectorHash {
+  size_t operator()(const StringViewVector& a) const;
+};
+
+class StringStatNameMap {
+public:
+  explicit StringStatNameMap(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+
+  /**
+   * This does not take a lock in the symbol table.
+   */
+  absl::optional<StatName> find(absl::string_view name) const {
+    absl::optional<StatName> ret;
+
+    StringViewVector v = symbol_table_.splitString(name);
+    auto iter = string_vector_stat_name_map_.find(v);
+    if (iter != string_vector_stat_name_map_.end()) {
+      ret = iter->second;
+    }
+    return ret;
+  }
+
+  /**
+   * Inserts stat_name into the StatNameStorageMap. Caller must guarantee that
+   * the backing-store for StatName lasts longer than the StatNameStorageMap.
+   *
+   * Note: this take a lock in the symbol table, so it's useful to call find() first.
+   */
+  void insert(StatName stat_name) {
+    StringViewVector v = symbol_table_.statNameToStringVector(stat_name);
+    string_vector_stat_name_map_[v] = stat_name;
+  }
+
+private:
+  using StringVectorStatNameMap =
+      absl::flat_hash_map<StringViewVector, StatName, StringViewVectorHash>;
+
+  StringVectorStatNameMap string_vector_stat_name_map_;
+  SymbolTable& symbol_table_;
 };
 
 } // namespace Stats

@@ -537,6 +537,16 @@ TEST_P(StatNameTest, SharedStatNameStorageSetSwap) {
   set2.free(*table_);
 }
 
+TEST_P(StatNameTest, StatNameStringMap) {
+  StatNameManagedStorage foo_bar("foo.bar", *table_); // Must outlive the map.
+  {
+    StringStatNameMap map(*table_);
+    EXPECT_FALSE(map.find("foo.bar"));
+    map.insert(foo_bar.statName());
+    EXPECT_EQ(map.find("foo.bar"), foo_bar.statName());
+  }
+}
+
 // Tests the memory savings realized from using symbol tables with 1k
 // clusters. This test shows the memory drops from almost 8M to less than
 // 2M. Note that only SymbolTableImpl is tested for memory consumption,
