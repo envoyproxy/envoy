@@ -143,7 +143,7 @@ public:
     stream_info.host_ = nullptr;
 
     Http::TestHeaderMapImpl request_headers{
-      {":method", request_method},
+        {":method", request_method},
     };
 
     expectLog(fmt::format(R"EOF(
@@ -163,7 +163,8 @@ public:
           request_method: {}
           request_headers_bytes: {}
         response: {{}}
-    )EOF", request_method, request_method.length() + 7));
+    )EOF",
+                          request_method, request_method.length() + 7));
     access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
 
