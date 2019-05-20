@@ -3,7 +3,6 @@ Version history
 
 1.11.0 (Pending)
 ================
-* tool: added `proto <https://github.com/envoyproxy/envoy/blob/master/test/tools/router_check/validation.proto>`_ support for :ref:`router check tool <install_tools_route_table_check_tool>` tests.
 * access log: added a new field for downstream TLS session ID to file and gRPC access logger.
 * access log: added a new field for response code details in :ref:`file access logger<config_access_log_format_response_code_details>` and :ref:`gRPC access logger<envoy_api_field_data.accesslog.v2.HTTPResponseProperties.response_code_details>`.
 * admin: the administration interface now includes a :ref:`/ready endpoint <operations_admin_interface>` for easier readiness checks.
@@ -37,6 +36,7 @@ Version history
   <envoy_api_field_config.bootstrap.v2.Runtime.base>`.
 * server: ``--define manual_stamp=manual_stamp`` was added to allow server stamping outside of binary rules.
   more info in the `bazel docs <https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#enabling-optional-features>`_.
+* tool: added `proto <https://github.com/envoyproxy/envoy/blob/master/test/tools/router_check/validation.proto>`_ support for :ref:`router check tool <install_tools_route_table_check_tool>` tests.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
 * upstream: an EDS management server can now force removal of a host that is still passing active
   health checking by first marking the host as failed via EDS health check and subsequently removing

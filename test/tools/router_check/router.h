@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
@@ -71,7 +73,7 @@ public:
    * @param expected_route_json tool config json file.
    * @return bool if all routes match what is expected.
    */
-  bool compareEntries(const std::string& expected_route_json);
+  bool compareEntries(const std::string& expected_routes);
 
   /**
    * Set whether to print out match case details.

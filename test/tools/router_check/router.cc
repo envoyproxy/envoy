@@ -50,9 +50,9 @@ ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem
   }
 
   if (check_config.input().additional_headers().data()) {
-    for (const envoy::RouterCheckToolSchema::AdditionalHeader& header_config :
+    for (const envoy::api::v2::core::HeaderValue& header_config :
          check_config.input().additional_headers()) {
-      headers->addCopy(header_config.field(), header_config.value());
+      headers->addCopy(header_config.key(), header_config.value());
     }
   }
 
@@ -152,12 +152,12 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
   return no_failures;
 }
 
-bool RouterCheckTool::compareEntries(const std::string& expected_route_json) {
+bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
   envoy::RouterCheckToolSchema::Validation validation_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
-  const std::string contents = api->fileSystem().fileReadToEnd(expected_route_json);
-  MessageUtil::loadFromFile(expected_route_json, validation_config, *api);
+  const std::string contents = api->fileSystem().fileReadToEnd(expected_routes);
+  MessageUtil::loadFromFile(expected_routes, validation_config, *api);
 
   bool no_failures = true;
   for (const envoy::RouterCheckToolSchema::ValidationItem& check_config :
@@ -325,8 +325,8 @@ bool RouterCheckTool::compareHeaderField(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
   if (expected.header_fields().data()) {
-    for (const envoy::RouterCheckToolSchema::AdditionalHeader& header : expected.header_fields()) {
-      if (!compareHeaderField(tool_config, header.field(), header.value())) {
+    for (const envoy::api::v2::core::HeaderValue& header : expected.header_fields()) {
+      if (!compareHeaderField(tool_config, header.key(), header.value())) {
         no_failures = false;
       }
     }
@@ -358,9 +358,8 @@ bool RouterCheckTool::compareCustomHeaderField(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
   if (expected.custom_header_fields().data()) {
-    for (const envoy::RouterCheckToolSchema::AdditionalHeader& header :
-         expected.custom_header_fields()) {
-      if (!compareCustomHeaderField(tool_config, header.field(), header.value())) {
+    for (const envoy::api::v2::core::HeaderValue& header : expected.custom_header_fields()) {
+      if (!compareCustomHeaderField(tool_config, header.key(), header.value())) {
         no_failures = false;
       }
     }

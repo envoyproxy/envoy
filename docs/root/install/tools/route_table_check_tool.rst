@@ -18,6 +18,10 @@ Input
      :ref:`config <config_tools_router_check_tool>`.
      The tool config input file specifies urls (composed of authorities and paths)
      and expected route parameter values. Additional parameters such as additional headers are optional.
+     Schema: The tool deals with JSON objects internally, based on `this schema <https://github.com/envoyproxy/envoy/blob/master/test/tools/router_check/json/tool_config_schemas.cc>`_.
+     A recent feature moves all internal schemas in the tool to proto3. This feature can be enabled by an extra optional parameter ``--useproto``.
+     It introduces a breaking change in the test based on `schema <https://github.com/envoyproxy/envoy/blob/master/test/tools/router_check/validation.proto>`_.
+     The json schema will be deprecated in future realeases.
 
 Output
   The program exits with status EXIT_FAILURE if any test case does not match the expected route parameter
@@ -65,8 +69,3 @@ Testing
 
     bazel test //test/tools/router_check/...
   
-Test schema
-  The tool deals with JSON objects internally. A recent feature moves all internal schemas in the tool to proto3. 
-  This feature can be enabled by an extra optional parameter ``--useproto``.
-  It introduces a breaking change in the test based on `schema <https://github.com/envoyproxy/envoy/blob/master/test/tools/router_check/validation.proto>`_.
-  The json schema will be deprecated in future realeases.
