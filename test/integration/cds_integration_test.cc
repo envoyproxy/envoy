@@ -41,11 +41,6 @@ public:
     sotw_or_delta_ = sotwOrDelta();
   }
 
-  // TODO TODO TRIM?  CdsIntegrationTest(Network::Address::IpVersion ip_version, const std::string&
-  // config)
-  // TODO TODO TRIM?      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ip_version, config)
-  // {}
-
   void TearDown() override {
     if (!test_skipped_) {
       cleanUpXdsConnection();

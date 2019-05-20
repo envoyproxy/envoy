@@ -44,9 +44,9 @@ public:
   ~GrpcClientIntegrationParamTest() override = default;
   static std::string protocolTestParamsToString(
       const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, ClientType>>& p) {
-    return absl::StrCat(
-        (std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
-        (std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc"));
+    return fmt::format("{}_{}",
+                       std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+                       std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc");
   }
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   ClientType clientType() const override { return std::get<1>(GetParam()); }
@@ -60,10 +60,10 @@ public:
   static std::string
   protocolTestParamsToString(const ::testing::TestParamInfo<
                              std::tuple<Network::Address::IpVersion, ClientType, SotwOrDelta>>& p) {
-    return absl::StrCat(
-        (std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
-        (std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc"),
-        (std::get<2>(p.param) == SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld"));
+    return fmt::format("{}_{}_{}",
+                       std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+                       std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
+                       std::get<2>(p.param) == SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld");
   }
   Network::Address::IpVersion ipVersion() const { return std::get<0>(GetParam()); }
   ClientType clientType() const { return std::get<1>(GetParam()); }
