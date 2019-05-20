@@ -49,9 +49,9 @@ public:
   virtual void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                                    const std::string& version, bool accept) PURE;
 
-  virtual void deliverConfigUpdateWithCode(const std::vector<std::string>& cluster_names,
-                                           const std::string& version, bool accept,
-                                           const std::string& response_code = "200") PURE;
+  virtual void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
+                                   const std::string& version, bool accept, bool modify,
+                                   const std::string& response_code = "200") PURE;
 
   virtual void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,
                            uint64_t version) {
