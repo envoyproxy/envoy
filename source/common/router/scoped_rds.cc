@@ -23,10 +23,8 @@ ConfigProviderPtr ScopedRoutesConfigProviderUtil::maybeCreate(
         config,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
     ConfigProviderManager& scoped_routes_config_provider_manager) {
-  if (config.route_specifier_case() != envoy::config::filter::network::http_connection_manager::v2::
-                                           HttpConnectionManager::kScopedRoutes) {
-    return nullptr;
-  }
+  ASSERT(config.route_specifier_case() == envoy::config::filter::network::http_connection_manager::
+                                              v2::HttpConnectionManager::kScopedRoutes);
 
   switch (config.scoped_routes().config_specifier_case()) {
   case envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
@@ -34,7 +32,7 @@ ConfigProviderPtr ScopedRoutesConfigProviderUtil::maybeCreate(
     const envoy::config::filter::network::http_connection_manager::v2::
         ScopedRouteConfigurationsList& scoped_route_list =
             config.scoped_routes().scoped_route_configurations_list();
-    std::vector<std::unique_ptr<const Protobuf::Message>> config_protos(
+    ProtobufTypes::ConstMessagePtrVector config_protos(
         scoped_route_list.scoped_route_configurations().size());
     for (const auto& it : scoped_route_list.scoped_route_configurations()) {
       Protobuf::Message* clone = it.New();
@@ -66,7 +64,7 @@ ConfigProviderPtr ScopedRoutesConfigProviderUtil::maybeCreate(
 }
 
 InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
-    std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos, std::string name,
+    ProtobufTypes::ConstMessagePtrVector&& config_protos, std::string name,
     Server::Configuration::FactoryContext& factory_context,
     ScopedRoutesConfigProviderManager& config_provider_manager,
     envoy::api::v2::core::ConfigSource rds_config_source,
@@ -254,7 +252,7 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
 }
 
 ConfigProviderPtr ScopedRoutesConfigProviderManager::createStaticConfigProvider(
-    std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
+    ProtobufTypes::ConstMessagePtrVector&& config_protos,
     Server::Configuration::FactoryContext& factory_context,
     const ConfigProviderManager::OptionalArg& optarg) {
   const auto& typed_optarg = static_cast<const ScopedRoutesConfigProviderManagerOptArg&>(optarg);

@@ -32,7 +32,7 @@ class ScopedRoutesConfigProviderManager;
 class InlineScopedRoutesConfigProvider : public Envoy::Config::ImmutableConfigProviderBase {
 public:
   InlineScopedRoutesConfigProvider(
-      std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos, std::string name,
+      ProtobufTypes::ConstMessagePtrVector&& config_protos, std::string name,
       Server::Configuration::FactoryContext& factory_context,
       ScopedRoutesConfigProviderManager& config_provider_manager,
       envoy::api::v2::core::ConfigSource rds_config_source,
