@@ -4,6 +4,7 @@ set -e
 
 # Router_check_tool binary path
 PATH_BIN="${TEST_RUNDIR}"/test/tools/router_check/router_check_tool
+
 # Config json path
 PATH_CONFIG="${TEST_RUNDIR}"/test/tools/router_check/test/config
 
@@ -19,11 +20,7 @@ done
 # --useproto needs the test schema as a validation.proto message.
 for t in "${TESTS[@]}"
 do
-  sed -i '1s/^/{"tests":\n/' "${PATH_CONFIG}/${t}.golden.json"
-  sed -i "\$a}" "${PATH_CONFIG}/${t}.golden.json"
-  TEST_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/${t}.yaml" "${PATH_CONFIG}/${t}.golden.json" "--details" "--useproto")
-  sed -i '$ d' "${PATH_CONFIG}/${t}.golden.json"
-  sed -i '1d' "${PATH_CONFIG}/${t}.golden.json"
+  TEST_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/${t}.yaml" "${PATH_CONFIG}/${t}.golden.proto.json" "--details" "--useproto")
 done
 
 # Bad config file
