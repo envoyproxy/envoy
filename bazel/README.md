@@ -303,7 +303,7 @@ To override the compilation mode and optimize the build for binary size, you can
 use the `sizeopt` configuration:
 
 ```
-bazel build //source/exe:envoy-static --config=sizeopt
+bazel build -c opt //source/exe:envoy-static --config=sizeopt
 ```
 
 ## Sanitizers
