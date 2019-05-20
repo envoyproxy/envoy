@@ -1,16 +1,15 @@
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy test targets. This includes both test library and test binary targets.
-
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load(":envoy_binary.bzl", "envoy_cc_binary")
 load(
     ":envoy_internal.bzl",
-    _envoy_copts = "envoy_copts",
-    _envoy_external_dep_path = "envoy_external_dep_path",
-    _envoy_linkstatic = "envoy_linkstatic",
-    _envoy_select_force_libcpp = "envoy_select_force_libcpp",
-    _envoy_static_link_libstdcpp_linkopts = "envoy_static_link_libstdcpp_linkopts",
-    _tcmalloc_external_dep = "tcmalloc_external_dep",
+    "envoy_copts",
+    "envoy_external_dep_path",
+    "envoy_linkstatic",
+    "envoy_select_force_libcpp",
+    "envoy_static_link_libstdcpp_linkopts",
+    "tcmalloc_external_dep",
 )
 
 # Envoy C++ related test infrastructure (that want gtest, gmock, but may be
@@ -32,15 +31,15 @@ def _envoy_cc_test_infrastructure_library(
         srcs = srcs,
         hdrs = hdrs,
         data = data,
-        copts = _envoy_copts(repository, test = True) + copts,
+        copts = envoy_copts(repository, test = True) + copts,
         testonly = 1,
-        deps = deps + [_envoy_external_dep_path(dep) for dep in external_deps] + [
-            _envoy_external_dep_path("googletest"),
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
+            envoy_external_dep_path("googletest"),
         ],
         tags = tags,
         include_prefix = include_prefix,
         alwayslink = 1,
-        linkstatic = _envoy_linkstatic(),
+        linkstatic = envoy_linkstatic(),
         **kargs
     )
 
@@ -61,7 +60,7 @@ def _envoy_test_linkopts():
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
         "//conditions:default": ["-pthread", "-lrt", "-ldl"],
-    }) + _envoy_select_force_libcpp(["-lc++fs"], ["-lstdc++fs", "-latomic"])
+    }) + envoy_select_force_libcpp(["-lc++fs"], ["-lstdc++fs", "-latomic"])
 
 # Envoy C++ fuzz test targets. These are not included in coverage runs.
 def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
@@ -87,7 +86,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
     )
     native.cc_test(
         name = name,
-        copts = _envoy_copts("@envoy", test = True),
+        copts = envoy_copts("@envoy", test = True),
         linkopts = _envoy_test_linkopts(),
         linkstatic = 1,
         args = ["$(locations %s)" % corpus_name],
@@ -109,7 +108,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
     # provide a path to FuzzingEngine.
     native.cc_binary(
         name = name + "_driverless",
-        copts = _envoy_copts("@envoy", test = True),
+        copts = envoy_copts("@envoy", test = True),
         linkopts = ["-lFuzzingEngine"] + _envoy_test_linkopts(),
         linkstatic = 1,
         testonly = 1,
@@ -150,10 +149,10 @@ def envoy_cc_test(
     )
     native.cc_test(
         name = name,
-        copts = _envoy_copts(repository, test = True) + copts,
+        copts = envoy_copts(repository, test = True) + copts,
         linkopts = _envoy_test_linkopts(),
-        linkstatic = _envoy_linkstatic(),
-        malloc = _tcmalloc_external_dep(repository),
+        linkstatic = envoy_linkstatic(),
+        malloc = tcmalloc_external_dep(repository),
         deps = [
             ":" + name + "_lib_internal_only",
             repository + "//test:main",
@@ -206,7 +205,7 @@ def envoy_cc_test_binary(
     envoy_cc_binary(
         name,
         testonly = 1,
-        linkopts = _envoy_test_linkopts() + _envoy_static_link_libstdcpp_linkopts(),
+        linkopts = _envoy_test_linkopts() + envoy_static_link_libstdcpp_linkopts(),
         **kargs
     )
 
@@ -218,7 +217,7 @@ def envoy_py_test_binary(
         **kargs):
     native.py_binary(
         name = name,
-        deps = deps + [_envoy_external_dep_path(dep) for dep in external_deps],
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
         **kargs
     )
 
