@@ -23,7 +23,7 @@ public:
   /**
    * @return the ProcessObject for this context.
    */
-  virtual ProcessObject* get() PURE;
+  virtual const ProcessObject* get() const PURE;
 };
 
 } // namespace Envoy

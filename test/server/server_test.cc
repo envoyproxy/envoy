@@ -5,6 +5,7 @@
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
+#include "server/process_context_impl.h"
 #include "server/server.h"
 
 #include "test/integration/server.h"
@@ -463,6 +464,39 @@ TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
   // so we look for a successful dynamic cast to HttpTracerImpl, rather
   // than HttpNullTracer.
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpTracerImpl*>(tracer()));
+}
+
+class TestObject : public ProcessObject {
+public:
+  TestObject() {}
+  void setFlag(bool value) { boolean_flag_ = value; }
+
+  bool boolean_flag_ = true;
+};
+
+TEST_P(ServerInstanceImplTest, WithProcessContext) {
+  TestObject object;
+
+  options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
+      "test/server/empty_bootstrap.yaml", {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
+  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+
+  auto server = std::make_unique<InstanceImpl>(
+      options_, test_time_.timeSystem(),
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+      hooks_, restart_, stats_store_, fakelock_, component_factory_,
+      std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+      std::make_unique<ProcessContextImpl>(&object));
+
+  ProcessContext& context = server->processContext();
+  const auto* object_from_context = dynamic_cast<const TestObject*>(context.get());
+  ASSERT_NE(object_from_context, nullptr);
+  EXPECT_EQ(object_from_context, &object);
+  EXPECT_TRUE(object_from_context->boolean_flag_);
+
+  object.boolean_flag_ = false;
+  EXPECT_FALSE(object_from_context->boolean_flag_);
 }
 
 } // namespace

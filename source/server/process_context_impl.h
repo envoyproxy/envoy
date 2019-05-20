@@ -8,10 +8,10 @@ class ProcessContextImpl : public ProcessContext {
 public:
   ProcessContextImpl(ProcessObject* process_object) : process_object_(process_object) {}
   // ProcessContext
-  ProcessObject* get() override { return process_object_; }
+  const ProcessObject* get() const override { return process_object_; }
 
 private:
-  ProcessObject* process_object_;
+  const ProcessObject* process_object_;
 };
 
 } // namespace Envoy
