@@ -1,3 +1,4 @@
+# DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy library targets
 load(
     ":envoy_internal.bzl",
@@ -8,6 +9,7 @@ load(
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 
+
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
 # SelectorValue values have to match the attribute type. See
 # https://github.com/bazelbuild/bazel/issues/2273.
@@ -17,12 +19,14 @@ def _tcmalloc_external_deps(repository):
         "//conditions:default": [envoy_external_dep_path("gperftools")],
     })
 
+
 # Envoy C++ library targets that need no transformations or additional dependencies before being
 # passed to cc_library should be specified with this function. Note: this exists to ensure that
 # all envoy targets pass through an envoy-declared skylark function where they can be modified
 # before being passed to a native bazel function.
 def envoy_basic_cc_library(name, **kargs):
     native.cc_library(name = name, **kargs)
+
 
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(
@@ -67,6 +71,7 @@ def envoy_cc_library(
         strip_include_prefix = strip_include_prefix,
     )
 
+
 # Used to specify a library that only builds on POSIX
 def envoy_cc_posix_library(name, srcs = [], hdrs = [], **kargs):
     envoy_cc_library(
@@ -81,6 +86,7 @@ def envoy_cc_posix_library(name, srcs = [], hdrs = [], **kargs):
         }),
         **kargs
     )
+
 
 # Used to specify a library that only builds on Windows
 def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
@@ -97,6 +103,7 @@ def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
         **kargs
     )
 
+
 # Transform the package path (e.g. include/envoy/common) into a path for
 # exporting the package headers at (e.g. envoy/common). Source files can then
 # include using this path scheme (e.g. #include "envoy/common/time.h").
@@ -104,6 +111,7 @@ def envoy_include_prefix(path):
     if path.startswith("source/") or path.startswith("include/"):
         return "/".join(path.split("/")[1:])
     return None
+
 
 # Envoy proto targets should be specified with this function.
 def envoy_proto_library(name, external_deps = [], **kwargs):

@@ -1,3 +1,4 @@
+# DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy binary targets
 load(
     ":envoy_internal.bzl",
@@ -6,6 +7,7 @@ load(
     "envoy_static_link_libstdcpp_linkopts",
     "tcmalloc_external_dep",
 )
+
 
 # Envoy C++ binary targets should be specified with this function.
 def envoy_cc_binary(
@@ -39,12 +41,14 @@ def envoy_cc_binary(
         deps = deps,
     )
 
+
 # Select the given values if exporting is enabled in the current build.
 def _envoy_select_exported_symbols(xs):
     return select({
         "@envoy//bazel:enable_exported_symbols": xs,
         "//conditions:default": [],
     })
+
 
 # Compute the final linkopts based on various options.
 def _envoy_linkopts():
@@ -69,6 +73,7 @@ def _envoy_linkopts():
            }) + envoy_static_link_libstdcpp_linkopts() + \
            _envoy_select_exported_symbols(["-Wl,-E"])
 
+
 def _envoy_stamped_deps():
     return select({
         "@envoy//bazel:apple": [
@@ -78,6 +83,7 @@ def _envoy_stamped_deps():
             "@envoy//bazel:gnu_build_id.ldscript",
         ],
     })
+
 
 def _envoy_stamped_linkopts():
     return select({
