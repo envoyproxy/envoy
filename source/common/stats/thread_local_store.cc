@@ -531,18 +531,15 @@ ThreadLocalStoreImpl::ScopeImpl::fastMemoryIntensiveStatNameLookup(absl::string_
   }
 
   // If that doesn't work, try the central cache.
-  Thread::LockGuard lock(parent_.lock_);
-  stat_name = central_cache_.hot_path_stats_map_.find(name, symbolTable());
-  if (!stat_name) {
-    StatNameStorage storage(name, symbolTable());
-    auto insertion = central_cache_.hot_path_stats_.insert(std::move(storage));
-    stat_name = insertion.first->statName();
-    if (insertion.second) {
+  {
+    Thread::LockGuard lock(parent_.lock_);
+    stat_name = central_cache_.hot_path_stats_map_.find(name, symbolTable());
+    if (!stat_name) {
+      StatNameStorage storage(name, symbolTable());
+      auto insertion = central_cache_.hot_path_stats_.insert(std::move(storage));
+      stat_name = insertion.first->statName();
+      ASSERT(insertion.second); // hot_path_stats_map_ and hot_path_stats_ are lock-protected.
       central_cache_.hot_path_stats_map_.insert(*stat_name, symbolTable());
-    } else {
-      // A race between threads can cause two threads to simultaneously
-      // try to insert the same name.
-      storage.free(symbolTable());
     }
   }
   if (tls_cache != nullptr) {
