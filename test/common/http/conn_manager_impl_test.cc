@@ -70,6 +70,7 @@ public:
     Router::ConfigConstSharedPtr config() override { return route_config_; }
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
+    void onConfigUpdate() override {}
 
     TimeSource& time_source_;
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
@@ -3293,7 +3294,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         decoder_filters_[0]->callbacks_->sendLocalReply(Code::BadRequest, "Bad request", nullptr,
-                                                        absl::nullopt);
+                                                        absl::nullopt, "");
         return FilterHeadersStatus::Continue;
       }));
 

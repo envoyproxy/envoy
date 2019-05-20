@@ -754,6 +754,14 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
             1);
 }
 
+// Test that if the route cache is cleared, it doesn't cause problems.
+TEST_P(IntegrationTest, TestClearingRouteCacheFilter) {
+  config_helper_.addFilter("{ name: clear-route-cache, config: {} }");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+}
+
 // Test that if no connection pools are free, Envoy fails to establish an upstream connection.
 TEST_P(IntegrationTest, NoConnectionPoolsFree) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {

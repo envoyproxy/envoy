@@ -403,7 +403,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::Timespan(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
-      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()) {
+      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()),
+      upstream_options_(std::make_shared<Network::Socket::Options>()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
   if (connection_manager_.codec_->protocol() == Protocol::Http2) {
@@ -717,7 +718,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
-  if (protocol == Protocol::Http11 && cached_route_.value()) {
+  if (protocol == Protocol::Http11 && hasCachedRoute()) {
     if (upgrade_rejected) {
       // Do not allow upgrades if the route does not support it.
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
@@ -729,7 +730,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     // Allow non websocket requests to go through websocket enabled routes.
   }
 
-  if (cached_route_.value()) {
+  if (hasCachedRoute()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     if (route_entry != nullptr && route_entry->idleTimeout()) {
       idle_timeout_ms_ = route_entry->idleTimeout().value();
@@ -777,7 +778,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
   // be broken in the case a filter changes the route.
 
   // If a decorator has been defined, apply it to the active span.
-  if (cached_route_.value() && cached_route_.value()->decorator()) {
+  if (hasCachedRoute() && cached_route_.value()->decorator()) {
     cached_route_.value()->decorator()->apply(*active_span_);
 
     // Cache decorated operation.
@@ -1606,7 +1607,7 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
 
     // We must check if the 'cached_route_' optional is populated since this function can be called
     // early via sendLocalReply(), before the cached route is populated.
-    if (cached_route_.has_value() && cached_route_.value() && cached_route_.value()->routeEntry()) {
+    if (hasCachedRoute() && cached_route_.value()->routeEntry()) {
       upgrade_map = &cached_route_.value()->routeEntry()->upgradeMap();
     }
 

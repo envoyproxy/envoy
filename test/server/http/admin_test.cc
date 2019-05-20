@@ -1211,6 +1211,44 @@ TEST_P(AdminInstanceTest, GetRequest) {
   EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
 }
 
+TEST_P(AdminInstanceTest, GetReadyRequest) {
+  NiceMock<Init::MockManager> initManager;
+  ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
+
+  {
+    Http::HeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/ready", "GET", response_headers, body));
+    EXPECT_EQ(body, "LIVE\n");
+    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+                HasSubstr("text/plain"));
+  }
+
+  {
+    Http::HeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
+    EXPECT_EQ(Http::Code::ServiceUnavailable,
+              admin_.request("/ready", "GET", response_headers, body));
+    EXPECT_EQ(body, "PRE_INITIALIZING\n");
+    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+                HasSubstr("text/plain"));
+  }
+
+  Http::HeaderMapImpl response_headers;
+  std::string body;
+
+  ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
+  EXPECT_EQ(Http::Code::ServiceUnavailable,
+            admin_.request("/ready", "GET", response_headers, body));
+  EXPECT_EQ(body, "INITIALIZING\n");
+  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+              HasSubstr("text/plain"));
+}
+
 TEST_P(AdminInstanceTest, GetRequestJson) {
   Http::HeaderMapImpl response_headers;
   std::string body;
@@ -1464,7 +1502,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
   histogram1->used_ = true;
-  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
   EXPECT_CALL(*histogram1, cumulativeStatistics())
       .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
@@ -1524,7 +1562,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
   auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
   histogram1->used_ = true;
-  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
   EXPECT_CALL(*histogram1, cumulativeStatistics())
       .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
@@ -1571,7 +1609,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
   auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
   histogram1->used_ = false;
-  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
 
   {
