@@ -194,10 +194,13 @@ private:
   statNameToStringVector(const StatName& stat_name) const PURE;
 
   /**
-   * Splits a string_view into multple symbols. This does not require a lock on
+   * Splits a string_view into multiple symbols. This does not require a lock on
    * the symbol table.
+   *
+   * @param str the string to split, based on the semantics of the SymbolTable.
+   * @return the string, split into tokens.
    */
-  virtual std::vector<absl::string_view> splitString(absl::string_view) const PURE;
+  virtual std::vector<absl::string_view> splitString(absl::string_view str) const PURE;
 };
 
 using SharedSymbolTable = std::shared_ptr<SymbolTable>;
