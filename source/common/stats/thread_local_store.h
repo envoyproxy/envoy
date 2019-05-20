@@ -240,7 +240,7 @@ private:
     // We keep a TLS cache of names that can only be discovered on the hot-path,
     // that we need to turn into stats. StringStatNameMap contains only
     // references to separately maintained stats, and the backing store for this
-    // is in CentralAcacheEntry.hot_path_stats_.
+    // is in CentralCacheEntry.hot_path_stats_.
     StringStatNameMap hot_path_stats_map_;
   };
 
