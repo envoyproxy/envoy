@@ -100,8 +100,16 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "quic_platform_epoll_clock_lib",
-    srcs = ["quic_epoll_clock.cc"],
-    hdrs = ["quic_epoll_clock.h"],
+    srcs = select({
+        "//bazel:linux_x86_64": ["quic_epoll_clock.cc"],
+        "//bazel:linux_aarch64": ["quic_epoll_clock.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "//bazel:linux_x86_64": ["quic_epoll_clock.h"],
+        "//bazel:linux_aarch64": ["quic_epoll_clock.h"],
+        "//conditions:default": [],
+    }),
     deps = [
         "@com_googlesource_quiche//:quic_platform",
         "@com_googlesource_quiche//:quic_platform_epoll_lib",
