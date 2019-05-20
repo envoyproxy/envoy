@@ -262,6 +262,22 @@ scoped_rds:
       "EDS cluster");
 }
 
+// Tests a config update failure.
+TEST_F(ScopedRdsTest, ConfigUpdateFailure) {
+  setup();
+
+  ScopedRdsConfigSubscription& subscription =
+      dynamic_cast<ScopedRdsConfigProvider&>(*provider_).subscription();
+  const auto time = std::chrono::milliseconds(1234567891234);
+  timeSystem().setSystemTime(time);
+  const EnvoyException ex(fmt::format("config failure"));
+  // Verify the failure updates the lastUpdated() timestamp.
+  subscription.onConfigUpdateFailed(&ex);
+  EXPECT_EQ(std::chrono::time_point_cast<std::chrono::milliseconds>(provider_->lastUpdated())
+                .time_since_epoch(),
+            time);
+}
+
 class ScopedRoutesConfigProviderManagerTest : public ScopedRoutesTestBase {
 public:
   ScopedRoutesConfigProviderManagerTest() = default;
@@ -404,6 +420,22 @@ dynamic_scoped_route_configs:
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   EXPECT_EQ(expected_config_dump.DebugString(), scoped_routes_config_dump3.DebugString());
+}
+
+using ScopedRoutesConfigProviderManagerDeathTest = ScopedRoutesConfigProviderManagerTest;
+
+// Tests that SRDS only allows creation of delta static config providers.
+TEST_F(ScopedRoutesConfigProviderManagerDeathTest, DeltaStaticConfigProviderOnly) {
+  EXPECT_DEBUG_DEATH(
+      config_provider_manager_->createStaticConfigProvider(
+          parseScopedRouteConfigurationFromYaml(R"EOF(
+name: dynamic-foo
+route_configuration_name: static-foo-route-config
+key:
+  fragments: { string_key: "172.30.30.10" }
+)EOF"),
+          factory_context_, Envoy::Config::ConfigProviderManager::NullOptionalArg()),
+      ".*SRDS supports delta updates and requires the use of the createStaticConfigProvider().*");
 }
 
 } // namespace
