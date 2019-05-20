@@ -5,9 +5,14 @@
 #include "test/tools/router_check/router.h"
 
 bool isArgument(int argc, char* argv[], const std::string& argument) {
-  if (argc >= 4 && (std::string(argv[3]) == argument || std::string(argv[4]) == argument)) {
+  if (argc > 4 && (std::string(argv[3]) == argument || std::string(argv[4]) == argument)) {
     return true;
   }
+
+  if (argc == 4 && std::string(argv[3]) == argument) {
+    return true;
+  }
+
   return false;
 }
 
