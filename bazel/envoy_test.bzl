@@ -13,7 +13,6 @@ load(
     _tcmalloc_external_dep = "tcmalloc_external_dep",
 )
 
-
 # Envoy C++ related test infrastructure (that want gtest, gmock, but may be
 # relied on by envoy_cc_test_library) should use this function.
 def _envoy_cc_test_infrastructure_library(
@@ -45,7 +44,6 @@ def _envoy_cc_test_infrastructure_library(
         **kargs
     )
 
-
 # Compute the test linkopts based on various options.
 def _envoy_test_linkopts():
     return select({
@@ -64,7 +62,6 @@ def _envoy_test_linkopts():
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
         "//conditions:default": ["-pthread", "-lrt", "-ldl"],
     }) + _envoy_select_force_libcpp(["-lc++fs"], ["-lstdc++fs", "-latomic"])
-
 
 # Envoy C++ fuzz test targets. These are not included in coverage runs.
 def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
@@ -120,7 +117,6 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         tags = ["manual"] + tags,
     )
 
-
 # Envoy C++ test targets should be specified with this function.
 def envoy_cc_test(
         name,
@@ -171,7 +167,6 @@ def envoy_cc_test(
         size = size,
     )
 
-
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified
 # with this function.
 def envoy_cc_test_library(
@@ -204,7 +199,6 @@ def envoy_cc_test_library(
         **kargs
     )
 
-
 # Envoy test binaries should be specified with this function.
 def envoy_cc_test_binary(
         name,
@@ -215,7 +209,6 @@ def envoy_cc_test_binary(
         linkopts = _envoy_test_linkopts() + _envoy_static_link_libstdcpp_linkopts(),
         **kargs
     )
-
 
 # Envoy Python test binaries should be specified with this function.
 def envoy_py_test_binary(
@@ -229,11 +222,9 @@ def envoy_py_test_binary(
         **kargs
     )
 
-
 # Envoy C++ mock targets should be specified with this function.
 def envoy_cc_mock(name, **kargs):
     envoy_cc_test_library(name = name, **kargs)
-
 
 # Envoy shell tests that need to be included in coverage run should be specified with this function.
 def envoy_sh_test(

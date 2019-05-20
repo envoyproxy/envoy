@@ -29,10 +29,8 @@ load(
     _envoy_sh_test = "envoy_sh_test",
 )
 
-
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
-
 
 # A genrule variant that can output a directory. This is useful when doing things like
 # generating a fuzz corpus mechanically.
@@ -47,7 +45,6 @@ def _envoy_directory_genrule_impl(ctx):
     )
     return [DefaultInfo(files = depset([tree]))]
 
-
 envoy_directory_genrule = rule(
     implementation = _envoy_directory_genrule_impl,
     attrs = {
@@ -57,12 +54,10 @@ envoy_directory_genrule = rule(
     },
 )
 
-
 def _filter_windows_keys(cache_entries = {}):
     # On Windows, we don't want to explicitly set CMAKE_BUILD_TYPE,
     # rules_foreign_cc will figure it out for us
     return {key: cache_entries[key] for key in cache_entries.keys() if key != "CMAKE_BUILD_TYPE"}
-
 
 # External CMake C++ library targets should be specified with this function. This defaults
 # to building the dependencies with ninja
@@ -118,7 +113,6 @@ def envoy_cmake_external(
         **kwargs
     )
 
-
 # Used to select a dependency that has different implementations on POSIX vs Windows.
 # The platform-specific implementations should be specified with envoy_cc_posix_library
 # and envoy_cc_win32_library respectively
@@ -127,7 +121,6 @@ def envoy_cc_platform_dep(name):
         "@envoy//bazel:windows_x86_64": [name + "_win32"],
         "//conditions:default": [name + "_posix"],
     })
-
 
 # Envoy proto descriptor targets should be specified with this function.
 # This is used for testing only.
@@ -160,11 +153,9 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
         tools = ["//external:protoc"],
     )
 
-
 # Dependencies on Google grpc should be wrapped with this function.
 def envoy_google_grpc_external_deps():
     return envoy_select_google_grpc([envoy_external_dep_path("grpc")])
-
 
 # Here we create wrappers for each of the public targets within the separate bazel
 # files loaded above. This maintains envoy_build_system.bzl as the preferred import
@@ -172,7 +163,7 @@ def envoy_google_grpc_external_deps():
 # from the other bzl files (e.g. envoy_select.bzl, envoy_binary.bzl, etc.)
 
 # Select wrappers (from envoy_select.bzl)
-envoy_select_boringssl =  _envoy_select_boringssl
+envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_hot_restart = _envoy_select_hot_restart
 

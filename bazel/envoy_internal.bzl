@@ -1,7 +1,6 @@
-# DO NOT LOAD THIS FILE. Targets from this file should be considered private 
+# DO NOT LOAD THIS FILE. Targets from this file should be considered private
 # and not used outside of the @envoy//bazel package.
 load(":envoy_select.bzl", "envoy_select_google_grpc", "envoy_select_hot_restart")
-
 
 # Compute the final copts based on various options.
 def envoy_copts(repository, test = False):
@@ -58,18 +57,15 @@ def envoy_copts(repository, test = False):
            envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
            _envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
 
-
 # References to Envoy external dependencies should be wrapped with this function.
 def envoy_external_dep_path(dep):
     return "//external:%s" % dep
-
 
 def envoy_linkstatic():
     return select({
         "@envoy//bazel:asan_build": 0,
         "//conditions:default": 1,
     })
-
 
 def envoy_select_force_libcpp(if_libcpp, default = None):
     return select({
@@ -79,7 +75,6 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
         "//conditions:default": default or [],
     })
 
-
 def envoy_static_link_libstdcpp_linkopts():
     return envoy_select_force_libcpp(
         # TODO(PiotrSikora): statically link libc++ once that's possible.
@@ -88,7 +83,6 @@ def envoy_static_link_libstdcpp_linkopts():
         ["-static-libstdc++", "-static-libgcc"],
     )
 
-
 # Dependencies on tcmalloc_and_profiler should be wrapped with this function.
 def tcmalloc_external_dep(repository):
     return select({
@@ -96,14 +90,12 @@ def tcmalloc_external_dep(repository):
         "//conditions:default": envoy_external_dep_path("gperftools"),
     })
 
-
 # Select the given values if default path normalization is on in the current build.
 def _envoy_select_path_normalization_by_default(xs, repository = ""):
     return select({
         repository + "//bazel:enable_path_normalization_by_default": xs,
         "//conditions:default": [],
     })
-
 
 def _envoy_select_perf_annotation(xs):
     return select({

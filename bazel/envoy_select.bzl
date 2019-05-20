@@ -11,13 +11,11 @@ def envoy_cc_platform_dep(name):
         "//conditions:default": [name + "_posix"],
     })
 
-
 def envoy_select_boringssl(if_fips, default = None):
     return select({
         "@envoy//bazel:boringssl_fips": if_fips,
         "//conditions:default": default or [],
     })
-
 
 # Selects the given values if Google gRPC is enabled in the current build.
 def envoy_select_google_grpc(xs, repository = ""):
@@ -25,7 +23,6 @@ def envoy_select_google_grpc(xs, repository = ""):
         repository + "//bazel:disable_google_grpc": [],
         "//conditions:default": xs,
     })
-
 
 # Selects the given values if hot restart is enabled in the current build.
 def envoy_select_hot_restart(xs, repository = ""):
