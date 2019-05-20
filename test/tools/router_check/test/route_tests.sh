@@ -3,8 +3,7 @@
 set -e
 
 # Router_check_tool binary path
-PATH_BIN=/private/var/tmp/_bazel_jmahapatra/2fb333e5536650745e9f1244a12ec391/execroot/envoy/bazel-out/darwin-dbg/bin/test/tools/router_check/router_check_tool
-TEST_RUNDIR="/Users/jmahapatra/src/envoy"
+PATH_BIN="${TEST_RUNDIR}"/test/tools/router_check/router_check_tool
 # Config json path
 PATH_CONFIG="${TEST_RUNDIR}"/test/tools/router_check/test/config
 
