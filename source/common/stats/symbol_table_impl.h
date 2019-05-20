@@ -514,17 +514,11 @@ struct StatNameHash {
   size_t operator()(const StatName& a) const { return a.hash(); }
 };
 
-// Helper class for constructing hash-tables with StatName keys.
-struct StatNameCompare {
-  bool operator()(const StatName& a, const StatName& b) const { return a == b; }
-};
-
 // Value-templatized hash-map with StatName key.
-template <class T>
-using StatNameHashMap = absl::flat_hash_map<StatName, T, StatNameHash, StatNameCompare>;
+template <class T> using StatNameHashMap = absl::flat_hash_map<StatName, T, StatNameHash>;
 
 // Hash-set of StatNames
-using StatNameHashSet = absl::flat_hash_set<StatName, StatNameHash, StatNameCompare>;
+using StatNameHashSet = absl::flat_hash_set<StatName, StatNameHash>;
 
 // Helper class for sorting StatNames.
 struct StatNameLessThan {
@@ -626,16 +620,7 @@ public:
   /**
    * This does not take a lock in the symbol table.
    */
-  absl::optional<StatName> find(absl::string_view name, const SymbolTable& symbol_table) const {
-    absl::optional<StatName> ret;
-
-    StringViewVector v = symbol_table.splitString(name);
-    auto iter = string_vector_stat_name_map_.find(v);
-    if (iter != string_vector_stat_name_map_.end()) {
-      ret = iter->second;
-    }
-    return ret;
-  }
+  absl::optional<StatName> find(absl::string_view name, const SymbolTable& symbol_table) const;
 
   /**
    * Inserts stat_name into the StatNameStorageMap. Caller must guarantee that
@@ -643,10 +628,7 @@ public:
    *
    * Note: this take a lock in the symbol table, so it's useful to call find() first.
    */
-  void insert(StatName stat_name, const SymbolTable& symbol_table) {
-    StringViewVector v = symbol_table.statNameToStringVector(stat_name);
-    string_vector_stat_name_map_[v] = stat_name;
-  }
+  void insert(StatName stat_name, const SymbolTable& symbol_table);
 
 private:
   using StringVectorStatNameMap =

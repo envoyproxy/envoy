@@ -156,6 +156,10 @@ std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
   return absl::StrJoin(decodeSymbolVecTokens(symbols), ".");
 }
 
+StringViewVector SymbolTableImpl::statNameToStringVector(const StatName& stat_name) const {
+  return decodeSymbolVecTokens(Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize()));
+}
+
 StringViewVector SymbolTableImpl::decodeSymbolVecTokens(const SymbolVec& symbols) const {
   StringViewVector name_tokens;
   name_tokens.reserve(symbols.size());
@@ -439,29 +443,22 @@ size_t StringViewVectorHash::operator()(const StringViewVector& a) const {
   return hash;
 }
 
-StringViewVector SymbolTableImpl::statNameToStringVector(const StatName& stat_name) const {
-  return decodeSymbolVecTokens(Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize()));
+absl::optional<StatName> StringStatNameMap::find(absl::string_view name,
+                                                 const SymbolTable& symbol_table) const {
+  absl::optional<StatName> ret;
+
+  StringViewVector v = symbol_table.splitString(name);
+  auto iter = string_vector_stat_name_map_.find(v);
+  if (iter != string_vector_stat_name_map_.end()) {
+    ret = iter->second;
+  }
+  return ret;
 }
 
-/*struct StringViewVectorCompare {
-  size_t operator()(const StringViewVector& a, const StringViewVector& b) const;
-};
-
-
-bool StringViewVectorCompare operator()(const StringViewVector& a,
-                                        const StringViewVector& b) const {
-  return
-  if (a.size() != b.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < a.size(); ++i) {
-    if (a[i] != b[i]) {
-      return false;
-    }
-  }
-  return true;
+void StringStatNameMap::insert(StatName stat_name, const SymbolTable& symbol_table) {
+  StringViewVector v = symbol_table.statNameToStringVector(stat_name);
+  string_vector_stat_name_map_[v] = stat_name;
 }
-*/
 
 } // namespace Stats
 } // namespace Envoy
