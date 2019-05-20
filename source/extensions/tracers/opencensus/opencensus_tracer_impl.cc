@@ -33,8 +33,8 @@ public:
   Span(const envoy::config::trace::v2::OpenCensusConfig* oc_config,
        ::opencensus::trace::Span&& span);
 
-  void setOperation(const std::string& operation) override;
-  void setTag(const std::string& name, const std::string& value) override;
+  void setOperation(absl::string_view operation) override;
+  void setTag(absl::string_view name, absl::string_view value) override;
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
   void injectContext(Http::HeaderMap& request_headers) override;
@@ -124,11 +124,11 @@ Span::Span(const envoy::config::trace::v2::OpenCensusConfig* oc_config,
            ::opencensus::trace::Span&& span)
     : span_(std::move(span)), oc_config_(oc_config) {}
 
-void Span::setOperation(const std::string& operation) {
+void Span::setOperation(absl::string_view operation) {
   span_.AddAnnotation("setOperation", {{"operation", operation}});
 }
 
-void Span::setTag(const std::string& name, const std::string& value) {
+void Span::setTag(absl::string_view name, absl::string_view value) {
   span_.AddAttribute(name, value);
 }
 
