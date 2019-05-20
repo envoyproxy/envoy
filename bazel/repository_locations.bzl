@@ -135,6 +135,7 @@ REPOSITORY_LOCATIONS = dict(
         # This also includes the fix for https://github.com/libevent/libevent/issues/806
         # TODO(mergeconflict): Update to v2.2 when it is released.
         strip_prefix = "libevent-3b1864b625ec37c3051512845982f347f4cc5621",
+        # 2019-05-16
         urls = ["https://github.com/libevent/libevent/archive/3b1864b625ec37c3051512845982f347f4cc5621.tar.gz"],
     ),
     net_zlib = dict(
