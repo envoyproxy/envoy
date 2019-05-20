@@ -4,6 +4,7 @@ trigger:
 
 jobs:
 - job: macOS
+  trigger: none
   timeoutInMinutes: 360
   pool:
     vmImage: 'macos-latest'
@@ -22,3 +23,5 @@ jobs:
       testResultsFiles: '**/bazel-testlogs/**/test.xml'
       testRunTitle: 'macOS'
     condition: always()
+
+
