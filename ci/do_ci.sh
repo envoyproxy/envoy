@@ -48,7 +48,7 @@ function cp_binary_for_outside_access() {
 
 function cp_binary_for_image_build() {
   # TODO(mattklein123): Replace this with caching and a different job which creates images.
-  echo "Copying size optimized binary for image build..."
+  echo "Copying binary for image build..."
   mkdir -p "${ENVOY_SRCDIR}"/build_$1
   cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_$1
   mkdir -p "${ENVOY_SRCDIR}"/build_$1_stripped
@@ -117,7 +117,7 @@ elif [[ "$1" == "bazel.sizeopt" ]]; then
   echo "bazel size optimized build with tests..."
   bazel_binary_build sizeopt
   echo "Testing..."
-  bazel test ${BAZEL_TEST_OPTIONS} //test/... --config optimize_binary_size=enabled
+  bazel test ${BAZEL_TEST_OPTIONS} //test/... --config=sizeopt
   exit 0
 elif [[ "$1" == "bazel.debug" ]]; then
   setup_clang_toolchain
@@ -171,7 +171,6 @@ elif [[ "$1" == "bazel.dev" ]]; then
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel fastbuild build with tests..."
   echo "Building..."
-  bazel_binary_build fastbuild
   bazel_binary_build fastbuild
 
   echo "Building and testing..."
