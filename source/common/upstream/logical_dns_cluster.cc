@@ -75,7 +75,7 @@ void LogicalDnsCluster::startResolve() {
 
   active_dns_query_ = dns_resolver_->resolve(
       dns_address, dns_lookup_family_,
-      [this, dns_address](const std::list<Network::DnsResponseConstSharedPtr>&& response) -> void {
+      [this, dns_address](const std::list<Network::DnsResponse>& response) -> void {
         active_dns_query_ = nullptr;
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address);
         info_->stats().update_success_.inc();
@@ -83,13 +83,13 @@ void LogicalDnsCluster::startResolve() {
         auto refresh_rate = dns_refresh_rate_ms_;
         if (!response.empty()) {
           // TODO(mattklein123): Move port handling into the DNS interface.
-          ASSERT(response.front()->address_ != nullptr);
+          ASSERT(response.front().address_ != nullptr);
           Network::Address::InstanceConstSharedPtr new_address =
-              Network::Utility::getAddressWithPort(*(response.front()->address_),
+              Network::Utility::getAddressWithPort(*(response.front().address_),
                                                    Network::Utility::portFromTcpUrl(dns_url_));
 
-          if (respect_dns_ttl_ && response.front()->ttl_ != std::chrono::seconds::max()) {
-            refresh_rate = response.front()->ttl_;
+          if (respect_dns_ttl_ && response.front().ttl_ != std::chrono::seconds::max()) {
+            refresh_rate = response.front().ttl_;
           }
 
           if (!logical_host_) {
@@ -97,7 +97,7 @@ void LogicalDnsCluster::startResolve() {
             // to show the friendly DNS name in that output, but currently there is no way to
             // express a DNS name inside of an Address::Instance. For now this is OK but we might
             // want to do better again later.
-            switch (response.front()->address_->ip()->version()) {
+            switch (response.front().address_->ip()->version()) {
             case Network::Address::IpVersion::v4:
               logical_host_.reset(
                   new LogicalHost(info_, hostname_, Network::Utility::getIpv4AnyAddress(), *this));

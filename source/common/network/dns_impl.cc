@@ -83,7 +83,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
     completed_ = true;
   }
 
-  std::list<DnsResponseConstSharedPtr> address_list;
+  std::list<DnsResponse> address_list;
   if (status == ARES_SUCCESS) {
     if (hostent->h_addrtype == AF_INET) {
       auto aresaddrttls = static_cast<ares_addrttl*>(addrttls);
@@ -112,7 +112,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
           addrttl = ttls[key];
         }
 
-        address_list.emplace_back(new DnsResponse(
+        address_list.emplace_back(DnsResponse(
             Address::InstanceConstSharedPtr(new Address::Ipv4Instance(&address)), addrttl));
       }
     } else if (hostent->h_addrtype == AF_INET6) {
@@ -142,7 +142,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
           addrttl = ttls[key];
         }
 
-        address_list.emplace_back(new DnsResponse(
+        address_list.emplace_back(DnsResponse(
             Address::InstanceConstSharedPtr(new Address::Ipv6Instance(address)), addrttl));
       }
     }
