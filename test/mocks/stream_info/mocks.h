@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/stream_info/stream_debug_info.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/stream_info/filter_state_impl.h"
@@ -105,14 +104,6 @@ public:
   const Ssl::ConnectionInfo* downstream_connection_info_{};
   std::string requested_server_name_;
   std::string upstream_transport_failure_reason_;
-};
-
-class MockStreamDebugInfo : public StreamDebugInfo {
-public:
-  MOCK_CONST_METHOD0(getAppendClusterInfo, bool());
-  MOCK_METHOD1(setAppendClusterInfo, void(bool));
-  MOCK_CONST_METHOD0(getDoNotForward, bool());
-  MOCK_METHOD1(setDoNotForward, void(bool));
 };
 
 } // namespace StreamInfo

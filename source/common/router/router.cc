@@ -24,6 +24,7 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
+#include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -274,6 +275,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   downstream_headers_ = &headers;
 
+  // Extract debug configuration from filter state. This is used further along to determine whether
+  // we should append cluster and host headers to the response, and whether to forward the request
+  // upstream.
+  const StreamInfo::FilterState& filter_state = callbacks_->streamInfo().filterState();
+  const DebugConfig* debug_config =
+      filter_state.hasData<DebugConfig>(DebugConfig::key())
+          ? &(filter_state.getDataReadOnly<DebugConfig>(DebugConfig::key()))
+          : nullptr;
+
   // TODO: Maybe add a filter API for this.
   grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
 
@@ -320,11 +330,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // A route entry matches for the request.
   route_entry_ = route_->routeEntry();
-  if (callbacks_->streamDebugInfo().getAppendClusterInfo()) {
-    // If we're asked to append cluster info, this is our first opportunity. The cluster name will
-    // be appended to any local or upstream responses from this point.
-    modify_headers = [this](Http::HeaderMap& headers) {
-      headers.addCopy(Http::LowerCaseString("x-envoy-cluster"), route_entry_->clusterName());
+  if (debug_config && debug_config->append_cluster_) {
+    // The cluster name will be appended to any local or upstream responses from this point.
+    modify_headers = [this, debug_config](Http::HeaderMap& headers) {
+      headers.addCopy(
+          Http::LowerCaseString(debug_config->cluster_header_.value_or("x-envoy-debug")),
+          route_entry_->clusterName());
     };
   }
   Upstream::ThreadLocalCluster* cluster = config_.cm_.get(route_entry_->clusterName());
@@ -375,21 +386,23 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
-  if (callbacks_->streamDebugInfo().getAppendClusterInfo()) {
-    // If we're asked to append cluster info, we now have some additional information to append
-    // on top of the cluster name. The hostname and address will be appended to any local or
-    // upstream responses from this point.
-    modify_headers = [modify_headers, conn_pool](Http::HeaderMap& headers) {
+  if (debug_config && debug_config->append_host_) {
+    // The hostname and address will be appended to any local or upstream responses from this point,
+    // possibly in addition to the cluster name.
+    modify_headers = [modify_headers, debug_config, conn_pool](Http::HeaderMap& headers) {
       modify_headers(headers);
-      headers.addCopy(Http::LowerCaseString("x-envoy-hostname"), conn_pool->host()->hostname());
-      headers.addCopy(Http::LowerCaseString("x-envoy-host-address"),
+      headers.addCopy(
+          Http::LowerCaseString(debug_config->hostname_header_.value_or("x-envoy-hostname")),
+          conn_pool->host()->hostname());
+      headers.addCopy(Http::LowerCaseString(
+                          debug_config->host_address_header_.value_or("x-envoy-host-address")),
                       conn_pool->host()->address()->asString());
     };
   }
 
   // If we've been instructed not to forward the request upstream, send an empty local response.
-  if (callbacks_->streamDebugInfo().getDoNotForward()) {
-    callbacks_->sendLocalReply(Http::Code::NoContent, "", modify_headers, absl::nullopt);
+  if (debug_config && debug_config->do_not_forward_) {
+    callbacks_->sendLocalReply(Http::Code::NoContent, "", modify_headers, absl::nullopt, "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 

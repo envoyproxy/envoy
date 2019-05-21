@@ -25,11 +25,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "stream_debug_info_interface",
-    hdrs = ["stream_debug_info.h"],
-)
-
-envoy_cc_library(
     name = "filter_state_interface",
     hdrs = ["filter_state.h"],
     external_deps = ["abseil_optional"],
