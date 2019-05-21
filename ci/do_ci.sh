@@ -40,7 +40,7 @@ function bazel_with_collection() {
 }
 
 function cp_binary_for_outside_access() {
-  DELIVERY_LOCATION=$1
+  DELIVERY_LOCATION="$1"
   cp -f \
     "${ENVOY_SRCDIR}"/bazel-bin/source/exe/envoy-static \
     "${ENVOY_DELIVERY_DIR}"/${DELIVERY_LOCATION}
@@ -58,15 +58,15 @@ function cp_binary_for_image_build() {
 function bazel_binary_build() {
   BINARY_TYPE=$1
   if [[ "${BINARY_TYPE}" == "release" ]]; then
-    COMPILE_TYPE=opt
+    COMPILE_TYPE="opt"
   elif [[ "${BINARY_TYPE}" == "debug" ]]; then
-    COMPILE_TYPE=dbg
+    COMPILE_TYPE="dbg"
     BINARY_SUFFIX="-debug"
   elif [[ "${BINARY_TYPE}" == "sizeopt" ]]; then
-    COMPILE_TYPE=opt
+    COMPILE_TYPE="opt"
     CONFIG_ARGS="--config=sizeopt"
   elif [[ "${BINARY_TYPE}" == "fastbuild" ]]; then
-    COMPILE_TYPE=fastbuild
+    COMPILE_TYPE="fastbuild"
     BINARY_SUFFIX="-fastbuild"
   fi
 
