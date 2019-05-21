@@ -12,7 +12,7 @@ namespace Upstream {
 namespace {
 
 TEST(HostUtilityTest, All) {
-  ClusterInfoConstSharedPtr cluster{new MockClusterInfo()};
+  auto cluster = std::make_shared<NiceMock<MockClusterInfo>>();
   HostSharedPtr host = makeTestHost(cluster, "tcp://127.0.0.1:80");
   EXPECT_EQ("healthy", HostUtility::healthFlagsToString(*host));
 

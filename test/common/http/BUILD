@@ -110,7 +110,6 @@ envoy_cc_test_binary(
         "benchmark",
     ],
     deps = [
-        "//source/common/common:empty_string",
         "//source/common/http:codes_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
