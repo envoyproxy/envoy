@@ -38,6 +38,12 @@ parseProtoFromJson(const std::string& json_string) {
   envoy::config::filter::network::redis_proxy::v2::RedisProxy config;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::FilterJson::translateRedisProxy(*json_object_ptr, config);
+  return config;
+}
+
+void addV2ProtoFromJson(const std::string& json_string,
+                        envoy::config::filter::network::redis_proxy::v2::RedisProxy& config) {
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
 
   // Instead of adding v2 properties to the v1 translateRedisProxy()
   // support function, v2 properties are processed separately here.
@@ -52,8 +58,6 @@ parseProtoFromJson(const std::string& json_string) {
       config.mutable_downstream_auth_password()->set_inline_string(password);
     }
   }
-
-  return config;
 }
 
 class RedisProxyFilterConfigTest : public testing::Test {
@@ -95,14 +99,19 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthPasswordSet) {
   std::string json_string = R"EOF(
   {
     "cluster_name": "fake_cluster",
-    "downstream_auth_password": { "inline_string": "somepassword" },
     "stat_prefix": "foo",
     "conn_pool": { "op_timeout_ms" : 10 }
+  }
+  )EOF";
+  std::string v2_json_string = R"EOF(
+  {
+    "downstream_auth_password": { "inline_string": "somepassword" }
   }
   )EOF";
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
       parseProtoFromJson(json_string);
+  addV2ProtoFromJson(v2_json_string, proto_config);
   ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_);
   EXPECT_EQ(config.downstream_auth_password_, "somepassword");
 }
@@ -117,9 +126,12 @@ public:
     }
     )EOF";
 
-  RedisProxyFilterTest(const std::string& json_string) {
+  RedisProxyFilterTest(const std::string& json_string, const std::string& v2_json_string) {
     envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
         parseProtoFromJson(json_string);
+    if (!v2_json_string.empty()) {
+      addV2ProtoFromJson(v2_json_string, proto_config);
+    }
     config_.reset(new ProxyFilterConfig(proto_config, store_, drain_decision_, runtime_, api_));
     filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_,
                                             config_);
@@ -133,7 +145,7 @@ public:
     filter_->onBelowWriteBufferLowWatermark();
   }
 
-  RedisProxyFilterTest() : RedisProxyFilterTest(default_config) {}
+  RedisProxyFilterTest() : RedisProxyFilterTest(default_config, "") {}
 
   ~RedisProxyFilterTest() override {
     filter_.reset();
@@ -324,16 +336,14 @@ TEST_F(RedisProxyFilterTest, AuthWhenNotRequired) {
 
 const std::string downstream_auth_password_config = R"EOF(
     {
-      "cluster_name": "fake_cluster",
-      "downstream_auth_password": { "inline_string": "somepassword" },
-      "stat_prefix": "foo",
-      "conn_pool": { "op_timeout_ms" : 10 }
+      "downstream_auth_password": { "inline_string": "somepassword" }
     }
     )EOF";
 
 class RedisProxyFilterWithAuthPasswordTest : public RedisProxyFilterTest {
 public:
-  RedisProxyFilterWithAuthPasswordTest() : RedisProxyFilterTest(downstream_auth_password_config) {}
+  RedisProxyFilterWithAuthPasswordTest()
+      : RedisProxyFilterTest(default_config, downstream_auth_password_config) {}
 };
 
 TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthPasswordCorrect) {

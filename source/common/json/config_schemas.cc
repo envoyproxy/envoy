@@ -441,7 +441,7 @@ const std::string Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
       "conn_pool" : {"type" : "object"}
     },
     "required": ["cluster_name", "stat_prefix", "conn_pool"],
-    "additionalProperties": true
+    "additionalProperties": false
   }
   )EOF");
 
