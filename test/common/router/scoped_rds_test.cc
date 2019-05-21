@@ -444,7 +444,7 @@ using ScopedRoutesConfigProviderManagerDeathTest = ScopedRoutesConfigProviderMan
 
 // Tests that SRDS only allows creation of delta static config providers.
 TEST_F(ScopedRoutesConfigProviderManagerDeathTest, DeltaStaticConfigProviderOnly) {
-  EXPECT_DEBUG_DEATH(
+  EXPECT_DEATH(
       config_provider_manager_->createStaticConfigProvider(
           parseScopedRouteConfigurationFromYaml(R"EOF(
 name: dynamic-foo
