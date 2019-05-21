@@ -62,11 +62,14 @@ Running
   expected order of command line arguments is:
   1. The router configuration file.
   2. The tool configuration json file.
-  3. The optional details flag. ::
+  3. ``--useproto`` to use any new features in the tool.
+  4. The optional details flag. ::
 
     bazel-bin/test/tools/router_check/router_check_tool router_config.(yaml|json) tool_config.json
 
     bazel-bin/test/tools/router_check/router_check_tool router_config.(yaml|json) tool_config.json --details
+
+    bazel-bin/test/tools/router_check/router_check_tool router_config.(yaml|json) tool_config.json --details --useproto
 
 Testing
   A bash shell script test can be run with bazel. The test compares routes using different router and
