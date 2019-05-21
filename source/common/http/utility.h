@@ -68,6 +68,21 @@ std::string createSslRedirectPath(const HeaderMap& headers);
 QueryParams parseQueryString(absl::string_view url);
 
 /**
+ * Parse a a request body into query parameters.
+ * @param body supplies the body to parse.
+ * @return QueryParams the parsed parameters, if any.
+ */
+QueryParams parseFromBody(absl::string_view body);
+
+/**
+ * Parse query parameters from a URL or body.
+ * @param data supplies the data to parse.
+ * @param start supplies the offset within the data.
+ * @return QueryParams the parsed parameters, if any.
+ */
+QueryParams parseParameters(absl::string_view data, size_t start);
+
+/**
  * Finds the start of the query string in a path
  * @param path supplies a HeaderString& to search for the query string
  * @return absl::string_view starting at the beginning of the query string,
