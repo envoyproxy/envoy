@@ -1087,7 +1087,6 @@ Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMa
   Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   if (params.empty()) {
     // Check if the params are in the request's body.
-    // TODO(rgs1): check the content-type header in the request.
     if (admin_stream.getRequestBody() != nullptr &&
         isFormUrlEncoded(admin_stream.getRequestHeaders().ContentType())) {
       params = Http::Utility::parseFromBody(admin_stream.getRequestBody()->toString());
