@@ -6,6 +6,7 @@
 #include "envoy/api/v2/srds.pb.validate.h"
 
 #include "common/common/assert.h"
+#include "common/common/logger.h"
 #include "common/config/subscription_factory.h"
 
 // Types are deeply nested under Envoy::Config::ConfigProvider; use 'using-directives' across all

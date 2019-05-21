@@ -7,7 +7,6 @@
 #include "envoy/config/subscription.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/logger.h"
 #include "common/config/config_provider_impl.h"
 #include "common/router/scoped_config_impl.h"
 
