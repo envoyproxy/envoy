@@ -444,16 +444,15 @@ using ScopedRoutesConfigProviderManagerDeathTest = ScopedRoutesConfigProviderMan
 
 // Tests that SRDS only allows creation of delta static config providers.
 TEST_F(ScopedRoutesConfigProviderManagerDeathTest, DeltaStaticConfigProviderOnly) {
-  EXPECT_DEATH(
-      config_provider_manager_->createStaticConfigProvider(
-          parseScopedRouteConfigurationFromYaml(R"EOF(
+  EXPECT_DEATH(config_provider_manager_->createStaticConfigProvider(
+                   parseScopedRouteConfigurationFromYaml(R"EOF(
 name: dynamic-foo
 route_configuration_name: static-foo-route-config
 key:
   fragments: { string_key: "172.30.30.10" }
 )EOF"),
-          factory_context_, Envoy::Config::ConfigProviderManager::NullOptionalArg()),
-      ".*SRDS supports delta updates and requires the use of the createStaticConfigProvider().*");
+                   factory_context_, Envoy::Config::ConfigProviderManager::NullOptionalArg()),
+               ".*(SRDS.*requires the use of the createStaticConfigProvider()|panic).*");
 }
 
 } // namespace
