@@ -10,10 +10,6 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/hash/hash.h"
-
-//
-// However, for some reason, bazel.clang_tidy cannot resolve the files when specified this way.
-
 #include "extensions/quic_listeners/quiche/platform/spdy_string_impl.h"
 #include "extensions/quic_listeners/quiche/platform/spdy_string_piece_impl.h"
 #include "quiche/common/simple_linked_hash_map.h"
