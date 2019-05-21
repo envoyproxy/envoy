@@ -526,6 +526,27 @@ message Cluster {
     // because merging those updates isn't currently safe. See
     // https://github.com/envoyproxy/envoy/pull/3941.
     google.protobuf.Duration update_merge_window = 4;
+
+    // If set to true, Envoy will not consider new hosts when computing load balancing weights until
+    // they have been health checked for the first time. This will have no effect unless
+    // active health checking is also configured.
+    //
+    // Ignoring a host means that for any load balancing calculations that adjust weights based
+    // on the ratio of eligible hosts and total hosts (priority spillover, locality weighting and
+    // panic mode) Envoy will exclude these hosts in the denominator.
+    //
+    // For example, with hosts in two priorities P0 and P1, where P0 looks like
+    // {healthy, unhealthy (new), unhealthy (new)}
+    // and where P1 looks like
+    // {healthy, healthy}
+    // all traffic will still hit P0, as 1 / (3 - 2) = 1.
+    //
+    // Enabling this will allow scaling up the number of hosts for a given cluster without entering
+    // panic mode or triggering priority spillover, assuming the hosts pass the first health check.
+    //
+    // If panic mode is triggered, new hosts are still eligible for traffic; they simply do not
+    // contribute to the calculation when deciding whether panic mode is enabled or not.
+    bool ignore_new_hosts_until_first_hc = 5;
   }
 
   // Common configuration for all load balancer implementations.

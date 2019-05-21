@@ -488,6 +488,22 @@ void BaseIntegrationTest::cleanUpXdsConnection() {
 AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names,
+    const std::vector<std::string>& expected_resource_names_added,
+    const std::vector<std::string>& expected_resource_names_removed,
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+    return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
+                                       expected_error_code, expected_error_message);
+  } else {
+    return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
+                                        expected_resource_names_removed, expected_error_code,
+                                        expected_error_message);
+  }
+}
+
+AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
+    const std::string& expected_type_url, const std::string& expected_version,
+    const std::vector<std::string>& expected_resource_names,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
   envoy::api::v2::DiscoveryRequest discovery_request;
   VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
@@ -496,8 +512,7 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
   EXPECT_FALSE(discovery_request.node().id().empty());
   EXPECT_FALSE(discovery_request.node().cluster().empty());
 
-  // TODO(PiotrSikora): Remove this hack once fixed internally.
-  if (!(expected_type_url == discovery_request.type_url())) {
+  if (expected_type_url != discovery_request.type_url()) {
     return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
                                              discovery_request.type_url(), expected_type_url);
   }
@@ -517,8 +532,7 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
                fmt::join(expected_resource_names.begin(), expected_resource_names.end(), ","),
                discovery_request.DebugString());
   }
-  // TODO(PiotrSikora): Remove this hack once fixed internally.
-  if (!(expected_version == discovery_request.version_info())) {
+  if (expected_version != discovery_request.version_info()) {
     return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",
                                              discovery_request.version_info(), expected_version,
                                              discovery_request.DebugString());
@@ -529,17 +543,16 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,
-    const std::vector<std::string>& expected_resource_unsubscriptions,
+    const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
   envoy::api::v2::DeltaDiscoveryRequest request;
-  VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, request));
+  VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 
   EXPECT_TRUE(request.has_node());
   EXPECT_FALSE(request.node().id().empty());
   EXPECT_FALSE(request.node().cluster().empty());
 
-  // TODO(PiotrSikora): Remove this hack once fixed internally.
-  if (!(expected_type_url == request.type_url())) {
+  if (expected_type_url != request.type_url()) {
     return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
                                              request.type_url(), expected_type_url);
   }

@@ -69,10 +69,15 @@ public:
 
   Test::Global<FakeSymbolTableImpl> symbol_table_; // Must outlive name_.
   MetricName name_;
-  std::vector<Tag> tags_;
+
+  void setTags(const std::vector<Tag>& tags);
+  void addTag(const Tag& tag);
 
 private:
+  std::vector<Tag> tags_;
+  std::vector<StatName> tag_names_and_values_;
   std::string tag_extracted_name_;
+  StatNamePool tag_pool_;
   std::unique_ptr<StatNameManagedStorage> tag_extracted_stat_name_;
 };
 
@@ -188,6 +193,11 @@ public:
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
+
+  MOCK_CONST_METHOD1(findCounter, absl::optional<std::reference_wrapper<const Counter>>(StatName));
+  MOCK_CONST_METHOD1(findGauge, absl::optional<std::reference_wrapper<const Gauge>>(StatName));
+  MOCK_CONST_METHOD1(findHistogram,
+                     absl::optional<std::reference_wrapper<const Histogram>>(StatName));
 
   Counter& counterFromStatName(StatName name) override {
     return counter(symbol_table_->toString(name));

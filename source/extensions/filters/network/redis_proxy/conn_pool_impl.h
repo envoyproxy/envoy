@@ -41,7 +41,7 @@ public:
       const std::string& cluster_name, Upstream::ClusterManager& cm,
       Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
       const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
-      Api::Api& api);
+      Api::Api& api, Stats::SymbolTable& symbol_table);
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
   makeRequest(const std::string& key, const Common::Redis::RespValue& request,
@@ -49,6 +49,7 @@ public:
   Common::Redis::Client::PoolRequest*
   makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                     Common::Redis::Client::PoolCallbacks& callbacks) override;
+  Stats::SymbolTable& symbolTable() { return symbol_table_; }
 
   // Allow the unit test to have access to private members.
   friend class RedisConnPoolImplTest;
@@ -118,6 +119,7 @@ private:
   ThreadLocal::SlotPtr tls_;
   Common::Redis::Client::ConfigImpl config_;
   Api::Api& api_;
+  Stats::SymbolTable& symbol_table_;
 };
 
 } // namespace ConnPool

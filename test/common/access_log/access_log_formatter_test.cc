@@ -315,6 +315,25 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }
   {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_SESSION_ID");
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    ON_CALL(connection_info, sessionId()).WillByDefault(Return("deadbeef"));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+    EXPECT_EQ("deadbeef", upstream_format.format(header, header, header, stream_info));
+  }
+  {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_SESSION_ID");
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    ON_CALL(connection_info, sessionId()).WillByDefault(Return(""));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+    EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+  }
+  {
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
+    StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_SESSION_ID");
+    EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+  }
+  {
     StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
     std::string upstream_transport_failure_reason = "SSL error";
     EXPECT_CALL(stream_info, upstreamTransportFailureReason())

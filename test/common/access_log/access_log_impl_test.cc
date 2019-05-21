@@ -102,7 +102,7 @@ TEST_F(AccessLogImplTest, DownstreamDisconnect) {
 
   EXPECT_CALL(*file_, write(_));
 
-  std::shared_ptr<Upstream::MockClusterInfo> cluster{new Upstream::MockClusterInfo()};
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   stream_info_.upstream_host_ = Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234");
   stream_info_.response_flags_ = StreamInfo::ResponseFlag::DownstreamConnectionTermination;
 
@@ -147,7 +147,7 @@ TEST_F(AccessLogImplTest, NoFilter) {
 }
 
 TEST_F(AccessLogImplTest, UpstreamHost) {
-  std::shared_ptr<Upstream::MockClusterInfo> cluster{new Upstream::MockClusterInfo()};
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   stream_info_.upstream_host_ = Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234");
 
   const std::string json = R"EOF(

@@ -176,13 +176,14 @@ private:
     }
 
     const std::string& name() const override { return EMPTY_STRING; }
+    bool usesVhds() const override { return false; }
 
     static const std::list<LowerCaseString> internal_only_headers_;
   };
 
   struct NullVirtualHost : public Router::VirtualHost {
     // Router::VirtualHost
-    const std::string& name() const override { return EMPTY_STRING; }
+    Stats::StatName statName() const override { return Stats::StatName(); }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     const Router::Config& routeConfig() const override { return route_configuration_; }
@@ -355,6 +356,8 @@ private:
   void setDecoderBufferLimit(uint32_t) override {}
   uint32_t decoderBufferLimit() override { return 0; }
   bool recreateStream() override { return false; }
+  void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
+  Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
 
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;

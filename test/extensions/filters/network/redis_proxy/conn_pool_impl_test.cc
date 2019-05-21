@@ -2,6 +2,7 @@
 #include <string>
 
 #include "common/network/utility.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/filters/network/common/redis/utility.h"
@@ -14,6 +15,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -48,7 +50,7 @@ public:
 
     std::unique_ptr<InstanceImpl> conn_pool_impl = std::make_unique<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
-        Common::Redis::Client::createConnPoolSettings(20, hashtagging, true), api_);
+        Common::Redis::Client::createConnPoolSettings(20, hashtagging, true), api_, *symbol_table_);
     // Set the authentication password for this connection pool.
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
     conn_pool_ = std::move(conn_pool_impl);
@@ -85,6 +87,7 @@ public:
   MOCK_METHOD1(create_, Common::Redis::Client::Client*(Upstream::HostConstSharedPtr host));
 
   const std::string cluster_name_{"fake_cluster"};
+  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   InstanceSharedPtr conn_pool_;

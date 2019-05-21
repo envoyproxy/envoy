@@ -127,7 +127,8 @@ public:
 
 private:
   absl::string_view toStringView(const StatName& stat_name) const {
-    return {reinterpret_cast<const char*>(stat_name.data()), stat_name.dataSize()};
+    return {reinterpret_cast<const char*>(stat_name.data()),
+            static_cast<absl::string_view::size_type>(stat_name.dataSize())};
   }
 
   StoragePtr encodeHelper(absl::string_view name) const {

@@ -195,9 +195,8 @@ Filter::~Filter() {
   ASSERT(!retry_state_);
 }
 
-const std::string Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
-  // TODO(PiotrSikora): Switch back to std::string& when string == std::string.
-  return upstream_host ? upstream_host->locality().zone() : "";
+Stats::StatName Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
+  return upstream_host ? upstream_host->localityZoneStatName() : config_.empty_stat_name_;
 }
 
 void Filter::chargeUpstreamCode(uint64_t response_status_code,
@@ -216,33 +215,34 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     const bool internal_request =
         internal_request_header && internal_request_header->value() == "true";
 
-    // TODO(mattklein123): Remove copy when G string compat issues are fixed.
-    const std::string zone_name = config_.local_info_.zoneName();
-    const std::string upstream_zone = upstreamZone(upstream_host);
-
+    Stats::StatName upstream_zone = upstreamZone(upstream_host);
     Http::CodeStats::ResponseStatInfo info{config_.scope_,
                                            cluster_->statsScope(),
-                                           EMPTY_STRING,
+                                           config_.empty_stat_name_,
                                            response_status_code,
                                            internal_request,
-                                           route_entry_->virtualHost().name(),
-                                           request_vcluster_ ? request_vcluster_->name()
-                                                             : EMPTY_STRING,
-                                           zone_name,
+                                           route_entry_->virtualHost().statName(),
+                                           request_vcluster_ ? request_vcluster_->statName()
+                                                             : config_.empty_stat_name_,
+                                           config_.zone_name_,
                                            upstream_zone,
                                            is_canary};
 
     Http::CodeStats& code_stats = httpContext().codeStats();
     code_stats.chargeResponseStat(info);
 
-    if (!alt_stat_prefix_.empty()) {
-      Http::CodeStats::ResponseStatInfo info{config_.scope_,   cluster_->statsScope(),
-                                             alt_stat_prefix_, response_status_code,
-                                             internal_request, EMPTY_STRING,
-                                             EMPTY_STRING,     zone_name,
-                                             upstream_zone,    is_canary};
-
-      code_stats.chargeResponseStat(info);
+    if (alt_stat_prefix_ != nullptr) {
+      Http::CodeStats::ResponseStatInfo alt_info{config_.scope_,
+                                                 cluster_->statsScope(),
+                                                 alt_stat_prefix_->statName(),
+                                                 response_status_code,
+                                                 internal_request,
+                                                 config_.empty_stat_name_,
+                                                 config_.empty_stat_name_,
+                                                 config_.zone_name_,
+                                                 upstream_zone,
+                                                 is_canary};
+      code_stats.chargeResponseStat(alt_info);
     }
 
     if (dropped) {
@@ -333,7 +333,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   const Http::HeaderEntry* request_alt_name = headers.EnvoyUpstreamAltStatName();
   if (request_alt_name) {
-    alt_stat_prefix_ = std::string(request_alt_name->value().getStringView()) + ".";
+    // TODO(#7003): converting this header value into a StatName requires
+    // taking a global symbol-table lock. This is not a frequently used feature,
+    // but may not be the only occurrence of this pattern, where it's difficult
+    // or impossible to pre-compute a StatName for a component of a stat name.
+    alt_stat_prefix_ = std::make_unique<Stats::StatNameManagedStorage>(
+        request_alt_name->value().getStringView(), config_.scope_.symbolTable());
     headers.removeEnvoyUpstreamAltStatName();
   }
 
@@ -770,7 +775,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
         retry_state_->shouldRetryHeaders(*headers, [this]() -> void { doRetry(); });
     if (retry_status == RetryStatus::Yes && setupRetry(end_stream)) {
       Http::CodeStats& code_stats = httpContext().codeStats();
-      code_stats.chargeBasicResponseStat(cluster_->statsScope(), "retry.",
+      code_stats.chargeBasicResponseStat(cluster_->statsScope(), config_.retry_,
                                          static_cast<Http::Code>(response_code));
       upstream_host->stats().rq_error_.inc();
       return;
@@ -884,34 +889,31 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
     const bool internal_request =
         internal_request_header && internal_request_header->value() == "true";
 
-    // TODO(mattklein123): Remove copy when G string compat issues are fixed.
-    const std::string zone_name = config_.local_info_.zoneName();
-
     Http::CodeStats& code_stats = httpContext().codeStats();
     Http::CodeStats::ResponseTimingInfo info{config_.scope_,
                                              cluster_->statsScope(),
-                                             EMPTY_STRING,
+                                             config_.empty_stat_name_,
                                              response_time,
                                              upstream_request.upstream_canary_,
                                              internal_request,
-                                             route_entry_->virtualHost().name(),
-                                             request_vcluster_ ? request_vcluster_->name()
-                                                               : EMPTY_STRING,
-                                             zone_name,
+                                             route_entry_->virtualHost().statName(),
+                                             request_vcluster_ ? request_vcluster_->statName()
+                                                               : config_.empty_stat_name_,
+                                             config_.zone_name_,
                                              upstreamZone(upstream_request.upstream_host_)};
 
     code_stats.chargeResponseTiming(info);
 
-    if (!alt_stat_prefix_.empty()) {
+    if (alt_stat_prefix_ != nullptr) {
       Http::CodeStats::ResponseTimingInfo info{config_.scope_,
                                                cluster_->statsScope(),
-                                               alt_stat_prefix_,
+                                               alt_stat_prefix_->statName(),
                                                response_time,
                                                upstream_request.upstream_canary_,
                                                internal_request,
-                                               EMPTY_STRING,
-                                               EMPTY_STRING,
-                                               zone_name,
+                                               config_.empty_stat_name_,
+                                               config_.empty_stat_name_,
+                                               config_.zone_name_,
                                                upstreamZone(upstream_request.upstream_host_)};
 
       code_stats.chargeResponseTiming(info);
