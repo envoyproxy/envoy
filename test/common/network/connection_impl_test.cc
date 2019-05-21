@@ -673,6 +673,43 @@ TEST_P(ConnectionImplTest, Watermarks) {
   disconnect(false);
 }
 
+// Test that as watermark levels are changed in delayed close, no watermark callbacks are triggered.
+// Regression test for https://github.com/envoyproxy/envoy/issues/6872
+TEST_P(ConnectionImplTest, WatermarksWithDelayedClose) {
+  useMockBuffer();
+
+  setUpBasicConnection();
+  EXPECT_FALSE(client_connection_->aboveHighWatermark());
+
+  // Stick 5 bytes in the connection buffer.
+  std::unique_ptr<Buffer::OwnedImpl> buffer(new Buffer::OwnedImpl("hello"));
+  int buffer_len = buffer->length();
+  EXPECT_CALL(*client_write_buffer_, write(_))
+      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
+  EXPECT_CALL(*client_write_buffer_, move(_));
+  client_write_buffer_->move(*buffer);
+
+  client_connection_->setDelayedCloseTimeout(std::chrono::seconds(100));
+  client_connection_->close(ConnectionCloseType::FlushWriteAndDelay);
+  {
+    // Go from watermarks being off to being above the high watermark.
+    EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
+    EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
+    client_connection_->setBufferLimits(buffer_len - 3);
+    EXPECT_TRUE(client_connection_->aboveHighWatermark());
+  }
+
+  {
+    // Go from above the high watermark to below the low watermark.
+    EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
+    EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
+    client_connection_->setBufferLimits(buffer_len * 3);
+    EXPECT_FALSE(client_connection_->aboveHighWatermark());
+  }
+
+  disconnect(false);
+}
+
 // Write some data to the connection. It will automatically attempt to flush
 // it to the upstream file descriptor via a write() call to buffer_, which is
 // configured to succeed and accept all bytes read.
