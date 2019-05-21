@@ -139,6 +139,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "spdy_core_alt_svc_wire_format_lib",
+    srcs = ["quiche/spdy/core/spdy_alt_svc_wire_format.cc"],
+    hdrs = ["quiche/spdy/core/spdy_alt_svc_wire_format.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [":spdy_platform"],
+)
+
+envoy_cc_library(
     name = "quic_platform",
     srcs = [
         "quiche/quic/platform/api/quic_clock.cc",

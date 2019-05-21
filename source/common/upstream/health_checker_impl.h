@@ -71,6 +71,7 @@ private:
     void onResponseComplete();
     enum class HealthCheckResult { Succeeded, Degraded, Failed };
     HealthCheckResult healthCheckResult();
+    bool shouldClose() const;
 
     // ActiveHealthCheckSession
     void onInterval() override;
