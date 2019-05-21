@@ -47,6 +47,11 @@ void RequestDecoder::doParse(const Buffer::RawSlice& slice) {
 
   while (!data.empty()) {
 
+    // Re-initialize the parser.
+    if (!current_parser_) {
+      current_parser_ = createNextParser();
+    }
+
     // Feed the data to the parser.
     RequestParseResponse result = current_parser_->parse(data);
     // This loop guarantees that parsers consuming 0 bytes also get processed in this invocation.
@@ -65,8 +70,10 @@ void RequestDecoder::doParse(const Buffer::RawSlice& slice) {
           }
         }
 
-        // As we finished parsing this request, re-initialize the parser.
-        current_parser_ = factory_.create(parser_resolver_);
+        // As we finished parsing this request, return to outer loop.
+        // If there is more data, the parser will be re-initialized again.
+        current_parser_ = nullptr;
+        break;
       } else {
 
         // The next parser that's supposed to consume the rest of payload was given.
@@ -77,6 +84,10 @@ void RequestDecoder::doParse(const Buffer::RawSlice& slice) {
       result = current_parser_->parse(data);
     }
   }
+}
+
+RequestParserSharedPtr RequestDecoder::createNextParser() {
+  return factory_.create(parser_resolver_);
 }
 
 void RequestEncoder::encode(const AbstractRequest& message) {

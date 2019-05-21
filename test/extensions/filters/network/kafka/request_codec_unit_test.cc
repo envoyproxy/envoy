@@ -162,47 +162,6 @@ TEST_F(RequestCodecUnitTest, shouldPassParseFailureDataToCallbackAndReinitialize
   // `request_callback_` had `onFailedParse` invoked once with matching argument.
 }
 
-TEST_F(RequestCodecUnitTest, shouldInvokeParsersEvenIfTheyDoNotConsumeZeroBytes) {
-  // given
-  putGarbageIntoBuffer();
-
-  MockParserSharedPtr parser1 = std::make_shared<MockParser>();
-  MockParserSharedPtr parser2 = std::make_shared<MockParser>();
-  MockParserSharedPtr parser3 = std::make_shared<MockParser>();
-
-  // parser1 consumes buffer_.length() bytes (== everything) and returns parser2
-  auto consume_and_return = [this, &parser2](absl::string_view& data) -> RequestParseResponse {
-    data = {data.data() + buffer_.length(), data.size() - buffer_.length()};
-    return RequestParseResponse::nextParser(parser2);
-  };
-  EXPECT_CALL(*parser1, parse(_)).WillOnce(Invoke(consume_and_return));
-
-  // parser2 just returns parse result
-  RequestParseFailureSharedPtr failure_data =
-      std::make_shared<RequestParseFailure>(RequestHeader{});
-  EXPECT_CALL(*parser2, parse(_))
-      .WillOnce(Return(RequestParseResponse::parseFailure(failure_data)));
-
-  // parser3 just consumes everything
-  EXPECT_CALL(*parser3, parse(ResultOf([](absl::string_view arg) { return arg.size(); }, Eq(0))))
-      .WillOnce(Return(RequestParseResponse::stillWaiting()));
-
-  EXPECT_CALL(initial_parser_factory_, create(_))
-      .WillOnce(Return(parser1))
-      .WillOnce(Return(parser3));
-
-  EXPECT_CALL(*request_callback_, onFailedParse(failure_data));
-
-  RequestDecoder testee{initial_parser_factory_, parser_resolver_, {request_callback_}};
-
-  // when
-  testee.onData(buffer_);
-
-  // then
-  // `request_callback_` had `onFailedParse` invoked once with matching argument.
-  // After that, `parser3` was created and passed remaining data (that should have been empty).
-}
-
 } // namespace RequestCodecUnitTest
 } // namespace Kafka
 } // namespace NetworkFilters

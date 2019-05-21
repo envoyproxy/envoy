@@ -94,6 +94,8 @@ public:
 private:
   void doParse(const Buffer::RawSlice& slice);
 
+  RequestParserSharedPtr createNextParser();
+
   const InitialParserFactory& factory_;
 
   const RequestParserResolver& parser_resolver_;
