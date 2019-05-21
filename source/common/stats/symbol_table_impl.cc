@@ -364,14 +364,18 @@ void StatNameStorageSet::free(SymbolTable& symbol_table) {
 SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_names) const {
   uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
-    num_bytes += stat_name.dataSize();
+    if (!stat_name.empty()) {
+      num_bytes += stat_name.dataSize();
+    }
   }
   auto bytes = std::make_unique<Storage>(num_bytes + StatNameSizeEncodingBytes);
   uint8_t* p = writeLengthReturningNext(num_bytes, bytes.get());
   for (StatName stat_name : stat_names) {
-    const uint64_t stat_name_bytes = stat_name.dataSize();
-    memcpy(p, stat_name.data(), stat_name_bytes);
-    p += stat_name_bytes;
+    if (!stat_name.empty()) {
+      const uint64_t stat_name_bytes = stat_name.dataSize();
+      memcpy(p, stat_name.data(), stat_name_bytes);
+      p += stat_name_bytes;
+    }
   }
   return bytes;
 }
