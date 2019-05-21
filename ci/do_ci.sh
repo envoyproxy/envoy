@@ -43,26 +43,28 @@ function cp_binary_for_outside_access() {
   DELIVERY_LOCATION="$1"
   cp -f \
     "${ENVOY_SRCDIR}"/bazel-bin/source/exe/envoy-static \
-    "${ENVOY_DELIVERY_DIR}"/${DELIVERY_LOCATION}
+    "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}"
 }
 
 function cp_binary_for_image_build() {
   # TODO(mattklein123): Replace this with caching and a different job which creates images.
   echo "Copying binary for image build..."
-  mkdir -p "${ENVOY_SRCDIR}"/build_$1
-  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_$1
-  mkdir -p "${ENVOY_SRCDIR}"/build_$1_stripped
-  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_$1_stripped/envoy
+  mkdir -p "${ENVOY_SRCDIR}"/build_"$1"
+  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_"$1"
+  mkdir -p "${ENVOY_SRCDIR}"/build_"$1"_stripped
+  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_"$1"_stripped/envoy
 }
 
 function bazel_binary_build() {
-  BINARY_TYPE=$1
+  BINARY_TYPE="$1"
   if [[ "${BINARY_TYPE}" == "release" ]]; then
     COMPILE_TYPE="opt"
   elif [[ "${BINARY_TYPE}" == "debug" ]]; then
     COMPILE_TYPE="dbg"
     BINARY_SUFFIX="-debug"
   elif [[ "${BINARY_TYPE}" == "sizeopt" ]]; then
+    # The COMPILE_TYPE variable is redundant in this case and is only here for
+    # readability. It is already set in the .bazelrc config for sizeopt.
     COMPILE_TYPE="opt"
     CONFIG_ARGS="--config=sizeopt"
   elif [[ "${BINARY_TYPE}" == "fastbuild" ]]; then
@@ -71,14 +73,14 @@ function bazel_binary_build() {
   fi
 
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c ${COMPILE_TYPE} //source/exe:envoy-static ${CONFIG_ARGS}
-  collect_build_profile ${BINARY_TYPE}_build
+  bazel build ${BAZEL_BUILD_OPTIONS} -c "${COMPILE_TYPE}" //source/exe:envoy-static ${CONFIG_ARGS}
+  collect_build_profile "${BINARY_TYPE}"_build
 
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container.
   cp_binary_for_outside_access envoy
 
-  cp_binary_for_image_build ${BINARY_TYPE}
+  cp_binary_for_image_build "${BINARY_TYPE}"
 }
 
 if [[ "$1" == "bazel.release" ]]; then
