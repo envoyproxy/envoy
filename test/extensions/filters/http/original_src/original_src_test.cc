@@ -192,22 +192,38 @@ TEST_F(OriginalSrcHttpTest, Mark0NotAdded) {
   ASSERT_FALSE(mark_option.has_value());
 }
 
-TEST_F(OriginalSrcHttpTest, DecodeDataDoesNothing) {
+TEST_F(OriginalSrcHttpTest, TrailersAndDataEndStreamDoNothing) {
+  // Use a strict mock to show that decodeData and decodeTrailers do nothing to the callback.
   StrictMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   auto filter = makeFilterWithCallbacks(callbacks);
 
+  // This will be invoked in decodeHeaders.
+  EXPECT_CALL(callbacks, addUpstreamSocketOptions(_));
+  EXPECT_CALL(callbacks, streamInfo());
+  callbacks.stream_info_.downstream_remote_address_ =
+      Network::Utility::parseInternetAddress("1.2.3.4");
+  filter->decodeHeaders(headers_, true);
+
+  // No new expectations => no side effects from calling these.
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(buffer_, true));
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(buffer_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(headers_));
 }
 
-TEST_F(OriginalSrcHttpTest, DecodeTrailersDoesNothing) {
+TEST_F(OriginalSrcHttpTest, TrailersAndDataNotEndStreamDoNothing) {
+  // Use a strict mock to show that decodeData and decodeTrailers do nothing to the callback.
   StrictMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   auto filter = makeFilterWithCallbacks(callbacks);
 
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(headers_));
+  // This will be invoked in decodeHeaders.
+  EXPECT_CALL(callbacks, addUpstreamSocketOptions(_));
+  EXPECT_CALL(callbacks, streamInfo());
+  callbacks.stream_info_.downstream_remote_address_ =
+      Network::Utility::parseInternetAddress("1.2.3.4");
+  filter->decodeHeaders(headers_, false);
 
-  // Make sure the headers haven't changed at all by comparing them to the default.
-  EXPECT_EQ(headers_, Http::TestHeaderMapImpl());
+  // No new expectations => no side effects from calling these.
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(buffer_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(headers_));
 }
 } // namespace
 } // namespace OriginalSrc
