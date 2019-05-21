@@ -265,8 +265,9 @@ public:
   MockServerLifecycleNotifier();
   ~MockServerLifecycleNotifier();
 
-  MOCK_METHOD2(registerCallback, void(Stage, StageCallback));
-  MOCK_METHOD2(registerCallback, void(Stage, StageCallbackWithCompletion));
+  MOCK_METHOD2(registerCallback, ServerLifecycleNotifier::HandlePtr(Stage, StageCallback));
+  MOCK_METHOD2(registerCallback,
+               ServerLifecycleNotifier::HandlePtr(Stage, StageCallbackWithCompletion));
 };
 
 class MockWorkerFactory : public WorkerFactory {

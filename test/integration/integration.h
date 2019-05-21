@@ -7,6 +7,7 @@
 
 #include "common/http/codec_client.h"
 
+#include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"
@@ -200,21 +201,27 @@ public:
   void createXdsUpstream();
   void createXdsConnection();
   void cleanUpXdsConnection();
+
+  // Helpers for setting up expectations and making the internal gears turn for xDS request/response
+  // sending/receiving to/from the (imaginary) xDS server. You should almost always use
+  // compareDiscoveryRequest() and sendDiscoveryResponse(), but the SotW/delta-specific versions are
+  // available if you're writing a SotW/delta-specific test.
   AssertionResult
   compareDiscoveryRequest(const std::string& expected_type_url, const std::string& expected_version,
                           const std::vector<std::string>& expected_resource_names,
+                          const std::vector<std::string>& expected_resource_names_added,
+                          const std::vector<std::string>& expected_resource_names_removed,
                           const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
                           const std::string& expected_error_message = "");
   template <class T>
-  void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                             const std::string& version) {
-    envoy::api::v2::DiscoveryResponse discovery_response;
-    discovery_response.set_version_info(version);
-    discovery_response.set_type_url(type_url);
-    for (const auto& message : messages) {
-      discovery_response.add_resources()->PackFrom(message);
+  void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
+                             const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version) {
+    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+      sendSotwDiscoveryResponse(type_url, state_of_the_world, version);
+    } else {
+      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version);
     }
-    xds_stream_->sendGrpcMessage(discovery_response);
   }
 
   AssertionResult compareDeltaDiscoveryRequest(
@@ -234,21 +241,42 @@ public:
       const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& stream,
       const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
       const std::string& expected_error_message = "");
+  AssertionResult compareSotwDiscoveryRequest(
+      const std::string& expected_type_url, const std::string& expected_version,
+      const std::vector<std::string>& expected_resource_names,
+      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+      const std::string& expected_error_message = "");
+
   template <class T>
-  void sendDeltaDiscoveryResponse(const std::vector<T>& added_or_updated,
-                                  const std::vector<std::string>& removed,
-                                  const std::string& version) {
-    sendDeltaDiscoveryResponse(added_or_updated, removed, version, xds_stream_);
+  void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
+                                 const std::string& version) {
+    envoy::api::v2::DiscoveryResponse discovery_response;
+    discovery_response.set_version_info(version);
+    discovery_response.set_type_url(type_url);
+    for (const auto& message : messages) {
+      discovery_response.add_resources()->PackFrom(message);
+    }
+    xds_stream_->sendGrpcMessage(discovery_response);
   }
   template <class T>
-  void sendDeltaDiscoveryResponse(const std::vector<T>& added_or_updated,
+  void
+  sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version) {
+    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_);
+  }
+  template <class T>
+  void sendDeltaDiscoveryResponse(const std::string& type_url,
+                                  const std::vector<T>& added_or_updated,
                                   const std::vector<std::string>& removed,
                                   const std::string& version, FakeStreamPtr& stream) {
     envoy::api::v2::DeltaDiscoveryResponse response;
     response.set_system_version_info("system_version_info_this_is_a_test");
+    response.set_type_url(type_url);
     for (const auto& message : added_or_updated) {
       auto* resource = response.add_resources();
-      resource->set_name(message.name());
+      ProtobufWkt::Any temp_any;
+      temp_any.PackFrom(message);
+      resource->set_name(TestUtility::xdsResourceName(temp_any));
       resource->set_version(version);
       resource->mutable_resource()->PackFrom(message);
     }
@@ -327,6 +355,7 @@ protected:
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
   bool create_xds_upstream_{false}; // TODO(alyssawilk) true by default.
   bool tls_xds_upstream_{false};
+  Grpc::SotwOrDelta sotw_or_delta_{Grpc::SotwOrDelta::Sotw};
 
 private:
   // The type for the Envoy-to-backend connection
