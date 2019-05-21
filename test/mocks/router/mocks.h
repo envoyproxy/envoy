@@ -365,8 +365,8 @@ public:
 
 class MockScopedConfig : public ScopedConfig {
 public:
-  MockScopedConfig() = default;
-  ~MockScopedConfig() override = default;
+  MockScopedConfig();
+  ~MockScopedConfig();
 
   MOCK_CONST_METHOD1(getRouterConfig, ConfigConstSharedPtr(const Http::HeaderMap& headers));
 };

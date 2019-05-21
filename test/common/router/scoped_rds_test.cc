@@ -84,10 +84,6 @@ api_config_source:
 
 class ScopedRdsTest : public ScopedRoutesTestBase {
 protected:
-  ScopedRdsTest() = default;
-
-  ~ScopedRdsTest() override = default;
-
   void setup() {
     InSequence s;
 
@@ -265,12 +261,7 @@ TEST_F(ScopedRdsTest, ConfigUpdateFailure) {
             time);
 }
 
-class ScopedRoutesConfigProviderManagerTest : public ScopedRoutesTestBase {
-public:
-  ScopedRoutesConfigProviderManagerTest() = default;
-
-  ~ScopedRoutesConfigProviderManagerTest() override = default;
-};
+using ScopedRoutesConfigProviderManagerTest = ScopedRoutesTestBase;
 
 // Tests that the /config_dump handler returns the corresponding scoped routing config.
 TEST_F(ScopedRoutesConfigProviderManagerTest, ConfigDump) {
