@@ -21,7 +21,7 @@ std::string Utility::sanitizeStatsName(absl::string_view name) {
   return stats_name;
 }
 
-absl::optional<StatName> Utility::findTag(Metric& metric, StatName find_tag_name) {
+absl::optional<StatName> Utility::findTag(const Metric& metric, StatName find_tag_name) {
   absl::optional<StatName> value;
   metric.iterateTagStatNames(
       [&value, &find_tag_name](Stats::StatName tag_name, Stats::StatName tag_value) -> bool {

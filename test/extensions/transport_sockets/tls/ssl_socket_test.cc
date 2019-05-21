@@ -3759,9 +3759,10 @@ protected:
 
     client_ssl_socket_factory_ = std::make_unique<ClientSslSocketFactory>(
         std::move(client_cfg), *manager_, client_stats_store_);
+    auto transport_socket = client_ssl_socket_factory_->createTransportSocket(nullptr);
+    client_transport_socket_ = transport_socket.get();
     client_connection_ = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_,
-        client_ssl_socket_factory_->createTransportSocket(nullptr), nullptr);
+        socket_.localAddress(), source_address_, std::move(transport_socket), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
     read_filter_.reset(new Network::MockReadFilter());
@@ -3937,6 +3938,7 @@ protected:
   Envoy::Ssl::ClientContextSharedPtr client_ctx_;
   Network::TransportSocketFactoryPtr client_ssl_socket_factory_;
   Network::ClientConnectionPtr client_connection_;
+  Network::TransportSocket* client_transport_socket_{};
   Network::ConnectionPtr server_connection_;
   NiceMock<Network::MockConnectionCallbacks> server_callbacks_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
@@ -4001,6 +4003,66 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
   EXPECT_EQ(address_string, server_connection_->remoteAddress()->ip()->addressAsString());
 
   disconnect();
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/6617
+TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
+  // write_size * num_writes must be large enough to cause buffer reserving fragmentation,
+  // but smaller than one reservation so the expected slice to be 1.
+  const uint32_t write_size = 1;
+  const uint32_t num_writes = 12 * 1024;
+  const uint32_t read_buffer_limit = write_size * num_writes;
+  const uint32_t expected_chunk_size = write_size * num_writes;
+
+  initialize();
+
+  EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+            std::move(socket), server_ssl_socket_factory_->createTransportSocket(nullptr));
+        new_connection->setBufferLimits(read_buffer_limit);
+        listener_callbacks_.onNewConnection(std::move(new_connection));
+      }));
+  EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection_ = std::move(conn);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+        EXPECT_EQ("", server_connection_->nextProtocol());
+        EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
+      }));
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  uint32_t filter_seen = 0;
+
+  EXPECT_CALL(*read_filter_, onNewConnection());
+  EXPECT_CALL(*read_filter_, onData(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+        EXPECT_GE(expected_chunk_size, data.length());
+        EXPECT_EQ(1, data.getRawSlices(nullptr, 0));
+        filter_seen += data.length();
+        data.drain(data.length());
+        if (filter_seen == (write_size * num_writes)) {
+          server_connection_->close(Network::ConnectionCloseType::FlushWrite);
+        }
+        return Network::FilterStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        EXPECT_EQ((write_size * num_writes), filter_seen);
+        dispatcher_->exit();
+      }));
+
+  for (uint32_t i = 0; i < num_writes; i++) {
+    Buffer::OwnedImpl data(std::string(write_size, 'a'));
+    client_transport_socket_->doWrite(data, false);
+  }
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 } // namespace Tls

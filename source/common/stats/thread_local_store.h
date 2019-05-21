@@ -163,7 +163,40 @@ public:
   const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   const TagProducer& tagProducer() const { return *tag_producer_; }
-
+  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+    absl::optional<std::reference_wrapper<const Counter>> found_counter;
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      found_counter = scope->findCounter(name);
+      if (found_counter.has_value()) {
+        return found_counter;
+      }
+    }
+    return absl::nullopt;
+  }
+  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+    absl::optional<std::reference_wrapper<const Gauge>> found_gauge;
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      found_gauge = scope->findGauge(name);
+      if (found_gauge.has_value()) {
+        return found_gauge;
+      }
+    }
+    return absl::nullopt;
+  }
+  absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const override {
+    absl::optional<std::reference_wrapper<const Histogram>> found_histogram;
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      found_histogram = scope->findHistogram(name);
+      if (found_histogram.has_value()) {
+        return found_histogram;
+      }
+    }
+    return absl::nullopt;
+  }
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
@@ -239,6 +272,13 @@ private:
 
     NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
 
+    // NOTE: The find methods assume that `name` is fully-qualified.
+    // Implementations will not add the scope prefix.
+    absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override;
+    absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override;
+    absl::optional<std::reference_wrapper<const Histogram>>
+    findHistogram(StatName name) const override;
+
     template <class StatType>
     using MakeStatFn = std::function<std::shared_ptr<StatType>(StatDataAllocator&, StatName name,
                                                                absl::string_view tag_extracted_name,
@@ -262,6 +302,19 @@ private:
                            StatMap<std::shared_ptr<StatType>>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
+    /**
+     * Looks up an existing stat, populating the local cache if necessary. Does
+     * not check the TLS or rejects, and does not create a stat if it does not
+     * exist.
+     *
+     * @param name the full name of the stat (not tag extracted).
+     * @param central_cache_map a map from name to the desired object in the central cache.
+     * @return a reference to the stat, if it exists.
+     */
+    template <class StatType>
+    absl::optional<std::reference_wrapper<const StatType>>
+    findStatLockHeld(StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map) const;
+
     void extractTagsAndTruncate(StatName& name,
                                 std::unique_ptr<StatNameManagedStorage>& truncated_name_storage,
                                 std::vector<Tag>& tags, std::string& tag_extracted_name);
@@ -271,7 +324,7 @@ private:
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;
-    CentralCacheEntry central_cache_;
+    mutable CentralCacheEntry central_cache_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {

@@ -154,7 +154,6 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
       local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
-  onDeferredDelete();
   ASSERT(client_ == nullptr);
 }
 
@@ -379,7 +378,6 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
       receive_bytes_(TcpHealthCheckMatcher::loadProtoBytes(config.tcp_health_check().receive())) {}
 
 TcpHealthCheckerImpl::TcpActiveHealthCheckSession::~TcpActiveHealthCheckSession() {
-  onDeferredDelete();
   ASSERT(client_ == nullptr);
 }
 
@@ -487,7 +485,6 @@ GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::GrpcActiveHealthCheckSessio
     : ActiveHealthCheckSession(parent, host), parent_(parent) {}
 
 GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::~GrpcActiveHealthCheckSession() {
-  onDeferredDelete();
   ASSERT(client_ == nullptr);
 }
 
