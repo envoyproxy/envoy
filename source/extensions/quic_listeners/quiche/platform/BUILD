@@ -128,13 +128,13 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":flags_impl_lib",
-        ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:byte_order_lib",
         "//source/server:backtrace_lib",
         "@com_googlesource_quiche//:quic_core_buffer_allocator_lib",
         "@com_googlesource_quiche//:quic_platform_export",
+        "@com_googlesource_quiche//:quiche_common_platform",
     ],
 )
 
@@ -182,7 +182,6 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        ":quic_platform_base_impl_lib",
         ":quic_platform_logging_impl_lib",
     ],
 )
