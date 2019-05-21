@@ -106,6 +106,20 @@ public:
     return histogramFromStatName(storage.statName());
   }
 
+  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->findCounter(name);
+  }
+  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->findGauge(name);
+  }
+  absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->findHistogram(name);
+  }
+
   const SymbolTable& symbolTable() const override { return wrapped_scope_->symbolTable(); }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
 
@@ -151,6 +165,19 @@ public:
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
+  }
+  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return store_.findCounter(name);
+  }
+  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return store_.findGauge(name);
+  }
+  absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return store_.findHistogram(name);
   }
   const SymbolTable& symbolTable() const override { return store_.symbolTable(); }
   SymbolTable& symbolTable() override { return store_.symbolTable(); }

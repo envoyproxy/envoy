@@ -301,7 +301,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 void HttpConnectionManagerConfig::processFilter(
     const envoy::config::filter::network::http_connection_manager::v2::HttpFilter& proto_config,
     int i, absl::string_view prefix, std::list<Http::FilterFactoryCb>& filter_factories) {
-  const ProtobufTypes::String& string_name = proto_config.name();
+  const std::string& string_name = proto_config.name();
 
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
   ENVOY_LOG(debug, "      name: {}", string_name);

@@ -112,7 +112,7 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
     (*output_struct.mutable_fields())[pair.first] = string_value;
   }
 
-  ProtobufTypes::String log_line;
+  std::string log_line;
   const auto conversion_status = Protobuf::util::MessageToJsonString(output_struct, &log_line);
   if (!conversion_status.ok()) {
     log_line =
@@ -397,6 +397,9 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.subjectLocalCertificate();
         });
+  } else if (field_name == "DOWNSTREAM_TLS_SESSION_ID") {
+    field_extractor_ = sslConnectionInfoStringExtractor(
+        [](const Ssl::ConnectionInfo& connection_info) { return connection_info.sessionId(); });
   } else if (field_name == "UPSTREAM_TRANSPORT_FAILURE_REASON") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       if (!stream_info.upstreamTransportFailureReason().empty()) {
@@ -504,7 +507,7 @@ std::string MetadataFormatter::format(const envoy::api::v2::core::Metadata& meta
     }
     data = &val;
   }
-  ProtobufTypes::String json;
+  std::string json;
   const auto status = Protobuf::util::MessageToJsonString(*data, &json);
   RELEASE_ASSERT(status.ok(), "");
   if (max_length_ && json.length() > max_length_.value()) {

@@ -70,9 +70,6 @@ PROTOBUF_TYPE_ERRORS = {
     "Protobuf::Struct":                 "ProtobufWkt::Struct",
     "Protobuf::Value":                  "ProtobufWkt::Value",
 
-    # Maps including strings should use the protobuf string types.
-    "Protobuf::MapPair<std::string":    "Protobuf::MapPair<Envoy::ProtobufTypes::String",
-
     # Other common mis-namespacing of protobuf types.
     "ProtobufWkt::Map":                 "Protobuf::Map",
     "ProtobufWkt::MapPair":             "Protobuf::MapPair",

@@ -50,8 +50,8 @@ public:
 
 class PerFilterConfigs {
 public:
-  PerFilterConfigs(const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Any>& typed_configs,
-                   const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
+  PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
+                   const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
                    Server::Configuration::FactoryContext& factory_context);
 
   const RouteSpecificFilterConfig* get(const std::string& name) const;
@@ -779,12 +779,15 @@ public:
 
   const std::string& name() const override { return name_; }
 
+  bool usesVhds() const override { return uses_vhds_; }
+
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   const std::string name_;
+  const bool uses_vhds_;
 };
 
 /**
@@ -800,6 +803,7 @@ public:
   }
 
   const std::string& name() const override { return name_; }
+  bool usesVhds() const override { return false; }
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;

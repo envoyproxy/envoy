@@ -84,6 +84,7 @@ public:
   MOCK_CONST_METHOD0(typedMetadata, const Envoy::Config::TypedMetadata&());
   MOCK_CONST_METHOD0(clusterSocketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(drainConnectionsOnHostRemoval, bool());
+  MOCK_CONST_METHOD0(warmHosts, bool());
   MOCK_CONST_METHOD0(eds_service_name, absl::optional<std::string>());
 
   std::string name_{"fake_cluster"};

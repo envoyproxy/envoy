@@ -13,6 +13,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
+struct RcDetailsValues {
+  // The ext_authz filter denied the downstream request.
+  const std::string AuthzDenied = "ext_authz_denied";
+  // The ext_authz filter encountered a failure, and was configured to fail-closed.
+  const std::string AuthzError = "ext_authz_error";
+};
+typedef ConstSingleton<RcDetailsValues> RcDetails;
+
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   disabled_ = other.disabled_;
   auto begin_it = other.context_extensions_.begin();
@@ -23,6 +31,10 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
 }
 
 void Filter::initiateCall(const Http::HeaderMap& headers) {
+  if (filter_return_ == FilterReturn::StopDecoding) {
+    return;
+  }
+
   Router::RouteConstSharedPtr route = callbacks_->route();
   if (route == nullptr || route->routeEntry() == nullptr) {
     return;
@@ -50,7 +62,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
             cfg_base.merge(cfg);
           });
 
-  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> context_extensions;
+  Protobuf::Map<std::string, std::string> context_extensions;
   if (maybe_merged_per_route_config) {
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
   }
@@ -88,8 +100,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
   if (buffer_data_) {
-    if (end_stream || isBufferFull()) {
-      ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request", *callbacks_);
+    const bool buffer_is_full = isBufferFull();
+    if (end_stream || buffer_is_full) {
+      ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request since {}",
+                       *callbacks_, buffer_is_full ? "buffer is full" : "stream is ended");
       initiateCall(*request_headers_);
       return filter_return_ == FilterReturn::StopDecoding
                  ? Http::FilterDataStatus::StopIterationAndWatermark
@@ -163,8 +177,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       (response->status == CheckStatus::Error && !config_->failureModeAllow())) {
     ENVOY_STREAM_LOG(debug, "ext_authz filter rejected the request", *callbacks_);
     const std::string& details = response->status == CheckStatus::Denied
-                                     ? StreamInfo::ResponseCodeDetails::get().AuthzDenied
-                                     : StreamInfo::ResponseCodeDetails::get().AuthzError;
+                                     ? RcDetails::get().AuthzDenied
+                                     : RcDetails::get().AuthzError;
     callbacks_->sendLocalReply(
         response->status_code, response->body,
         [& headers = response->headers_to_add,

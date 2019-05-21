@@ -6,6 +6,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
 
+#include "common/common/logger.h"
+
 namespace Envoy {
 namespace Config {
 
