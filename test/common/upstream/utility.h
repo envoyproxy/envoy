@@ -14,13 +14,16 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-inline std::string defaultSdsClusterJson(const std::string& name) {
+inline std::string defaultStaticClusterJsonV1(const std::string& name) {
   return fmt::sprintf(R"EOF(
   {
     "name": "%s",
     "connect_timeout_ms": 250,
-    "type": "sds",
-    "lb_type": "round_robin"
+    "type": "static",
+    "lb_type": "round_robin",
+    "hosts": [
+      {"url": "tcp://127.0.0.1:11001"}
+    ]
   }
   )EOF",
                       name);
@@ -30,10 +33,17 @@ inline std::string defaultStaticClusterJson(const std::string& name) {
   return fmt::sprintf(R"EOF(
   {
     "name": "%s",
-    "connect_timeout_ms": 250,
+    "connect_timeout": "0.250s",
     "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+    "lb_policy": "round_robin",
+    "hosts": [
+      {
+        "socket_address": {
+          "address": "127.0.0.1",
+          "port_value": 11001
+        }
+      }
+    ]
   }
   )EOF",
                       name);
@@ -58,7 +68,7 @@ inline envoy::api::v2::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
 }
 
 inline envoy::api::v2::Cluster defaultStaticCluster(const std::string& name) {
-  return parseClusterFromJson(defaultStaticClusterJson(name));
+  return parseClusterFromJson(defaultStaticClusterJsonV1(name));
 }
 
 inline envoy::api::v2::Cluster
