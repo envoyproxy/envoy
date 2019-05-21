@@ -48,6 +48,8 @@ namespace {
 
 template <class T> class HttpFilterTestBase : public T {
 public:
+  HttpFilterTestBase() : http_context_(stats_store_.symbolTable()) {}
+
   void initialize(std::string&& yaml) {
     envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
     if (!yaml.empty()) {
@@ -68,7 +70,7 @@ public:
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_;
   Http::TestHeaderMapImpl request_headers_;
   Buffer::OwnedImpl data_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -83,7 +85,10 @@ public:
   }
 };
 
-class HttpFilterTest : public HttpFilterTestBase<testing::Test> {};
+class HttpFilterTest : public HttpFilterTestBase<testing::Test> {
+public:
+  HttpFilterTest() = default;
+};
 
 using CreateFilterConfigFunc = envoy::config::filter::http::ext_authz::v2::ExtAuthz();
 

@@ -12,8 +12,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
-using Filters::Common::ExtAuthz::CheckStatus;
-
 struct RcDetailsValues {
   // The ext_authz filter denied the downstream request.
   const std::string AuthzDenied = "ext_authz_denied";
@@ -144,6 +142,8 @@ void Filter::onDestroy() {
 void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   ASSERT(cluster_);
   state_ = State::Complete;
+  using Filters::Common::ExtAuthz::CheckStatus;
+  Stats::StatName empty_stat_name;
 
   switch (response->status) {
   case CheckStatus::OK: {
@@ -180,13 +180,13 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     cluster_->statsScope().counter("ext_authz.denied").inc();
     Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                            cluster_->statsScope(),
-                                           EMPTY_STRING,
+                                           empty_stat_name,
                                            enumToInt(response->status_code),
                                            true,
-                                           EMPTY_STRING,
-                                           EMPTY_STRING,
-                                           EMPTY_STRING,
-                                           EMPTY_STRING,
+                                           empty_stat_name,
+                                           empty_stat_name,
+                                           empty_stat_name,
+                                           empty_stat_name,
                                            false};
     config_->httpContext().codeStats().chargeResponseStat(info);
     callbacks_->sendLocalReply(

@@ -2,6 +2,7 @@
 #include <string>
 
 #include "common/network/utility.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
@@ -12,6 +13,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -46,7 +48,7 @@ public:
 
     conn_pool_ = std::make_unique<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
-        Common::Redis::Client::createConnPoolSettings(20, hashtagging, true));
+        Common::Redis::Client::createConnPoolSettings(20, hashtagging, true), *symbol_table_);
     test_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
   }
 
@@ -77,6 +79,7 @@ public:
   MOCK_METHOD1(create_, Common::Redis::Client::Client*(Upstream::HostConstSharedPtr host));
 
   const std::string cluster_name_{"fake_cluster"};
+  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   InstanceSharedPtr conn_pool_;

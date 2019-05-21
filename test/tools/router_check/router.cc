@@ -144,7 +144,9 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
 
   if (tool_config.route_->routeEntry() != nullptr &&
       tool_config.route_->routeEntry()->virtualCluster(*tool_config.headers_) != nullptr) {
-    actual = tool_config.route_->routeEntry()->virtualCluster(*tool_config.headers_)->name();
+    Stats::StatName stat_name =
+        tool_config.route_->routeEntry()->virtualCluster(*tool_config.headers_)->statName();
+    actual = tool_config.symbolTable().toString(stat_name);
   }
   return compareResults(actual, expected, "virtual_cluster_name");
 }
@@ -152,7 +154,8 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
 bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
   if (tool_config.route_->routeEntry() != nullptr) {
-    actual = tool_config.route_->routeEntry()->virtualHost().name();
+    Stats::StatName stat_name = tool_config.route_->routeEntry()->virtualHost().statName();
+    actual = tool_config.symbolTable().toString(stat_name);
   }
   return compareResults(actual, expected, "virtual_host_name");
 }
