@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/stats.h"
 
 namespace Envoy {
 namespace Stats {
@@ -17,10 +18,21 @@ public:
     std::reference_wrapper<const Counter> counter_;
   };
 
-  // fixfix
   virtual ~MetricSnapshot() = default;
+
+  /**
+   * @return a snapshot of all counters with pre-latched deltas.
+   */
   virtual const std::vector<CounterSnapshot>& counters() PURE;
+
+  /**
+   * @return a snapshot of all gauges.
+   */
   virtual const std::vector<std::reference_wrapper<const Gauge>>& gauges() PURE;
+
+  /**
+   * @return a snapshot of all histograms.
+   */
   virtual const std::vector<std::reference_wrapper<const ParentHistogram>>& histograms() PURE;
 };
 

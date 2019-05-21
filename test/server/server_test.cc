@@ -33,28 +33,38 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-/*TEST(ServerInstanceUtil, flushHelper) {
+TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
   Stats::IsolatedStoreImpl store;
-  Stats::SourceImpl source(store);
-  store.counter("hello").inc();
+  Stats::Counter& c = store.counter("hello");
+  c.inc();
   store.gauge("world").set(5);
-  std::unique_ptr<Stats::MockSink> sink(new StrictMock<Stats::MockSink>());
-  EXPECT_CALL(*sink, flush(Ref(source))).WillOnce(Invoke([](Stats::Source& source) {
-    ASSERT_EQ(source.cachedCounters().size(), 1);
-    EXPECT_EQ(source.cachedCounters().front()->name(), "hello");
-    EXPECT_EQ(source.cachedCounters().front()->latch(), 1);
-
-    ASSERT_EQ(source.cachedGauges().size(), 1);
-    EXPECT_EQ(source.cachedGauges().front()->name(), "world");
-    EXPECT_EQ(source.cachedGauges().front()->value(), 5);
-  }));
+  store.histogram("histogram");
 
   std::list<Stats::SinkPtr> sinks;
+  InstanceUtil::flushMetricsToSinks(sinks, store);
+  // Make sure that counters have been latched even if there are no sinks.
+  EXPECT_EQ(1UL, c.value());
+  EXPECT_EQ(0, c.latch());
+
+  std::unique_ptr<Stats::MockSink> sink(new StrictMock<Stats::MockSink>());
+  EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
+    ASSERT_EQ(snapshot.counters().size(), 1);
+    EXPECT_EQ(snapshot.counters()[0].counter_.get().name(), "hello");
+    EXPECT_EQ(snapshot.counters()[0].delta_, 1);
+
+    ASSERT_EQ(snapshot.gauges().size(), 1);
+    EXPECT_EQ(snapshot.gauges()[0].get().name(), "world");
+    EXPECT_EQ(snapshot.gauges()[0].get().value(), 5);
+
+    ASSERT_EQ(snapshot.histograms().size(), 1);
+    EXPECT_EQ(snapshot.histograms()[0].get().name(), "histogram");
+  }));
   sinks.emplace_back(std::move(sink));
-  InstanceUtil::flushMetricsToSinks(sinks, source);
-}fixfix*/
+  c.inc();
+  InstanceUtil::flushMetricsToSinks(sinks, store);
+}
 
 class RunHelperTest : public testing::Test {
 public:

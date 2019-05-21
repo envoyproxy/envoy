@@ -128,12 +128,12 @@ void InstanceImpl::drainListeners() {
   drain_manager_->startDrainSequence(nullptr);
 }
 
-void InstanceImpl::failHealthcheck(bool fail) {
-  // We keep liveness state in shared memory so the parent process sees the same state.
-  server_stats_->live_.set(!fail);
-}
+void InstanceImpl::failHealthcheck(bool fail) { server_stats_->live_.set(!fail); }
 
-// fixfix comment
+// Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could
+// potentially make this static and have a clear() method to avoid some vector constructions
+// and reservations, but I'm not sure it's worth the extra complexity until it shows up in perf
+// traces.
 class MetricSnapshotImpl : public Stats::MetricSnapshot {
 public:
   MetricSnapshotImpl(Stats::Store& store) {
@@ -176,7 +176,10 @@ private:
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
                                        Stats::Store& store) {
-  // fixfix comment about latching.
+  // Create a snapshot and flush to all sinks.
+  // NOTE: Even if there are no sinks, creating the snapshot has the important property that it
+  //       latches all counters on a periodic basis. The hot restart code assumes this is being
+  //       done so this should not be removed.
   MetricSnapshotImpl snapshot(store);
   for (const auto& sink : sinks) {
     sink->flush(snapshot);
@@ -575,9 +578,6 @@ void InstanceImpl::shutdown() {
 
 void InstanceImpl::shutdownAdmin() {
   ENVOY_LOG(warn, "shutting down admin due to child startup");
-  // TODO(mattklein123): Since histograms are not shared between processes, this will also stop
-  //                     histogram flushing. In the future we can consider whether we want to
-  //                     somehow keep flushing histograms from the old process.
   stat_flush_timer_.reset();
   handler_->stopListeners();
   admin_->closeSocket();
