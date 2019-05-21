@@ -1079,7 +1079,8 @@ bool AdminImpl::isFormUrlEncoded(const Http::HeaderEntry* content_type) const {
     return false;
   }
 
-  return content_type->value().getStringView() == "application/x-www-form-urlencoded";
+  return content_type->value().getStringView() ==
+         Http::Headers::get().ContentTypeValues.FormUrlEncoded;
 }
 
 Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMap&,

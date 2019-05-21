@@ -596,7 +596,8 @@ public:
                          Buffer::Instance& response, absl::string_view method,
                          absl::string_view body = absl::string_view()) {
     if (!body.empty()) {
-      request_headers_.insertContentType().value(std::string("application/x-www-form-urlencoded"));
+      request_headers_.insertContentType().value(
+          Http::Headers::get().ContentTypeValues.FormUrlEncoded);
       callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>(body);
     }
 

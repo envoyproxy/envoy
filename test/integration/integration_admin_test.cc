@@ -319,9 +319,9 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/runtime_modify",
-                                                "foo=bar&foo1=bar1", downstreamProtocol(), version_,
-                                                "host", "application/x-www-form-urlencoded");
+  response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/runtime_modify", "foo=bar&foo1=bar1", downstreamProtocol(),
+      version_, "host", Http::Headers::get().ContentTypeValues.FormUrlEncoded);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 
