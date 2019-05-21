@@ -9,12 +9,12 @@ quic::QuicTime EnvoyQuicClock::ApproximateNow() const {
 }
 
 quic::QuicTime EnvoyQuicClock::Now() const {
-    return quic::QuicTime::Zero() +
-        quic::QuicTime::Delta::FromMicroseconds(timePointToInt64(time_source_.monotonicTime());
+  return quic::QuicTime::Zero() +
+         quic::QuicTime::Delta::FromMicroseconds(timePointToInt64(time_system_.monotonicTime()));
 }
 
 quic::QuicWallTime EnvoyQuicClock::WallNow() const {
-  return quic::QuicWallTime::FromUNIXMicroseconds(timePointToInt64(time_source_.systemTime()));
+  return quic::QuicWallTime::FromUNIXMicroseconds(timePointToInt64(time_system_.systemTime()));
 }
 
 } // namespace Quic
