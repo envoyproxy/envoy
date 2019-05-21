@@ -267,6 +267,12 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(3L, store_->gauges().front().use_count());
 
+  StatName fast_lookup = store_->fastMemoryIntensiveStatNameLookup("fast.lookup");
+  // Request the same string so that we trigger the cache 'hit' case.
+  StatName fast_lookup2 = store_->fastMemoryIntensiveStatNameLookup("fast.lookup");
+  EXPECT_EQ(fast_lookup, fast_lookup2);
+  EXPECT_EQ("fast.lookup", symbol_table_.toString(fast_lookup));
+
   store_->shutdownThreading();
   tls_.shutdownThread();
 
@@ -276,9 +282,6 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
-
-  StatName fast_lookup = store_->fastMemoryIntensiveStatNameLookup("fast.lookup");
-  EXPECT_EQ("fast.lookup", symbol_table_.toString(fast_lookup));
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {
