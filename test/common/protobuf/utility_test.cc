@@ -122,7 +122,7 @@ TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
 
 TEST_F(ProtobufUtilityTest, DowncastAndValidate) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  bootstrap.mutable_runtime();
+  bootstrap.mutable_static_resources()->add_clusters();
   EXPECT_THROW(MessageUtil::validate(bootstrap), ProtoValidationException);
   EXPECT_THROW(
       MessageUtil::downcastAndValidate<const envoy::config::bootstrap::v2::Bootstrap&>(bootstrap),
@@ -162,7 +162,7 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile) {
       ->mutable_source_address()
       ->set_address("1.1.1.1");
 
-  ProtobufTypes::String bootstrap_text;
+  std::string bootstrap_text;
   ASSERT_TRUE(Protobuf::TextFormat::PrintToString(bootstrap, &bootstrap_text));
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
@@ -450,7 +450,7 @@ class DeprecatedFieldsTest : public testing::Test {
 protected:
   DeprecatedFieldsTest()
       : loader_(new Runtime::ScopedLoaderSingleton(
-            Runtime::LoaderPtr{new Runtime::LoaderImpl(rand_, store_, tls_)})) {}
+            Runtime::LoaderPtr{new Runtime::LoaderImpl({}, rand_, store_, tls_)})) {}
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::IsolatedStoreImpl store_;
@@ -635,5 +635,14 @@ INSTANTIATE_TEST_SUITE_P(TimestampUtilTestAcrossRange, TimestampUtilTest,
                                            1000 * 60 * 60 * 24,    // day
                                            1000 * 60 * 60 * 24 * 7 // week
                                            ));
+
+TEST(StatusCode, Strings) {
+  int last_code = static_cast<int>(ProtobufUtil::error::UNAUTHENTICATED);
+  for (int i = 0; i < last_code; ++i) {
+    EXPECT_NE(MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(i)), "");
+  }
+  ASSERT_EQ("",
+            MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(last_code + 1)));
+}
 
 } // namespace Envoy

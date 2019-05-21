@@ -221,11 +221,11 @@ private:
 
     void sendLocalReply(Code code, absl::string_view body,
                         std::function<void(HeaderMap& headers)> modify_headers,
-                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
-      // TODO(#6542): add an extra parameter for setting rc details
-      parent_.stream_info_.setResponseCodeDetails("");
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                        absl::string_view details) override {
+      parent_.stream_info_.setResponseCodeDetails(details);
       parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, parent_.is_head_request_,
-                             grpc_status);
+                             grpc_status, details);
     }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -241,6 +241,14 @@ private:
     void setDecoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
     uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
     bool recreateStream() override;
+
+    void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
+      Network::Socket::appendOptions(parent_.upstream_options_, options);
+    }
+
+    Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override {
+      return parent_.upstream_options_;
+    }
 
     // Each decoder filter instance checks if the request passed to the filter is gRPC
     // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -359,7 +367,8 @@ private:
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                         const std::function<void(HeaderMap& headers)>& modify_headers,
                         bool is_head_request,
-                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                        absl::string_view details);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     // Sends data through encoding filter chains. filter_iteration_start_state indicates which
@@ -478,6 +487,8 @@ private:
     // Per-stream request timeout callback
     void onRequestTimeout();
 
+    bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
+
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
     Tracing::SpanPtr active_span_;
@@ -516,6 +527,7 @@ private:
     // Whether a filter has indicated that the response should be treated as a headers only
     // response.
     bool encoding_headers_only_{};
+    Network::Socket::OptionsSharedPtr upstream_options_;
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

@@ -11,6 +11,7 @@
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/zero_copy_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl.h"
+#include "google/protobuf/map.h"
 #include "google/protobuf/message.h"
 #include "google/protobuf/repeated_field.h"
 #include "google/protobuf/service.h"
@@ -39,14 +40,12 @@ namespace ProtobufUtil = google::protobuf::util;
 // namespace.
 namespace ProtobufWkt = google::protobuf;
 
-// Alternative protobuf implementations might not use std::string as a string
-// type. Below we provide wrappers to facilitate remapping of the type during
-// import.
+// Alternative protobuf implementations might not have the same basic types.
+// Below we provide wrappers to facilitate remapping of the type during import.
 namespace ProtobufTypes {
 
 typedef std::unique_ptr<Protobuf::Message> MessagePtr;
 
-typedef std::string String;
 typedef int64_t Int64;
 
 } // namespace ProtobufTypes

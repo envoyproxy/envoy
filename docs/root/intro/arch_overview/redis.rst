@@ -57,6 +57,28 @@ If passive healthchecking is desired, also configure
 For the purposes of passive healthchecking, connect timeouts, command timeouts, and connection
 close map to 5xx. All other responses from Redis are counted as a success.
 
+Redis Cluster Support (Experimental)
+----------------------------------------
+
+Envoy currently offers experimental support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_.
+
+When using Envoy as a sidecar proxy for a Redis Cluster, the service can use a non-cluster Redis client
+implemented in any language to connect to the proxy as if it's a single node Redis instance.
+The Envoy proxy will keep track of the cluster topology and send commands to the correct Redis node in the
+cluster according to the `spec <https://redis.io/topics/cluster-spec>`_. Advance features such as reading
+from replicas can also be added to the Envoy proxy instead of updating redis clients in each language.
+
+Envoy proxy tracks the topology of the cluster by sending periodic
+`cluster slots <https://redis.io/commands/cluster-slots>`_ commands to a random node in the cluster, and maintains the
+following information:
+
+* List of known nodes.
+* The masters for each shard.
+* Nodes entering or leaving the cluster.
+
+For topology configuration details, see the Redis Cluster
+:ref:`v2 API reference <envoy_api_msg_config.cluster.redis.RedisClusterConfig>`.
+
 Supported commands
 ------------------
 

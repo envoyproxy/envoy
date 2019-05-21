@@ -32,6 +32,7 @@
 using testing::_;
 using testing::ContainerEq;
 using testing::ElementsAreArray;
+using testing::Eq;
 using testing::Matcher;
 using testing::MockFunction;
 using testing::NiceMock;
@@ -4321,7 +4322,7 @@ virtual_hosts:
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
     Tracing::MockSpan span;
-    EXPECT_CALL(span, setOperation("myFoo"));
+    EXPECT_CALL(span, setOperation(Eq("myFoo")));
     route->decorator()->apply(span);
   }
   {

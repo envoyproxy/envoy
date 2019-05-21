@@ -11,6 +11,7 @@
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
 #include "common/http/headers.h"
+#include "common/stats/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
@@ -267,8 +268,10 @@ const std::string HystrixSink::printRollingWindows() {
 
 HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_buckets)
     : server_(server), current_index_(num_buckets > 0 ? num_buckets : DEFAULT_NUM_BUCKETS),
-      window_size_(current_index_ + 1),
-      cluster_upstream_rq_time_("cluster.upstream_rq_time", server.stats().symbolTable()) {
+      window_size_(current_index_ + 1), stat_name_pool_(server.stats().symbolTable()),
+      cluster_name_(stat_name_pool_.add(Config::TagNames::get().CLUSTER_NAME)),
+      cluster_upstream_rq_time_(stat_name_pool_.add("cluster.upstream_rq_time")) {
+
   Server::Admin& admin = server_.admin();
   ENVOY_LOG(debug,
             "adding hystrix_event_stream endpoint to enable connection to hystrix dashboard");
@@ -328,16 +331,12 @@ void HystrixSink::flush(Stats::Source& source) {
   // Save a map of the relevant histograms per cluster in a convenient format.
   std::unordered_map<std::string, QuantileLatencyMap> time_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : source.cachedHistograms()) {
-    if (histogram->tagExtractedStatName() == cluster_upstream_rq_time_.statName()) {
-      // TODO(mrice32): add an Envoy utility function to look up and return a tag for a metric.
-      auto tags = histogram->tags();
-      auto it = std::find_if(tags.begin(), tags.end(), [](const Stats::Tag& tag) {
-        return (tag.name_ == Config::TagNames::get().CLUSTER_NAME);
-      });
-
+    if (histogram->tagExtractedStatName() == cluster_upstream_rq_time_) {
+      absl::optional<Stats::StatName> value = Stats::Utility::findTag(*histogram, cluster_name_);
       // Make sure we found the cluster name tag
-      ASSERT(it != histogram->tags().end());
-      auto it_bool_pair = time_histograms.emplace(std::make_pair(it->value_, QuantileLatencyMap()));
+      ASSERT(value);
+      std::string value_str = server_.stats().symbolTable().toString(*value);
+      auto it_bool_pair = time_histograms.emplace(std::make_pair(value_str, QuantileLatencyMap()));
       // Make sure histogram with this name was not already added
       ASSERT(it_bool_pair.second);
       QuantileLatencyMap& hist_map = it_bool_pair.first->second;

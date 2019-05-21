@@ -6,12 +6,10 @@
 #include <string>
 
 #include "envoy/stats/stats.h"
-#include "envoy/stats/stats_options.h"
 #include "envoy/stats/store.h"
 
 #include "common/common/utility.h"
 #include "common/stats/heap_stat_data.h"
-#include "common/stats/stats_options_impl.h"
 #include "common/stats/store_impl.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
@@ -52,6 +50,16 @@ public:
   }
 
 private:
+  friend class IsolatedStoreImpl;
+
+  absl::optional<std::reference_wrapper<const Base>> find(StatName name) const {
+    auto stat = stats_.find(name);
+    if (stat == stats_.end()) {
+      return absl::nullopt;
+    }
+    return std::cref(*stat->second.get());
+  }
+
   StatNameHashMap<std::shared_ptr<Base>> stats_;
   Allocator alloc_;
 };
@@ -71,7 +79,16 @@ public:
     Histogram& histogram = histograms_.get(name);
     return histogram;
   }
-  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
+  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+    return counters_.find(name);
+  }
+  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+    return gauges_.find(name);
+  }
+  absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const override {
+    return histograms_.find(name);
+  }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
@@ -101,7 +118,6 @@ private:
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
-  const StatsOptionsImpl stats_options_;
   NullGaugeImpl null_gauge_;
 };
 

@@ -14,6 +14,14 @@ namespace ExtAuthz {
 
 using Filters::Common::ExtAuthz::CheckStatus;
 
+struct RcDetailsValues {
+  // The ext_authz filter denied the downstream request.
+  const std::string AuthzDenied = "ext_authz_denied";
+  // The ext_authz filter encountered a failure, and was configured to fail-closed.
+  const std::string AuthzError = "ext_authz_error";
+};
+typedef ConstSingleton<RcDetailsValues> RcDetails;
+
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   disabled_ = other.disabled_;
   auto begin_it = other.context_extensions_.begin();
@@ -51,7 +59,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
             cfg_base.merge(cfg);
           });
 
-  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> context_extensions;
+  Protobuf::Map<std::string, std::string> context_extensions;
   if (maybe_merged_per_route_config) {
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
   }
@@ -187,7 +195,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
             response_headers.addCopy(header.first, header.second);
           }
         },
-        absl::nullopt);
+        absl::nullopt, RcDetails::get().AuthzDenied);
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService);
     break;
   }
@@ -204,7 +212,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           *callbacks_, enumToInt(config_->statusOnError()));
       callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
-      callbacks_->sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt);
+      callbacks_->sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+                                 RcDetails::get().AuthzError);
     }
     break;
   }

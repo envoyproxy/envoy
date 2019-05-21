@@ -97,7 +97,6 @@ public:
   Http::TestHeaderMapImpl header_;
   const RouteEntry* route_;
   Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};
-  Stats::StatsOptionsImpl stats_options;
 };
 
 TEST_F(RateLimitConfiguration, NoApplicableRateLimit) {

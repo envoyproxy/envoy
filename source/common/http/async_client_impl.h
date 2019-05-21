@@ -176,6 +176,7 @@ private:
     }
 
     const std::string& name() const override { return EMPTY_STRING; }
+    bool usesVhds() const override { return false; }
 
     static const std::list<LowerCaseString> internal_only_headers_;
   };
@@ -327,9 +328,9 @@ private:
   }
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(HeaderMap& headers)> modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
-    // TODO(#6542): add an extra parameter for setting rc details
-    stream_info_.setResponseCodeDetails("");
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details) override {
+    stream_info_.setResponseCodeDetails(details);
     Utility::sendLocalReply(
         is_grpc_request_,
         [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
@@ -355,6 +356,8 @@ private:
   void setDecoderBufferLimit(uint32_t) override {}
   uint32_t decoderBufferLimit() override { return 0; }
   bool recreateStream() override { return false; }
+  void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
+  Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
 
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;

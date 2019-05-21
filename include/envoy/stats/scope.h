@@ -1,12 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
-#include "envoy/stats/stats_options.h"
 #include "envoy/stats/symbol_table.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
@@ -15,7 +17,6 @@ class Counter;
 class Gauge;
 class Histogram;
 class Scope;
-class StatsOptions;
 class NullGaugeImpl;
 
 typedef std::unique_ptr<Scope> ScopePtr;
@@ -87,10 +88,25 @@ public:
   virtual Histogram& histogram(const std::string& name) PURE;
 
   /**
-   * @return a reference to the top-level StatsOptions struct, containing information about the
-   * maximum allowable object name length and stat suffix length.
+   * @param The name of the stat, obtained from the SymbolTable.
+   * @return a reference to a counter within the scope's namespace, if it exists.
    */
-  virtual const Stats::StatsOptions& statsOptions() const PURE;
+  virtual absl::optional<std::reference_wrapper<const Counter>>
+  findCounter(StatName name) const PURE;
+
+  /**
+   * @param The name of the stat, obtained from the SymbolTable.
+   * @return a reference to a gauge within the scope's namespace, if it exists.
+   */
+  virtual absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const PURE;
+
+  /**
+   * @param The name of the stat, obtained from the SymbolTable.
+   * @return a reference to a histogram within the scope's namespace, if it
+   * exists.
+   */
+  virtual absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const PURE;
 
   /**
    * @return a reference to the symbol table.

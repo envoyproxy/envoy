@@ -119,9 +119,14 @@ public:
                                       std::string* method);
 
   /**
-   * Serialize protobuf message.
+   * Serialize protobuf message with gRPC frame header.
    */
-  static Buffer::InstancePtr serializeBody(const Protobuf::Message& message);
+  static Buffer::InstancePtr serializeToGrpcFrame(const Protobuf::Message& message);
+
+  /**
+   * Serialize protobuf message. Without grpc header.
+   */
+  static Buffer::InstancePtr serializeMessage(const Protobuf::Message& message);
 
   /**
    * Prepare headers for protobuf service.
@@ -147,6 +152,12 @@ public:
    * @return qualified_name prefixed with typeUrlPrefix + "/".
    */
   static std::string typeUrl(const std::string& qualified_name);
+
+  /**
+   * Prepend a gRPC frame header to a Buffer::Instance containing a single gRPC frame.
+   * @param buffer containing the frame data which will be modified.
+   */
+  static void prependGrpcFrameHeader(Buffer::Instance& buffer);
 
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);

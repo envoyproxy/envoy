@@ -70,8 +70,9 @@ public:
 
 private:
   static Http::Code toErrorCode(uint64_t status) {
-    if (Http::CodeUtility::is5xx(status)) {
-      return static_cast<Http::Code>(status);
+    const auto code = static_cast<Http::Code>(status);
+    if (code >= Http::Code::Continue && code <= Http::Code::NetworkAuthenticationRequired) {
+      return code;
     }
     return Http::Code::Forbidden;
   }
@@ -95,7 +96,7 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  */
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
-  using ContextExtensionsMap = Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>;
+  using ContextExtensionsMap = Protobuf::Map<std::string, std::string>;
 
   FilterConfigPerRoute(const envoy::config::filter::http::ext_authz::v2::ExtAuthzPerRoute& config)
       : context_extensions_(config.has_check_settings()
