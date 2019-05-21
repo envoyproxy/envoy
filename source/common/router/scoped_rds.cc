@@ -83,24 +83,15 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
       scoped_config_manager_.scopedRouteMap();
   for (auto& scoped_route : scoped_routes) {
     const std::string& scoped_route_name = scoped_route.name();
-    try {
-      scoped_routes_to_remove.erase(scoped_route_name);
-      ScopedRouteInfoConstSharedPtr scoped_route_info =
-          scoped_config_manager_.addOrUpdateRoutingScope(scoped_route, version_info);
-      if (scoped_route_info == nullptr) {
-        throw EnvoyException(
-            fmt::format("failed to create/update global routing scope {}", scoped_route_name));
-      }
-      ENVOY_LOG(debug, "srds: add/update scoped_route '{}'", scoped_route_name);
-      applyDeltaConfigUpdate(
-          [scoped_route_info](const ConfigProvider::ConfigConstSharedPtr& config) {
-            auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
-                static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
-            thread_local_scoped_config->addOrUpdateRoutingScope(scoped_route_info);
-          });
-    } catch (const EnvoyException& ex) {
-      exception_msgs.push_back(fmt::format("{}: {}", scoped_route_name, ex.what()));
-    }
+    scoped_routes_to_remove.erase(scoped_route_name);
+    ScopedRouteInfoConstSharedPtr scoped_route_info =
+        scoped_config_manager_.addOrUpdateRoutingScope(scoped_route, version_info);
+    ENVOY_LOG(debug, "srds: add/update scoped_route '{}'", scoped_route_name);
+    applyDeltaConfigUpdate([scoped_route_info](const ConfigProvider::ConfigConstSharedPtr& config) {
+      auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
+          static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
+      thread_local_scoped_config->addOrUpdateRoutingScope(scoped_route_info);
+    });
   }
 
   for (const auto& scoped_route : scoped_routes_to_remove) {
@@ -116,10 +107,6 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
 
   ConfigSubscriptionCommonBase::onConfigUpdate();
   setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
-  if (!exception_msgs.empty()) {
-    throw EnvoyException(fmt::format("Error adding/updating scoped route(s) {}",
-                                     StringUtil::join(exception_msgs, ", ")));
-  }
   stats_.config_reload_.inc();
 }
 

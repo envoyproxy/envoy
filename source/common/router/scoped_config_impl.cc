@@ -8,7 +8,7 @@ void ThreadLocalScopedConfigImpl::addOrUpdateRoutingScope(const ScopedRouteInfoC
 void ThreadLocalScopedConfigImpl::removeRoutingScope(const std::string&) {}
 
 Router::ConfigConstSharedPtr
-ThreadLocalScopedConfigImpl::getRouterConfig(const Http::HeaderMap&) const {
+ThreadLocalScopedConfigImpl::getRouteConfig(const Http::HeaderMap&) const {
   return std::make_shared<const NullConfigImpl>();
 }
 

@@ -21,7 +21,7 @@ public:
    * @param headers the request headers to match the scoped routing configuration against.
    * @return ConfigConstSharedPtr the router's Config matching the request headers.
    */
-  virtual ConfigConstSharedPtr getRouterConfig(const Http::HeaderMap& headers) const PURE;
+  virtual ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const PURE;
 };
 
 using ScopedConfigConstSharedPtr = std::shared_ptr<const ScopedConfig>;

@@ -28,13 +28,11 @@ public:
           scope_key_builder)
       : scope_key_builder_(std::move(scope_key_builder)) {}
 
-  ~ThreadLocalScopedConfigImpl() override = default;
-
   void addOrUpdateRoutingScope(const ScopedRouteInfoConstSharedPtr& scoped_route_info);
   void removeRoutingScope(const std::string& scope_name);
 
   // Envoy::Router::ScopedConfig
-  Router::ConfigConstSharedPtr getRouterConfig(const Http::HeaderMap& headers) const override;
+  Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const override;
 
 private:
   const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
@@ -46,7 +44,7 @@ private:
  */
 class NullScopedConfigImpl : public ScopedConfig {
 public:
-  Router::ConfigConstSharedPtr getRouterConfig(const Http::HeaderMap&) const override {
+  Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap&) const override {
     return std::make_shared<const NullConfigImpl>();
   }
 };
