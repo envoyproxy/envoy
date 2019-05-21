@@ -1048,7 +1048,7 @@ TEST_P(SslSocketTest, GetPeerCertChain) {
   std::string expected_peer_cert_chain =
       TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
           "{{ test_rundir "
-          "}}/test/extensions/transport_sockets/tls/test_data/no_san_chain.pem"));
+          "}}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert.pem"));
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
                .setExpectedPeerCertChain(expected_peer_cert_chain));
 }

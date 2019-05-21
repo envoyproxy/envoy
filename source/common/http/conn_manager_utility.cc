@@ -309,6 +309,13 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
         }
         break;
       }
+      case ClientCertDetailsType::Chain: {
+        const std::string peer_chain = connection.ssl()->urlEncodedPemEncodedPeerCertificateChain();
+        if (!peer_chain.empty()) {
+          client_cert_details.push_back("Chain=\"" + peer_chain + "\"");
+        }
+        break;
+      }
       case ClientCertDetailsType::Subject:
         // The "Subject" key still exists even if the subject is empty.
         client_cert_details.push_back("Subject=\"" + connection.ssl()->subjectPeerCertificate() +
