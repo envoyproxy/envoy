@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
 namespace Envoy {
