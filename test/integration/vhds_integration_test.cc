@@ -175,8 +175,8 @@ public:
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
     EXPECT_TRUE(
-        compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"my_route"}));
-    sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+        compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"my_route"}));
+    sendSotwDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
         Config::TypeUrl::get().RouteConfiguration, {rdsConfig()}, "1");
 
     result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_, true);
@@ -185,8 +185,8 @@ public:
 
     EXPECT_TRUE(
         compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
-    sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>({buildVirtualHost()}, {}, "1",
-                                                                   vhds_stream_);
+    sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(
+        Config::TypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_);
     EXPECT_TRUE(
         compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 
@@ -219,8 +219,8 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   codec_client_->waitForDisconnect();
 
   // A spontaneous VHDS DiscoveryResponse adds two virtual hosts
-  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(buildVirtualHost1(), {}, "2",
-                                                                 vhds_stream_);
+  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(
+      Config::TypeUrl::get().VirtualHost, buildVirtualHost1(), {}, "2", vhds_stream_);
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 
@@ -232,8 +232,8 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   codec_client_->waitForDisconnect();
 
   // A spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
-  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>({}, {"vhost_1", "vhost_2"}, "3",
-                                                                 vhds_stream_);
+  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(
+      Config::TypeUrl::get().VirtualHost, {}, {"vhost_1", "vhost_2"}, "3", vhds_stream_);
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 
@@ -265,8 +265,8 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   codec_client_->waitForDisconnect();
 
   // A spontaneous VHDS DiscoveryResponse adds two virtual hosts
-  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(buildVirtualHost1(), {}, "2",
-                                                                 vhds_stream_);
+  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(
+      Config::TypeUrl::get().VirtualHost, buildVirtualHost1(), {}, "2", vhds_stream_);
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 
@@ -282,8 +282,8 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   codec_client_->waitForDisconnect();
 
   // A spontaneous VHDS DiscoveryResponse removes virtual hosts added via vhds
-  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>({}, {"vhost_1", "vhost_2"}, "3",
-                                                                 vhds_stream_);
+  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(
+      Config::TypeUrl::get().VirtualHost, {}, {"vhost_1", "vhost_2"}, "3", vhds_stream_);
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 

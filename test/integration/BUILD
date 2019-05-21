@@ -412,6 +412,7 @@ envoy_cc_test_library(
         "//source/server:hot_restart_nop_lib",
         "//source/server:listener_hooks_lib",
         "//source/server:server_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
         "//test/common/runtime:utility_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
