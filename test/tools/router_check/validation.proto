@@ -18,14 +18,14 @@ message Validation {
 // Schema for each test case.
 message ValidationItem {
   // Name of the test case. There is no uniqueness constraint among the test case names.
-  // The
+  // The name has to be non empty.
   string test_name = 1 [(validate.rules).string.min_bytes = 1];
 
   // The input constraints of the test case.
-  ValidationInput input = 2;
+  ValidationInput input = 2 [(validate.rules).message.required = true];
 
   // The validations that need to be performed on the resultant route.
-  ValidationAssert validate = 3;
+  ValidationAssert validate = 3 [(validate.rules).message.required = true];
 }
 
 // Input values sent to the router that determine the returned route.
