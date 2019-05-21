@@ -100,17 +100,13 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_c
   cb();
 
   std::shared_ptr<Event::PostCb> shared_function(
-    new Event::PostCb(cb),
-    [this, all_threads_complete_cb](Event::PostCb* cb) {
-      main_thread_dispatcher_->post(all_threads_complete_cb);
-      delete cb;
-    }
-  );
+      new Event::PostCb(cb), [this, all_threads_complete_cb](Event::PostCb* cb) {
+        main_thread_dispatcher_->post(all_threads_complete_cb);
+        delete cb;
+      });
 
   for (Event::Dispatcher& dispatcher : registered_threads_) {
-    dispatcher.post([cb_guard = shared_function]() -> void {
-      cb_guard->operator()();
-    });
+    dispatcher.post([cb_guard = shared_function]() -> void { cb_guard->operator()(); });
   }
 }
 
