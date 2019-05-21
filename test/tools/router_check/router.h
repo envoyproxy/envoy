@@ -9,8 +9,10 @@
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
+#include "common/stats/fake_symbol_table_impl.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 #include "test/tools/router_check/json/tool_config_schemas.h"
@@ -30,12 +32,15 @@ struct ToolConfig {
    */
   static ToolConfig create(const Json::ObjectSharedPtr check_config);
 
+  Stats::SymbolTable& symbolTable() { return *symbol_table_; }
+
   std::unique_ptr<Http::TestHeaderMapImpl> headers_;
   Router::RouteConstSharedPtr route_;
   int random_value_;
 
 private:
   ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int random_value);
+  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
 };
 
 /**

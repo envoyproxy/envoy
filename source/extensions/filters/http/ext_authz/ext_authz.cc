@@ -31,6 +31,10 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
 }
 
 void Filter::initiateCall(const Http::HeaderMap& headers) {
+  if (filter_return_ == FilterReturn::StopDecoding) {
+    return;
+  }
+
   Router::RouteConstSharedPtr route = callbacks_->route();
   if (route == nullptr || route->routeEntry() == nullptr) {
     return;
@@ -96,8 +100,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
   if (buffer_data_) {
-    if (end_stream || isBufferFull()) {
-      ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request", *callbacks_);
+    const bool buffer_is_full = isBufferFull();
+    if (end_stream || buffer_is_full) {
+      ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request since {}",
+                       *callbacks_, buffer_is_full ? "buffer is full" : "stream is ended");
       initiateCall(*request_headers_);
       return filter_return_ == FilterReturn::StopDecoding
                  ? Http::FilterDataStatus::StopIterationAndWatermark
@@ -138,6 +144,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   ASSERT(cluster_);
   state_ = State::Complete;
   using Filters::Common::ExtAuthz::CheckStatus;
+  Stats::StatName empty_stat_name;
 
   switch (response->status) {
   case CheckStatus::OK:
@@ -150,13 +157,13 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     cluster_->statsScope().counter("ext_authz.denied").inc();
     Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                            cluster_->statsScope(),
-                                           EMPTY_STRING,
+                                           empty_stat_name,
                                            enumToInt(response->status_code),
                                            true,
-                                           EMPTY_STRING,
-                                           EMPTY_STRING,
-                                           EMPTY_STRING,
-                                           EMPTY_STRING,
+                                           empty_stat_name,
+                                           empty_stat_name,
+                                           empty_stat_name,
+                                           empty_stat_name,
                                            false};
     config_->httpContext().codeStats().chargeResponseStat(info);
     break;

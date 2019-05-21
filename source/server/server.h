@@ -194,8 +194,9 @@ public:
   }
 
   // ServerLifecycleNotifier
-  void registerCallback(Stage stage, StageCallback callback) override;
-  void registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
+  ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
+  ServerLifecycleNotifier::HandlePtr
+  registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
 
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
@@ -260,8 +261,23 @@ private:
   Http::ContextImpl http_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   const std::thread::id main_thread_id_;
-  absl::flat_hash_map<Stage, std::vector<StageCallback>> stage_callbacks_;
-  absl::flat_hash_map<Stage, std::vector<StageCallbackWithCompletion>> stage_completable_callbacks_;
+
+  using LifecycleNotifierCallbacks = std::list<StageCallback>;
+  using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
+
+  template <class T> class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle {
+  public:
+    LifecycleCallbackHandle(T& callbacks, typename T::iterator it)
+        : callbacks_(callbacks), it_(it) {}
+    ~LifecycleCallbackHandle() override { callbacks_.erase(it_); }
+
+  private:
+    T& callbacks_;
+    typename T::iterator it_;
+  };
+
+  absl::flat_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
+  absl::flat_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
 };
 
 } // namespace Server
