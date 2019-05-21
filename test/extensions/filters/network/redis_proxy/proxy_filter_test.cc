@@ -1,7 +1,7 @@
 #include <memory>
 #include <string>
 
-#include "common/config/filter_json.h"
+#include "common/config/json_utility.h"
 
 #include "extensions/filters/network/redis_proxy/proxy_filter.h"
 
@@ -37,27 +37,25 @@ envoy::config::filter::network::redis_proxy::v2::RedisProxy
 parseProtoFromJson(const std::string& json_string) {
   envoy::config::filter::network::redis_proxy::v2::RedisProxy config;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::FilterJson::translateRedisProxy(*json_object_ptr, config);
-  return config;
-}
 
-void addV2ProtoFromJson(const std::string& json_string,
-                        envoy::config::filter::network::redis_proxy::v2::RedisProxy& config) {
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  config.set_cluster(json_object_ptr->getString("cluster_name"));
+  config.set_stat_prefix(json_object_ptr->getString("stat_prefix", ""));
 
-  // Instead of adding v2 properties to the v1 translateRedisProxy()
-  // support function, v2 properties are processed separately here.
-  //
-  // Process only the inline_string specifier for DataSource downstream_auth_password,
-  // since that is the only form of the DataSource used in this test.
+  const auto json_conn_pool = json_object_ptr->getObject("conn_pool");
+  auto* conn_pool = config.mutable_settings();
+  JSON_UTIL_SET_DURATION(*json_conn_pool, *conn_pool, op_timeout);
 
   if (json_object_ptr->hasObject("downstream_auth_password")) {
     auto downstream_auth_obj = json_object_ptr->getObject("downstream_auth_password");
+    // Process only the inline_string specifier for DataSource downstream_auth_password,
+    // since that is the only form of the DataSource used in this test.
     if (downstream_auth_obj->hasObject("inline_string")) {
       const std::string password = downstream_auth_obj->getString("inline_string");
       config.mutable_downstream_auth_password()->set_inline_string(password);
     }
   }
+
+  return config;
 }
 
 class RedisProxyFilterConfigTest : public testing::Test {
@@ -100,18 +98,13 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthPasswordSet) {
   {
     "cluster_name": "fake_cluster",
     "stat_prefix": "foo",
-    "conn_pool": { "op_timeout_ms" : 10 }
-  }
-  )EOF";
-  std::string v2_json_string = R"EOF(
-  {
+    "conn_pool": { "op_timeout_ms" : 10 },
     "downstream_auth_password": { "inline_string": "somepassword" }
   }
   )EOF";
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
       parseProtoFromJson(json_string);
-  addV2ProtoFromJson(v2_json_string, proto_config);
   ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_);
   EXPECT_EQ(config.downstream_auth_password_, "somepassword");
 }
@@ -126,12 +119,9 @@ public:
     }
     )EOF";
 
-  RedisProxyFilterTest(const std::string& json_string, const std::string& v2_json_string) {
+  RedisProxyFilterTest(const std::string& json_string) {
     envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
-        parseProtoFromJson(json_string.empty() ? default_config : json_string);
-    if (!v2_json_string.empty()) {
-      addV2ProtoFromJson(v2_json_string, proto_config);
-    }
+        parseProtoFromJson(json_string);
     config_.reset(new ProxyFilterConfig(proto_config, store_, drain_decision_, runtime_, api_));
     filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_,
                                             config_);
@@ -145,7 +135,7 @@ public:
     filter_->onBelowWriteBufferLowWatermark();
   }
 
-  RedisProxyFilterTest() : RedisProxyFilterTest(default_config, "") {}
+  RedisProxyFilterTest() : RedisProxyFilterTest(default_config) {}
 
   ~RedisProxyFilterTest() override {
     filter_.reset();
@@ -336,14 +326,16 @@ TEST_F(RedisProxyFilterTest, AuthWhenNotRequired) {
 
 const std::string downstream_auth_password_config = R"EOF(
     {
+      "cluster_name": "fake_cluster",
+      "stat_prefix": "foo",
+      "conn_pool": { "op_timeout_ms" : 10 },
       "downstream_auth_password": { "inline_string": "somepassword" }
     }
     )EOF";
 
 class RedisProxyFilterWithAuthPasswordTest : public RedisProxyFilterTest {
 public:
-  RedisProxyFilterWithAuthPasswordTest()
-      : RedisProxyFilterTest("", downstream_auth_password_config) {}
+  RedisProxyFilterWithAuthPasswordTest() : RedisProxyFilterTest(downstream_auth_password_config) {}
 };
 
 TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthPasswordCorrect) {

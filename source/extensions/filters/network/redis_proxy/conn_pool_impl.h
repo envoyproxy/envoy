@@ -99,7 +99,7 @@ private:
     std::unordered_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
     Envoy::Common::CallbackHandle* host_set_member_update_cb_handle_{};
     std::unordered_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
-    const std::string auth_password_;
+    std::string auth_password_;
   };
 
   struct LbContextImpl : public Upstream::LoadBalancerContextBase {

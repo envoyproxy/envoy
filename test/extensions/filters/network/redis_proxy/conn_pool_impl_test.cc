@@ -50,9 +50,7 @@ public:
         cluster_name_, cm_, *this, tls_,
         Common::Redis::Client::createConnPoolSettings(20, hashtagging, true), api_);
     // Set the authentication password for this connection pool.
-    const_cast<std::string&>(
-        conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_) =
-        auth_password_;
+    conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
     conn_pool_ = std::move(conn_pool_impl);
     test_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
   }

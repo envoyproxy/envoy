@@ -56,7 +56,7 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
     auto options = cluster->info()->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
         NetworkFilterNames::get().RedisProxy);
     if (options) {
-      const_cast<std::string&>(auth_password_) = options->auth_password(parent_.api_);
+      auth_password_ = options->auth_password(parent_.api_);
     }
     onClusterAddOrUpdateNonVirtual(*cluster);
   }
