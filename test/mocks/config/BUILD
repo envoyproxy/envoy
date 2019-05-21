@@ -19,6 +19,7 @@ envoy_cc_mock(
         "//source/common/config:config_provider_lib",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:cds_cc",
         "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/api/v2:lds_cc",
