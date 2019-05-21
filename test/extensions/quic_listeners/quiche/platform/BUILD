@@ -118,7 +118,6 @@ envoy_cc_test_library(
     hdrs = ["quic_expect_bug_impl.h"],
     deps = [
         "@com_googlesource_quiche//:quic_platform_base",
-        "@com_googlesource_quiche//:quic_platform_logging",
         "@com_googlesource_quiche//:quic_platform_mock_log",
     ],
 )
@@ -173,7 +172,6 @@ envoy_cc_test_library(
     deps = [
         "//source/common/filesystem:filesystem_lib",
         "@com_googlesource_quiche//:quic_platform_base",
-        "@com_googlesource_quiche//:quic_platform_logging",
     ],
 )
 

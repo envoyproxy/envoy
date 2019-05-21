@@ -225,7 +225,6 @@ envoy_cc_library(
     deps = [
         ":quic_core_time_lib",
         ":quic_platform_base",
-        ":quic_platform_logging",
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_impl_lib",
     ],
 )
@@ -302,14 +301,6 @@ envoy_cc_test_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform_logging",
-    hdrs = ["quiche/quic/platform/api/quic_logging.h"],
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
-    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_logging_impl_lib"],
-)
-
-envoy_cc_library(
     name = "quic_platform_base",
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",
@@ -324,6 +315,7 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_flags.h",
         "quiche/quic/platform/api/quic_iovec.h",
+	"quiche/quic/platform/api/quic_logging.h",
         "quiche/quic/platform/api/quic_map_util.h",
         "quiche/quic/platform/api/quic_prefetch.h",
         "quiche/quic/platform/api/quic_ptr_util.h",
@@ -352,6 +344,7 @@ envoy_cc_library(
     deps = [
         ":quic_platform_export",
         ":quiche_common_lib",
+	"@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_logging_impl_lib",
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
     ],
 )
@@ -409,7 +402,6 @@ envoy_cc_library(
         ":quic_core_error_codes_lib",
         ":quic_core_time_lib",
         ":quic_platform_base",
-        ":quic_platform_logging",
     ],
 )
 
