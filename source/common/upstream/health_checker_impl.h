@@ -71,6 +71,7 @@ private:
     void onResponseComplete();
     enum class HealthCheckResult { Succeeded, Degraded, Failed };
     HealthCheckResult healthCheckResult();
+    bool shouldClose() const;
 
     // ActiveHealthCheckSession
     void onInterval() override;
@@ -111,7 +112,6 @@ private:
     ConnectionCallbackImpl connection_callback_impl_{*this};
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
-    Http::StreamEncoder* request_encoder_{};
     Http::HeaderMapPtr response_headers_;
     const std::string& hostname_;
     const Http::Protocol protocol_;

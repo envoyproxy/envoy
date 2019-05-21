@@ -535,6 +535,8 @@ private:
     // Per-stream request timeout callback
     void onRequestTimeout();
 
+    bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
+
     MetadataMapVector* getRequestMetadataMapVector() {
       if (request_metadata_map_vector_ == nullptr) {
         request_metadata_map_vector_ = std::make_unique<MetadataMapVector>();

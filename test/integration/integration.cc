@@ -488,6 +488,22 @@ void BaseIntegrationTest::cleanUpXdsConnection() {
 AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names,
+    const std::vector<std::string>& expected_resource_names_added,
+    const std::vector<std::string>& expected_resource_names_removed,
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+    return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
+                                       expected_error_code, expected_error_message);
+  } else {
+    return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
+                                        expected_resource_names_removed, expected_error_code,
+                                        expected_error_message);
+  }
+}
+
+AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
+    const std::string& expected_type_url, const std::string& expected_version,
+    const std::vector<std::string>& expected_resource_names,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
   envoy::api::v2::DiscoveryRequest discovery_request;
   VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
