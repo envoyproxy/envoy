@@ -547,7 +547,7 @@ Http::Code AdminImpl::handlerHeapProfiler(absl::string_view url, Http::HeaderMap
       // TODO(silentdai) remove the GCOVR when startProfiler is better implemented
       response.add("Fail to start the heap profiler");
       res = Http::Code::InternalServerError;
-      // GCOVR_EXCL_END
+      // GCOVR_EXCL_STOP
     } else {
       response.add("Starting heap profiler");
       res = Http::Code::OK;
