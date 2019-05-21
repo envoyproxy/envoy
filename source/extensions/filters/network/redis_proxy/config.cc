@@ -52,7 +52,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
     upstreams.emplace(cluster, std::make_shared<ConnPool::InstanceImpl>(
                                    cluster, context.clusterManager(),
                                    Common::Redis::Client::ClientFactoryImpl::instance_,
-                                   context.threadLocal(), proto_config.settings()));
+                                   context.threadLocal(), proto_config.settings(),
+                                   context.scope().symbolTable()));
   }
 
   auto router = std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams));
