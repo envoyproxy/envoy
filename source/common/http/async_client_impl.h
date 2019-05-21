@@ -183,7 +183,7 @@ private:
 
   struct NullVirtualHost : public Router::VirtualHost {
     // Router::VirtualHost
-    const std::string& name() const override { return EMPTY_STRING; }
+    Stats::StatName statName() const override { return Stats::StatName(); }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     const Router::Config& routeConfig() const override { return route_configuration_; }

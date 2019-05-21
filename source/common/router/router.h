@@ -26,6 +26,7 @@
 #include "common/config/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 
@@ -105,7 +106,10 @@ public:
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers), http_context_(http_context),
-        shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {}
+        stat_name_pool_(scope_.symbolTable()), retry_(stat_name_pool_.add("retry")),
+        zone_name_(stat_name_pool_.add(local_info_.zoneName())),
+        empty_stat_name_(stat_name_pool_.add("")), shadow_writer_(std::move(shadow_writer)),
+        time_source_(time_source) {}
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
@@ -134,6 +138,10 @@ public:
   const bool suppress_envoy_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
+  Stats::StatNamePool stat_name_pool_;
+  Stats::StatName retry_;
+  Stats::StatName zone_name_;
+  Stats::StatName empty_stat_name_;
 
 private:
   ShadowWriterPtr shadow_writer_;
@@ -370,7 +378,7 @@ private:
 
   StreamInfo::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
-  static const std::string& upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
+  Stats::StatName upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
   void chargeUpstreamCode(uint64_t response_status_code, const Http::HeaderMap& response_headers,
                           Upstream::HostDescriptionConstSharedPtr upstream_host, bool dropped);
   void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host,
@@ -422,7 +430,7 @@ private:
   RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  std::string alt_stat_prefix_;
+  std::unique_ptr<Stats::StatNameManagedStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;

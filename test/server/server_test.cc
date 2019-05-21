@@ -182,23 +182,32 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   // Run the server in a separate thread so we can test different lifecycle stages.
   auto server_thread = Thread::threadFactoryForTest().createThread([&] {
     initialize("test/server/node_bootstrap.yaml");
-    server_->registerCallback(ServerLifecycleNotifier::Stage::Startup, [&] {
+    auto handle1 = server_->registerCallback(ServerLifecycleNotifier::Stage::Startup, [&] {
       startup = true;
       started.Notify();
     });
-    server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
+    auto handle2 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
       shutdown = true;
       shutdown_begin.Notify();
     });
-    server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
-                              [&](Event::PostCb completion_cb) {
-                                // Block till we're told to complete
-                                completion_block.WaitForNotification();
-                                shutdown_with_completion = true;
-                                server_->dispatcher().post(completion_cb);
-                                completion_done.Notify();
-                              });
+    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                                             [&](Event::PostCb completion_cb) {
+                                               // Block till we're told to complete
+                                               completion_block.WaitForNotification();
+                                               shutdown_with_completion = true;
+                                               server_->dispatcher().post(completion_cb);
+                                               completion_done.Notify();
+                                             });
+    auto handle4 =
+        server_->registerCallback(ServerLifecycleNotifier::Stage::Startup, [&] { FAIL(); });
+    handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                                        [&](Event::PostCb) { FAIL(); });
+    handle4 = nullptr;
+
     server_->run();
+    handle1 = nullptr;
+    handle2 = nullptr;
+    handle3 = nullptr;
     server_ = nullptr;
     thread_local_ = nullptr;
   });
