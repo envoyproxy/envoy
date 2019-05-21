@@ -430,6 +430,8 @@ those resources in the response; due to implementation details hidden
 from the server, the client may have "forgotten" those resources despite
 apparently remaining subscribed.
 
+.. _xds_protocol_unsubscribe:
+
 Unsubscribing from Resources
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
