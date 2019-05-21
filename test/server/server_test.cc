@@ -48,7 +48,8 @@ TEST(ServerInstanceUtil, flushHelper) {
   EXPECT_EQ(1UL, c.value());
   EXPECT_EQ(0, c.latch());
 
-  std::unique_ptr<Stats::MockSink> sink(new StrictMock<Stats::MockSink>());
+  Stats::MockSink* sink = new StrictMock<Stats::MockSink>();
+  sinks.emplace_back(sink);
   EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
     ASSERT_EQ(snapshot.counters().size(), 1);
     EXPECT_EQ(snapshot.counters()[0].counter_.get().name(), "hello");
@@ -57,13 +58,21 @@ TEST(ServerInstanceUtil, flushHelper) {
     ASSERT_EQ(snapshot.gauges().size(), 1);
     EXPECT_EQ(snapshot.gauges()[0].get().name(), "world");
     EXPECT_EQ(snapshot.gauges()[0].get().value(), 5);
-
-    ASSERT_EQ(snapshot.histograms().size(), 1);
-    EXPECT_EQ(snapshot.histograms()[0].get().name(), "histogram");
   }));
-  sinks.emplace_back(std::move(sink));
   c.inc();
   InstanceUtil::flushMetricsToSinks(sinks, store);
+
+  // Histograms don't currently work with the isolated store so test those with a mock store.
+  NiceMock<Stats::MockStore> mock_store;
+  Stats::ParentHistogramSharedPtr parent_histogram(new Stats::MockParentHistogram());
+  std::vector<Stats::ParentHistogramSharedPtr> parent_histograms = {parent_histogram};
+  ON_CALL(mock_store, histograms).WillByDefault(Return(parent_histograms));
+  EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
+    EXPECT_TRUE(snapshot.counters().empty());
+    EXPECT_TRUE(snapshot.gauges().empty());
+    EXPECT_EQ(snapshot.histograms().size(), 1);
+  }));
+  InstanceUtil::flushMetricsToSinks(sinks, mock_store);
 }
 
 class RunHelperTest : public testing::Test {
