@@ -595,12 +595,13 @@ public:
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response, absl::string_view method,
                          absl::string_view body = absl::string_view()) {
-    request_headers_.insertMethod().value(method.data(), method.size());
-    admin_filter_.decodeHeaders(request_headers_, false);
-
     if (!body.empty()) {
+      request_headers_.insertContentType().value(std::string("application/x-www-form-urlencoded"));
       callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>(body);
     }
+
+    request_headers_.insertMethod().value(method.data(), method.size());
+    admin_filter_.decodeHeaders(request_headers_, false);
 
     return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
   }

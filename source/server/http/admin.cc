@@ -1074,13 +1074,22 @@ std::string AdminImpl::runtimeAsJson(
   return strbuf.GetString();
 }
 
+bool AdminImpl::isFormUrlEncoded(const Http::HeaderEntry* content_type) const {
+  if (content_type == nullptr) {
+    return false;
+  }
+
+  return content_type->value().getStringView() == "application/x-www-form-urlencoded";
+}
+
 Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMap&,
                                            Buffer::Instance& response, AdminStream& admin_stream) {
   Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   if (params.empty()) {
     // Check if the params are in the request's body.
     // TODO(rgs1): check the content-type header in the request.
-    if (admin_stream.getRequestBody() != nullptr) {
+    if (admin_stream.getRequestBody() != nullptr &&
+        isFormUrlEncoded(admin_stream.getRequestHeaders().ContentType())) {
       params = Http::Utility::parseFromBody(admin_stream.getRequestBody()->toString());
     }
 
