@@ -52,6 +52,8 @@ public:
 private:
   friend class CodeStatsTest;
 
+  void writeCategory(const ResponseStatInfo& info, Stats::StatName rq_group,
+                     Stats::StatName rq_code, Stats::StatName category) const;
   void incCounter(Stats::Scope& scope, const std::vector<Stats::StatName>& names) const;
   void incCounter(Stats::Scope& scope, Stats::StatName a, Stats::StatName b) const;
   void recordHistogram(Stats::Scope& scope, const std::vector<Stats::StatName>& names,
@@ -65,23 +67,23 @@ private:
   mutable absl::Mutex mutex_;
   Stats::SymbolTable& symbol_table_;
 
-  Stats::StatName canary_;
-  Stats::StatName empty_; // Used for the group-name for invalid http codes.
-  Stats::StatName external_;
-  Stats::StatName internal_;
-  Stats::StatName upstream_;
-  Stats::StatName upstream_rq_1xx_;
-  Stats::StatName upstream_rq_2xx_;
-  Stats::StatName upstream_rq_3xx_;
-  Stats::StatName upstream_rq_4xx_;
-  Stats::StatName upstream_rq_5xx_;
-  Stats::StatName upstream_rq_unknown_;
-  Stats::StatName upstream_rq_completed_;
-  Stats::StatName upstream_rq_time;
-  Stats::StatName upstream_rq_time_;
-  Stats::StatName vcluster_;
-  Stats::StatName vhost_;
-  Stats::StatName zone_;
+  const Stats::StatName canary_;
+  const Stats::StatName empty_; // Used for the group-name for invalid http codes.
+  const Stats::StatName external_;
+  const Stats::StatName internal_;
+  const Stats::StatName upstream_;
+  const Stats::StatName upstream_rq_1xx_;
+  const Stats::StatName upstream_rq_2xx_;
+  const Stats::StatName upstream_rq_3xx_;
+  const Stats::StatName upstream_rq_4xx_;
+  const Stats::StatName upstream_rq_5xx_;
+  const Stats::StatName upstream_rq_unknown_;
+  const Stats::StatName upstream_rq_completed_;
+  const Stats::StatName upstream_rq_time;
+  const Stats::StatName upstream_rq_time_;
+  const Stats::StatName vcluster_;
+  const Stats::StatName vhost_;
+  const Stats::StatName zone_;
 
   // Use an array of atomic pointers to hold StatNameStorage objects for
   // every conceivable HTTP response code. In the hot-path we'll reference

@@ -177,9 +177,9 @@ private:
     // Router::VirtualCluster
     Stats::StatName statName() const override { return stat_name_; }
 
-    std::regex pattern_;
+    const std::regex pattern_;
     absl::optional<std::string> method_;
-    Stats::StatName stat_name_;
+    const Stats::StatName stat_name_;
   };
 
   class CatchAllVirtualCluster : public VirtualCluster {
@@ -190,13 +190,13 @@ private:
     Stats::StatName statName() const override { return stat_name_; }
 
   private:
-    Stats::StatName stat_name_;
+    const Stats::StatName stat_name_;
   };
 
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
   Stats::StatNamePool stat_name_pool_;
-  Stats::StatName stat_name_;
+  const Stats::StatName stat_name_;
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
   SslRequirements ssl_requirements_;

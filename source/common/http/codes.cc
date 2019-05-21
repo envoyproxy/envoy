@@ -49,18 +49,18 @@ CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
 
 void CodeStatsImpl::incCounter(Stats::Scope& scope,
                                const std::vector<Stats::StatName>& names) const {
-  Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
+  const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
   scope.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
 
 void CodeStatsImpl::incCounter(Stats::Scope& scope, Stats::StatName a, Stats::StatName b) const {
-  Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join({a, b});
+  const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join({a, b});
   scope.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
 
 void CodeStatsImpl::recordHistogram(Stats::Scope& scope, const std::vector<Stats::StatName>& names,
                                     uint64_t count) const {
-  Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
+  const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
   scope.histogramFromStatName(Stats::StatName(stat_name_storage.get())).recordValue(count);
 }
 
@@ -70,7 +70,7 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
 
   // Build a dynamic stat for the response code and increment it.
   incCounter(scope, prefix, upstream_rq_completed_);
-  Stats::StatName rq_group = upstreamRqGroup(response_code);
+  const Stats::StatName rq_group = upstreamRqGroup(response_code);
   if (!rq_group.empty()) {
     incCounter(scope, prefix, rq_group);
   }
@@ -78,32 +78,24 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
 }
 
 void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
-  Code code = static_cast<Code>(info.response_status_code_);
+  const Code code = static_cast<Code>(info.response_status_code_);
 
   ASSERT(&info.cluster_scope_.symbolTable() == &symbol_table_);
   chargeBasicResponseStat(info.cluster_scope_, info.prefix_, code);
 
-  Stats::StatName rq_group = upstreamRqGroup(code);
-  Stats::StatName rq_code = upstreamRqStatName(code);
-
-  auto write_category = [this, rq_group, rq_code, &info](Stats::StatName category) {
-    incCounter(info.cluster_scope_, {info.prefix_, category, upstream_rq_completed_});
-    if (!rq_group.empty()) {
-      incCounter(info.cluster_scope_, {info.prefix_, category, rq_group});
-    }
-    incCounter(info.cluster_scope_, {info.prefix_, category, rq_code});
-  };
+  const Stats::StatName rq_group = upstreamRqGroup(code);
+  const Stats::StatName rq_code = upstreamRqStatName(code);
 
   // If the response is from a canary, also create canary stats.
   if (info.upstream_canary_) {
-    write_category(canary_);
+    writeCategory(info, rq_group, rq_code, canary_);
   }
 
   // Split stats into external vs. internal.
   if (info.internal_request_) {
-    write_category(internal_);
+    writeCategory(info, rq_group, rq_code, internal_);
   } else {
-    write_category(external_);
+    writeCategory(info, rq_group, rq_code, external_);
   }
 
   // Handle request virtual cluster.
@@ -124,6 +116,15 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
                {info.prefix_, zone_, info.from_zone_, info.to_zone_, rq_group});
     incCounter(info.cluster_scope_, {info.prefix_, zone_, info.from_zone_, info.to_zone_, rq_code});
   }
+}
+
+void CodeStatsImpl::writeCategory(const ResponseStatInfo& info, Stats::StatName rq_group,
+                                  Stats::StatName rq_code, Stats::StatName category) const {
+  incCounter(info.cluster_scope_, {info.prefix_, category, upstream_rq_completed_});
+  if (!rq_group.empty()) {
+    incCounter(info.cluster_scope_, {info.prefix_, category, rq_group});
+  }
+  incCounter(info.cluster_scope_, {info.prefix_, category, rq_code});
 }
 
 void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
@@ -179,7 +180,7 @@ Stats::StatName CodeStatsImpl::upstreamRqGroup(Code response_code) const {
 
 Stats::StatName CodeStatsImpl::upstreamRqStatName(Code response_code) const {
   // Take a lock only if we've never seen this response-code before.
-  uint32_t rc_index = static_cast<uint32_t>(response_code) - HttpCodeOffset;
+  const uint32_t rc_index = static_cast<uint32_t>(response_code) - HttpCodeOffset;
   if (rc_index >= NumHttpCodes) {
     return upstream_rq_unknown_;
   }
