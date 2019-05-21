@@ -17,6 +17,7 @@
 #include "test/test_common/utility.h"
 #include "test/tools/router_check/json/tool_config_schemas.h"
 #include "test/tools/router_check/validation.pb.h"
+#include "test/tools/router_check/validation.pb.validate.h"
 
 namespace Envoy {
 /**

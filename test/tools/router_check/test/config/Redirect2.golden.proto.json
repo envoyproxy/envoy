@@ -3,8 +3,8 @@
     {
       "test_name": "Test_1",
       "input": {
-        ":authority": "www.lyft.com",
-        ":path": "/foo",
+        "authority": "www.lyft.com",
+        "path": "/foo",
         "ssl": true,
         "internal": true
       },
@@ -16,8 +16,8 @@
     {
       "test_name": "Test_2",
       "input": {
-        ":authority": "redirect.lyft.com",
-        ":path": "/foo",
+        "authority": "redirect.lyft.com",
+        "path": "/foo",
         "ssl": false,
         "internal": false
       },
@@ -29,8 +29,8 @@
     {
       "test_name": "Test_3",
       "input": {
-        ":authority": "redirect.lyft.com",
-        ":path": "/foo"
+        "authority": "redirect.lyft.com",
+        "path": "/foo"
       },
       "validate": {
         "path_redirect": "http://new.lyft.com/foo",
@@ -40,8 +40,8 @@
     {
       "test_name": "Test_4",
       "input": {
-        ":authority": "redirect.lyft.com",
-        ":path": "/foo",
+        "authority": "redirect.lyft.com",
+        "path": "/foo",
         "ssl": false
       },
       "validate": {
@@ -52,9 +52,9 @@
     {
       "test_name": "Test_5",
       "input": {
-        ":authority": "redirect.lyft.com",
+        "authority": "redirect.lyft.com",
         "ssl": false,
-        ":path": "/foo"
+        "path": "/foo"
       },
       "validate": {
         "path_redirect": "http://new.lyft.com/foo",

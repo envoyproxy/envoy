@@ -4,6 +4,7 @@
 
 #include "test/tools/router_check/router.h"
 
+// TODO(jyotima): In the future, change this to use TCLAP
 bool isArgument(int argc, char* argv[], const std::string& argument) {
   if (argc == 5 && (std::string(argv[3]) == argument || std::string(argv[4]) == argument)) {
     return true;
@@ -28,15 +29,15 @@ int main(int argc, char* argv[]) {
       checktool.setShowDetails();
     }
 
-    bool isEqual = true;
+    bool is_Equal = true;
     if (isArgument(argc, argv, "--useproto")) {
-      isEqual = checktool.compareEntries(argv[2]);
+      is_Equal = checktool.compareEntries(argv[2]);
     } else {
       // TODO(jyotima): Remove this code path once the json schema code path is deprecated.
-      isEqual = checktool.compareEntriesInJson(argv[2]);
+      is_Equal = checktool.compareEntriesInJson(argv[2]);
     }
     // Test fails if routes do not match what is expected
-    if (!isEqual) {
+    if (!is_Equal) {
       return EXIT_FAILURE;
     }
   } catch (const Envoy::EnvoyException& ex) {

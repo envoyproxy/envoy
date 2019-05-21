@@ -2,16 +2,16 @@
   "tests": [
     {
       "test_name": "Test_1", "input": {
-        ":authority": "www.lyft.com",
-        ":path": "/"
+        "authority": "www.lyft.com",
+        "path": "/"
       },
       "validate": {"cluster_name": "local_service_without_headers"}
     },
     {
       "test_name": "Test_2",
       "input": {
-        ":authority": "www.lyft.com",
-        ":path": "/",
+        "authority": "www.lyft.com",
+        "path": "/",
         "additional_headers": [
           {
       "key": "test_header",
@@ -24,8 +24,8 @@
     {
       "test_name": "Test_3",
       "input": {
-        ":authority": "www.lyft.com",
-        ":path": "/",
+        "authority": "www.lyft.com",
+        "path": "/",
         "additional_headers": [
           {
       "key": "test_header_multiple1",
@@ -42,8 +42,8 @@
     {
       "test_name": "Test_4",
       "input": {
-        ":authority": "www.lyft.com",
-        ":path": "/",
+        "authority": "www.lyft.com",
+        "path": "/",
         "additional_headers": [
           {
       "key": "non_existent_header",
@@ -56,8 +56,8 @@
     {
       "test_name": "Test_5",
       "input": {
-        ":authority": "www.lyft.com",
-        ":path": "/",
+        "authority": "www.lyft.com",
+        "path": "/",
         "additional_headers": [
           {
       "key": "test_header_presence",
@@ -70,8 +70,8 @@
     {
       "test_name": "Test_6",
       "input": {
-        ":authority": "www.lyft.com",
-        ":path": "/",
+        "authority": "www.lyft.com",
+        "path": "/",
         "additional_headers": [
           {
       "key": "test_header_pattern",
@@ -84,8 +84,8 @@
     {
       "test_name": "Test_7",
       "input": {
-        ":authority": "www.lyft.com",
-        ":path": "/",
+        "authority": "www.lyft.com",
+        "path": "/",
         "additional_headers": [
           {
             "key": "test_header_pattern",
@@ -98,8 +98,8 @@
     {
       "test_name": "Test_8",
       "input": {
-        ":authority": "www.lyft.com",
-        ":path": "/",
+        "authority": "www.lyft.com",
+        "path": "/",
         "additional_headers": [
           {
             "key": "content-type",
@@ -112,8 +112,8 @@
     {
       "test_name": "Test_9",
       "input": {
-        ":authority": "www.lyft.com",
-        ":path": "/",
+        "authority": "www.lyft.com",
+        "path": "/",
         "additional_headers": [
           {
             "key": "content-type",
