@@ -12,7 +12,7 @@ import "validate/validate.proto";
 // The tool transparently converts json/yaml into this proto schema.
 message Validation {
   // A collection of test cases.
-  repeated ValidationItem tests = 1;
+  repeated ValidationItem tests = 1 [(validate.rules).repeated .min_items = 1];
 }
 
 // Schema for each test case.
@@ -46,7 +46,7 @@ message ValidationInput {
 
   // This pseudo-header field includes the HTTP method.
   // The options are GET, PUT, or POST. When not specified the field defaults to GET.
-  string method = 4 [(validate.rules).string = {in: ["GET", "POST", "PUT", ""]}];
+  string method = 4;
 
   // An integer used to identify the target for weighted cluster selection.
   // The default value of random_value is 0.
