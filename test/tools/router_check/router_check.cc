@@ -29,15 +29,15 @@ int main(int argc, char* argv[]) {
       checktool.setShowDetails();
     }
 
-    bool is_Equal = true;
+    bool is_equal = true;
     if (isArgument(argc, argv, "--useproto")) {
-      is_Equal = checktool.compareEntries(argv[2]);
+      is_equal = checktool.compareEntries(argv[2]);
     } else {
       // TODO(jyotima): Remove this code path once the json schema code path is deprecated.
-      is_Equal = checktool.compareEntriesInJson(argv[2]);
+      is_equal = checktool.compareEntriesInJson(argv[2]);
     }
     // Test fails if routes do not match what is expected
-    if (!is_Equal) {
+    if (!is_equal) {
       return EXIT_FAILURE;
     }
   } catch (const Envoy::EnvoyException& ex) {
