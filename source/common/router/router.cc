@@ -195,9 +195,8 @@ Filter::~Filter() {
   ASSERT(!retry_state_);
 }
 
-const std::string Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
-  // TODO(PiotrSikora): Switch back to std::string& when string == std::string.
-  return upstream_host ? upstream_host->locality().zone() : "";
+const std::string& Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
+  return upstream_host ? upstream_host->locality().zone() : EMPTY_STRING;
 }
 
 void Filter::chargeUpstreamCode(uint64_t response_status_code,

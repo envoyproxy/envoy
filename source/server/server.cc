@@ -547,13 +547,19 @@ void InstanceImpl::shutdownAdmin() {
   restarter_.sendParentTerminateRequest();
 }
 
-void InstanceImpl::registerCallback(Stage stage, StageCallback callback) {
-  stage_callbacks_[stage].push_back(callback);
+ServerLifecycleNotifier::HandlePtr InstanceImpl::registerCallback(Stage stage,
+                                                                  StageCallback callback) {
+  auto& callbacks = stage_callbacks_[stage];
+  return absl::make_unique<LifecycleCallbackHandle<LifecycleNotifierCallbacks>>(
+      callbacks, callbacks.insert(callbacks.end(), callback));
 }
 
-void InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
+ServerLifecycleNotifier::HandlePtr
+InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
   ASSERT(stage == Stage::ShutdownExit);
-  stage_completable_callbacks_[stage].push_back(callback);
+  auto& callbacks = stage_completable_callbacks_[stage];
+  return absl::make_unique<LifecycleCallbackHandle<LifecycleNotifierCompletionCallbacks>>(
+      callbacks, callbacks.insert(callbacks.end(), callback));
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
