@@ -869,7 +869,6 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   tls.shutdownThread();
   */
 
-
   // EXPECT_LT(end_mem - start_mem, 20 * million); // actual value: 19601552 as of March 14, 2019
   EXPECT_LT(end_mem - start_mem, 13 * million); // actual value: 12443472 as of March 14, 2019
 }

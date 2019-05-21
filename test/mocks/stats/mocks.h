@@ -174,7 +174,7 @@ public:
 
 class SymbolTableProvider {
 public:
-  Test::Global<FakeSymbolTableImpl> fake_symbol_table_;
+  Test::Global<SymbolTableImpl> global_symbol_table_;
 };
 
 class MockStore : public SymbolTableProvider, public StoreImpl {
@@ -200,17 +200,13 @@ public:
                      absl::optional<std::reference_wrapper<const Histogram>>(StatName));
 
   Counter& counterFromStatName(StatName name) override {
-    return counter(symbol_table_->toString(name));
+    return counter(symbolTable().toString(name));
   }
-  Gauge& gaugeFromStatName(StatName name) override { return gauge(symbol_table_->toString(name)); }
+  Gauge& gaugeFromStatName(StatName name) override { return gauge(symbolTable().toString(name)); }
   Histogram& histogramFromStatName(StatName name) override {
-    return histogram(symbol_table_->toString(name));
+    return histogram(symbolTable().toString(name));
   }
 
-  SymbolTable& symbolTable() override { return symbol_table_.get(); }
-  const SymbolTable& symbolTable() const override { return symbol_table_.get(); }
-
-  Test::Global<SymbolTableImpl> symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
 };

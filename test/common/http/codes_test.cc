@@ -25,17 +25,22 @@ namespace Http {
 class CodeUtilityTest : public testing::Test {
 public:
   CodeUtilityTest()
-      : global_store_(*symbol_table_), cluster_scope_(*symbol_table_), code_stats_(*symbol_table_) {
-  }
+      : global_store_(*symbol_table_), cluster_scope_(*symbol_table_), code_stats_(*symbol_table_),
+        pool_(*symbol_table_) {}
 
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    const std::string& request_vhost_name = EMPTY_STRING,
                    const std::string& request_vcluster_name = EMPTY_STRING,
                    const std::string& from_az = EMPTY_STRING,
                    const std::string& to_az = EMPTY_STRING) {
+    Stats::StatName prefix = pool_.add("prefix");
+    Stats::StatName from_zone = pool_.add(from_az);
+    Stats::StatName to_zone = pool_.add(to_az);
+    Stats::StatName vhost_name = pool_.add(request_vhost_name);
+    Stats::StatName vcluster_name = pool_.add(request_vcluster_name);
     Http::CodeStats::ResponseStatInfo info{
-        global_store_,      cluster_scope_,        "prefix.", code,  internal_request,
-        request_vhost_name, request_vcluster_name, from_az,   to_az, canary};
+        global_store_, cluster_scope_, prefix,    code,    internal_request,
+        vhost_name,    vcluster_name,  from_zone, to_zone, canary};
 
     code_stats_.chargeResponseStat(info);
   }
@@ -44,7 +49,7 @@ public:
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
-  std::vector<Stats::StatNameStorage> stat_name_storage_;
+  Stats::StatNamePool pool_;
 };
 
 TEST_F(CodeUtilityTest, GroupStrings) {
@@ -86,9 +91,17 @@ TEST_F(CodeUtilityTest, NoCanary) {
 }
 
 TEST_F(CodeUtilityTest, Canary) {
+  addResponse(100, true, true);
   addResponse(200, true, true);
   addResponse(300, false, false);
   addResponse(500, true, false);
+
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_1xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_100").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_1xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_100").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_1xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_100").value());
 
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_2xx").value());
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_200").value());
@@ -107,12 +120,25 @@ TEST_F(CodeUtilityTest, Canary) {
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_5xx").value());
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_500").value());
 
-  EXPECT_EQ(3U, cluster_scope_.counter("prefix.upstream_rq_completed").value());
+  EXPECT_EQ(4U, cluster_scope_.counter("prefix.upstream_rq_completed").value());
   EXPECT_EQ(2U, cluster_scope_.counter("prefix.external.upstream_rq_completed").value());
-  EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_completed").value());
-  EXPECT_EQ(2U, cluster_scope_.counter("prefix.canary.upstream_rq_completed").value());
+  EXPECT_EQ(2U, cluster_scope_.counter("prefix.internal.upstream_rq_completed").value());
+  EXPECT_EQ(3U, cluster_scope_.counter("prefix.canary.upstream_rq_completed").value());
 
-  EXPECT_EQ(20U, cluster_scope_.counters().size());
+  EXPECT_EQ(26U, cluster_scope_.counters().size());
+}
+
+TEST_F(CodeUtilityTest, UnknownResponseCodes) {
+  addResponse(23, true, true);
+  addResponse(600, false, false);
+  addResponse(1000000, false, true);
+
+  EXPECT_EQ(3U, cluster_scope_.counter("prefix.upstream_rq_unknown").value());
+  EXPECT_EQ(2U, cluster_scope_.counter("prefix.internal.upstream_rq_unknown").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_unknown").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.external.upstream_rq_unknown").value());
+
+  EXPECT_EQ(8U, cluster_scope_.counters().size());
 }
 
 TEST_F(CodeUtilityTest, All) {
@@ -207,10 +233,17 @@ TEST_F(CodeUtilityTest, ResponseTimingTest) {
   Stats::MockStore global_store;
   Stats::MockStore cluster_scope;
 
-  Http::CodeStats::ResponseTimingInfo info{
-      global_store, cluster_scope, "prefix.",    std::chrono::milliseconds(5),
-      true,         true,          "vhost_name", "req_vcluster_name",
-      "from_az",    "to_az"};
+  Stats::StatNameManagedStorage prefix("prefix", *symbol_table_);
+  Http::CodeStats::ResponseTimingInfo info{global_store,
+                                           cluster_scope,
+                                           pool_.add("prefix"),
+                                           std::chrono::milliseconds(5),
+                                           true,
+                                           true,
+                                           pool_.add("vhost_name"),
+                                           pool_.add("req_vcluster_name"),
+                                           pool_.add("from_az"),
+                                           pool_.add("to_az")};
 
   EXPECT_CALL(cluster_scope, histogram("prefix.upstream_rq_time"));
   EXPECT_CALL(cluster_scope, deliverHistogramToSinks(

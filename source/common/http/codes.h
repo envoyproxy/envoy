@@ -13,10 +13,35 @@
 namespace Envoy {
 namespace Http {
 
+struct CodeStats::ResponseStatInfo {
+  Stats::Scope& global_scope_;
+  Stats::Scope& cluster_scope_;
+  Stats::StatName prefix_;
+  uint64_t response_status_code_;
+  bool internal_request_;
+  Stats::StatName request_vhost_name_;
+  Stats::StatName request_vcluster_name_;
+  Stats::StatName from_zone_;
+  Stats::StatName to_zone_;
+  bool upstream_canary_;
+};
+
+struct CodeStats::ResponseTimingInfo {
+  Stats::Scope& global_scope_;
+  Stats::Scope& cluster_scope_;
+  Stats::StatName prefix_;
+  std::chrono::milliseconds response_time_;
+  bool upstream_canary_;
+  bool internal_request_;
+  Stats::StatName request_vhost_name_;
+  Stats::StatName request_vcluster_name_;
+  Stats::StatName from_zone_;
+  Stats::StatName to_zone_;
+};
+
 class CodeStatsImpl : public CodeStats {
 public:
   explicit CodeStatsImpl(Stats::SymbolTable& symbol_table);
-  ~CodeStatsImpl() override;
 
   // CodeStats
   void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
@@ -27,79 +52,65 @@ public:
 private:
   friend class CodeStatsTest;
 
+  void writeCategory(const ResponseStatInfo& info, Stats::StatName rq_group,
+                     Stats::StatName rq_code, Stats::StatName category) const;
   void incCounter(Stats::Scope& scope, const std::vector<Stats::StatName>& names) const;
   void incCounter(Stats::Scope& scope, Stats::StatName a, Stats::StatName b) const;
   void recordHistogram(Stats::Scope& scope, const std::vector<Stats::StatName>& names,
                        uint64_t count) const;
 
-  class RequestCodeGroup {
-  public:
-    RequestCodeGroup(absl::string_view prefix, CodeStatsImpl& code_stats);
-    ~RequestCodeGroup();
-
-    Stats::StatName statName(Code response_code);
-
-  private:
-    // Use an array of atomic pointers to hold StatNameStorage objects for
-    // every conceivable HTTP response code. In the hot-path we'll reference
-    // these with a null-check, and if we need to allocate a symbol for a
-    // new code, we'll take a mutex to avoid duplicate allocations and
-    // subsequent leaks. This is similar in principle to a ReaderMutexLock,
-    // but should be faster, as ReaderMutexLocks appear to be too expensive for
-    // fine-grained controls. Another option would be to use a lock per
-    // stat-name, which might have similar performance to atomics with default
-    // barrier policy.
-
-    static constexpr uint32_t NumHttpCodes = 1000;
-    std::atomic<Stats::StatNameStorage*> rc_stat_names_[NumHttpCodes];
-
-    CodeStatsImpl& code_stats_;
-    std::string prefix_;
-    absl::Mutex mutex_;
-  };
-
   static absl::string_view stripTrailingDot(absl::string_view prefix);
-  Stats::StatName makeStatName(absl::string_view name);
   Stats::StatName upstreamRqGroup(Code response_code) const;
+  Stats::StatName upstreamRqStatName(Code response_code) const;
 
-  // We have to actively free the StatNameStorage with the symbol_table_, so
-  // it's easiest to accumulate the StatNameStorage objects in a vector, in
-  // addition to having discrete member variables. That saves having to
-  // enumerate the stat-names in both the member-variables listed below
-  // and the destructor.
-  //
-  // TODO(jmarantz): consider a new variant in stats_macros.h to enumerate stats
-  // names and manage their storage.
-  std::vector<Stats::StatNameStorage> storage_;
-
+  mutable Stats::StatNamePool stat_name_pool_ GUARDED_BY(mutex_);
+  mutable absl::Mutex mutex_;
   Stats::SymbolTable& symbol_table_;
 
-  Stats::StatName canary_;
-  Stats::StatName canary_upstream_rq_time_;
-  Stats::StatName external_;
-  Stats::StatName external_rq_time_;
-  Stats::StatName external_upstream_rq_time_;
-  Stats::StatName internal_;
-  Stats::StatName internal_rq_time_;
-  Stats::StatName internal_upstream_rq_time_;
-  Stats::StatName upstream_;
-  Stats::StatName upstream_rq_1xx_;
-  Stats::StatName upstream_rq_2xx_;
-  Stats::StatName upstream_rq_3xx_;
-  Stats::StatName upstream_rq_4xx_;
-  Stats::StatName upstream_rq_5xx_;
-  Stats::StatName upstream_rq_unknown_;
-  Stats::StatName upstream_rq_completed_;
-  Stats::StatName upstream_rq_time;
-  Stats::StatName upstream_rq_time_;
-  Stats::StatName vcluster_;
-  Stats::StatName vhost_;
-  Stats::StatName zone_;
+  const Stats::StatName canary_;
+  const Stats::StatName empty_; // Used for the group-name for invalid http codes.
+  const Stats::StatName external_;
+  const Stats::StatName internal_;
+  const Stats::StatName upstream_;
+  const Stats::StatName upstream_rq_1xx_;
+  const Stats::StatName upstream_rq_2xx_;
+  const Stats::StatName upstream_rq_3xx_;
+  const Stats::StatName upstream_rq_4xx_;
+  const Stats::StatName upstream_rq_5xx_;
+  const Stats::StatName upstream_rq_unknown_;
+  const Stats::StatName upstream_rq_completed_;
+  const Stats::StatName upstream_rq_time;
+  const Stats::StatName upstream_rq_time_;
+  const Stats::StatName vcluster_;
+  const Stats::StatName vhost_;
+  const Stats::StatName zone_;
 
-  mutable RequestCodeGroup canary_upstream_rq_;
-  mutable RequestCodeGroup external_upstream_rq_;
-  mutable RequestCodeGroup internal_upstream_rq_;
-  mutable RequestCodeGroup upstream_rq_;
+  // Use an array of atomic pointers to hold StatNameStorage objects for
+  // every conceivable HTTP response code. In the hot-path we'll reference
+  // these with a null-check, and if we need to allocate a symbol for a
+  // new code, we'll take a mutex to avoid duplicate allocations and
+  // subsequent leaks. This is similar in principle to a ReaderMutexLock,
+  // but should be faster, as ReaderMutexLocks appear to be too expensive for
+  // fine-grained controls. Another option would be to use a lock per
+  // stat-name, which might have similar performance to atomics with default
+  // barrier policy.
+  //
+  // We don't allocate these all up front during construction because
+  // SymbolTable greedily encodes the first 128 names it discovers in one
+  // byte. We don't want those high-value single-byte codes to go to fully
+  // enumerating the 4 prefixes combined with HTTP codes that are seldom used,
+  // so we allocate these on demand.
+  //
+  // There can be multiple symbol tables in a server. The one passed into the
+  // Codes constructor should be the same as the one passed to
+  // Stats::ThreadLocalStore. Note that additional symbol tables can be created
+  // from IsolatedStoreImpl's default constructor.
+  //
+  // The Codes object is global to the server.
+
+  static constexpr uint32_t NumHttpCodes = 500;
+  static constexpr uint32_t HttpCodeOffset = 100; // code 100 is at index 0.
+  mutable std::atomic<uint8_t*> rc_stat_names_[NumHttpCodes];
 };
 
 /**
