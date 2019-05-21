@@ -50,20 +50,15 @@ public:
   static std::string encode(absl::string_view value);
 
   /**
-   * Encodes string view to its percent encoded representation, with start index.
-   * @param value supplies string to be encoded.
-   * @param start index supplies the first index a string should be scanned.
-   * @return std::string percent-encoded string based on
-   * https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses.
-   */
-  static std::string encode(absl::string_view value, const size_t index);
-
-  /**
    * Decodes string view from its percent encoded representation.
    * @param encoded supplies string to be decoded.
    * @return std::string decoded string https://tools.ietf.org/html/rfc3986#section-2.1.
    */
   static std::string decode(absl::string_view value);
+
+private:
+  // Encodes string view to its percent encoded representation, with start index.
+  static std::string encode(absl::string_view value, const size_t index);
 };
 
 /**
