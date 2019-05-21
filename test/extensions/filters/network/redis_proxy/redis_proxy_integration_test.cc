@@ -5,8 +5,7 @@
 
 #include "test/integration/integration.h"
 
-#include "gtest/gtest.h"
-
+using testing::Matcher;
 using testing::Return;
 
 namespace RedisCmdSplitter = Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitter;
@@ -71,7 +70,7 @@ const std::string CONFIG_WITH_BATCHING = CONFIG + R"EOF(
             buffer_flush_timeout: 0.003s 
 )EOF";
 
-const std::string CONFIG_WITH_ROUTES = R"EOF(
+const std::string CONFIG_WITH_ROUTES_BASE = R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -144,6 +143,9 @@ static_resources:
           stat_prefix: redis_stats
           settings:
             op_timeout: 5s
+)EOF";
+
+const std::string CONFIG_WITH_ROUTES = CONFIG_WITH_ROUTES_BASE + R"EOF(
           prefix_routes:
             catch_all_cluster: cluster_0
             routes:
@@ -151,6 +153,30 @@ static_resources:
               cluster: cluster_1
             - prefix: "baz:"
               cluster: cluster_2
+)EOF";
+
+const std::string CONFIG_WITH_MIRROR = CONFIG_WITH_ROUTES_BASE + R"EOF(
+          prefix_routes:
+            catch_all_route:
+              cluster: cluster_0
+              request_mirror_policy:
+              - cluster: cluster_1
+              - cluster: cluster_2
+            routes:
+            - prefix: "write_only:"
+              cluster: cluster_0
+              request_mirror_policy:
+              - cluster: cluster_1
+                exclude_read_commands: true
+            - prefix: "percentage:"
+              cluster: cluster_0
+              request_mirror_policy:
+              - cluster: cluster_1
+                runtime_fraction:
+                  default_value:
+                    numerator: 50
+                    denominator: HUNDRED
+                  runtime_key: "bogus_key"
 )EOF";
 
 // This function encodes commands as an array of bulkstrings as transmitted by Redis clients to
@@ -227,6 +253,7 @@ protected:
   Runtime::MockRandomGenerator* mock_rng_{};
   const int num_upstreams_;
   const Network::Address::IpVersion version_;
+  Runtime::MockLoader* runtime_{};
 };
 
 class RedisProxyWithRedirectionIntegrationTest : public RedisProxyIntegrationTest {
@@ -258,6 +285,15 @@ public:
   RedisProxyWithRoutesIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES, 6) {}
 };
 
+class RedisProxyWithMirrorsIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithMirrorsIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_MIRROR, 6) {}
+
+  FakeRawConnectionPtr expectUpstreamRequestResponse(FakeUpstreamPtr& upstream,
+                                                     const std::string& request,
+                                                     const std::string& response);
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -271,6 +307,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithBatchingIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithMirrorsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -367,6 +407,18 @@ void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
   redis_client->close();
   EXPECT_TRUE(fake_upstream_connection_1->close());
   EXPECT_TRUE(fake_upstream_connection_2->close());
+}
+
+FakeRawConnectionPtr RedisProxyWithMirrorsIntegrationTest::expectUpstreamRequestResponse(
+    FakeUpstreamPtr& upstream, const std::string& request, const std::string& response) {
+  std::__cxx11::string proxy_to_server;
+  FakeRawConnectionPtr upstream_connection;
+  EXPECT_TRUE(upstream->waitForRawConnection(upstream_connection));
+  EXPECT_TRUE(upstream_connection->waitForData(request.size(), &proxy_to_server));
+  // The original request should be the same as the data received by the server.
+  EXPECT_EQ(request, proxy_to_server);
+  EXPECT_TRUE(upstream_connection->write(response));
+  return std::move(upstream_connection);
 }
 
 // This test sends a simple "get foo" command from a fake
@@ -616,6 +668,110 @@ TEST_P(RedisProxyWithRoutesIntegrationTest, SimpleRequestAndResponseRoutedByPref
   // roundtrip to cluster_2 (prefix "baz:" route)
   simpleRoundtripToUpstream(fake_upstreams_[4], makeBulkStringArray({"get", "baz:123"}),
                             "$3\r\nbar\r\n");
+}
+
+TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredCatchAllRequest) {
+  initialize();
+
+  const std::string& request = makeBulkStringArray({"get", "toto"});
+  const std::string& response = "$3\r\nbar\r\n";
+  // roundtrip to cluster_0 (catch_all route)
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->write(request);
+
+  auto cluster_0_connection = expectUpstreamRequestResponse(fake_upstreams_[0], request, response);
+
+  // mirror to cluster_1 and cluster_2
+  auto cluster_1_connection =
+      expectUpstreamRequestResponse(fake_upstreams_[2], request, "$3\r\nbar1\r\n");
+  auto cluster_2_connection =
+      expectUpstreamRequestResponse(fake_upstreams_[4], request, "$3\r\nbar2\r\n");
+
+  redis_client->waitForData(response);
+  // The original response from the cluster_0 should be received by the fake Redis client and the
+  // response from mirrored requests are ignored.
+  EXPECT_EQ(response, redis_client->data());
+
+  redis_client->close();
+  EXPECT_TRUE(cluster_0_connection->close());
+  EXPECT_TRUE(cluster_1_connection->close());
+  EXPECT_TRUE(cluster_2_connection->close());
+}
+
+TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredWriteOnlyRequest) {
+  initialize();
+
+  const std::string& set_request = makeBulkStringArray({"set", "write_only:toto", "bar"});
+  const std::string& set_response = ":1\r\n";
+
+  // roundtrip to cluster_0 (write_only route)
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->write(set_request);
+
+  auto cluster_0_connection =
+      expectUpstreamRequestResponse(fake_upstreams_[0], set_request, set_response);
+
+  // mirror to cluster_1
+  auto cluster_1_connection =
+      expectUpstreamRequestResponse(fake_upstreams_[2], set_request, ":2\r\n");
+
+  // The original response from the cluster_1 should be received by the fake Redis client
+  redis_client->waitForData(set_response);
+  EXPECT_EQ(set_response, redis_client->data());
+
+  redis_client->close();
+  EXPECT_TRUE(cluster_0_connection->close());
+  EXPECT_TRUE(cluster_1_connection->close());
+}
+
+TEST_P(RedisProxyWithMirrorsIntegrationTest, ExcludeReadCommands) {
+  initialize();
+
+  const std::string& get_request = makeBulkStringArray({"get", "write_only:toto"});
+  const std::string& get_response = "$3\r\nbar\r\n";
+
+  // roundtrip to cluster_0 (write_only route)
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->write(get_request);
+
+  auto cluster_0_connection =
+      expectUpstreamRequestResponse(fake_upstreams_[0], get_request, get_response);
+
+  // command is not mirrored to cluster 1
+  FakeRawConnectionPtr cluster_1_connection;
+  EXPECT_FALSE(fake_upstreams_[2]->waitForRawConnection(cluster_1_connection));
+
+  redis_client->waitForData(get_response);
+  EXPECT_EQ(get_response, redis_client->data());
+
+  redis_client->close();
+  EXPECT_TRUE(cluster_0_connection->close());
+}
+
+TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
+  initialize();
+  // When random_value is < 50, the percentage:* will be mirrored
+  ON_CALL(*mock_rng_, random()).WillByDefault(Return(0));
+  const std::string& request = makeBulkStringArray({"get", "percentage:toto"});
+  const std::string& response = "$3\r\nbar\r\n";
+  // roundtrip to cluster_0 (catch_all route)
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->write(request);
+
+  auto cluster_0_connection = expectUpstreamRequestResponse(fake_upstreams_[0], request, response);
+
+  // mirror to cluster_1 and cluster_2
+  auto cluster_1_connection =
+      expectUpstreamRequestResponse(fake_upstreams_[2], request, "$3\r\nbar1\r\n");
+
+  redis_client->waitForData(response);
+  // The original response from the cluster_0 should be received by the fake Redis client and the
+  // response from mirrored requests are ignored.
+  EXPECT_EQ(response, redis_client->data());
+
+  redis_client->close();
+  EXPECT_TRUE(cluster_0_connection->close());
+  EXPECT_TRUE(cluster_1_connection->close());
 }
 
 } // namespace

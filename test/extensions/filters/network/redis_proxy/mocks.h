@@ -24,7 +24,20 @@ public:
   MockRouter();
   ~MockRouter();
 
-  MOCK_METHOD1(upstreamPool, ConnPool::InstanceSharedPtr(std::string& key));
+  MOCK_METHOD1(upstreamPool, RouteSharedPtr(std::string& key));
+};
+
+class MockRoute : public Route {
+public:
+  MockRoute(ConnPool::InstanceSharedPtr);
+  ~MockRoute();
+
+  MOCK_CONST_METHOD0(upstream, ConnPool::InstanceSharedPtr());
+  MOCK_CONST_METHOD0(mirrorPolicies, const MirrorPolicies&());
+
+private:
+  ConnPool::InstanceSharedPtr conn_pool_;
+  const MirrorPolicies policies_;
 };
 
 namespace ConnPool {

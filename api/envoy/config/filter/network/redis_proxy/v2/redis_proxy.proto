@@ -7,6 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.network.redis_proxy.v2";
 option go_package = "v2";
 
+import "envoy/api/v2/core/base.proto";
 import "google/protobuf/duration.proto";
 
 import "validate/validate.proto";
@@ -26,7 +27,7 @@ message RedisProxy {
   // .. attention::
   //
   //   This field is deprecated. Use a :ref:`catch-all
-  //   cluster<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>`
+  //   cluster<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>`
   //   instead.
   string cluster = 2 [deprecated = true];
 
@@ -93,13 +94,44 @@ message RedisProxy {
     message Route {
       // String prefix that must match the beginning of the keys. Envoy will always favor the
       // longest match.
-      string prefix = 1 [(validate.rules).string.min_bytes = 1];
+      string prefix = 1;
 
       // Indicates if the prefix needs to be removed from the key when forwarded.
       bool remove_prefix = 2;
 
       // Upstream cluster to forward the command to.
       string cluster = 3 [(validate.rules).string.min_bytes = 1];
+
+      // The router is capable of shadowing traffic from one cluster to another. The current
+      // implementation is "fire and forget," meaning Envoy will not wait for the shadow cluster to
+      // respond before returning the response from the primary cluster. All normal statistics are
+      // collected for the shadow cluster making this feature useful for testing.
+      message RequestMirrorPolicy {
+        // Specifies the cluster that requests will be mirrored to. The cluster must
+        // exist in the cluster manager configuration.
+        string cluster = 1 [(validate.rules).string.min_bytes = 1];
+
+        // If not specified or the runtime key is not present, all requests to the target cluster
+        // will be mirrored.
+        //
+        // If specified, Envoy will lookup the runtime key to get the percentage of requests to the
+        // mirror.
+        //
+        // Parsing this field is implemented such that the runtime key's data may be represented
+        // as a :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` proto represented
+        // as JSON/YAML and may also be represented as an integer with the assumption that the value
+        // is an integral percentage out of 100. For instance, a runtime key lookup returning the
+        // value "42" would parse as a `FractionalPercent` whose numerator is 42 and denominator is
+        // HUNDRED.
+        envoy.api.v2.core.RuntimeFractionalPercent runtime_fraction = 2;
+
+        // Set this to TRUE to only mirror write commands, this is effectively replicating the
+        // writes in a "fire and forget" manner.
+        bool exclude_read_commands = 3;
+      }
+
+      // Indicates that the route has a request mirroring policy.
+      repeated RequestMirrorPolicy request_mirror_policy = 4;
     }
 
     // List of prefix routes.
@@ -110,7 +142,15 @@ message RedisProxy {
 
     // Optional catch-all route to forward commands that doesn't match any of the routes. The
     // catch-all route becomes required when no routes are specified.
-    string catch_all_cluster = 3;
+    // .. attention::
+    //   **This field is deprecated**. Set the
+    //   :ref:`catch_all_route<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>`
+    //   field instead.
+    string catch_all_cluster = 3 [deprecated = true];
+
+    // Optional catch-all route to forward commands that doesn't match any of the routes. The
+    // catch-all route becomes required when no routes are specified.
+    Route catch_all_route = 4;
   }
 
   // List of **unique** prefixes used to separate keys from different workloads to different
