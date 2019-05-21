@@ -61,7 +61,6 @@ function bazel_binary_build() {
     COMPILE_TYPE="opt"
   elif [[ "${BINARY_TYPE}" == "debug" ]]; then
     COMPILE_TYPE="dbg"
-    BINARY_SUFFIX="-debug"
   elif [[ "${BINARY_TYPE}" == "sizeopt" ]]; then
     # The COMPILE_TYPE variable is redundant in this case and is only here for
     # readability. It is already set in the .bazelrc config for sizeopt.
@@ -69,7 +68,6 @@ function bazel_binary_build() {
     CONFIG_ARGS="--config=sizeopt"
   elif [[ "${BINARY_TYPE}" == "fastbuild" ]]; then
     COMPILE_TYPE="fastbuild"
-    BINARY_SUFFIX="-fastbuild"
   fi
 
   echo "Building..."
