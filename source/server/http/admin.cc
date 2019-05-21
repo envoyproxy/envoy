@@ -1095,7 +1095,7 @@ Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMa
 
     if (params.empty()) {
       response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
-      response.add("       or send the parameters within the request's body\n");
+      response.add("       or send the parameters as form values\n");
       response.add("use an empty value to remove a previously added override");
       return Http::Code::BadRequest;
     }
