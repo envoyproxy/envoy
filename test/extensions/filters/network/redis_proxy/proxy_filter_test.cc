@@ -128,7 +128,7 @@ public:
 
   RedisProxyFilterTest(const std::string& json_string, const std::string& v2_json_string) {
     envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
-        parseProtoFromJson(json_string);
+        parseProtoFromJson(json_string.empty() ? default_config : json_string);
     if (!v2_json_string.empty()) {
       addV2ProtoFromJson(v2_json_string, proto_config);
     }
@@ -343,7 +343,7 @@ const std::string downstream_auth_password_config = R"EOF(
 class RedisProxyFilterWithAuthPasswordTest : public RedisProxyFilterTest {
 public:
   RedisProxyFilterWithAuthPasswordTest()
-      : RedisProxyFilterTest(default_config, downstream_auth_password_config) {}
+      : RedisProxyFilterTest("", downstream_auth_password_config) {}
 };
 
 TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthPasswordCorrect) {
