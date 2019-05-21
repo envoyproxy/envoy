@@ -25,6 +25,7 @@ The Redis project offers a thorough reference on partitioning as it relates to R
 * Active and passive healthchecking.
 * Hash tagging.
 * Prefix routing.
+* Request mirroring for all requests or write requests only.
 
 **Planned future enhancements**:
 

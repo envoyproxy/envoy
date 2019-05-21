@@ -418,7 +418,7 @@ FakeRawConnectionPtr RedisProxyWithMirrorsIntegrationTest::expectUpstreamRequest
   // The original request should be the same as the data received by the server.
   EXPECT_EQ(request, proxy_to_server);
   EXPECT_TRUE(upstream_connection->write(response));
-  return std::move(upstream_connection);
+  return upstream_connection;
 }
 
 // This test sends a simple "get foo" command from a fake

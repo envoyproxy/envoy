@@ -26,8 +26,8 @@ message RedisProxy {
   //
   // .. attention::
   //
-  //   This field is deprecated. Use a :ref:`catch-all
-  //   cluster<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>`
+  //   This field is deprecated. Use a :ref:`catch_all
+  //   route<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>`
   //   instead.
   string cluster = 2 [deprecated = true];
 
@@ -143,9 +143,10 @@ message RedisProxy {
     // Optional catch-all route to forward commands that doesn't match any of the routes. The
     // catch-all route becomes required when no routes are specified.
     // .. attention::
-    //   **This field is deprecated**. Set the
-    //   :ref:`catch_all_route<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>`
-    //   field instead.
+    //
+    //   This field is deprecated. Use a :ref:`catch_all
+    //   route<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>`
+    //   instead.
     string catch_all_cluster = 3 [deprecated = true];
 
     // Optional catch-all route to forward commands that doesn't match any of the routes. The
@@ -174,7 +175,7 @@ message RedisProxy {
   // * 'get abc:users' would retrive the key 'abc:users' from cluster_b.
   // * 'get ab:users' would retrive the key 'ab:users' from cluster_a.
   // * 'get z:users' would return a NoUpstreamHost error. A :ref:`catch-all
-  //   cluster<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>`
+  //   route<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>`
   //   would have retrieved the key from that cluster instead.
   //
   // See the :ref:`configuration section
