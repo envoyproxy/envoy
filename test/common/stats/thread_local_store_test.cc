@@ -345,9 +345,9 @@ TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
 TEST_F(StatsThreadLocalStoreTest, ConstSymtabAccessor) {
   ScopePtr scope = store_->createScope("scope.");
   const Scope& cscope = *scope;
-  const SymbolTable& csymtab = cscope.constSymbolTable();
-  SymbolTable& symtab = scope->symbolTable();
-  EXPECT_EQ(&csymtab, &symtab);
+  const SymbolTable& const_symbol_table = cscope.constSymbolTable();
+  SymbolTable& symbol_table = scope->symbolTable();
+  EXPECT_EQ(&const_symbol_table, &symbol_table);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {

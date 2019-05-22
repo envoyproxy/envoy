@@ -17,10 +17,6 @@ namespace Envoy {
 // responds OK to all requests if it is.
 class EdsReadyFilter : public Http::PassThroughFilter {
 public:
-  // TODO(jmarantz): this const-cast of the symbol-table is needed only because
-  // it lacks a const-method to encode a string, that could fail (e.g. via
-  // absl::optional) if the tokens in it were not already present in the symbol
-  // table. No new stats are created by this filter.
   EdsReadyFilter(const Stats::Scope& root_scope)
       : root_scope_(root_scope),
         stat_name_("cluster.cluster_0.membership_healthy",

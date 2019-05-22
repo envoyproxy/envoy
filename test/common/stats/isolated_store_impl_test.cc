@@ -115,9 +115,9 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
 TEST_F(StatsIsolatedStoreImplTest, ConstSymtabAccessor) {
   ScopePtr scope = store_.createScope("scope.");
   const Scope& cscope = *scope;
-  const SymbolTable& csymtab = cscope.constSymbolTable();
-  SymbolTable& symtab = scope->symbolTable();
-  EXPECT_EQ(&csymtab, &symtab);
+  const SymbolTable& const_symbol_table = cscope.constSymbolTable();
+  SymbolTable& symbol_table = scope->symbolTable();
+  EXPECT_EQ(&const_symbol_table, &symbol_table);
 }
 
 TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
