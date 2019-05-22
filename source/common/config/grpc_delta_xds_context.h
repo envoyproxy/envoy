@@ -152,8 +152,7 @@ public:
     trySendDiscoveryRequests();
   }
 
-  // TODO TODO remove, GrpcMux impersonation. Basically combination of  addSubscription and
-  // updateResources.
+  // TODO(fredlas) remove, only here for compatibility with old-style GrpcMuxImpl.
   GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
                             GrpcMuxCallbacks&) override {
     // don't need any implementation here. only grpc_mux_subscription_impl ever calls it, and there

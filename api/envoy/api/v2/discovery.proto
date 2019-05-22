@@ -187,13 +187,6 @@ message DeltaDiscoveryResponse {
   // The version of the response data (used for debugging).
   string system_version_info = 1;
 
-  // Type of the resources that are being provided, e.g.
-  // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment". This is implicit
-  // in requests made via singleton xDS APIs such as CDS, LDS, etc. but is
-  // required for ADS.
-  // Must match the type_url in the DeltaDiscoveryRequest.
-  string type_url = 3;
-
   // The response resources. The Resource proto's Any field named 'resource' should be
   // of type type_url.
   repeated Resource resources = 2 [(gogoproto.nullable) = false];

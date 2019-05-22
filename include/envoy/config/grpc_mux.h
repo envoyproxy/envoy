@@ -99,7 +99,9 @@ public:
 
 /**
  * Manage one or more gRPC subscriptions on a single stream to management server. This can be used
- * for a single xDS API, e.g. EDS, or to combined multiple xDS APIs for ADS. Both delta and state-of-the-world implement this same interface - whether a GrpcSubscriptionImpl is delta or SotW is determined entirely by which type of GrpcMux it works with.
+ * for a single xDS API, e.g. EDS, or to combined multiple xDS APIs for ADS. Both delta and
+ * state-of-the-world implement this same interface - whether a GrpcSubscriptionImpl is delta or
+ * SotW is determined entirely by which type of GrpcMux it works with.
  */
 class GrpcMux {
 public:
