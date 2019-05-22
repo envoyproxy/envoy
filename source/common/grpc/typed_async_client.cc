@@ -7,6 +7,7 @@
 
 namespace Envoy {
 namespace Grpc {
+namespace Internal {
 
 void sendMessageUntyped(RawAsyncStream* stream, const Protobuf::Message& request, bool end_stream) {
   stream->sendMessageRaw(Common::serializeMessage(request), end_stream);
@@ -38,5 +39,6 @@ AsyncRequest* sendUntyped(RawAsyncClient* client, const Protobuf::MethodDescript
                          Common::serializeMessage(request), callbacks, parent_span, timeout);
 }
 
+} // namespace Internal
 } // namespace Grpc
 } // namespace Envoy

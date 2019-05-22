@@ -95,8 +95,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
       .WillRepeatedly(Invoke([this](Buffer::InstancePtr& buffer, bool) {
         envoy::api::v2::DeltaDiscoveryRequest message;
-        Buffer::ZeroCopyInputStreamImpl stream(std::move(buffer));
-        EXPECT_TRUE(message.ParseFromZeroCopyStream(&stream));
+        EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
         const std::string nonce = message.response_nonce();
         if (!nonce.empty()) {
           nonce_acks_sent_.push(nonce);

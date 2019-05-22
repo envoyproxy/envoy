@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/config/delta_subscription_impl.h"
+#include "common/grpc/common.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
@@ -92,9 +92,8 @@ public:
                 sendMessageRaw_(
                     Grpc::ProtoBufferEqIgnoringField(expected_request, "response_nonce"), false))
         .WillOnce([this](Buffer::InstancePtr& buffer, bool) {
-          Buffer::ZeroCopyInputStreamImpl stream(std::move(buffer));
           envoy::api::v2::DeltaDiscoveryRequest message;
-          EXPECT_TRUE(message.ParseFromZeroCopyStream(&stream));
+          EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
           const std::string nonce = message.response_nonce();
           if (!nonce.empty()) {
             nonce_acks_sent_.push(nonce);

@@ -104,7 +104,10 @@ public:
 
 MATCHER_P(ProtoBufferEq, expected, "") {
   typename std::remove_const<decltype(expected)>::type proto;
-  proto.ParseFromArray(static_cast<char*>(arg->linearize(arg->length())), arg->length());
+  if (!proto.ParseFromArray(static_cast<char*>(arg->linearize(arg->length())), arg->length())) {
+    *result_listener << "\nParse of buffer failed\n";
+    return false;
+  }
   auto equal = ::Envoy::TestUtility::protoEqual(proto, expected);
   if (!equal) {
     *result_listener << "\n"
@@ -119,7 +122,10 @@ MATCHER_P(ProtoBufferEq, expected, "") {
 
 MATCHER_P2(ProtoBufferEqIgnoringField, expected, ignored_field, "") {
   typename std::remove_const<decltype(expected)>::type proto;
-  proto.ParseFromArray(static_cast<char*>(arg->linearize(arg->length())), arg->length());
+  if (!proto.ParseFromArray(static_cast<char*>(arg->linearize(arg->length())), arg->length())) {
+    *result_listener << "\nParse of buffer failed\n";
+    return false;
+  }
   auto equal = ::Envoy::TestUtility::protoEqualIgnoringField(proto, expected, ignored_field);
   if (!equal) {
     std::string but_ignoring = absl::StrCat("(but ignoring ", ignored_field, ")");

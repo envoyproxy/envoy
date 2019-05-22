@@ -6,6 +6,7 @@
 
 namespace Envoy {
 namespace Grpc {
+namespace Internal {
 
 /**
  * Forward declarations for helper functions.
@@ -21,6 +22,8 @@ AsyncRequest* sendUntyped(RawAsyncClient* client, const Protobuf::MethodDescript
                           Tracing::Span& parent_span,
                           const absl::optional<std::chrono::milliseconds>& timeout);
 
+} // namespace Internal
+
 /**
  * Convenience wrapper for an AsyncStream* providing typed protobuf support.
  */
@@ -30,7 +33,7 @@ public:
   AsyncStream(RawAsyncStream* stream) : stream_(stream) {}
   AsyncStream(const AsyncStream& other) = default;
   void sendMessage(const Request& request, bool end_stream) {
-    sendMessageUntyped(stream_, std::move(request), end_stream);
+    Internal::sendMessageUntyped(stream_, std::move(request), end_stream);
   }
   void closeStream() { stream_->closeStream(); }
   void resetStream() { stream_->resetStream(); }
@@ -57,7 +60,8 @@ public:
 private:
   void onSuccessRaw(Buffer::InstancePtr&& response, Tracing::Span& span) override {
     auto message = std::unique_ptr<Response>(dynamic_cast<Response*>(
-        parseMessageUntyped(std::make_unique<Response>(), std::move(response)).release()));
+        Internal::parseMessageUntyped(std::make_unique<Response>(), std::move(response))
+            .release()));
     if (!message) {
       onFailure(Status::GrpcStatus::Internal, "", span);
       return;
@@ -77,7 +81,8 @@ public:
 private:
   bool onReceiveMessageRaw(Buffer::InstancePtr&& response) {
     auto message = std::unique_ptr<Response>(dynamic_cast<Response*>(
-        parseMessageUntyped(std::make_unique<Response>(), std::move(response)).release()));
+        Internal::parseMessageUntyped(std::make_unique<Response>(), std::move(response))
+            .release()));
     if (!message) {
       return false;
     }
@@ -95,11 +100,12 @@ public:
                      const Protobuf::Message& request, AsyncRequestCallbacks<Response>& callbacks,
                      Tracing::Span& parent_span,
                      const absl::optional<std::chrono::milliseconds>& timeout) {
-    return sendUntyped(client_.get(), service_method, request, callbacks, parent_span, timeout);
+    return Internal::sendUntyped(client_.get(), service_method, request, callbacks, parent_span,
+                                 timeout);
   }
   AsyncStream<Request> start(const Protobuf::MethodDescriptor& service_method,
                              AsyncStreamCallbacks<Response>& callbacks) {
-    return AsyncStream<Request>(startUntyped(client_.get(), service_method, callbacks));
+    return AsyncStream<Request>(Internal::startUntyped(client_.get(), service_method, callbacks));
   }
 
   AsyncClient* operator->() { return this; }

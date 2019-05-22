@@ -139,6 +139,7 @@ envoy_cc_test_library(
     deps = [
         ":subscription_test_harness",
         "//source/common/config:delta_subscription_lib",
+        "//source/common/grpc:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",

@@ -84,6 +84,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",

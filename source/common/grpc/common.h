@@ -9,6 +9,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 
+#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/grpc/status.h"
 #include "common/protobuf/protobuf.h"
 
@@ -158,6 +159,11 @@ public:
    * @param buffer containing the frame data which will be modified.
    */
   static void prependGrpcFrameHeader(Buffer::Instance& buffer);
+
+  template <typename P> static bool parseBufferInstance(Buffer::InstancePtr&& buffer, P& proto) {
+    Buffer::ZeroCopyInputStreamImpl stream(std::move(buffer));
+    return proto.ParseFromZeroCopyStream(&stream);
+  }
 
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);
