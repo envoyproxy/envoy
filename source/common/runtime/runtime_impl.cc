@@ -510,9 +510,7 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
       layers.push_back(std::make_unique<AdminLayer>(admin_layer_));
       break;
     default:
-      // Skip unimplemented layers.
-      ENVOY_LOG(warn, "unknown layer {}", layer.DebugString());
-      break;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
   stats_.num_layers_.set(layers.size());
