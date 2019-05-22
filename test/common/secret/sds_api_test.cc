@@ -141,17 +141,20 @@ TEST_F(SdsApiTest, Delta) {
   resource->set_name("secret_1");
   resource->set_version("version1");
 
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> for_matching;
+  for_matching.Add()->PackFrom(secret);
+
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
   PartialMockSds sds(server, *api_, init_manager, config_source);
-  EXPECT_CALL(sds, onConfigUpdate(_, "version1"));
+  EXPECT_CALL(sds, onConfigUpdate(RepeatedProtoEq(for_matching), "version1"));
   sds.SdsApi::onConfigUpdate(resources, {}, "ignored");
 
   // An attempt to remove a resource logs an error, but otherwise just carries on (ignoring the
   // removal attempt).
   resource->set_version("version2");
-  EXPECT_CALL(sds, onConfigUpdate(_, "version2"));
+  EXPECT_CALL(sds, onConfigUpdate(RepeatedProtoEq(for_matching), "version2"));
   Protobuf::RepeatedPtrField<std::string> removals;
   *removals.Add() = "route_0";
   sds.SdsApi::onConfigUpdate(resources, removals, "ignored");
