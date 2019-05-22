@@ -5,8 +5,6 @@
 
 #include "envoy/common/time.h"
 
-#include "common/common/utility.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -68,13 +66,13 @@ public:
    * @param text The string to compare against the pattern.
    * @return whether the text matches the pattern.
    */
-  static bool simpleWildcardMatch(std::string& pattern, std::string& text);
+  static bool simpleWildcardMatch(const std::string& pattern, const std::string& text);
 
   /**
    * Indicates whether the passed pattern is a single wildcard glob
    * (i.e., "*")
    */
-  static bool isWildcardGlob(std::string& pattern);
+  static bool isWildcardGlob(const std::string& pattern);
 };
 } // namespace XRay
 } // namespace Tracers

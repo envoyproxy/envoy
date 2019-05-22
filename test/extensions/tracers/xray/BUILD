@@ -1,0 +1,58 @@
+licenses(["notice"])  # Apache 2
+
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test_library",
+    "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
+)
+
+envoy_package()
+
+envoy_extension_cc_test(
+    name = "xray_test",
+    srcs = [
+        # "sampling_test.cc",
+        "tracer_test.cc",
+        "util_test.cc",
+        # "xray_core_types_test.cc",
+        # "xray_tracer_impl_test.cc",
+    ],
+    extension_name = "envoy.tracers.xray",
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//include/envoy/runtime:runtime_interface",
+        "//source/common/common:hex_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/runtime:runtime_lib",
+        "//source/extensions/tracers/xray:xray_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_name = "envoy.tracers.xray",
+    deps = [
+        "//source/extensions/tracers/xray:config",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)

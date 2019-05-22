@@ -601,6 +601,7 @@ protoc
 protodoc
 protos
 proxied
+pseduo
 proxying
 pthread
 pthreads
@@ -783,6 +784,7 @@ xeon
 xform
 xhtml
 xid
+xray
 xxhash
 xxs
 xxxx

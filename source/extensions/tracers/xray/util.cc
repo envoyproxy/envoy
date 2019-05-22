@@ -67,17 +67,14 @@ double Util::generateRandomDouble(TimeSource& time_source) {
 }
 
 bool Util::wildcardMatch(std::string& pattern, std::string& text) {
-  if (pattern.empty() || text.empty()) {
-    return false;
+  if (pattern.empty()) {
+    return text.empty();
   }
 
-  int pattern_length = pattern.size();
-  int text_length = text.size();
-  if (pattern_length == 0) {
-    return text_length == 0;
-  }
+  size_t pattern_length = pattern.size();
+  size_t text_length = text.size();
 
-  // Check the special case of a single * pattern, as it's common
+  // Check the special case of a single * pattern, as it's common.
   if (isWildcardGlob(pattern)) {
     return true;
   }
@@ -87,8 +84,8 @@ bool Util::wildcardMatch(std::string& pattern, std::string& text) {
 
   // Infix globs are relatively rare, and the below search is expensive especially when
   // Balsa is used a lot. Check for infix globs and, in their absence, do the simple thing
-  int index_of_glob = pattern.find("*");
-  if (index_of_glob == -1 || index_of_glob == pattern_length - 1) {
+  size_t index_of_glob = pattern.find("*");
+  if (index_of_glob == std::string::npos || index_of_glob == pattern_length - 1) {
     return simpleWildcardMatch(pattern, text);
   }
 
@@ -103,17 +100,17 @@ bool Util::wildcardMatch(std::string& pattern, std::string& text) {
    *   all the res[i+1], res[i+2],...,res[text_length] could be true
    */
 
-  std::vector<int> res(text_length + 1);
+  std::vector<size_t> res(text_length + 1);
   res[0] = true;
-  for (int j = 0; j < pattern_length; j++) {
+  for (size_t j = 0; j < pattern_length; j++) {
     char p = pattern.at(j);
     if (p != '*') {
-      for (int i = text_length - 1; i >= 0; i--) {
+      for (size_t i = text_length - 1; i != std::string::npos; i--) {
         char t = text.at(i);
         res[i + 1] = res[i] && (p == '?' || (p == t));
       }
     } else {
-      int i = 0;
+      size_t i = 0;
       while (i <= text_length && !res[i]) {
         i++;
       }
@@ -126,11 +123,11 @@ bool Util::wildcardMatch(std::string& pattern, std::string& text) {
   return res[text_length];
 }
 
-bool Util::simpleWildcardMatch(std::string& pattern, std::string& text) {
-  int j = 0;
-  int pattern_length = pattern.length();
-  int text_length = text.length();
-  for (int i = 0; i < pattern_length; i++) {
+bool Util::simpleWildcardMatch(const std::string& pattern, const std::string& text) {
+  size_t j = 0;
+  size_t pattern_length = pattern.size();
+  size_t text_length = text.size();
+  for (size_t i = 0; i < pattern_length; i++) {
     char p = pattern.at(i);
     if (p == '*') {
       // Presumption for this method is that globs only occur at end
@@ -156,7 +153,7 @@ bool Util::simpleWildcardMatch(std::string& pattern, std::string& text) {
   return j == text_length;
 }
 
-bool Util::isWildcardGlob(std::string& pattern) {
+bool Util::isWildcardGlob(const std::string& pattern) {
   return pattern.size() == 1 && pattern.at(0) == '*';
 }
 
