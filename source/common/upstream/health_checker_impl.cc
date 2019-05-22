@@ -71,7 +71,7 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& health_che
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
-            std::string(health_check_config.custom_health_check().name()));
+            health_check_config.custom_health_check().name());
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,
                                             std::move(event_logger)));
@@ -154,7 +154,6 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
       local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
-  onDeferredDelete();
   ASSERT(client_ == nullptr);
 }
 
@@ -195,8 +194,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
     expect_reset_ = false;
   }
 
-  request_encoder_ = &client_->newStream(*this);
-  request_encoder_->getStream().addCallbacks(*this);
+  Http::StreamEncoder* request_encoder = &client_->newStream(*this);
+  request_encoder->getStream().addCallbacks(*this);
 
   Http::HeaderMapImpl request_headers{
       {Http::Headers::get().Method, "GET"},
@@ -209,8 +208,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   stream_info.setDownstreamRemoteAddress(local_address_);
   stream_info.onUpstreamHostSelected(host_);
   parent_.request_headers_parser_->evaluateHeaders(request_headers, stream_info);
-  request_encoder_->encodeHeaders(request_headers, true);
-  request_encoder_ = nullptr;
+  request_encoder->encodeHeaders(request_headers, true);
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::StreamResetReason,
@@ -269,17 +267,43 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     break;
   }
 
-  if ((response_headers_->Connection() &&
-       absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
-                              Http::Headers::get().ConnectionValues.Close)) ||
-      (response_headers_->ProxyConnection() && protocol_ != Http::Protocol::Http2 &&
-       absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
-                              Http::Headers::get().ConnectionValues.Close)) ||
-      !parent_.reuse_connection_) {
+  if (shouldClose()) {
     client_->close();
   }
 
   response_headers_.reset();
+}
+
+// It is possible for this session to have been deferred destroyed inline in handleFailure()
+// above so make sure we still have a connection that we might need to close.
+bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
+  if (client_ == nullptr) {
+    return false;
+  }
+
+  if (response_headers_->Connection()) {
+    const bool close =
+        absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
+                               Http::Headers::get().ConnectionValues.Close);
+    if (close) {
+      return true;
+    }
+  }
+
+  if (response_headers_->ProxyConnection() && protocol_ != Http::Protocol::Http2) {
+    const bool close =
+        absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
+                               Http::Headers::get().ConnectionValues.Close);
+    if (close) {
+      return true;
+    }
+  }
+
+  if (!parent_.reuse_connection_) {
+    return true;
+  }
+
+  return false;
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
@@ -354,7 +378,6 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
       receive_bytes_(TcpHealthCheckMatcher::loadProtoBytes(config.tcp_health_check().receive())) {}
 
 TcpHealthCheckerImpl::TcpActiveHealthCheckSession::~TcpActiveHealthCheckSession() {
-  onDeferredDelete();
   ASSERT(client_ == nullptr);
 }
 
@@ -462,7 +485,6 @@ GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::GrpcActiveHealthCheckSessio
     : ActiveHealthCheckSession(parent, host), parent_(parent) {}
 
 GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::~GrpcActiveHealthCheckSession() {
-  onDeferredDelete();
   ASSERT(client_ == nullptr);
 }
 

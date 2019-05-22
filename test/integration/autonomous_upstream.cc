@@ -8,7 +8,7 @@ void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeader
   if (!header_value.empty()) {
     uint64_t parsed_value;
     RELEASE_ASSERT(absl::SimpleAtoi(header_value, &parsed_value) &&
-                       parsed_value < std::numeric_limits<int32_t>::max(),
+                       parsed_value < static_cast<uint32_t>(std::numeric_limits<int32_t>::max()),
                    "");
     return_int = parsed_value;
   }

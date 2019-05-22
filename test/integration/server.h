@@ -13,7 +13,6 @@
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
-#include "common/stats/source_impl.h"
 
 #include "server/listener_hooks.h"
 #include "server/options_impl.h"
@@ -106,6 +105,20 @@ public:
     return histogramFromStatName(storage.statName());
   }
 
+  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->findCounter(name);
+  }
+  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->findGauge(name);
+  }
+  absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->findHistogram(name);
+  }
+
   const SymbolTable& symbolTable() const override { return wrapped_scope_->symbolTable(); }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
 
@@ -120,7 +133,6 @@ private:
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
-  TestIsolatedStoreImpl() : source_(*this) {}
   // Stats::Scope
   Counter& counterFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
@@ -152,6 +164,19 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
   }
+  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return store_.findCounter(name);
+  }
+  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return store_.findGauge(name);
+  }
+  absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return store_.findHistogram(name);
+  }
   const SymbolTable& symbolTable() const override { return store_.symbolTable(); }
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
 
@@ -177,12 +202,10 @@ public:
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
   void mergeHistograms(PostMergeCb) override {}
-  Source& source() override { return source_; }
 
 private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
-  SourceImpl source_;
 };
 
 } // namespace Stats

@@ -145,7 +145,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
-        "//source/common/config:utility_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/server:lds_api_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",

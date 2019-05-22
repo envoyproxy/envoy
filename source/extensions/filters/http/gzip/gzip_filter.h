@@ -137,9 +137,7 @@ public:
   }
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
-    return Http::FilterTrailersStatus::Continue;
-  }
+  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
     return Http::FilterMetadataStatus::Continue;
   }

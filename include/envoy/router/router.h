@@ -332,9 +332,9 @@ public:
   virtual ~VirtualCluster() {}
 
   /**
-   * @return the name of the virtual cluster.
+   * @return the stat-name of the virtual cluster.
    */
-  virtual const std::string& name() const PURE;
+  virtual Stats::StatName statName() const PURE;
 };
 
 class RateLimitPolicy;
@@ -364,9 +364,9 @@ public:
   virtual const CorsPolicy* corsPolicy() const PURE;
 
   /**
-   * @return const std::string& the name of the virtual host.
+   * @return the stat-name of the virtual host.
    */
-  virtual const std::string& name() const PURE;
+  virtual Stats::StatName statName() const PURE;
 
   /**
    * @return const RateLimitPolicy& the rate limit policy for the virtual host.
@@ -803,6 +803,11 @@ public:
    * @return const std::string the RouteConfiguration name.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return whether router configuration uses VHDS.
+   */
+  virtual bool usesVhds() const PURE;
 };
 
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;
