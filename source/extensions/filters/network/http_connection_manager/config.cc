@@ -23,6 +23,7 @@
 #include "common/json/config_schemas.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
+#include "common/router/scoped_rds.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -69,6 +70,7 @@ std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
 // Singleton registration via macro defined in envoy/singleton/manager.h
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
+SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
 
 Network::FilterFactoryCb
 HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
@@ -88,14 +90,21 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
           });
 
+  std::shared_ptr<Config::ConfigProviderManager> scoped_routes_config_provider_manager =
+      context.singletonManager().getTyped<Config::ConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(scoped_routes_config_provider_manager), [&context] {
+            return std::make_shared<Router::ScopedRoutesConfigProviderManager>(context.admin());
+          });
+
   std::shared_ptr<HttpConnectionManagerConfig> filter_config(new HttpConnectionManagerConfig(
-      proto_config, context, *date_provider, *route_config_provider_manager));
+      proto_config, context, *date_provider, *route_config_provider_manager,
+      *scoped_routes_config_provider_manager));
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count. Moreover, keep in mind the capture list determines
   // destruction order.
-  return [route_config_provider_manager, filter_config, &context,
-          date_provider](Network::FilterManager& filter_manager) -> void {
+  return [route_config_provider_manager, scoped_routes_config_provider_manager, filter_config,
+          &context, date_provider](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
         context.runtime(), context.localInfo(), context.clusterManager(),
@@ -125,7 +134,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
-    Router::RouteConfigProviderManager& route_config_provider_manager)
+    Router::RouteConfigProviderManager& route_config_provider_manager,
+    Config::ConfigProviderManager& scoped_routes_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
@@ -135,6 +145,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
       route_config_provider_manager_(route_config_provider_manager),
+      scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -162,9 +173,16 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                       0
 #endif
                                                       ))) {
+  // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
+  // be managed by the scoped routing logic instead.
+  if (config.route_specifier_case() != envoy::config::filter::network::http_connection_manager::v2::
+                                           HttpConnectionManager::kScopedRoutes) {
+    route_config_provider_ = Router::RouteConfigProviderUtil::create(
+        config, context_, stats_prefix_, route_config_provider_manager_);
+  }
 
-  route_config_provider_ = Router::RouteConfigProviderUtil::create(config, context_, stats_prefix_,
-                                                                   route_config_provider_manager_);
+  scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::maybeCreate(
+      config, context_, stats_prefix_, scoped_routes_config_provider_manager_);
 
   switch (config.forward_client_cert_details()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::SANITIZE:
