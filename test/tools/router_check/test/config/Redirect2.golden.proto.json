@@ -5,6 +5,7 @@
       "input": {
         "authority": "www.lyft.com",
         "path": "/foo",
+        "method": "GET",
         "ssl": true,
         "internal": true
       },
@@ -18,6 +19,7 @@
       "input": {
         "authority": "redirect.lyft.com",
         "path": "/foo",
+        "method": "GET",
         "ssl": false,
         "internal": false
       },
@@ -30,7 +32,8 @@
       "test_name": "Test_3",
       "input": {
         "authority": "redirect.lyft.com",
-        "path": "/foo"
+        "path": "/foo",
+        "method": "GET"
       },
       "validate": {
         "path_redirect": "http://new.lyft.com/foo",
@@ -42,6 +45,7 @@
       "input": {
         "authority": "redirect.lyft.com",
         "path": "/foo",
+        "method": "GET",
         "ssl": false
       },
       "validate": {
@@ -54,7 +58,8 @@
       "input": {
         "authority": "redirect.lyft.com",
         "ssl": false,
-        "path": "/foo"
+        "path": "/foo",
+        "method": "GET"
       },
       "validate": {
         "path_redirect": "http://new.lyft.com/foo",

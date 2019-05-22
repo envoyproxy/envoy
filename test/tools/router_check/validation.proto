@@ -45,8 +45,7 @@ message ValidationInput {
   string path = 2 [(validate.rules).string.min_bytes = 1];
 
   // This pseudo-header field includes the HTTP method.
-  // The options are GET, PUT, or POST. When not specified the field defaults to GET.
-  string method = 4;
+  string method = 4 [(validate.rules).string.min_bytes = 3];
 
   // An integer used to identify the target for weighted cluster selection.
   // The default value of random_value is 0.

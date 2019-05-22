@@ -4,6 +4,7 @@ tests:
     authority: www1.lyft.com
     path: "/foo"
     ssl: true
+    method: GET
     internal: true
   validate:
     path_redirect: ''
@@ -11,6 +12,7 @@ tests:
   input:
     authority: www1.lyft.com
     path: "/foo"
+    method: GET
     random_value: 115
   validate:
     cluster_name: cluster1
@@ -18,6 +20,7 @@ tests:
   input:
     authority: www1.lyft.com
     path: "/foo"
+    method: GET
     random_value: 445
   validate:
     cluster_name: cluster2
@@ -25,6 +28,7 @@ tests:
   input:
     authority: www1.lyft.com
     path: "/foo"
+    method: GET
     random_value: 560
   validate:
     cluster_name: cluster3

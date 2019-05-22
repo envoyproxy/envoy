@@ -5,6 +5,7 @@ tests {
         path: "/foo"
         ssl: true
         internal: true
+        method: "GET"
     }
     validate: {
         path_redirect: ""
@@ -16,6 +17,7 @@ tests {
     input: {
         authority: "www1.lyft.com"
         path: "/foo"
+        method: "GET"
         random_value: 115
     }
     validate: {

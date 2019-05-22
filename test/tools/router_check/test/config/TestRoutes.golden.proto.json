@@ -4,7 +4,8 @@
       "test_name": "Test1",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/"
+        "path": "/",
+        "method": "GET"
       },
       "validate": {
         "cluster_name": "instant-server",
@@ -18,7 +19,8 @@
       "test_name": "Test2",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/api/leads/me"
+        "path": "/api/leads/me",
+        "method": "GET"
       },
       "validate": {"cluster_name": "ats"}
     },
@@ -26,7 +28,8 @@
       "test_name": "Test3",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/api/locations?works=true"
+        "path": "/api/locations?works=true",
+        "method": "GET"
       },
       "validate": {"cluster_name": "locations"}
     },
@@ -34,7 +37,8 @@
       "test_name": "Test4",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/api/locations"
+        "path": "/api/locations",
+        "method": "GET"
       },
       "validate": {"cluster_name": "locations"}
     },
@@ -42,7 +46,8 @@
       "test_name": "Test5",
       "input": {
         "authority": "lyft.com",
-        "path": "/foo"
+        "path": "/foo",
+        "method": "GET"
       },
       "validate": {"cluster_name": "www2"}
     },
@@ -50,7 +55,8 @@
       "test_name": "Test6",
       "input": {
         "authority": "wwww.lyft.com",
-        "path": "/"
+        "path": "/",
+        "method": "GET"
       },
       "validate": {"cluster_name": "root_www2"}
     },
@@ -58,7 +64,8 @@
       "test_name": "Test7",
       "input": {
         "authority": "www.lyft.com",
-        "path": "/new_endpoint/foo"
+        "path": "/new_endpoint/foo",
+        "method": "GET"
       },
       "validate":
         {
@@ -70,7 +77,8 @@
       "test_name": "Test8",
       "input": {
         "authority": "www.lyft.com",
-        "path": "/new_endpoint/foo"
+        "path": "/new_endpoint/foo",
+        "method": "GET"
       },
       "validate": {"path_rewrite": "/api/new_endpoint/foo"}
     },
@@ -78,7 +86,8 @@
       "test_name": "Test9",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/api/locations?works=true"
+        "path": "/api/locations?works=true",
+        "method": "GET"
       },
       "validate": {"path_rewrite": "/rewrote?works=true"}
     },
@@ -86,7 +95,8 @@
       "test_name": "Test10",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/foo"
+        "path": "/foo",
+        "method": "GET"
       },
       "validate": {"path_rewrite": "/bar"}
     },
@@ -94,7 +104,8 @@
       "test_name": "Test11",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/host/rewrite/me"
+        "path": "/host/rewrite/me",
+        "method": "GET"
      },
       "validate": {"host_rewrite":"new_host"}
     },
@@ -102,7 +113,8 @@
       "test_name": "Test12",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/API/locations?works=true"
+        "path": "/API/locations?works=true",
+        "method": "GET"
       },
       "validate": {"path_rewrite": "/rewrote?works=true"}
     },
@@ -110,7 +122,8 @@
       "test_name": "Test13",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/fooD"
+        "path": "/fooD",
+        "method": "GET"
       },
       "validate": {"path_rewrite": "/cAndy"}
     },
@@ -118,7 +131,8 @@
       "test_name": "Test14",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/FOO"
+        "path": "/FOO",
+        "method": "GET"
       },
       "validate": {"path_rewrite": "/FOO"}
     },
@@ -126,7 +140,8 @@
       "test_name": "Test15",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/ApPles"
+        "path": "/ApPles",
+        "method": "GET"
       },
       "validate": {"path_rewrite": "/ApPles"}
     },
@@ -134,7 +149,8 @@
       "test_name": "Test16",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/oLDhost/rewrite/me"
+        "path": "/oLDhost/rewrite/me",
+        "method": "GET"
       },
       "validate": {"host_rewrite": "api.lyft.com"}
     },
@@ -142,7 +158,8 @@
       "test_name": "Test17",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/Tart"
+        "path": "/Tart",
+        "method": "GET"
       },
       "validate": {"path_rewrite": "/Tart"}
     },
@@ -150,7 +167,8 @@
       "test_name": "Test18",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/newhost/rewrite/me"
+        "path": "/newhost/rewrite/me",
+        "method": "GET"
       },
       "validate": {"host_rewrite": "new_host"}
     },
@@ -158,7 +176,8 @@
       "test_name": "Test19",
       "input": {
         "authority": "api.lyft.com",
-        "path": "/rides"
+        "path": "/rides",
+        "method": "GET"
       },
       "validate": {"virtual_cluster_name": "other"}
     },

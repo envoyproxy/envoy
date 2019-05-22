@@ -3,7 +3,8 @@
     {
       "test_name": "Test_1", "input": {
         "authority": "www.lyft.com",
-        "path": "/"
+        "path": "/",
+        "method": "GET"
       },
       "validate": {"cluster_name": "local_service_without_headers"}
     },
@@ -12,6 +13,7 @@
       "input": {
         "authority": "www.lyft.com",
         "path": "/",
+        "method": "GET",
         "additional_headers": [
           {
       "key": "test_header",
@@ -26,6 +28,7 @@
       "input": {
         "authority": "www.lyft.com",
         "path": "/",
+        "method": "GET",
         "additional_headers": [
           {
       "key": "test_header_multiple1",
@@ -44,6 +47,7 @@
       "input": {
         "authority": "www.lyft.com",
         "path": "/",
+        "method": "GET",
         "additional_headers": [
           {
       "key": "non_existent_header",
@@ -58,6 +62,7 @@
       "input": {
         "authority": "www.lyft.com",
         "path": "/",
+        "method": "GET",
         "additional_headers": [
           {
       "key": "test_header_presence",
@@ -72,6 +77,7 @@
       "input": {
         "authority": "www.lyft.com",
         "path": "/",
+        "method": "GET",
         "additional_headers": [
           {
       "key": "test_header_pattern",
@@ -86,6 +92,7 @@
       "input": {
         "authority": "www.lyft.com",
         "path": "/",
+        "method": "GET",
         "additional_headers": [
           {
             "key": "test_header_pattern",
@@ -100,6 +107,7 @@
       "input": {
         "authority": "www.lyft.com",
         "path": "/",
+        "method": "GET",
         "additional_headers": [
           {
             "key": "content-type",
@@ -114,6 +122,7 @@
       "input": {
         "authority": "www.lyft.com",
         "path": "/",
+        "method": "GET",
         "additional_headers": [
           {
             "key": "content-type",

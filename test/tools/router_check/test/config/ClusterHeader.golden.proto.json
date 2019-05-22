@@ -4,7 +4,8 @@
       "test_name": "Test1",
       "input": {
         "authority": "some_cluster",
-        "path": "/foo"
+        "path": "/foo",
+        "method": "GET"
       },
       "validate": {"cluster_name": "some_cluster"}
     },
@@ -12,7 +13,8 @@
       "test_name": "Test2",
       "input": {
         "authority": "www.lyft.com",
-        "path": "/bar"
+        "path": "/bar",
+        "method": "GET"
       },
       "validate": {"cluster_name": ""}
     },
@@ -21,6 +23,7 @@
       "input": {
         "authority": "www.lyft.com",
         "path": "/bar",
+        "method": "GET",
         "additional_headers": [
           {
       "key": "some_header",

@@ -25,7 +25,7 @@ Input
      Few known changes necessary are:
      ``:authority`` input is now ``authority``.
      ``:path`` input is now ``path``.
-     ``:method`` input is now ``method``.
+     ``:method`` input is now ``method``. This is a required property.
      ``additional_headers`` in the input along with ``header_fields`` and ``custom_header_fields`` contain ``key`` instead of ``field``.
      ``tests`` is a root level field in the yaml/json.
 

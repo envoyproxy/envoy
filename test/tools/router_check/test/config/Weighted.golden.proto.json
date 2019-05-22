@@ -6,7 +6,8 @@
         "authority": "www1.lyft.com",
         "path": "/foo",
         "ssl": true,
-        "internal": true
+        "internal": true,
+        "method": "GET"
       },
       "validate": {"path_redirect": ""}
     },
@@ -15,6 +16,7 @@
       "input": {
         "authority": "www1.lyft.com",
         "path": "/foo",
+        "method": "GET",
         "random_value": 115
       },
       "validate": {"cluster_name": "cluster1"}
@@ -24,6 +26,7 @@
       "input": {
         "authority": "www1.lyft.com",
         "path": "/foo",
+        "method": "GET",
         "random_value": 445
       },
       "validate": {"cluster_name": "cluster2"}
@@ -33,6 +36,7 @@
       "input": {
         "authority": "www1.lyft.com",
         "path": "/foo",
+        "method": "GET",
         "random_value": 560
       },
       "validate": {"cluster_name": "cluster3"}
