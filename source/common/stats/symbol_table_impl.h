@@ -417,6 +417,8 @@ private:
  *   StatNamePool pool(symbol_table);
  *   StatName name1 = pool.add("name1");
  *   StatName name2 = pool.add("name2");
+ *   uint8_t* storage = pool.addReturningStorage("name3");
+ *   StatName name3(storage);
  */
 class StatNamePool {
 public:
@@ -433,6 +435,24 @@ public:
    * @return the StatName held in the container for this name.
    */
   StatName add(absl::string_view name);
+
+  /**
+   * Does essentially the same thing as add(), but returns the storage as a
+   * pointer which can later be used to create a StatName. This can be used
+   * to accumulate a vector of uint8_t* which can later be used to create
+   * StatName objects on demand.
+   *
+   * The use-case for this is in source/common/http/codes.cc, where we have a
+   * fixed sized array of atomic pointers, indexed by HTTP code. This API
+   * enables storing the allocated stat-name in that array of atomics, which
+   * enables content-avoidance when finding StatNames for frequently used HTTP
+   * codes.
+   *
+   * @param name the name to add the container.
+   * @return a pointer to the bytes held in the container for this name, suitable for
+   *         using to construct a StatName.
+   */
+  uint8_t* addReturningStorage(absl::string_view name);
 
 private:
   // We keep the stat names in a vector of StatNameStorage, storing the

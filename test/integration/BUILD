@@ -413,6 +413,7 @@ envoy_cc_test_library(
         "//source/server:listener_hooks_lib",
         "//source/server:process_context_lib",
         "//source/server:server_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
         "//test/common/runtime:utility_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
@@ -709,6 +710,8 @@ envoy_cc_test(
     data = ["//test/config/integration:server_xds_files"],
     deps = [
         ":http_integration_lib",
+        ":http_protocol_integration_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )
