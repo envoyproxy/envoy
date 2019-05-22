@@ -76,10 +76,7 @@ envoy_cc_library(
     name = "common_lib",
     srcs = ["common.cc"],
     hdrs = ["common.h"],
-    external_deps = [
-        "abseil_optional",
-        "grpc",
-    ],
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",

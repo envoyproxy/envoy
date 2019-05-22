@@ -142,7 +142,7 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
     }
   }
 
-  if (!http_reset_ && end_stream) {
+  if (end_stream) {
     streamError(Status::GrpcStatus::Unknown);
   }
 }

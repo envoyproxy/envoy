@@ -13,7 +13,6 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
-#include "grpcpp/grpcpp.h"
 
 namespace Envoy {
 namespace Grpc {

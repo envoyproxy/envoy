@@ -8,11 +8,11 @@
 namespace Envoy {
 namespace Grpc {
 
-void SendMessageUntyped(RawAsyncStream* stream, const Protobuf::Message& request, bool end_stream) {
+void sendMessageUntyped(RawAsyncStream* stream, const Protobuf::Message& request, bool end_stream) {
   stream->sendMessageRaw(Common::serializeMessage(request), end_stream);
 }
 
-ProtobufTypes::MessagePtr ParseMessageUntyped(ProtobufTypes::MessagePtr&& message,
+ProtobufTypes::MessagePtr parseMessageUntyped(ProtobufTypes::MessagePtr&& message,
                                               Buffer::InstancePtr&& response) {
   // TODO(htuch): Need to add support for compressed responses as well here.
   if (response->length() > 0) {
@@ -24,13 +24,13 @@ ProtobufTypes::MessagePtr ParseMessageUntyped(ProtobufTypes::MessagePtr&& messag
   return std::move(message);
 }
 
-RawAsyncStream* StartUntyped(RawAsyncClient* client,
+RawAsyncStream* startUntyped(RawAsyncClient* client,
                              const Protobuf::MethodDescriptor& service_method,
                              RawAsyncStreamCallbacks& callbacks) {
   return client->startRaw(service_method.service()->full_name(), service_method.name(), callbacks);
 }
 
-AsyncRequest* SendUntyped(RawAsyncClient* client, const Protobuf::MethodDescriptor& service_method,
+AsyncRequest* sendUntyped(RawAsyncClient* client, const Protobuf::MethodDescriptor& service_method,
                           const Protobuf::Message& request, RawAsyncRequestCallbacks& callbacks,
                           Tracing::Span& parent_span,
                           const absl::optional<std::chrono::milliseconds>& timeout) {

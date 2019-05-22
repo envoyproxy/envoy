@@ -10,13 +10,13 @@ namespace Grpc {
 /**
  * Forward declarations for helper functions.
  */
-void SendMessageUntyped(RawAsyncStream* stream, const Protobuf::Message& request, bool end_stream);
-ProtobufTypes::MessagePtr ParseMessageUntyped(ProtobufTypes::MessagePtr&& message,
+void sendMessageUntyped(RawAsyncStream* stream, const Protobuf::Message& request, bool end_stream);
+ProtobufTypes::MessagePtr parseMessageUntyped(ProtobufTypes::MessagePtr&& message,
                                               Buffer::InstancePtr&& response);
-RawAsyncStream* StartUntyped(RawAsyncClient* client,
+RawAsyncStream* startUntyped(RawAsyncClient* client,
                              const Protobuf::MethodDescriptor& service_method,
                              RawAsyncStreamCallbacks& callbacks);
-AsyncRequest* SendUntyped(RawAsyncClient* client, const Protobuf::MethodDescriptor& service_method,
+AsyncRequest* sendUntyped(RawAsyncClient* client, const Protobuf::MethodDescriptor& service_method,
                           const Protobuf::Message& request, RawAsyncRequestCallbacks& callbacks,
                           Tracing::Span& parent_span,
                           const absl::optional<std::chrono::milliseconds>& timeout);
@@ -30,7 +30,7 @@ public:
   AsyncStream(RawAsyncStream* stream) : stream_(stream) {}
   AsyncStream(const AsyncStream& other) = default;
   void sendMessage(const Request& request, bool end_stream) {
-    SendMessageUntyped(stream_, std::move(request), end_stream);
+    sendMessageUntyped(stream_, std::move(request), end_stream);
   }
   void closeStream() { stream_->closeStream(); }
   void resetStream() { stream_->resetStream(); }
@@ -57,7 +57,7 @@ public:
 private:
   void onSuccessRaw(Buffer::InstancePtr&& response, Tracing::Span& span) override {
     auto message = std::unique_ptr<Response>(dynamic_cast<Response*>(
-        ParseMessageUntyped(std::make_unique<Response>(), std::move(response)).release()));
+        parseMessageUntyped(std::make_unique<Response>(), std::move(response)).release()));
     if (!message) {
       onFailure(Status::GrpcStatus::Internal, "", span);
       return;
@@ -77,7 +77,7 @@ public:
 private:
   bool onReceiveMessageRaw(Buffer::InstancePtr&& response) {
     auto message = std::unique_ptr<Response>(dynamic_cast<Response*>(
-        ParseMessageUntyped(std::make_unique<Response>(), std::move(response)).release()));
+        parseMessageUntyped(std::make_unique<Response>(), std::move(response)).release()));
     if (!message) {
       return false;
     }
@@ -95,11 +95,11 @@ public:
                      const Protobuf::Message& request, AsyncRequestCallbacks<Response>& callbacks,
                      Tracing::Span& parent_span,
                      const absl::optional<std::chrono::milliseconds>& timeout) {
-    return SendUntyped(client_.get(), service_method, request, callbacks, parent_span, timeout);
+    return sendUntyped(client_.get(), service_method, request, callbacks, parent_span, timeout);
   }
   AsyncStream<Request> start(const Protobuf::MethodDescriptor& service_method,
                              AsyncStreamCallbacks<Response>& callbacks) {
-    return AsyncStream<Request>(StartUntyped(client_.get(), service_method, callbacks));
+    return AsyncStream<Request>(startUntyped(client_.get(), service_method, callbacks));
   }
 
   AsyncClient* operator->() { return this; }
