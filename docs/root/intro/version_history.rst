@@ -3,7 +3,10 @@ Version history
 
 1.11.0 (Pending)
 ================
+* access log: added a new field for downstream TLS session ID to file and gRPC access logger.
 * access log: added a new field for response code details in :ref:`file access logger<config_access_log_format_response_code_details>` and :ref:`gRPC access logger<envoy_api_field_data.accesslog.v2.HTTPResponseProperties.response_code_details>`.
+* admin: the administration interface now includes a :ref:`/ready endpoint <operations_admin_interface>` for easier readiness checks.
+* admin: extend :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to support parameters within the request body.
 * api: track and report requests issued since last load report.
 * build: releases are built with Clang and linked with LLD.
 * dubbo_proxy: support the :ref:`Dubbo proxy filter <config_network_filters_dubbo_proxy>`.
@@ -11,6 +14,9 @@ Version history
 * event: added :ref:`loop duration and poll delay statistics <operations_performance>`.
 * ext_authz: added a `x-envoy-auth-partial-body` metadata header set to `false|true` indicating if there is a partial body sent in the authorization request message.
 * ext_authz: added option to `ext_authz` that allows the filter clearing route cache.
+* grpc-json: added support for :ref:`auto mapping
+  <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.auto_mapping>`.
+* health check: added :ref:`initial jitter <envoy_api_field_core.HealthCheck.initial_jitter>` to add jitter to the first health check in order to prevent thundering herd on Envoy startup.
 * hot restart: stats are no longer shared between hot restart parent/child via shared memory, but rather by RPC. Hot restart version incremented to 11.
 * http: fixed a bug where large unbufferable responses were not tracked in stats and logs correctly.
 * http: fixed a crashing bug where gRPC local replies would cause segfaults when upstream access logging was on.
@@ -29,8 +35,10 @@ Version history
   downstreams and that will not start before the global timeout.
 * runtime: added support for statically :ref:`specifying the runtime in the bootstrap configuration
   <envoy_api_field_config.bootstrap.v2.Runtime.base>`.
+* sandbox: added :ref:`CSRF sandbox <install_sandboxes_csrf>`.
 * server: ``--define manual_stamp=manual_stamp`` was added to allow server stamping outside of binary rules.
   more info in the `bazel docs <https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#enabling-optional-features>`_.
+* tool: added :repo:`proto <test/tools/router_check/validation.proto>` support for :ref:`router check tool <install_tools_route_table_check_tool>` tests.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
 * upstream: an EDS management server can now force removal of a host that is still passing active
   health checking by first marking the host as failed via EDS health check and subsequently removing
@@ -41,8 +49,6 @@ Version history
   that allows ignoring new hosts for the purpose of load balancing calculations until they have
   been health checked for the first time.
 * upstream: added runtime error checking to prevent setting dns type to STRICT_DNS or LOGICAL_DNS when custom resolver name is specified.
-* grpc-json: added support for :ref:`auto mapping
-  <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.auto_mapping>`.
 
 1.10.0 (Apr 5, 2019)
 ====================

@@ -99,7 +99,7 @@ public:
 class MetricsServiceSinkTest : public testing::Test {};
 
 TEST(MetricsServiceSinkTest, CheckSendCall) {
-  NiceMock<Stats::MockSource> source;
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
   Event::SimulatedTimeSystem time_system;
   std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer()};
 
@@ -109,13 +109,13 @@ TEST(MetricsServiceSinkTest, CheckSendCall) {
   counter->name_ = "test_counter";
   counter->latch_ = 1;
   counter->used_ = true;
-  source.counters_.push_back(counter);
+  snapshot.counters_.push_back({1, *counter});
 
   auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
   gauge->name_ = "test_gauge";
   gauge->value_ = 1;
   gauge->used_ = true;
-  source.gauges_.push_back(gauge);
+  snapshot.gauges_.push_back(*gauge);
 
   auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram->name_ = "test_histogram";
@@ -123,11 +123,11 @@ TEST(MetricsServiceSinkTest, CheckSendCall) {
 
   EXPECT_CALL(*streamer_, send(_));
 
-  sink.flush(source);
+  sink.flush(snapshot);
 }
 
 TEST(MetricsServiceSinkTest, CheckStatsCount) {
-  NiceMock<Stats::MockSource> source;
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
   Event::SimulatedTimeSystem time_system;
   std::shared_ptr<TestGrpcMetricsStreamer> streamer_{new TestGrpcMetricsStreamer()};
 
@@ -137,20 +137,20 @@ TEST(MetricsServiceSinkTest, CheckStatsCount) {
   counter->name_ = "test_counter";
   counter->latch_ = 1;
   counter->used_ = true;
-  source.counters_.push_back(counter);
+  snapshot.counters_.push_back({1, *counter});
 
   auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
   gauge->name_ = "test_gauge";
   gauge->value_ = 1;
   gauge->used_ = true;
-  source.gauges_.push_back(gauge);
+  snapshot.gauges_.push_back(*gauge);
 
-  sink.flush(source);
+  sink.flush(snapshot);
   EXPECT_EQ(2, (*streamer_).metric_count);
 
   // Verify only newly added metrics come after endFlush call.
   gauge->used_ = false;
-  sink.flush(source);
+  sink.flush(snapshot);
   EXPECT_EQ(1, (*streamer_).metric_count);
 }
 

@@ -300,16 +300,44 @@ void BaseIntegrationTest::createEnvoy() {
       ports.push_back(upstream->localAddress()->ip()->port());
     }
   }
+
+  if (use_lds_) {
+    ENVOY_LOG_MISC(debug, "Setting up file-based LDS");
+    // Before finalization, set up a real lds path, replacing the default /dev/null
+    std::string lds_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+    config_helper_.addConfigModifier(
+        [lds_path](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+          bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_path(lds_path);
+        });
+  }
+
   // Note that finalize assumes that every fake_upstream_ must correspond to a bootstrap config
   // static entry. So, if you want to manually create a fake upstream without specifying it in the
   // config, you will need to do so *after* initialize() (which calls this function) is done.
   config_helper_.finalize(ports);
 
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = config_helper_.bootstrap();
+  if (use_lds_) {
+    // After the config has been finalized, write the final listener config to the lds file.
+    const std::string lds_path = config_helper_.bootstrap().dynamic_resources().lds_config().path();
+    envoy::api::v2::DiscoveryResponse lds;
+    lds.set_version_info("0");
+    for (auto& listener : config_helper_.bootstrap().static_resources().listeners()) {
+      ProtobufWkt::Any* resource = lds.add_resources();
+      resource->PackFrom(listener);
+    }
+    TestEnvironment::writeStringToFileForTest(lds_path, MessageUtil::getJsonStringFromMessage(lds),
+                                              true);
+
+    // Now that the listeners have been written to the lds file, remove them from static resources
+    // or they will not be reloadable.
+    bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+  }
   ENVOY_LOG_MISC(debug, "Running Envoy with configuration:\n{}",
-                 MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
+                 MessageUtil::getYamlStringFromMessage(bootstrap));
 
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
-      "bootstrap.json", MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+      "bootstrap.json", MessageUtil::getJsonStringFromMessage(bootstrap));
 
   std::vector<std::string> named_ports;
   const auto& static_resources = config_helper_.bootstrap().static_resources();
@@ -488,6 +516,22 @@ void BaseIntegrationTest::cleanUpXdsConnection() {
 AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names,
+    const std::vector<std::string>& expected_resource_names_added,
+    const std::vector<std::string>& expected_resource_names_removed,
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+    return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
+                                       expected_error_code, expected_error_message);
+  } else {
+    return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
+                                        expected_resource_names_removed, expected_error_code,
+                                        expected_error_message);
+  }
+}
+
+AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
+    const std::string& expected_type_url, const std::string& expected_version,
+    const std::vector<std::string>& expected_resource_names,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
   envoy::api::v2::DiscoveryRequest discovery_request;
   VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
@@ -496,8 +540,7 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
   EXPECT_FALSE(discovery_request.node().id().empty());
   EXPECT_FALSE(discovery_request.node().cluster().empty());
 
-  // TODO(PiotrSikora): Remove this hack once fixed internally.
-  if (!(expected_type_url == discovery_request.type_url())) {
+  if (expected_type_url != discovery_request.type_url()) {
     return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
                                              discovery_request.type_url(), expected_type_url);
   }
@@ -517,8 +560,7 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
                fmt::join(expected_resource_names.begin(), expected_resource_names.end(), ","),
                discovery_request.DebugString());
   }
-  // TODO(PiotrSikora): Remove this hack once fixed internally.
-  if (!(expected_version == discovery_request.version_info())) {
+  if (expected_version != discovery_request.version_info()) {
     return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",
                                              discovery_request.version_info(), expected_version,
                                              discovery_request.DebugString());
@@ -529,17 +571,16 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,
-    const std::vector<std::string>& expected_resource_unsubscriptions,
+    const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
   envoy::api::v2::DeltaDiscoveryRequest request;
-  VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, request));
+  VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 
   EXPECT_TRUE(request.has_node());
   EXPECT_FALSE(request.node().id().empty());
   EXPECT_FALSE(request.node().cluster().empty());
 
-  // TODO(PiotrSikora): Remove this hack once fixed internally.
-  if (!(expected_type_url == request.type_url())) {
+  if (expected_type_url != request.type_url()) {
     return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
                                              request.type_url(), expected_type_url);
   }

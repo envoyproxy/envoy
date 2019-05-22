@@ -3,6 +3,7 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 
+#include "common/common/empty_string.h"
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
@@ -31,6 +32,7 @@ using testing::Invoke;
 using testing::IsSubstring;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Config {
@@ -608,7 +610,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
 }
 
 TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
-  EXPECT_CALL(local_info_, clusterName()).WillOnce(Return(""));
+  EXPECT_CALL(local_info_, clusterName()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_THROW_WITH_MESSAGE(
       GrpcMuxImpl(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
@@ -621,7 +623,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
 }
 
 TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
-  EXPECT_CALL(local_info_, nodeName()).WillOnce(Return(""));
+  EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_THROW_WITH_MESSAGE(
       GrpcMuxImpl(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,

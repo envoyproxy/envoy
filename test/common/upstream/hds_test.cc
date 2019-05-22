@@ -167,7 +167,7 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   }
 
   // Process message
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).Times(2);
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).Times(2).WillRepeatedly(Return(cluster_info_));
   hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
   // Check Correctness
@@ -217,7 +217,6 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   // Check Correctness
   EXPECT_EQ(hds_delegate_->hdsClusters()[0]->healthCheckers().size(), 2);
   EXPECT_EQ(hds_delegate_->hdsClusters()[1]->healthCheckers().size(), 3);
-  EXPECT_CALL(dispatcher_, clearDeferredDeleteList()).Times(5);
 }
 
 // Tests OnReceiveMessage given a minimal HealthCheckSpecifier message
@@ -325,8 +324,6 @@ TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
                 .socket_address()
                 .port_value(),
             1234);
-
-  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
 }
 
 } // namespace Upstream

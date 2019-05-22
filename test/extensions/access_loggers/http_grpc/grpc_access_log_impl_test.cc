@@ -350,6 +350,8 @@ http_logs:
     ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return(localSans));
     ON_CALL(connection_info, subjectPeerCertificate()).WillByDefault(Return("peerSubject"));
     ON_CALL(connection_info, subjectLocalCertificate()).WillByDefault(Return("localSubject"));
+    ON_CALL(connection_info, sessionId())
+        .WillByDefault(Return("D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B"));
     stream_info.setDownstreamSslConnection(&connection_info);
     stream_info.requested_server_name_ = "sni";
 
@@ -383,6 +385,7 @@ http_logs:
           - uri: peerSan1
           - uri: peerSan2
           subject: peerSubject
+        tls_session_id: D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B
     request:
       request_method: "METHOD_UNSPECIFIED"
     response: {}

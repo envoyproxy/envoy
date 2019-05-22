@@ -146,6 +146,16 @@ Http::FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_s
   return Http::FilterDataStatus::Continue;
 }
 
+Http::FilterTrailersStatus GzipFilter::encodeTrailers(Http::HeaderMap&) {
+  if (!skip_compression_) {
+    Buffer::OwnedImpl empty_buffer;
+    compressor_.compress(empty_buffer, Compressor::State::Finish);
+    config_->stats().total_compressed_bytes_.add(empty_buffer.length());
+    encoder_callbacks_->addEncodedData(empty_buffer, true);
+  }
+  return Http::FilterTrailersStatus::Continue;
+}
+
 bool GzipFilter::hasCacheControlNoTransform(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* cache_control = headers.CacheControl();
   if (cache_control) {
