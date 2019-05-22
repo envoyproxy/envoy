@@ -64,9 +64,9 @@ public:
   void addSubscription(const std::set<std::string>& resources, const std::string& type_url,
                        SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
                        std::chrono::milliseconds init_fetch_timeout) override {
-    subscriptions_.emplace(
-        std::make_pair(type_url, DeltaSubscriptionState(type_url, resources, callbacks, local_info_,
-                                                        init_fetch_timeout, dispatcher_, stats)));
+    subscriptions_.emplace(type_url, std::make_unique<DeltaSubscriptionState>(
+                                         type_url, resources, callbacks, local_info_,
+                                         init_fetch_timeout, dispatcher_, stats));
     subscription_ordering_.emplace_back(type_url);
     grpc_stream_.establishNewStream(); // (idempotent) TODO TODO does print warning though...
   }
@@ -80,7 +80,7 @@ public:
       ENVOY_LOG(warn, "Not updating non-existent subscription {}.", type_url);
       return;
     }
-    sub->second.updateResourceInterest(resources);
+    sub->second->updateResourceInterest(resources);
     // Tell the server about our new interests, if there are any.
     trySendDiscoveryRequests();
   }
@@ -104,7 +104,7 @@ public:
       ENVOY_LOG(warn, "Not pausing non-existent subscription {}.", type_url);
       return;
     }
-    sub->second.pause();
+    sub->second->pause();
   }
 
   void resume(const std::string& type_url) override {
@@ -113,7 +113,7 @@ public:
       ENVOY_LOG(warn, "Not resuming non-existent subscription {}.", type_url);
       return;
     }
-    sub->second.resume();
+    sub->second->resume();
     trySendDiscoveryRequests();
   }
 
@@ -129,19 +129,19 @@ public:
                 message->system_version_info(), message->type_url());
       return;
     }
-    kickOffAck(sub->second.handleResponse(*message));
+    kickOffAck(sub->second->handleResponse(*message));
   }
 
   void onStreamEstablished() override {
     for (auto& sub : subscriptions_) {
-      sub.second.markStreamFresh();
+      sub.second->markStreamFresh();
     }
     trySendDiscoveryRequests();
   }
 
   void onEstablishmentFailure() override {
     for (auto& sub : subscriptions_) {
-      sub.second.handleEstablishmentFailure();
+      sub.second->handleEstablishmentFailure();
     }
   }
 
@@ -189,17 +189,17 @@ private:
         continue;
       }
       // Try again later if paused/rate limited/stream down.
-      if (!canSendDiscoveryRequest(next_request_type_url, &sub->second)) {
+      if (!canSendDiscoveryRequest(next_request_type_url, sub->second.get())) {
         break;
       }
       // Get our subscription state to generate the appropriate DeltaDiscoveryRequest, and send.
       if (!ack_queue_.empty()) {
         // Because ACKs take precedence over plain requests, if there is anything in the queue, it's
         // safe to assume it's what we want to send here.
-        grpc_stream_.sendMessage(sub->second.getNextRequestWithAck(ack_queue_.front()));
+        grpc_stream_.sendMessage(sub->second->getNextRequestWithAck(ack_queue_.front()));
         ack_queue_.pop();
       } else {
-        grpc_stream_.sendMessage(sub->second.getNextRequestAckless());
+        grpc_stream_.sendMessage(sub->second->getNextRequestAckless());
       }
     }
     grpc_stream_.maybeUpdateQueueSizeStat(ack_queue_.size());
@@ -238,7 +238,7 @@ private:
       if (sub == subscriptions_.end()) {
         continue;
       }
-      if (sub->second.subscriptionUpdatePending()) {
+      if (sub->second->subscriptionUpdatePending()) {
         return sub->first;
       }
     }
@@ -253,7 +253,7 @@ private:
   std::queue<UpdateAck> ack_queue_;
 
   // Map from type_url strings to a DeltaSubscriptionState for that type.
-  std::unordered_map<std::string, DeltaSubscriptionState> subscriptions_;
+  absl::flat_hash_map<std::string, std::unique_ptr<DeltaSubscriptionState>> subscriptions_;
 
   // Determines the order of initial discovery requests. (Assumes that subscriptions are added in
   // the order of Envoy's dependency ordering).

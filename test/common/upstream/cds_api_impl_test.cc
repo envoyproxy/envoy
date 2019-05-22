@@ -396,16 +396,16 @@ resources:
 )EOF";
 
   // Two clusters updated, both warmed up.
-  EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
   cm_.expectAddWithWarming("cluster1", "0");
   cm_.expectWarmingClusterCount();
-  EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
   cm_.expectAddWithWarming("cluster2", "0");
   cm_.expectWarmingClusterCount();
   EXPECT_CALL(initialized_, ready());
   cm_.expectWarmingClusterCount(2);
-  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
-  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, resume(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   cm_.clustersToWarmUp({"cluster1", "cluster2"});
   callbacks_->onSuccess(parseResponseMessageFromYaml(response1_yaml));
@@ -431,15 +431,15 @@ resources:
       path: eds path
 )EOF";
 
-  EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
   cm_.expectAddWithWarming("cluster1", "1");
   cm_.expectWarmingClusterCount();
-  EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
   cm_.expectAddWithWarming("cluster3", "1");
   cm_.expectWarmingClusterCount();
   EXPECT_CALL(initialized_, ready());
   cm_.expectWarmingClusterCount();
-  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, resume(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   resetCdsInitializedCb();
   cm_.clustersToWarmUp({"cluster1"});
@@ -460,13 +460,13 @@ resources:
       path: eds path
 )EOF";
 
-  EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
   cm_.expectAddWithWarming("cluster4", "2");
   cm_.expectWarmingClusterCount();
   EXPECT_CALL(initialized_, ready());
   cm_.expectWarmingClusterCount(2);
-  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
-  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, resume(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   resetCdsInitializedCb();
   cm_.clustersToWarmUp({"cluster4", "cluster3"});
@@ -493,19 +493,19 @@ resources:
 )EOF";
 
   // Two clusters updated, first one warmed up before processing of the second one starts.
-  EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, pause(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
   cm_.expectAddWithWarming("cluster5", "3", true);
   cm_.expectWarmingClusterCount();
-  EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
   cm_.expectWarmingClusterCount();
-  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
   cm_.expectAddWithWarming("cluster6", "3");
   cm_.expectWarmingClusterCount();
-  EXPECT_CALL(cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, pause(Config::TypeUrl::get().Cluster)).Times(1);
   EXPECT_CALL(initialized_, ready());
   cm_.expectWarmingClusterCount();
-  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
-  EXPECT_CALL(cm_.ads_mux_, resume(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, resume(Config::TypeUrl::get().Cluster)).Times(1);
+  EXPECT_CALL(*cm_.ads_mux_, resume(Config::TypeUrl::get().ClusterLoadAssignment)).Times(1);
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   resetCdsInitializedCb();
   cm_.clustersToWarmUp({"cluster6"});

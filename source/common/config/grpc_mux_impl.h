@@ -120,6 +120,7 @@ private:
 
 class NullGrpcMuxImpl : public GrpcMux, GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
 public:
+  void start() override {}
   GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
                             GrpcMuxCallbacks&) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");

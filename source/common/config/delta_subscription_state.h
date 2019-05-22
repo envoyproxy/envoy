@@ -103,6 +103,9 @@ private:
   std::set<std::string> names_removed_;
 
   SubscriptionStats& stats_;
+
+  DeltaSubscriptionState(const DeltaSubscriptionState&) = delete;
+  DeltaSubscriptionState& operator=(const DeltaSubscriptionState&) = delete;
 };
 
 } // namespace Config
