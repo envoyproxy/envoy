@@ -627,14 +627,14 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
     if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
-    callbacks_->sendLocalReply(
-        code, body,
-        [dropped, this](Http::HeaderMap& headers) {
-          if (dropped && !config_.suppress_envoy_headers_) {
-            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
-          }
-        },
-        absl::nullopt, details);
+    callbacks_->sendLocalReply(code, body,
+                               [dropped, this](Http::HeaderMap& headers) {
+                                 if (dropped && !config_.suppress_envoy_headers_) {
+                                   headers.insertEnvoyOverloaded().value(
+                                       Http::Headers::get().EnvoyOverloadedValues.True);
+                                 }
+                               },
+                               absl::nullopt, details);
   }
 }
 
@@ -1221,7 +1221,12 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host) {
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
 
-  host->outlierDetector().putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS);
+  // Send value zero for optional HTTP code. It is invalid code and means that
+  // LOCAL_ORIGIN_CONNECT_SUCCESS is not mapped to HTTP code when running in outlier non-split mode.
+  // If it was mapped to HTTP code it would interfere with code returned by HTTP server and two
+  // codes would be reported to outlier detector for one request.
+  host->outlierDetector().putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                                    absl::optional<uint64_t>(0));
 
   // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);

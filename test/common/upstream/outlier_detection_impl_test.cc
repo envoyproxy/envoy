@@ -304,10 +304,8 @@ TEST_F(OutlierDetectorImplTest, ExternalOriginEventsNonSplit) {
       cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  // Make sure that in non-split mode LOCAL_ORIGIN_CONNECT_SUCCESS with optional HTTP code 200
-  // cancels LOCAL_ORIGIN_CONNECT_FAILED.
-  // Make sure that EXT_ORIGIN_REQUEST_SUCCESS cancels LOCAL_ORIGIN_CONNECT_FAILED
-  // such scenario is used by tcp_proxy.
+  // Make sure that EXT_ORIGIN_REQUEST_SUCCESS cancels EXT_ORIGIN_REQUEST_FAILED
+  // such scenario is used by redis filter.
   for (auto i = 0; i < 100; i++) {
     hosts_[0]->outlierDetector().putResult(Result::EXT_ORIGIN_REQUEST_FAILED);
     hosts_[0]->outlierDetector().putResult(Result::EXT_ORIGIN_REQUEST_SUCCESS);
@@ -779,9 +777,12 @@ TEST_F(OutlierDetectorImplTest, BasicFlowNonHttpCodesExternalOrigin) {
   }
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
-  // Cause a consecutive 5xx error.
+  // Cause a consecutive 5xx error. This situation happens in router filter.
+  // Make sure that one CONNECT_SUCCESS with optional code zero, does not
+  // interrupt sequence of LOCAL_ORIGIN_CONNECT_FAILED.
   loadRq(hosts_[0], 1, Result::LOCAL_ORIGIN_CONNECT_FAILED);
-  loadRq(hosts_[0], 1, Result::LOCAL_ORIGIN_CONNECT_SUCCESS);
+  hosts_[0]->outlierDetector().putResult(Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                                         absl::optional<uint64_t>(0));
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(hosts_[0], 3, Result::LOCAL_ORIGIN_CONNECT_FAILED);
 

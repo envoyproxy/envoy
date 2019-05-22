@@ -652,7 +652,7 @@ TEST_F(TcpProxyTest, OutlierDetection) {
 
   EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
               putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
-                        absl::optional<uint64_t>(enumToInt(Http::Code::OK))));
+                        absl::optional<uint64_t>(absl::nullopt)));
   raiseEventUpstreamConnected(2);
 }
 

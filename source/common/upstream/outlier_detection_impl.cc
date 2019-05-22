@@ -99,6 +99,7 @@ Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
 
   switch (result) {
   case Result::EXT_ORIGIN_REQUEST_SUCCESS:
+  case Result::LOCAL_ORIGIN_CONNECT_SUCCESS:
     http_code = Http::Code::OK;
     break;
   case Result::LOCAL_ORIGIN_TIMEOUT:
@@ -110,11 +111,6 @@ Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
   case Result::EXT_ORIGIN_REQUEST_FAILED:
     http_code = Http::Code::InternalServerError;
     break;
-  case Result::LOCAL_ORIGIN_CONNECT_SUCCESS:
-    // Must never happen - LOCAL_ORIGIN_CONNECT_SUCCESS is not mapped to HTTP code.
-    // See DetectorHostMonitorImpl::putResultNoLocalExternalSplit
-    NOT_REACHED_GCOVR_EXCL_LINE;
-    break;
   }
 
   return http_code;
@@ -122,25 +118,23 @@ Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
 
 // Method is called by putResult when external and local origin errors
 // are not treated differently. All errors are mapped to HTTP codes.
+// Depending on the value of the parameter *code* the function behaves differently:
+// - if the *code* is not defined, mapping uses resultToHttpCode method to do mapping.
+// - if *code* is zero, no mapping takes place: result is dropped and not reported to outlier
+// detector.
+// - if *code* is non-zero, it is taken as HTTP code and reported as such to outlier detector.
 void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
                                                             absl::optional<uint64_t> code) {
-  switch (result) {
-  case Result::LOCAL_ORIGIN_CONNECT_SUCCESS:
-    // LOCAL_ORIGIN_CONNECT_SUCCESS is treated specially and may not be mapped to HTTP code.
-    // LOCAL_ORIGIN_CONNECT_SUCCESS indicates that Envoy connected to upstream host. The upstream
-    // host will subsequently return HTTP code as part of the transaction. If
-    // LOCAL_ORIGIN_CONNECT_SUCCESS was mapped to HTTP there would be 2 codes for each transaction.
-    // If caller wants LOCAL_ORIGIN_CONNECT_SUCCESS to be mapped to HTTP code then proceed,
-    // otherwise bail out here.
-    if (code) {
-      putHttpResponseCode(code.value());
-    } else {
+  if (code) {
+    if (0 == code.value()) {
+      // Zero value of the code parameter indicates NOP. No mapping should take place
+      // between result parameter and HTTP code.
       return;
+    } else {
+      putHttpResponseCode(code.value());
     }
-    break;
-  default:
-    putHttpResponseCode(code ? code.value() : enumToInt(resultToHttpCode(result)));
-    break;
+  } else {
+    putHttpResponseCode(enumToInt(resultToHttpCode(result)));
   }
 }
 
