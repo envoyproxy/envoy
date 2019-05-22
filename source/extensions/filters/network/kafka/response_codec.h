@@ -78,7 +78,7 @@ using ResponseInitialParserFactorySharedPtr = std::shared_ptr<ResponseInitialPar
 class ResponseDecoder : public MessageDecoder, public Logger::Loggable<Logger::Id::kafka> {
 public:
   /**
-   * Creates a decoder that will notify provided callbacks.
+   * Creates a decoder that will notify provided callbacks when a message is successfully parsed.
    * @param callbacks callbacks to be invoked (in order).
    */
   ResponseDecoder(const std::vector<ResponseCallbackSharedPtr> callbacks)
@@ -87,7 +87,10 @@ public:
 
   /**
    * Visible for testing.
-   * Allows injecting parser resolver.
+   * Allows injecting initial parser factory and parser resolver.
+   * @param factory parser factory to be used when new message is to be processed.
+   * @param parserResolver supported parser resolver.
+   * @param callbacks callbacks to be invoked (in order).
    */
   ResponseDecoder(const ResponseInitialParserFactorySharedPtr factory,
                   const ResponseParserResolver& response_parser_resolver,

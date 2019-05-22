@@ -64,18 +64,19 @@ public:
 class RequestDecoder : public MessageDecoder {
 public:
   /**
-   * Creates a decoder that can decode requests specified by RequestParserResolver, notifying
-   * callbacks on successful decoding.
-   * @param parserResolver supported parser resolver.
+   * Creates a decoder that will notify provided callbacks when a message is successfully parsed.
    * @param callbacks callbacks to be invoked (in order).
    */
-  RequestDecoder(const RequestParserResolver& parserResolver,
-                 const std::vector<RequestCallbackSharedPtr> callbacks)
-      : RequestDecoder(InitialParserFactory::getDefaultInstance(), parserResolver, callbacks){};
+  RequestDecoder(const std::vector<RequestCallbackSharedPtr> callbacks)
+      : RequestDecoder(InitialParserFactory::getDefaultInstance(),
+                       RequestParserResolver::getDefaultInstance(), callbacks){};
 
   /**
    * Visible for testing.
-   * Allows injecting initial parser factory.
+   * Allows injecting initial parser factory and parser resolver.
+   * @param factory parser factory to be used when new message is to be processed.
+   * @param parserResolver supported parser resolver.
+   * @param callbacks callbacks to be invoked (in order).
    */
   RequestDecoder(const InitialParserFactory& factory, const RequestParserResolver& parserResolver,
                  const std::vector<RequestCallbackSharedPtr> callbacks)
