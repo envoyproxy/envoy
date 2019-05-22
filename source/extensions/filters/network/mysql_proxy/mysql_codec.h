@@ -99,7 +99,7 @@ public:
 
   PACKED_STRUCT(struct header_fields {
     uint32_t length_ : 24;
-    uint32_t seq_ : 8;
+    uint8_t seq_ : 8;
   });
 
   union MySQLHeader {
@@ -109,7 +109,7 @@ public:
 
   virtual ~MySQLCodec() {}
 
-  int decode(Buffer::Instance& data, int seq, int len) {
+  int decode(Buffer::Instance& data, uint8_t seq, uint32_t len) {
     seq_ = seq;
     return parseMessage(data, len);
   }
@@ -117,9 +117,9 @@ public:
   virtual std::string encode() PURE;
 
 protected:
-  virtual int parseMessage(Buffer::Instance& data, int len) PURE;
+  virtual int parseMessage(Buffer::Instance& data, uint32_t len) PURE;
 
-  int seq_;
+  uint8_t seq_;
 };
 
 } // namespace MySQLProxy

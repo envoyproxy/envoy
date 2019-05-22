@@ -59,7 +59,7 @@ public:
 
 private:
   bool decode(Buffer::Instance& data);
-  void parseMessage(Buffer::Instance& message, int seq, int len);
+  void parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t len);
 
   DecoderCallbacks& callbacks_;
   MySQLSession session_;

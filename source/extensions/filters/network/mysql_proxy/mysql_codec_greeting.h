@@ -11,7 +11,7 @@ namespace MySQLProxy {
 class ServerGreeting : public MySQLCodec {
 public:
   // MySQLCodec
-  int parseMessage(Buffer::Instance& buffer, int len) override;
+  int parseMessage(Buffer::Instance& buffer, uint32_t len) override;
   std::string encode() override;
 
   int getProtocol() const { return protocol_; }

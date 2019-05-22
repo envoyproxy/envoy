@@ -24,7 +24,7 @@ void ServerGreeting::setServerStatus(int server_status) { server_status_ = serve
 
 void ServerGreeting::setExtServerCap(int ext_server_cap) { ext_server_cap_ = ext_server_cap; }
 
-int ServerGreeting::parseMessage(Buffer::Instance& buffer, int) {
+int ServerGreeting::parseMessage(Buffer::Instance& buffer, uint32_t) {
   uint8_t protocol = 0;
   if (BufferHelper::readUint8(buffer, protocol) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing protocol in mysql Greeting msg");

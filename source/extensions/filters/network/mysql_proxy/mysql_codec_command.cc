@@ -20,7 +20,7 @@ void Command::setCmd(Command::Cmd cmd) { cmd_ = cmd; }
 
 void Command::setDb(std::string db) { db_ = db; }
 
-int Command::parseMessage(Buffer::Instance& buffer, int len) {
+int Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
   Command::Cmd cmd = parseCmd(buffer);
   setCmd(cmd);
   if (cmd == Command::Cmd::COM_NULL) {

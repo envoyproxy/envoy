@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
@@ -20,8 +22,8 @@ public:
   int encodeQuery(std::string query, hsql::SQLParserResult& result) {
     Command mysql_cmd_encode{};
     Command mysql_cmd_decode{};
-    int seq = 0;
-    int len = 0;
+    uint8_t seq = 0u;
+    uint32_t len = 0u;
     mysql_cmd_encode.setCmd(Command::Cmd::COM_QUERY);
     mysql_cmd_encode.setData(query);
     std::string data = mysql_cmd_encode.encode();

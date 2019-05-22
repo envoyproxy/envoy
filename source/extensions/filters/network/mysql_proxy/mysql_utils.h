@@ -29,7 +29,7 @@ public:
   static void addUint16(Buffer::Instance& buffer, uint16_t val);
   static void addUint32(Buffer::Instance& buffer, uint32_t val);
   static void addString(Buffer::Instance& buffer, const std::string& str);
-  static std::string encodeHdr(const std::string& cmd_str, int seq);
+  static std::string encodeHdr(const std::string& cmd_str, uint8_t seq);
   static bool endOfBuffer(Buffer::Instance& buffer);
   static int readUint8(Buffer::Instance& buffer, uint8_t& val);
   static int readUint16(Buffer::Instance& buffer, uint16_t& val);
@@ -40,7 +40,7 @@ public:
   static int readStringBySize(Buffer::Instance& buffer, size_t len, std::string& str);
   static int peekUint32(Buffer::Instance& buffer, uint32_t& val);
   static void consumeHdr(Buffer::Instance& buffer);
-  static int peekHdr(Buffer::Instance& buffer, int& len, int& seq);
+  static int peekHdr(Buffer::Instance& buffer, uint32_t& len, uint8_t& seq);
 };
 
 } // namespace MySQLProxy

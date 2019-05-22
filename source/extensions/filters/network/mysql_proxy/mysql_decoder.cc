@@ -9,7 +9,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-void DecoderImpl::parseMessage(Buffer::Instance& message, int seq, int len) {
+void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t len) {
   ENVOY_LOG(trace, "mysql_proxy: parsing message, seq {}, len {}", seq, len);
 
   // Run the MySQL state machine
@@ -135,8 +135,8 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, int seq, int len) {
 bool DecoderImpl::decode(Buffer::Instance& data) {
   ENVOY_LOG(trace, "mysql_proxy: decoding {} bytes", data.length());
 
-  int len = 0;
-  int seq = 0;
+  uint32_t len = 0;
+  uint8_t seq = 0;
   if (BufferHelper::peekHdr(data, len, seq) != MYSQL_SUCCESS) {
     throw EnvoyException("error parsing mysql packet header");
   }
@@ -160,9 +160,9 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
 
   session_.setExpectedSeq(seq + 1);
 
-  const int data_len = data.length();
+  const ssize_t data_len = data.length();
   parseMessage(data, seq, len);
-  const int consumed_len = data_len - data.length();
+  const ssize_t consumed_len = data_len - data.length();
   data.drain(len - consumed_len); // Ensure that the whole message was consumed
 
   ENVOY_LOG(trace, "mysql_proxy: {} bytes remaining in buffer", data.length());
@@ -171,7 +171,7 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
 
 void DecoderImpl::onData(Buffer::Instance& data) {
   // TODO(venilnoronha): handle messages over 16 mb. See
-  // https://dev.mysql.com/doc/dev/mysql-server/8.0.2/page_protocol_basic_packets.html#sect_protocol_basic_packets_sending_mt_16mb.
+  // https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_packets.html#sect_protocol_basic_packets_sending_mt_16mb.
   while (!BufferHelper::endOfBuffer(data) && decode(data)) {
   }
 }

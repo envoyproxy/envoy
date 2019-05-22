@@ -20,7 +20,7 @@ void ClientLoginResponse::setServerStatus(uint16_t status) { server_status_ = st
 
 void ClientLoginResponse::setWarnings(uint16_t warnings) { warnings_ = warnings; }
 
-int ClientLoginResponse::parseMessage(Buffer::Instance& buffer, int) {
+int ClientLoginResponse::parseMessage(Buffer::Instance& buffer, uint32_t) {
   uint8_t resp_code = 0;
   if (BufferHelper::readUint8(buffer, resp_code) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing response code in mysql Login Ok msg");
