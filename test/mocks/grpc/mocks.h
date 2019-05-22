@@ -35,7 +35,6 @@ public:
   MOCK_METHOD2_T(sendMessageRaw_, void(Buffer::InstancePtr& request, bool end_stream));
   MOCK_METHOD0_T(closeStream, void());
   MOCK_METHOD0_T(resetStream, void());
-  MOCK_METHOD0_T(isGrpcHeaderRequired, bool());
 };
 
 template <class ResponseType>
@@ -81,7 +80,6 @@ public:
   MOCK_METHOD3_T(startRaw,
                  RawAsyncStream*(absl::string_view service_full_name, absl::string_view method_name,
                                  RawAsyncStreamCallbacks& callbacks));
-  MOCK_METHOD0_T(isGrpcHeaderRequired, bool());
 };
 
 class MockAsyncClientFactory : public AsyncClientFactory {
