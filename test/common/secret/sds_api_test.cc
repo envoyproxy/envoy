@@ -126,6 +126,11 @@ public:
 
   MOCK_METHOD2(onConfigUpdate,
                void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>&, const std::string&));
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added,
+                      const Protobuf::RepeatedPtrField<std::string>& removed,
+                      const std::string& version) override {
+    SdsApi::onConfigUpdate(added, removed, version);
+  }
   void setSecret(const envoy::api::v2::auth::Secret&) override {}
   void validateConfig(const envoy::api::v2::auth::Secret&) override {}
 };
