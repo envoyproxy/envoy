@@ -30,7 +30,7 @@ the request is rejected.
 
   .. note::
     Due to differing functionality between browsers this filter will determine
-    a request's source origin from the Host header. If that is not present it will
+    a request's source origin from the Origin header. If that is not present it will
     fall back to the host and port value from the requests Referer header.
 
 
