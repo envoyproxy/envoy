@@ -378,7 +378,8 @@ SubsetLoadBalancer::extractSubsetMetadata(const std::set<std::string>& subset_ke
     }
 
     if (list_as_any_) {
-      // TODO(snowp): Should we switch on the the type of the oneof instead? This might add an empty list.
+      // TODO(snowp): Should we switch on the the type of the oneof instead? This might add an empty
+      // list.
       if (it->second.list_value().values().empty()) {
         kvs.emplace_back(std::make_pair(key, it->second));
       } else {

@@ -150,8 +150,8 @@ private:
   LbSubsetEntryPtr
   findSubset(const std::vector<Router::MetadataMatchCriterionConstSharedPtr>& matches);
 
-  void findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadata& kvs,
-                                      uint32_t idx, std::vector<LbSubsetEntryPtr>& entries);
+  void findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadata& kvs, uint32_t idx,
+                          std::vector<LbSubsetEntryPtr>& entries);
   void forEachSubset(LbSubsetMap& subsets, std::function<void(LbSubsetEntryPtr)> cb);
 
   SubsetMetadata extractSubsetMetadata(const std::set<std::string>& subset_keys, const Host& host);

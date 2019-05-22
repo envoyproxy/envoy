@@ -66,9 +66,9 @@ public:
   virtual bool panicModeAny() const PURE;
 
   /*
-  * @return bool whether matching metadata should attempt to match against any of the
-  * elements in a list value defined in endpoint metadata.
-  */
+   * @return bool whether matching metadata should attempt to match against any of the
+   * elements in a list value defined in endpoint metadata.
+   */
   virtual bool listAsAny() const PURE;
 };
 

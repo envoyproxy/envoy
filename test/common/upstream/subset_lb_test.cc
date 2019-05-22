@@ -377,7 +377,8 @@ public:
     EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
   }
 
-  envoy::api::v2::core::Metadata buildMetadata(const std::string& version, bool is_default = false) const {
+  envoy::api::v2::core::Metadata buildMetadata(const std::string& version,
+                                               bool is_default = false) const {
     envoy::api::v2::core::Metadata metadata;
 
     if (version != "") {
