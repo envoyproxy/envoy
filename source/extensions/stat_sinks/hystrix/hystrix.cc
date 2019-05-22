@@ -320,7 +320,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   return Http::Code::OK;
 }
 
-void HystrixSink::flush(Stats::Source& source) {
+void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
   if (callbacks_list_.empty()) {
     return;
   }
@@ -330,9 +330,10 @@ void HystrixSink::flush(Stats::Source& source) {
 
   // Save a map of the relevant histograms per cluster in a convenient format.
   std::unordered_map<std::string, QuantileLatencyMap> time_histograms;
-  for (const Stats::ParentHistogramSharedPtr& histogram : source.cachedHistograms()) {
-    if (histogram->tagExtractedStatName() == cluster_upstream_rq_time_) {
-      absl::optional<Stats::StatName> value = Stats::Utility::findTag(*histogram, cluster_name_);
+  for (const auto& histogram : snapshot.histograms()) {
+    if (histogram.get().tagExtractedStatName() == cluster_upstream_rq_time_) {
+      absl::optional<Stats::StatName> value =
+          Stats::Utility::findTag(histogram.get(), cluster_name_);
       // Make sure we found the cluster name tag
       ASSERT(value);
       std::string value_str = server_.stats().symbolTable().toString(*value);
@@ -342,12 +343,12 @@ void HystrixSink::flush(Stats::Source& source) {
       QuantileLatencyMap& hist_map = it_bool_pair.first->second;
 
       const std::vector<double>& supported_quantiles =
-          histogram->intervalStatistics().supportedQuantiles();
+          histogram.get().intervalStatistics().supportedQuantiles();
       for (size_t i = 0; i < supported_quantiles.size(); ++i) {
         // binary-search here is likely not worth it, as hystrix_quantiles has <10 elements.
         if (std::find(hystrix_quantiles.begin(), hystrix_quantiles.end(), supported_quantiles[i]) !=
             hystrix_quantiles.end()) {
-          const double value = histogram->intervalStatistics().computedQuantiles()[i];
+          const double value = histogram.get().intervalStatistics().computedQuantiles()[i];
           if (!std::isnan(value)) {
             hist_map[supported_quantiles[i]] = value;
           }

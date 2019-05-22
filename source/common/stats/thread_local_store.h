@@ -11,7 +11,6 @@
 #include "common/common/hash.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/histogram_impl.h"
-#include "common/stats/source_impl.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
 
@@ -211,10 +210,7 @@ public:
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
-
   void mergeHistograms(PostMergeCb mergeCb) override;
-
-  Source& source() override { return source_; }
 
 private:
   template <class Stat> using StatMap = StatNameHashMap<Stat>;
@@ -362,7 +358,6 @@ private:
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   HeapStatDataAllocator heap_allocator_;
-  SourceImpl source_;
 
   NullCounterImpl null_counter_;
   NullGaugeImpl null_gauge_;

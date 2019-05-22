@@ -18,6 +18,16 @@ Input
      :ref:`config <config_tools_router_check_tool>`.
      The tool config input file specifies urls (composed of authorities and paths)
      and expected route parameter values. Additional parameters such as additional headers are optional.
+     Schema: All internal schemas in the tool are based on :repo:`proto3 <test/tools/router_check/validation.proto>`.
+     This is enabled by an extra optional parameter ``--useproto``. This parameter will become the default in the future releases and enables more validation features in the tool.
+     Any new feature addition in validations will be added behind this parameter.
+     Migration: If you are currently using the tool and plan to migrate to use ``--useproto``, change the yaml/json test's schema based on the :repo:`proto <test/tools/router_check/validation.proto>`.
+     Few known changes necessary are:
+     ``:authority`` input is now ``authority``.
+     ``:path`` input is now ``path``.
+     ``:method`` input is now ``method``. This is a required property.
+     ``additional_headers`` in the input along with ``header_fields`` and ``custom_header_fields`` contain ``key`` instead of ``field``.
+     ``tests`` is a root level field in the yaml/json.
 
 Output
   The program exits with status EXIT_FAILURE if any test case does not match the expected route parameter
@@ -52,11 +62,14 @@ Running
   expected order of command line arguments is:
   1. The router configuration file.
   2. The tool configuration json file.
-  3. The optional details flag. ::
+  3. ``--useproto`` to use any new features in the tool.
+  4. The optional details flag. ::
 
     bazel-bin/test/tools/router_check/router_check_tool router_config.(yaml|json) tool_config.json
 
     bazel-bin/test/tools/router_check/router_check_tool router_config.(yaml|json) tool_config.json --details
+
+    bazel-bin/test/tools/router_check/router_check_tool router_config.(yaml|json) tool_config.json --details --useproto
 
 Testing
   A bash shell script test can be run with bazel. The test compares routes using different router and

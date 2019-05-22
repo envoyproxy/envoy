@@ -7,7 +7,6 @@
 
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/sink.h"
-#include "envoy/stats/source.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/store.h"
@@ -148,19 +147,18 @@ public:
       std::make_shared<HistogramStatisticsImpl>();
 };
 
-class MockSource : public Source {
+class MockMetricSnapshot : public MetricSnapshot {
 public:
-  MockSource();
-  ~MockSource();
+  MockMetricSnapshot();
+  ~MockMetricSnapshot();
 
-  MOCK_METHOD0(cachedCounters, const std::vector<CounterSharedPtr>&());
-  MOCK_METHOD0(cachedGauges, const std::vector<GaugeSharedPtr>&());
-  MOCK_METHOD0(cachedHistograms, const std::vector<ParentHistogramSharedPtr>&());
-  MOCK_METHOD0(clearCache, void());
+  MOCK_METHOD0(counters, const std::vector<CounterSnapshot>&());
+  MOCK_METHOD0(gauges, const std::vector<std::reference_wrapper<const Gauge>>&());
+  MOCK_METHOD0(histograms, const std::vector<std::reference_wrapper<const ParentHistogram>>&());
 
-  std::vector<CounterSharedPtr> counters_;
-  std::vector<GaugeSharedPtr> gauges_;
-  std::vector<ParentHistogramSharedPtr> histograms_;
+  std::vector<CounterSnapshot> counters_;
+  std::vector<std::reference_wrapper<const Gauge>> gauges_;
+  std::vector<std::reference_wrapper<const ParentHistogram>> histograms_;
 };
 
 class MockSink : public Sink {
@@ -168,7 +166,7 @@ public:
   MockSink();
   ~MockSink();
 
-  MOCK_METHOD1(flush, void(Source& source));
+  MOCK_METHOD1(flush, void(MetricSnapshot& snapshot));
   MOCK_METHOD2(onHistogramComplete, void(const Histogram& histogram, uint64_t value));
 };
 

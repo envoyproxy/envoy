@@ -128,19 +128,65 @@ void InstanceImpl::drainListeners() {
   drain_manager_->startDrainSequence(nullptr);
 }
 
-void InstanceImpl::failHealthcheck(bool fail) {
-  // We keep liveness state in shared memory so the parent process sees the same state.
-  server_stats_->live_.set(!fail);
-}
+void InstanceImpl::failHealthcheck(bool fail) { server_stats_->live_.set(!fail); }
+
+// Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could
+// potentially have a single class instance held in a static and have a clear() method to avoid some
+// vector constructions and reservations, but I'm not sure it's worth the extra complexity until it
+// shows up in perf traces.
+// TODO(mattklein123): One thing we probably want to do is switch from returning vectors of metrics
+//                     to a lambda based callback iteration API. This would require less vector
+//                     copying and probably be a cleaner API in general.
+class MetricSnapshotImpl : public Stats::MetricSnapshot {
+public:
+  MetricSnapshotImpl(Stats::Store& store) {
+    snapped_counters_ = store.counters();
+    counters_.reserve(snapped_counters_.size());
+    for (const auto& counter : snapped_counters_) {
+      counters_.push_back({counter->latch(), *counter});
+    }
+
+    snapped_gauges_ = store.gauges();
+    gauges_.reserve(snapped_gauges_.size());
+    for (const auto& gauge : snapped_gauges_) {
+      gauges_.push_back(*gauge);
+    }
+
+    snapped_histograms_ = store.histograms();
+    histograms_.reserve(snapped_histograms_.size());
+    for (const auto& histogram : snapped_histograms_) {
+      histograms_.push_back(*histogram);
+    }
+  }
+
+  // Stats::MetricSnapshot
+  const std::vector<CounterSnapshot>& counters() override { return counters_; }
+  const std::vector<std::reference_wrapper<const Stats::Gauge>>& gauges() override {
+    return gauges_;
+  };
+  const std::vector<std::reference_wrapper<const Stats::ParentHistogram>>& histograms() override {
+    return histograms_;
+  }
+
+private:
+  std::vector<Stats::CounterSharedPtr> snapped_counters_;
+  std::vector<CounterSnapshot> counters_;
+  std::vector<Stats::GaugeSharedPtr> snapped_gauges_;
+  std::vector<std::reference_wrapper<const Stats::Gauge>> gauges_;
+  std::vector<Stats::ParentHistogramSharedPtr> snapped_histograms_;
+  std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
+};
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                       Stats::Source& source) {
+                                       Stats::Store& store) {
+  // Create a snapshot and flush to all sinks.
+  // NOTE: Even if there are no sinks, creating the snapshot has the important property that it
+  //       latches all counters on a periodic basis. The hot restart code assumes this is being
+  //       done so this should not be removed.
+  MetricSnapshotImpl snapshot(store);
   for (const auto& sink : sinks) {
-    sink->flush(source);
+    sink->flush(snapshot);
   }
-  // TODO(mrice32): this reset should be called by the StoreRoot on stat construction/destruction so
-  // that it doesn't need to be reset when the set of stats isn't changing.
-  source.clearCache();
 }
 
 void InstanceImpl::flushStats() {
@@ -160,7 +206,7 @@ void InstanceImpl::flushStats() {
                                           parent_stats.parent_connections_);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
-    InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_.source());
+    InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
     if (stat_flush_timer_ != nullptr) {
       stat_flush_timer_->enableTimer(config_.statsFlushInterval());
@@ -535,9 +581,6 @@ void InstanceImpl::shutdown() {
 
 void InstanceImpl::shutdownAdmin() {
   ENVOY_LOG(warn, "shutting down admin due to child startup");
-  // TODO(mattklein123): Since histograms are not shared between processes, this will also stop
-  //                     histogram flushing. In the future we can consider whether we want to
-  //                     somehow keep flushing histograms from the old process.
   stat_flush_timer_.reset();
   handler_->stopListeners();
   admin_->closeSocket();
