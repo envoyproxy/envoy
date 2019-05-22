@@ -140,7 +140,7 @@ void UdpListenerImpl::handleReadCallback() {
                                peer_address->asString(), local_address->asString(),
                                recv_result.result_.rc_, addr_len));
 
-    UdpRecvData recvData = {local_address, peer_address, std::move(recv_result.buffer_)};
+    UdpRecvData recvData{local_address, peer_address, std::move(recv_result.buffer_)};
     cb_.onData(recvData);
 
   } while (true);

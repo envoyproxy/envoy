@@ -450,7 +450,7 @@ public:
   ~MockUdpListenerReadFilter();
 
   MOCK_METHOD1(onData, void(UdpRecvData&));
-  MOCK_METHOD1(initializeCallbacks, void(UdpReadFilterCallbacks& callbacks));
+  MOCK_METHOD1(setCallbacks, void(UdpReadFilterCallbacks& callbacks));
 };
 
 class MockUdpListenerFilterManager : public UdpListenerFilterManager {

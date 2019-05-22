@@ -379,7 +379,7 @@ public:
   virtual void onData(UdpRecvData& data) PURE;
 
   /**
-   * Initializes the read filter callbacks used to interact with the filter manager. It will be
+   * Sets the read filter callbacks used to interact with the filter manager. It will be
    * called by the filter manager a single time when the filter is first registered. Thus, any
    * construction that requires the listener should take place in the context of this
    * function.
@@ -389,7 +389,7 @@ public:
    *
    * @param callbacks supplies the callbacks.
    */
-  virtual void initializeCallbacks(UdpReadFilterCallbacks& callbacks) PURE;
+  virtual void setCallbacks(UdpReadFilterCallbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<UdpListenerReadFilter> UdpListenerReadFilterPtr;

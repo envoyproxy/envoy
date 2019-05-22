@@ -332,12 +332,6 @@ ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImp
         "Cannot create listener as no read filters registered for the udp listener: {} ",
         config_.name()));
   }
-
-  // Initialize the filters so that they get a handle to the dispatcher and other global structures
-  // if needed.
-  for (auto&& read_filter : read_filters_) {
-    read_filter->initializeCallbacks(*this);
-  }
 }
 
 void ConnectionHandlerImpl::ActiveUdpListener::onData(Network::UdpRecvData& data) {
@@ -361,6 +355,9 @@ void ConnectionHandlerImpl::ActiveUdpListener::onError(
 
 void ConnectionHandlerImpl::ActiveUdpListener::addReadFilter(
     Network::UdpListenerReadFilterPtr&& filter) {
+  // Set callbacks on the filter so that they get a handle to the dispatcher and other global
+  // structures if needed.
+  filter->setCallbacks(*this);
   read_filters_.emplace_back(std::move(filter));
 }
 

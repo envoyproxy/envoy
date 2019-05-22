@@ -38,8 +38,6 @@ public:
 private:
   // Converts a SysCallSizeResult to IoCallUint64Result.
   Api::IoCallUint64Result sysCallResultToIoCallResult(const Api::SysCallSizeResult& result);
-  // Converts a SysCallIntResult to IoCallUint64Result.
-  Api::IoCallUint64Result sysCallResultToIoCallResult(const Api::SysCallIntResult& result);
 
   int fd_;
 };

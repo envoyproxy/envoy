@@ -17,13 +17,13 @@ class UdpListenerEchoFilter : public Network::UdpListenerReadFilter,
 public:
   // Network::UdpListenerReadFilter
   void onData(Network::UdpRecvData& data) override;
-  void initializeCallbacks(Network::UdpReadFilterCallbacks& callbacks) override;
+  void setCallbacks(Network::UdpReadFilterCallbacks& callbacks) override;
 
 private:
   Network::UdpReadFilterCallbacks* read_callbacks_{};
 };
 
-void UdpListenerEchoFilter::initializeCallbacks(Network::UdpReadFilterCallbacks& callbacks) {
+void UdpListenerEchoFilter::setCallbacks(Network::UdpReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
 }
 
