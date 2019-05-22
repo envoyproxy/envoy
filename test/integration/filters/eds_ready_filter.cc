@@ -18,8 +18,7 @@ namespace Envoy {
 class EdsReadyFilter : public Http::PassThroughFilter {
 public:
   EdsReadyFilter(const Stats::Scope& root_scope, Stats::SymbolTable& symbol_table)
-      : root_scope_(root_scope),
-        stat_name_("cluster.cluster_0.membership_healthy", symbol_table) {}
+      : root_scope_(root_scope), stat_name_("cluster.cluster_0.membership_healthy", symbol_table) {}
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override {
     absl::optional<std::reference_wrapper<const Stats::Gauge>> gauge =
         root_scope_.findGauge(stat_name_.statName());
