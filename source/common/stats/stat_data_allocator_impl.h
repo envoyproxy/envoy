@@ -37,7 +37,7 @@ public:
   virtual void free(StatData& data) PURE;
 
   SymbolTable& symbolTable() override { return symbol_table_; }
-  const SymbolTable& symbolTable() const override { return symbol_table_; }
+  const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
 private:
   // SymbolTable encodes encodes stat names as back into strings. This does not
@@ -81,7 +81,6 @@ public:
   bool used() const override { return data_.flags_ & Flags::Used; }
   uint64_t value() const override { return data_.value_; }
 
-  const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
 
 protected:
@@ -164,8 +163,6 @@ public:
     }
   }
 
-private:
-  const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
 
 protected:

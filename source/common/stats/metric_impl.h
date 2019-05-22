@@ -26,12 +26,16 @@ public:
              SymbolTable& symbol_table);
   ~MetricImpl();
 
-  std::string name() const override { return symbolTable().toString(statName()); }
+  std::string name() const override { return constSymbolTable().toString(statName()); }
   std::string tagExtractedName() const override;
   std::vector<Tag> tags() const override;
   StatName tagExtractedStatName() const override;
   void iterateTagStatNames(const TagStatNameIterFn& fn) const override;
   void iterateTags(const TagIterFn& fn) const override;
+
+  const SymbolTable& constSymbolTable() const override {
+    return const_cast<MetricImpl*>(this)->symbolTable();
+  }
 
 protected:
   void clear();
@@ -45,7 +49,6 @@ public:
   explicit NullMetricImpl(SymbolTable& symbol_table)
       : MetricImpl("", std::vector<Tag>(), symbol_table), stat_name_storage_("", symbol_table) {}
 
-  const SymbolTable& symbolTable() const override { return stat_name_storage_.symbolTable(); }
   SymbolTable& symbolTable() override { return stat_name_storage_.symbolTable(); }
   bool used() const override { return false; }
   StatName statName() const override { return stat_name_storage_.statName(); }
