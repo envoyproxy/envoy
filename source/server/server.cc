@@ -70,7 +70,7 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
       terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
-      main_thread_id_(std::this_thread::get_id()) {
+      http_context_(store.symbolTable()), main_thread_id_(std::this_thread::get_id()) {
   try {
     if (!options.logPath().empty()) {
       try {

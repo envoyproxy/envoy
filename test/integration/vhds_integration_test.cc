@@ -106,7 +106,9 @@ class VhdsIntegrationTest : public HttpIntegrationTest,
                             public Grpc::GrpcClientIntegrationParamTest {
 public:
   VhdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), Config) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), Config) {
+    use_lds_ = false;
+  }
 
   void TearDown() override {
     cleanUpXdsConnection();

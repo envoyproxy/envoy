@@ -296,8 +296,10 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
 }
 
 std::string TestEnvironment::writeStringToFileForTest(const std::string& filename,
-                                                      const std::string& contents) {
-  const std::string out_path = TestEnvironment::temporaryPath(filename);
+                                                      const std::string& contents,
+                                                      bool fully_qualified_path) {
+  const std::string out_path =
+      fully_qualified_path ? filename : TestEnvironment::temporaryPath(filename);
   createParentPath(out_path);
   unlink(out_path.c_str());
   {
