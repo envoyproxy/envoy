@@ -1155,14 +1155,8 @@ void Filter::doRetry() {
 }
 
 uint32_t Filter::numRequestsAwaitingHeaders() {
-  uint32_t ret = 0;
-  for (auto& upstream_request : upstream_requests_) {
-    if (upstream_request->awaiting_headers_) {
-      ret++;
-    }
-  }
-
-  return ret;
+  return std::count_if(upstream_requests_.begin(), upstream_requests_.end(),
+                       [](const auto& req) -> bool { return req.get()->awaiting_headers_; });
 }
 
 Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
@@ -1345,8 +1339,6 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
   if (!parent_.downstream_response_started_) {
     ENVOY_STREAM_LOG(debug, "upstream per try timeout", *parent_.callbacks_);
 
-    // Set response flag to UT for now, but it might be overwritten if a
-    // response arrives later and hedge_on_per_try_timeout_ is set
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
     parent_.onPerTryTimeout(*this);
   } else {
@@ -1459,8 +1451,8 @@ void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHigh
   // There are two states we should get this callback in: 1) the watermark was
   // hit due to writes from a different filter instance over a shared
   // downstream connection, or 2) the watermark was hit due to THIS filter
-  // instance due to writing back the "winning" upstream request. In either
-  // case we can disable reads from upstream.
+  // instance writing back the "winning" upstream request. In either case we
+  // can disable reads from upstream.
   ASSERT(!parent_.parent_.final_upstream_request_ ||
          &parent_ == parent_.parent_.final_upstream_request_);
 
