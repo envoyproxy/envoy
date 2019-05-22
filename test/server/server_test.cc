@@ -37,23 +37,42 @@ TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
   Stats::IsolatedStoreImpl store;
-  Stats::SourceImpl source(store);
-  store.counter("hello").inc();
+  Stats::Counter& c = store.counter("hello");
+  c.inc();
   store.gauge("world").set(5);
-  std::unique_ptr<Stats::MockSink> sink(new StrictMock<Stats::MockSink>());
-  EXPECT_CALL(*sink, flush(Ref(source))).WillOnce(Invoke([](Stats::Source& source) {
-    ASSERT_EQ(source.cachedCounters().size(), 1);
-    EXPECT_EQ(source.cachedCounters().front()->name(), "hello");
-    EXPECT_EQ(source.cachedCounters().front()->latch(), 1);
-
-    ASSERT_EQ(source.cachedGauges().size(), 1);
-    EXPECT_EQ(source.cachedGauges().front()->name(), "world");
-    EXPECT_EQ(source.cachedGauges().front()->value(), 5);
-  }));
+  store.histogram("histogram");
 
   std::list<Stats::SinkPtr> sinks;
-  sinks.emplace_back(std::move(sink));
-  InstanceUtil::flushMetricsToSinks(sinks, source);
+  InstanceUtil::flushMetricsToSinks(sinks, store);
+  // Make sure that counters have been latched even if there are no sinks.
+  EXPECT_EQ(1UL, c.value());
+  EXPECT_EQ(0, c.latch());
+
+  Stats::MockSink* sink = new StrictMock<Stats::MockSink>();
+  sinks.emplace_back(sink);
+  EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
+    ASSERT_EQ(snapshot.counters().size(), 1);
+    EXPECT_EQ(snapshot.counters()[0].counter_.get().name(), "hello");
+    EXPECT_EQ(snapshot.counters()[0].delta_, 1);
+
+    ASSERT_EQ(snapshot.gauges().size(), 1);
+    EXPECT_EQ(snapshot.gauges()[0].get().name(), "world");
+    EXPECT_EQ(snapshot.gauges()[0].get().value(), 5);
+  }));
+  c.inc();
+  InstanceUtil::flushMetricsToSinks(sinks, store);
+
+  // Histograms don't currently work with the isolated store so test those with a mock store.
+  NiceMock<Stats::MockStore> mock_store;
+  Stats::ParentHistogramSharedPtr parent_histogram(new Stats::MockParentHistogram());
+  std::vector<Stats::ParentHistogramSharedPtr> parent_histograms = {parent_histogram};
+  ON_CALL(mock_store, histograms).WillByDefault(Return(parent_histograms));
+  EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
+    EXPECT_TRUE(snapshot.counters().empty());
+    EXPECT_TRUE(snapshot.gauges().empty());
+    EXPECT_EQ(snapshot.histograms().size(), 1);
+  }));
+  InstanceUtil::flushMetricsToSinks(sinks, mock_store);
 }
 
 class RunHelperTest : public testing::Test {

@@ -40,15 +40,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "source_impl_test",
-    srcs = ["source_impl_test.cc"],
-    deps = [
-        "//source/common/stats:source_impl_lib",
-        "//test/mocks/stats:stats_mocks",
-    ],
-)
-
-envoy_cc_test(
     name = "stat_merger_test",
     srcs = ["stat_merger_test.cc"],
     deps = [
