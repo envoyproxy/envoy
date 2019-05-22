@@ -20,34 +20,11 @@
 namespace Envoy {
 namespace Config {
 
-// (TODO this will become more of a README level thing)
-// When using gRPC, xDS has two pairs of options: aggregated/non-aggregated, and
-// delta/state-of-the-world updates. All four combinations of these are usable.
-//
-// "Aggregated" means that EDS, CDS, etc resources are all carried by the same gRPC stream (not even
-// channel). For Envoy's implementation of xDS client logic, there is effectively no difference
-// between aggregated xDS and non-aggregated: they both use the same request/response protos. The
-// non-aggregated case is handled by running the aggregated logic, and just happening to only have 1
-// xDS subscription type to "aggregate", i.e., GrpcDeltaXdsContext only has one
-// DeltaSubscriptionState entry in its map. The sole implementation difference: when the bootstrap
-// specifies ADS, the method string set on the gRPC client that the GrpcMux holds is
-// {Delta,Stream}AggregatedResources, as opposed to e.g. {Delta,Stream}Clusters. This distinction is
-// necessary for the server to know what resources should be provided.
-//
-// DeltaSubscriptionState is what handles the conceptual/application-level protocol state of a given
-// resource type subscription, which may or may not be multiplexed with others. So,
-// DeltaSubscriptionState is equally applicable to non- and aggregated.
-//
-// Delta vs state-of-the-world is a question of wire format: the protos in question are named
-// [Delta]Discovery{Request,Response}. That is what the GrpcMux interface is useful for: its
-// GrpcDeltaXdsContext implementation works with DeltaDiscovery{Request,Response} and has
-// delta-specific logic, and its GrpxMuxImpl implementation works with Discovery{Request,Response}
-// and has SotW-specific logic. A DeltaSubscriptionImpl (TODO rename to not delta-specific since
-// it's ideally going to cover ALL 4 subscription "meta-types") has its shared_ptr<GrpcMux>.
-// Both GrpcDeltaXdsContext (delta) or GrpcMuxImpl (SotW) will work just fine. The shared_ptr allows
-// for both non- and aggregated: if non-aggregated, you'll be the only holder of that shared_ptr. By
-// those two mechanisms, the single class (TODO rename) DeltaSubscriptionImpl handles all 4
-// delta/SotW and non-/aggregated combinations.
+// Manages subscriptions to one or more type of resource. The logical protocol
+// state of those subscription(s) is handled by DeltaSubscriptionState.
+// This class owns the GrpcStream used to talk to the server, maintains queuing
+// logic to properly order the subscription(s)' various messages, and allows
+// starting/stopping/pausing of the subscriptions.
 class GrpcDeltaXdsContext : public GrpcMux,
                             public GrpcStreamCallbacks<envoy::api::v2::DeltaDiscoveryResponse>,
                             Logger::Loggable<Logger::Id::config> {
@@ -222,8 +199,10 @@ private:
 
   // Checks whether we have something to say in a DeltaDiscoveryRequest, which can be an ACK and/or
   // a subscription update. (Does not check whether we *can* send that DeltaDiscoveryRequest).
-  // Returns the type_url of the resource type we should send the DeltaDiscoveryRequest for (if
-  // any). Prioritizes ACKs over non-ACK subscription interest updates.
+  // Returns the type_url we should send the DeltaDiscoveryRequest for (if any).
+  // First, prioritizes ACKs over non-ACK subscription interest updates.
+  // Then, prioritizes non-ACK updates in the order the various types
+  // of subscriptions were activated.
   absl::optional<std::string> whoWantsToSendDiscoveryRequest() {
     // All ACKs are sent before plain updates. trySendDiscoveryRequests() relies on this. So, choose
     // type_url from ack_queue_ if possible, before looking at pending updates.

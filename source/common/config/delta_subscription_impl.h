@@ -15,7 +15,7 @@ namespace Config {
  * the only difference is that ADS has multiple DeltaSubscriptions sharing a single
  * GrpcDeltaXdsContext.
  */
-// TODO(fredlas) someday this class will be named SubscriptionImpl (without any changes to its code)
+// TODO(fredlas) someday this class will be named GrpcSubscriptionImpl
 class DeltaSubscriptionImpl : public Subscription {
 public:
   DeltaSubscriptionImpl(std::shared_ptr<GrpcDeltaXdsContext> context, absl::string_view type_url,

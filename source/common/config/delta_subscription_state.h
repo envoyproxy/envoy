@@ -20,7 +20,10 @@ struct UpdateAck {
   ::google::rpc::Status error_detail_;
 };
 
-// Tracks the xDS protocol state of an individual ongoing delta xDS session.
+// Tracks the xDS protocol state of an individual ongoing delta xDS session, i.e. a single type_url.
+// There can be multiple DeltaSubscriptionStates active. They will always all be
+// blissfully unaware of each other's existence, even when their messages are
+// being multiplexed together by ADS.
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   DeltaSubscriptionState(const std::string& type_url, const std::set<std::string>& resource_names,
