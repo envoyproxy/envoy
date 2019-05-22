@@ -377,8 +377,7 @@ void HystrixSink::flush(Stats::Source& source) {
         *cluster_stats_cache_ptr, cluster_info->name(),
         cluster_info->resourceManager(Upstream::ResourcePriority::Default).pendingRequests().max(),
         cluster_info->statsScope().gaugeFromStatName(membership_total_).value(),
-        server_.statsFlushInterval(),
-        time_histograms[cluster_info->name()], ss);
+        server_.statsFlushInterval(), time_histograms[cluster_info->name()], ss);
   }
 
   Buffer::OwnedImpl data;

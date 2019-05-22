@@ -17,18 +17,14 @@
 namespace Envoy {
 namespace Http {
 
-template<class SymTab> class CodeUtilitySpeedTest {
+template <class SymTab> class CodeUtilitySpeedTest {
 public:
   CodeUtilitySpeedTest()
       : global_store_(symbol_table_), cluster_scope_(symbol_table_), code_stats_(symbol_table_),
-        pool_(symbol_table_),
-        from_az_(pool_.add("from_az")),
-        prefix_(pool_.add("prefix")),
+        pool_(symbol_table_), from_az_(pool_.add("from_az")), prefix_(pool_.add("prefix")),
         req_vcluster_name_(pool_.add("req_vcluster_name")),
-        test_cluster_(pool_.add("test-cluster")),
-        test_vhost_(pool_.add("test-vhost")),
-        to_az_(pool_.add("to_az")),
-        vhost_name_(pool_.add("vhost_name")) {}
+        test_cluster_(pool_.add("test-cluster")), test_vhost_(pool_.add("test-vhost")),
+        to_az_(pool_.add("to_az")), vhost_name_(pool_.add("vhost_name")) {}
 
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    Stats::StatName request_vhost_name = Stats::StatName(),
@@ -56,16 +52,10 @@ public:
   }
 
   void responseTiming() {
-    Http::CodeStats::ResponseTimingInfo info{global_store_,
-                                             cluster_scope_,
-                                             prefix_,
-                                             std::chrono::milliseconds(5),
-                                             true,
-                                             true,
-                                             vhost_name_,
-                                             req_vcluster_name_,
-                                             from_az_,
-                                             to_az_};
+    Http::CodeStats::ResponseTimingInfo info{
+        global_store_, cluster_scope_, prefix_,     std::chrono::milliseconds(5),
+        true,          true,           vhost_name_, req_vcluster_name_,
+        from_az_,      to_az_};
     code_stats_.chargeResponseTiming(info);
   }
 
