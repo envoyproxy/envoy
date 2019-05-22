@@ -75,7 +75,7 @@ using ResponseInitialParserFactorySharedPtr = std::shared_ptr<ResponseInitialPar
  * As Kafka protocol does not carry response type data, it is necessary to register expected message
  * type beforehand with `expectResponse`.
  */
-class ResponseDecoder : public MessageDecoder, public Logger::Loggable<Logger::Id::kafka> {
+class ResponseDecoder : public AbstractMessageDecoder<ResponseParserSharedPtr, ResponseCallbackSharedPtr>, public Logger::Loggable<Logger::Id::kafka> {
 public:
   /**
    * Creates a decoder that will notify provided callbacks when a message is successfully parsed.
@@ -95,8 +95,7 @@ public:
   ResponseDecoder(const ResponseInitialParserFactorySharedPtr factory,
                   const ResponseParserResolver& response_parser_resolver,
                   const std::vector<ResponseCallbackSharedPtr> callbacks)
-      : factory_{factory}, response_parser_resolver_{response_parser_resolver}, callbacks_{
-                                                                                    callbacks} {};
+      : AbstractMessageDecoder{callbacks}, factory_{factory}, response_parser_resolver_{response_parser_resolver} {};
 
   /**
    * Registers an expected message.
@@ -107,23 +106,12 @@ public:
    */
   void expectResponse(const int16_t api_key, const int16_t api_version);
 
-  /**
-   * Consumes all data present in a buffer.
-   * If a response can be successfully parsed, then callbacks get notified with parsed response.
-   * Updates decoder state.
-   * Can throw if data is received, but the decoder is not expecting any response.
-   * Impl note: similar to redis codec, which also keeps state.
-   */
-  void onData(Buffer::Instance& data) override;
+protected:
+  ResponseParserSharedPtr createStartParser() override;
 
 private:
-  void doParse(const Buffer::RawSlice& slice);
-
   ResponseInitialParserFactorySharedPtr factory_;
   const ResponseParserResolver& response_parser_resolver_;
-  const std::vector<ResponseCallbackSharedPtr> callbacks_;
-
-  ResponseParserSharedPtr current_parser_;
 };
 
 /**

@@ -61,7 +61,7 @@ public:
  * Each parser along the line returns the fully parsed message or the next parser.
  * Stores parse state (as large message's payload can be provided through multiple `onData` calls).
  */
-class RequestDecoder : public MessageDecoder {
+class RequestDecoder : public AbstractMessageDecoder<RequestParserSharedPtr, RequestCallbackSharedPtr> {
 public:
   /**
    * Creates a decoder that will notify provided callbacks when a message is successfully parsed.
@@ -80,29 +80,14 @@ public:
    */
   RequestDecoder(const InitialParserFactory& factory, const RequestParserResolver& parserResolver,
                  const std::vector<RequestCallbackSharedPtr> callbacks)
-      : factory_{factory}, parser_resolver_{parserResolver}, callbacks_{callbacks},
-        current_parser_{factory_.create(parser_resolver_)} {};
+      : AbstractMessageDecoder{callbacks}, factory_{factory}, parser_resolver_{parserResolver} {};
 
-  /**
-   * Consumes all data present in a buffer.
-   * If a request can be successfully parsed, then callbacks get notified with parsed request.
-   * Updates decoder state.
-   * Impl note: similar to redis codec, which also keeps state.
-   */
-  void onData(Buffer::Instance& data) override;
+protected:
+  RequestParserSharedPtr createStartParser() override;
 
 private:
-  void doParse(const Buffer::RawSlice& slice);
-
-  RequestParserSharedPtr createNextParser();
-
   const InitialParserFactory& factory_;
-
   const RequestParserResolver& parser_resolver_;
-
-  const std::vector<RequestCallbackSharedPtr> callbacks_;
-
-  RequestParserSharedPtr current_parser_;
 };
 
 /**
