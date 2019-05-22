@@ -72,10 +72,10 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
       "envoy.api.v2.RouteDiscoveryService.StreamRoutes",
       Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
-      factory_context.api());
+      factory_context.messageValidationVisitor(), factory_context.api());
 
-  config_update_info_ =
-      std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource());
+  config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(
+      factory_context.timeSource(), factory_context.messageValidationVisitor());
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -95,7 +95,8 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   if (!validateUpdateSize(resources.size())) {
     return;
   }
-  auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resources[0]);
+  auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(
+      resources[0], factory_context_.messageValidationVisitor());
   MessageUtil::validate(route_config);
   if (route_config.name() != route_config_name_) {
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",

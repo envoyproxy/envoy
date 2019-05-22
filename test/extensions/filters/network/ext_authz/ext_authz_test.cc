@@ -49,7 +49,7 @@ public:
     )EOF";
 
     envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
-    MessageUtil::loadFromJson(json, proto_config);
+    TestUtility::loadFromJson(json, proto_config);
     config_.reset(new Config(proto_config, stats_store_));
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
@@ -93,7 +93,7 @@ TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
   )EOF";
 
   envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
-  MessageUtil::loadFromJson(json_string, proto_config);
+  TestUtility::loadFromJson(json_string, proto_config);
 
   EXPECT_THROW(MessageUtil::downcastAndValidate<
                    const envoy::config::filter::network::ext_authz::v2::ExtAuthz&>(proto_config),

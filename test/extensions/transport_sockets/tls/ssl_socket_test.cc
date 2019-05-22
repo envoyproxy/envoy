@@ -224,7 +224,7 @@ void testUtil(const TestUtilOptions& options) {
   ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
 
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(options.serverCtxYaml()),
+  TestUtility::loadFromYaml(TestEnvironment::substitute(options.serverCtxYaml()),
                             server_tls_context);
   auto server_cfg =
       std::make_unique<ServerContextConfigImpl>(server_tls_context, server_factory_context);
@@ -240,7 +240,7 @@ void testUtil(const TestUtilOptions& options) {
   Network::ListenerPtr listener = dispatcher->createListener(socket, callbacks, true, false);
 
   envoy::api::v2::auth::UpstreamTlsContext client_tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(options.clientCtxYaml()),
+  TestUtility::loadFromYaml(TestEnvironment::substitute(options.clientCtxYaml()),
                             client_tls_context);
 
   Stats::IsolatedStoreImpl client_stats_store;
@@ -2043,7 +2043,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
 )EOF";
 
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
   ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
@@ -2103,7 +2103,7 @@ TEST_P(SslSocketTest, HalfClose) {
 )EOF";
 
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context_);
   ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
@@ -2124,7 +2124,7 @@ TEST_P(SslSocketTest, HalfClose) {
   )EOF";
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
   Stats::IsolatedStoreImpl client_stats_store;
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
@@ -2190,7 +2190,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
 )EOF";
 
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context_);
   ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
@@ -2213,7 +2213,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
 )EOF";
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
   Stats::IsolatedStoreImpl client_stats_store;
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
@@ -2281,12 +2281,12 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
 
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context1;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml1), server_tls_context1);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml1), server_tls_context1);
   auto server_cfg1 =
       std::make_unique<ServerContextConfigImpl>(server_tls_context1, server_factory_context);
 
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context2;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml2), server_tls_context2);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml2), server_tls_context2);
   auto server_cfg2 =
       std::make_unique<ServerContextConfigImpl>(server_tls_context2, server_factory_context);
   ServerSslSocketFactory server_ssl_socket_factory1(std::move(server_cfg1), manager,
@@ -2305,7 +2305,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   Network::ListenerPtr listener2 = dispatcher->createListener(socket2, callbacks, true, false);
 
   envoy::api::v2::auth::UpstreamTlsContext client_tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
 
   Stats::IsolatedStoreImpl client_stats_store;
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
@@ -2692,10 +2692,10 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
 )EOF";
 
   envoy::api::v2::auth::DownstreamTlsContext tls_context1;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context1);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context1);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context1, factory_context_);
   envoy::api::v2::auth::DownstreamTlsContext tls_context2;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(server2_ctx_yaml), tls_context2);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server2_ctx_yaml), tls_context2);
   auto server2_cfg = std::make_unique<ServerContextConfigImpl>(tls_context2, factory_context_);
   ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
@@ -2722,7 +2722,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
 )EOF";
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
 
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
   Stats::IsolatedStoreImpl client_stats_store;
@@ -2813,7 +2813,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
 
   envoy::api::v2::auth::DownstreamTlsContext server_ctx_proto;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_ctx_proto);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_ctx_proto);
   auto server_cfg =
       std::make_unique<ServerContextConfigImpl>(server_ctx_proto, server_factory_context);
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
@@ -2831,7 +2831,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   Network::MockConnectionCallbacks server_connection_callbacks;
 
   envoy::api::v2::auth::UpstreamTlsContext client_ctx_proto;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_ctx_proto);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_ctx_proto);
 
   Stats::IsolatedStoreImpl client_stats_store;
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system_);
@@ -3082,7 +3082,7 @@ TEST_P(SslSocketTest, SslError) {
 )EOF";
 
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
   ContextManagerImpl manager(time_system_);
   Stats::IsolatedStoreImpl server_stats_store;
@@ -3743,7 +3743,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
 class SslReadBufferLimitTest : public SslSocketTest {
 protected:
   void initialize() {
-    MessageUtil::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml_),
+    TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml_),
                               downstream_tls_context_);
     auto server_cfg =
         std::make_unique<ServerContextConfigImpl>(downstream_tls_context_, factory_context_);
@@ -3753,7 +3753,7 @@ protected:
 
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
-    MessageUtil::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml_), upstream_tls_context_);
+    TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml_), upstream_tls_context_);
     auto client_cfg =
         std::make_unique<ClientContextConfigImpl>(upstream_tls_context_, factory_context_);
 

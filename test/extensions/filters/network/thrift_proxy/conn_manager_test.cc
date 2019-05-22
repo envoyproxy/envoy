@@ -90,7 +90,7 @@ public:
     if (yaml.empty()) {
       proto_config_.set_stat_prefix("test");
     } else {
-      MessageUtil::loadFromYaml(yaml, proto_config_);
+      TestUtility::loadFromYaml(yaml, proto_config_);
       MessageUtil::validate(proto_config_);
     }
 

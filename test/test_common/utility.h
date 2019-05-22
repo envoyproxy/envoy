@@ -19,6 +19,7 @@
 #include "common/common/c_smart_ptr.h"
 #include "common/common/thread.h"
 #include "common/http/header_map_impl.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/fake_symbol_table_impl.h"
 
@@ -324,7 +325,7 @@ public:
    */
   template <class MessageType> static MessageType parseYaml(const std::string& yaml) {
     MessageType message;
-    MessageUtil::loadFromYaml(yaml, message);
+    TestUtility::loadFromYaml(yaml, message);
     return message;
   }
 
@@ -407,6 +408,50 @@ public:
    * @return bool indicating that passed gauges not matching the omitted regex have a value of 0.
    */
   static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr> gauges);
+
+  // Strict variants of Protobuf::MessageUtil
+  static void loadFromJson(const std::string& json, Protobuf::Message& message) {
+    return MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
+    return MessageUtil::loadFromJson(json, message);
+  }
+
+  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
+    return MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
+    return MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(),
+                                     api);
+  }
+
+  template <class MessageType>
+  static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
+    return MessageUtil::anyConvert<MessageType>(message,
+                                                ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  template <class MessageType>
+  static void loadFromFileAndValidate(const std::string& path, MessageType& message) {
+    return MessageUtil::loadFromFileAndValidate(path, message,
+                                                ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  template <class MessageType>
+  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
+    return MessageUtil::loadFromYamlAndValidate(yaml, message,
+                                                ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  static void jsonConvert(const ProtobufWkt::Message& source, Protobuf::Message& dest) {
+    // Explicit round-tripping to support conversions inside tests between arbitrary messages as a
+    // convenience.
+    ProtobufWkt::Struct tmp;
+    MessageUtil::jsonConvert(source, tmp);
+    MessageUtil::jsonConvert(tmp, ProtobufMessage::getStrictValidationVisitor(), dest);
+  }
 };
 
 /**

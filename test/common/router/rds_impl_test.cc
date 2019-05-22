@@ -418,7 +418,7 @@ public:
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::RouteConfiguration route_config;
-  MessageUtil::loadFromYaml(yaml, route_config);
+  TestUtility::loadFromYaml(yaml, route_config);
   return route_config;
 }
 
@@ -430,7 +430,7 @@ TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
 
   // No routes at all, no last_updated timestamp
   envoy::admin::v2alpha::RoutesConfigDump expected_route_config_dump;
-  MessageUtil::loadFromYaml(R"EOF(
+  TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
 dynamic_route_configs:
 )EOF",
@@ -457,7 +457,7 @@ virtual_hosts:
   const auto& route_config_dump2 =
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
-  MessageUtil::loadFromYaml(R"EOF(
+  TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
   - route_config:
       name: foo
@@ -503,7 +503,7 @@ dynamic_route_configs:
   const auto& route_config_dump3 =
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
-  MessageUtil::loadFromYaml(R"EOF(
+  TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
   - route_config:
       name: foo

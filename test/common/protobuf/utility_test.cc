@@ -140,7 +140,7 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
       TestEnvironment::writeStringToFileForTest("proto.pb", bootstrap.SerializeAsString());
 
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
-  MessageUtil::loadFromFile(filename, proto_from_file, *api_);
+  TestUtility::loadFromFile(filename, proto_from_file, *api_);
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
@@ -151,7 +151,7 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoUnknownFieldFromFile) {
       TestEnvironment::writeStringToFileForTest("proto.pb", source_duration.SerializeAsString());
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
   EXPECT_THROW_WITH_MESSAGE(
-      MessageUtil::loadFromFile(filename, proto_from_file, *api_), EnvoyException,
+      TestUtility::loadFromFile(filename, proto_from_file, *api_), EnvoyException,
       "Protobuf message (type envoy.config.bootstrap.v2.Bootstrap) has unknown fields");
 }
 
@@ -168,7 +168,7 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile) {
       TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
 
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
-  MessageUtil::loadFromFile(filename, proto_from_file, *api_);
+  TestUtility::loadFromFile(filename, proto_from_file, *api_);
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
@@ -177,7 +177,7 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
       TestEnvironment::writeStringToFileForTest("proto.pb_text", "invalid {");
 
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
-  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromFile(filename, proto_from_file, *api_),
+  EXPECT_THROW_WITH_MESSAGE(TestUtility::loadFromFile(filename, proto_from_file, *api_),
                             EnvoyException,
                             "Unable to parse file \"" + filename +
                                 "\" as a text protobuf (type envoy.config.bootstrap.v2.Bootstrap)");
@@ -319,7 +319,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
   source_any.PackFrom(source_duration);
-  EXPECT_THROW_WITH_REGEX(MessageUtil::anyConvert<ProtobufWkt::Timestamp>(source_any),
+  EXPECT_THROW_WITH_REGEX(TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any),
                           EnvoyException, "Unable to unpack .*");
 }
 
@@ -328,32 +328,33 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongFields) {
   ProtobufWkt::Any source_any;
   source_any.PackFrom(obj);
   source_any.set_type_url("type.google.com/google.protobuf.Timestamp");
-  EXPECT_THROW_WITH_MESSAGE(MessageUtil::anyConvert<ProtobufWkt::Timestamp>(source_any),
+  EXPECT_THROW_WITH_MESSAGE(TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any),
                             EnvoyException,
                             "Protobuf message (type google.protobuf.Timestamp) has unknown fields");
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertSuccess) {
-  ProtobufWkt::Duration source_duration;
-  source_duration.set_seconds(42);
-  ProtobufWkt::Duration dest_duration;
-  MessageUtil::jsonConvert(source_duration, dest_duration);
-  EXPECT_EQ(42, dest_duration.seconds());
+  envoy::config::bootstrap::v2::Bootstrap source;
+  source.set_flags_path("foo");
+  ProtobufWkt::Struct tmp;
+  envoy::config::bootstrap::v2::Bootstrap dest;
+  TestUtility::jsonConvert(source, tmp);
+  TestUtility::jsonConvert(tmp, dest);
+  EXPECT_EQ("foo", dest.flags_path());
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertUnknownFieldSuccess) {
-  MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Allow;
   const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  EXPECT_NO_THROW(MessageUtil::jsonConvert(obj, bootstrap));
-  MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Strict;
+  EXPECT_NO_THROW(
+      MessageUtil::jsonConvert(obj, ProtobufMessage::getNullValidationVisitor(), bootstrap));
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertFail) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(-281474976710656);
-  ProtobufWkt::Duration dest_duration;
-  EXPECT_THROW_WITH_REGEX(MessageUtil::jsonConvert(source_duration, dest_duration), EnvoyException,
+  ProtobufWkt::Struct dest_struct;
+  EXPECT_THROW_WITH_REGEX(TestUtility::jsonConvert(source_duration, dest_struct), EnvoyException,
                           "Unable to convert protobuf message to JSON string.*"
                           "seconds exceeds limit for field:  seconds: -281474976710656\n");
 }
@@ -364,9 +365,9 @@ TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
   // Make sure we use a field eligible for snake/camel case translation.
   bootstrap.mutable_cluster_manager()->set_local_cluster_name("foo");
   ProtobufWkt::Struct json;
-  MessageUtil::jsonConvert(bootstrap, json);
+  TestUtility::jsonConvert(bootstrap, json);
   // Verify we can round-trip. This didn't cause the #3665 regression, but useful as a sanity check.
-  MessageUtil::loadFromJson(MessageUtil::getJsonStringFromMessage(json, false), bootstrap);
+  TestUtility::loadFromJson(MessageUtil::getJsonStringFromMessage(json, false), bootstrap);
   // Verify we don't do a camel case conversion.
   EXPECT_EQ("foo", json.fields()
                        .at("cluster_manager")
@@ -379,18 +380,18 @@ TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
 TEST_F(ProtobufUtilityTest, YamlLoadFromStringFail) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   // Verify loadFromYaml can parse valid YAML string.
-  MessageUtil::loadFromYaml("node: { id: node1 }", bootstrap);
+  TestUtility::loadFromYaml("node: { id: node1 }", bootstrap);
   // Verify loadFromYaml throws error when the input is an invalid YAML string.
   EXPECT_THROW_WITH_MESSAGE(
-      MessageUtil::loadFromYaml("not_a_yaml_that_can_be_converted_to_json", bootstrap),
+      TestUtility::loadFromYaml("not_a_yaml_that_can_be_converted_to_json", bootstrap),
       EnvoyException, "Unable to convert YAML as JSON: not_a_yaml_that_can_be_converted_to_json");
   // When wrongly inputted by a file path, loadFromYaml throws an error.
-  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromYaml("/home/configs/config.yaml", bootstrap),
+  EXPECT_THROW_WITH_MESSAGE(TestUtility::loadFromYaml("/home/configs/config.yaml", bootstrap),
                             EnvoyException,
                             "Unable to convert YAML as JSON: /home/configs/config.yaml");
   // Verify loadFromYaml throws error when the input leads to an Array. This error message is
   // arguably more useful than only "Unable to convert YAML as JSON".
-  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromYaml("- node: { id: node1 }", bootstrap),
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml("- node: { id: node1 }", bootstrap),
                           EnvoyException,
                           "Unable to parse JSON as proto.*Root element must be a message.*");
 }

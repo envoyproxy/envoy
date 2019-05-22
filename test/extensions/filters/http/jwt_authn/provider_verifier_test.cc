@@ -21,7 +21,7 @@ namespace {
 
 ProtobufWkt::Struct getExpectedPayload(const std::string& name) {
   ProtobufWkt::Struct expected_payload;
-  MessageUtil::loadFromJson(ExpectedPayloadJSON, expected_payload);
+  TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
 
   ProtobufWkt::Struct struct_obj;
   *(*struct_obj.mutable_fields())[name].mutable_struct_value() = expected_payload;
@@ -45,7 +45,7 @@ public:
 };
 
 TEST_F(ProviderVerifierTest, TestOkJWT) {
-  MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
+  TestUtility::loadFromYaml(ExampleConfig, proto_config_);
   (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(
       "my_payload");
   createVerifier();
@@ -67,7 +67,7 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
 }
 
 TEST_F(ProviderVerifierTest, TestMissedJWT) {
-  MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
+  TestUtility::loadFromYaml(ExampleConfig, proto_config_);
   createVerifier();
 
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed)).Times(1);
@@ -102,7 +102,7 @@ rules:
   requires:
     provider_name: "other_provider"
 )";
-  MessageUtil::loadFromYaml(config, proto_config_);
+  TestUtility::loadFromYaml(config, proto_config_);
   createVerifier();
 
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer)).Times(1);
@@ -120,7 +120,7 @@ rules:
 
 // This test verifies that JWT requirement can override audiences
 TEST_F(ProviderVerifierTest, TestRequiresProviderWithAudiences) {
-  MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
+  TestUtility::loadFromYaml(ExampleConfig, proto_config_);
   auto* requires =
       proto_config_.mutable_rules(0)->mutable_requires()->mutable_provider_and_audiences();
   requires->set_provider_name("example_provider");
@@ -141,7 +141,7 @@ TEST_F(ProviderVerifierTest, TestRequiresProviderWithAudiences) {
 
 // This test verifies that requirement referencing nonexistent provider will throw exception
 TEST_F(ProviderVerifierTest, TestRequiresNonexistentProvider) {
-  MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
+  TestUtility::loadFromYaml(ExampleConfig, proto_config_);
   proto_config_.mutable_rules(0)->mutable_requires()->set_provider_name("nosuchprovider");
 
   EXPECT_THROW(::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_),

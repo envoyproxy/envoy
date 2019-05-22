@@ -116,7 +116,9 @@ public:
                       const std::string&) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
+    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(
+               resource, factory_context_.messageValidationVisitor())
+        .name();
   }
 
 private:

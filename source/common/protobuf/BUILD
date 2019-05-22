@@ -25,6 +25,18 @@ cc_proto_library(
 )
 
 envoy_cc_library(
+    name = "message_validator_lib",
+    srcs = ["message_validator_impl.cc"],
+    hdrs = ["message_validator_impl.h"],
+    external_deps = ["protobuf"],
+    deps = [
+        "//include/envoy/protobuf:message_validator_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
     name = "protobuf",
     hdrs = ["protobuf.h"],
     external_deps = [
@@ -39,8 +51,10 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     external_deps = ["protobuf"],
     deps = [
+        ":message_validator_lib",
         ":protobuf",
         "//include/envoy/api:api_interface",
+        "//include/envoy/protobuf:message_validator_interface",
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
