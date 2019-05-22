@@ -14,7 +14,13 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/escaping.h"
+#include "fmt/printf.h"
 #include "gmock/gmock.h"
+#include "openssl/base64.h"
+#include "openssl/bytestring.h"
+#include "openssl/evp.h"
+#include "openssl/pem.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -79,8 +85,8 @@ public:
   }
 
   void setupSecureConnection(const bool secure) {
-    EXPECT_CALL(decoder_callbacks_, connection()).WillOnce(Return(&connection_));
-    EXPECT_CALL(Const(connection_), ssl()).Times(1).WillOnce(Return(secure ? &ssl_ : nullptr));
+    EXPECT_CALL(decoder_callbacks_, connection()).WillRepeatedly(Return(&connection_));
+    EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(secure ? &ssl_ : nullptr));
   }
 
   void setupMetadata(const std::string& yaml) {
@@ -1574,6 +1580,179 @@ TEST_F(LuaHttpFilterTest, CheckConnection) {
 
   setupSecureConnection(true);
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("secure")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Check base64 decode.
+TEST_F(LuaHttpFilterTest, CheckBase64Decode) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      str = request_handle:decodeBase64("aGVsbG8=")
+      if str == nil then
+        request_handle:logTrace("fail")
+      else
+        request_handle:logTrace(str)
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("hello")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Check base64 decode.
+TEST_F(LuaHttpFilterTest, CheckBase64DecodeFailure) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      str = request_handle:decodeBase64(".")
+      if str == nil then
+        request_handle:logTrace("fail")
+      else
+        request_handle:logTrace(str)
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("fail")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, ImportandReleasePublicKey) {
+  const std::string SCRIPT{R"EOF(
+    function string.fromhex(str)
+      return (str:gsub('..', function (cc)
+        return string.char(tonumber(cc, 16))
+      end))
+    end
+    function envoy_on_request(request_handle)
+      key = "30820122300d06092a864886f70d01010105000382010f003082010a0282010100a7471266d01d160308d73409c06f2e8d35c531c458d3e480e9f3191847d062ec5ccff7bc51e949d5f2c3540c189a4eca1e8633a62cf2d0923101c27e38013e71de9ae91a704849bff7fbe2ce5bf4bd666fd9731102a53193fe5a9a5a50644ff8b1183fa897646598caad22a37f9544510836372b44c58c98586fb7144629cd8c9479592d996d32ff6d395c0b8442ec5aa1ef8051529ea0e375883cefc72c04e360b4ef8f5760650589ca814918f678eee39b884d5af8136a9630a6cc0cde157dc8e00f39540628d5f335b2c36c54c7c8bc3738a6b21acff815405afa28e5183f550dac19abcf1145a7f9ced987db680e4a229cac75dee347ec9ebce1fc3dbbbb0203010001"
+      raw = key:fromhex()
+      key = request_handle:importPublicKey(raw, string.len(raw)) 
+
+      if key == nil then
+        request_handle:logTrace("failed to import public key")
+      else
+        request_handle:releasePublicKey(key)
+        request_handle:logTrace("succeeded to import public key")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("succeeded to import public key")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, InvalidPublicKey) {
+  const std::string SCRIPT{R"EOF(
+    function string.fromhex(str)
+      return (str:gsub('..', function (cc)
+        return string.char(tonumber(cc, 16))
+      end))
+    end
+    function envoy_on_request(request_handle)
+      key = "0000"
+      raw = key:fromhex()
+      key = request_handle:importPublicKey(raw, string.len(raw)) 
+
+      if key == nil then
+        request_handle:logTrace("failed to import public key")
+      else
+        request_handle:releasePublicKey(key)
+        request_handle:logTrace("succeeded to import public key")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("failed to import public key")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, SignatureVerify) {
+  const std::string SCRIPT{R"EOF(
+    function string.fromhex(str)
+      return (str:gsub('..', function (cc)
+        return string.char(tonumber(cc, 16))
+      end))
+    end
+    function envoy_on_request(request_handle)
+      key = "30820122300d06092a864886f70d01010105000382010f003082010a0282010100a7471266d01d160308d73409c06f2e8d35c531c458d3e480e9f3191847d062ec5ccff7bc51e949d5f2c3540c189a4eca1e8633a62cf2d0923101c27e38013e71de9ae91a704849bff7fbe2ce5bf4bd666fd9731102a53193fe5a9a5a50644ff8b1183fa897646598caad22a37f9544510836372b44c58c98586fb7144629cd8c9479592d996d32ff6d395c0b8442ec5aa1ef8051529ea0e375883cefc72c04e360b4ef8f5760650589ca814918f678eee39b884d5af8136a9630a6cc0cde157dc8e00f39540628d5f335b2c36c54c7c8bc3738a6b21acff815405afa28e5183f550dac19abcf1145a7f9ced987db680e4a229cac75dee347ec9ebce1fc3dbbbb0203010001"
+      hashFunc = "sha256"
+      signature = "345ac3a167558f4f387a81c2d64234d901a7ceaa544db779d2f797b0ea4ef851b740905a63e2f4d5af42cee093a29c7155db9a63d3d483e0ef948f5ac51ce4e10a3a6606fd93ef68ee47b30c37491103039459122f78e1c7ea71a1a5ea24bb6519bca02c8c9915fe8be24927c91812a13db72dbcb500103a79e8f67ff8cb9e2a631974e0668ab3977bf570a91b67d1b6bcd5dce84055f21427d64f4256a042ab1dc8e925d53a769f6681a873f5859693a7728fcbe95beace1563b5ffbcd7c93b898aeba31421dafbfadeea50229c49fd6c445449314460f3d19150bd29a91333beaced557ed6295234f7c14fa46303b7e977d2c89ba8a39a46a35f33eb07a332"
+      data = "hello"
+
+      rawkey = key:fromhex()
+      pkey = request_handle:importPublicKey(rawkey, string.len(rawkey))
+
+      if pkey == nil then
+        request_handle:logTrace("failed to import public key")
+        return
+      end
+
+      rawsig = signature:fromhex()
+
+      ok, error = request_handle:verifySignature(pkey, hashFunc, rawsig, string.len(rawsig), data, string.len(data)) 
+      if ok then
+        request_handle:logTrace("signature is valid")
+      else
+        request_handle:logTrace(error)
+      end
+
+      ok, error = request_handle:verifySignature(pkey, "unknown", rawsig, string.len(rawsig), data, string.len(data)) 
+      if ok then
+        request_handle:logTrace("signature is valid")
+      else
+        request_handle:logTrace(error)
+      end
+
+      ok, error = request_handle:verifySignature(pkey, hashFunc, "0000", 4, data, string.len(data)) 
+      if ok then
+        request_handle:logTrace("signature is valid")
+      else
+        request_handle:logTrace(error)
+      end
+
+      ok, error = request_handle:verifySignature(pkey, hashFunc, rawsig, string.len(rawsig), "xxxx", 4) 
+      if ok then
+        request_handle:logTrace("signature is valid")
+      else
+        request_handle:logTrace(error)
+      end
+
+      request_handle:releasePublicKey(pkey)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("signature is valid")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("unknown is not supported.")));
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::trace, StrEq("Failed to verify digest. Error code: 0")));
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::trace, StrEq("Failed to verify digest. Error code: 0")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 

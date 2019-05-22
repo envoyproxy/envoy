@@ -9,6 +9,13 @@
 #include "common/common/enum_to_int.h"
 #include "common/http/message_impl.h"
 
+#include "absl/strings/ascii.h"
+#include "absl/strings/escaping.h"
+#include "absl/strings/str_cat.h"
+#include "openssl/base64.h"
+#include "openssl/bytestring.h"
+#include "openssl/evp.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -425,6 +432,122 @@ int StreamHandleWrapper::luaLogErr(lua_State* state) {
 int StreamHandleWrapper::luaLogCritical(lua_State* state) {
   const char* message = luaL_checkstring(state, 2);
   filter_.scriptLog(spdlog::level::critical, message);
+  return 0;
+}
+
+int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
+  // Step 1: get public key
+  auto ptr = lua_touserdata(state, 2);
+  auto key = reinterpret_cast<EVP_PKEY*>(ptr);
+
+  // Step 2: initialize EVP_MD_CTX
+  auto ctx = EVP_MD_CTX_new();
+
+  // Step 3: initialize EVP_MD
+  absl::string_view hashFunc = luaL_checkstring(state, 3);
+  const EVP_MD* md = nullptr;
+  hashFunc = absl::AsciiStrToLower(hashFunc);
+
+  // Ref
+  // https://github.com/google/boringssl/blob/ff62b38b4b5a0e7926034b5f93d0c276e55b571d/include/openssl/digest.h#L79
+  if (hashFunc == "md4") {
+    md = EVP_md4();
+  } else if (hashFunc == "md5") {
+    md = EVP_md5();
+  } else if (hashFunc == "sha1") {
+    md = EVP_sha1();
+  } else if (hashFunc == "sha224") {
+    md = EVP_sha224();
+  } else if (hashFunc == "sha256") {
+    md = EVP_sha256();
+  } else if (hashFunc == "sha384") {
+    md = EVP_sha384();
+  } else if (hashFunc == "sha512") {
+    md = EVP_sha512();
+  } else if (hashFunc == "md5_sha1") {
+    md = EVP_md5_sha1();
+  } else {
+    lua_pushboolean(state, false);
+    auto errMsg = absl::StrCat(hashFunc, " is not supported.");
+    lua_pushlstring(state, errMsg.data(), errMsg.length());
+    EVP_MD_CTX_free(ctx);
+    return 2;
+  }
+
+  // Step 4: initialize EVP_DigestVerify
+  int ok = EVP_DigestVerifyInit(ctx, nullptr, md, nullptr, key);
+  if (!ok) {
+    lua_pushboolean(state, false);
+    absl::string_view errMsg = "Failed to initialize digest verify.";
+    lua_pushlstring(state, errMsg.data(), errMsg.length());
+    EVP_MD_CTX_free(ctx);
+    return 2;
+  }
+
+  // Step 5: verify signature
+  const char* signature = luaL_checkstring(state, 4);
+  int sigLen = luaL_checknumber(state, 5);
+  absl::string_view sig(signature, sigLen);
+
+  const char* clearText = luaL_checkstring(state, 6);
+  int textLen = luaL_checknumber(state, 7);
+  absl::string_view text(clearText, textLen);
+
+  ok = EVP_DigestVerify(ctx, reinterpret_cast<const uint8_t*>(sig.data()), sig.length(),
+                        reinterpret_cast<const uint8_t*>(text.data()), text.length());
+
+  // Step 6: check result
+  if (ok == 1) {
+    lua_pushboolean(state, true);
+    lua_pushnil(state);
+    EVP_MD_CTX_free(ctx);
+    return 2;
+  }
+
+  lua_pushboolean(state, false);
+  auto errMsg = absl::StrCat("Failed to verify digest. Error code: ", ok);
+  lua_pushlstring(state, errMsg.data(), errMsg.length());
+  EVP_MD_CTX_free(ctx);
+  return 2;
+}
+
+int StreamHandleWrapper::luaDecodeBase64(lua_State* state) {
+  // Get input string
+  absl::string_view str = luaL_checkstring(state, 2);
+  std::string output;
+
+  auto ok = absl::Base64Unescape(str, &output);
+
+  if (ok) {
+    lua_pushlstring(state, output.data(), output.length());
+  } else {
+    // If decode failed, push a nil into stack.
+    lua_pushnil(state);
+  }
+
+  return 1;
+}
+
+int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
+  // Get byte array the the length.
+  const char* str = luaL_checkstring(state, 2);
+  int n = luaL_checknumber(state, 3);
+
+  absl::string_view keyder(str, n);
+  CBS cbs({reinterpret_cast<const uint8_t*>(keyder.data()), keyder.length()});
+  auto key = EVP_parse_public_key(&cbs);
+  if (key == nullptr) {
+    lua_pushnil(state);
+  } else {
+    lua_pushlightuserdata(state, key);
+  }
+  return 1;
+}
+
+int StreamHandleWrapper::luaReleasePublicKey(lua_State* state) {
+  auto ptr = lua_touserdata(state, 2);
+  auto key = reinterpret_cast<EVP_PKEY*>(ptr);
+  EVP_PKEY_free(key);
   return 0;
 }
 
