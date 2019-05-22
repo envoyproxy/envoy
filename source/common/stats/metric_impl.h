@@ -33,7 +33,7 @@ public:
   void iterateTagStatNames(const TagStatNameIterFn& fn) const override;
   void iterateTags(const TagIterFn& fn) const override;
 
-  // Metric implementations must each implement Metric::symboTable(). However,
+  // Metric implementations must each implement Metric::symbolTable(). However,
   // they can inherit the const version of that accessor from MetricImpl.
   const SymbolTable& constSymbolTable() const override {
     // Cast our 'this', which is of type `const MetricImpl*` to a non-const
@@ -41,7 +41,7 @@ public:
     // symbolTable(). That will be returned as a non-const SymbolTable&,
     // which will become const on return.
     //
-    // This pattern is used to share a single non-trival implementation to
+    // This pattern is used to share a single non-trivial implementation to
     // provide const and non-const variants of a method.
     return const_cast<MetricImpl*>(this)->symbolTable();
   }
