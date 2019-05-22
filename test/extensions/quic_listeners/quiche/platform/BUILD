@@ -35,6 +35,7 @@ envoy_cc_test(
         ":quic_platform_epoll_clock_lib",
         "//source/common/memory:stats_lib",
         "//source/extensions/quic_listeners/quiche/platform:flags_impl_lib",
+        "//test/common/buffer:utility_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/extensions/transport_sockets/tls:ssl_test_utils",
         "//test/mocks/api:api_mocks",

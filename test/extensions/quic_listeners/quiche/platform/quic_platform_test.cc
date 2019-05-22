@@ -14,6 +14,7 @@
 
 #include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 
+#include "test/common/buffer/utility.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/quic_listeners/quiche/platform/quic_epoll_clock.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
@@ -705,7 +706,16 @@ TEST_F(QuicPlatformTest, TestSystemEventLoop) {
   QuicSystemEventLoop("dummy");
 }
 
-TEST_F(QuicPlatformTest, ConstructMemSliceFromBuffer) {
+class QuicMemSliceTest : public Envoy::Buffer::BufferImplementationParamTest {
+public:
+  ~QuicMemSliceTest() override {}
+};
+
+INSTANTIATE_TEST_CASE_P(QuicMemSliceTests, QuicMemSliceTest,
+                        testing::ValuesIn({Envoy::Buffer::BufferImplementation::Old,
+                                           Envoy::Buffer::BufferImplementation::New}));
+
+TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');
   // Fragment needs to out-live buffer.
   bool fragment_releaser_called = false;
@@ -716,6 +726,7 @@ TEST_F(QuicPlatformTest, ConstructMemSliceFromBuffer) {
         fragment_releaser_called = true;
       });
   Envoy::Buffer::OwnedImpl buffer;
+  Envoy::Buffer::BufferImplementationParamTest::verifyImplementation(buffer);
   EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer, 0)}, "");
   std::string str2(1024, 'a');
   // str2 is copied.
@@ -743,7 +754,7 @@ TEST_F(QuicPlatformTest, ConstructMemSliceFromBuffer) {
   EXPECT_TRUE(fragment_releaser_called);
 }
 
-TEST_F(QuicPlatformTest, QuicMemSliceStorage) {
+TEST_P(QuicMemSliceTest, QuicMemSliceStorage) {
   std::string str(512, 'a');
   struct iovec iov = {const_cast<char*>(str.data()), str.length()};
   SimpleBufferAllocator allocator;
