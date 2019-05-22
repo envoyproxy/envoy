@@ -20,7 +20,7 @@ public:
   EdsReadyFilter(const Stats::Scope& root_scope)
       : root_scope_(root_scope),
         stat_name_("cluster.cluster_0.membership_healthy",
-                   const_cast<Stats::SymbolTable&>(root_scope_.symbolTable())) {}
+                   const_cast<Stats::SymbolTable&>(root_scope_.constSymbolTable())) {}
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override {
     absl::optional<std::reference_wrapper<const Stats::Gauge>> gauge =
         root_scope_.findGauge(stat_name_.statName());
