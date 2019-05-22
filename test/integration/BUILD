@@ -709,6 +709,8 @@ envoy_cc_test(
     data = ["//test/config/integration:server_xds_files"],
     deps = [
         ":http_integration_lib",
+        ":http_protocol_integration_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )
