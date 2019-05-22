@@ -131,9 +131,12 @@ void InstanceImpl::drainListeners() {
 void InstanceImpl::failHealthcheck(bool fail) { server_stats_->live_.set(!fail); }
 
 // Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could
-// potentially make this static and have a clear() method to avoid some vector constructions
-// and reservations, but I'm not sure it's worth the extra complexity until it shows up in perf
-// traces.
+// potentially have a single class instance held in a static and have a clear() method to avoid some
+// vector constructions and reservations, but I'm not sure it's worth the extra complexity until it
+// shows up in perf traces.
+// TODO(mattklein123): One thing we probably want to do is switch from returning vectors of metrics
+//                     to a lambda based callback iteration API. This would require less vector
+//                     copying and probably be a cleaner API in general.
 class MetricSnapshotImpl : public Stats::MetricSnapshot {
 public:
   MetricSnapshotImpl(Stats::Store& store) {
