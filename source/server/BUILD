@@ -285,6 +285,7 @@ envoy_cc_library(
     srcs = ["proto_descriptors.cc"],
     hdrs = ["proto_descriptors.h"],
     deps = [
+        "//source/common/common:assert_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:cds_cc",
