@@ -627,14 +627,14 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
     if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
-    callbacks_->sendLocalReply(code, body,
-                               [dropped, this](Http::HeaderMap& headers) {
-                                 if (dropped && !config_.suppress_envoy_headers_) {
-                                   headers.insertEnvoyOverloaded().value(
-                                       Http::Headers::get().EnvoyOverloadedValues.True);
-                                 }
-                               },
-                               absl::nullopt, details);
+    callbacks_->sendLocalReply(
+        code, body,
+        [dropped, this](Http::HeaderMap& headers) {
+          if (dropped && !config_.suppress_envoy_headers_) {
+            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+          }
+        },
+        absl::nullopt, details);
   }
 }
 
