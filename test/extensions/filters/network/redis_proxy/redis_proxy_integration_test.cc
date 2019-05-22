@@ -411,7 +411,7 @@ void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
 
 FakeRawConnectionPtr RedisProxyWithMirrorsIntegrationTest::expectUpstreamRequestResponse(
     FakeUpstreamPtr& upstream, const std::string& request, const std::string& response) {
-  std::__cxx11::string proxy_to_server;
+  std::string proxy_to_server;
   FakeRawConnectionPtr upstream_connection;
   EXPECT_TRUE(upstream->waitForRawConnection(upstream_connection));
   EXPECT_TRUE(upstream_connection->waitForData(request.size(), &proxy_to_server));
