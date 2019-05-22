@@ -428,8 +428,8 @@ TEST_P(OwnedImplTest, PrependEmpty) {
 // https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=14466, empty commit
 // following a reserve resulted in a corrupted libevent internal state.
 TEST_P(OwnedImplTest, ReserveZeroCommit) {
-  Buffer::OwnedImpl buf;
   BufferFragmentImpl frag("", 0, nullptr);
+  Buffer::OwnedImpl buf;
   buf.addBufferFragment(frag);
   buf.prepend("bbbbb");
   buf.add("");
