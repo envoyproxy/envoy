@@ -8,7 +8,6 @@
 #include "envoy/server/instance.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/sink.h"
-#include "envoy/stats/source.h"
 
 #include "common/stats/symbol_table_impl.h"
 
@@ -51,7 +50,7 @@ public:
   HystrixSink(Server::Instance& server, uint64_t num_buckets);
   Http::Code handlerHystrixEventStream(absl::string_view, Http::HeaderMap& response_headers,
                                        Buffer::Instance&, Server::AdminStream& admin_stream);
-  void flush(Stats::Source& source) override;
+  void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override{};
 
   /**

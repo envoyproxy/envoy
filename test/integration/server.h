@@ -13,7 +13,6 @@
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
-#include "common/stats/source_impl.h"
 
 #include "server/listener_hooks.h"
 #include "server/options_impl.h"
@@ -134,7 +133,6 @@ private:
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
-  TestIsolatedStoreImpl() : source_(*this) {}
   // Stats::Scope
   Counter& counterFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
@@ -204,12 +202,10 @@ public:
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
   void mergeHistograms(PostMergeCb) override {}
-  Source& source() override { return source_; }
 
 private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
-  SourceImpl source_;
 };
 
 } // namespace Stats
