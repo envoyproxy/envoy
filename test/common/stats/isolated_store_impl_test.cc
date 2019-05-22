@@ -148,5 +148,13 @@ TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
   EXPECT_EQ("test.test_histogram", histogram.name());
 }
 
+TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {
+  NullCounterImpl c(store_.symbolTable());
+  EXPECT_EQ(0, c.latch());
+  NullGaugeImpl g(store_.symbolTable());
+  g.setShouldImport(true);
+  EXPECT_EQ(absl::nullopt, g.cachedShouldImport());
+}
+
 } // namespace Stats
 } // namespace Envoy
