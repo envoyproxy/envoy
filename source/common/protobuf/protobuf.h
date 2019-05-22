@@ -45,6 +45,7 @@ namespace ProtobufWkt = google::protobuf;
 namespace ProtobufTypes {
 
 typedef std::unique_ptr<Protobuf::Message> MessagePtr;
+typedef std::vector<std::unique_ptr<const Protobuf::Message>> ConstMessagePtrVector;
 
 typedef int64_t Int64;
 

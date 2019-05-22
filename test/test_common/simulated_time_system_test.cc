@@ -197,6 +197,42 @@ TEST_F(SimulatedTimeSystemTest, DeleteTime) {
   EXPECT_EQ("36", output_);
 }
 
+// Regression test for issues documented in https://github.com/envoyproxy/envoy/pull/6956
+TEST_F(SimulatedTimeSystemTest, DuplicateTimer) {
+  // Set one alarm two times to test that pending does not get duplicated..
+  std::chrono::milliseconds delay(0);
+  TimerPtr zero_timer = scheduler_->createTimer([this]() { output_.append(1, '2'); });
+  zero_timer->enableTimer(delay);
+  zero_timer->enableTimer(delay);
+  sleepMsAndLoop(1);
+  EXPECT_EQ("2", output_);
+
+  // Now set an alarm which requires 10ms of progress and make sure waitFor works.
+  std::atomic<bool> done(false);
+  auto thread = Thread::threadFactoryForTest().createThread([this, &done]() {
+    while (!done) {
+      base_scheduler_.run(Dispatcher::RunType::Block);
+    }
+  });
+  Thread::CondVar condvar;
+  Thread::MutexBasicLockable mutex;
+  TimerPtr timer = scheduler_->createTimer([&condvar, &mutex, &done]() {
+    Thread::LockGuard lock(mutex);
+    done = true;
+    condvar.notifyOne();
+  });
+  timer->enableTimer(std::chrono::seconds(10));
+
+  {
+    Thread::LockGuard lock(mutex);
+    EXPECT_EQ(Thread::CondVar::WaitStatus::NoTimeout,
+              time_system_.waitFor(mutex, condvar, std::chrono::seconds(10)));
+  }
+  EXPECT_TRUE(done);
+
+  thread->join();
+}
+
 } // namespace
 } // namespace Test
 } // namespace Event

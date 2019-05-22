@@ -14,6 +14,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/common/macros.h"
 
 #include "absl/strings/string_view.h"
 

@@ -44,7 +44,7 @@ protected:
 };
 
 // Verifies that an incoming request with too small a request body will immediately fail.
-TEST_F(ReverseBridgeTest, InvalidGrcpRequest) {
+TEST_F(ReverseBridgeTest, InvalidGrpcRequest) {
   initialize();
   decoder_callbacks_.is_grpc_request_ = true;
 

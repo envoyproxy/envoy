@@ -303,6 +303,11 @@ TEST_F(OptionsImplTest, SetBothConcurrencyAndCpuset) {
           createOptionsImpl("envoy -c hello --concurrency 42 --cpuset-threads"));
 }
 
+TEST_F(OptionsImplTest, SetCpusetOnly) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello --cpuset-threads");
+  EXPECT_NE(options->concurrency(), 0);
+}
+
 #if defined(__linux__)
 
 using testing::DoAll;

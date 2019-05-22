@@ -255,6 +255,9 @@ message TLSProperties {
 
   // Properties of the peer certificate used to negotiate TLS.
   CertificateProperties peer_certificate_properties = 5;
+
+  // The TLS session ID.
+  string tls_session_id = 6;
 }
 
 message HTTPRequestProperties {
