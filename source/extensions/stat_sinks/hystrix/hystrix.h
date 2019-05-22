@@ -162,6 +162,12 @@ private:
   Stats::StatNamePool stat_name_pool_;
   Stats::StatName cluster_name_;
   Stats::StatName cluster_upstream_rq_time_;
+  Stats::StatName membership_total_;
+  Stats::StatName retry_upstream_rq_4xx_;
+  Stats::StatName retry_upstream_rq_5xx_;
+  Stats::StatName upstream_rq_2xx_;
+  Stats::StatName upstream_rq_4xx_;
+  Stats::StatName upstream_rq_5xx_;
 };
 
 typedef std::unique_ptr<HystrixSink> HystrixSinkPtr;
