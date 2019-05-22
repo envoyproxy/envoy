@@ -154,7 +154,6 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
       local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
-  onDeferredDelete();
   ASSERT(client_ == nullptr);
 }
 
@@ -268,20 +267,43 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     break;
   }
 
-  // It is possible for this session to have been deferred destroyed inline in handleFailure()
-  // above so make sure we still have a connection that we might need to close.
-  if (client_ != nullptr &&
-      ((response_headers_->Connection() &&
-        absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
-                               Http::Headers::get().ConnectionValues.Close)) ||
-       (response_headers_->ProxyConnection() && protocol_ != Http::Protocol::Http2 &&
-        absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
-                               Http::Headers::get().ConnectionValues.Close)) ||
-       !parent_.reuse_connection_)) {
+  if (shouldClose()) {
     client_->close();
   }
 
   response_headers_.reset();
+}
+
+// It is possible for this session to have been deferred destroyed inline in handleFailure()
+// above so make sure we still have a connection that we might need to close.
+bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
+  if (client_ == nullptr) {
+    return false;
+  }
+
+  if (response_headers_->Connection()) {
+    const bool close =
+        absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
+                               Http::Headers::get().ConnectionValues.Close);
+    if (close) {
+      return true;
+    }
+  }
+
+  if (response_headers_->ProxyConnection() && protocol_ != Http::Protocol::Http2) {
+    const bool close =
+        absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
+                               Http::Headers::get().ConnectionValues.Close);
+    if (close) {
+      return true;
+    }
+  }
+
+  if (!parent_.reuse_connection_) {
+    return true;
+  }
+
+  return false;
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
@@ -356,7 +378,6 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
       receive_bytes_(TcpHealthCheckMatcher::loadProtoBytes(config.tcp_health_check().receive())) {}
 
 TcpHealthCheckerImpl::TcpActiveHealthCheckSession::~TcpActiveHealthCheckSession() {
-  onDeferredDelete();
   ASSERT(client_ == nullptr);
 }
 
@@ -464,7 +485,6 @@ GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::GrpcActiveHealthCheckSessio
     : ActiveHealthCheckSession(parent, host), parent_(parent) {}
 
 GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::~GrpcActiveHealthCheckSession() {
-  onDeferredDelete();
   ASSERT(client_ == nullptr);
 }
 

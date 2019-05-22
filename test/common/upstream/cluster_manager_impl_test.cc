@@ -196,7 +196,8 @@ const ClusterManager::ClusterWarmingCallback dummyWarmingCb = [](auto, auto) {};
 
 class ClusterManagerImplTest : public testing::Test {
 public:
-  ClusterManagerImplTest() : api_(Api::createApiForTest()) {}
+  ClusterManagerImplTest()
+      : api_(Api::createApiForTest()), http_context_(factory_.stats_.symbolTable()) {}
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(

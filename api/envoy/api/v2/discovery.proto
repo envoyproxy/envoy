@@ -83,9 +83,8 @@ message DiscoveryResponse {
   //   validated via a dry run.
   bool canary = 3;
 
-  // Type URL for resources. This must be consistent with the type_url in the
-  // Any messages for resources if resources is non-empty. This effectively
-  // identifies the xDS API when muxing over ADS.
+  // Type URL for resources. Identifies the xDS API when muxing over ADS.
+  // Must be consistent with the type_url in the 'resources' repeated Any (if non-empty).
   string type_url = 4;
 
   // For gRPC based subscriptions, the nonce provides a way to explicitly ack a
@@ -190,6 +189,12 @@ message DeltaDiscoveryResponse {
   // The response resources. These are typed resources that match the type url
   // in the DeltaDiscoveryRequest.
   repeated Resource resources = 2 [(gogoproto.nullable) = false];
+
+  // field id 3 IS available!
+
+  // Type URL for resources. Identifies the xDS API when muxing over ADS.
+  // Must be consistent with the type_url in the Any within 'resources' if 'resources' is non-empty.
+  string type_url = 4;
 
   // Resources names of resources that have be deleted and to be removed from the xDS Client.
   // Removed resources for missing resources can be ignored.
