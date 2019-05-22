@@ -2,8 +2,8 @@
 
 #include "envoy/api/v2/lds.pb.h"
 
-#include "common/config/utility.h"
 #include "common/http/message_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "server/lds_api.h"
 
@@ -17,6 +17,7 @@ using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
+using testing::ReturnRef;
 using testing::Throw;
 
 namespace Envoy {
@@ -32,17 +33,16 @@ public:
   }
 
   void setup() {
-    const std::string config_json = R"EOF(
-    {
-      "api_type": "REST",
-      "cluster": "foo_cluster",
-      "refresh_delay_ms": 1000
-    }
+    const std::string config_yaml = R"EOF(
+api_config_source:
+  api_type: REST
+  cluster_names:
+  - foo_cluster
+  refresh_delay: 1s
     )EOF";
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
     envoy::api::v2::core::ConfigSource lds_config;
-    Config::Utility::translateLdsConfig(*config, lds_config);
+    MessageUtil::loadFromYaml(config_yaml, lds_config);
     lds_config.mutable_api_config_source()->set_api_type(
         envoy::api::v2::core::ApiConfigSource::REST);
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
@@ -158,17 +158,16 @@ TEST_F(LdsApiTest, ValidateFail) {
 }
 
 TEST_F(LdsApiTest, UnknownCluster) {
-  const std::string config_json = R"EOF(
-  {
-    "api_type": "REST",
-    "cluster": "foo_cluster",
-    "refresh_delay_ms": 1000
-  }
+  const std::string config_yaml = R"EOF(
+api_config_source:
+  api_type: REST
+  cluster_names:
+  - foo_cluster
+  refresh_delay: 1s
   )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   envoy::api::v2::core::ConfigSource lds_config;
-  Config::Utility::translateLdsConfig(*config, lds_config);
+  MessageUtil::loadFromYaml(config_yaml, lds_config);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
@@ -272,17 +271,16 @@ TEST_F(LdsApiTest, ValidateDuplicateListeners) {
 
 TEST_F(LdsApiTest, BadLocalInfo) {
   interval_timer_ = new Event::MockTimer(&dispatcher_);
-  const std::string config_json = R"EOF(
-  {
-    "api_type": "REST",
-    "cluster": "foo_cluster",
-    "refresh_delay_ms": 1000
-  }
+  const std::string config_yaml = R"EOF(
+api_config_source:
+  api_type: REST
+  cluster_names:
+  - foo_cluster
+  refresh_delay: 1s
   )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   envoy::api::v2::core::ConfigSource lds_config;
-  Config::Utility::translateLdsConfig(*config, lds_config);
+  MessageUtil::loadFromYaml(config_yaml, lds_config);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("foo_cluster", cluster);
@@ -290,7 +288,7 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type());
-  ON_CALL(local_info_, clusterName()).WillByDefault(Return(std::string()));
+  ON_CALL(local_info_, clusterName()).WillByDefault(ReturnRef(EMPTY_STRING));
   EXPECT_THROW_WITH_MESSAGE(
       LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_manager_, local_info_,
                  store_, listener_manager_, *api_),

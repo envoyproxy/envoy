@@ -327,3 +327,4 @@ CrashOverride will vouch for the "Seven" distribution joining the distribution l
 | secalert@redhat.com                       | Red Hat       |
 | envoy-security@solo.io                    | solo.io       |
 | envoy-security@tetrate.io                 | Tetrate       |
+| security@vmware.com                       | VMware        |

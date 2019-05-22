@@ -92,8 +92,8 @@ public:
     config_ = std::make_unique<ConfigImpl>(route_config, factory_context_, true);
   }
 
-  std::unique_ptr<ConfigImpl> config_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  std::unique_ptr<ConfigImpl> config_;
   Http::TestHeaderMapImpl header_;
   const RouteEntry* route_;
   Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};

@@ -48,20 +48,19 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
   });
 }
 
-void UdpStatsdSink::flush(Stats::Source& source) {
+void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
   Writer& writer = tls_->getTyped<Writer>();
-  for (const Stats::CounterSharedPtr& counter : source.cachedCounters()) {
-    if (counter->used()) {
-      uint64_t delta = counter->latch();
-      writer.write(fmt::format("{}.{}:{}|c{}", prefix_, getName(*counter), delta,
-                               buildTagStr(counter->tags())));
+  for (const auto& counter : snapshot.counters()) {
+    if (counter.counter_.get().used()) {
+      writer.write(fmt::format("{}.{}:{}|c{}", prefix_, getName(counter.counter_.get()),
+                               counter.delta_, buildTagStr(counter.counter_.get().tags())));
     }
   }
 
-  for (const Stats::GaugeSharedPtr& gauge : source.cachedGauges()) {
-    if (gauge->used()) {
-      writer.write(fmt::format("{}.{}:{}|g{}", prefix_, getName(*gauge), gauge->value(),
-                               buildTagStr(gauge->tags())));
+  for (const auto& gauge : snapshot.gauges()) {
+    if (gauge.get().used()) {
+      writer.write(fmt::format("{}.{}:{}|g{}", prefix_, getName(gauge.get()), gauge.get().value(),
+                               buildTagStr(gauge.get().tags())));
     }
   }
 }
@@ -110,18 +109,18 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
   });
 }
 
-void TcpStatsdSink::flush(Stats::Source& source) {
+void TcpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
   TlsSink& tls_sink = tls_->getTyped<TlsSink>();
   tls_sink.beginFlush(true);
-  for (const Stats::CounterSharedPtr& counter : source.cachedCounters()) {
-    if (counter->used()) {
-      tls_sink.flushCounter(counter->name(), counter->latch());
+  for (const auto& counter : snapshot.counters()) {
+    if (counter.counter_.get().used()) {
+      tls_sink.flushCounter(counter.counter_.get().name(), counter.delta_);
     }
   }
 
-  for (const Stats::GaugeSharedPtr& gauge : source.cachedGauges()) {
-    if (gauge->used()) {
-      tls_sink.flushGauge(gauge->name(), gauge->value());
+  for (const auto& gauge : snapshot.gauges()) {
+    if (gauge.get().used()) {
+      tls_sink.flushGauge(gauge.get().name(), gauge.get().value());
     }
   }
   tls_sink.endFlush(true);

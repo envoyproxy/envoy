@@ -139,8 +139,12 @@ public:
   }
 
   // ServerLifecycleNotifier
-  void registerCallback(Stage, StageCallback) override {}
-  void registerCallback(Stage, StageCallbackWithCompletion) override {}
+  ServerLifecycleNotifier::HandlePtr registerCallback(Stage, StageCallback) override {
+    return nullptr;
+  }
+  ServerLifecycleNotifier::HandlePtr registerCallback(Stage, StageCallbackWithCompletion) override {
+    return nullptr;
+  }
 
 private:
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
