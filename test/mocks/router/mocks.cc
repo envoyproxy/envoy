@@ -109,5 +109,8 @@ MockRoute::~MockRoute() {}
 MockRouteConfigProviderManager::MockRouteConfigProviderManager() {}
 MockRouteConfigProviderManager::~MockRouteConfigProviderManager() {}
 
+MockScopedConfig::MockScopedConfig() {}
+MockScopedConfig::~MockScopedConfig() {}
+
 } // namespace Router
 } // namespace Envoy
