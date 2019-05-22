@@ -82,16 +82,33 @@ If a vulnerability does not affect any point release but only master, additional
 
 We advise distributors and operators working from the master branch to allow at least 3 days soak
 time after cutting a binary release before distribution or rollout, to allow time for our fuzzers to
-detect issues during their execution on ClusterFuzz.
+detect issues during their execution on ClusterFuzz. A soak period of 5 days provides an even stronger
+guarantee, since we will invoke the security release process for medium or higher severity issues
+for these older bugs.
 
 ### Confidentiality, integrity and availability
 
 We consider vulnerabilities leading to the compromise of data confidentiality or integrity to be our
 highest priority concerns. Availability, in particular in areas relating to DoS and resource
-exhaustion, is a serious security concern that we are making a best effort attempt to address in
-Envoy today. We will not activate the security release process for vulnerabilities that only affect
-availability until we are confident that Envoy is production hardened with respect to availability.
-Operators deploying Envoy at the edge should keep this caveat in mind.
+exhaustion, is also a serious security concern for Envoy operators, in particular those utilizing
+Envoy in edge deployments.
+
+The Envoy availability stance around CPU and memory DoS, as well as Query-of-Death (QoD), is still
+evolving. We will continue to iterate and fix well known resource issues in the open, e.g. overload
+manager and watermark improvements. We will activate the security process for disclosures that
+appear to present a risk profile that is significantly greater than the current Envoy availability
+hardening status quo. Examples of disclosures that would elicit this response:
+* QoD; where a single query from a client can bring down an Envoy server.
+* High amplification attacks, where very little traffic, e.g. that delivered by a single client, can
+  cause resource exhaustion.
+
+Note that we do not currently consider the default settings for Envoy to be safe from an availability
+perspective. It is necessary for operators to explicitly configure watermarks, the overload manager,
+circuit breakers and other resource related features in Envoy to provide a robust availability
+story. We will not act on any security disclosure that relates to a lack of safe defaults. Over
+time, we will work towards improved safe-by-default configuration, but due to backwards
+compatibility and performance concerns, this will require following the breaking change deprecation
+policy.
 
 ### Fix Team Organization
 
