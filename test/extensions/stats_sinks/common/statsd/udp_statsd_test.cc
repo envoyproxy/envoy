@@ -179,7 +179,6 @@ TEST(UdpStatsdSinkTest, CheckActualStatsWithCustomPrefix) {
 }
 
 TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
-  Stats::SymbolTableImpl symbol_table;
   NiceMock<Stats::MockSource> source;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
   NiceMock<ThreadLocal::MockInstance> tls_;
