@@ -16,6 +16,7 @@
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
+#include "envoy/router/scopes.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -372,6 +373,14 @@ public:
   MOCK_METHOD2(createStaticRouteConfigProvider,
                RouteConfigProviderPtr(const envoy::api::v2::RouteConfiguration& route_config,
                                       Server::Configuration::FactoryContext& factory_context));
+};
+
+class MockScopedConfig : public ScopedConfig {
+public:
+  MockScopedConfig();
+  ~MockScopedConfig();
+
+  MOCK_CONST_METHOD1(getRouterConfig, ConfigConstSharedPtr(const Http::HeaderMap& headers));
 };
 
 } // namespace Router

@@ -351,15 +351,12 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_EQ(1UL, store_->counters().size());
   CounterSharedPtr c1 = TestUtility::findCounter(*store_, "scope1.c1");
   EXPECT_EQ("scope1.c1", c1->name());
-  EXPECT_EQ(TestUtility::findByName(store_->source().cachedCounters(), "scope1.c1"), c1);
+  EXPECT_EQ(TestUtility::findByName(store_->counters(), "scope1.c1"), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(tls_, runOnAllThreads(_, _));
   scope1.reset();
   EXPECT_EQ(0UL, store_->counters().size());
-  EXPECT_EQ(1UL, store_->source().cachedCounters().size());
-  store_->source().clearCache();
-  EXPECT_EQ(0UL, store_->source().cachedCounters().size());
 
   EXPECT_EQ(1L, c1.use_count());
   c1.reset();
