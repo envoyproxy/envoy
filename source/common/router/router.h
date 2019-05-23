@@ -458,6 +458,8 @@ private:
   void onUpstreamComplete(UpstreamRequest& upstream_request);
   void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure,
                        UpstreamRequest& upstream_request);
+  // Reset all in-flight upstream requests.
+  void resetAll();
   // Reset all in-flight upstream requests that do NOT match the passed argument. This is used
   // if a "good" response comes back and we return downstream, so there is no point in waiting
   // for the remaining upstream requests to return.
