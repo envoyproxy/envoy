@@ -92,14 +92,8 @@ RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
 void RdsRouteConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
-  if (resources.empty()) {
-    ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
-    stats_.update_empty_.inc();
-    init_target_.ready();
+  if (!validateUpdateSize(resources.size())) {
     return;
-  }
-  if (resources.size() != 1) {
-    throw EnvoyException(fmt::format("Unexpected RDS resource length: {}", resources.size()));
   }
   auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resources[0]);
   MessageUtil::validate(route_config);
@@ -131,10 +125,46 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   init_target_.ready();
 }
 
+void RdsRouteConfigSubscription::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+    const std::string& system_version_info) {
+  if (!removed_resources.empty()) {
+    // TODO(#2500) when on-demand resource loading is supported, an RDS removal may make sense (see
+    // discussion in #6879), and so we should do something other than ignoring here.
+    ENVOY_LOG(
+        error,
+        "Server sent a delta RDS update attempting to remove a resource (name: {}). Ignoring.",
+        removed_resources[0]);
+  }
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
+  if (!added_resources.empty()) {
+    *unwrapped_resource.Add() = added_resources[0].resource();
+    onConfigUpdate(unwrapped_resource, added_resources[0].version());
+  } else {
+    onConfigUpdate({}, system_version_info);
+    return;
+  }
+}
+
 void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();
+}
+
+bool RdsRouteConfigSubscription::validateUpdateSize(int num_resources) {
+  if (num_resources == 0) {
+    ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
+    stats_.update_empty_.inc();
+    init_target_.ready();
+    return false;
+  }
+  if (num_resources != 1) {
+    throw EnvoyException(fmt::format("Unexpected RDS resource length: {}", num_resources));
+    // (would be a return false here)
+  }
+  return true;
 }
 
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
