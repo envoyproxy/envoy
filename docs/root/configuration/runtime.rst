@@ -156,7 +156,7 @@ At most one admin layer may be specified. If a non-empty :ref:`layered runtime
 <envoy_api_msg_config.bootstrap.v2.LayeredRuntime>` bootstrap configuration is specified with an
 absent admin layer, any mutating admin console actions will elicit a 503 response.
 
-.. _config_runtime_proto_json:
+.. _config_runtime_atomicity:
 
 Atomicity
 ---------
@@ -174,6 +174,8 @@ and symlink changes should be used to orchestrate updates.
 Disk layers with the same symlink root will only trigger a single refresh when a file movement is
 detected. Disk layers with overlapping symlink root paths that are not identical may trigger
 multiple reloads when a file movement is detected.
+
+.. _config_runtime_proto_json:
 
 Protobuf and JSON representation
 --------------------------------

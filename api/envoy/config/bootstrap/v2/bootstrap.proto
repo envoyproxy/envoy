@@ -212,7 +212,8 @@ message Runtime {
   // symbolic link. An atomic link swap is used when a new tree should be
   // switched to. This parameter specifies the path to the symbolic link. Envoy
   // will watch the location for changes and reload the file system tree when
-  // they happen. If this parameter is not set, there will be no disk based runtime.
+  // they happen. If this parameter is not set, there will be no disk based
+  // runtime.
   string symlink_root = 1;
 
   // Specifies the subdirectory to load within the root directory. This is
@@ -245,14 +246,17 @@ message RuntimeLayer {
 
   // :ref:`Disk runtime <config_runtime_local_disk>` layer.
   message DiskLayer {
-    // Specifies the subdirectory to load within the :ref:`root directory
-    // <envoy_api_field_config.bootstrap.v2.LayeredRuntime.symlink_root>`. This
-    // is useful if multiple systems share the same delivery mechanism. Envoy
-    // configuration elements can be contained in a dedicated subdirectory.
-    string subdirectory = 1;
+    // The implementation assumes that the file system tree is accessed via a
+    // symbolic link. An atomic link swap is used when a new tree should be
+    // switched to. This parameter specifies the path to the symbolic link.
+    // Envoy will watch the location for changes and reload the file system tree
+    // when they happen. See documentation on runtime :ref:`atomicity
+    // <config_runtime_atomicity>` for further details on how reloads are
+    // treated.
+    string symlink_root = 1;
 
     // :ref:`Append <config_runtime_local_disk_service_cluster_subdirs>` the
-    // service cluster to the path.
+    // service cluster to the path under symlink root.
     bool append_service_cluster = 2;
   }
 
@@ -273,16 +277,7 @@ message RuntimeLayer {
 
 // Runtime :ref:`configuration overview <config_runtime>`.
 message LayeredRuntime {
-  // For disk-based runtime layers, the implementation assumes that the file
-  // system tree is accessed via a symbolic link. An atomic link swap is used
-  // when a new tree should be switched to. This parameter specifies the path to
-  // the symbolic link. Envoy will watch the location for changes and reload the
-  // file system tree when they happen. If this parameter is not set, there will
-  // be no disk based runtime. This symlink root applies to all disk-based
-  // runtime layers.
-  string symlink_root = 1;
-
   // The :ref:`layers <config_runtime_layering>` of the runtime. This is ordered
   // such that later layers in the list overlay earlier entries.
-  repeated RuntimeLayer layers = 2;
+  repeated RuntimeLayer layers = 1;
 }

@@ -85,7 +85,7 @@ protected:
       EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
           .WillRepeatedly(
               Invoke([this](const std::string&, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-                on_changed_cb_ = cb;
+                on_changed_cbs_.emplace_back(cb);
               }));
       return mock_watcher;
     }));
@@ -108,12 +108,15 @@ protected:
     TestEnvironment::writeStringToFileForTest(path, value);
   }
 
-  void updateDiskLayer() { on_changed_cb_(Filesystem::Watcher::Events::MovedTo); }
+  void updateDiskLayer(uint32_t layer) {
+    ASSERT_LT(layer, on_changed_cbs_.size());
+    on_changed_cbs_[layer](Filesystem::Watcher::Events::MovedTo);
+  }
 
   Event::MockDispatcher dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
 
-  Filesystem::Watcher::OnChangedCb on_changed_cb_;
+  std::vector<Filesystem::Watcher::OnChangedCb> on_changed_cbs_;
   Stats::IsolatedStoreImpl store_;
   MockRandomGenerator generator_;
   std::unique_ptr<LoaderImpl> loader_;
@@ -406,11 +409,12 @@ TEST_F(LoaderImplTest, LayersOverride) {
   EXPECT_EQ("Cheese cake", loader_->snapshot().get("file15"));
   write("test/common/runtime/test_data/current/envoy/file14", "Sad cake");
   write("test/common/runtime/test_data/current/envoy/file15", "Happy cake");
-  updateDiskLayer();
+  updateDiskLayer(0);
   EXPECT_EQ("Mega layer cake", loader_->snapshot().get("file14"));
   EXPECT_EQ("Happy cake", loader_->snapshot().get("file15"));
 }
 
+// Validate that multiple admin layers leads to a configuration load failure.
 TEST_F(LoaderImplTest, MultipleAdminLayersFail) {
   setup();
   envoy::config::bootstrap::v2::LayeredRuntime layered_runtime;

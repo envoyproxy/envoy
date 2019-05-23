@@ -458,12 +458,13 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       } else {
         config_has_admin_layer_ = true;
       }
+    } else if (layer.has_disk_layer()) {
+      if (watcher_ == nullptr) {
+        watcher_ = dispatcher.createFilesystemWatcher();
+      }
+      watcher_->addWatch(layer.disk_layer().symlink_root(), Filesystem::Watcher::Events::MovedTo,
+                         [this](uint32_t) -> void { loadNewSnapshot(); });
     }
-  }
-  if (!config.symlink_root().empty()) {
-    watcher_ = dispatcher.createFilesystemWatcher();
-    watcher_->addWatch(config.symlink_root(), Filesystem::Watcher::Events::MovedTo,
-                       [this](uint32_t) -> void { loadNewSnapshot(); });
   }
 
   loadNewSnapshot();
@@ -503,7 +504,7 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
       layers.emplace_back(std::make_unique<const ProtoLayer>(layer.static_layer()));
       break;
     case envoy::config::bootstrap::v2::RuntimeLayer::kDiskLayer: {
-      std::string path = config_.symlink_root() + "/" + layer.disk_layer().subdirectory();
+      std::string path = layer.disk_layer().symlink_root();
       if (layer.disk_layer().append_service_cluster()) {
         path += "/" + service_cluster_;
       }
