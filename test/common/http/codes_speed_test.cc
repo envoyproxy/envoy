@@ -17,7 +17,7 @@
 namespace Envoy {
 namespace Http {
 
-template <class SymTab> class CodeUtilitySpeedTest {
+template <class SymbolTableClass> class CodeUtilitySpeedTest {
 public:
   CodeUtilitySpeedTest()
       : global_store_(symbol_table_), cluster_scope_(symbol_table_), code_stats_(symbol_table_),
@@ -59,7 +59,7 @@ public:
     code_stats_.chargeResponseTiming(info);
   }
 
-  SymTab symbol_table_;
+  SymbolTableClass symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
