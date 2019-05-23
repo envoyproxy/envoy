@@ -142,6 +142,9 @@ message AccessLogCommon {
   // upstream transport socket. Common TLS failures are in
   // :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
   string upstream_transport_failure_reason = 18;
+
+  // The name of the route
+  string route_name = 19;
 }
 
 // Flags indicating occurrences during request/response processing.
