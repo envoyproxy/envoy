@@ -89,6 +89,11 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
 
   EXPECT_EQ(4UL, store_.counters().size());
   EXPECT_EQ(2UL, store_.gauges().size());
+
+  StatNameManagedStorage nonexistent_name("nonexistent", store_.symbolTable());
+  EXPECT_EQ(store_.findCounter(nonexistent_name.statName()), absl::nullopt);
+  EXPECT_EQ(store_.findGauge(nonexistent_name.statName()), absl::nullopt);
+  EXPECT_EQ(store_.findHistogram(nonexistent_name.statName()), absl::nullopt);
 }
 
 TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
