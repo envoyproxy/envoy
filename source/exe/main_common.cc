@@ -42,7 +42,8 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
                                Server::ComponentFactory& component_factory,
                                std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
                                Thread::ThreadFactory& thread_factory,
-                               Filesystem::Instance& file_system)
+                               Filesystem::Instance& file_system,
+                               std::unique_ptr<ProcessContext> process_context)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
       file_system_(file_system), stats_allocator_(symbol_table_) {
   switch (options_.mode()) {
@@ -75,7 +76,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     server_ = std::make_unique<Server::InstanceImpl>(
         options_, time_system, local_address, listener_hooks, *restarter_, *stats_store_,
         access_log_lock, component_factory, std::move(random_generator), *tls_, thread_factory_,
-        file_system_);
+        file_system_, std::move(process_context));
 
     break;
   }
@@ -128,7 +129,7 @@ MainCommon::MainCommon(int argc, const char* const* argv)
     : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
             std::make_unique<Runtime::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
-            platform_impl_.fileSystem()) {}
+            platform_impl_.fileSystem(), nullptr) {}
 
 std::string MainCommon::hotRestartVersion(bool hot_restart_enabled) {
 #ifdef ENVOY_HOT_RESTART
