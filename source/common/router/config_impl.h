@@ -75,6 +75,10 @@ public:
   void rewritePathHeader(Http::HeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
   const std::string& responseBody() const override { return EMPTY_STRING; }
+  const std::string& routeName() const override { return route_name_; }
+
+private:
+  const std::string route_name_;
 };
 
 class SslRedirectRoute : public Route {
@@ -376,6 +380,7 @@ public:
   Http::Code clusterNotFoundResponseCode() const override {
     return cluster_not_found_response_code_;
   }
+  const std::string& routeName() const override { return route_name_; }
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   void finalizeRequestHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
@@ -462,6 +467,7 @@ private:
     DynamicRouteEntry(const RouteEntryImplBase* parent, const std::string& name)
         : parent_(parent), cluster_name_(name) {}
 
+    const std::string& routeName() const override { return parent_->routeName(); }
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
     Http::Code clusterNotFoundResponseCode() const override {
@@ -653,6 +659,7 @@ private:
   const absl::optional<Http::Code> direct_response_code_;
   std::string direct_response_body_;
   PerFilterConfigs per_filter_configs_;
+  const std::string route_name_;
   TimeSource& time_source_;
   InternalRedirectAction internal_redirect_action_;
 };
