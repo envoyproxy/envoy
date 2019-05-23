@@ -138,6 +138,36 @@ public:
             }));
   }
 
+  void expectLogRequestMethod(const std::string& request_method) {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+
+    Http::TestHeaderMapImpl request_headers{
+        {":method", request_method},
+    };
+
+    expectLog(fmt::format(R"EOF(
+    http_logs:
+      log_entry:
+        common_properties:
+          downstream_remote_address:
+            socket_address:
+              address: "127.0.0.1"
+              port_value: 0
+          downstream_local_address:
+            socket_address:
+              address: "127.0.0.2"
+              port_value: 0
+          start_time: {{}}
+        request:
+          request_method: {}
+          request_headers_bytes: {}
+        response: {{}}
+    )EOF",
+                          request_method, request_method.length() + 7));
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+  }
+
   AccessLog::MockFilter* filter_{new NiceMock<AccessLog::MockFilter>()};
   envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
   std::shared_ptr<MockGrpcAccessLogStreamer> streamer_{new MockGrpcAccessLogStreamer()};
@@ -333,9 +363,10 @@ http_logs:
       upstream_transport_failure_reason: "TLS error"
     request:
       request_method: "METHOD_UNSPECIFIED"
+      request_headers_bytes: 16
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
 
   {
@@ -388,9 +419,10 @@ http_logs:
         tls_session_id: D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B
     request:
       request_method: "METHOD_UNSPECIFIED"
+      request_headers_bytes: 16
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
 }
 
@@ -507,6 +539,19 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->set_stream_idle_timeout(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
+}
+
+TEST_F(HttpGrpcAccessLogTest, LogWithRequestMethod) {
+  InSequence s;
+  expectLogRequestMethod("GET");
+  expectLogRequestMethod("HEAD");
+  expectLogRequestMethod("POST");
+  expectLogRequestMethod("PUT");
+  expectLogRequestMethod("DELETE");
+  expectLogRequestMethod("CONNECT");
+  expectLogRequestMethod("OPTIONS");
+  expectLogRequestMethod("TRACE");
+  expectLogRequestMethod("PATCH");
 }
 
 } // namespace
