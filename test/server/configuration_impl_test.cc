@@ -234,17 +234,24 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
 TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   std::string json = R"EOF(
   {
-    "listeners": [],
-
-    "cluster_manager": {
+    "static_resources": {
+      "listeners": [],
       "clusters": []
     },
-
-    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  MessageUtil::loadFromJson(json, bootstrap);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
