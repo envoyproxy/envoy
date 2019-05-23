@@ -593,7 +593,7 @@ void Filter::onResponseTimeout() {
   // If we had an upstream request that got a "good" response, save its
   // upstream timing information into the downstream stream info.
   if (final_upstream_request_) {
-      callbacks_->streamInfo().setUpstreamTiming(final_upstream_request_->upstream_timing_);
+    callbacks_->streamInfo().setUpstreamTiming(final_upstream_request_->upstream_timing_);
   }
 
   // Reset any upstream requests that are still in flight.
@@ -754,7 +754,7 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
     if (upstream_request.upstream_host_) {
       upstream_request.upstream_host_->stats().rq_error_.inc();
     }
-  upstream_request.removeFromList(upstream_requests_);
+    upstream_request.removeFromList(upstream_requests_);
     return true;
   } else if (retry_status == RetryStatus::NoOverflow) {
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
@@ -884,7 +884,9 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
   }
 
   // Now put the final request back on thie list.
-  final_upstream_request->moveIntoList(std::move(final_upstream_request), upstream_requests_);
+  if (final_upstream_request) {
+    final_upstream_request->moveIntoList(std::move(final_upstream_request), upstream_requests_);
+  }
 }
 
 void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
