@@ -365,8 +365,6 @@ void InstanceImpl::initialize(const Options& options,
       component_factory.createRuntime(*this, initial_config));
   hooks.onRuntimeCreated();
 
-  // Initialize the dynamic runtime now that we have the static base runtime.
-
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ =
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_source_);
@@ -428,7 +426,7 @@ void InstanceImpl::startWorkers() {
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
-  ENVOY_LOG(info, "runtime layers: {}", config.runtime().DebugString());
+  ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
   return std::make_unique<Runtime::LoaderImpl>(server.dispatcher(), server.threadLocal(),
                                                config.runtime(), server.localInfo().clusterName(),
                                                server.stats(), server.random(), server.api());
