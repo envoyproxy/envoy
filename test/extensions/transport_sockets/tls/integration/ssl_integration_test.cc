@@ -344,38 +344,46 @@ public:
   void initialize() override {
     // TODO(mattklein123): Merge/use the code in ConfigHelper::setTapTransportSocket().
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      // The test supports tapping either the downstream or upstream connection, but not both.
       if (upstream_tap_) {
-        auto* transport_socket =
-            bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
-        transport_socket->set_name("envoy.transport_sockets.tap");
-        envoy::api::v2::core::TransportSocket raw_transport_socket;
-        raw_transport_socket.set_name("raw_buffer");
-        envoy::config::transport_socket::tap::v2alpha::Tap tap_config =
-            createTapConfig(raw_transport_socket);
-        tap_config.mutable_transport_socket()->MergeFrom(raw_transport_socket);
-        MessageUtil::jsonConvert(tap_config, *transport_socket->mutable_config());
+        setupUpstreamTap(bootstrap);
       } else {
-        auto* filter_chain =
-            bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-        // Configure inner SSL transport socket based on existing config.
-        envoy::api::v2::core::TransportSocket ssl_transport_socket;
-        ssl_transport_socket.set_name("tls");
-        MessageUtil::jsonConvert(filter_chain->tls_context(),
-                                 *ssl_transport_socket.mutable_config());
-        // Configure outer tap transport socket.
-        auto* transport_socket = filter_chain->mutable_transport_socket();
-        transport_socket->set_name("envoy.transport_sockets.tap");
-        envoy::config::transport_socket::tap::v2alpha::Tap tap_config =
-            createTapConfig(ssl_transport_socket);
-        tap_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
-        MessageUtil::jsonConvert(tap_config, *transport_socket->mutable_config());
-        // Nuke TLS context from legacy location.
-        filter_chain->clear_tls_context();
+        setupDownstreamTap(bootstrap);
       }
     });
     SslIntegrationTest::initialize();
     // This confuses our socket counting.
     debug_with_s_client_ = false;
+  }
+
+  void setupUpstreamTap(envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* transport_socket =
+        bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
+    transport_socket->set_name("envoy.transport_sockets.tap");
+    envoy::api::v2::core::TransportSocket raw_transport_socket;
+    raw_transport_socket.set_name("raw_buffer");
+    envoy::config::transport_socket::tap::v2alpha::Tap tap_config =
+        createTapConfig(raw_transport_socket);
+    tap_config.mutable_transport_socket()->MergeFrom(raw_transport_socket);
+    MessageUtil::jsonConvert(tap_config, *transport_socket->mutable_config());
+  }
+
+  void setupDownstreamTap(envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    // Configure inner SSL transport socket based on existing config.
+    envoy::api::v2::core::TransportSocket ssl_transport_socket;
+    ssl_transport_socket.set_name("tls");
+    MessageUtil::jsonConvert(filter_chain->tls_context(), *ssl_transport_socket.mutable_config());
+    // Configure outer tap transport socket.
+    auto* transport_socket = filter_chain->mutable_transport_socket();
+    transport_socket->set_name("envoy.transport_sockets.tap");
+    envoy::config::transport_socket::tap::v2alpha::Tap tap_config =
+        createTapConfig(ssl_transport_socket);
+    tap_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
+    MessageUtil::jsonConvert(tap_config, *transport_socket->mutable_config());
+    // Nuke TLS context from legacy location.
+    filter_chain->clear_tls_context();
   }
 
   envoy::config::transport_socket::tap::v2alpha::Tap
