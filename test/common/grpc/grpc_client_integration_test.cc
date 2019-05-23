@@ -190,7 +190,7 @@ TEST_P(GrpcClientIntegrationTest, ReplyNoTrailers) {
   dispatcher_helper_.setStreamEventPending();
   stream->expectTrailingMetadata(empty_metadata_);
   stream->expectGrpcStatus(Status::GrpcStatus::InvalidCode);
-  auto serialized_response = Grpc::Common::serializeBody(reply);
+  auto serialized_response = Grpc::Common::serializeToGrpcFrame(reply);
   stream->fake_stream_->encodeData(*serialized_response, true);
   stream->fake_stream_->encodeResetStream();
   dispatcher_helper_.runDispatcher();

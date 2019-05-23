@@ -185,6 +185,7 @@ envoy_cc_library(
     srcs = ["options_impl.cc"] + select({
         "//bazel:linux_x86_64": ["options_impl_platform_linux.cc"],
         "//bazel:linux_aarch64": ["options_impl_platform_linux.cc"],
+        "//bazel:linux_ppc": ["options_impl_platform_linux.cc"],
         "//conditions:default": ["options_impl_platform_default.cc"],
     }),
     hdrs = [
@@ -193,8 +194,11 @@ envoy_cc_library(
     ] + select({
         "//bazel:linux_x86_64": ["options_impl_platform_linux.h"],
         "//bazel:linux_aarch64": ["options_impl_platform_linux.h"],
+        "//bazel:linux_ppc": ["options_impl_platform_linux.h"],
         "//conditions:default": [],
     }),
+    # TCLAP command line parser needs this to support int64_t/uint64_t in several build environments.
+    copts = ["-DHAVE_LONG_LONG"],
     external_deps = ["tclap"],
     deps = [
         "//include/envoy/network:address_interface",
@@ -277,10 +281,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "process_context_lib",
+    hdrs = ["process_context_impl.h"],
+    deps = ["//include/envoy/server:process_context_interface"],
+)
+
+envoy_cc_library(
     name = "proto_descriptors_lib",
     srcs = ["proto_descriptors.cc"],
     hdrs = ["proto_descriptors.h"],
     deps = [
+        "//source/common/common:assert_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:cds_cc",
@@ -321,6 +332,7 @@ envoy_cc_library(
         "//include/envoy/server:instance_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:options_interface",
+        "//include/envoy/server:process_context_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",

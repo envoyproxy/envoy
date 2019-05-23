@@ -79,7 +79,7 @@ public:
 class RouterTestBase : public testing::Test {
 public:
   RouterTestBase(bool start_child_span, bool suppress_envoy_headers)
-      : shadow_writer_(new MockShadowWriter()),
+      : http_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
         config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
                 ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
                 test_time_.timeSystem(), http_context_),
@@ -2253,12 +2253,16 @@ TEST_F(RouterTest, AltStatName) {
 
 TEST_F(RouterTest, Redirect) {
   MockDirectResponseEntry direct_response;
+  std::string route_name("route-test-name");
   EXPECT_CALL(direct_response, newPath(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillOnce(Return(Http::Code::MovedPermanently));
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+  absl::string_view route_name_view(route_name);
+  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
 
   Http::TestHeaderMapImpl response_headers{{":status", "301"}, {"location", "hello"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -2270,12 +2274,16 @@ TEST_F(RouterTest, Redirect) {
 
 TEST_F(RouterTest, RedirectFound) {
   MockDirectResponseEntry direct_response;
+  std::string route_name("route-test-name");
   EXPECT_CALL(direct_response, newPath(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillOnce(Return(Http::Code::Found));
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+  absl::string_view route_name_view(route_name);
+  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
 
   Http::TestHeaderMapImpl response_headers{{":status", "302"}, {"location", "hello"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -2287,9 +2295,13 @@ TEST_F(RouterTest, RedirectFound) {
 
 TEST_F(RouterTest, DirectResponse) {
   NiceMock<MockDirectResponseEntry> direct_response;
+  std::string route_name("route-test-name");
+  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
   EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+  absl::string_view route_name_view(route_name);
+  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -2303,10 +2315,14 @@ TEST_F(RouterTest, DirectResponse) {
 
 TEST_F(RouterTest, DirectResponseWithBody) {
   NiceMock<MockDirectResponseEntry> direct_response;
+  std::string route_name("route-test-name");
+  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
   const std::string response_body("static response");
   EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(response_body));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+  absl::string_view route_name_view(route_name);
+  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "200"}, {"content-length", "15"}, {"content-type", "text/plain"}};

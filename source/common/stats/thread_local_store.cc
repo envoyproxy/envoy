@@ -12,7 +12,6 @@
 #include "envoy/stats/stats.h"
 
 #include "common/common/lock_guard.h"
-#include "common/stats/scope_prefixer.h"
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
@@ -25,11 +24,11 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(StatDataAllocator& alloc)
     : alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()), heap_allocator_(alloc.symbolTable()),
-      source_(*this), null_counter_(alloc.symbolTable()), null_gauge_(alloc.symbolTable()),
+      null_counter_(alloc.symbolTable()), null_gauge_(alloc.symbolTable()),
       null_histogram_(alloc.symbolTable()) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
-  ASSERT(shutting_down_);
+  ASSERT(shutting_down_ || !threading_ever_initialized_);
   default_scope_.reset();
   ASSERT(scopes_.empty());
   for (StatNameStorageSet* rejected_stats : rejected_stats_purgatory_) {
@@ -86,7 +85,8 @@ bool ThreadLocalStoreImpl::rejects(StatName stat_name) const {
   // Also note that the elaboration of the stat-name into a string is expensive,
   // so I think it might be better to move the matcher test until after caching,
   // unless its acceptsAll/rejectsAll.
-  return stats_matcher_->rejectsAll() || stats_matcher_->rejects(symbolTable().toString(stat_name));
+  return stats_matcher_->rejectsAll() ||
+         stats_matcher_->rejects(constSymbolTable().toString(stat_name));
 }
 
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
@@ -148,6 +148,7 @@ std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
 
 void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                                                ThreadLocal::Instance& tls) {
+  threading_ever_initialized_ = true;
   main_thread_dispatcher_ = &main_thread_dispatcher;
   tls_ = tls.allocateSlot();
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
@@ -315,7 +316,6 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatMap<std::shared_ptr<StatType>>* tls_cache, StatNameHashSet* tls_rejected_stats,
     StatType& null_stat) {
 
-  // We do name-rejections on the full name, prior to truncation.
   if (tls_rejected_stats != nullptr &&
       tls_rejected_stats->find(name) != tls_rejected_stats->end()) {
     return null_stat;
@@ -355,6 +355,18 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 
   // Finally we return the reference.
   return **central_ref;
+}
+
+template <class StatType>
+absl::optional<std::reference_wrapper<const StatType>>
+ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
+    StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map) const {
+  auto iter = central_cache_map.find(name);
+  if (iter == central_cache_map.end()) {
+    return absl::nullopt;
+  }
+
+  return std::cref(*iter->second.get());
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
@@ -493,6 +505,27 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name)
     tls_cache->insert(std::make_pair((*central_ref)->statName(), *central_ref));
   }
   return **central_ref;
+}
+
+absl::optional<std::reference_wrapper<const Counter>>
+ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
+  return findStatLockHeld<Counter>(name, central_cache_.counters_);
+}
+
+absl::optional<std::reference_wrapper<const Gauge>>
+ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
+  return findStatLockHeld<Gauge>(name, central_cache_.gauges_);
+}
+
+absl::optional<std::reference_wrapper<const Histogram>>
+ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
+  auto iter = central_cache_.histograms_.find(name);
+  if (iter == central_cache_.histograms_.end()) {
+    return absl::nullopt;
+  }
+
+  std::shared_ptr<Histogram> histogram_ref(iter->second);
+  return std::cref(*histogram_ref.get());
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,

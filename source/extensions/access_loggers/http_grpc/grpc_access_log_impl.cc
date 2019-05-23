@@ -219,6 +219,8 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
 
     peer_properties->set_subject(stream_info.downstreamSslConnection()->subjectPeerCertificate());
 
+    tls_properties->set_tls_session_id(stream_info.downstreamSslConnection()->sessionId());
+
     // TODO(snowp): Populate remaining tls_properties fields.
   }
   common_properties->mutable_start_time()->MergeFrom(
@@ -275,6 +277,11 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
         *common_properties->mutable_upstream_remote_address());
     common_properties->set_upstream_cluster(stream_info.upstreamHost()->cluster().name());
   }
+
+  if (!stream_info.getRouteName().empty()) {
+    common_properties->set_route_name(stream_info.getRouteName());
+  }
+
   if (stream_info.upstreamLocalAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
         *stream_info.upstreamLocalAddress(), *common_properties->mutable_upstream_local_address());
