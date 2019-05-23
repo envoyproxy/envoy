@@ -110,8 +110,8 @@ private:
     // Network::UdpListenerCallbacks
     void onData(Network::UdpRecvData& data) override;
     void onWriteReady(const Network::Socket& socket) override;
-    void onError(const Network::UdpListenerCallbacks::ErrorCode& error_code,
-                 int error_number) override;
+    void onReceiveError(const Network::UdpListenerCallbacks::ErrorCode& error_code,
+                        int error_number) override;
 
     // Network::UdpListenerFilterManager
     void addReadFilter(Network::UdpListenerReadFilterPtr&& filter) override;

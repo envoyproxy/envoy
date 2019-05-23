@@ -102,7 +102,8 @@ void UdpListenerImpl::handleReadCallback() {
     if ((recv_result.result_.rc_ < 0)) {
       if (recv_result.result_.errno_ != EAGAIN) {
         ENVOY_UDP_LOG(error, "recvfrom result {}", recv_result.result_.errno_);
-        cb_.onError(UdpListenerCallbacks::ErrorCode::SyscallError, recv_result.result_.errno_);
+        cb_.onReceiveError(UdpListenerCallbacks::ErrorCode::SyscallError,
+                           recv_result.result_.errno_);
       }
       return;
     }
@@ -157,7 +158,7 @@ const Address::InstanceConstSharedPtr& UdpListenerImpl::localAddress() const {
   return socket_.localAddress();
 }
 
-void UdpListenerImpl::send(const UdpSendData& send_data) {
+Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   ENVOY_UDP_LOG(trace, "send");
   Buffer::Instance& buffer = send_data.buffer_;
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
@@ -176,13 +177,9 @@ void UdpListenerImpl::send(const UdpSendData& send_data) {
       ENVOY_UDP_LOG(debug, "sendmsg failed with error {}",
                     static_cast<int>(send_result.err_->getErrorCode()));
     }
-
-    // Drain the buffer even on failure because there is no error returned to caller
-    buffer.drain(buffer.length());
-    // TODO(sumukhs) - Convert the OnError method to use IoErrors
-    cb_.onError(UdpListenerCallbacks::ErrorCode::SyscallError,
-                static_cast<int>(send_result.err_->getErrorCode()));
   }
+
+  return send_result;
 }
 
 } // namespace Network

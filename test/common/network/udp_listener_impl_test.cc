@@ -380,7 +380,7 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvFromError) {
       getSocket(Address::SocketType::Datagram, Network::Test::getCanonicalLoopbackAddress(version_),
                 nullptr, false);
 
-  // When the `receive` system call returns an error, we expect the `onError`
+  // When the `receive` system call returns an error, we expect the `onReceiveError`
   // callback callwed with `SyscallError` parameter.
   const std::string first("first");
   const void* void_pointer = static_cast<const void*>(first.c_str());
@@ -397,7 +397,7 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvFromError) {
         EXPECT_EQ(socket.ioHandle().fd(), server_socket->ioHandle().fd());
       }));
 
-  EXPECT_CALL(listener_callbacks, onError_(_, _))
+  EXPECT_CALL(listener_callbacks, onReceiveError_(_, _))
       .Times(1)
       .WillOnce(Invoke([&](const UdpListenerCallbacks::ErrorCode& err_code, int err) -> void {
         ASSERT_EQ(err_code, UdpListenerCallbacks::ErrorCode::SyscallError);
@@ -437,7 +437,9 @@ TEST_P(UdpListenerImplTest, SendData) {
   buffer->add(payload);
   UdpSendData send_data{client_socket->localAddress(), *buffer};
 
-  server_listener.send(send_data);
+  auto send_result = server_listener.send(send_data);
+
+  EXPECT_EQ(send_result.ok(), true);
 
   // This is trigerred on opening the listener on registering the event
   EXPECT_CALL(server_listener_callbacks, onWriteReady_(_))
@@ -474,7 +476,6 @@ TEST_P(UdpListenerImplTest, SendData) {
 }
 
 /**
- * Tests error callback invocation due to send failure
  * The send fails because the server_socket is created with bind=false.
  */
 TEST_P(UdpListenerImplTest, SendDataError) {
@@ -501,15 +502,11 @@ TEST_P(UdpListenerImplTest, SendDataError) {
         EXPECT_EQ(socket.ioHandle().fd(), server_socket->ioHandle().fd());
       }));
 
-  EXPECT_CALL(server_listener_callbacks, onError_(_, _))
-      .WillOnce(Invoke([&](const Network::UdpListenerCallbacks::ErrorCode& ec, int err) {
-        EXPECT_EQ(ec, Network::UdpListenerCallbacks::ErrorCode::SyscallError);
-        EXPECT_EQ(err, 5); // InvalidArgs is returned as errno
-        dispatcher_->exit();
-      }));
-
-  server_listener.send(send_data);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  auto send_result = server_listener.send(send_data);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(send_result.ok(), false);
+  EXPECT_EQ(send_result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  dispatcher_->exit();
 }
 
 } // namespace

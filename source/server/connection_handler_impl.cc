@@ -346,10 +346,10 @@ void ConnectionHandlerImpl::ActiveUdpListener::onWriteReady(const Network::Socke
   // data
 }
 
-void ConnectionHandlerImpl::ActiveUdpListener::onError(
+void ConnectionHandlerImpl::ActiveUdpListener::onReceiveError(
     const Network::UdpListenerCallbacks::ErrorCode&, int) {
-  // TODO(sumukhs): Determine what to do on error. Close the listener?
-  // or would the filters need to know on error? Can't foresee a scenario where they
+  // TODO(sumukhs): Determine what to do on receive error.
+  // Would the filters need to know on error? Can't foresee a scenario where they
   // would take an action
 }
 

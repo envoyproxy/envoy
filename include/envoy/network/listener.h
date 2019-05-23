@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/io_error.h"
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
@@ -164,12 +165,13 @@ public:
   virtual void onWriteReady(const Socket& socket) PURE;
 
   /**
-   * Called when there is an error event.
+   * Called when there is an error event in the receive data path.
+   * The send side error is a return type on the send method.
    *
    * @param error_code ErrorCode for the error event.
    * @param error_number System error number.
    */
-  virtual void onError(const ErrorCode& error_code, int error_number) PURE;
+  virtual void onReceiveError(const ErrorCode& error_code, int error_number) PURE;
 };
 
 /**
@@ -210,15 +212,18 @@ public:
   virtual const Network::Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * Send data through the underlying udp socket. If the send buffer of the socket FD is full, it is
-   * possible the write is dropped. The buffers underlying the data are always drained.
+   * Send data through the underlying udp socket. If the send buffer of the socket FD is full, an
+   * error code is returned.
    *
    * TODO(sumukhs): We do not currently handle max MTU size of the datagram. Determine if we could
    * expose the path MTU information to the caller.
    *
-   * @param data Supplies the data to send to a target using udp
+   * @param data Supplies the data to send to a target using udp.
+   * @return the error code of the underlying send api. On successfully sending 'n' bytes, the
+   * underlying buffers in the data  are drained by 'n' bytes. The remaining can be retried by the
+   * sender.
    */
-  virtual void send(const UdpSendData& data) PURE;
+  virtual Api::IoCallUint64Result send(const UdpSendData& data) PURE;
 };
 
 /**

@@ -144,13 +144,15 @@ public:
 
   void onWriteReady(const Socket& socket) override { onWriteReady_(socket); }
 
-  void onError(const ErrorCode& err_code, int err) override { onError_(err_code, err); }
+  void onReceiveError(const ErrorCode& err_code, int err) override {
+    onReceiveError_(err_code, err);
+  }
 
   MOCK_METHOD1(onData_, void(UdpRecvData& data));
 
   MOCK_METHOD1(onWriteReady_, void(const Socket& socket));
 
-  MOCK_METHOD2(onError_, void(const ErrorCode& err_code, int err));
+  MOCK_METHOD2(onReceiveError_, void(const ErrorCode& err_code, int err));
 };
 
 class MockDrainDecision : public DrainDecision {
@@ -432,7 +434,7 @@ public:
   MOCK_METHOD0(disable, void());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_CONST_METHOD0(localAddress, Address::InstanceConstSharedPtr&());
-  MOCK_METHOD1(send, void(const UdpSendData&));
+  MOCK_METHOD1(send, Api::IoCallUint64Result(const UdpSendData&));
 };
 
 class MockUdpReadFilterCallbacks : public UdpReadFilterCallbacks {

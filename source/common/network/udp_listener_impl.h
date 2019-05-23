@@ -29,7 +29,7 @@ public:
   // Network::UdpListener Interface
   Event::Dispatcher& dispatcher() override;
   const Address::InstanceConstSharedPtr& localAddress() const override;
-  void send(const UdpSendData& data) override;
+  Api::IoCallUint64Result send(const UdpSendData& data) override;
 
   struct ReceiveResult {
     Api::SysCallIntResult result_;
