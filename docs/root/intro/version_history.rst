@@ -13,6 +13,7 @@ Version history
 * eds: added support to specify max time for which endpoints can be used :ref:`gRPC filter <envoy_api_msg_ClusterLoadAssignment.Policy>`.
 * event: added :ref:`loop duration and poll delay statistics <operations_performance>`.
 * ext_authz: added a `x-envoy-auth-partial-body` metadata header set to `false|true` indicating if there is a partial body sent in the authorization request message.
+* ext_authz: added configurable status code that allows customizing HTTP responses on filter check status errors.
 * ext_authz: added option to `ext_authz` that allows the filter clearing route cache.
 * grpc-json: added support for :ref:`auto mapping
   <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.auto_mapping>`.
