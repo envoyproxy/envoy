@@ -88,6 +88,10 @@ MockStreamInfo::MockStreamInfo()
         requested_server_name_ = std::string(requested_server_name);
       }));
   ON_CALL(*this, requestedServerName()).WillByDefault(ReturnRef(requested_server_name_));
+  ON_CALL(*this, setRouteName(_)).WillByDefault(Invoke([this](const absl::string_view route_name) {
+    route_name_ = std::string(route_name);
+  }));
+  ON_CALL(*this, getRouteName()).WillByDefault(ReturnRef(route_name_));
   ON_CALL(*this, upstreamTransportFailureReason())
       .WillByDefault(ReturnRef(upstream_transport_failure_reason_));
 }

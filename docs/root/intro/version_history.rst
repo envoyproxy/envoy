@@ -4,6 +4,7 @@ Version history
 1.11.0 (Pending)
 ================
 * access log: added a new field for downstream TLS session ID to file and gRPC access logger.
+* access log: added a new field for route name to file and gRPC access logger.
 * access log: added a new field for response code details in :ref:`file access logger<config_access_log_format_response_code_details>` and :ref:`gRPC access logger<envoy_api_field_data.accesslog.v2.HTTPResponseProperties.response_code_details>`.
 * admin: the administration interface now includes a :ref:`/ready endpoint <operations_admin_interface>` for easier readiness checks.
 * admin: extend :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to support parameters within the request body.
@@ -31,6 +32,7 @@ Version history
   :ref:`buffer_flush_timeout <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.buffer_flush_timeout>` to control how quickly the buffer is flushed if it is not full.
 * router: add support for configuring a :ref:`grpc timeout offset <envoy_api_field_route.RouteAction.grpc_timeout_offset>` on incoming requests.
 * router: added ability to control retry back-off intervals via :ref:`retry policy <envoy_api_msg_route.RetryPolicy.RetryBackOff>`.
+* router: added a route name field to each http route in route.Route list 
 * router: per try timeouts will no longer start before the downstream request has been received
   in full by the router. This ensures that the per try timeout does not account for slow
   downstreams and that will not start before the global timeout.
