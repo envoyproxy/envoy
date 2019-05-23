@@ -277,6 +277,11 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
         *common_properties->mutable_upstream_remote_address());
     common_properties->set_upstream_cluster(stream_info.upstreamHost()->cluster().name());
   }
+
+  if (!stream_info.getRouteName().empty()) {
+    common_properties->set_route_name(stream_info.getRouteName());
+  }
+
   if (stream_info.upstreamLocalAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
         *stream_info.upstreamLocalAddress(), *common_properties->mutable_upstream_local_address());

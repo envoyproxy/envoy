@@ -377,6 +377,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         return UnspecifiedValueString;
       }
     };
+  } else if (field_name == "ROUTE_NAME") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      std::string route_name = stream_info.getRouteName();
+      return route_name.empty() ? UnspecifiedValueString : route_name;
+    };
   } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
     field_extractor_ =
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {

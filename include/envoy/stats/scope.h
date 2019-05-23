@@ -111,7 +111,7 @@ public:
   /**
    * @return a reference to the symbol table.
    */
-  virtual const SymbolTable& symbolTable() const PURE;
+  virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 };
 

@@ -86,6 +86,11 @@ public:
    */
   virtual void rewritePathHeader(Http::HeaderMap& headers,
                                  bool insert_envoy_original_path) const PURE;
+
+  /**
+   * @return std::string& the name of the route.
+   */
+  virtual const std::string& routeName() const PURE;
 };
 
 /**
@@ -711,6 +716,11 @@ public:
    * @returns the internal redirect action which should be taken on this route.
    */
   virtual InternalRedirectAction internalRedirectAction() const PURE;
+
+  /**
+   * @return std::string& the name of the route.
+   */
+  virtual const std::string& routeName() const PURE;
 };
 
 /**
