@@ -16,6 +16,7 @@
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
+#include "envoy/router/scopes.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -43,6 +44,7 @@ public:
                      void(Http::HeaderMap& headers, bool insert_envoy_original_path));
   MOCK_CONST_METHOD0(responseCode, Http::Code());
   MOCK_CONST_METHOD0(responseBody, const std::string&());
+  MOCK_CONST_METHOD0(routeName, const std::string&());
 };
 
 class TestCorsPolicy : public CorsPolicy {
@@ -299,8 +301,10 @@ public:
   MOCK_CONST_METHOD0(includeAttemptCount, bool());
   MOCK_CONST_METHOD0(upgradeMap, const UpgradeMap&());
   MOCK_CONST_METHOD0(internalRedirectAction, InternalRedirectAction());
+  MOCK_CONST_METHOD0(routeName, const std::string&());
 
   std::string cluster_name_{"fake_cluster"};
+  std::string route_name_{"fake_route_name"};
   std::multimap<std::string, std::string> opaque_config_;
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
@@ -372,6 +376,14 @@ public:
   MOCK_METHOD2(createStaticRouteConfigProvider,
                RouteConfigProviderPtr(const envoy::api::v2::RouteConfiguration& route_config,
                                       Server::Configuration::FactoryContext& factory_context));
+};
+
+class MockScopedConfig : public ScopedConfig {
+public:
+  MockScopedConfig();
+  ~MockScopedConfig();
+
+  MOCK_CONST_METHOD1(getRouterConfig, ConfigConstSharedPtr(const Http::HeaderMap& headers));
 };
 
 } // namespace Router

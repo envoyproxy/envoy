@@ -13,6 +13,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        "//include/envoy/config:config_provider_manager_interface",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/config:xds_grpc_context_interface",
