@@ -220,9 +220,8 @@ public:
 
   /**
    * Create a particular udp listener filter factory implementation. If the implementation is unable
-   * to produce a factory with the provided parameters, it should throw an EnvoyException in the
-   * case of general error or a Json::Exception if the json configuration is erroneous. The returned
-   * callback should always be initialized.
+   * to produce a factory with the provided parameters, it should throw an EnvoyException.
+   * The returned callback should always be initialized.
    * @param config supplies the general protobuf configuration for the filter
    * @param context supplies the filter's context.
    * @return Network::UdpListenerFilterFactoryCb the factory creation function.

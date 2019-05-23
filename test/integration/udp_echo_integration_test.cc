@@ -53,8 +53,9 @@ TEST_P(UdpEchoIntegrationTest, HelloWorld) {
   ASSERT_NE(client_socket, nullptr);
 
   const std::string request("hello world");
-  auto send_rc =
-      client_socket->ioHandle().sendto(request.c_str(), request.length(), 0, *listener_address);
+  const void* void_pointer = static_cast<const void*>(request.c_str());
+  Buffer::RawSlice slice{const_cast<void*>(void_pointer), request.length()};
+  auto send_rc = client_socket->ioHandle().sendto(&slice, 0, *listener_address);
   ASSERT_EQ(send_rc.rc_, request.length());
 
   Buffer::InstancePtr response_buffer(new Buffer::OwnedImpl());

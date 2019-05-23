@@ -18,23 +18,23 @@ ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Event::Disp
     : logger_(logger), dispatcher_(dispatcher), disable_listeners_(false) {}
 
 void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
-  ActiveListenerBasePtr l;
+  ActiveListenerBasePtr listener;
   Network::Address::SocketType socket_type = config.socket().socketType();
 
   if (socket_type == Network::Address::SocketType::Stream) {
     ActiveTcpListenerPtr tcp(new ActiveTcpListener(*this, config));
-    l = std::move(tcp);
+    listener = std::move(tcp);
   } else {
     ASSERT(socket_type == Network::Address::SocketType::Datagram,
            "Only datagram/stream listener supported");
     ActiveUdpListenerPtr udp(new ActiveUdpListener(*this, config));
-    l = std::move(udp);
+    listener = std::move(udp);
   }
 
   if (disable_listeners_) {
-    l->listener_->disable();
+    listener->listener_->disable();
   }
-  listeners_.emplace_back(config.socket().localAddress(), std::move(l));
+  listeners_.emplace_back(config.socket().localAddress(), std::move(listener));
 }
 
 void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
@@ -204,8 +204,9 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
       new_listener = listener_.parent_.findActiveListenerByAddress(*socket_->localAddress());
     }
     if (new_listener != nullptr) {
+      // TODO(sumukhs): Try to avoid dynamic_cast by coming up with a better interface design
       ActiveTcpListener* tcp_listener = dynamic_cast<ActiveTcpListener*>(new_listener);
-      RELEASE_ASSERT(tcp_listener != nullptr, "ActiveSocket listner is expected to be tcp");
+      ASSERT(tcp_listener != nullptr, "ActiveSocket listner is expected to be tcp");
       // Hands off connections redirected by iptables to the listener associated with the
       // original destination address. Pass 'hand_off_restored_destination_connections' as false to
       // prevent further redirection.
@@ -320,11 +321,11 @@ ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImp
                                                             Network::ListenerConfig& config)
     : ConnectionHandlerImpl::ActiveListenerBase(parent, std::move(listener), config),
       udp_listener_(dynamic_cast<Network::UdpListener*>(listener_.get())) {
-
-  RELEASE_ASSERT(udp_listener_ != nullptr, "");
+  // TODO(sumukhs): Try to avoid dynamic_cast by coming up with a better interface design
+  ASSERT(udp_listener_ != nullptr, "");
 
   // Create the filter chain on creating a new udp listener
-  config_.filterChainFactory().createUdpListenerFilterChain(*this);
+  config_.filterChainFactory().createUdpListenerFilterChain(*this, *this);
 
   // If filter chain is empty, fail the creation of the listener
   if (read_filters_.empty()) {
@@ -335,9 +336,8 @@ ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImp
 }
 
 void ConnectionHandlerImpl::ActiveUdpListener::onData(Network::UdpRecvData& data) {
-  for (auto& filter : read_filters_) {
-    filter->onData(data);
-  }
+  ASSERT(read_filters_.size() == 1, "Udp listener only supports 1 filter");
+  read_filters_.front()->onData(data);
 }
 
 void ConnectionHandlerImpl::ActiveUdpListener::onWriteReady(const Network::Socket&) {
@@ -355,9 +355,6 @@ void ConnectionHandlerImpl::ActiveUdpListener::onError(
 
 void ConnectionHandlerImpl::ActiveUdpListener::addReadFilter(
     Network::UdpListenerReadFilterPtr&& filter) {
-  // Set callbacks on the filter so that they get a handle to the dispatcher and other global
-  // structures if needed.
-  filter->setCallbacks(*this);
   read_filters_.emplace_back(std::move(filter));
 }
 

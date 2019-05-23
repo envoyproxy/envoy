@@ -60,13 +60,12 @@ public:
 
   /**
    * Send buffer to address.
-   * @param buffer points to the location of the data to be sent.
-   * @param size indicates the size of the data in bytes.
+   * @param slice points to the location of the data to be sent.
    * @param to_address is the destination address.
    * @return a Api::IoCallUint64Result with err_ = an Api::IoError instance or
    * err_ = nullptr and rc_ = the bytes written for success.
    */
-  virtual Api::IoCallUint64Result sendto(const void* buffer, size_t size, int flags,
+  virtual Api::IoCallUint64Result sendto(const Buffer::RawSlice* slice, int flags,
                                          const Address::Instance& address) PURE;
   /**
    * Send a message to the address.

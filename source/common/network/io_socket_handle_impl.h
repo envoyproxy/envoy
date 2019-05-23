@@ -29,7 +29,7 @@ public:
 
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
 
-  Api::IoCallUint64Result sendto(const void* buffer, size_t size, int flags,
+  Api::IoCallUint64Result sendto(const Buffer::RawSlice* slice, int flags,
                                  const Address::Instance& address) override;
 
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,

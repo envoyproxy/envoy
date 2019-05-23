@@ -44,10 +44,10 @@ bool FilterChainUtility::buildFilterChain(
 }
 
 bool FilterChainUtility::buildUdpFilterChain(
-    Network::UdpListenerFilterManager& filter_manager,
+    Network::UdpListenerFilterManager& filter_manager, Network::UdpReadFilterCallbacks& callbacks,
     const std::vector<Network::UdpListenerFilterFactoryCb>& factories) {
   for (const Network::UdpListenerFilterFactoryCb& factory : factories) {
-    factory(filter_manager);
+    factory(filter_manager, callbacks);
   }
 
   return true;

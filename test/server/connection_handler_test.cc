@@ -695,8 +695,9 @@ TEST_F(ConnectionHandlerTest, UdpListenerNoFilterThrowsException) {
       .WillOnce(Invoke([&](Network::Socket&, Network::UdpListenerCallbacks&) -> Network::Listener* {
         return listener;
       }));
-  EXPECT_CALL(factory_, createUdpListenerFilterChain(_))
-      .WillOnce(Invoke([&](Network::UdpListenerFilterManager&) -> bool { return true; }));
+  EXPECT_CALL(factory_, createUdpListenerFilterChain(_, _))
+      .WillOnce(Invoke([&](Network::UdpListenerFilterManager&,
+                           Network::UdpReadFilterCallbacks&) -> bool { return true; }));
   EXPECT_CALL(*listener, onDestroy());
 
   try {
@@ -707,61 +708,6 @@ TEST_F(ConnectionHandlerTest, UdpListenerNoFilterThrowsException) {
         e.what(),
         HasSubstr("Cannot create listener as no read filters registered for the udp listener"));
   }
-}
-
-// UDP listener read filter chain
-TEST_F(ConnectionHandlerTest, UdpListenerReadFilterChain) {
-  InSequence s;
-
-  TestListener* test_listener =
-      addListener(1, true, false, "test_listener", Network::Address::SocketType::Datagram,
-                  std::chrono::milliseconds());
-  Network::MockUdpListener* listener = new Network::MockUdpListener();
-  Network::UdpListenerCallbacks* listener_callbacks;
-  EXPECT_CALL(dispatcher_, createUdpListener_(_, _))
-      .WillOnce(
-          Invoke([&](Network::Socket&, Network::UdpListenerCallbacks& cb) -> Network::Listener* {
-            listener_callbacks = &cb;
-            return listener;
-          }));
-
-  Network::MockUdpListenerReadFilter* test_filter1 = new Network::MockUdpListenerReadFilter();
-  Network::MockUdpListenerReadFilter* test_filter2 = new Network::MockUdpListenerReadFilter();
-
-  EXPECT_CALL(factory_, createUdpListenerFilterChain(_))
-      .WillRepeatedly(Invoke([&](Network::UdpListenerFilterManager& manager) -> bool {
-        manager.addReadFilter(Network::UdpListenerReadFilterPtr{test_filter1});
-        manager.addReadFilter(Network::UdpListenerReadFilterPtr{test_filter2});
-        return true;
-      }));
-
-  EXPECT_CALL(*test_filter1, setCallbacks(_))
-      .WillOnce(Invoke([&](Network::UdpReadFilterCallbacks&) -> void {}));
-  EXPECT_CALL(*test_filter2, setCallbacks(_))
-      .WillOnce(Invoke([&](Network::UdpReadFilterCallbacks&) -> void {}));
-
-  EXPECT_CALL(test_listener->socket_, localAddress());
-
-  handler_->addListener(*test_listener);
-
-  // Pump some data and verify the filters receive the data in the same order as being added
-  Network::UdpRecvData data{nullptr, nullptr, nullptr};
-
-  EXPECT_CALL(*test_filter1, onData(_))
-      .WillOnce(
-          Invoke([&](Network::UdpRecvData& recv_data) -> void { EXPECT_EQ(&recv_data, &data); }));
-
-  EXPECT_CALL(*test_filter2, onData(_))
-      .WillOnce(
-          Invoke([&](Network::UdpRecvData& recv_data) -> void { EXPECT_EQ(&recv_data, &data); }));
-
-  listener_callbacks->onData(data);
-
-  // These 2 calls do not test anything currently.
-  listener_callbacks->onError(Network::UdpListenerCallbacks::ErrorCode::SyscallError, -1);
-  listener_callbacks->onWriteReady(test_listener->socket());
-
-  EXPECT_CALL(*listener, onDestroy());
 }
 
 } // namespace

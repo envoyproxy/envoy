@@ -116,7 +116,7 @@ MockFilterChainManager::~MockFilterChainManager() {}
 
 MockFilterChainFactory::MockFilterChainFactory() {
   ON_CALL(*this, createListenerFilterChain(_)).WillByDefault(Return(true));
-  ON_CALL(*this, createUdpListenerFilterChain(_)).WillByDefault(Return(true));
+  ON_CALL(*this, createUdpListenerFilterChain(_, _)).WillByDefault(Return(true));
 }
 MockFilterChainFactory::~MockFilterChainFactory() {}
 
@@ -179,7 +179,8 @@ MockUdpReadFilterCallbacks::MockUdpReadFilterCallbacks() {
 
 MockUdpReadFilterCallbacks::~MockUdpReadFilterCallbacks() {}
 
-MockUdpListenerReadFilter::MockUdpListenerReadFilter() {}
+MockUdpListenerReadFilter::MockUdpListenerReadFilter(UdpReadFilterCallbacks& callbacks)
+    : UdpListenerReadFilter(callbacks) {}
 MockUdpListenerReadFilter::~MockUdpListenerReadFilter() {}
 
 MockUdpListenerFilterManager::MockUdpListenerFilterManager() {}

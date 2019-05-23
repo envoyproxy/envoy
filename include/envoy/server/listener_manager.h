@@ -76,7 +76,7 @@ public:
 
   /**
    * Creates a list of udp listener filter factories.
-   * @param filters supplies the JSON configuration.
+   * @param filters supplies the configuration.
    * @param context supplies the factory creation context.
    * @return std::vector<Network::UdpListenerFilterFactoryCb> the list of filter factories.
    */

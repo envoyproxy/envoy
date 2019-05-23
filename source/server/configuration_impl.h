@@ -83,6 +83,7 @@ public:
    */
   static bool
   buildUdpFilterChain(Network::UdpListenerFilterManager& filter_manager,
+                      Network::UdpReadFilterCallbacks& callbacks,
                       const std::vector<Network::UdpListenerFilterFactoryCb>& factories);
 };
 

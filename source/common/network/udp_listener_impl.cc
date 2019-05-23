@@ -167,6 +167,7 @@ void UdpListenerImpl::send(const UdpSendData& send_data) {
       socket_.ioHandle().sendmsg(slices.begin(), num_slices, 0, *send_data.send_address_);
 
   if (send_result.ok()) {
+    buffer.drain(send_result.rc_);
     ENVOY_UDP_LOG(trace, "sendmsg sent:{} bytes", send_result.rc_);
   } else {
     if (send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
@@ -176,6 +177,8 @@ void UdpListenerImpl::send(const UdpSendData& send_data) {
                     static_cast<int>(send_result.err_->getErrorCode()));
     }
 
+    // Drain the buffer even on failure because there is no error returned to caller
+    buffer.drain(buffer.length());
     // TODO(sumukhs) - Convert the OnError method to use IoErrors
     cb_.onError(UdpListenerCallbacks::ErrorCode::SyscallError,
                 static_cast<int>(send_result.err_->getErrorCode()));

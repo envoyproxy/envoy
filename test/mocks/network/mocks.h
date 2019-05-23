@@ -207,7 +207,8 @@ public:
                bool(Connection& connection,
                     const std::vector<Network::FilterFactoryCb>& filter_factories));
   MOCK_METHOD1(createListenerFilterChain, bool(ListenerFilterManager& listener));
-  MOCK_METHOD1(createUdpListenerFilterChain, bool(UdpListenerFilterManager& listener));
+  MOCK_METHOD2(createUdpListenerFilterChain,
+               bool(UdpListenerFilterManager& listener, UdpReadFilterCallbacks& callbacks));
 };
 
 class MockListenSocket : public Socket {
@@ -446,11 +447,10 @@ public:
 
 class MockUdpListenerReadFilter : public UdpListenerReadFilter {
 public:
-  MockUdpListenerReadFilter();
+  MockUdpListenerReadFilter(UdpReadFilterCallbacks& callbacks);
   ~MockUdpListenerReadFilter();
 
   MOCK_METHOD1(onData, void(UdpRecvData&));
-  MOCK_METHOD1(setCallbacks, void(UdpReadFilterCallbacks& callbacks));
 };
 
 class MockUdpListenerFilterManager : public UdpListenerFilterManager {

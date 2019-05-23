@@ -54,7 +54,6 @@ void getSocketAddressInfo(const Address::Instance& address, sockaddr_storage& ad
   }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
-    break;
   }
 }
 
@@ -113,15 +112,15 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   return sysCallResultToIoCallResult(result);
 }
 
-Api::IoCallUint64Result IoSocketHandleImpl::sendto(const void* buffer, size_t size, int flags,
+Api::IoCallUint64Result IoSocketHandleImpl::sendto(const Buffer::RawSlice* slice, int flags,
                                                    const Address::Instance& address) {
   sockaddr_storage ss;
   socklen_t ss_len = sizeof ss;
   getSocketAddressInfo(address, ss, ss_len);
 
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result =
-      os_syscalls.sendto(fd_, buffer, size, flags, reinterpret_cast<sockaddr*>(&ss), ss_len);
+  const Api::SysCallSizeResult result = os_syscalls.sendto(
+      fd_, slice->mem_, slice->len_, flags, reinterpret_cast<sockaddr*>(&ss), ss_len);
   return sysCallResultToIoCallResult(result);
 }
 

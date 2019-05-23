@@ -326,7 +326,8 @@ public:
   bool createNetworkFilterChain(Network::Connection& connection,
                                 const std::vector<Network::FilterFactoryCb>& factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& manager) override;
-  bool createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener) override;
+  bool createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
+                                    Network::UdpReadFilterCallbacks& callbacks) override;
 
   SystemTime last_updated_;
 

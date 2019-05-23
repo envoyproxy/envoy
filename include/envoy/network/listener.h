@@ -211,7 +211,11 @@ public:
 
   /**
    * Send data through the underlying udp socket. If the send buffer of the socket FD is full, it is
-   * possible the write is dropped.
+   * possible the write is dropped. The buffers underlying the data are always drained.
+   *
+   * TODO(sumukhs): We do not currently handle max MTU size of the datagram. Determine if we could
+   * expose the path MTU information to the caller.
+   *
    * @param data Supplies the data to send to a target using udp
    */
   virtual void send(const UdpSendData& data) PURE;

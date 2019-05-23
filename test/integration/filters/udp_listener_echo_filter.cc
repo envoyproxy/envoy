@@ -15,17 +15,14 @@ namespace Envoy {
 class UdpListenerEchoFilter : public Network::UdpListenerReadFilter,
                               Logger::Loggable<Logger::Id::filter> {
 public:
+  UdpListenerEchoFilter(Network::UdpReadFilterCallbacks& callbacks);
+
   // Network::UdpListenerReadFilter
   void onData(Network::UdpRecvData& data) override;
-  void setCallbacks(Network::UdpReadFilterCallbacks& callbacks) override;
-
-private:
-  Network::UdpReadFilterCallbacks* read_callbacks_{};
 };
 
-void UdpListenerEchoFilter::setCallbacks(Network::UdpReadFilterCallbacks& callbacks) {
-  read_callbacks_ = &callbacks;
-}
+UdpListenerEchoFilter::UdpListenerEchoFilter(Network::UdpReadFilterCallbacks& callbacks)
+    : Network::UdpListenerReadFilter(callbacks) {}
 
 void UdpListenerEchoFilter::onData(Network::UdpRecvData& data) {
   ENVOY_LOG(trace, "UdpEchoFilter: Got {} bytes from {}", data.buffer_->length(),
@@ -48,8 +45,9 @@ public:
   Network::UdpListenerFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::ListenerFactoryContext&) override {
-    return [](Network::UdpListenerFilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_unique<UdpListenerEchoFilter>());
+    return [](Network::UdpListenerFilterManager& filter_manager,
+              Network::UdpReadFilterCallbacks& callbacks) -> void {
+      filter_manager.addReadFilter(std::make_unique<UdpListenerEchoFilter>(callbacks));
     };
   }
 

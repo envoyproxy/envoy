@@ -92,7 +92,8 @@ bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connectio
 
 bool AutonomousUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { return true; }
 
-bool AutonomousUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManager&) {
+bool AutonomousUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
+                                                      Network::UdpReadFilterCallbacks&) {
   return true;
 }
 
