@@ -1,7 +1,5 @@
 #pragma once
 
-#include <unordered_set>
-
 #include "envoy/api/api.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
@@ -318,41 +316,6 @@ public:
   static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     const ProtobufWkt::Struct& config,
                                     Protobuf::Message& out_proto);
-
-#if 0
-  template <class ResourceVector, MessageType>
-  static bool diffResourcesAndUpdateConfig(
-      const std::string& api_name, const ResourceVector& resources, const std::string& version_info,
-      std::function<bool(const MessageType&, const std::string&)> addOrUpdateFn,
-      std::function<bool(const std::string&)> removeFn,
-      std::function<void(const MessageType&)> validateFn) {
-    std::unordered_set<std::string> resource_names;
-    for (const auto& resource : resources) {
-      if (!resource_names.insert(resource.name()).second) {
-        throw EnvoyException(fmt::format("duplicate resource {} found", resource.name()));
-      }
-    }
-    for (const auto& resource : resources) {
-      validateFn(resource);
-    }
-    // We need to keep track of which clusters we might need to remove.
-    ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
-    for (auto& cluster : resources) {
-      const std::string cluster_name = cluster.name();
-      clusters_to_remove.erase(cluster_name);
-      if (cm_.addOrUpdateCluster(cluster, version_info)) {
-        ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
-      }
-    }
-
-    for (auto cluster : clusters_to_remove) {
-      const std::string cluster_name = cluster.first;
-      if (cm_.removeCluster(cluster_name)) {
-        ENVOY_LOG(debug, "cds: remove cluster '{}'", cluster_name);
-      }
-    }
-  }
-#endif
 };
 
 } // namespace Config
