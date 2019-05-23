@@ -41,7 +41,7 @@ public:
   std::vector<std::set<std::string>> subset_keys_;
 };
 
-// While this mock class doesn't have any direct use in Envoy tests per se, it's
+// While this mock class doesn't have any direct use in public Envoy tests, it's
 // useful for constructing tests of downstream private filters that use
 // ClusterTypedMetadata.
 class MockClusterTypedMetadata : public Config::TypedMetadataImpl<ClusterTypedMetadataFactory> {
