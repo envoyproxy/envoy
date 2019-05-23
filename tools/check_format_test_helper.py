@@ -229,6 +229,7 @@ if __name__ == "__main__":
   errors += checkAndFixError("bad_envoy_build_sys_ref.BUILD", "Superfluous '@envoy//' prefix")
   errors += checkAndFixError("proto_format.proto", "clang-format check failed")
   errors += checkAndFixError("api/java_options.proto", "Java proto option")
+  errors += checkAndFixError("cpp_std.cc", "cpp std:")
 
   errors += checkFileExpectingOK("real_time_source_override.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")

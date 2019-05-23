@@ -76,7 +76,7 @@ PROTOBUF_TYPE_ERRORS = {
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 }
 CPP_STD_ERRORS = {
-    "absl::make_unique": "std::make_unique",
+    "absl::make_unique<": "std::make_unique<",
 }
 # yapf: enable
 
