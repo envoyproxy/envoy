@@ -1,12 +1,17 @@
 #pragma once
 
-#include "absl/base/attributes.h"
-
 // NOLINT(namespace-envoy)
 
 // This file is part of the QUICHE platform implementation, and is not to be
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#define SPDY_MUST_USE_RESULT_IMPL ABSL_MUST_USE_RESULT
-#define SPDY_UNUSED_IMPL ABSL_ATTRIBUTE_UNUSED
+#include <memory>
+
+namespace quiche {
+
+template <typename T, typename... Args> std::unique_ptr<T> QuicheMakeUniqueImpl(Args&&... args) {
+  return std::make_unique<T>(std::forward<Args>(args)...);
+}
+
+} // namespace quiche
