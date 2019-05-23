@@ -27,7 +27,7 @@ namespace Compressors {
  * the user can measure the memory performance of the
  * compression.
  * "header_gzip" is specific to the gzip filter and is
- * depricated since it duplicates "header_compressor_used".
+ * deprecated since it duplicates "header_compressor_used".
  */
 // clang-format off
 #define ALL_COMPRESSOR_STATS(COUNTER)    \
