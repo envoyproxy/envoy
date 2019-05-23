@@ -99,8 +99,8 @@ manager and watermark improvements. We will activate the security process for di
 appear to present a risk profile that is significantly greater than the current Envoy availability
 hardening status quo. Examples of disclosures that would elicit this response:
 * QoD; where a single query from a client can bring down an Envoy server.
-* High amplification attacks, where very little traffic, e.g. that delivered by a single client, can
-  cause resource exhaustion.
+* Highly asymmetric resource exhaustion attacks, where very little traffic can cause resource
+  exhaustion, e.g. that delivered by a single client.
 
 Note that we do not currently consider the default settings for Envoy to be safe from an availability
 perspective. It is necessary for operators to explicitly configure watermarks, the overload manager,
