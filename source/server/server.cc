@@ -593,7 +593,7 @@ void InstanceImpl::shutdownAdmin() {
 ServerLifecycleNotifier::HandlePtr InstanceImpl::registerCallback(Stage stage,
                                                                   StageCallback callback) {
   auto& callbacks = stage_callbacks_[stage];
-  return absl::make_unique<LifecycleCallbackHandle<LifecycleNotifierCallbacks>>(
+  return std::make_unique<LifecycleCallbackHandle<LifecycleNotifierCallbacks>>(
       callbacks, callbacks.insert(callbacks.end(), callback));
 }
 
@@ -601,7 +601,7 @@ ServerLifecycleNotifier::HandlePtr
 InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
   ASSERT(stage == Stage::ShutdownExit);
   auto& callbacks = stage_completable_callbacks_[stage];
-  return absl::make_unique<LifecycleCallbackHandle<LifecycleNotifierCompletionCallbacks>>(
+  return std::make_unique<LifecycleCallbackHandle<LifecycleNotifierCompletionCallbacks>>(
       callbacks, callbacks.insert(callbacks.end(), callback));
 }
 

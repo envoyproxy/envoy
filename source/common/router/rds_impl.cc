@@ -216,7 +216,7 @@ RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigPr
     const envoy::api::v2::RouteConfiguration& route_config,
     Server::Configuration::FactoryContext& factory_context) {
   auto provider =
-      absl::make_unique<StaticRouteConfigProviderImpl>(route_config, factory_context, *this);
+      std::make_unique<StaticRouteConfigProviderImpl>(route_config, factory_context, *this);
   static_route_config_providers_.insert(provider.get());
   return provider;
 }
