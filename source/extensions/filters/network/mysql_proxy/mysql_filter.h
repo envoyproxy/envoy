@@ -103,6 +103,8 @@ public:
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   MySQLFilterConfigSharedPtr config_;
+  Buffer::OwnedImpl read_buffer_;
+  Buffer::OwnedImpl write_buffer_;
   std::unique_ptr<Decoder> decoder_;
   bool sniffing_{true};
 };
