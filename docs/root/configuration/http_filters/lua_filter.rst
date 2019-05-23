@@ -312,6 +312,57 @@ Returns the current request's underlying :repo:`connection <include/envoy/networ
 
 Returns a :ref:`connection object <config_http_filters_lua_connection_wrapper>`.
 
+importPublicKey()
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+  
+  pkey = handle:importPublicKey(keyder, keyderLenght)
+
+Returns public key which is used by :ref:`verifySignature <verify_signature>` to verify digital signature. 
+
+.. attention::
+
+  Remember to call :ref:`releasePublicKey <release_public_key>` if *pkey* is not needed to avoid memory leak.
+
+.. _release_public_key:
+
+releasePublicKey()
+^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+  
+  handle:releasePublicKey(pkey)
+
+Free the resource of *pkey*
+
+decodeBase64()
+^^^^^^^^^^^^^^
+
+.. code-block:: lua
+  
+  raw = request_handle:decodeBase64(str)
+
+Decodes base64 encoded string. Returns *nil* if input string is invalid.
+
+.. _verify_signature:
+
+verifySignature()
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  ok, error = verifySignature(pkey, hashFunction, signature, signatureLength, data, dataLength)
+
+Verify signature using provided parameters. *pkey* is the public key, *hashFunction* is the variable 
+for hash function which be used for verifying signature. *MD4*, *MD5*, *SHA1*, *SHA224*, *SHA256*, 
+*SHA384*, *SHA512* and *MD5_SHA1* are supported. *signature* is the signature to be verified. 
+*signatureLength* is the length of the signature. *data* is the content which will be hashed. 
+*dataLength* is the length of data.
+
+The function returns a pair. If the first element is *true*, the second element will be empty
+which means signature is verified; otherwise, the second element will store the error message. 
+
 .. _config_http_filters_lua_header_wrapper:
 
 Header object API
