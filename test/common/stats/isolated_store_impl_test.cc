@@ -46,6 +46,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(0, g2.tags().size());
 
   Histogram& h1 = store_.histogram("h1");
+  EXPECT_TRUE(h1.used()); // hardcoded in impl to be true always.
   Histogram& h2 = scope1->histogram("h2");
   scope1->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
@@ -109,6 +110,14 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
 
   EXPECT_EQ(4UL, store_.counters().size());
   EXPECT_EQ(2UL, store_.gauges().size());
+}
+
+TEST_F(StatsIsolatedStoreImplTest, ConstSymtabAccessor) {
+  ScopePtr scope = store_.createScope("scope.");
+  const Scope& cscope = *scope;
+  const SymbolTable& const_symbol_table = cscope.constSymbolTable();
+  SymbolTable& symbol_table = scope->symbolTable();
+  EXPECT_EQ(&const_symbol_table, &symbol_table);
 }
 
 TEST_F(StatsIsolatedStoreImplTest, LongStatName) {

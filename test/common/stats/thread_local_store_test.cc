@@ -342,6 +342,14 @@ TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
   tls_.shutdownThread();
 }
 
+TEST_F(StatsThreadLocalStoreTest, ConstSymtabAccessor) {
+  ScopePtr scope = store_->createScope("scope.");
+  const Scope& cscope = *scope;
+  const SymbolTable& const_symbol_table = cscope.constSymbolTable();
+  SymbolTable& symbol_table = scope->symbolTable();
+  EXPECT_EQ(&const_symbol_table, &symbol_table);
+}
+
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -501,6 +509,13 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(2UL, store_.gauges().size());
 }
 
+TEST_F(LookupWithStatNameTest, NotFound) {
+  StatName not_found(makeStatName("not_found"));
+  EXPECT_FALSE(store_.findCounter(not_found));
+  EXPECT_FALSE(store_.findGauge(not_found));
+  EXPECT_FALSE(store_.findHistogram(not_found));
+}
+
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
   envoy::config::metrics::v2::StatsConfig stats_config_;
@@ -527,6 +542,7 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   EXPECT_EQ(noop_counter.value(), 0);
   Counter& noop_counter_2 = store_->counter("noop_counter_2");
   EXPECT_EQ(&noop_counter, &noop_counter_2);
+  EXPECT_FALSE(noop_counter.used()); // hardcoded to return false in NullMetricImpl.
 
   // Gauge
   Gauge& noop_gauge = store_->gauge("noop_gauge");

@@ -29,12 +29,12 @@ public:
 
   void setState(MySQLSession::State state) { state_ = state; }
   MySQLSession::State getState() { return state_; }
-  int getExpectedSeq() { return expected_seq_; }
-  void setExpectedSeq(int seq) { expected_seq_ = seq; }
+  uint8_t getExpectedSeq() { return expected_seq_; }
+  void setExpectedSeq(uint8_t seq) { expected_seq_ = seq; }
 
 private:
   MySQLSession::State state_{State::MYSQL_INIT};
-  int expected_seq_{0};
+  uint8_t expected_seq_{0};
 };
 
 } // namespace MySQLProxy

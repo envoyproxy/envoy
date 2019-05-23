@@ -2908,6 +2908,38 @@ static Http::TestHeaderMapImpl genRedirectHeaders(const std::string& host, const
   return headers;
 }
 
+TEST_F(RouteMatcherTest, RouteName) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    routes:
+      - name: "route-test"
+        match: { prefix: "/"}
+        route:
+          cluster: "ufesservice"
+  - name: redirect
+    domains: [redirect.lyft.com]
+    routes:
+      - name: "route-test-2"
+        match: { path: /host }
+        redirect: { host_redirect: new.lyft.com }
+  )EOF";
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    EXPECT_EQ("route-test", config.route(headers, 0)->routeEntry()->routeName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/host", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    EXPECT_EQ("route-test-2", redirect->routeName());
+  }
+}
+
 TEST_F(RouteMatcherTest, DirectResponse) {
   const auto pathname =
       TestEnvironment::writeStringToFileForTest("direct_response_body", "Example text 3");

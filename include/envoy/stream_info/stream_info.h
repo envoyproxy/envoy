@@ -203,6 +203,15 @@ public:
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
 
   /**
+   * @param std::string name denotes the name of the route.
+   */
+  virtual void setRouteName(absl::string_view name) PURE;
+
+  /**
+   * @return std::string& the name of the route.
+   */
+  virtual const std::string& getRouteName() const PURE;
+  /**
    * @param bytes_received denotes number of bytes to add to total received bytes.
    */
   virtual void addBytesReceived(uint64_t bytes_received) PURE;
