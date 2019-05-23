@@ -44,21 +44,21 @@ bool ClientLogin::isClientSecureConnection() const {
   return extended_client_cap_ & MYSQL_EXT_CL_SECURE_CONNECTION;
 }
 
-int ClientLogin::parseMessage(Buffer::Instance& buffer, uint64_t& offset, int) {
+int ClientLogin::parseMessage(Buffer::Instance& buffer, uint32_t) {
   uint16_t client_cap = 0;
-  if (BufferHelper::peekUint16(buffer, offset, client_cap) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint16(buffer, client_cap) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing client_cap in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
   setClientCap(client_cap);
   uint16_t extended_client_cap = 0;
-  if (BufferHelper::peekUint16(buffer, offset, extended_client_cap) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint16(buffer, extended_client_cap) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing extended_client_cap in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
   setExtendedClientCap(extended_client_cap);
   uint32_t max_packet = 0;
-  if (BufferHelper::peekUint32(buffer, offset, max_packet) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint32(buffer, max_packet) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing max_packet in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
@@ -68,17 +68,17 @@ int ClientLogin::parseMessage(Buffer::Instance& buffer, uint64_t& offset, int) {
     return MYSQL_SUCCESS;
   }
   uint8_t charset = 0;
-  if (BufferHelper::peekUint8(buffer, offset, charset) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint8(buffer, charset) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing charset in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
   setCharset(charset);
-  if (BufferHelper::peekBytes(buffer, offset, UNSET_BYTES) != MYSQL_SUCCESS) {
+  if (BufferHelper::readBytes(buffer, UNSET_BYTES) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error skipping unset bytes in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
   std::string username;
-  if (BufferHelper::peekString(buffer, offset, username) != MYSQL_SUCCESS) {
+  if (BufferHelper::readString(buffer, username) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing username in mysql ClientLogin msg");
     return MYSQL_FAILURE;
   }
@@ -86,26 +86,26 @@ int ClientLogin::parseMessage(Buffer::Instance& buffer, uint64_t& offset, int) {
   std::string auth_resp;
   if (isClientAuthLenClData()) {
     uint64_t auth_resp_len = 0;
-    if (BufferHelper::peekLengthEncodedInteger(buffer, offset, auth_resp_len) != MYSQL_SUCCESS) {
+    if (BufferHelper::readLengthEncodedInteger(buffer, auth_resp_len) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing LengthEncodedInteger in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
-    if (BufferHelper::peekStringBySize(buffer, offset, auth_resp_len, auth_resp) != MYSQL_SUCCESS) {
+    if (BufferHelper::readStringBySize(buffer, auth_resp_len, auth_resp) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
   } else if (isClientSecureConnection()) {
     uint8_t auth_resp_len = 0;
-    if (BufferHelper::peekUint8(buffer, offset, auth_resp_len) != MYSQL_SUCCESS) {
+    if (BufferHelper::readUint8(buffer, auth_resp_len) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp_len in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
-    if (BufferHelper::peekStringBySize(buffer, offset, auth_resp_len, auth_resp) != MYSQL_SUCCESS) {
+    if (BufferHelper::readStringBySize(buffer, auth_resp_len, auth_resp) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
   } else {
-    if (BufferHelper::peekString(buffer, offset, auth_resp) != MYSQL_SUCCESS) {
+    if (BufferHelper::readString(buffer, auth_resp) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }
@@ -113,7 +113,7 @@ int ClientLogin::parseMessage(Buffer::Instance& buffer, uint64_t& offset, int) {
   setAuthResp(auth_resp);
   if (isConnectWithDb()) {
     std::string db;
-    if (BufferHelper::peekString(buffer, offset, db) != MYSQL_SUCCESS) {
+    if (BufferHelper::readString(buffer, db) != MYSQL_SUCCESS) {
       ENVOY_LOG(info, "error parsing auth_resp in mysql ClientLogin msg");
       return MYSQL_FAILURE;
     }

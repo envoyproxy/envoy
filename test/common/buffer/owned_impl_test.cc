@@ -424,6 +424,39 @@ TEST_P(OwnedImplTest, PrependEmpty) {
   EXPECT_EQ(0, buf.length());
 }
 
+// Regression test for oss-fuzz issues
+// https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=14466, empty commit
+// following a reserve resulted in a corrupted libevent internal state.
+TEST_P(OwnedImplTest, ReserveZeroCommit) {
+  BufferFragmentImpl frag("", 0, nullptr);
+  Buffer::OwnedImpl buf;
+  buf.addBufferFragment(frag);
+  buf.prepend("bbbbb");
+  buf.add("");
+  constexpr uint32_t reserve_slices = 16;
+  Buffer::RawSlice slices[reserve_slices];
+  const uint32_t allocated_slices = buf.reserve(1280, slices, reserve_slices);
+  for (uint32_t i = 0; i < allocated_slices; ++i) {
+    slices[i].len_ = 0;
+  }
+  buf.commit(slices, allocated_slices);
+  int pipe_fds[2] = {0, 0};
+  ASSERT_EQ(::pipe(pipe_fds), 0);
+  Network::IoSocketHandleImpl io_handle(pipe_fds[0]);
+  ASSERT_EQ(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK), 0);
+  ASSERT_EQ(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK), 0);
+  const uint32_t max_length = 1953;
+  std::string data(max_length, 'e');
+  const ssize_t rc = ::write(pipe_fds[1], data.data(), max_length);
+  ASSERT_GT(rc, 0);
+  const uint32_t previous_length = buf.length();
+  Api::IoCallUint64Result result = buf.read(io_handle, max_length);
+  ASSERT_EQ(result.rc_, static_cast<uint64_t>(rc));
+  ASSERT_EQ(::close(pipe_fds[1]), 0);
+  ASSERT_EQ(previous_length, buf.search(data.data(), rc, previous_length));
+  EXPECT_EQ("bbbbb", buf.toString().substr(0, 5));
+}
+
 TEST(OverflowDetectingUInt64, Arithmetic) {
   Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink()); // For coverage build.
   OverflowDetectingUInt64 length;

@@ -51,7 +51,7 @@ public:
   };
 
   SymbolTable& symbolTable() override { return symbol_table_.get(); }
-  const SymbolTable& symbolTable() const override { return symbol_table_.get(); }
+  const SymbolTable& constSymbolTable() const override { return symbol_table_.get(); }
 
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
@@ -204,9 +204,6 @@ public:
   Histogram& histogramFromStatName(StatName name) override {
     return histogram(symbol_table_->toString(name));
   }
-
-  SymbolTable& symbolTable() override { return symbol_table_.get(); }
-  const SymbolTable& symbolTable() const override { return symbol_table_.get(); }
 
   Test::Global<FakeSymbolTableImpl> symbol_table_;
   testing::NiceMock<MockCounter> counter_;

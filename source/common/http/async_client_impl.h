@@ -262,7 +262,7 @@ private:
     Router::InternalRedirectAction internalRedirectAction() const override {
       return Router::InternalRedirectAction::PassThrough;
     }
-
+    const std::string& routeName() const override { return route_name_; }
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
@@ -277,6 +277,7 @@ private:
     Router::RouteEntry::UpgradeMap upgrade_map_;
     const std::string& cluster_name_;
     absl::optional<std::chrono::milliseconds> timeout_;
+    const std::string route_name_;
   };
 
   struct RouteImpl : public Router::Route {
