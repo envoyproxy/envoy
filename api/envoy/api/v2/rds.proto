@@ -123,7 +123,7 @@ message RouteConfiguration {
   // option. This setting default to false if the route table is loaded dynamically via the
   // :ref:`rds
   // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.rds>`
-  // option. Users may which to override the default behavior in certain cases (for example when
+  // option. Users may wish to override the default behavior in certain cases (for example when
   // using CDS with a static route table).
   google.protobuf.BoolValue validate_clusters = 7;
 }

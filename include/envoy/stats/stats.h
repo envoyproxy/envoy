@@ -105,7 +105,7 @@ public:
     static const uint8_t LogicCached = LogicAccumulate | LogicNeverImport;
   };
   virtual SymbolTable& symbolTable() PURE;
-  virtual const SymbolTable& symbolTable() const PURE;
+  virtual const SymbolTable& constSymbolTable() const PURE;
 };
 
 /**
