@@ -209,6 +209,7 @@ private:
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
 
+  bool config_has_admin_layer_{};
   RandomGenerator& generator_;
   RuntimeStats stats_;
   AdminLayer admin_layer_;

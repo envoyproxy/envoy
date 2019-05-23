@@ -411,6 +411,18 @@ TEST_F(LoaderImplTest, LayersOverride) {
   EXPECT_EQ("Happy cake", loader_->snapshot().get("file15"));
 }
 
+TEST_F(LoaderImplTest, MultipleAdminLayersFail) {
+  setup();
+  envoy::config::bootstrap::v2::LayeredRuntime layered_runtime;
+  layered_runtime.add_layers()->mutable_admin_layer();
+  layered_runtime.add_layers()->mutable_admin_layer();
+  EXPECT_THROW_WITH_MESSAGE(
+      std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, "", store_, generator_,
+                                   *api_),
+      EnvoyException,
+      "Too many admin layers specified in LayeredRuntime, at most one may be specified");
+}
+
 class DisklessLoaderImplTest : public LoaderImplTest {
 protected:
   void setup() override {

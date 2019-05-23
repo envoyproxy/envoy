@@ -450,6 +450,16 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
                        RandomGenerator& generator, Api::Api& api)
     : generator_(generator), stats_(generateStats(store)), admin_layer_(stats_),
       tls_(tls.allocateSlot()), config_(config), service_cluster_(service_cluster), api_(api) {
+  for (const auto& layer : config_.layers()) {
+    if (layer.has_admin_layer()) {
+      if (config_has_admin_layer_) {
+        throw EnvoyException(
+            "Too many admin layers specified in LayeredRuntime, at most one may be specified");
+      } else {
+        config_has_admin_layer_ = true;
+      }
+    }
+  }
   if (!config.symlink_root().empty()) {
     watcher_ = dispatcher.createFilesystemWatcher();
     watcher_->addWatch(config.symlink_root(), Filesystem::Watcher::Events::MovedTo,
@@ -469,6 +479,9 @@ void LoaderImpl::loadNewSnapshot() {
 Snapshot& LoaderImpl::snapshot() { return tls_->getTyped<Snapshot>(); }
 
 void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>& values) {
+  if (!config_has_admin_layer_) {
+    throw EnvoyException("No admin layer specified");
+  }
   admin_layer_.mergeValues(values);
   loadNewSnapshot();
 }

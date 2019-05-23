@@ -319,6 +319,22 @@ TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz"));
 }
 
+// Validate that a runtime absent an admin layer will fail mutating operations
+// but still support inspection of runtime values.
+TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
+  options_.service_cluster_name_ = "some_service";
+  initialize("test/server/runtime_bootstrap.yaml");
+  Http::TestHeaderMapImpl response_headers;
+  std::string response_body;
+  EXPECT_EQ(Http::Code::OK,
+            server_->admin().request("/runtime", "GET", response_headers, response_body));
+  EXPECT_THAT(response_body, HasSubstr("fozz"));
+  EXPECT_EQ(
+      Http::Code::ServiceUnavailable,
+      server_->admin().request("/runtime_modify?foo=bar", "POST", response_headers, response_body));
+  EXPECT_EQ("No admin layer specified", response_body);
+}
+
 // Validate invalid runtime in bootstrap is rejected.
 TEST_P(ServerInstanceImplTest, InvalidBootstrapRuntime) {
   EXPECT_THROW_WITH_MESSAGE(initialize("test/server/invalid_runtime_bootstrap.yaml"),
