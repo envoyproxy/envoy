@@ -19,6 +19,55 @@ using Envoy::Config::ConfigProviderPtr;
 namespace Envoy {
 namespace Router {
 
+namespace ScopedRoutesConfigProviderUtil {
+
+ConfigProviderPtr
+create(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+           config,
+       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+       ConfigProviderManager& scoped_routes_config_provider_manager) {
+  ASSERT(config.route_specifier_case() == envoy::config::filter::network::http_connection_manager::
+                                              v2::HttpConnectionManager::kScopedRoutes);
+
+  switch (config.scoped_routes().config_specifier_case()) {
+  case envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
+      kScopedRouteConfigurationsList: {
+    const envoy::config::filter::network::http_connection_manager::v2::
+        ScopedRouteConfigurationsList& scoped_route_list =
+            config.scoped_routes().scoped_route_configurations_list();
+    ProtobufTypes::ConstMessagePtrVector config_protos(
+        scoped_route_list.scoped_route_configurations().size());
+    for (const auto& it : scoped_route_list.scoped_route_configurations()) {
+      Protobuf::Message* clone = it.New();
+      clone->CopyFrom(it);
+      config_protos.push_back(std::unique_ptr<const Protobuf::Message>(clone));
+    }
+
+    return scoped_routes_config_provider_manager.createStaticConfigProvider(
+        std::move(config_protos), factory_context,
+        ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
+                                                config.scoped_routes().rds_config_source(),
+                                                config.scoped_routes().scope_key_builder()));
+  }
+
+  case envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::kScopedRds:
+    return scoped_routes_config_provider_manager.createXdsConfigProvider(
+        config.scoped_routes().scoped_rds(), factory_context, stat_prefix,
+        ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
+                                                config.scoped_routes().rds_config_source(),
+                                                config.scoped_routes().scope_key_builder()));
+
+  case envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
+      CONFIG_SPECIFIER_NOT_SET:
+    return nullptr;
+
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+} // namespace ScopedRoutesConfigProviderUtil
+
 InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
     ProtobufTypes::ConstMessagePtrVector&& config_protos, std::string name,
     Server::Configuration::FactoryContext& factory_context,

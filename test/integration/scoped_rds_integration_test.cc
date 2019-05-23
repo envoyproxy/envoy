@@ -148,6 +148,7 @@ fragments:
 INSTANTIATE_TEST_CASE_P(IpVersionsAndGrpcTypes, ScopedRdsIntegrationTest,
                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
+// Test that a SRDS DiscoveryResponse is successfully processed.
 TEST_P(ScopedRdsIntegrationTest, BasicSuccess) {
   const std::string scope_route1 = R"EOF(
 name: foo_scope1
@@ -192,6 +193,26 @@ key:
 
   // TODO(AndresGuedez): test actual scoped routing logic; only the config handling is implemented
   // at this point.
+}
+
+// Test that a bad config update updates the corresponding stats.
+TEST_P(ScopedRdsIntegrationTest, ConfigUpdateFailure) {
+  // 'name' will fail to validate due to empty string.
+  const std::string scope_route1 = R"EOF(
+name:
+route_configuration_name: foo_route1
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  on_server_init_function_ = [this, &scope_route1]() {
+    createScopedRdsStream();
+    sendScopedRdsResponse({scope_route1}, "1");
+  };
+  initialize();
+
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_rejected",
+                                 1);
 }
 
 } // namespace

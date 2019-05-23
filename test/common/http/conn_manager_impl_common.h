@@ -24,6 +24,7 @@ struct RouteConfigProvider : public Router::RouteConfigProvider {
   Router::ConfigConstSharedPtr config() override { return route_config_; }
   absl::optional<ConfigInfo> configInfo() const override { return {}; }
   SystemTime lastUpdated() const override { return time_source_.systemTime(); }
+  void onConfigUpdate() override {}
 
   TimeSource& time_source_;
   std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
@@ -39,9 +40,7 @@ struct ScopedRouteConfigProvider : public Config::ConfigProvider {
   // Config::ConfigProvider
   SystemTime lastUpdated() const override { return time_source_.systemTime(); }
   const Protobuf::Message* getConfigProto() const override { return nullptr; }
-  const Envoy::Config::ConfigProvider::ConfigProtoVector getConfigProtos() const override {
-    return {};
-  }
+  Envoy::Config::ConfigProvider::ConfigProtoVector getConfigProtos() const override { return {}; }
   std::string getConfigVersion() const override { return ""; }
   ConfigConstSharedPtr getConfig() const override { return config_; }
   ApiType apiType() const override { return ApiType::Delta; }

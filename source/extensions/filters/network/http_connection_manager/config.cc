@@ -179,10 +179,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                            HttpConnectionManager::kScopedRoutes) {
     route_config_provider_ = Router::RouteConfigProviderUtil::create(
         config, context_, stats_prefix_, route_config_provider_manager_);
+  } else {
+    scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
+        config, context_, stats_prefix_, scoped_routes_config_provider_manager_);
   }
-
-  scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::maybeCreate(
-      config, context_, stats_prefix_, scoped_routes_config_provider_manager_);
 
   switch (config.forward_client_cert_details()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::SANITIZE:
