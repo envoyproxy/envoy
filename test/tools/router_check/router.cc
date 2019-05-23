@@ -405,16 +405,18 @@ Options::Options(int argc, char** argv) {
   is_proto_ = is_proto.getValue();
   is_detailed_ = is_detailed.getValue();
 
-  if(is_proto_) {
+  if (is_proto_) {
     config_path_ = config_path.getValue();
     test_path_ = test_path.getValue();
     if (config_path_ == "" || test_path_ == "") {
-      std::cerr << "error: " << "Both --config-path/c and --test-path/t are mandatory with --useproto" << std::endl;
+      std::cerr << "error: "
+                << "Both --config-path/c and --test-path/t are mandatory with --useproto"
+                << std::endl;
       exit(EXIT_FAILURE);
     }
   } else {
     unlabelled_config_path_ =
-      unlabelled_configs.getValue().empty() ? "" : unlabelled_configs.getValue()[0];
+        unlabelled_configs.getValue().empty() ? "" : unlabelled_configs.getValue()[0];
     unlabelled_test_path_ =
         unlabelled_configs.getValue().empty() ? "" : unlabelled_configs.getValue()[1];
   }

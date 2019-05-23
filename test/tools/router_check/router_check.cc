@@ -16,8 +16,9 @@ int main(int argc, char* argv[]) {
       checktool.setShowDetails();
     }
 
-    bool is_equal = options.isProto() ? checktool.compareEntries(options.testPath())
-                                 : checktool.compareEntriesInJson(options.unlabelledTestPath());
+    bool is_equal = options.isProto()
+                        ? checktool.compareEntries(options.testPath())
+                        : checktool.compareEntriesInJson(options.unlabelledTestPath());
     // Test fails if routes do not match what is expected
     if (!is_equal) {
       return EXIT_FAILURE;
