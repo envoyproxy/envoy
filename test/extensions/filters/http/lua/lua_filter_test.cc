@@ -85,8 +85,8 @@ public:
   }
 
   void setupSecureConnection(const bool secure) {
-    EXPECT_CALL(decoder_callbacks_, connection()).WillRepeatedly(Return(&connection_));
-    EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(secure ? &ssl_ : nullptr));
+    EXPECT_CALL(decoder_callbacks_, connection()).WillOnce(Return(&connection_));
+    EXPECT_CALL(Const(connection_), ssl()).Times(1).WillOnce(Return(secure ? &ssl_ : nullptr));
   }
 
   void setupMetadata(const std::string& yaml) {
