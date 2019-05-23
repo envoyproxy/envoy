@@ -36,6 +36,15 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
 
+  StatNameManagedStorage c1_name("c1", store_.symbolTable());
+  c1.add(100);
+  auto found_counter = store_.findCounter(c1_name.statName());
+  ASSERT_TRUE(found_counter.has_value());
+  EXPECT_EQ(&c1, &found_counter->get());
+  EXPECT_EQ(100, found_counter->get().value());
+  c1.add(100);
+  EXPECT_EQ(200, found_counter->get().value());
+
   Gauge& g1 = store_.gauge("g1");
   Gauge& g2 = scope1->gauge("g2");
   EXPECT_EQ("g1", g1.name());
@@ -44,6 +53,15 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ("scope1.g2", g2.tagExtractedName());
   EXPECT_EQ(0, g1.tags().size());
   EXPECT_EQ(0, g2.tags().size());
+
+  StatNameManagedStorage g1_name("g1", store_.symbolTable());
+  g1.set(100);
+  auto found_gauge = store_.findGauge(g1_name.statName());
+  ASSERT_TRUE(found_gauge.has_value());
+  EXPECT_EQ(&g1, &found_gauge->get());
+  EXPECT_EQ(100, found_gauge->get().value());
+  g1.set(0);
+  EXPECT_EQ(0, found_gauge->get().value());
 
   Histogram& h1 = store_.histogram("h1");
   EXPECT_TRUE(h1.used()); // hardcoded in impl to be true always.
@@ -58,6 +76,11 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   h1.recordValue(200);
   h2.recordValue(200);
 
+  StatNameManagedStorage h1_name("h1", store_.symbolTable());
+  auto found_histogram = store_.findHistogram(h1_name.statName());
+  ASSERT_TRUE(found_histogram.has_value());
+  EXPECT_EQ(&h1, &found_histogram->get());
+
   ScopePtr scope2 = scope1->createScope("foo.");
   EXPECT_EQ("scope1.foo.bar", scope2->counter("bar").name());
 
@@ -67,6 +90,11 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
 
   EXPECT_EQ(4UL, store_.counters().size());
   EXPECT_EQ(2UL, store_.gauges().size());
+
+  StatNameManagedStorage nonexistent_name("nonexistent", store_.symbolTable());
+  EXPECT_EQ(store_.findCounter(nonexistent_name.statName()), absl::nullopt);
+  EXPECT_EQ(store_.findGauge(nonexistent_name.statName()), absl::nullopt);
+  EXPECT_EQ(store_.findHistogram(nonexistent_name.statName()), absl::nullopt);
 }
 
 TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
