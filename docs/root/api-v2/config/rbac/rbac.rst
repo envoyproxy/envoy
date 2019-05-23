@@ -5,4 +5,4 @@ RBAC
   :glob:
   :maxdepth: 1
 
-  v2alpha/*
+  v2/*
