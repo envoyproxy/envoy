@@ -29,7 +29,7 @@ CompressorFilterConfig::CompressorFilterConfig(
     const Protobuf::uint32 content_length,
     const Protobuf::RepeatedPtrField<std::string>& content_types, const bool disable_on_etag_header,
     const bool remove_accept_encoding_header, const std::string& stats_prefix, Stats::Scope& scope,
-    Runtime::Loader& runtime, const std::string content_encoding)
+    Runtime::Loader& runtime, const std::string& content_encoding)
     : content_length_(contentLengthUint(content_length)),
       content_type_values_(contentTypeSet(content_types)),
       disable_on_etag_header_(disable_on_etag_header),
@@ -57,8 +57,8 @@ uint32_t CompressorFilterConfig::contentLengthUint(Protobuf::uint32 length) {
   return length >= MinimumContentLength ? length : MinimumContentLength;
 }
 
-CompressorFilter::CompressorFilter(const CompressorFilterConfigSharedPtr& config)
-    : skip_compression_{true}, compressed_data_(), compressor_(), config_(config) {}
+CompressorFilter::CompressorFilter(CompressorFilterConfigSharedPtr config)
+    : skip_compression_{true}, compressor_(), config_(std::move(config)) {}
 
 Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   if (config_->runtime().snapshot().featureEnabled(config_->featureName(), 100) &&
@@ -158,7 +158,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
     }
   }
 
-  if (pairs.size() == 0) {
+  if (pairs.empty()) {
     // If the Accept-Encoding field-value is empty, then only the "identity" encoding is acceptable.
     config_->stats().header_not_valid_.inc();
     return false;
@@ -168,7 +168,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
             [](const encPair& a, const encPair& b) -> bool { return a.second > b.second; });
 
   for (const auto pair : pairs) {
-    for (const auto compr : config_->registeredCompressors()) {
+    for (const auto& compr : config_->registeredCompressors()) {
       if (StringUtil::caseCompare(pair.first, compr) && pair.second > 0) {
         // In case a user specified more than one encodings with the same quality value
         // select the one which is registered first in Envoy's config.
@@ -198,7 +198,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
 
     // If wildcard is given then use which ever compressor is registered first.
     if (pair.first == Http::Headers::get().AcceptEncodingValues.Wildcard) {
-      if (pair.second > 0 && allowed_compressors.size() > 0) {
+      if (pair.second > 0 && !allowed_compressors.empty()) {
         config_->stats().header_wildcard_.inc();
         return StringUtil::caseCompare(config_->contentEncoding(), allowed_compressors[0]);
       } else {

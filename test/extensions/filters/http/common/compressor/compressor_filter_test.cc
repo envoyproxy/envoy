@@ -19,23 +19,23 @@ namespace Common {
 namespace Compressors {
 
 class MockCompressor : public Compressor::Compressor {
-  void compress(Buffer::Instance&, ::Envoy::Compressor::State) {}
+  void compress(Buffer::Instance&, ::Envoy::Compressor::State) override {}
 };
 
 class MockCompressorFilterConfig : public CompressorFilterConfig {
 public:
   MockCompressorFilterConfig(const test::extensions::filters::http::common::compressor::Mock& mock,
                              const std::string& stats_prefix, Stats::Scope& scope,
-                             Runtime::Loader& runtime, std::string compressor_name)
+                             Runtime::Loader& runtime, const std::string& compressor_name)
       : CompressorFilterConfig(mock.content_length().value(), mock.content_type(),
                                mock.disable_on_etag_header(), mock.remove_accept_encoding_header(),
                                stats_prefix + compressor_name + ".", scope, runtime,
                                compressor_name) {}
 
-  std::unique_ptr<Compressor::Compressor> makeCompressor() {
+  std::unique_ptr<Compressor::Compressor> makeCompressor() override {
     return std::make_unique<MockCompressor>();
   }
-  const std::string featureName() const { return "test.filter_enabled"; }
+  const std::string featureName() const override { return "test.filter_enabled"; }
 };
 
 class CompressorFilterTest : public testing::Test {

@@ -78,7 +78,7 @@ protected:
                          const bool disable_on_etag_header,
                          const bool remove_accept_encoding_header,
                          const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-                         const std::string content_encoding);
+                         const std::string& content_encoding);
 
 private:
   static StringUtil::CaseUnorderedSet
@@ -100,14 +100,14 @@ private:
   std::string content_encoding_;
   static std::vector<std::string> registered_compressors_;
 };
-typedef std::shared_ptr<CompressorFilterConfig> CompressorFilterConfigSharedPtr;
+using CompressorFilterConfigSharedPtr = std::shared_ptr<CompressorFilterConfig>;
 
 /**
  * A filter that compresses data dispatched from the upstream upon client request.
  */
 class CompressorFilter : public Http::StreamFilter {
 public:
-  CompressorFilter(const CompressorFilterConfigSharedPtr& config);
+  CompressorFilter(CompressorFilterConfigSharedPtr config);
 
   // Http::StreamFilterBase
   void onDestroy() override{};
