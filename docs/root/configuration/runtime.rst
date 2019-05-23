@@ -100,7 +100,13 @@ typical configuration setting for runtime:
 
 Where ``/srv/runtime/current`` is a symbolic link to ``/srv/runtime/v1``.
 
-The *override_subdirectory* is used along with the :option:`--service-cluster` CLI option. Assume
+.. _config_runtime_local_disk_service_cluster_subdirs:
+
+Cluster-specific subdirectories
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the deprecated :ref:`runtime <envoy_api_msg_config.bootstrap.v2.Runtime>` bootstrap configuration,
+the *override_subdirectory* is used along with the :option:`--service-cluster` CLI option. Assume
 that :option:`--service-cluster` has been set to ``my-cluster``. Envoy will first look for the
 *health_check.min_interval* key in the following full file system path:
 
@@ -111,7 +117,8 @@ to customize the runtime values for individual clusters on top of global default
 
 With the :ref:`layered runtime <envoy_api_msg_config.bootstrap.v2.LayeredRuntime>` bootstrap
 configuration, it is possible to specialize on service cluster via the :ref:`append_service_cluster
-<envoy_api_field_config.bootstrap.v2.RuntimeLayer.DiskLayer.append_service_cluster>` option.
+<envoy_api_field_config.bootstrap.v2.RuntimeLayer.DiskLayer.append_service_cluster>` option at any
+disk layer.
 
 .. _config_runtime_symbolic_link_swap:
 
@@ -145,7 +152,28 @@ built into the code, except for any values added via `/runtime_modify`.
   Changes are effectively immediately. It is **critical** that the admin interface is :ref:`properly
   secured <operations_admin_interface_security>`.
 
+At most one admin layer may be specified. If a non-empty :ref:`layered runtime
+<envoy_api_msg_config.bootstrap.v2.LayeredRuntime>` bootstrap configuration is specified with an
+absent admin layer, any mutating admin console actions will elicit a 503 response.
+
 .. _config_runtime_proto_json:
+
+Atomicity
+---------
+
+The runtime will reload and a new snapshot will be generated in a variety of situations, i.e.:
+
+* When a file move operation is detected under the symlink root or the symlink root changes.
+* When an admin console override is added or modified.
+
+All runtime layers are evaluated during a snapshot. Layers with errors are ignored and excluded from
+the effective layers, see :ref:`num_layers <runtime_stats>`. Walking the symlink root will take a
+non-zero amount of time, so if true atomicity is desired, the runtime directory should be immutable
+and symlink changes should be used to orchestrate updates.
+
+Disk layers with the same symlink root will only trigger a single refresh when a file movement is
+detected. Disk layers with overlapping symlink root paths that are not identical may trigger
+multiple reloads when a file movement is detected.
 
 Protobuf and JSON representation
 --------------------------------

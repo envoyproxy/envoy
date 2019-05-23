@@ -251,8 +251,8 @@ message RuntimeLayer {
     // configuration elements can be contained in a dedicated subdirectory.
     string subdirectory = 1;
 
-    // :ref:`Append <config_runtime_local_disk_overrides>` the service cluster
-    // to the path.
+    // :ref:`Append <config_runtime_local_disk_service_cluster_subdirs>` the
+    // service cluster to the path.
     bool append_service_cluster = 2;
   }
 
