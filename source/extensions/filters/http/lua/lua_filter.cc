@@ -435,6 +435,32 @@ int StreamHandleWrapper::luaLogCritical(lua_State* state) {
   return 0;
 }
 
+const EVP_MD* StreamHandleWrapper::getDigest(const absl::string_view& name) {
+  auto hash = absl::AsciiStrToLower(name);
+
+  // Hash Hash algorithms set refers
+  // https://github.com/google/boringssl/blob/ff62b38b4b5a0e7926034b5f93d0c276e55b571d/include/openssl/digest.h
+  if (hash == "md4") {
+    return EVP_md4();
+  } else if (hash == "md5") {
+    return EVP_md5();
+  } else if (hash == "sha1") {
+    return EVP_sha1();
+  } else if (hash == "sha224") {
+    return EVP_sha224();
+  } else if (hash == "sha256") {
+    return EVP_sha256();
+  } else if (hash == "sha384") {
+    return EVP_sha384();
+  } else if (hash == "sha512") {
+    return EVP_sha512();
+  } else if (hash == "md5_sha1") {
+    return EVP_md5_sha1();
+  } else {
+    return nullptr;
+  }
+}
+
 int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   // Step 1: get public key
   auto ptr = lua_touserdata(state, 2);
@@ -445,28 +471,9 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
 
   // Step 3: initialize EVP_MD
   absl::string_view hashFunc = luaL_checkstring(state, 3);
-  const EVP_MD* md = nullptr;
-  hashFunc = absl::AsciiStrToLower(hashFunc);
+  auto md = getDigest(hashFunc);
 
-  // Ref
-  // https://github.com/google/boringssl/blob/ff62b38b4b5a0e7926034b5f93d0c276e55b571d/include/openssl/digest.h#L79
-  if (hashFunc == "md4") {
-    md = EVP_md4();
-  } else if (hashFunc == "md5") {
-    md = EVP_md5();
-  } else if (hashFunc == "sha1") {
-    md = EVP_sha1();
-  } else if (hashFunc == "sha224") {
-    md = EVP_sha224();
-  } else if (hashFunc == "sha256") {
-    md = EVP_sha256();
-  } else if (hashFunc == "sha384") {
-    md = EVP_sha384();
-  } else if (hashFunc == "sha512") {
-    md = EVP_sha512();
-  } else if (hashFunc == "md5_sha1") {
-    md = EVP_md5_sha1();
-  } else {
+  if (md == nullptr) {
     lua_pushboolean(state, false);
     auto errMsg = absl::StrCat(hashFunc, " is not supported.");
     lua_pushlstring(state, errMsg.data(), errMsg.length());

@@ -7,6 +7,8 @@
 #include "extensions/filters/http/lua/wrappers.h"
 #include "extensions/filters/http/well_known_names.h"
 
+#include "openssl/evp.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -261,6 +263,8 @@ private:
   DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
 
   static Http::HeaderMapPtr buildHeadersFromTable(lua_State* state, int table_index);
+
+  static const EVP_MD* getDigest(const absl::string_view&);
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
