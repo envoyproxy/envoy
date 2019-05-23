@@ -384,4 +384,39 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
   }
   return false;
 }
+
+Options::Options(int argc, char** argv) {
+  TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
+  TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
+  TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
+  TCLAP::UnlabeledMultiArg<std::string> unlabelled_configs(
+      "unlabelled-configs", "unlabelled configs", false, "unlabelledConfigStrings", cmd);
+  TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", false,
+                                           "", "string", cmd);
+  TCLAP::ValueArg<std::string> test_path("t", "test-path", "Path to test file.", false, "",
+                                         "string", cmd);
+  try {
+    cmd.parse(argc, argv);
+  } catch (TCLAP::ArgException& e) {
+    std::cerr << "error: " << e.error() << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+  is_proto_ = is_proto.getValue();
+  is_detailed_ = is_detailed.getValue();
+
+  if(is_proto_) {
+    config_path_ = config_path.getValue();
+    test_path_ = test_path.getValue();
+    if (config_path_ == "" || test_path_ == "") {
+      std::cerr << "error: " << "Both --config-path/c and --test-path/t are mandatory with --useproto" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+  } else {
+    unlabelled_config_path_ =
+      unlabelled_configs.getValue().empty() ? "" : unlabelled_configs.getValue()[0];
+    unlabelled_test_path_ =
+        unlabelled_configs.getValue().empty() ? "" : unlabelled_configs.getValue()[1];
+  }
+}
 } // namespace Envoy
