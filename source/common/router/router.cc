@@ -527,7 +527,7 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 void Filter::cleanup() {
   // All callers of cleanup() should have cleaned out the upstream_requests_
   // list as appropriate.
-  ASSERT(upstream_requests_.size() == 0);
+  ASSERT(upstream_requests_.empty());
 
   retry_state_.reset();
   if (response_timeout_) {
@@ -884,7 +884,7 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
   }
 
   ASSERT(final_upstream_request);
-  // Now put the final request back on thie list.
+  // Now put the final request back on this list.
   final_upstream_request->moveIntoList(std::move(final_upstream_request), upstream_requests_);
 }
 
@@ -1185,7 +1185,7 @@ void Filter::doRetry() {
 
 uint32_t Filter::numRequestsAwaitingHeaders() {
   return std::count_if(upstream_requests_.begin(), upstream_requests_.end(),
-                       [](const auto& req) -> bool { return req.get()->awaiting_headers_; });
+                       [](const auto& req) -> bool { return req->awaiting_headers_; });
 }
 
 Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
