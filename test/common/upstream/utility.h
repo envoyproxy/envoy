@@ -71,15 +71,6 @@ inline envoy::api::v2::Cluster defaultStaticCluster(const std::string& name) {
   return parseClusterFromJson(defaultStaticClusterJsonV1(name));
 }
 
-inline envoy::api::v2::Cluster
-parseSdsClusterFromJson(const std::string& json_string,
-                        const envoy::api::v2::core::ConfigSource eds_config) {
-  envoy::api::v2::Cluster cluster;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster);
-  return cluster;
-}
-
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
                                   uint32_t weight = 1) {
   return HostSharedPtr{new HostImpl(

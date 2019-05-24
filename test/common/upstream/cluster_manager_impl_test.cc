@@ -284,7 +284,7 @@ public:
   Http::ContextImpl http_context_;
 };
 
-envoy::config::bootstrap::v2::Bootstrap parseV2BootstrapFromJson(const std::string& json_string) {
+envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Json(const std::string& json_string) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   MessageUtil::loadFromJson(json_string, bootstrap);
   return bootstrap;
@@ -382,7 +382,7 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   )EOF";
 
   EXPECT_CALL(log_manager_, createAccessLog("foo"));
-  create(parseV2BootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
 }
 
 TEST_F(ClusterManagerImplTest, NoSdsConfig) {
@@ -413,7 +413,7 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
     }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(create(parseV2BootstrapFromJson(json)), EnvoyException, "invalid value \"foo\" for type TYPE_ENUM");
+  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV2Json(json)), EnvoyException, "invalid value \"foo\" for type TYPE_ENUM");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
@@ -430,7 +430,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
   )EOF",
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2")}));
 
-  EXPECT_THROW(create(parseV2BootstrapFromJson(json)), EnvoyException);
+  EXPECT_THROW(create(parseBootstrapFromV2Json(json)), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
@@ -448,7 +448,7 @@ TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
   }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(create(parseV2BootstrapFromJson(json)), EnvoyException, "fake_property: Cannot find field");
+  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV2Json(json)), EnvoyException, "fake_property: Cannot find field");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
@@ -466,7 +466,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2"),
                     defaultStaticClusterJson("new_cluster")}));
 
-  create(parseV2BootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
   checkStats(3 /*added*/, 0 /*modified*/, 0 /*removed*/, 3 /*active*/, 0 /*warming*/);
 
   factory_.tls_.shutdownThread();
@@ -475,7 +475,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
 TEST_F(ClusterManagerImplTest, DuplicateCluster) {
   const std::string json =
         fmt::sprintf("{\"static_resources\":{%s}}", clustersJson({defaultStaticClusterJson("cluster_1"),defaultStaticClusterJson("cluster_1")}));
-  const auto config = parseV2BootstrapFromJson(json);
+  const auto config = parseBootstrapFromV2Json(json);
   EXPECT_THROW(create(config), EnvoyException);
 }
 
@@ -684,7 +684,7 @@ public:
     InSequence s;
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
     ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-    create(parseV2BootstrapFromJson(json));
+    create(parseBootstrapFromV2Json(json));
 
     EXPECT_EQ(nullptr, cluster_manager_->get("cluster_0")->loadBalancer().chooseHost(nullptr));
 
@@ -777,7 +777,7 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   const std::string json =
       fmt::sprintf("{\"static_resources\":{%s}}", clustersJson({defaultStaticClusterJson("cluster_1")}));
 
-  create(parseV2BootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default,
                                                               Http::Protocol::Http2, nullptr));
@@ -829,7 +829,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   const std::string json =
       fmt::sprintf("{\"static_resources\":{%s}}", clustersJson({defaultStaticClusterJson("cluster_1")}));
 
-  create(parseV2BootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
   EXPECT_EQ("cluster_1", cluster.info()->name());
   EXPECT_EQ(cluster.info(), cluster_manager_->get("cluster_1")->info());
@@ -893,7 +893,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   EXPECT_CALL(*cds_cluster, initialize(_));
   EXPECT_CALL(*cluster1, initialize(_));
 
-  create(parseV2BootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
 
   ReadyWatcher initialized;
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -1051,7 +1051,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   ON_CALL(*foo, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*foo, initialize(_));
 
-  create(parseV2BootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
   foo->initialize_callback_();
 
   // Now add a dynamic cluster. This cluster will have a member update callback from the local
@@ -1268,7 +1268,7 @@ TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
 
-  create(parseV2BootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
 
   ReadyWatcher initialized;
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -1297,7 +1297,7 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
 
-  create(parseV2BootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
 
   ReadyWatcher initialized;
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -1364,7 +1364,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
           // Test inline init.
           initialize_callback();
         }));
-    create(parseV2BootstrapFromJson(json));
+    create(parseBootstrapFromV2Json(json));
 
     EXPECT_CALL(factory_, allocateConnPool_(_, _)).WillOnce(Return(cp1));
     cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
@@ -1426,7 +1426,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
           // Test inline init.
           initialize_callback();
         }));
-    create(parseV2BootstrapFromJson(json));
+    create(parseBootstrapFromV2Json(json));
 
     EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(cp1));
     cluster_manager_->tcpConnPoolForCluster("some_cluster", ResourcePriority::Default, nullptr,
