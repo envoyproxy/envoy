@@ -591,9 +591,9 @@ TEST(SymbolTableTest, Memory) {
     // libc++:
     // -------
     // string_mem_used:        6710912
-    // symbol_table_mem_used:  1743512 (3.85x)
+    // symbol_table_mem_used:  1742472 (3.85x)
     EXPECT_LT(symbol_table_mem_used, string_mem_used / 3);
-    EXPECT_LT(symbol_table_mem_used, 1750000);
+    EXPECT_EQ(symbol_table_mem_used, 1742472);
   }
 }
 
