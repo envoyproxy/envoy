@@ -135,6 +135,7 @@ public:
   // Timer
   MOCK_METHOD0(disableTimer, void());
   MOCK_METHOD1(enableTimer, void(const std::chrono::milliseconds&));
+  MOCK_METHOD1(enableTimerInUs, void(const std::chrono::microseconds&));
   MOCK_METHOD0(enabled, bool());
 
   bool enabled_{};

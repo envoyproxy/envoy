@@ -105,6 +105,11 @@ public:
   virtual const envoy::api::v2::core::Locality& locality() const PURE;
 
   /**
+   * @return the human readable name of the host's locality zone as a StatName.
+   */
+  virtual Stats::StatName localityZoneStatName() const PURE;
+
+  /**
    * @return the address used to health check the host.
    */
   virtual Network::Address::InstanceConstSharedPtr healthCheckAddress() const PURE;

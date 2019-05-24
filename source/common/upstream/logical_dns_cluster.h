@@ -76,7 +76,7 @@ private:
     RealHostDescription(Network::Address::InstanceConstSharedPtr address,
                         const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
                         const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
-                        HostConstSharedPtr logical_host)
+                        HostConstSharedPtr logical_host, Stats::SymbolTable& symbol_table)
         : address_(address), logical_host_(logical_host),
           metadata_(std::make_shared<envoy::api::v2::core::Metadata>(lb_endpoint.metadata())),
           health_check_address_(
@@ -84,7 +84,8 @@ private:
                   ? address
                   : Network::Utility::getAddressWithPort(
                         *address, lb_endpoint.endpoint().health_check_config().port_value())),
-          locality_lb_endpoint_(locality_lb_endpoint), lb_endpoint_(lb_endpoint) {}
+          locality_lb_endpoint_(locality_lb_endpoint), lb_endpoint_(lb_endpoint),
+          locality_zone_stat_name_(locality().zone(), symbol_table) {}
 
     // Upstream:HostDescription
     bool canary() const override { return false; }
@@ -107,6 +108,9 @@ private:
     const envoy::api::v2::core::Locality& locality() const override {
       return locality_lb_endpoint_.locality();
     }
+    Stats::StatName localityZoneStatName() const override {
+      return locality_zone_stat_name_.statName();
+    }
     Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
       return health_check_address_;
     }
@@ -120,6 +124,7 @@ private:
     Network::Address::InstanceConstSharedPtr health_check_address_;
     envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint_;
+    Stats::StatNameManagedStorage locality_zone_stat_name_;
   };
 
   struct PerThreadCurrentHostData : public ThreadLocal::ThreadLocalObject {
