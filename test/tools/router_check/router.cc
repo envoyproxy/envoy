@@ -409,7 +409,7 @@ Options::Options(int argc, char** argv) {
   if (is_proto_) {
     config_path_ = config_path.getValue();
     test_path_ = test_path.getValue();
-    if (config_path_ == "" || test_path_ == "") {
+    if (config_path_.empty() || test_path_.empty()) {
       std::cerr << "error: "
                 << "Both --config-path/c and --test-path/t are mandatory with --useproto"
                 << std::endl;
