@@ -157,12 +157,12 @@ public:
   const std::string& testPath() const { return test_path_; }
 
   /**
-   * @return the path to unlabelled configuration file.
+   * @return the path to json schema configuration file.
    */
   const std::string& unlabelledConfigPath() const { return unlabelled_config_path_; }
 
   /**
-   * @return the path to unlabelled test file.
+   * @return the path to json schema test file.
    */
   const std::string& unlabelledTestPath() const { return unlabelled_test_path_; }
 
