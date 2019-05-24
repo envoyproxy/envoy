@@ -1168,34 +1168,30 @@ TEST_F(Http1ServerConnectionImplTest, TestLargeRequestHeadersAcceptedMaxConfigur
   codec_->dispatch(buffer);
 }
 
-TEST_F(Http1ClientConnectionImplTest, TestLargeResponseHeadersRejected) {
+TEST_F(Http1ServerConnectionImplTest, TestLargeResponseHeaders) {
   initialize();
 
-  NiceMock<Http::MockStreamDecoder> response_decoder;
-  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
-  TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  NiceMock<Http::MockStreamDecoder> decoder;
+  Http::StreamEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
 
-  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   codec_->dispatch(buffer);
-  std::string long_header = "big: " + std::string(80 * 1024, 'q') + "\r\n";
-  buffer = Buffer::OwnedImpl(long_header);
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException, "headers size exceeds limit");
-}
+  EXPECT_EQ(0U, buffer.length());
 
-TEST_F(Http1ClientConnectionImplTest, TestLargeResponseHeadersAccepted) {
-  initialize();
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
 
-  NiceMock<Http::MockStreamDecoder> response_decoder;
-  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
-  TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  std::string long_string = std::string((1UL << 15) * 1024, 'q');
+  response_headers.addCopy("big", long_string);
 
-  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
-  codec_->dispatch(buffer);
-  std::string long_header = "big: " + std::string(79 * 1024, 'q') + "\r\n";
-  buffer = Buffer::OwnedImpl(long_header);
-  codec_->dispatch(buffer);
+  response_encoder->encodeHeaders(response_headers, true);
+  ASSERT_THAT(output, testing::HasSubstr(long_string));
 }
 
 } // namespace Http1

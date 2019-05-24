@@ -1009,6 +1009,22 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAtMaxConfigurable) {
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
+TEST_P(Http2CodecImplTest, TestLargeResponseHeaders) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  std::string long_string = std::string((1UL << 6) * 1024, 'q');
+
+  response_headers.addCopy("big", long_string);
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
+  response_encoder_->encodeHeaders(response_headers, true);
+}
+
 // Note this is Http2CodecImplTestAll not Http2CodecImplTest, to test
 // compression with min and max HPACK table size.
 TEST_P(Http2CodecImplTestAll, TestCodecHeaderCompression) {
