@@ -31,7 +31,7 @@ public:
 
 private:
   void checkRule(const std::string& policy_json) {
-    envoy::config::rbac::v2alpha::Policy policy_proto{};
+    envoy::config::rbac::v2::Policy policy_proto{};
     MessageUtil::loadFromJson(policy_json, policy_proto);
 
     envoy::config::filter::network::rbac::v2::RBAC config{};
@@ -49,7 +49,7 @@ private:
 };
 
 TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, ValidProto) {
-  envoy::config::rbac::v2alpha::Policy policy;
+  envoy::config::rbac::v2::Policy policy;
   policy.add_permissions()->set_any(true);
   policy.add_principals()->set_any(true);
   envoy::config::filter::network::rbac::v2::RBAC config;

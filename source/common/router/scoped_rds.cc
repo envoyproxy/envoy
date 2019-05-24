@@ -197,7 +197,7 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createStaticConfigProvider(
     Server::Configuration::FactoryContext& factory_context,
     const ConfigProviderManager::OptionalArg& optarg) {
   const auto& typed_optarg = static_cast<const ScopedRoutesConfigProviderManagerOptArg&>(optarg);
-  return absl::make_unique<InlineScopedRoutesConfigProvider>(
+  return std::make_unique<InlineScopedRoutesConfigProvider>(
       std::move(config_protos), typed_optarg.scoped_routes_name_, factory_context, *this,
       typed_optarg.rds_config_source_, typed_optarg.scope_key_builder_);
 }
