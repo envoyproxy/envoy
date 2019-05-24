@@ -763,6 +763,7 @@ TEST_P(QuicMemSliceTest, QuicMemSliceStorage) {
   QuicMemSliceStorage other = storage;
   QuicMemSliceSpan span = storage.ToSpan();
   EXPECT_EQ(1u, span.NumSlices());
+  EXPECT_EQ(str.length(), span.total_length());
   EXPECT_EQ(str, span.GetData(0));
   QuicMemSliceSpan span_other = other.ToSpan();
   EXPECT_EQ(1u, span_other.NumSlices());
