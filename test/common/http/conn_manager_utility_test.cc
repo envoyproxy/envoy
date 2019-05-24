@@ -520,6 +520,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   route_config_.internal_only_headers_.push_back(LowerCaseString("custom_header"));
   TestHeaderMapImpl headers{{"x-envoy-decorator-operation", "foo"},
                             {"x-envoy-downstream-service-cluster", "foo"},
+                            {"x-envoy-hedge-on-per-try-timeout", "foo"},
                             {"x-envoy-retriable-status-codes", "123,456"},
                             {"x-envoy-retry-on", "foo"},
                             {"x-envoy-retry-grpc-on", "foo"},
@@ -537,6 +538,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_EQ("50.0.0.1", headers.get_("x-envoy-external-address"));
   EXPECT_FALSE(headers.has("x-envoy-decorator-operation"));
   EXPECT_FALSE(headers.has("x-envoy-downstream-service-cluster"));
+  EXPECT_FALSE(headers.has("x-envoy-hedge-on-per-try-timeout"));
   EXPECT_FALSE(headers.has("x-envoy-retriable-status-codes"));
   EXPECT_FALSE(headers.has("x-envoy-retry-on"));
   EXPECT_FALSE(headers.has("x-envoy-retry-grpc-on"));
