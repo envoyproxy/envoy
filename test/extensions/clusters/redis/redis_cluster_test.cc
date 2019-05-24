@@ -370,6 +370,22 @@ protected:
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
   }
 
+  void exerciseStubs() {
+    EXPECT_CALL(dispatcher_, createTimer_(_));
+    RedisCluster::RedisDiscoverySession discovery_session(*cluster_, *this);
+    EXPECT_FALSE(discovery_session.enableHashtagging());
+    EXPECT_EQ(discovery_session.bufferFlushTimeoutInMs(), std::chrono::milliseconds(0));
+
+    NetworkFilters::Common::Redis::RespValue dummy_value;
+    dummy_value.type(NetworkFilters::Common::Redis::RespType::Error);
+    dummy_value.asString() = "dummy text";
+    EXPECT_TRUE(discovery_session.onRedirection(dummy_value));
+
+    RedisCluster::RedisDiscoveryClient discovery_client(discovery_session);
+    EXPECT_NO_THROW(discovery_client.onAboveWriteBufferHighWatermark());
+    EXPECT_NO_THROW(discovery_client.onBelowWriteBufferLowWatermark());
+  }
+
   Stats::IsolatedStoreImpl stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
@@ -522,6 +538,9 @@ TEST_F(RedisClusterTest, Basic) {
 
   testBasicSetup(basic_yaml_hosts, "foo.bar.com");
   testBasicSetup(basic_yaml_load_assignment, "foo.bar.com");
+
+  // Exercise stubbed out interfaces for coverage.
+  exerciseStubs();
 }
 
 TEST_F(RedisClusterTest, RedisResolveFailure) {
