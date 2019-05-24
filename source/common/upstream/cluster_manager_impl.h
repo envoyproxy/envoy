@@ -380,10 +380,10 @@ private:
   };
 
   struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle,
-                                            ListAddAndRemove<ClusterUpdateCallbacks*> {
+                                            RaiiListElement<ClusterUpdateCallbacks*> {
     ClusterUpdateCallbacksHandleImpl(ClusterUpdateCallbacks& cb,
                                      std::list<ClusterUpdateCallbacks*>& parent)
-        : ListAddAndRemove<ClusterUpdateCallbacks*>(parent, &cb) {}
+        : RaiiListElement<ClusterUpdateCallbacks*>(parent, &cb) {}
   };
 
   typedef std::unique_ptr<ClusterData> ClusterDataPtr;

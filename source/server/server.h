@@ -267,10 +267,10 @@ private:
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
 
   template <class T>
-  class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, ListAddAndRemove<T> {
+  class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {
   public:
     LifecycleCallbackHandle(std::list<T>& callbacks, T& callback)
-        : ListAddAndRemove<T>(callbacks, callback) {}
+        : RaiiListElement<T>(callbacks, callback) {}
   };
 
   absl::flat_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
