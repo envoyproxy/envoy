@@ -38,11 +38,12 @@ public:
    *        service description).
    * @param api reference to the Api object
    */
+  // TODO(fredlas) remove is_delta once delta and SotW are more unified
   static std::unique_ptr<Subscription> subscriptionFromConfigSource(
       const envoy::api::v2::core::ConfigSource& config, const LocalInfo::LocalInfo& local_info,
       Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
       Stats::Scope& scope, const std::string& rest_method, const std::string& grpc_method,
-      absl::string_view type_url, Api::Api& api) {
+      absl::string_view type_url, Api::Api& api, bool is_delta) {
     std::unique_ptr<Subscription> result;
     SubscriptionStats stats = Utility::generateStats(scope);
     switch (config.config_source_specifier_case()) {
@@ -99,9 +100,16 @@ public:
       break;
     }
     case envoy::api::v2::core::ConfigSource::kAds: {
-      result = std::make_unique<GrpcMuxSubscriptionImpl>(
-          cm.adsMux(), stats, type_url, dispatcher,
-          Utility::configSourceInitialFetchTimeout(config));
+      if (is_delta) {
+        std::cerr << "making a delta " << type_url << std::endl;
+        result = std::make_unique<DeltaSubscriptionImpl>(
+            cm.adsMux(), type_url, stats, Utility::configSourceInitialFetchTimeout(config));
+      } else {
+        std::cerr << "making a sotw" << type_url << std::endl;
+        result = std::make_unique<GrpcMuxSubscriptionImpl>(
+            cm.adsMux(), stats, type_url, dispatcher,
+            Utility::configSourceInitialFetchTimeout(config));
+      }
       break;
     }
     default:

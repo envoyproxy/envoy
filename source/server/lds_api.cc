@@ -19,14 +19,17 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
                        Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, Init::Manager& init_manager,
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                       ListenerManager& lm, Api::Api& api)
+                       ListenerManager& lm, Api::Api& api, bool is_delta)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
       init_target_("LDS", [this]() { subscription_->start({}, *this); }) {
+  const std::string grpc_method = is_delta
+                                      ? "envoy.api.v2.ListenerDiscoveryService.DeltaListeners"
+                                      : "envoy.api.v2.ListenerDiscoveryService.StreamListeners";
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       lds_config, local_info, dispatcher, cm, random, *scope_,
-      "envoy.api.v2.ListenerDiscoveryService.FetchListeners",
-      "envoy.api.v2.ListenerDiscoveryService.StreamListeners",
-      Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()), api);
+      "envoy.api.v2.ListenerDiscoveryService.FetchListeners", grpc_method,
+      Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()), api,
+      is_delta);
   Config::Utility::checkLocalInfo("lds", local_info);
   init_manager.add(init_target_);
 }
@@ -35,8 +38,8 @@ void LdsApiImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
-  cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
-  Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
+  cm_.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
+  Cleanup rds_resume([this] { cm_.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration); });
 
   // We do all listener removals before adding the new listeners. This allows adding a new listener
   // with the same address as a listener that is to be removed. Do not change the order.

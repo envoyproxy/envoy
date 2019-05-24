@@ -236,6 +236,8 @@ public:
   virtual ClusterManagerFactory& clusterManagerFactory() PURE;
 
   virtual std::size_t warmingClusterCount() const PURE;
+
+  virtual bool xdsIsDelta() const PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;
@@ -309,7 +311,7 @@ public:
   /**
    * Create a CDS API provider from configuration proto.
    */
-  virtual CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+  virtual CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
                               ClusterManager& cm) PURE;
 
   /**

@@ -32,37 +32,16 @@ using testing::IsSubstring;
 namespace Envoy {
 namespace {
 
-const std::string config = R"EOF(
-dynamic_resources:
-  lds_config: {ads: {}}
-  cds_config: {ads: {}}
-  ads_config:
-    api_type: GRPC
-static_resources:
-  clusters:
-    name: dummy_cluster
-    connect_timeout: { seconds: 5 }
-    type: STATIC
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
-    lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
-admin:
-  access_log_path: /dev/null
-  address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 0
-)EOF";
-
-class AdsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest, public HttpIntegrationTest {
+class AdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
-  AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {
+  AdsIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+                            ConfigHelper::adsBootstrap(
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
     use_lds_ = false;
     create_xds_upstream_ = true;
     tls_xds_upstream_ = true;
+    sotw_or_delta_ = sotwOrDelta();
   }
 
   void TearDown() override {
@@ -318,7 +297,7 @@ public:
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsIntegrationTest, DELTA_INTEGRATION_PARAMS);
 
 // Validate basic config delivery and upgrade.
 TEST_P(AdsIntegrationTest, Basic) {
@@ -813,13 +792,16 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsInvalidated) {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
 }
 
-class AdsFailIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+class AdsFailIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
                                public HttpIntegrationTest {
 public:
   AdsFailIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+                            ConfigHelper::adsBootstrap(
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
     create_xds_upstream_ = true;
     use_lds_ = false;
+    sotw_or_delta_ = sotwOrDelta();
   }
 
   void TearDown() override {
@@ -842,8 +824,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsFailIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsFailIntegrationTest,
+                         DELTA_INTEGRATION_PARAMS);
 
 // Validate that we don't crash on failed ADS stream.
 TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
@@ -854,13 +836,16 @@ TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 }
 
-class AdsConfigIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+class AdsConfigIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
   AdsConfigIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+                            ConfigHelper::adsBootstrap(
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
     create_xds_upstream_ = true;
     use_lds_ = false;
+    sotw_or_delta_ = sotwOrDelta();
   }
 
   void TearDown() override {
@@ -891,8 +876,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsConfigIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsConfigIntegrationTest,
+                         DELTA_INTEGRATION_PARAMS);
 
 // This is s regression validating that we don't crash on EDS static Cluster that uses ADS.
 TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {

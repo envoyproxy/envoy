@@ -22,10 +22,10 @@ class CdsApiImpl : public CdsApi,
                    Config::SubscriptionCallbacks,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
-  static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-                          Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                          const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                          Api::Api& api);
+  static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
+                          ClusterManager& cm, Event::Dispatcher& dispatcher,
+                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                          Stats::Scope& scope, Api::Api& api);
 
   // Upstream::CdsApi
   void initialize() override { subscription_->start({}, *this); }
@@ -46,8 +46,8 @@ public:
   }
 
 private:
-  CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-             Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+  CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
+             ClusterManager& cm, Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api);
   void runInitializeCallbackIfAny();
 

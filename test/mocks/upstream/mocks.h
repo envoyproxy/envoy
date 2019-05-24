@@ -255,8 +255,8 @@ public:
                                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                                 bool added_via_api));
 
-  MOCK_METHOD2(createCds,
-               CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm));
+  MOCK_METHOD3(createCds, CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config,
+                                    bool is_delta, ClusterManager& cm));
 
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
@@ -318,6 +318,7 @@ public:
   MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks_,
                ClusterUpdateCallbacksHandle*(ClusterUpdateCallbacks& callbacks));
   MOCK_CONST_METHOD0(warmingClusterCount, std::size_t());
+  MOCK_CONST_METHOD0(xdsIsDelta, bool());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;

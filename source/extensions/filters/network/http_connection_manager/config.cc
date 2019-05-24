@@ -163,8 +163,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 #endif
                                                       ))) {
 
-  route_config_provider_ = Router::RouteConfigProviderUtil::create(config, context_, stats_prefix_,
-                                                                   route_config_provider_manager_);
+  route_config_provider_ = Router::RouteConfigProviderUtil::create(
+      config, context_, stats_prefix_, route_config_provider_manager_,
+      context_.clusterManager().xdsIsDelta());
 
   switch (config.forward_client_cert_details()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::SANITIZE:

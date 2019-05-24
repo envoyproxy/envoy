@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace Config {
 
-DeltaSubscriptionImpl::DeltaSubscriptionImpl(std::shared_ptr<GrpcDeltaXdsContext> context,
+DeltaSubscriptionImpl::DeltaSubscriptionImpl(std::shared_ptr<GrpcMux> context,
                                              absl::string_view type_url, SubscriptionStats stats,
                                              std::chrono::milliseconds init_fetch_timeout)
     : context_(context), type_url_(type_url), stats_(stats),

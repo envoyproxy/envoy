@@ -45,7 +45,7 @@ public:
   create(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
              config,
          Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-         RouteConfigProviderManager& route_config_provider_manager);
+         RouteConfigProviderManager& route_config_provider_manager, bool is_delta);
 };
 
 class RouteConfigProviderManagerImpl;
@@ -123,8 +123,8 @@ private:
   RdsRouteConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
-      const std::string& stat_prefix,
-      RouteConfigProviderManagerImpl& route_config_provider_manager);
+      const std::string& stat_prefix, RouteConfigProviderManagerImpl& route_config_provider_manager,
+      bool is_delta);
 
   bool validateUpdateSize(int num_resources);
 
@@ -192,8 +192,8 @@ public:
   // RouteConfigProviderManager
   RouteConfigProviderPtr createRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      Server::Configuration::FactoryContext& factory_context,
-      const std::string& stat_prefix) override;
+      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+      bool is_delta) override;
 
   RouteConfigProviderPtr
   createStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,

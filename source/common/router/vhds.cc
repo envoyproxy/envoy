@@ -45,7 +45,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
       factory_context.dispatcher(), factory_context.clusterManager(), factory_context.random(),
       *scope_, "none", "envoy.api.v2.VirtualHostDiscoveryService.DeltaVirtualHosts",
       Grpc::Common::typeUrl(envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()),
-      factory_context.api());
+      factory_context.api(), /*is_delta=*/true);
 }
 
 void VhdsSubscription::onConfigUpdateFailed(const EnvoyException*) {

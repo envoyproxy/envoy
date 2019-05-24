@@ -11,7 +11,7 @@ namespace Upstream {
 EdsClusterImpl::EdsClusterImpl(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    Stats::ScopePtr&& stats_scope, bool added_via_api, bool is_delta)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api),
       cm_(factory_context.clusterManager()), local_info_(factory_context.localInfo()),
@@ -24,12 +24,14 @@ EdsClusterImpl::EdsClusterImpl(
   Upstream::ClusterManager& cm = factory_context.clusterManager();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
+  const std::string grpc_method = is_delta
+                                      ? "envoy.api.v2.EndpointDiscoveryService.DeltaEndpoints"
+                                      : "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints";
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
       eds_config, local_info_, dispatcher, cm, random, info_->statsScope(),
-      "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-      "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints",
+      "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints", grpc_method,
       Grpc::Common::typeUrl(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
-      factory_context.api());
+      factory_context.api(), is_delta);
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }
@@ -267,7 +269,8 @@ ClusterImplBaseSharedPtr EdsClusterFactory::createClusterImpl(
   }
 
   return std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                          std::move(stats_scope), context.addedViaApi());
+                                          std::move(stats_scope), context.addedViaApi(),
+                                          context.clusterManager().xdsIsDelta());
 }
 
 /**

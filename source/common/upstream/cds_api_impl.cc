@@ -16,28 +16,33 @@
 namespace Envoy {
 namespace Upstream {
 
-CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
+CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
                              ClusterManager& cm, Event::Dispatcher& dispatcher,
                              Runtime::RandomGenerator& random,
                              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                              Api::Api& api) {
-  return CdsApiPtr{new CdsApiImpl(cds_config, cm, dispatcher, random, local_info, scope, api)};
+  return CdsApiPtr{
+      new CdsApiImpl(cds_config, is_delta, cm, dispatcher, random, local_info, scope, api)};
 }
 
-CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-                       Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api)
+// TODO(fredlas) the is_delta argument can be removed upon delta+SotW ADS Envoy code unification. It
+// is only actually needed to choose the grpc_method, which is irrelevant if ADS is used.
+// TODO(fredlas) actually the whole "pass the grpc_method as an argument to SubscriptionFactory"
+// seems like it could be streamlined/centralized, given that we're also passing type_url. I'm
+// thinking, have a (type_url, is_delta) -> grpc_method map that SubscriptionFactory can look up in.
+CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
+                       ClusterManager& cm, Event::Dispatcher& dispatcher,
+                       Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                       Stats::Scope& scope, Api::Api& api)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   Config::Utility::checkLocalInfo("cds", local_info);
 
-  const bool is_delta = (cds_config.api_config_source().api_type() ==
-                         envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
   const std::string grpc_method = is_delta ? "envoy.api.v2.ClusterDiscoveryService.DeltaClusters"
                                            : "envoy.api.v2.ClusterDiscoveryService.StreamClusters";
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
       cds_config, local_info, dispatcher, cm, random, *scope_,
       "envoy.api.v2.ClusterDiscoveryService.FetchClusters", grpc_method,
-      Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()), api);
+      Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()), api, is_delta);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

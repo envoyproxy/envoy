@@ -181,6 +181,39 @@ static_resources:
       api_type);
 }
 
+// TODO(#6327) cleaner approach to testing with static config.
+std::string ConfigHelper::adsBootstrap(const std::string& api_type) {
+  return fmt::format(
+      R"EOF(
+dynamic_resources:
+  lds_config:
+    ads: {{}}
+  cds_config:
+    ads: {{}}
+  ads_config:
+    api_type: {}
+static_resources:
+  clusters:
+    name: dummy_cluster
+    connect_timeout:
+      seconds: 5
+    type: STATIC
+    hosts:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options: {{}}
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+)EOF",
+      api_type);
+}
+
 envoy::api::v2::Cluster ConfigHelper::buildCluster(const std::string& name, int port,
                                                    const std::string& ip_version) {
   return TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(R"EOF(

@@ -45,11 +45,12 @@ public:
       Configuration::ListenerFactoryContext& context);
 
   // Server::ListenerComponentFactory
-  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
+  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config,
+                         bool is_delta) override {
     return std::make_unique<LdsApiImpl>(lds_config, server_.clusterManager(), server_.dispatcher(),
                                         server_.random(), server_.initManager(),
                                         server_.localInfo(), server_.stats(),
-                                        server_.listenerManager(), server_.api());
+                                        server_.listenerManager(), server_.api(), is_delta);
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -111,9 +112,9 @@ public:
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::api::v2::Listener& config, const std::string& version_info,
                            bool modifiable) override;
-  void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
+  void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config, bool is_delta) override {
     ASSERT(lds_api_ == nullptr);
-    lds_api_ = factory_.createLdsApi(lds_config);
+    lds_api_ = factory_.createLdsApi(lds_config, is_delta);
   }
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() override;
   uint64_t numConnections() override;

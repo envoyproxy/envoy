@@ -64,7 +64,7 @@ public:
   ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
                                     bool added_via_api) override;
-  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
 
@@ -225,6 +225,8 @@ public:
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
   std::size_t warmingClusterCount() const override { return warming_clusters_.size(); }
+
+  bool xdsIsDelta() const override { return xds_is_delta_; }
 
 protected:
   virtual void postThreadLocalHostRemoval(const Cluster& cluster, const HostVector& hosts_removed);
@@ -466,6 +468,7 @@ private:
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
+  bool xds_is_delta_;
 };
 
 } // namespace Upstream

@@ -55,7 +55,8 @@ public:
 };
 
 class DeltaSotwIntegrationParamTest
-    : public testing::TestWithParam<
+    : public BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<
           std::tuple<Network::Address::IpVersion, ClientType, SotwOrDelta>> {
 public:
   ~DeltaSotwIntegrationParamTest() override = default;
@@ -67,8 +68,8 @@ public:
                        std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
                        std::get<2>(p.param) == SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld");
   }
-  Network::Address::IpVersion ipVersion() const { return std::get<0>(GetParam()); }
-  ClientType clientType() const { return std::get<1>(GetParam()); }
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  ClientType clientType() const override { return std::get<1>(GetParam()); }
   SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
 };
 

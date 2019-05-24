@@ -284,8 +284,15 @@ ClusterManagerImpl::ClusterManagerImpl(
   });
 
   // We can now potentially create the CDS API once the backing cluster exists.
-  if (bootstrap.dynamic_resources().has_cds_config()) {
-    cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), *this);
+  const auto& dyn_resources = bootstrap.dynamic_resources();
+  if (dyn_resources.has_cds_config()) {
+    const auto& cds_config = dyn_resources.cds_config();
+    xds_is_delta_ =
+        cds_config.api_config_source().api_type() ==
+            envoy::api::v2::core::ApiConfigSource::DELTA_GRPC ||
+        (dyn_resources.has_ads_config() && dyn_resources.ads_config().api_type() ==
+                                               envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
+    cds_api_ = factory_.createCds(cds_config, xds_is_delta_, *this);
     init_helper_.setCds(cds_api_.get());
   } else {
     init_helper_.setCds(nullptr);
@@ -302,7 +309,10 @@ ClusterManagerImpl::ClusterManagerImpl(
   // clusters have already initialized. (E.g., if all static).
   init_helper_.onStaticLoadComplete();
 
-  ads_mux_->start();
+  if (!xds_is_delta_) {
+    // TODO TODO i think just have the same approach for start() with both, i.e. remove the if.
+    ads_mux_->start();
+  }
 
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
@@ -1268,9 +1278,9 @@ ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
 }
 
 CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
-                                               ClusterManager& cm) {
-  return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_,
-                            api_);
+                                               bool is_delta, ClusterManager& cm) {
+  return CdsApiImpl::create(cds_config, is_delta, cm, main_thread_dispatcher_, random_, local_info_,
+                            stats_, api_);
 }
 
 } // namespace Upstream

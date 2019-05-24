@@ -7,6 +7,7 @@
 
 #include "server/lds_api.h"
 
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -26,7 +27,9 @@ namespace {
 
 class LdsApiTest : public testing::Test {
 public:
-  LdsApiTest() : request_(&cluster_manager_.async_client_), api_(Api::createApiForTest(store_)) {
+  LdsApiTest()
+      : grpc_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()),
+        request_(&cluster_manager_.async_client_), api_(Api::createApiForTest(store_)) {
     ON_CALL(init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
     }));
@@ -49,6 +52,7 @@ api_config_source:
     Upstream::MockClusterMockPrioritySet cluster;
     cluster_map.emplace("foo_cluster", cluster);
     EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
+    ON_CALL(cluster_manager_, adsMux()).WillByDefault(Return(grpc_mux_));
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, addedViaApi());
     EXPECT_CALL(cluster, info());
@@ -124,6 +128,7 @@ api_config_source:
     listeners.Add()->PackFrom(listener);
   }
 
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> grpc_mux_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Event::MockDispatcher dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;

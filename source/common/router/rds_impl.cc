@@ -23,7 +23,7 @@ RouteConfigProviderPtr RouteConfigProviderUtil::create(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         config,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-    RouteConfigProviderManager& route_config_provider_manager) {
+    RouteConfigProviderManager& route_config_provider_manager, bool is_delta) {
   switch (config.route_specifier_case()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       kRouteConfig:
@@ -31,7 +31,7 @@ RouteConfigProviderPtr RouteConfigProviderUtil::create(
                                                                          factory_context);
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::kRds:
     return route_config_provider_manager.createRdsRouteConfigProvider(config.rds(), factory_context,
-                                                                      stat_prefix);
+                                                                      stat_prefix, is_delta);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -56,7 +56,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
     const std::string& stat_prefix,
-    Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
+    Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager, bool is_delta)
     : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
       init_target_(fmt::format("RdsRouteConfigSubscription {}", route_config_name_),
                    [this]() { subscription_->start({route_config_name_}, *this); }),
@@ -66,13 +66,14 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       manager_identifier_(manager_identifier) {
   Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
 
+  const std::string grpc_method = is_delta ? "envoy.api.v2.RouteDiscoveryService.DeltaRoutes"
+                                           : "envoy.api.v2.RouteDiscoveryService.StreamRoutes";
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       rds.config_source(), factory_context.localInfo(), factory_context.dispatcher(),
       factory_context.clusterManager(), factory_context.random(), *scope_,
-      "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
-      "envoy.api.v2.RouteDiscoveryService.StreamRoutes",
+      "envoy.api.v2.RouteDiscoveryService.FetchRoutes", grpc_method,
       Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
-      factory_context.api());
+      factory_context.api(), is_delta);
 
   config_update_info_ =
       std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource());
@@ -211,7 +212,8 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& ad
 
 Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
+    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+    bool is_delta) {
 
   // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
   const uint64_t manager_identifier = MessageUtil::hash(rds);
@@ -224,7 +226,7 @@ Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteCon
     // around it. However, since this is not a performance critical path we err on the side
     // of simplicity.
     subscription.reset(new RdsRouteConfigSubscription(rds, manager_identifier, factory_context,
-                                                      stat_prefix, *this));
+                                                      stat_prefix, *this, is_delta));
 
     factory_context.initManager().add(subscription->init_target_);
 
