@@ -258,6 +258,8 @@ http_logs:
     stream_info.addBytesSent(20);
     stream_info.response_code_ = 200;
     stream_info.response_code_details_ = "via_upstream";
+    absl::string_view route_name_view("route-name-test");
+    stream_info.setRouteName(route_name_view);
     ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
 
@@ -313,6 +315,7 @@ http_logs:
       upstream_cluster: "fake_cluster"
       response_flags:
         fault_injected: true
+      route_name: "route-name-test"
     protocol_version: HTTP10
     request:
       scheme: "scheme_value"

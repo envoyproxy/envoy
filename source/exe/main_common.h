@@ -38,7 +38,8 @@ public:
   MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
                  ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
                  std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
-                 Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
+                 Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
+                 std::unique_ptr<ProcessContext> process_context);
 
   bool run();
 
