@@ -9,8 +9,8 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
-#include "absl/strings/substitute.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
