@@ -76,7 +76,6 @@ public:
 
   bool used() const override { return true; }
   StatName statName() const override { return name_.statName(); }
-  const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
   SymbolTable& symbolTable() override { return parent_.symbolTable(); }
 
 private:

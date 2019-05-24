@@ -21,7 +21,7 @@ void BufferHelper::addUint32(Buffer::Instance& buffer, uint32_t val) {
 
 void BufferHelper::addString(Buffer::Instance& buffer, const std::string& str) { buffer.add(str); }
 
-std::string BufferHelper::encodeHdr(const std::string& cmd_str, int seq) {
+std::string BufferHelper::encodeHdr(const std::string& cmd_str, uint8_t seq) {
   MySQLCodec::MySQLHeader mysqlhdr;
   mysqlhdr.fields_.length_ = cmd_str.length();
   mysqlhdr.fields_.seq_ = seq;
@@ -34,14 +34,12 @@ std::string BufferHelper::encodeHdr(const std::string& cmd_str, int seq) {
   return e_string;
 }
 
-bool BufferHelper::endOfBuffer(Buffer::Instance& buffer, uint64_t& offset) {
-  return buffer.length() == offset;
-}
+bool BufferHelper::endOfBuffer(Buffer::Instance& buffer) { return buffer.length() == 0; }
 
-int BufferHelper::peekUint8(Buffer::Instance& buffer, uint64_t& offset, uint8_t& val) {
+int BufferHelper::readUint8(Buffer::Instance& buffer, uint8_t& val) {
   try {
-    val = buffer.peekLEInt<uint8_t>(offset);
-    offset += sizeof(uint8_t);
+    val = buffer.peekLEInt<uint8_t>(0);
+    buffer.drain(sizeof(uint8_t));
     return MYSQL_SUCCESS;
   } catch (EnvoyException& e) {
     // buffer underflow
@@ -49,10 +47,10 @@ int BufferHelper::peekUint8(Buffer::Instance& buffer, uint64_t& offset, uint8_t&
   }
 }
 
-int BufferHelper::peekUint16(Buffer::Instance& buffer, uint64_t& offset, uint16_t& val) {
+int BufferHelper::readUint16(Buffer::Instance& buffer, uint16_t& val) {
   try {
-    val = buffer.peekLEInt<uint16_t>(offset);
-    offset += sizeof(uint16_t);
+    val = buffer.peekLEInt<uint16_t>(0);
+    buffer.drain(sizeof(uint16_t));
     return MYSQL_SUCCESS;
   } catch (EnvoyException& e) {
     // buffer underflow
@@ -60,10 +58,10 @@ int BufferHelper::peekUint16(Buffer::Instance& buffer, uint64_t& offset, uint16_
   }
 }
 
-int BufferHelper::peekUint32(Buffer::Instance& buffer, uint64_t& offset, uint32_t& val) {
+int BufferHelper::readUint32(Buffer::Instance& buffer, uint32_t& val) {
   try {
-    val = buffer.peekLEInt<uint32_t>(offset);
-    offset += sizeof(uint32_t);
+    val = buffer.peekLEInt<uint32_t>(0);
+    buffer.drain(sizeof(uint32_t));
     return MYSQL_SUCCESS;
   } catch (EnvoyException& e) {
     // buffer underflow
@@ -73,10 +71,9 @@ int BufferHelper::peekUint32(Buffer::Instance& buffer, uint64_t& offset, uint32_
 
 // Implementation of MySQL lenenc encoder based on
 // https://dev.mysql.com/doc/internals/en/integer.html#packet-Protocol::LengthEncodedInteger
-int BufferHelper::peekLengthEncodedInteger(Buffer::Instance& buffer, uint64_t& offset,
-                                           uint64_t& val) {
+int BufferHelper::readLengthEncodedInteger(Buffer::Instance& buffer, uint64_t& val) {
   uint8_t byte_val = 0;
-  if (peekUint8(buffer, offset, byte_val) == MYSQL_FAILURE) {
+  if (readUint8(buffer, byte_val) == MYSQL_FAILURE) {
     return MYSQL_FAILURE;
   }
   if (byte_val < LENENCODINT_1BYTE) {
@@ -86,14 +83,14 @@ int BufferHelper::peekLengthEncodedInteger(Buffer::Instance& buffer, uint64_t& o
 
   try {
     if (byte_val == LENENCODINT_2BYTES) {
-      val = buffer.peekLEInt<uint64_t, sizeof(uint16_t)>(offset);
-      offset += sizeof(uint16_t);
+      val = buffer.peekLEInt<uint64_t, sizeof(uint16_t)>(0);
+      buffer.drain(sizeof(uint16_t));
     } else if (byte_val == LENENCODINT_3BYTES) {
-      val = buffer.peekLEInt<uint64_t, sizeof(uint8_t) * 3>(offset);
-      offset += sizeof(uint8_t) * 3;
+      val = buffer.peekLEInt<uint64_t, sizeof(uint8_t) * 3>(0);
+      buffer.drain(sizeof(uint8_t) * 3);
     } else if (byte_val == LENENCODINT_8BYTES) {
-      val = buffer.peekLEInt<uint64_t>(offset);
-      offset += sizeof(uint64_t);
+      val = buffer.peekLEInt<uint64_t>(0);
+      buffer.drain(sizeof(uint64_t));
     } else {
       return MYSQL_FAILURE;
     }
@@ -105,17 +102,17 @@ int BufferHelper::peekLengthEncodedInteger(Buffer::Instance& buffer, uint64_t& o
   return MYSQL_SUCCESS;
 }
 
-int BufferHelper::peekBytes(Buffer::Instance& buffer, uint64_t& offset, int skip_bytes) {
-  if (buffer.length() < (offset + skip_bytes)) {
+int BufferHelper::readBytes(Buffer::Instance& buffer, size_t skip_bytes) {
+  if (buffer.length() < skip_bytes) {
     return MYSQL_FAILURE;
   }
-  offset += skip_bytes;
+  buffer.drain(skip_bytes);
   return MYSQL_SUCCESS;
 }
 
-int BufferHelper::peekString(Buffer::Instance& buffer, uint64_t& offset, std::string& str) {
+int BufferHelper::readString(Buffer::Instance& buffer, std::string& str) {
   char end = MYSQL_STR_END;
-  ssize_t index = buffer.search(&end, sizeof(end), offset);
+  ssize_t index = buffer.search(&end, sizeof(end), 0);
   if (index == -1) {
     return MYSQL_FAILURE;
   }
@@ -123,25 +120,36 @@ int BufferHelper::peekString(Buffer::Instance& buffer, uint64_t& offset, std::st
     return MYSQL_FAILURE;
   }
   str.assign(std::string(static_cast<char*>(buffer.linearize(index)), index));
-  str = str.substr(offset);
-  offset = index + 1;
+  str = str.substr(0);
+  buffer.drain(index + 1);
   return MYSQL_SUCCESS;
 }
 
-int BufferHelper::peekStringBySize(Buffer::Instance& buffer, uint64_t& offset, int len,
-                                   std::string& str) {
-  if (buffer.length() < (offset + len)) {
+int BufferHelper::readStringBySize(Buffer::Instance& buffer, size_t len, std::string& str) {
+  if (buffer.length() < len) {
     return MYSQL_FAILURE;
   }
-  str.assign(std::string(static_cast<char*>(buffer.linearize(len + offset)), len + offset));
-  str = str.substr(offset);
-  offset += len;
+  str.assign(std::string(static_cast<char*>(buffer.linearize(len)), len));
+  str = str.substr(0);
+  buffer.drain(len);
   return MYSQL_SUCCESS;
 }
 
-int BufferHelper::peekHdr(Buffer::Instance& buffer, uint64_t& offset, int& len, int& seq) {
+int BufferHelper::peekUint32(Buffer::Instance& buffer, uint32_t& val) {
+  try {
+    val = buffer.peekLEInt<uint32_t>(0);
+    return MYSQL_SUCCESS;
+  } catch (EnvoyException& e) {
+    // buffer underflow
+    return MYSQL_FAILURE;
+  }
+}
+
+void BufferHelper::consumeHdr(Buffer::Instance& buffer) { buffer.drain(sizeof(uint32_t)); }
+
+int BufferHelper::peekHdr(Buffer::Instance& buffer, uint32_t& len, uint8_t& seq) {
   uint32_t val = 0;
-  if (peekUint32(buffer, offset, val) != MYSQL_SUCCESS) {
+  if (peekUint32(buffer, val) != MYSQL_SUCCESS) {
     return MYSQL_FAILURE;
   }
   seq = htonl(val) & MYSQL_HDR_SEQ_MASK;

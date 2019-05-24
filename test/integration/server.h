@@ -119,7 +119,9 @@ public:
     return wrapped_scope_->findHistogram(name);
   }
 
-  const SymbolTable& symbolTable() const override { return wrapped_scope_->symbolTable(); }
+  const SymbolTable& constSymbolTable() const override {
+    return wrapped_scope_->constSymbolTable();
+  }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
 
 private:
@@ -177,7 +179,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.findHistogram(name);
   }
-  const SymbolTable& symbolTable() const override { return store_.symbolTable(); }
+  const SymbolTable& constSymbolTable() const override { return store_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
 
   // Stats::Store

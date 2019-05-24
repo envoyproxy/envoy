@@ -5,6 +5,7 @@
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
+#include "server/process_context_impl.h"
 #include "server/server.h"
 
 #include "test/integration/server.h"
@@ -147,12 +148,16 @@ protected:
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
     }
     thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+    if (process_object_ != nullptr) {
+      process_context_ = std::make_unique<ProcessContextImpl>(*process_object_);
+    }
     server_ = std::make_unique<InstanceImpl>(
         options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
+        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+        std::move(process_context_));
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
@@ -170,7 +175,7 @@ protected:
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
+        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
@@ -187,6 +192,8 @@ protected:
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;
   DangerousDeprecatedTestTime test_time_;
+  ProcessObject* process_object_ = nullptr;
+  std::unique_ptr<ProcessContextImpl> process_context_;
   std::unique_ptr<InstanceImpl> server_;
 };
 
@@ -432,7 +439,7 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
           Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest())),
+          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr)),
       EnvoyException, "At least one of --config-path and --config-yaml should be non-empty");
 }
 
@@ -491,6 +498,28 @@ TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
   // so we look for a successful dynamic cast to HttpTracerImpl, rather
   // than HttpNullTracer.
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpTracerImpl*>(tracer()));
+}
+
+class TestObject : public ProcessObject {
+public:
+  void setFlag(bool value) { boolean_flag_ = value; }
+
+  bool boolean_flag_ = true;
+};
+
+TEST_P(ServerInstanceImplTest, WithProcessContext) {
+  TestObject object;
+  process_object_ = &object;
+
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+
+  ProcessContext& context = server_->processContext();
+  auto& object_from_context = dynamic_cast<TestObject&>(context.get());
+  EXPECT_EQ(&object_from_context, &object);
+  EXPECT_TRUE(object_from_context.boolean_flag_);
+
+  object.boolean_flag_ = false;
+  EXPECT_FALSE(object_from_context.boolean_flag_);
 }
 
 } // namespace
