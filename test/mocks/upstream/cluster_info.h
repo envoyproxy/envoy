@@ -41,6 +41,22 @@ public:
   std::vector<std::set<std::string>> subset_keys_;
 };
 
+// While this mock class doesn't have any direct use in public Envoy tests, it's
+// useful for constructing tests of downstream private filters that use
+// ClusterTypedMetadata.
+class MockClusterTypedMetadata : public Config::TypedMetadataImpl<ClusterTypedMetadataFactory> {
+public:
+  using Config::TypedMetadataImpl<ClusterTypedMetadataFactory>::TypedMetadataImpl;
+
+  void inject(const std::string& key, std::unique_ptr<const TypedMetadata::Object> value) {
+    data_[key] = std::move(value);
+  }
+
+  std::unordered_map<std::string, std::unique_ptr<const TypedMetadata::Object>>& data() {
+    return data_;
+  }
+};
+
 class MockClusterInfo : public ClusterInfo {
 public:
   MockClusterInfo();
@@ -108,6 +124,8 @@ public:
   absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   envoy::api::v2::Cluster::CommonLbConfig lb_config_;
+  envoy::api::v2::core::Metadata metadata_;
+  std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
