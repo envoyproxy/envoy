@@ -341,9 +341,9 @@ public:
   ~MockRouteTracing();
 
   // Router::RouteTracing
-  MOCK_CONST_METHOD0(getClientSampling, uint64_t());
-  MOCK_CONST_METHOD0(getRandomSampling, uint64_t());
-  MOCK_CONST_METHOD0(getOverallSampling, uint64_t());
+  MOCK_CONST_METHOD0(getClientSampling, const envoy::type::FractionalPercent&());
+  MOCK_CONST_METHOD0(getRandomSampling, const envoy::type::FractionalPercent&());
+  MOCK_CONST_METHOD0(getOverallSampling, const envoy::type::FractionalPercent&());
 };
 
 class MockRoute : public Route {

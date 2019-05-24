@@ -233,7 +233,7 @@ message Route {
 
   // Presence of the object defines whether the connection manager's tracing configuration
   // is overridden by this route specific instance.
-  Tracing tracing = 14;
+  Tracing tracing = 15;
 }
 
 // Compared to the :ref:`cluster <envoy_api_field_route.RouteAction.cluster>` field that specifies a
@@ -1019,14 +1019,14 @@ message Tracing {
   // 'tracing.client_sampling' in the :ref:`HTTP Connection Manager
   // <config_http_conn_man_runtime>`.
   // Default: 100%
-  envoy.type.Percent client_sampling = 1;
+  envoy.type.FractionalPercent client_sampling = 1;
 
   // Target percentage of requests managed by this HTTP connection manager that will be randomly
   // selected for trace generation, if not requested by the client or not forced. This field is
   // a direct analog for the runtime variable 'tracing.random_sampling' in the
   // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
   // Default: 100%
-  envoy.type.Percent random_sampling = 2;
+  envoy.type.FractionalPercent random_sampling = 2;
 
   // Target percentage of requests managed by this HTTP connection manager that will be traced
   // after all other sampling checks have been applied (client-directed, force tracing, random
@@ -1036,7 +1036,7 @@ message Tracing {
   // analog for the runtime variable 'tracing.global_enabled' in the
   // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
   // Default: 100%
-  envoy.type.Percent overall_sampling = 3;
+  envoy.type.FractionalPercent overall_sampling = 3;
 }
 
 // A virtual cluster is a way of specifying a regex matching rule against

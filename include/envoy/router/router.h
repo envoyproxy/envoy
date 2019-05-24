@@ -779,19 +779,19 @@ public:
    * This method returns the client sampling percentage.
    * @return the client sampling percentage
    */
-  virtual uint64_t getClientSampling() const PURE;
+  virtual const envoy::type::FractionalPercent& getClientSampling() const PURE;
 
   /**
    * This method returns the random sampling percentage.
    * @return the random sampling percentage
    */
-  virtual uint64_t getRandomSampling() const PURE;
+  virtual const envoy::type::FractionalPercent& getRandomSampling() const PURE;
 
   /**
    * This method returns the overall sampling percentage.
    * @return the overall sampling percentage
    */
-  virtual uint64_t getOverallSampling() const PURE;
+  virtual const envoy::type::FractionalPercent& getOverallSampling() const PURE;
 };
 
 typedef std::unique_ptr<const RouteTracing> RouteTracingConstPtr;

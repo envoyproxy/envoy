@@ -715,7 +715,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   ASSERT(!cached_route_);
   refreshCachedRoute();
 
-  if (!state_.is_internally_created_) {
+  if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
     ConnectionManagerUtility::mutateTracingRequestHeader(
         *request_headers_, connection_manager_.runtime_, connection_manager_.config_,
         cached_route_.value().get());

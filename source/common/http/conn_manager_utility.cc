@@ -234,9 +234,9 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
     return;
   }
 
-  uint32_t client_sampling = config.tracingConfig()->client_sampling_;
-  uint32_t random_sampling = config.tracingConfig()->random_sampling_;
-  uint32_t overall_sampling = config.tracingConfig()->overall_sampling_;
+  envoy::type::FractionalPercent client_sampling = config.tracingConfig()->client_sampling_;
+  envoy::type::FractionalPercent random_sampling = config.tracingConfig()->random_sampling_;
+  envoy::type::FractionalPercent overall_sampling = config.tracingConfig()->overall_sampling_;
 
   if (route && route->tracingConfig()) {
     client_sampling = route->tracingConfig()->getClientSampling();
@@ -251,8 +251,8 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
     } else if (request_headers.EnvoyForceTrace()) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
-    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", random_sampling, result,
-                                                 10000)) {
+    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", random_sampling,
+                                                 result)) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
     }
   }

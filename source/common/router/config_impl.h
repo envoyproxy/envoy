@@ -355,18 +355,18 @@ public:
   RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing);
 
   // Tracing::getClientSampling
-  uint64_t getClientSampling() const override;
+  const envoy::type::FractionalPercent& getClientSampling() const override;
 
   // Tracing::getRandomSampling
-  uint64_t getRandomSampling() const override;
+  const envoy::type::FractionalPercent& getRandomSampling() const override;
 
   // Tracing::getOverallSampling
-  uint64_t getOverallSampling() const override;
+  const envoy::type::FractionalPercent& getOverallSampling() const override;
 
 private:
-  const uint64_t client_sampling_;
-  const uint64_t random_sampling_;
-  const uint64_t overall_sampling_;
+  const envoy::type::FractionalPercent client_sampling_;
+  const envoy::type::FractionalPercent random_sampling_;
+  const envoy::type::FractionalPercent overall_sampling_;
 };
 
 /**
@@ -459,7 +459,7 @@ public:
   const DirectResponseEntry* directResponseEntry() const override;
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
-  const RouteTracing* tracingConfig() const override { return routeTracing_.get(); }
+  const RouteTracing* tracingConfig() const override { return route_tracing_.get(); }
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
 
 protected:
@@ -683,7 +683,7 @@ private:
   const std::multimap<std::string, std::string> opaque_config_;
 
   const DecoratorConstPtr decorator_;
-  const RouteTracingConstPtr routeTracing_;
+  const RouteTracingConstPtr route_tracing_;
   const absl::optional<Http::Code> direct_response_code_;
   std::string direct_response_body_;
   PerFilterConfigs per_filter_configs_;
