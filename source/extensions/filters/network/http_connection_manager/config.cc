@@ -175,13 +175,20 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                       ))) {
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
-  if (config.route_specifier_case() != envoy::config::filter::network::http_connection_manager::v2::
-                                           HttpConnectionManager::kScopedRoutes) {
+  switch (config.route_specifier_case()) {
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::kRds:
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      kRouteConfig:
     route_config_provider_ = Router::RouteConfigProviderUtil::create(
         config, context_, stats_prefix_, route_config_provider_manager_);
-  } else {
+    break;
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      kScopedRoutes:
     scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
         config, context_, stats_prefix_, scoped_routes_config_provider_manager_);
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   switch (config.forward_client_cert_details()) {
