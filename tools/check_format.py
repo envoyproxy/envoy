@@ -75,7 +75,7 @@ PROTOBUF_TYPE_ERRORS = {
     "ProtobufWkt::MapPair":             "Protobuf::MapPair",
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 }
-CPP_STD_ERRORS = {
+LIBCXX_REPLACEMENTS = {
     "absl::make_unique<": "std::make_unique<",
 }
 # yapf: enable
@@ -345,7 +345,7 @@ def fixSourceLine(line):
     line = line.replace(invalid_construct, valid_construct)
 
   # Use recommended cpp stdlib
-  for invalid_construct, valid_construct in CPP_STD_ERRORS.items():
+  for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
     line = line.replace(invalid_construct, valid_construct)
 
   return line
@@ -377,9 +377,9 @@ def checkSourceLine(line, file_path, reportError):
     if invalid_construct in line:
       reportError("incorrect protobuf type reference %s; "
                   "should be %s" % (invalid_construct, valid_construct))
-  for invalid_construct, valid_construct in CPP_STD_ERRORS.items():
+  for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
     if invalid_construct in line:
-      reportError("cpp std: %s should be replaced by %s" % (invalid_construct, valid_construct))
+      reportError("term %s should be replaced with standard library term %s" % (invalid_construct, valid_construct))
 
   # Some errors cannot be fixed automatically, and actionable, consistent,
   # navigable messages should be emitted to make it easy to find and fix
