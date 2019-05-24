@@ -184,6 +184,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     break;
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       kScopedRoutes:
+    ENVOY_LOG(warn, "Scoped routing has been enabled but it is not yet fully implemented! HTTP "
+                    "request routing DOES NOT work (yet) with this configuration.");
     scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
         config, context_, stats_prefix_, scoped_routes_config_provider_manager_);
     break;
