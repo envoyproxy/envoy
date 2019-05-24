@@ -23,9 +23,10 @@ namespace Stats {
  * This structure is an alternate backing store for both CounterImpl and GaugeImpl. It is designed
  * so that it can be allocated efficiently from the heap on demand.
  */
-struct HeapStatData {
+struct HeapStatData : public InlineStorage {
 private:
   explicit HeapStatData(StatName stat_name) { stat_name.copyToStorage(symbol_storage_); }
+  ~HeapStatData() = default;
 
 public:
   static HeapStatData* alloc(StatName stat_name, SymbolTable& symbol_table);

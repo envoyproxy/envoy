@@ -14,6 +14,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/common/non_copyable.h"
 
 #include "absl/strings/string_view.h"
 
@@ -630,6 +631,66 @@ template <class Value> struct TrieLookupTable {
   }
 
   TrieEntry<Value> root_;
+};
+
+// Helper class for allocating classes with variable-sized inlined storage. See
+// InlineString below for usage.
+class InlineStorage : public NonCopyable {
+public:
+  // Custom delete operator to keep C++14 from using the global operator delete(void*, size_t),
+  // which would result in the compiler error:
+  // "exception cleanup for this placement new selects non-placement operator delete"
+  static void operator delete(void* address) { ::operator delete(address); }
+
+protected:
+  static void* operator new(size_t object_size, size_t data_size) {
+    return ::operator new(object_size + data_size);
+  }
+};
+
+class InlineString;
+using InlineStringPtr = std::unique_ptr<InlineString>;
+
+// Represents immutable string data, keeping the storage inline with the
+// object. These cannot be copied or held by value; they must be created
+// as unique pointers.
+class InlineString : public InlineStorage {
+public:
+  /**
+   * @param str the string_view for which to create an InlineString
+   * @return a unique_ptr to the InlineString containing the bytes of str.
+   */
+  static InlineStringPtr create(absl::string_view str) {
+    return InlineStringPtr(new (str.size()) InlineString(str.data(), str.size()));
+  }
+
+  /**
+   * @return a std::string copy of the InlineString.
+   */
+  std::string toString() const { return std::string(data_, size_); }
+
+  /**
+   * @return a string_view into the InlineString.
+   */
+  absl::string_view toStringView() const { return absl::string_view(data_, size_); }
+
+  /**
+   * @return the number of bytes in the string
+   */
+  size_t size() const { return size_; }
+
+  /**
+   * @return a pointer to the first byte of the string.
+   */
+  const char* data() const { return data_; }
+
+private:
+  // Constructor is declared private so that no one constructs one without the
+  // proper size allocation. to accomomdate the variable-size buffer.
+  InlineString(const char* str, size_t size) : size_(size) { memcpy(data_, str, size); }
+
+  size_t size_;
+  char data_[];
 };
 
 } // namespace Envoy
