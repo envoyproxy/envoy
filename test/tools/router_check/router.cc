@@ -390,12 +390,12 @@ Options::Options(int argc, char** argv) {
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
   TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
-  TCLAP::UnlabeledMultiArg<std::string> unlabelled_configs(
-      "unlabelled-configs", "unlabelled configs", false, "unlabelledConfigStrings", cmd);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", false,
                                            "", "string", cmd);
   TCLAP::ValueArg<std::string> test_path("t", "test-path", "Path to test file.", false, "",
                                          "string", cmd);
+  TCLAP::UnlabeledMultiArg<std::string> unlabelled_configs(
+      "unlabelled-configs", "unlabelled configs", false, "unlabelledConfigStrings", cmd);
   try {
     cmd.parse(argc, argv);
   } catch (TCLAP::ArgException& e) {
@@ -416,10 +416,10 @@ Options::Options(int argc, char** argv) {
       exit(EXIT_FAILURE);
     }
   } else {
-    unlabelled_config_path_ =
-        unlabelled_configs.getValue().empty() ? "" : unlabelled_configs.getValue()[0];
-    unlabelled_test_path_ =
-        unlabelled_configs.getValue().empty() ? "" : unlabelled_configs.getValue()[1];
+    if (!unlabelled_configs.getValue().empty()) {
+      unlabelled_config_path_ = unlabelled_configs.getValue()[0];
+      unlabelled_test_path_ = unlabelled_configs.getValue()[1];
+    }
   }
 }
 } // namespace Envoy
