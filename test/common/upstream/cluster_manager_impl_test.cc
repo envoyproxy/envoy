@@ -1,9 +1,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
-
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/upstream/upstream.h"
 
@@ -289,7 +288,7 @@ public:
 };
 
 envoy::config::bootstrap::v2::Bootstrap defaultConfig() {
-    const std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 static_resources:
   clusters: []
   )EOF";
@@ -411,7 +410,8 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
     }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV2Json(json)), EnvoyException, "invalid value \"foo\" for type TYPE_ENUM");
+  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV2Json(json)), EnvoyException,
+                          "invalid value \"foo\" for type TYPE_ENUM");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
@@ -446,7 +446,8 @@ TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
   }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV2Json(json)), EnvoyException, "fake_property: Cannot find field");
+  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV2Json(json)), EnvoyException,
+                          "fake_property: Cannot find field");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
@@ -471,8 +472,9 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
 }
 
 TEST_F(ClusterManagerImplTest, DuplicateCluster) {
-  const std::string json =
-        fmt::sprintf("{\"static_resources\":{%s}}", clustersJson({defaultStaticClusterJson("cluster_1"),defaultStaticClusterJson("cluster_1")}));
+  const std::string json = fmt::sprintf(
+      "{\"static_resources\":{%s}}",
+      clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_1")}));
   const auto config = parseBootstrapFromV2Json(json);
   EXPECT_THROW(create(config), EnvoyException);
 }
@@ -671,8 +673,8 @@ TEST_F(ClusterManagerImplTest, EdsClustersRequireEdsConfig) {
 class ClusterManagerImplThreadAwareLbTest : public ClusterManagerImplTest {
 public:
   void doTest(LoadBalancerType lb_type) {
-    const std::string json =
-        fmt::sprintf("{\"static_resources\":{%s}}", clustersJson({defaultStaticClusterJson("cluster_0")}));
+    const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                          clustersJson({defaultStaticClusterJson("cluster_0")}));
 
     std::shared_ptr<MockClusterMockPrioritySet> cluster1(
         new NiceMock<MockClusterMockPrioritySet>());
@@ -772,8 +774,8 @@ static_resources:
 }
 
 TEST_F(ClusterManagerImplTest, UnknownCluster) {
-  const std::string json =
-      fmt::sprintf("{\"static_resources\":{%s}}", clustersJson({defaultStaticClusterJson("cluster_1")}));
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("cluster_1")}));
 
   create(parseBootstrapFromV2Json(json));
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
@@ -824,8 +826,8 @@ static_resources:
 }
 
 TEST_F(ClusterManagerImplTest, ShutdownOrder) {
-  const std::string json =
-      fmt::sprintf("{\"static_resources\":{%s}}", clustersJson({defaultStaticClusterJson("cluster_1")}));
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("cluster_1")}));
 
   create(parseBootstrapFromV2Json(json));
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
@@ -866,8 +868,9 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
     }
   }
   )EOF",
-      clustersJson(
-          {defaultStaticClusterJson("cds_cluster"), defaultStaticClusterJson("fake_cluster"), defaultStaticClusterJson("fake_cluster2")}));
+      clustersJson({defaultStaticClusterJson("cds_cluster"),
+                    defaultStaticClusterJson("fake_cluster"),
+                    defaultStaticClusterJson("fake_cluster2")}));
 
   MockCdsApi* cds = new MockCdsApi();
   std::shared_ptr<MockClusterMockPrioritySet> cds_cluster(
@@ -1254,8 +1257,8 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 }
 
 TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
-  const std::string json =
-      fmt::sprintf("{\"static_resources\":{%s}}", clustersJson({defaultStaticClusterJson("fake_cluster")}));
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("fake_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   InSequence s;
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
@@ -1283,8 +1286,8 @@ TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
 
 // Verifies that we correctly propagate the host_set state to the TLS clusters.
 TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
-  const std::string json =
-      fmt::sprintf("{\"static_resources\":{%s}}", clustersJson({defaultStaticClusterJson("fake_cluster")}));
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("fake_cluster")}));
   std::shared_ptr<MockClusterRealPrioritySet> cluster1(new NiceMock<MockClusterRealPrioritySet>());
   InSequence s;
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
@@ -1330,8 +1333,8 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
 
 // Test that we close all HTTP connection pool connections when there is a host health failure.
 TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
-  const std::string json =
-      fmt::sprintf("{\"static_resources\":{%s}}", clustersJson({defaultStaticClusterJson("some_cluster")}));
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("some_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "some_cluster";
   HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
@@ -1392,8 +1395,8 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
 
 // Test that we close all TCP connection pool connections when there is a host health failure.
 TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
-  const std::string json =
-      fmt::sprintf("{\"static_resources\":{%s}}", clustersJson({defaultStaticClusterJson("some_cluster")}));
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("some_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "some_cluster";
   HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");

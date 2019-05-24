@@ -34,7 +34,8 @@ inline std::string defaultStaticClusterJson(const std::string& name) {
                       name);
 }
 
-inline envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Json(const std::string& json_string) {
+inline envoy::config::bootstrap::v2::Bootstrap
+parseBootstrapFromV2Json(const std::string& json_string) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   MessageUtil::loadFromJson(json_string, bootstrap);
   return bootstrap;
