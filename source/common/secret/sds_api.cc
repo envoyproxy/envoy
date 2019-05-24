@@ -31,19 +31,11 @@ SdsApi::SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispat
 
 void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                             const std::string&) {
-  if (resources.empty()) {
-    throw EnvoyException(
-        fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
-  }
-  if (resources.size() != 1) {
-    throw EnvoyException(fmt::format("Unexpected SDS secrets length: {}", resources.size()));
-  }
+  validateUpdateSize(resources.size());
   auto secret = MessageUtil::anyConvert<envoy::api::v2::auth::Secret>(resources[0]);
   MessageUtil::validate(secret);
 
-  // Wrap sds_config_name_ in string_view to deal with proto string/std::string incompatibility
-  // issues within Google.
-  if (secret.name() != absl::string_view(sds_config_name_)) {
+  if (secret.name() != sds_config_name_) {
     throw EnvoyException(
         fmt::format("Unexpected SDS secret (expecting {}): {}", sds_config_name_, secret.name()));
   }
@@ -59,9 +51,27 @@ void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& 
   init_target_.ready();
 }
 
+void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
+                            const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+  validateUpdateSize(resources.size());
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
+  *unwrapped_resource.Add() = resources[0].resource();
+  onConfigUpdate(unwrapped_resource, resources[0].version());
+}
+
 void SdsApi::onConfigUpdateFailed(const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad config.
   init_target_.ready();
+}
+
+void SdsApi::validateUpdateSize(int num_resources) {
+  if (num_resources == 0) {
+    throw EnvoyException(
+        fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
+  }
+  if (num_resources != 1) {
+    throw EnvoyException(fmt::format("Unexpected SDS secrets length: {}", num_resources));
+  }
 }
 
 void SdsApi::initialize() {

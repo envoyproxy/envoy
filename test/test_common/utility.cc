@@ -20,6 +20,10 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
 
@@ -31,6 +35,7 @@
 #include "common/common/thread_impl.h"
 #include "common/common/utility.h"
 #include "common/config/bootstrap_json.h"
+#include "common/config/resources.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
@@ -180,6 +185,26 @@ TestUtility::parseBootstrapFromJson(const std::string& json_string) {
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::BootstrapJson::translateBootstrap(*json_object_ptr, bootstrap);
   return bootstrap;
+}
+
+std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
+  if (resource.type_url() == Config::TypeUrl::get().Listener) {
+    return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
+    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().Cluster) {
+    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
+    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().VirtualHost) {
+    return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
+  }
+  throw EnvoyException(
+      fmt::format("xdsResourceName does not know about type URL {}", resource.type_url()));
 }
 
 std::string TestUtility::addLeftAndRightPadding(absl::string_view to_pad, int desired_length) {

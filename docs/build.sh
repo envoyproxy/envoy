@@ -126,7 +126,7 @@ PROTO_RST="
   /envoy/config/filter/thrift/router/v2alpha1/router/envoy/config/filter/thrift/router/v2alpha1/router.proto.rst
   /envoy/config/health_checker/redis/v2/redis/envoy/config/health_checker/redis/v2/redis.proto.rst
   /envoy/config/overload/v2alpha/overload/envoy/config/overload/v2alpha/overload.proto.rst
-  /envoy/config/rbac/v2alpha/rbac/envoy/config/rbac/v2alpha/rbac.proto.rst
+  /envoy/config/rbac/v2/rbac/envoy/config/rbac/v2/rbac.proto.rst
   /envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap/envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.proto.rst
   /envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource/envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.proto.rst
   /envoy/config/transport_socket/tap/v2alpha/tap/envoy/config/transport_socket/tap/v2alpha/tap.proto.rst

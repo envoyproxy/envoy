@@ -56,9 +56,9 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   HostsPerLocalitySharedPtr updated_locality_hosts{new HostsPerLocalityImpl(hosts)};
   priority_set.updateHosts(
       0,
-      HostSetImpl::updateHostsParams(updated_hosts, updated_locality_hosts,
-                                     std::make_shared<const HealthyHostVector>(*updated_hosts),
-                                     updated_locality_hosts),
+      updateHostsParams(updated_hosts, updated_locality_hosts,
+                        std::make_shared<const HealthyHostVector>(*updated_hosts),
+                        updated_locality_hosts),
       {}, hosts, {}, absl::nullopt);
 
   Stats::IsolatedStoreImpl stats_store;
@@ -162,9 +162,9 @@ public:
       auto per_zone_local_shared = makeHostsPerLocality(std::move(per_zone_local));
       local_priority_set_->updateHosts(
           0,
-          HostSetImpl::updateHostsParams(
-              originating_hosts, per_zone_local_shared,
-              std::make_shared<const HealthyHostVector>(*originating_hosts), per_zone_local_shared),
+          updateHostsParams(originating_hosts, per_zone_local_shared,
+                            std::make_shared<const HealthyHostVector>(*originating_hosts),
+                            per_zone_local_shared),
           {}, empty_vector_, empty_vector_, absl::nullopt);
 
       HostConstSharedPtr selected = lb.chooseHost(nullptr);

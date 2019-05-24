@@ -70,13 +70,15 @@ public:
     Router::ConfigConstSharedPtr config() override { return route_config_; }
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
+    void onConfigUpdate() override {}
 
     TimeSource& time_source_;
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   };
 
   HttpConnectionManagerImplTest()
-      : route_config_provider_(test_time_.timeSystem()), access_log_path_("dummy_path"),
+      : route_config_provider_(test_time_.timeSystem()), http_context_(fake_stats_.symbolTable()),
+        access_log_path_("dummy_path"),
         access_logs_{
             AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
                 access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
@@ -3143,10 +3145,13 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
       .WillOnce(Return(FilterDataStatus::StopIterationAndWatermark));
   decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
 
+  // unregister callbacks2
+  decoder_filters_[0]->callbacks_->removeDownstreamWatermarkCallbacks(callbacks2);
+
   // Change the limit so the buffered data is below the new watermark.
   buffer_len = encoder_filters_[1]->callbacks_->encodingBuffer()->length();
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
-  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   encoder_filters_[1]->callbacks_->setEncoderBufferLimit((buffer_len + 1) * 2);
 }
 
@@ -3293,7 +3298,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         decoder_filters_[0]->callbacks_->sendLocalReply(Code::BadRequest, "Bad request", nullptr,
-                                                        absl::nullopt);
+                                                        absl::nullopt, "");
         return FilterHeadersStatus::Continue;
       }));
 

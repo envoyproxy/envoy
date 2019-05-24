@@ -170,6 +170,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     request_headers.removeEnvoyForceTrace();
     request_headers.removeEnvoyIpTags();
     request_headers.removeEnvoyOriginalUrl();
+    request_headers.removeEnvoyHedgeOnPerTryTimeout();
 
     for (const LowerCaseString& header : route_config.internalOnlyHeaders()) {
       request_headers.remove(header);
@@ -187,7 +188,9 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
 
     // TODO(htuch): should this be under the config.userAgent() condition or in the outer scope?
     if (!local_info.nodeName().empty()) {
-      request_headers.insertEnvoyDownstreamServiceNode().value(local_info.nodeName());
+      // Following setReference() is safe because local info is constant for the life of the server.
+      request_headers.insertEnvoyDownstreamServiceNode().value().setReference(
+          local_info.nodeName());
     }
   }
 

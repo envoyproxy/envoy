@@ -44,6 +44,8 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@com_googlesource_quiche//:epoll_server_lib",
         "@com_googlesource_quiche//:quic_core_buffer_allocator_lib",
+        "@com_googlesource_quiche//:quic_core_error_codes_lib",
+        "@com_googlesource_quiche//:quic_core_types_lib",
         "@com_googlesource_quiche//:quic_platform_expect_bug",
         "@com_googlesource_quiche//:quic_platform_mem_slice_span_lib",
         "@com_googlesource_quiche//:quic_platform_mem_slice_storage_lib",
@@ -65,6 +67,7 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche/platform:flags_impl_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+        "@com_googlesource_quiche//:spdy_platform",
         "@com_googlesource_quiche//:spdy_platform_test_helpers",
     ],
 )
@@ -182,6 +185,11 @@ envoy_cc_test_library(
         "//source/common/filesystem:filesystem_lib",
         "@com_googlesource_quiche//:quic_platform_base",
     ],
+)
+
+envoy_cc_test_library(
+    name = "quiche_common_platform_test_impl_lib",
+    hdrs = ["quiche_test_impl.h"],
 )
 
 envoy_cc_test_library(

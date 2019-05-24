@@ -11,6 +11,7 @@
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/process_context.h"
 #include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
@@ -97,11 +98,11 @@ public:
 
   /**
    * Helper for flushing counters, gauges and histograms to sinks. This takes care of calling
-   * flush() on each sink and clearing the cache afterward.
+   * flush() on each sink.
    * @param sinks supplies the list of sinks.
-   * @param source provides the metrics being flushed.
+   * @param store provides the store being flushed.
    */
-  static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Source& source);
+  static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store);
 
   /**
    * Load a bootstrap config from either v1 or v2 and perform validation.
@@ -149,7 +150,8 @@ public:
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
-               Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
+               Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
+               std::unique_ptr<ProcessContext> process_context);
 
   ~InstanceImpl() override;
 
@@ -185,6 +187,7 @@ public:
   time_t startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
   Http::Context& httpContext() override { return http_context_; }
+  ProcessContext& processContext() override { return *process_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
@@ -194,8 +197,9 @@ public:
   }
 
   // ServerLifecycleNotifier
-  void registerCallback(Stage stage, StageCallback callback) override;
-  void registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
+  ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
+  ServerLifecycleNotifier::HandlePtr
+  registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
 
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
@@ -258,10 +262,26 @@ private:
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
   Envoy::MutexTracer* mutex_tracer_;
   Http::ContextImpl http_context_;
+  std::unique_ptr<ProcessContext> process_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   const std::thread::id main_thread_id_;
-  absl::flat_hash_map<Stage, std::vector<StageCallback>> stage_callbacks_;
-  absl::flat_hash_map<Stage, std::vector<StageCallbackWithCompletion>> stage_completable_callbacks_;
+
+  using LifecycleNotifierCallbacks = std::list<StageCallback>;
+  using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
+
+  template <class T> class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle {
+  public:
+    LifecycleCallbackHandle(T& callbacks, typename T::iterator it)
+        : callbacks_(callbacks), it_(it) {}
+    ~LifecycleCallbackHandle() override { callbacks_.erase(it_); }
+
+  private:
+    T& callbacks_;
+    typename T::iterator it_;
+  };
+
+  absl::flat_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
+  absl::flat_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
 };
 
 } // namespace Server

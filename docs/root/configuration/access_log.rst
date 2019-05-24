@@ -228,6 +228,9 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+%ROUTE_NAME%
+  Name of the route.
+
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
 
@@ -357,4 +360,9 @@ The following command operators are supported:
   TCP
     The subject present in the peer certificate used to establish the downstream TLS connection.
 
+%DOWNSTREAM_TLS_SESSION_ID%
+  HTTP
+    The session ID for the established downstream TLS connection.
+  TCP
+    The session ID for the established downstream TLS connection.
 

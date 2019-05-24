@@ -299,6 +299,13 @@ You can use the `-c <compilation_mode>` flag to control this, e.g.
 bazel build -c opt //source/exe:envoy-static
 ```
 
+To override the compilation mode and optimize the build for binary size, you can
+use the `sizeopt` configuration:
+
+```
+bazel build //source/exe:envoy-static --config=sizeopt
+```
+
 ## Sanitizers
 
 To build and run tests with the gcc compiler's [address sanitizer
@@ -363,6 +370,10 @@ The following optional features can be enabled on the Bazel build command-line:
   `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL.
 * Default [path normalization](https://github.com/envoyproxy/envoy/issues/6435) with
   `--define path_normalization_by_default=true`. Note this still could be disable by explicit xDS config.
+* Manual stamping via VersionInfo with `--define manual_stamp=manual_stamp`.
+  This is needed if the `version_info_lib` is compiled via a non-binary bazel rules, e.g `envoy_cc_library`.
+  Otherwise, the linker will fail to resolve symbols that are included via the `linktamp` rule, which is only available to binary targets.
+  This is being tracked as a feature in: https://github.com/envoyproxy/envoy/issues/6859.
 
 ## Disabling extensions
 

@@ -10,6 +10,7 @@
 #include "common/thread_local/thread_local_impl.h"
 
 #include "exe/platform_impl.h"
+#include "exe/process_wide.h"
 
 #include "server/listener_hooks.h"
 #include "server/options_impl.h"
@@ -37,8 +38,8 @@ public:
   MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
                  ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
                  std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
-                 Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
-  ~MainCommonBase();
+                 Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
+                 std::unique_ptr<ProcessContext> process_context);
 
   bool run();
 
@@ -64,6 +65,7 @@ public:
                     const AdminRequestFn& handler);
 
 protected:
+  ProcessWide process_wide_; // Process-wide state setup/teardown.
   const Envoy::OptionsImpl& options_;
   Stats::FakeSymbolTableImpl symbol_table_;
   Server::ComponentFactory& component_factory_;
