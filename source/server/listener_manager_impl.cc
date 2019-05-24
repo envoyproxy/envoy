@@ -248,6 +248,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
 
     // Validate IP addresses.
     std::vector<std::string> destination_ips;
+    destination_ips.reserve(filter_chain_match.prefix_ranges().size());
     for (const auto& destination_ip : filter_chain_match.prefix_ranges()) {
       const auto& cidr_range = Network::Address::CidrRange::create(destination_ip);
       destination_ips.push_back(cidr_range.asString());
@@ -267,6 +268,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     }
 
     std::vector<std::string> source_ips;
+    source_ips.reserve(filter_chain_match.source_prefix_ranges().size());
     for (const auto& source_ip : filter_chain_match.source_prefix_ranges()) {
       const auto& cidr_range = Network::Address::CidrRange::create(source_ip);
       source_ips.push_back(cidr_range.asString());
@@ -477,7 +479,7 @@ void ListenerImpl::addFilterChainForSourcePorts(SourcePortsMapSharedPtr& source_
   }
   auto& source_ports_map = *source_ports_map_ptr;
 
-  if (source_ports_map.find(source_port) != source_ports_map.end()) {
+  if (!source_ports_map.try_emplace(source_port, filter_chain).second) {
     // If we got here and found already configured branch, then it means that this FilterChainMatch
     // is a duplicate, and that there is some overlap in the repeated fields with already processed
     // FilterChainMatches.
@@ -485,7 +487,6 @@ void ListenerImpl::addFilterChainForSourcePorts(SourcePortsMapSharedPtr& source_
                                      "overlapping matching rules are defined",
                                      address_->asString()));
   }
-  source_ports_map[source_port] = filter_chain;
 }
 
 namespace {
@@ -497,10 +498,12 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
   std::vector<Network::Address::CidrRange> subnets;
   if (cidr == EMPTY_STRING) {
     if (Network::Address::ipFamilySupported(AF_INET)) {
-      subnets.push_back(Network::Address::CidrRange::create("0.0.0.0/0"));
+      static const std::string catch_all_ipv4 = "0.0.0.0/0";
+      subnets.push_back(Network::Address::CidrRange::create(catch_all_ipv4));
     }
     if (Network::Address::ipFamilySupported(AF_INET6)) {
-      subnets.push_back(Network::Address::CidrRange::create("::/0"));
+      static const std::string catch_all_ipv6 = "::/0";
+      subnets.push_back(Network::Address::CidrRange::create(catch_all_ipv6));
     }
   } else {
     subnets.push_back(Network::Address::CidrRange::create(cidr));
@@ -517,6 +520,7 @@ void ListenerImpl::convertIPsToTries() {
     auto& destination_ips_map = destination_ips_pair.first;
     std::vector<std::pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>>
         destination_ips_list;
+    destination_ips_list.reserve(destination_ips_map.size());
 
     for (const auto& entry : destination_ips_map) {
       destination_ips_list.push_back(makeCidrListEntry(entry.first, entry.second));
@@ -532,6 +536,7 @@ void ListenerImpl::convertIPsToTries() {
               std::vector<
                   std::pair<SourcePortsMapSharedPtr, std::vector<Network::Address::CidrRange>>>
                   source_ips_list;
+              source_ips_list.reserve(source_ips_map.size());
 
               for (auto& source_ip : source_ips_map) {
                 source_ips_list.push_back(makeCidrListEntry(source_ip.first, source_ip.second));
@@ -713,26 +718,26 @@ ListenerImpl::findFilterChainForSourceIpAndPort(const SourceIPsTrie& source_ips_
 
   // Match on both: exact IP and wider CIDR ranges using LcTrie.
   const auto& data = source_ips_trie.getData(address);
-  if (!data.empty()) {
-    ASSERT(data.size() == 1);
-    const auto& source_ports_map = *data.back();
-    const uint32_t source_port = address->ip()->port();
-    const auto port_match = source_ports_map.find(source_port);
-
-    // Did we get a direct hit on port.
-    if (port_match != source_ports_map.end()) {
-      return port_match->second.get();
-    }
-
-    // Try port 0 if we didn't already try it (UDS).
-    if (source_port != 0) {
-      const auto any_match = source_ports_map.find(0);
-      if (any_match != source_ports_map.end()) {
-        return any_match->second.get();
-      }
-    }
-
+  if (data.empty()) {
     return nullptr;
+  }
+
+  ASSERT(data.size() == 1);
+  const auto& source_ports_map = *data.back();
+  const uint32_t source_port = address->ip()->port();
+  const auto port_match = source_ports_map.find(source_port);
+
+  // Did we get a direct hit on port.
+  if (port_match != source_ports_map.end()) {
+    return port_match->second.get();
+  }
+
+  // Try port 0 if we didn't already try it (UDS).
+  if (source_port != 0) {
+    const auto any_match = source_ports_map.find(0);
+    if (any_match != source_ports_map.end()) {
+      return any_match->second.get();
+    }
   }
 
   return nullptr;
