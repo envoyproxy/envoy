@@ -35,14 +35,16 @@ create(const envoy::config::filter::network::http_connection_manager::v2::HttpCo
     const envoy::config::filter::network::http_connection_manager::v2::
         ScopedRouteConfigurationsList& scoped_route_list =
             config.scoped_routes().scoped_route_configurations_list();
-    ProtobufTypes::ConstMessagePtrVector config_protos(
-        scoped_route_list.scoped_route_configurations().size());
-    for (const auto& it : scoped_route_list.scoped_route_configurations()) {
-      Protobuf::Message* clone = it.New();
-      clone->CopyFrom(it);
-      config_protos.push_back(std::unique_ptr<const Protobuf::Message>(clone));
-    }
-
+    ProtobufTypes::ConstMessagePtrVector config_protos;
+    std::transform(scoped_route_list.scoped_route_configurations().begin(),
+                   scoped_route_list.scoped_route_configurations().end(),
+                   std::back_inserter(config_protos),
+                   [](const envoy::api::v2::ScopedRouteConfiguration& scoped_route_config)
+                       -> std::unique_ptr<const Protobuf::Message> {
+                     Protobuf::Message* clone = scoped_route_config.New();
+                     clone->MergeFrom(scoped_route_config);
+                     return std::unique_ptr<const Protobuf::Message>(clone);
+                   });
     return scoped_routes_config_provider_manager.createStaticConfigProvider(
         std::move(config_protos), factory_context,
         ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
