@@ -883,10 +883,9 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
     }
   }
 
+  ASSERT(final_upstream_request);
   // Now put the final request back on thie list.
-  if (final_upstream_request) {
-    final_upstream_request->moveIntoList(std::move(final_upstream_request), upstream_requests_);
-  }
+  final_upstream_request->moveIntoList(std::move(final_upstream_request), upstream_requests_);
 }
 
 void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
@@ -1136,8 +1135,6 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upst
       convertRequestHeadersForInternalRedirect(*downstream_headers_, *location,
                                                *callbacks_->connection()) &&
       callbacks_->recreateStream()) {
-    final_upstream_request_ = &upstream_request;
-    resetOtherUpstreams(upstream_request);
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return true;
   }
