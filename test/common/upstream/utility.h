@@ -43,6 +43,14 @@ parseBootstrapFromV2Json(const std::string& json_string) {
 
 inline envoy::api::v2::Cluster parseClusterFromJson(const std::string& json_string) {
   envoy::api::v2::Cluster cluster;
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Config::CdsJson::translateCluster(*json_object_ptr,
+                                    absl::optional<envoy::api::v2::core::ConfigSource>(), cluster);
+  return cluster;
+}
+
+inline envoy::api::v2::Cluster parseClusterFromV2Json(const std::string& json_string) {
+  envoy::api::v2::Cluster cluster;
   MessageUtil::loadFromJson(json_string, cluster);
   return cluster;
 }
@@ -54,7 +62,7 @@ inline envoy::api::v2::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
 }
 
 inline envoy::api::v2::Cluster defaultStaticCluster(const std::string& name) {
-  return parseClusterFromJson(defaultStaticClusterJson(name));
+  return parseClusterFromV2Json(defaultStaticClusterJson(name));
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
