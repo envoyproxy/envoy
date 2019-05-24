@@ -114,7 +114,8 @@ TEST(OriginalDstClusterConfigTest, BadConfig) {
   }
   )EOF"; // Help Emacs balance quotation marks: "
 
-  EXPECT_THROW(parseClusterFromJson(json), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(parseClusterFromJson(json), EnvoyException,
+                            "original_dst clusters must have no hosts configured");
 }
 
 TEST(OriginalDstClusterConfigTest, GoodConfig) {
@@ -131,40 +132,81 @@ TEST(OriginalDstClusterConfigTest, GoodConfig) {
   EXPECT_TRUE(parseClusterFromJson(json).has_cleanup_interval());
 }
 
+TEST_F(OriginalDstClusterTest, BadConfigWithLoadAssignment) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: ORIGINAL_DST
+    lb_policy: ORIGINAL_DST_LB
+    cleanup_interval: 1s
+    load_assignment:
+      cluster_name: name
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8000
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      setupFromYaml(yaml), EnvoyException,
+      "ORIGINAL_DST clusters must have no load assignment or hosts configured");
+}
+
+TEST_F(OriginalDstClusterTest, BadConfigWithDeprecatedHosts) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: ORIGINAL_DST
+    lb_policy: ORIGINAL_DST_LB
+    cleanup_interval: 1s
+    hosts:
+      - socket_address:
+          address: 127.0.0.1
+          port_value: 8000
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      setupFromYaml(yaml), EnvoyException,
+      "ORIGINAL_DST clusters must have no load assignment or hosts configured");
+}
+
 TEST_F(OriginalDstClusterTest, CleanupInterval) {
-  std::string json = R"EOF(
+  std::string yaml = R"EOF(
   {
     "name": "name",
-    "connect_timeout_ms": 250,
+    "connect_timeout": "0.25s",
     "type": "original_dst",
-    "lb_type": "original_dst_lb",
-    "cleanup_interval_ms": 1000
+    "lb_policy": "original_dst_lb",
+    "cleanup_interval": "1s"
   }
   )EOF"; // Help Emacs balance quotation marks: "
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(membership_updated_, ready()).Times(0);
   EXPECT_CALL(*cleanup_timer_, enableTimer(std::chrono::milliseconds(1000)));
-  setupFromJson(json);
+  setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
 TEST_F(OriginalDstClusterTest, NoContext) {
-  std::string json = R"EOF(
+  std::string yaml = R"EOF(
   {
     "name": "name",
-    "connect_timeout_ms": 1250,
+    "connect_timeout": "0.125s",
     "type": "original_dst",
-    "lb_type": "original_dst_lb"
+    "lb_policy": "original_dst_lb"
   }
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(membership_updated_, ready()).Times(0);
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
-  setupFromJson(json);
+  setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -215,18 +257,18 @@ TEST_F(OriginalDstClusterTest, NoContext) {
 }
 
 TEST_F(OriginalDstClusterTest, Membership) {
-  std::string json = R"EOF(
+  std::string yaml = R"EOF(
   {
     "name": "name",
-    "connect_timeout_ms": 1250,
+    "connect_timeout": "0.125s",
     "type": "original_dst",
-    "lb_type": "original_dst_lb"
+    "lb_policy": "original_dst_lb"
   }
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
-  setupFromJson(json);
+  setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -307,18 +349,18 @@ TEST_F(OriginalDstClusterTest, Membership) {
 }
 
 TEST_F(OriginalDstClusterTest, Membership2) {
-  std::string json = R"EOF(
+  std::string yaml = R"EOF(
   {
     "name": "name",
-    "connect_timeout_ms": 1250,
+    "connect_timeout": "0.125s",
     "type": "original_dst",
-    "lb_type": "original_dst_lb"
+    "lb_policy": "original_dst_lb"
   }
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
-  setupFromJson(json);
+  setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -399,18 +441,18 @@ TEST_F(OriginalDstClusterTest, Membership2) {
 }
 
 TEST_F(OriginalDstClusterTest, Connection) {
-  std::string json = R"EOF(
+  std::string yaml = R"EOF(
   {
     "name": "name",
-    "connect_timeout_ms": 1250,
+    "connect_timeout": "0.125s",
     "type": "original_dst",
-    "lb_type": "original_dst_lb"
+    "lb_policy": "original_dst_lb"
   }
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
-  setupFromJson(json);
+  setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -442,18 +484,18 @@ TEST_F(OriginalDstClusterTest, Connection) {
 }
 
 TEST_F(OriginalDstClusterTest, MultipleClusters) {
-  std::string json = R"EOF(
+  std::string yaml = R"EOF(
   {
     "name": "name",
-    "connect_timeout_ms": 1250,
+    "connect_timeout": "0.125s",
     "type": "original_dst",
-    "lb_type": "original_dst_lb"
+    "lb_policy": "original_dst_lb"
   }
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
-  setupFromJson(json);
+  setupFromYaml(yaml);
 
   PrioritySetImpl second;
   cluster_->prioritySet().addPriorityUpdateCb(
