@@ -487,10 +487,14 @@ static_resources:
     connect_timeout: 0.250s
     type: static
     lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 11001
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
   )EOF";
 
   create(parseBootstrapFromV2Yaml(yaml));
@@ -527,10 +531,14 @@ static_resources:
     connect_timeout: 0.250s
     type: static
     lb_policy: original_dst_lb
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 11001
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -546,13 +554,19 @@ static_resources:
     connect_timeout: 0.250s
     type: static
     lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 8000
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 8001
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8000
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8001
   )EOF";
 
   envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromV2Yaml(yaml);
@@ -596,13 +610,19 @@ static_resources:
     connect_timeout: 0.250s
     type: STATIC
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 8000
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 8001
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8000
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8001
   )EOF";
 
   envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromV2Yaml(yaml);
@@ -625,13 +645,19 @@ static_resources:
       minimum_ring_size: 125
     connect_timeout: 0.250s
     type: STATIC
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 8000
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 8001
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8000
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8001
   )EOF";
   create(parseBootstrapFromV2Yaml(yaml));
 }
@@ -643,13 +669,19 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
     - name: redis_cluster
       connect_timeout: 0.250s
       lb_policy: RING_HASH
-      hosts:
-      - socket_address:
-          address: 127.0.0.1
-          port_value: 8000
-      - socket_address:
-          address: 127.0.0.1
-          port_value: 8001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 8000
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 8001
       dns_lookup_family: V4_ONLY
       ring_hash_lb_config:
         minimum_ring_size: 125
@@ -718,10 +750,14 @@ static_resources:
     connect_timeout: 0.250s
     type: STATIC
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 11001
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     health_checks:
     - timeout: 1s
       interval: 1s
@@ -751,10 +787,14 @@ static_resources:
     connect_timeout: 0.250s
     type: STATIC
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 11001
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     health_checks:
     - timeout: 1s
       interval: 1s
@@ -809,10 +849,14 @@ static_resources:
     type: static
     lb_policy: round_robin
     per_connection_buffer_limit_bytes: 8192
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 11001
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
   )EOF";
 
   create(parseBootstrapFromV2Yaml(yaml));
@@ -1595,10 +1639,14 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
         - socket_address:
             address: 1.2.3.4
             port_value: 80
-      hosts:
-        - socket_address:
-            address: 127.0.0.1
-            port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -1738,10 +1786,14 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
           address: 1.2.3.4
           port_value: 80
       lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: localhost
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -1968,10 +2020,14 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
           address: 1.2.3.4
           port_value: 80
       lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: localhost
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -2044,10 +2100,14 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
           address: 1.2.3.4
           port_value: 80
       lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: localhost
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -2403,10 +2463,14 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   connect_timeout: 0.250s
   type: STATIC
   lb_policy: ROUND_ROBIN
-  hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 12001
+  load_assignment:
+    endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 12001
   common_lb_config:
     update_merge_window: 3s
   )EOF";
@@ -2457,10 +2521,14 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   connect_timeout: 0.250s
   type: STATIC
   lb_policy: ROUND_ROBIN
-  hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 12001
+  load_assignment:
+    endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 12001
   common_lb_config:
     update_merge_window: 4s
   )EOF";
@@ -2765,10 +2833,14 @@ TEST_F(SockoptsTest, SockoptsUnset) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   )EOF";
   initialize(yaml);
   expectNoSocketOptions();
@@ -2782,10 +2854,14 @@ TEST_F(SockoptsTest, FreebindClusterOnly) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
       upstream_bind_config:
         freebind: true
   )EOF";
@@ -2801,10 +2877,14 @@ TEST_F(SockoptsTest, FreebindClusterManagerOnly) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   cluster_manager:
     upstream_bind_config:
       freebind: true
@@ -2821,10 +2901,14 @@ TEST_F(SockoptsTest, FreebindClusterOverride) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
       upstream_bind_config:
         freebind: true
   cluster_manager:
@@ -2843,10 +2927,14 @@ TEST_F(SockoptsTest, SockoptsClusterOnly) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
       upstream_bind_config:
         socket_options: [
           { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
@@ -2867,10 +2955,14 @@ TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   cluster_manager:
     upstream_bind_config:
       socket_options: [
@@ -2891,10 +2983,14 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
       upstream_bind_config:
         socket_options: [
           { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
@@ -3018,10 +3114,14 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveUnset) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   )EOF";
   initialize(yaml);
   expectNoSocketOptions();
@@ -3035,10 +3135,14 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveCluster) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
       upstream_connection_options:
         tcp_keepalive: {}
   )EOF";
@@ -3054,10 +3158,14 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterProbes) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
       upstream_connection_options:
         tcp_keepalive:
           keepalive_probes: 7
@@ -3074,10 +3182,14 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
       upstream_connection_options:
         tcp_keepalive:
           keepalive_probes: 7
