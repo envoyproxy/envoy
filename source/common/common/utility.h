@@ -686,7 +686,7 @@ public:
 
 private:
   // Constructor is declared private so that no one constructs one without the
-  // proper size allocation. to accomomdate the variable-size buffer.
+  // proper size allocation. to accommodate the variable-size buffer.
   InlineString(const char* str, size_t size) : size_(size) { memcpy(data_, str, size); }
 
   size_t size_;
