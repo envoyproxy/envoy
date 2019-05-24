@@ -313,13 +313,12 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
 TEST(InitialImplTest, LayeredRuntime) {
   const std::string yaml = R"EOF(
   layered_runtime:
-    symlink_root: /srv/runtime/current
     layers:
     - static_layer:
         health_check:
           min_interval: 5
-    - disk_layer: { subdirectory: envoy }
-    - disk_layer: { subdirectory: envoy_override, append_service_cluster: true }
+    - disk_layer: { symlink_root: /srv/runtime/current/envoy }
+    - disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
     - admin_layer: {}
   )EOF";
   const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v2::Bootstrap>(yaml);
@@ -376,15 +375,14 @@ TEST(InitialImplTest, DeprecatedRuntimeTranslation) {
   InitialImpl config(bootstrap);
 
   const std::string expected_yaml = R"EOF(
-  symlink_root: /srv/runtime/current
   layers:
   - static_layer:
       health_check:
         min_interval: 5
   - name: root
-    disk_layer: { subdirectory: envoy }
+    disk_layer: { symlink_root: /srv/runtime/current/envoy }
   - name: override
-    disk_layer: { subdirectory: envoy_override, append_service_cluster: true }
+    disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
   - admin_layer: {}
   )EOF";
   const auto expected_runtime =
