@@ -148,7 +148,6 @@ message VirtualHost {
   // Indicates the hedge policy for all routes in this virtual host. Note that setting a
   // route level entry will take precedence over this config and it'll be treated
   // independently (e.g.: values are not inherited).
-  // [#not-implemented-hide:]
   HedgePolicy hedge_policy = 17;
 }
 
@@ -803,7 +802,6 @@ message RouteAction {
   // Indicates that the route has a hedge policy. Note that if this is set,
   // it'll take precedence over the virtual host level hedge policy entirely
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
-  // [#not-implemented-hide:]
   HedgePolicy hedge_policy = 27;
 }
 
@@ -899,22 +897,28 @@ message RetryPolicy {
   RetryBackOff retry_back_off = 8;
 }
 
-// HTTP request hedging TODO(mpuncel) docs
-// [#not-implemented-hide:]
+// HTTP request hedging :ref:`architecture overview <arch_overview_http_routing_hedging>`.
 message HedgePolicy {
   // Specifies the number of initial requests that should be sent upstream.
   // Must be at least 1.
   // Defaults to 1.
+  // [#not-implemented-hide:]
   google.protobuf.UInt32Value initial_requests = 1 [(validate.rules).uint32.gte = 1];
 
   // Specifies a probability that an additional upstream request should be sent
   // on top of what is specified by initial_requests.
   // Defaults to 0.
+  // [#not-implemented-hide:]
   envoy.type.FractionalPercent additional_request_chance = 2;
 
   // Indicates that a hedged request should be sent when the per-try timeout
   // is hit. This will only occur if the retry policy also indicates that a
-  // timed out request should be retried. Defaults to false.
+  // timed out request should be retried.
+  // Once a timed out request is retried due to per try timeout, the router
+  // filter will ensure that it is not retried again even if the returned
+  // response headers would otherwise be retried according the specified
+  // :ref:`RetryPolicy <envoy_api_msg_route.RetryPolicy>`.
+  // Defaults to false.
   bool hedge_on_per_try_timeout = 3;
 }
 

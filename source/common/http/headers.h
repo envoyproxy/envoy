@@ -42,6 +42,7 @@ public:
   const LowerCaseString EnvoyDownstreamServiceNode{"x-envoy-downstream-service-node"};
   const LowerCaseString EnvoyExternalAddress{"x-envoy-external-address"};
   const LowerCaseString EnvoyForceTrace{"x-envoy-force-trace"};
+  const LowerCaseString EnvoyHedgeOnPerTryTimeout{"x-envoy-hedge-on-per-try-timeout"};
   const LowerCaseString EnvoyImmediateHealthCheckFail{"x-envoy-immediate-health-check-fail"};
   const LowerCaseString EnvoyOriginalUrl{"x-envoy-original-url"};
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
