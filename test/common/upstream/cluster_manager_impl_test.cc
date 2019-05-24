@@ -194,6 +194,10 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
   return bootstrap;
 }
 
+std::string clustersJson(const std::vector<std::string>& clusters) {
+  return fmt::sprintf("\"clusters\": [%s]", StringUtil::join(clusters, ","));
+}
+
 const ClusterManager::ClusterWarmingCallback dummyWarmingCb = [](auto, auto) {};
 
 class ClusterManagerImplTest : public testing::Test {
@@ -283,12 +287,6 @@ public:
   MockLocalHostsRemoved local_hosts_removed_;
   Http::ContextImpl http_context_;
 };
-
-envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Json(const std::string& json_string) {
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromJson(json_string, bootstrap);
-  return bootstrap;
-}
 
 envoy::config::bootstrap::v2::Bootstrap defaultConfig() {
     const std::string yaml = R"EOF(
@@ -977,7 +975,6 @@ dynamic_active_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
-      dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -990,7 +987,6 @@ dynamic_active_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
-      dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -1003,7 +999,6 @@ dynamic_active_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
-      dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -1114,7 +1109,6 @@ dynamic_warming_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
-      dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
       nanos: 234000000

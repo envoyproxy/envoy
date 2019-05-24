@@ -11,6 +11,7 @@
 
 #include "extensions/stat_sinks/well_known_names.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -91,8 +92,7 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromJson(json, bootstrap);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
@@ -135,8 +135,7 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromJson(json, bootstrap);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
@@ -180,8 +179,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromJson(json, bootstrap);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   server_.local_info_.node_.set_cluster("");
   MainImpl config;
@@ -220,8 +218,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromJson(json, bootstrap);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   server_.local_info_.node_.set_cluster("");
   MainImpl config;
@@ -269,8 +266,7 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromJson(json, bootstrap);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
@@ -296,8 +292,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromJson(json, bootstrap);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
@@ -329,8 +324,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromJson(json, bootstrap);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   envoy::config::metrics::v2::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name("envoy.invalid");
@@ -362,8 +356,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromJson(json, bootstrap);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
   auto& field_map = *sink.mutable_config()->mutable_fields();

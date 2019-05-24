@@ -14,21 +14,6 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-inline std::string defaultStaticClusterJsonV1(const std::string& name) {
-  return fmt::sprintf(R"EOF(
-  {
-    "name": "%s",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [
-      {"url": "tcp://127.0.0.1:11001"}
-    ]
-  }
-  )EOF",
-                      name);
-}
-
 inline std::string defaultStaticClusterJson(const std::string& name) {
   return fmt::sprintf(R"EOF(
   {
@@ -49,15 +34,15 @@ inline std::string defaultStaticClusterJson(const std::string& name) {
                       name);
 }
 
-inline std::string clustersJson(const std::vector<std::string>& clusters) {
-  return fmt::sprintf("\"clusters\": [%s]", StringUtil::join(clusters, ","));
+inline envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Json(const std::string& json_string) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  MessageUtil::loadFromJson(json_string, bootstrap);
+  return bootstrap;
 }
 
 inline envoy::api::v2::Cluster parseClusterFromJson(const std::string& json_string) {
   envoy::api::v2::Cluster cluster;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::CdsJson::translateCluster(*json_object_ptr,
-                                    absl::optional<envoy::api::v2::core::ConfigSource>(), cluster);
+  MessageUtil::loadFromJson(json_string, cluster);
   return cluster;
 }
 
@@ -68,7 +53,7 @@ inline envoy::api::v2::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
 }
 
 inline envoy::api::v2::Cluster defaultStaticCluster(const std::string& name) {
-  return parseClusterFromJson(defaultStaticClusterJsonV1(name));
+  return parseClusterFromJson(defaultStaticClusterJson(name));
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
