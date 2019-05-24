@@ -336,7 +336,6 @@ envoy_cc_library(
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:utility_lib",
         "//source/common/common:version_lib",
-        "//source/common/config:bootstrap_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/http:codes_lib",

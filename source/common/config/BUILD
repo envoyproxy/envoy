@@ -22,25 +22,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "bootstrap_json_lib",
-    srcs = ["bootstrap_json.cc"],
-    hdrs = ["bootstrap_json.h"],
-    deps = [
-        ":address_json_lib",
-        ":cds_json_lib",
-        ":json_utility_lib",
-        ":lds_json_lib",
-        ":utility_lib",
-        "//include/envoy/json:json_object_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/protobuf:utility_lib",
-        "//source/extensions/stat_sinks:well_known_names",
-        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
-    ],
-)
-
-envoy_cc_library(
     name = "base_json_lib",
     srcs = ["base_json.cc"],
     hdrs = ["base_json.h"],

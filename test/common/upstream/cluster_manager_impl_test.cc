@@ -8,7 +8,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/api/api_impl.h"
-#include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
 #include "common/http/context_impl.h"
 #include "common/network/socket_option_factory.h"
