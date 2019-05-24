@@ -101,14 +101,8 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
 
 void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                     const std::string&) {
-  if (resources.empty()) {
-    ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
-    info_->stats().update_empty_.inc();
-    onPreInitComplete();
+  if (!validateUpdateSize(resources.size())) {
     return;
-  }
-  if (resources.size() != 1) {
-    throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
   }
   auto cluster_load_assignment =
       MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[0]);
@@ -133,6 +127,29 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
 
   BatchUpdateHelper helper(*this, cluster_load_assignment);
   priority_set_.batchHostUpdate(helper);
+}
+
+void EdsClusterImpl::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
+    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+  validateUpdateSize(resources.size());
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
+  *unwrapped_resource.Add() = resources[0].resource();
+  onConfigUpdate(unwrapped_resource, resources[0].version());
+}
+
+bool EdsClusterImpl::validateUpdateSize(int num_resources) {
+  if (num_resources == 0) {
+    ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
+    info_->stats().update_empty_.inc();
+    onPreInitComplete();
+    return false;
+  }
+  if (num_resources != 1) {
+    throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", num_resources));
+    // (would be a return false here)
+  }
+  return true;
 }
 
 void EdsClusterImpl::onAssignmentTimeout() {

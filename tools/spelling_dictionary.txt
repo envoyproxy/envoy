@@ -358,6 +358,7 @@ comparator
 cond
 condvar
 conf
+configdump
 conn
 conns
 const
@@ -788,6 +789,7 @@ usr
 util
 utils
 validator
+validators
 vanishingly
 var
 variadic
@@ -797,6 +799,7 @@ verifiers
 versa
 versioned
 vhost
+vip
 vptr
 vptrs
 wakeup

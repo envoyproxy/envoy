@@ -19,6 +19,7 @@ envoy_cc_mock(
         "//include/envoy/router:route_config_provider_manager_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/router:router_ratelimit_interface",
+        "//include/envoy/router:scopes_interface",
         "//include/envoy/router:shadow_writer_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_interface",

@@ -82,6 +82,7 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(hedge_policy_));
+  ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
 }
 
 MockRouteEntry::~MockRouteEntry() {}
@@ -108,6 +109,9 @@ MockRoute::~MockRoute() {}
 
 MockRouteConfigProviderManager::MockRouteConfigProviderManager() {}
 MockRouteConfigProviderManager::~MockRouteConfigProviderManager() {}
+
+MockScopedConfig::MockScopedConfig() {}
+MockScopedConfig::~MockScopedConfig() {}
 
 } // namespace Router
 } // namespace Envoy

@@ -1834,6 +1834,7 @@ virtual_hosts:
     EXPECT_EQ("some_cluster", route->routeEntry()->clusterName());
 
     // Make sure things forward and don't crash.
+    // TODO(mattklein123): Make this a real test of behavior.
     EXPECT_EQ(std::chrono::milliseconds(0), route->routeEntry()->timeout());
     route->routeEntry()->finalizeRequestHeaders(headers, stream_info, true);
     route->routeEntry()->priority();
@@ -1844,6 +1845,11 @@ virtual_hosts:
     route->routeEntry()->virtualHost();
     route->routeEntry()->virtualHost().rateLimitPolicy();
     route->routeEntry()->pathMatchCriterion();
+    route->routeEntry()->hedgePolicy();
+    route->routeEntry()->maxGrpcTimeout();
+    route->routeEntry()->grpcTimeoutOffset();
+    route->routeEntry()->upgradeMap();
+    route->routeEntry()->internalRedirectAction();
   }
 }
 
@@ -2908,6 +2914,38 @@ static Http::TestHeaderMapImpl genRedirectHeaders(const std::string& host, const
   return headers;
 }
 
+TEST_F(RouteMatcherTest, RouteName) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    routes:
+      - name: "route-test"
+        match: { prefix: "/"}
+        route:
+          cluster: "ufesservice"
+  - name: redirect
+    domains: [redirect.lyft.com]
+    routes:
+      - name: "route-test-2"
+        match: { path: /host }
+        redirect: { host_redirect: new.lyft.com }
+  )EOF";
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    EXPECT_EQ("route-test", config.route(headers, 0)->routeEntry()->routeName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/host", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    EXPECT_EQ("route-test-2", redirect->routeName());
+  }
+}
+
 TEST_F(RouteMatcherTest, DirectResponse) {
   const auto pathname =
       TestEnvironment::writeStringToFileForTest("direct_response_body", "Example text 3");
@@ -3133,6 +3171,7 @@ virtual_hosts:
         genRedirectHeaders("redirect.lyft.com", "/https", false, false);
     EXPECT_EQ("https://redirect.lyft.com/https",
               config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    EXPECT_EQ(nullptr, config.route(headers, 0)->perFilterConfig("bar"));
   }
   {
     Http::TestHeaderMapImpl headers =

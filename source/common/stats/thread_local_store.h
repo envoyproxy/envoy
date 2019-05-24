@@ -11,7 +11,6 @@
 #include "common/common/hash.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/histogram_impl.h"
-#include "common/stats/source_impl.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
 
@@ -52,7 +51,6 @@ public:
   // Stats::Metric
   StatName statName() const override { return name_.statName(); }
   SymbolTable& symbolTable() override { return symbol_table_; }
-  const SymbolTable& symbolTable() const override { return symbol_table_; }
 
 private:
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
@@ -99,7 +97,6 @@ public:
   // Stats::Metric
   StatName statName() const override { return name_.statName(); }
   SymbolTable& symbolTable() override { return parent_.symbolTable(); }
-  const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
 
 private:
   bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
@@ -160,7 +157,7 @@ public:
   }
   Histogram& histogram(const std::string& name) override { return default_scope_->histogram(name); }
   NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
-  const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
+  const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   const TagProducer& tagProducer() const { return *tag_producer_; }
   absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
@@ -211,10 +208,7 @@ public:
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
-
   void mergeHistograms(PostMergeCb mergeCb) override;
-
-  Source& source() override { return source_; }
 
 private:
   template <class Stat> using StatMap = StatNameHashMap<Stat>;
@@ -254,7 +248,7 @@ private:
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }
-    const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
+    const SymbolTable& constSymbolTable() const override { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() override { return parent_.symbolTable(); }
 
     Counter& counter(const std::string& name) override {
@@ -362,7 +356,6 @@ private:
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   HeapStatDataAllocator heap_allocator_;
-  SourceImpl source_;
 
   NullCounterImpl null_counter_;
   NullGaugeImpl null_gauge_;
