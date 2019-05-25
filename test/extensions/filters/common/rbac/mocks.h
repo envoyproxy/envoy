@@ -12,7 +12,7 @@ namespace RBAC {
 
 class MockEngine : public RoleBasedAccessControlEngineImpl {
 public:
-  MockEngine(const envoy::config::rbac::v2alpha::RBAC& rules)
+  MockEngine(const envoy::config::rbac::v2::RBAC& rules)
       : RoleBasedAccessControlEngineImpl(rules){};
 
   MOCK_CONST_METHOD4(allowed,

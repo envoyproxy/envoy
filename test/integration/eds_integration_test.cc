@@ -146,6 +146,14 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
   upstream_request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   EXPECT_EQ(0, test_server_->gauge("cluster_manager.warming_clusters")->value());
+
+  // Since the second connection is not managed by the integration test base we need to close it
+  // ourselves.
+  result = fake_upstream_connection->close();
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  fake_upstream_connection.reset();
 }
 
 // Verify that a host stabilized via active health checking which is first removed from EDS and
