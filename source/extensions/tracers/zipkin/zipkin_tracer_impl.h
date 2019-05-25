@@ -76,6 +76,9 @@ public:
   Zipkin::Span& span() { return span_; }
 
 private:
+  ZipkinSpan();
+  ZipkinSpan(const ZipkinSpan& zipkin_span);
+  
   Zipkin::Span span_;
   Zipkin::Tracer& tracer_;
 };
