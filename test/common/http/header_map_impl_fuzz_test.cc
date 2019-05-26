@@ -48,7 +48,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
   };
   std::vector<std::unique_ptr<Http::LowerCaseString>> lower_case_strings;
   std::vector<std::unique_ptr<std::string>> strings;
-  for (int i = 0; i < input.actions().size(); ++i) {
+  constexpr auto max_actions = 1024;
+  for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
     const auto& action = input.actions(i);
     ENVOY_LOG_MISC(debug, "Action {}", action.DebugString());
     switch (action.action_selector_case()) {
