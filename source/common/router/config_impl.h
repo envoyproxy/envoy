@@ -364,9 +364,9 @@ public:
   const envoy::type::FractionalPercent& getOverallSampling() const override;
 
 private:
-  const envoy::type::FractionalPercent client_sampling_;
-  const envoy::type::FractionalPercent random_sampling_;
-  const envoy::type::FractionalPercent overall_sampling_;
+  envoy::type::FractionalPercent client_sampling_;
+  envoy::type::FractionalPercent random_sampling_;
+  envoy::type::FractionalPercent overall_sampling_;
 };
 
 /**

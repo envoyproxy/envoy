@@ -3472,13 +3472,6 @@ virtual_hosts:
         metadata: { filter_metadata: { com.bar.foo: { baz: test_value }, baz: {name: meh} } }
         decorator:
           operation: hello
-        tracing:
-          client_sampling:
-            numerator: 1
-          random_sampling:
-            numerator: 2
-          overall_sampling:
-            numerator: 3
         route:
           weighted_clusters:
             clusters:
@@ -3568,9 +3561,6 @@ virtual_hosts:
     EXPECT_EQ(nullptr, route_entry->typedMetadata().get<Foo>(baz_factory.name()));
     EXPECT_EQ("meh", route_entry->typedMetadata().get<Baz>(baz_factory.name())->name);
     EXPECT_EQ("hello", route->decorator()->getOperation());
-    EXPECT_EQ(1, route->tracingConfig()->getClientSampling().numerator());
-    EXPECT_EQ(2, route->tracingConfig()->getRandomSampling().numerator());
-    EXPECT_EQ(3, route->tracingConfig()->getOverallSampling().numerator());
 
     Http::TestHeaderMapImpl response_headers;
     StreamInfo::MockStreamInfo stream_info;
@@ -4826,6 +4816,60 @@ virtual_hosts:
 
   EXPECT_EQ("bar", symbol_table_->toString(route_entry->virtualHost().statName()));
   EXPECT_EQ("foo", route_entry->virtualHost().routeConfig().name());
+}
+
+TEST_F(RouteConfigurationV2, RouteTracingConfig) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { regex: "/first" }
+        tracing:
+          client_sampling:
+            numerator: 1
+        route: { cluster: ww2 }
+      - match: { regex: "/second" }
+        tracing:
+          overall_sampling:
+            numerator: 1
+        route: { cluster: ww2 }
+      - match: { path: "/third" }
+        tracing:
+          client_sampling:
+            numerator: 1
+          random_sampling:
+            numerator: 200
+            denominator: 1
+          overall_sampling:
+            numerator: 3
+        route: { cluster: ww2 }
+  )EOF";
+  BazFactory baz_factory;
+  Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
+  const TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  const auto route1 = config.route(genHeaders("www.foo.com", "/first", "GET"), 0);
+  const auto route2 = config.route(genHeaders("www.foo.com", "/second", "GET"), 0);
+  const auto route3 = config.route(genHeaders("www.foo.com", "/third", "GET"), 0);
+
+  // Check default values for random and overall sampling
+  EXPECT_EQ(10000, route1->tracingConfig()->getRandomSampling().numerator());
+  EXPECT_EQ(1, route1->tracingConfig()->getRandomSampling().denominator());
+  EXPECT_EQ(100, route1->tracingConfig()->getOverallSampling().numerator());
+  EXPECT_EQ(0, route1->tracingConfig()->getOverallSampling().denominator());
+
+  // Check default values for client sampling
+  EXPECT_EQ(100, route2->tracingConfig()->getClientSampling().numerator());
+  EXPECT_EQ(0, route2->tracingConfig()->getClientSampling().denominator());
+
+  EXPECT_EQ(1, route3->tracingConfig()->getClientSampling().numerator());
+  EXPECT_EQ(0, route3->tracingConfig()->getClientSampling().denominator());
+  EXPECT_EQ(200, route3->tracingConfig()->getRandomSampling().numerator());
+  EXPECT_EQ(1, route3->tracingConfig()->getRandomSampling().denominator());
+  EXPECT_EQ(3, route3->tracingConfig()->getOverallSampling().numerator());
+  EXPECT_EQ(0, route3->tracingConfig()->getOverallSampling().denominator());
 }
 
 // Test to check Prefix Rewrite for redirects

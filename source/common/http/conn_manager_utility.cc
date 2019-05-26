@@ -234,30 +234,31 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
     return;
   }
 
-  envoy::type::FractionalPercent client_sampling = config.tracingConfig()->client_sampling_;
-  envoy::type::FractionalPercent random_sampling = config.tracingConfig()->random_sampling_;
-  envoy::type::FractionalPercent overall_sampling = config.tracingConfig()->overall_sampling_;
+  const envoy::type::FractionalPercent* client_sampling = &config.tracingConfig()->client_sampling_;
+  const envoy::type::FractionalPercent* random_sampling = &config.tracingConfig()->random_sampling_;
+  const envoy::type::FractionalPercent* overall_sampling =
+      &config.tracingConfig()->overall_sampling_;
 
   if (route && route->tracingConfig()) {
-    client_sampling = route->tracingConfig()->getClientSampling();
-    random_sampling = route->tracingConfig()->getRandomSampling();
-    overall_sampling = route->tracingConfig()->getOverallSampling();
+    client_sampling = &route->tracingConfig()->getClientSampling();
+    random_sampling = &route->tracingConfig()->getRandomSampling();
+    overall_sampling = &route->tracingConfig()->getOverallSampling();
   }
 
   // Do not apply tracing transformations if we are currently tracing.
   if (UuidTraceStatus::NoTrace == UuidUtils::isTraceableUuid(x_request_id)) {
     if (request_headers.ClientTraceId() &&
-        runtime.snapshot().featureEnabled("tracing.client_enabled", client_sampling)) {
+        runtime.snapshot().featureEnabled("tracing.client_enabled", *client_sampling)) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
     } else if (request_headers.EnvoyForceTrace()) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
-    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", random_sampling,
+    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", *random_sampling,
                                                  result)) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
     }
   }
 
-  if (!runtime.snapshot().featureEnabled("tracing.global_enabled", overall_sampling, result)) {
+  if (!runtime.snapshot().featureEnabled("tracing.global_enabled", *overall_sampling, result)) {
     UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::NoTrace);
   }
 

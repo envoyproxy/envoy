@@ -324,9 +324,26 @@ void DecoratorImpl::apply(Tracing::Span& span) const {
 
 const std::string& DecoratorImpl::getOperation() const { return operation_; }
 
-RouteTracingImpl::RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing)
-    : client_sampling_(tracing.client_sampling()), random_sampling_(tracing.random_sampling()),
-      overall_sampling_(tracing.overall_sampling()) {}
+RouteTracingImpl::RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing) {
+  if (!tracing.has_client_sampling()) {
+    client_sampling_.set_numerator(100);
+    client_sampling_.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  } else {
+    client_sampling_ = tracing.client_sampling();
+  }
+  if (!tracing.has_random_sampling()) {
+    random_sampling_.set_numerator(10000);
+    random_sampling_.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+  } else {
+    random_sampling_ = tracing.random_sampling();
+  }
+  if (!tracing.has_overall_sampling()) {
+    overall_sampling_.set_numerator(100);
+    overall_sampling_.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  } else {
+    overall_sampling_ = tracing.overall_sampling();
+  }
+}
 
 const envoy::type::FractionalPercent& RouteTracingImpl::getClientSampling() const {
   return client_sampling_;
