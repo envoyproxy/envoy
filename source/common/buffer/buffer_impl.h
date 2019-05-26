@@ -131,6 +131,12 @@ public:
   }
 
   /**
+   * Clear any outstanding reservation on the Slice, allowing the memory
+   * to be re-reserve()d.
+   */
+  void clearReservation() { reservation_outstanding_ = false; }
+
+  /**
    * Copy as much of the supplied data as possible to the end of the slice.
    * @param data start of the data to copy.
    * @param size number of bytes to copy.

@@ -409,6 +409,9 @@ uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iove
     // Check whether there are any empty slices with reservable space at the end of the buffer.
     size_t first_reservable_slice = slices_.size();
     while (first_reservable_slice > 0) {
+      // Reclaim any space that was previously reserved but never committed.
+      slices_[first_reservable_slice - 1]->clearReservation();
+
       if (slices_[first_reservable_slice - 1]->reservableSize() == 0) {
         break;
       }
