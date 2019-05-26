@@ -14,15 +14,19 @@ Usage
       :ref:`config <config_tools_router_check_tool>`.
       The tool config input file specifies urls (composed of authorities and paths)
       and expected route parameter values. Additional parameters such as additional headers are optional.
+      
       Schema: All internal schemas in the tool are based on :repo:`proto3 <test/tools/router_check/validation.proto>`.
-      This is enabled by an extra optional parameter ``--useproto``. This parameter will become the default in the future releases and enables more validation features in the tool.
+      This is enabled by an extra optional parameter ``--useproto``.
+      This parameter will become the default in the future releases and enables more validation features in the tool.
       Any new feature addition in validations will be added behind this parameter.
-      Migration: If you are currently using the tool and plan to migrate to use ``--useproto``, change the yaml/json test's schema based on the :repo:`proto <test/tools/router_check/validation.proto>`.
+
+      Migration: If you are currently using the tool and plan to migrate to use ``--useproto``,
+      change the yaml/json test's schema based on the :repo:`proto <test/tools/router_check/validation.proto>`.
       Few known changes necessary are:
       ``:authority`` input is now ``authority``.
       ``:path`` input is now ``path``.
       ``:method`` input is now ``method``. This is a required property.
-      ``additional_headers`` in the input along with ``header_fields`` and ``custom_header_fields`` contain ``key`` instead of ``field``.
+      ``additional_headers``, ``header_fields`` and ``custom_header_fields`` contain ``key`` instead of ``field``.
       ``tests`` is a root level field in the yaml/json.
 
     -c <string>,  --config-path <string>
@@ -40,16 +44,18 @@ Usage
       Displays usage information and exits.
 
     <unlabelledConfigStrings>  (accepted multiple times)
-      If you haven't migrated to the proto schema, the binary accepts the paths to the router config file and the tool config JSON file
-      in that particular order. The ``--details`` parameter can be appended at the end to show the detailed test results.
+      If you haven't migrated to the proto schema, the binary accepts the paths to the 
+      router config file and the tool config JSON file in that particular order.
+      The ``--details`` parameter can be appended at the end to show the detailed test results.
 
 Output
   The program exits with status EXIT_FAILURE if any test case does not match the expected route parameter
   value.
 
-  If a test fails, details of the failed test cases are printed if ``-details`` flag is provided. The first field is the expected
-  route parameter value. The second field is the actual route parameter value. The third field indicates
-  the parameter that is compared. In the following example, Test_2 and Test_5 failed while the other tests
+  If a test fails, details of the failed test cases are printed if ``-details`` flag is provided. 
+  The first field is the expected route parameter value. The second field is the actual route parameter value. 
+  The third field indicates the parameter that is compared.
+  In the following example, Test_2 and Test_5 failed while the other tests
   passed. In the failed test cases, conflict details are printed. ::
 
     Test_1
