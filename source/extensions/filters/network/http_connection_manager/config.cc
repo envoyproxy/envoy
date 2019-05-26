@@ -332,18 +332,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   if (config.has_local_reply_config()) {
-    switch (config.local_reply_config().reply_type_case()) {
-    case envoy::data::core::v2alpha::LocalReplyConfiguration::kAlwaysJson:
-      local_reply_type_ = Http::LocalReplyType::AlwaysJson;
+    switch (config.local_reply_config().media_type()) {
+    case envoy::data::core::v2alpha::LocalReplyConfiguration::TEXT_PLAIN:
+      local_reply_media_type_ = Http::MediaType::TextPlain;
       break;
-    case envoy::data::core::v2alpha::LocalReplyConfiguration::kAlwaysText:
-      local_reply_type_ = Http::LocalReplyType::AlwaysJson;
+    case envoy::data::core::v2alpha::LocalReplyConfiguration::APPLICATION_JSON:
+      local_reply_media_type_ = Http::MediaType::ApplicationJson;
       break;
-    case envoy::data::core::v2alpha::LocalReplyConfiguration::kDetermineViaAcceptHeader:
-      local_reply_type_ = Http::LocalReplyType::DetermineViaAcceptHeader;
-      break;
-    case envoy::data::core::v2alpha::LocalReplyConfiguration::REPLY_TYPE_NOT_SET:
-      local_reply_type_ = Http::LocalReplyType::AlwaysJson;
+    case envoy::data::core::v2alpha::LocalReplyConfiguration::NEGOTIATE_VIA_ACCEPT_HEADER:
+      local_reply_media_type_ = Http::MediaType::NegotiateViaAcceptHeader;
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;

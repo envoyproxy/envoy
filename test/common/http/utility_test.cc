@@ -455,7 +455,7 @@ TEST(HttpUtility, SendLocalGrpcReply) {
         EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), "large");
       }));
   Utility::LocalReplyInfo info;
-  info.is_grpc = true;
+  info.is_grpc_ = true;
   Utility::sendLocalReply(info, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
                           absl::nullopt);
 }
@@ -497,7 +497,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
                   std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unavailable)));
       }));
   Utility::LocalReplyInfo info;
-  info.is_grpc = true;
+  info.is_grpc_ = true;
   Utility::sendLocalReply(info, callbacks, false, Http::Code::TooManyRequests, "", absl::nullopt);
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
@@ -538,7 +538,7 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
                           absl::nullopt);
 }
 
-TEST(HttpUtility, SendLocalReplyJsonConntentTypeRequest) {
+TEST(HttpUtility, SendLocalReplyJsonContentTypeRequest) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
   EXPECT_CALL(callbacks, encodeHeaders_(_, false))
@@ -553,7 +553,7 @@ TEST(HttpUtility, SendLocalReplyJsonConntentTypeRequest) {
         EXPECT_EQ(MessageUtil::getJsonStringFromMessage(local_reply, true, true), data.toString());
       }));
   Utility::LocalReplyInfo info;
-  info.reply_type = Http::LocalReplyType::AlwaysJson;
+  info.media_type_ = Http::MediaType::TextPlain;
   Utility::sendLocalReply(info, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
                           absl::nullopt);
 }

@@ -177,9 +177,9 @@ Http2Settings parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOption
 Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& config);
 
 struct LocalReplyInfo {
-  bool is_grpc{false};
-  bool is_head_request{false};
-  Http::LocalReplyType reply_type{Http::LocalReplyType::AlwaysText};
+  bool is_grpc_{false};
+  bool is_head_request_{false};
+  Http::MediaType media_type_{Http::MediaType::TextPlain};
 };
 
 /**
@@ -187,7 +187,7 @@ struct LocalReplyInfo {
  * Http::HeaderMap& request_headers.
  */
 LocalReplyInfo generateLocalReplyInfo(const Http::HeaderMap& request_headers,
-                                      const Http::LocalReplyType& reply_type);
+                                      const Http::MediaType& media_type);
 
 /**
  * Create a locally generated response using filter callbacks.

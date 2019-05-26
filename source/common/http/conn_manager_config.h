@@ -165,7 +165,7 @@ public:
   }
 };
 
-enum class LocalReplyType { DetermineViaAcceptHeader, AlwaysJson, AlwaysText };
+enum class MediaType { TextPlain, ApplicationJson, NegotiateViaAcceptHeader };
 
 /**
  * Abstract configuration for the connection manager.
@@ -361,9 +361,9 @@ public:
   virtual bool shouldNormalizePath() const PURE;
 
   /*
-   * @return LocalReplyType the Local reply body type
+   * @return MediaType the Local reply body media type
    */
-  virtual LocalReplyType localReplyType() const PURE;
+  virtual Http::MediaType mediaType() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

@@ -47,7 +47,7 @@ protected:
 // Verifies that an incoming request with too small a request body will immediately fail.
 TEST_F(ReverseBridgeTest, InvalidGrpcRequest) {
   initialize();
-  decoder_callbacks_.local_reply_info_.is_grpc = true;
+  decoder_callbacks_.local_reply_info_.is_grpc_ = true;
 
   {
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
@@ -81,7 +81,7 @@ TEST_F(ReverseBridgeTest, InvalidGrpcRequest) {
 // Verifies that we do nothing to a header only request even if it looks like a gRPC request.
 TEST_F(ReverseBridgeTest, HeaderOnlyGrpcRequest) {
   initialize();
-  decoder_callbacks_.local_reply_info_.is_grpc = true;
+  decoder_callbacks_.local_reply_info_.is_grpc_ = true;
 
   {
     Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
@@ -157,7 +157,7 @@ TEST_F(ReverseBridgeTest, NoGrpcRequest) {
 // frames, then the data should not be modified.
 TEST_F(ReverseBridgeTest, GrpcRequestNoManageFrameHeader) {
   initialize(false);
-  decoder_callbacks_.local_reply_info_.is_grpc = true;
+  decoder_callbacks_.local_reply_info_.is_grpc_ = true;
 
   {
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
@@ -216,7 +216,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoManageFrameHeader) {
 // to gRPC.
 TEST_F(ReverseBridgeTest, GrpcRequest) {
   initialize();
-  decoder_callbacks_.local_reply_info_.is_grpc = true;
+  decoder_callbacks_.local_reply_info_.is_grpc_ = true;
 
   {
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
@@ -296,7 +296,7 @@ TEST_F(ReverseBridgeTest, GrpcRequest) {
 // Same as ReverseBridgeTest.GrpcRequest except no content-length header is passed.
 TEST_F(ReverseBridgeTest, GrpcRequestNoContentLength) {
   initialize();
-  decoder_callbacks_.local_reply_info_.is_grpc = true;
+  decoder_callbacks_.local_reply_info_.is_grpc_ = true;
 
   {
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
@@ -375,7 +375,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoContentLength) {
 // grpc-status.
 TEST_F(ReverseBridgeTest, GrpcRequestInternalError) {
   initialize();
-  decoder_callbacks_.local_reply_info_.is_grpc = true;
+  decoder_callbacks_.local_reply_info_.is_grpc_ = true;
 
   {
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
@@ -448,7 +448,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestInternalError) {
 // has an invalid content type we respond with a useful error message.
 TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
   initialize();
-  decoder_callbacks_.local_reply_info_.is_grpc = true;
+  decoder_callbacks_.local_reply_info_.is_grpc_ = true;
 
   {
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());

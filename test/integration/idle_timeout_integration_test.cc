@@ -196,7 +196,10 @@ TEST_P(IdleTimeoutIntegrationTest,
        PerStreamIdleTimeoutHeadRequestAfterDownstreamJsonContentTypeRequest) {
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void { hcm.mutable_local_reply_config()->set_always_json(true); });
+          -> void {
+        hcm.mutable_local_reply_config()->set_media_type(
+            envoy::data::core::v2alpha::LocalReplyConfiguration_MediaType_APPLICATION_JSON);
+      });
 
   enable_per_stream_idle_timeout_ = true;
   auto response = setupPerStreamIdleTimeoutTest("GET");

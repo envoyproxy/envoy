@@ -14,11 +14,11 @@ message LocalReplyConfiguration {
     string body = 1;
   }
 
-  // If not set, the default is always_text
-  oneof reply_type {
-    // [#not-implemented-hide:]
-    bool determine_via_accept_header = 2;
-    bool always_json = 3;
-    bool always_text = 4;
+  enum MediaType {
+    TEXT_PLAIN = 0;
+    APPLICATION_JSON = 1;
+    NEGOTIATE_VIA_ACCEPT_HEADER = 2;
   }
+
+  MediaType media_type = 1;
 }

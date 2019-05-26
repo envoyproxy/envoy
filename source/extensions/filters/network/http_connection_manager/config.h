@@ -141,7 +141,7 @@ public:
   bool shouldNormalizePath() const override { return normalize_path_; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
 
-  Http::LocalReplyType localReplyType() const override { return local_reply_type_; }
+  Http::MediaType mediaType() const override { return local_reply_media_type_; }
 
 private:
   enum class CodecType { HTTP1, HTTP2, AUTO };
@@ -185,7 +185,7 @@ private:
   const bool proxy_100_continue_;
   std::chrono::milliseconds delayed_close_timeout_;
   const bool normalize_path_;
-  Http::LocalReplyType local_reply_type_{Http::LocalReplyType::AlwaysText};
+  Http::MediaType local_reply_media_type_{Http::MediaType::TextPlain};
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;

@@ -266,7 +266,7 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
 }
 
 Utility::LocalReplyInfo Utility::generateLocalReplyInfo(const Http::HeaderMap& request_headers,
-                                                        const Http::LocalReplyType& reply_type) {
+                                                        const Http::MediaType& media_type) {
   bool is_head_request = false;
 
   const bool is_grpc = Grpc::Utility::hasGrpcContentType(request_headers);
@@ -275,7 +275,7 @@ Utility::LocalReplyInfo Utility::generateLocalReplyInfo(const Http::HeaderMap& r
     is_head_request = true;
   }
 
-  return LocalReplyInfo{is_grpc, is_head_request, reply_type};
+  return LocalReplyInfo{is_grpc, is_head_request, media_type};
 }
 
 void Utility::sendLocalReply(const Utility::LocalReplyInfo& info,
@@ -302,7 +302,7 @@ void Utility::sendLocalReply(
   // encode_headers() may reset the stream, so the stream must not be reset before calling it.
   ASSERT(!is_reset);
   // Respond with a gRPC trailers-only response if the request is gRPC
-  if (info.is_grpc) {
+  if (info.is_grpc_) {
     HeaderMapPtr response_headers{new HeaderMapImpl{
         {Headers::get().Status, std::to_string(enumToInt(Code::OK))},
         {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
@@ -310,7 +310,7 @@ void Utility::sendLocalReply(
          std::to_string(
              enumToInt(grpc_status ? grpc_status.value()
                                    : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
-    if (!body_text.empty() && !info.is_head_request) {
+    if (!body_text.empty() && !info.is_head_request_) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
       response_headers->insertGrpcMessage().value(PercentEncoding::encode(body_text));
@@ -324,8 +324,8 @@ void Utility::sendLocalReply(
 
   std::string body(body_text);
 
-  switch (info.reply_type) {
-  case Http::LocalReplyType::AlwaysJson: {
+  switch (info.media_type_) {
+  case Http::MediaType::ApplicationJson: {
     std::string json_body;
     envoy::data::core::v2alpha::LocalReplyConfiguration::JsonReply local_reply;
     local_reply.set_body(body.c_str(), body.size());
@@ -335,20 +335,20 @@ void Utility::sendLocalReply(
     response_headers->insertContentType().value(Headers::get().ContentTypeValues.Json);
     break;
   }
-  case Http::LocalReplyType::AlwaysText: {
+  case Http::MediaType::TextPlain: {
     if (!body_text.empty()) {
       response_headers->insertContentLength().value(body.size());
       response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
     }
     break;
   }
-  case Http::LocalReplyType::DetermineViaAcceptHeader:
+  case Http::MediaType::NegotiateViaAcceptHeader:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  if (info.is_head_request) {
+  if (info.is_head_request_) {
     encode_headers(std::move(response_headers), true);
     return;
   }

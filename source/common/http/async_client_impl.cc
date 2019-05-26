@@ -110,8 +110,8 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
-  // TODO(zyfjeff): Make the local reply body type can be configured
-  local_reply_info_ = Utility::generateLocalReplyInfo(headers, Http::LocalReplyType::AlwaysText);
+  // TODO(zyfjeff): Make the local reply body type configurable
+  local_reply_info_ = Utility::generateLocalReplyInfo(headers, Http::MediaType::TextPlain);
   headers.insertEnvoyInternalRequest().value().setReference(
       Headers::get().EnvoyInternalRequestValues.True);
   if (send_xff_) {
