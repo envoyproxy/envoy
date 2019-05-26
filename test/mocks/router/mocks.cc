@@ -25,6 +25,11 @@ void MockRetryState::expectHeadersRetry() {
       .WillOnce(DoAll(SaveArg<1>(&callback_), Return(RetryStatus::Yes)));
 }
 
+void MockRetryState::expectHedgedPerTryTimeoutRetry() {
+  EXPECT_CALL(*this, shouldHedgeRetryPerTryTimeout(_))
+      .WillOnce(DoAll(SaveArg<0>(&callback_), Return(RetryStatus::Yes)));
+}
+
 void MockRetryState::expectResetRetry() {
   EXPECT_CALL(*this, shouldRetryReset(_, _))
       .WillOnce(DoAll(SaveArg<1>(&callback_), Return(RetryStatus::Yes)));

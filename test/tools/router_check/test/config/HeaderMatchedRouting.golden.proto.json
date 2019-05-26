@@ -136,5 +136,5 @@
       },
       "validate": {"cluster_name": "local_service_with_grpc_and_other_header"}
     }
-  ]  
+  ]
 }
