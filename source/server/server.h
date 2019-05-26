@@ -185,8 +185,8 @@ public:
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override;
   const Options& options() override { return options_; }
-  time_t startTimeCurrentEpoch() override { return start_time_; }
-  time_t startTimeFirstEpoch() override { return original_start_time_; }
+  Envoy::SystemTime startTimeCurrentEpoch() override { return start_time_; }
+  Envoy::SystemTime startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
   Http::Context& httpContext() override { return http_context_; }
   ProcessContext& processContext() override { return *process_context_; }
@@ -233,8 +233,8 @@ private:
   const Options& options_;
   TimeSource& time_source_;
   HotRestart& restarter_;
-  const time_t start_time_;
-  time_t original_start_time_;
+  const Envoy::SystemTime start_time_;
+  Envoy::SystemTime original_start_time_;
   Stats::StoreRoot& stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;

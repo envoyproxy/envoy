@@ -170,12 +170,12 @@ public:
   /**
    * @return the time that the server started during the current hot restart epoch.
    */
-  virtual time_t startTimeCurrentEpoch() PURE;
+  virtual Envoy::SystemTime startTimeCurrentEpoch() PURE;
 
   /**
    * @return the time that the server started the first hot restart epoch.
    */
-  virtual time_t startTimeFirstEpoch() PURE;
+  virtual Envoy::SystemTime startTimeFirstEpoch() PURE;
 
   /**
    * @return the server-wide stats store.

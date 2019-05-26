@@ -661,15 +661,19 @@ envoy::admin::v2alpha::ServerInfo::State AdminImpl::serverState() {
 
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
-  time_t current_time = time(nullptr);
+  const auto current_time = server_.timeSource().systemTime();
   envoy::admin::v2alpha::ServerInfo server_info;
   server_info.set_version(VersionInfo::version());
   server_info.set_state(serverState());
 
-  server_info.mutable_uptime_current_epoch()->set_seconds(current_time -
-                                                          server_.startTimeCurrentEpoch());
-  server_info.mutable_uptime_all_epochs()->set_seconds(current_time -
-                                                       server_.startTimeFirstEpoch());
+  const auto result_1 = std::chrono::duration_cast<std::chrono::seconds>(
+                            current_time - server_.startTimeCurrentEpoch())
+                            .count();
+  const auto result_2 =
+      std::chrono::duration_cast<std::chrono::seconds>(current_time - server_.startTimeFirstEpoch())
+          .count();
+  server_info.mutable_uptime_current_epoch()->set_seconds(result_1);
+  server_info.mutable_uptime_all_epochs()->set_seconds(result_2);
   envoy::admin::v2alpha::CommandLineOptions* command_line_options =
       server_info.mutable_command_line_options();
   *command_line_options = *server_.options().toCommandLineOptions();

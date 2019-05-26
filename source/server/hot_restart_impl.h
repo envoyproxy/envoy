@@ -101,7 +101,7 @@ public:
   void drainParentListeners() override;
   int duplicateParentListenSocket(const std::string& address) override;
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
-  void sendParentAdminShutdownRequest(time_t& original_start_time) override;
+  void sendParentAdminShutdownRequest(Envoy::SystemTime& original_start_time) override;
   void sendParentTerminateRequest() override;
   ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot& stats_store) override;
   void shutdown() override;

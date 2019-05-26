@@ -116,7 +116,7 @@ void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance&
   as_parent_.initialize(dispatcher, server);
 }
 
-void HotRestartImpl::sendParentAdminShutdownRequest(time_t& original_start_time) {
+void HotRestartImpl::sendParentAdminShutdownRequest(Envoy::SystemTime& original_start_time) {
   as_child_.sendParentAdminShutdownRequest(original_start_time);
 }
 
