@@ -19,7 +19,7 @@ namespace ThriftProxy {
   COUNTER(request_call)                                                                            \
   COUNTER(request_oneway)                                                                          \
   COUNTER(request_invalid_type)                                                                    \
-  GAUGE(request_active)                                                                            \
+  GAUGE(request_active, Accumulate)                                                \
   COUNTER(request_decoding_error)                                                                  \
   HISTOGRAM(request_time_ms)                                                                       \
   COUNTER(response)                                                                                \

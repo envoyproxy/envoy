@@ -28,10 +28,10 @@ namespace Server {
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, HISTOGRAM)                                              \
   COUNTER  (downstream_cx_total)                                                                   \
   COUNTER  (downstream_cx_destroy)                                                                 \
-  GAUGE    (downstream_cx_active)                                                                  \
+  GAUGE    (downstream_cx_active, Accumulate)                                      \
   HISTOGRAM(downstream_cx_length_ms)                                                               \
   COUNTER  (downstream_pre_cx_timeout)                                                             \
-  GAUGE    (downstream_pre_cx_active)                                                              \
+  GAUGE    (downstream_pre_cx_active, Accumulate)                                  \
   COUNTER  (no_filter_chain_match)
 // clang-format on
 

@@ -62,7 +62,7 @@ typedef ConstSingleton<MongoRuntimeConfigKeys> MongoRuntimeConfig;
   COUNTER(op_query_no_max_time)                                                                    \
   COUNTER(op_query_scatter_get)                                                                    \
   COUNTER(op_query_multi_get)                                                                      \
-  GAUGE  (op_query_active)                                                                         \
+  GAUGE  (op_query_active, Accumulate)                                             \
   COUNTER(op_reply)                                                                                \
   COUNTER(op_reply_cursor_not_found)                                                               \
   COUNTER(op_reply_query_failure)                                                                  \

@@ -27,15 +27,15 @@ namespace RedisProxy {
 // clang-format off
 #define ALL_REDIS_PROXY_STATS(COUNTER, GAUGE)                                                      \
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_rx_bytes_buffered)                                                         \
+  GAUGE  (downstream_cx_rx_bytes_buffered, Accumulate)                                                         \
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
+  GAUGE  (downstream_cx_tx_bytes_buffered, Accumulate)                                                         \
   COUNTER(downstream_cx_protocol_error)                                                            \
   COUNTER(downstream_cx_total)                                                                     \
-  GAUGE  (downstream_cx_active)                                                                    \
+  GAUGE  (downstream_cx_active, Accumulate)                                                                    \
   COUNTER(downstream_cx_drain_close)                                                               \
   COUNTER(downstream_rq_total)                                                                     \
-  GAUGE  (downstream_rq_active)
+  GAUGE  (downstream_rq_active, Accumulate)
 // clang-format on
 
 /**

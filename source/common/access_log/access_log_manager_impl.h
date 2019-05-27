@@ -21,7 +21,7 @@ namespace Envoy {
   COUNTER(write_completed)                                                                         \
   COUNTER(flushed_by_timer)                                                                        \
   COUNTER(reopen_failed)                                                                           \
-  GAUGE  (write_total_buffered)
+  GAUGE  (write_total_buffered, Accumulate)
 // clang-format on
 
 struct AccessLogFileStats {

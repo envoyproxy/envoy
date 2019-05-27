@@ -33,7 +33,7 @@ namespace Fault {
   COUNTER(aborts_injected)                                                                         \
   COUNTER(response_rl_injected)                                                                    \
   COUNTER(faults_overflow)                                                                         \
-  GAUGE  (active_faults)
+  GAUGE  (active_faults, Accumulate)
 // clang-format on
 
 /**

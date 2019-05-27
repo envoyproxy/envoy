@@ -147,8 +147,8 @@ private:
   COUNTER(cluster_updated_via_merge)                                                               \
   COUNTER(update_merge_cancelled)                                                                  \
   COUNTER(update_out_of_merge_window)                                                              \
-  GAUGE  (active_clusters)                                                                         \
-  GAUGE  (warming_clusters)
+  GAUGE  (active_clusters, Accumulate)                                                                         \
+  GAUGE  (warming_clusters, Accumulate)
 // clang-format on
 
 /**

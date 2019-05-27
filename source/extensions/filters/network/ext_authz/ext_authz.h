@@ -32,7 +32,7 @@ namespace ExtAuthz {
   COUNTER(failure_mode_allowed)                         \
   COUNTER(ok)                                           \
   COUNTER(cx_closed)                                    \
-  GAUGE  (active)
+  GAUGE  (active, Accumulate)
 // clang-format on
 
 /**

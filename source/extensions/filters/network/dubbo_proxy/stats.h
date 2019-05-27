@@ -21,7 +21,7 @@ namespace DubboProxy {
   COUNTER(request_event)                                                                           \
   COUNTER(request_decoding_error)                                                                  \
   COUNTER(request_decoding_success)                                                                \
-  GAUGE(request_active)                                                                            \
+  GAUGE(request_active, Accumulate)                                                \
   HISTOGRAM(request_time_ms)                                                                       \
   COUNTER(response)                                                                                \
   COUNTER(response_success)                                                                        \
