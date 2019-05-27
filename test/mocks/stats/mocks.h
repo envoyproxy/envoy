@@ -110,10 +110,11 @@ public:
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(value, uint64_t());
   MOCK_CONST_METHOD0(cachedShouldImport, absl::optional<bool>());
-  MOCK_METHOD1(setShouldImport, void(bool should_import));
+  MOCK_CONST_METHOD0(importMode, ImportMode());
 
   bool used_;
   uint64_t value_;
+  ImportMode import_mode_;
 };
 
 class MockHistogram : public Histogram, public MockMetric {

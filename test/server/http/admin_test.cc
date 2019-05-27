@@ -1070,8 +1070,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   store.counter("test_counter").add(10);
   store.counter("rest_counter").add(10);
   store.counter("arest_counter").add(5);
-  store.gauge("test_gauge").set(11);
-  store.gauge("atest_gauge").set(10);
+  store.gauge("test_gauge", Stats::Gauge::ImportMode::Accumulate).set(11);
+  store.gauge("atest_gauge", Stats::Gauge::ImportMode::Accumulate).set(10);
   ON_CALL(*host, gauges()).WillByDefault(Invoke([&store]() { return store.gauges(); }));
   ON_CALL(*host, counters()).WillByDefault(Invoke([&store]() { return store.counters(); }));
 
@@ -1329,7 +1329,8 @@ protected:
 
   void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
     Stats::StatNameManagedStorage storage(name, symbol_table_);
-    gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags));
+    gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags,
+                                       Stats::Gauge::ImportMode::Accumulate));
   }
 
   void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {

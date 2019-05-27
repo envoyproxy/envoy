@@ -2004,19 +2004,24 @@ TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
 
   // The value of a remaining resource gauge will always be 0 for the default
   // priority circuit breaker since track_remaining is false
-  EXPECT_EQ(0U, stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries").value());
+  Stats::Gauge& default_remaining_retries =
+      stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries",
+                   Stats::Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(0U, default_remaining_retries.value());
   cluster->info()->resourceManager(ResourcePriority::Default).retries().inc();
-  EXPECT_EQ(0U, stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries").value());
+  EXPECT_EQ(0U, default_remaining_retries.value());
   cluster->info()->resourceManager(ResourcePriority::Default).retries().dec();
-  EXPECT_EQ(0U, stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries").value());
+  EXPECT_EQ(0U, default_remaining_retries.value());
 
   // This gauge will be correctly set since we have opted in to tracking remaining
   // resource gauges in the high priority circuit breaker.
-  EXPECT_EQ(4U, stats_.gauge("cluster.name.circuit_breakers.high.remaining_retries").value());
+  Stats::Gauge& high_remaining_retries = stats_.gauge(
+      "cluster.name.circuit_breakers.high.remaining_retries", Stats::Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(4U, high_remaining_retries.value());
   cluster->info()->resourceManager(ResourcePriority::High).retries().inc();
-  EXPECT_EQ(3U, stats_.gauge("cluster.name.circuit_breakers.high.remaining_retries").value());
+  EXPECT_EQ(3U, high_remaining_retries.value());
   cluster->info()->resourceManager(ResourcePriority::High).retries().dec();
-  EXPECT_EQ(4U, stats_.gauge("cluster.name.circuit_breakers.high.remaining_retries").value());
+  EXPECT_EQ(4U, high_remaining_retries.value());
 }
 
 class TestFilterConfigFactoryBase {
