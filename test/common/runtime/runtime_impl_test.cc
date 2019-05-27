@@ -277,7 +277,7 @@ TEST_F(DiskBackedLoaderImplTest, PercentHandling) {
 
 void testNewOverrides(Loader& loader, Stats::Store& store) {
   Stats::Gauge& admin_overrides_active =
-      store.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::Accumulate);
+      store.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport);
 
   // New string
   loader.mergeValues({{"foo", "bar"}});
@@ -305,7 +305,7 @@ TEST_F(DiskBackedLoaderImplTest, MergeValues) {
   run("test/common/runtime/test_data/current", "envoy_override");
   testNewOverrides(*loader_, store_);
   Stats::Gauge& admin_overrides_active =
-      store_.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::Accumulate);
+      store_.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport);
 
   // Override string
   loader_->mergeValues({{"file2", "new world"}});
