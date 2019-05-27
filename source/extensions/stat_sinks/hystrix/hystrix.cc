@@ -373,10 +373,10 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
     addClusterStatsToStream(
         *cluster_stats_cache_ptr, cluster_info->name(),
         cluster_info->resourceManager(Upstream::ResourcePriority::Default).pendingRequests().max(),
-        cluster_info->statsScope().gauge("membership_total",
-                                         Stats::Gauge::ImportMode::Accumulate).value(),
-        server_.statsFlushInterval(),
-        time_histograms[cluster_info->name()], ss);
+        cluster_info->statsScope()
+            .gauge("membership_total", Stats::Gauge::ImportMode::Accumulate)
+            .value(),
+        server_.statsFlushInterval(), time_histograms[cluster_info->name()], ss);
   }
 
   Buffer::OwnedImpl data;

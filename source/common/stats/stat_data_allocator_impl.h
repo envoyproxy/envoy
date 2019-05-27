@@ -116,7 +116,8 @@ public:
 template <class StatData> class GaugeImpl : public Gauge, public MetricImpl {
 public:
   GaugeImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
-            absl::string_view tag_extracted_name, const std::vector<Tag>& tags, ImportMode import_mode)
+            absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
+            ImportMode import_mode)
       : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {
     if (import_mode == ImportMode::Accumulate) {
       data_.flags_ |= Flags::LogicAccumulate;
@@ -153,7 +154,7 @@ public:
 
   ImportMode importMode() const override {
     return (data_.flags_ & Flags::LogicAccumulate) ? ImportMode::Accumulate
-        : ImportMode::NeverImport;
+                                                   : ImportMode::NeverImport;
   }
 
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }

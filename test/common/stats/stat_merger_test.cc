@@ -15,9 +15,9 @@ namespace {
 
 class StatMergerTest : public testing::Test {
 public:
-  StatMergerTest() :
-      stat_merger_(store_),
-      whywassixafraidofseven_(store_.gauge("whywassixafraidofseven", Gauge::ImportMode::Accumulate)) {
+  StatMergerTest()
+      : stat_merger_(store_), whywassixafraidofseven_(store_.gauge("whywassixafraidofseven",
+                                                                   Gauge::ImportMode::Accumulate)) {
     whywassixafraidofseven_.set(678);
   }
 
@@ -105,7 +105,8 @@ TEST_F(StatMergerTest, multipleImportsWithAccumulationLogic) {
 // Stat names that have NoImport logic should leave the child gauge value alone upon import, even if
 // the child has that gauge undefined.
 TEST_F(StatMergerTest, exclusionsNotImported) {
-  Gauge& some_sort_of_version = store_.gauge("some.sort.of.version", Gauge::ImportMode::NeverImport);
+  Gauge& some_sort_of_version =
+      store_.gauge("some.sort.of.version", Gauge::ImportMode::NeverImport);
   some_sort_of_version.set(12345);
 
   Protobuf::Map<std::string, uint64_t> gauges;
@@ -115,7 +116,8 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   // Check defined values are not changed, and undefined remain undefined.
   stat_merger_.mergeStats(empty_counter_deltas_, gauges);
   EXPECT_EQ(12345, some_sort_of_version.value());
-  EXPECT_FALSE(store_.gauge("child.doesnt.have.this.version", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(
+      store_.gauge("child.doesnt.have.this.version", Gauge::ImportMode::NeverImport).used());
 
   // Check the "undefined remains undefined" behavior for a bunch of other names.
   /*
@@ -139,23 +141,36 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   */
 
   stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-  EXPECT_FALSE(store_.gauge("child.doesnt.have.this.version", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("runtime.admin_overrides_active", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(
+      store_.gauge("child.doesnt.have.this.version", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(
+      store_.gauge("runtime.admin_overrides_active", Gauge::ImportMode::NeverImport).used());
   EXPECT_FALSE(store_.gauge("runtime.num_keys", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_draining", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_warming", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(
+      store_.gauge("listener_manager.total_listeners_draining", Gauge::ImportMode::NeverImport)
+          .used());
+  EXPECT_FALSE(
+      store_.gauge("listener_manager.total_listeners_warming", Gauge::ImportMode::NeverImport)
+          .used());
   EXPECT_FALSE(store_.gauge("server.hot_restart_epoch", Gauge::ImportMode::NeverImport).used());
   EXPECT_FALSE(store_.gauge("server.live", Gauge::ImportMode::NeverImport).used());
   EXPECT_FALSE(store_.gauge("server.concurrency", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("some.control_plane.connected_state", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("cluster_manager.active_clusters", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("cluster_manager.warming_clusters", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(
+      store_.gauge("some.control_plane.connected_state", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(
+      store_.gauge("cluster_manager.active_clusters", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(
+      store_.gauge("cluster_manager.warming_clusters", Gauge::ImportMode::NeverImport).used());
   EXPECT_FALSE(store_.gauge("cluster.rds.membership_total", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("cluster.rds.membership_healthy", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("cluster.rds.membership_degraded", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(
+      store_.gauge("cluster.rds.membership_healthy", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(
+      store_.gauge("cluster.rds.membership_degraded", Gauge::ImportMode::NeverImport).used());
   EXPECT_FALSE(store_.gauge("cluster.rds.max_host_weight", Gauge::ImportMode::NeverImport).used());
   EXPECT_FALSE(store_.gauge("anything.total_principals", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_active", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(
+      store_.gauge("listener_manager.total_listeners_active", Gauge::ImportMode::NeverImport)
+          .used());
   EXPECT_FALSE(store_.gauge("overload.something.pressure", Gauge::ImportMode::NeverImport).used());
 }
 

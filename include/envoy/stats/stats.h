@@ -129,8 +129,8 @@ typedef std::shared_ptr<Counter> CounterSharedPtr;
 class Gauge : public virtual Metric {
 public:
   enum class ImportMode {
-    NeverImport,  // On hot-restart, each process starts with gauge at 0.
-    Accumulate,   // Transfers gauge state on hot-restart.
+    NeverImport, // On hot-restart, each process starts with gauge at 0.
+    Accumulate,  // Transfers gauge state on hot-restart.
   };
 
   virtual ~Gauge() {}

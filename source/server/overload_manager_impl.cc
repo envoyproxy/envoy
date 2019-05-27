@@ -211,7 +211,8 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
 OverloadManagerImpl::Resource::Resource(const std::string& name, ResourceMonitorPtr monitor,
                                         OverloadManagerImpl& manager, Stats::Scope& stats_scope)
     : name_(name), monitor_(std::move(monitor)), manager_(manager), pending_update_(false),
-      pressure_gauge_(stats_scope.gauge(StatsName(name, "pressure"), Stats::Gauge::ImportMode::Accumulate)),
+      pressure_gauge_(
+          stats_scope.gauge(StatsName(name, "pressure"), Stats::Gauge::ImportMode::Accumulate)),
       failed_updates_counter_(stats_scope.counter(StatsName(name, "failed_updates"))),
       skipped_updates_counter_(stats_scope.counter(StatsName(name, "skipped_updates"))) {}
 

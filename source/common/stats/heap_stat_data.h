@@ -74,8 +74,8 @@ public:
 
   GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
                            const std::vector<Tag>& tags, Gauge::ImportMode import_mode) override {
-    return std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(alloc(name), *this,
-                                                               tag_extracted_name, tags, import_mode);
+    return std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(
+        alloc(name), *this, tag_extracted_name, tags, import_mode);
   }
 
 #ifndef ENVOY_CONFIG_COVERAGE
