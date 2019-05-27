@@ -6,8 +6,8 @@
 #include "envoy/common/time.h"
 #include "envoy/network/address.h"
 
-#include "common/common/empty_string.h"
 #include "common/common/hex.h"
+#include "common/common/assert.h"
 
 #include "extensions/tracers/zipkin/tracer_interface.h"
 #include "extensions/tracers/zipkin/util.h"
@@ -478,7 +478,8 @@ public:
    * @return the span's parent id as a byte string.
    */
   const std::string parentIdAsByteString() const {
-    return parent_id_ ? Util::toByteString(parent_id_.value()) : EMPTY_STRING;
+    ASSERT(parent_id_);
+    return Util::toByteString(parent_id_.value());
   }
 
   /**

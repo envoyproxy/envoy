@@ -58,10 +58,7 @@ const std::string Endpoint::toJson() {
 
 const zipkin::proto3::Endpoint Endpoint::toProtoEndpoint() const {
   zipkin::proto3::Endpoint endpoint;
-  if (!address_) {
-    endpoint.set_ipv4(EMPTY_STRING);
-    endpoint.set_port(0);
-  } else {
+  if (address_) {
     if (address_->ip()->version() == Network::Address::IpVersion::v4) {
       endpoint.set_ipv4(address_->ip()->addressAsString());
     } else {
@@ -70,7 +67,10 @@ const zipkin::proto3::Endpoint Endpoint::toProtoEndpoint() const {
     endpoint.set_port(address_->ip()->port());
   }
 
-  endpoint.set_service_name(service_name_);
+  if (!service_name_.empty()) {
+    endpoint.set_service_name(service_name_);
+  }
+
   return endpoint;
 }
 
@@ -241,7 +241,9 @@ const std::string Span::toJson() {
 const zipkin::proto3::Span Span::toProtoSpan() const {
   zipkin::proto3::Span span;
   span.set_trace_id(traceIdAsByteString());
-  span.set_parent_id(parentIdAsByteString());
+  if (parent_id_ && parent_id_.value()) {
+    span.set_parent_id(parentIdAsByteString());
+  }
   span.set_id(idAsByteString());
   span.set_name(name_);
 
@@ -257,11 +259,10 @@ const zipkin::proto3::Span Span::toProtoSpan() const {
     if (annotation.isSetEndpoint()) {
       if (annotation.value() == ZipkinCoreConstants::get().CLIENT_SEND) {
         span.set_kind(zipkin::proto3::Span::CLIENT);
-        span.mutable_local_endpoint()->MergeFrom(annotation.endpoint().toProtoEndpoint());
       } else if (annotation.value() == ZipkinCoreConstants::get().SERVER_RECV) {
         span.set_kind(zipkin::proto3::Span::SERVER);
-        span.mutable_remote_endpoint()->MergeFrom(annotation.endpoint().toProtoEndpoint());
       }
+      span.mutable_local_endpoint()->MergeFrom(annotation.endpoint().toProtoEndpoint());
     }
   }
 
