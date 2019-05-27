@@ -235,6 +235,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     client_sampling.set_numerator(
         tracing_config.has_client_sampling() ? tracing_config.client_sampling().value() : 100);
     envoy::type::FractionalPercent random_sampling;
+    // TODO: Random sampling historically was an integer and default to out of 10,000. We should
+    // deprecate that and move to a straight fractional percent config.
     random_sampling.set_numerator(
         tracing_config.has_random_sampling() ? tracing_config.random_sampling().value() : 10000);
     random_sampling.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);

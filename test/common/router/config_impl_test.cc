@@ -4855,8 +4855,8 @@ virtual_hosts:
   const auto route3 = config.route(genHeaders("www.foo.com", "/third", "GET"), 0);
 
   // Check default values for random and overall sampling
-  EXPECT_EQ(10000, route1->tracingConfig()->getRandomSampling().numerator());
-  EXPECT_EQ(1, route1->tracingConfig()->getRandomSampling().denominator());
+  EXPECT_EQ(100, route1->tracingConfig()->getRandomSampling().numerator());
+  EXPECT_EQ(0, route1->tracingConfig()->getRandomSampling().denominator());
   EXPECT_EQ(100, route1->tracingConfig()->getOverallSampling().numerator());
   EXPECT_EQ(0, route1->tracingConfig()->getOverallSampling().denominator());
 

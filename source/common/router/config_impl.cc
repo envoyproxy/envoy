@@ -332,8 +332,8 @@ RouteTracingImpl::RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing
     client_sampling_ = tracing.client_sampling();
   }
   if (!tracing.has_random_sampling()) {
-    random_sampling_.set_numerator(10000);
-    random_sampling_.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+    random_sampling_.set_numerator(100);
+    random_sampling_.set_denominator(envoy::type::FractionalPercent::HUNDRED);
   } else {
     random_sampling_ = tracing.random_sampling();
   }
