@@ -70,7 +70,10 @@ public:
    * @return the number of bytes available to be reserve()d.
    * @note Read-only implementations of Slice should return zero from this method.
    */
-  uint64_t reservableSize() const { return capacity_ - reservable_; }
+  uint64_t reservableSize() const {
+    ASSERT(capacity_ >= reservable_);
+    return capacity_ - reservable_;
+  }
 
   /**
    * Reserve `size` bytes that the caller can populate with content. The caller SHOULD then
@@ -90,14 +93,10 @@ public:
     if (size == 0) {
       return {nullptr, 0};
     }
-    if (data_ != 0 && data_ == reservable_) {
-      // If the slice is empty but starts at an offset from its base, that means it
-      // used to contain some content but has since been fully drained. Resetting the
-      // offset to the start of the slice allows all the space in the slice to be
-      // reused.
-      data_ = 0;
-      reservable_ = 0;
-    }
+    // Verify the semantics that drain() enforces: if the slice is empty, either because
+    // no data has been added or because all the added data has been drained, the data
+    // section is at the very start of the slice.
+    ASSERT(!(dataSize() == 0 && data_ > 0));
     uint64_t available_size = capacity_ - reservable_;
     if (available_size == 0) {
       return {nullptr, 0};
