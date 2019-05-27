@@ -1,11 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/symbol_table.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
@@ -85,9 +88,30 @@ public:
   virtual Histogram& histogram(const std::string& name) PURE;
 
   /**
+   * @param The name of the stat, obtained from the SymbolTable.
+   * @return a reference to a counter within the scope's namespace, if it exists.
+   */
+  virtual absl::optional<std::reference_wrapper<const Counter>>
+  findCounter(StatName name) const PURE;
+
+  /**
+   * @param The name of the stat, obtained from the SymbolTable.
+   * @return a reference to a gauge within the scope's namespace, if it exists.
+   */
+  virtual absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const PURE;
+
+  /**
+   * @param The name of the stat, obtained from the SymbolTable.
+   * @return a reference to a histogram within the scope's namespace, if it
+   * exists.
+   */
+  virtual absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const PURE;
+
+  /**
    * @return a reference to the symbol table.
    */
-  virtual const SymbolTable& symbolTable() const PURE;
+  virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 };
 

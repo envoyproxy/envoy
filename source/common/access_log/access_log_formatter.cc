@@ -377,6 +377,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         return UnspecifiedValueString;
       }
     };
+  } else if (field_name == "ROUTE_NAME") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      std::string route_name = stream_info.getRouteName();
+      return route_name.empty() ? UnspecifiedValueString : route_name;
+    };
   } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
     field_extractor_ =
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
@@ -397,6 +402,9 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.subjectLocalCertificate();
         });
+  } else if (field_name == "DOWNSTREAM_TLS_SESSION_ID") {
+    field_extractor_ = sslConnectionInfoStringExtractor(
+        [](const Ssl::ConnectionInfo& connection_info) { return connection_info.sessionId(); });
   } else if (field_name == "UPSTREAM_TRANSPORT_FAILURE_REASON") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       if (!stream_info.upstreamTransportFailureReason().empty()) {

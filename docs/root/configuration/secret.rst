@@ -21,7 +21,7 @@ SDS server
 ----------
 
 A SDS server needs to implement the gRPC service :repo:`SecretDiscoveryService <api/envoy/service/discovery/v2/sds.proto>`.
-It follows the same protocol as other :repo:`xDS <api/XDS_PROTOCOL.md>`.
+It follows the same protocol as other :ref:`xDS <xds_protocol>`.
 
 SDS Configuration
 -----------------

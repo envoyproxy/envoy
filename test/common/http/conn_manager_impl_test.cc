@@ -77,7 +77,8 @@ public:
   };
 
   HttpConnectionManagerImplTest()
-      : route_config_provider_(test_time_.timeSystem()), access_log_path_("dummy_path"),
+      : route_config_provider_(test_time_.timeSystem()), http_context_(fake_stats_.symbolTable()),
+        access_log_path_("dummy_path"),
         access_logs_{
             AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
                 access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
@@ -3144,10 +3145,13 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
       .WillOnce(Return(FilterDataStatus::StopIterationAndWatermark));
   decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
 
+  // unregister callbacks2
+  decoder_filters_[0]->callbacks_->removeDownstreamWatermarkCallbacks(callbacks2);
+
   // Change the limit so the buffered data is below the new watermark.
   buffer_len = encoder_filters_[1]->callbacks_->encodingBuffer()->length();
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
-  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   encoder_filters_[1]->callbacks_->setEncoderBufferLimit((buffer_len + 1) * 2);
 }
 

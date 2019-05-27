@@ -71,7 +71,7 @@ proto_library(
         "//envoy/config/metrics/v2:metrics_service",
         "//envoy/config/metrics/v2:stats",
         "//envoy/config/ratelimit/v2:rls",
-        "//envoy/config/rbac/v2alpha:rbac",
+        "//envoy/config/rbac/v2:rbac",
         "//envoy/config/resource_monitor/fixed_heap/v2alpha:fixed_heap",
         "//envoy/config/resource_monitor/injected_resource/v2alpha:injected_resource",
         "//envoy/config/trace/v2:trace",

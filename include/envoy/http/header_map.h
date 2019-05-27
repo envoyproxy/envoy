@@ -14,6 +14,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/common/macros.h"
 
 #include "absl/strings/string_view.h"
 
@@ -288,6 +289,7 @@ private:
   HEADER_FUNC(EnvoyExpectedRequestTimeoutMs)                                                       \
   HEADER_FUNC(EnvoyExternalAddress)                                                                \
   HEADER_FUNC(EnvoyForceTrace)                                                                     \
+  HEADER_FUNC(EnvoyHedgeOnPerTryTimeout)                                                           \
   HEADER_FUNC(EnvoyImmediateHealthCheckFail)                                                       \
   HEADER_FUNC(EnvoyInternalRequest)                                                                \
   HEADER_FUNC(EnvoyIpTags)                                                                         \

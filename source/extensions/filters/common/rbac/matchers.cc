@@ -8,61 +8,61 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Permission& permission) {
+MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2::Permission& permission) {
   switch (permission.rule_case()) {
-  case envoy::config::rbac::v2alpha::Permission::RuleCase::kAndRules:
+  case envoy::config::rbac::v2::Permission::RuleCase::kAndRules:
     return std::make_shared<const AndMatcher>(permission.and_rules());
-  case envoy::config::rbac::v2alpha::Permission::RuleCase::kOrRules:
+  case envoy::config::rbac::v2::Permission::RuleCase::kOrRules:
     return std::make_shared<const OrMatcher>(permission.or_rules());
-  case envoy::config::rbac::v2alpha::Permission::RuleCase::kHeader:
+  case envoy::config::rbac::v2::Permission::RuleCase::kHeader:
     return std::make_shared<const HeaderMatcher>(permission.header());
-  case envoy::config::rbac::v2alpha::Permission::RuleCase::kDestinationIp:
+  case envoy::config::rbac::v2::Permission::RuleCase::kDestinationIp:
     return std::make_shared<const IPMatcher>(permission.destination_ip(), true);
-  case envoy::config::rbac::v2alpha::Permission::RuleCase::kDestinationPort:
+  case envoy::config::rbac::v2::Permission::RuleCase::kDestinationPort:
     return std::make_shared<const PortMatcher>(permission.destination_port());
-  case envoy::config::rbac::v2alpha::Permission::RuleCase::kAny:
+  case envoy::config::rbac::v2::Permission::RuleCase::kAny:
     return std::make_shared<const AlwaysMatcher>();
-  case envoy::config::rbac::v2alpha::Permission::RuleCase::kMetadata:
+  case envoy::config::rbac::v2::Permission::RuleCase::kMetadata:
     return std::make_shared<const MetadataMatcher>(permission.metadata());
-  case envoy::config::rbac::v2alpha::Permission::RuleCase::kNotRule:
+  case envoy::config::rbac::v2::Permission::RuleCase::kNotRule:
     return std::make_shared<const NotMatcher>(permission.not_rule());
-  case envoy::config::rbac::v2alpha::Permission::RuleCase::kRequestedServerName:
+  case envoy::config::rbac::v2::Permission::RuleCase::kRequestedServerName:
     return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
-MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Principal& principal) {
+MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2::Principal& principal) {
   switch (principal.identifier_case()) {
-  case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kAndIds:
+  case envoy::config::rbac::v2::Principal::IdentifierCase::kAndIds:
     return std::make_shared<const AndMatcher>(principal.and_ids());
-  case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kOrIds:
+  case envoy::config::rbac::v2::Principal::IdentifierCase::kOrIds:
     return std::make_shared<const OrMatcher>(principal.or_ids());
-  case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kAuthenticated:
+  case envoy::config::rbac::v2::Principal::IdentifierCase::kAuthenticated:
     return std::make_shared<const AuthenticatedMatcher>(principal.authenticated());
-  case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kSourceIp:
+  case envoy::config::rbac::v2::Principal::IdentifierCase::kSourceIp:
     return std::make_shared<const IPMatcher>(principal.source_ip(), false);
-  case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kHeader:
+  case envoy::config::rbac::v2::Principal::IdentifierCase::kHeader:
     return std::make_shared<const HeaderMatcher>(principal.header());
-  case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kAny:
+  case envoy::config::rbac::v2::Principal::IdentifierCase::kAny:
     return std::make_shared<const AlwaysMatcher>();
-  case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kMetadata:
+  case envoy::config::rbac::v2::Principal::IdentifierCase::kMetadata:
     return std::make_shared<const MetadataMatcher>(principal.metadata());
-  case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kNotId:
+  case envoy::config::rbac::v2::Principal::IdentifierCase::kNotId:
     return std::make_shared<const NotMatcher>(principal.not_id());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
-AndMatcher::AndMatcher(const envoy::config::rbac::v2alpha::Permission_Set& set) {
+AndMatcher::AndMatcher(const envoy::config::rbac::v2::Permission_Set& set) {
   for (const auto& rule : set.rules()) {
     matchers_.push_back(Matcher::create(rule));
   }
 }
 
-AndMatcher::AndMatcher(const envoy::config::rbac::v2alpha::Principal_Set& set) {
+AndMatcher::AndMatcher(const envoy::config::rbac::v2::Principal_Set& set) {
   for (const auto& id : set.ids()) {
     matchers_.push_back(Matcher::create(id));
   }
@@ -81,14 +81,13 @@ bool AndMatcher::matches(const Network::Connection& connection,
 }
 
 OrMatcher::OrMatcher(
-    const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Permission>& rules) {
+    const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2::Permission>& rules) {
   for (const auto& rule : rules) {
     matchers_.push_back(Matcher::create(rule));
   }
 }
 
-OrMatcher::OrMatcher(
-    const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Principal>& ids) {
+OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2::Principal>& ids) {
   for (const auto& id : ids) {
     matchers_.push_back(Matcher::create(id));
   }

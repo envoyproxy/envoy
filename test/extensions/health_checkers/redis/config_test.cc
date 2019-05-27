@@ -107,7 +107,6 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
 
-  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
                          Upstream::HealthCheckerFactory::create(
                              Upstream::parseHealthCheckFromV2Yaml(yaml), cluster, runtime, random,

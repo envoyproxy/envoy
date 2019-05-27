@@ -48,6 +48,8 @@ namespace {
 
 template <class T> class HttpFilterTestBase : public T {
 public:
+  HttpFilterTestBase() : http_context_(stats_store_.symbolTable()) {}
+
   void initialize(std::string&& yaml) {
     envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
     if (!yaml.empty()) {
@@ -68,7 +70,7 @@ public:
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_;
   Http::TestHeaderMapImpl request_headers_;
   Buffer::OwnedImpl data_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -83,7 +85,10 @@ public:
   }
 };
 
-class HttpFilterTest : public HttpFilterTestBase<testing::Test> {};
+class HttpFilterTest : public HttpFilterTestBase<testing::Test> {
+public:
+  HttpFilterTest() = default;
+};
 
 using CreateFilterConfigFunc = envoy::config::filter::http::ext_authz::v2::ExtAuthz();
 
@@ -177,6 +182,47 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.Status()->value().getStringView(),
+                  std::to_string(enumToInt(Http::Code::Forbidden)));
+      }));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
+}
+
+// Verifies that the filter responds with a configurable HTTP status when an network error occurs.
+TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  status_on_error: 
+    code: 503
+  )EOF");
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.Status()->value().getStringView(),
+                  std::to_string(enumToInt(Http::Code::ServiceUnavailable)));
+      }));
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -328,7 +374,11 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
 
   data_.add("barfoo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+
+  data_.add("more data after watermark is set is possible");
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
 }
 
