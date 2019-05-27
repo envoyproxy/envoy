@@ -39,7 +39,7 @@ public:
   RsaPrivateKeyConnection(SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb,
                           Event::Dispatcher& dispatcher, bssl::UniquePtr<EVP_PKEY> pkey,
                           RsaPrivateKeyConnectionTestOptions& test_options);
-  EVP_PKEY* getPrivateKey() { return pkey_.get(); };
+  RSA* getPrivateKey() { return EVP_PKEY_get0_RSA(pkey_.get()); }
   void delayed_op();
 
   // Store the output data temporarily.

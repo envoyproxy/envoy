@@ -1,24 +1,3 @@
-/* Copyright (c) 2014, Google Inc.
- * Copyright (c) 2019, Intel Corp.
- *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
- * SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
- * OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
- * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE. */
-
-// The RSA signing and decrypting code has been adapted from the
-// reference implementation in BoringSSL tests
-// (https://github.com/google/boringssl/blob/master/ssl/test/test_config.cc).
-// The license for this file is thus the same as the license for the
-// source file.
-
 #include "test/extensions/transport_sockets/tls/rsa_private_key_method_provider.h"
 
 #include <memory>
@@ -47,14 +26,17 @@ void RsaPrivateKeyConnection::delayed_op() {
 static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* out_len,
                                                size_t max_out, uint16_t signature_algorithm,
                                                const uint8_t* in, size_t in_len) {
-  (void)out;
-  (void)out_len;
-  size_t len = 0;
-  EVP_PKEY_CTX* pkey_ctx;
-  const EVP_MD* digest;
-  bssl::ScopedEVP_MD_CTX md_ctx;
+  RSA* rsa;
+  bssl::ScopedEVP_MD_CTX ctx;
+  const EVP_MD* md;
   RsaPrivateKeyConnection* ops = static_cast<RsaPrivateKeyConnection*>(
       SSL_get_ex_data(ssl, RsaPrivateKeyMethodProvider::ssl_rsa_connection_index));
+  unsigned char hash[EVP_MAX_MD_SIZE];
+  unsigned int hash_len;
+  uint8_t* msg;
+  size_t msg_len;
+  int prefix_allocated = 0;
+  int padding = RSA_NO_PADDING;
 
   if (!ops) {
     return ssl_private_key_failure;
@@ -70,51 +52,57 @@ static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* o
     return ssl_private_key_failure;
   }
 
-  EVP_PKEY* rsa_pkey = ops->getPrivateKey();
-  if (!rsa_pkey) {
+  rsa = ops->getPrivateKey();
+  if (rsa == nullptr) {
     return ssl_private_key_failure;
   }
 
-  // Get the digest algorithm.
-  digest = SSL_get_signature_algorithm_digest(signature_algorithm);
-  if (digest == NULL) {
+  md = SSL_get_signature_algorithm_digest(signature_algorithm);
+  if (!md) {
     return ssl_private_key_failure;
   }
 
-  // Initialize the signing context.
-  if (!EVP_DigestSignInit(md_ctx.get(), &pkey_ctx, digest, nullptr, rsa_pkey)) {
+  // Calculate the digest for signing.
+  if (!EVP_DigestInit_ex(ctx.get(), md, nullptr) || !EVP_DigestUpdate(ctx.get(), in, in_len) ||
+      !EVP_DigestFinal_ex(ctx.get(), hash, &hash_len)) {
     return ssl_private_key_failure;
   }
 
-  // Set options for PSS.
+  // Addd RSA padding to the the hash. Supported types are PSS and PKCS1.
   if (SSL_is_signature_algorithm_rsa_pss(signature_algorithm)) {
-    if (!EVP_PKEY_CTX_set_rsa_padding(pkey_ctx, RSA_PKCS1_PSS_PADDING)) {
+    msg_len = RSA_size(rsa);
+    msg = static_cast<uint8_t*>(OPENSSL_malloc(msg_len));
+    if (!msg) {
       return ssl_private_key_failure;
     }
-    if (!EVP_PKEY_CTX_set_rsa_pss_saltlen(pkey_ctx, -1)) {
+    prefix_allocated = 1;
+    if (!RSA_padding_add_PKCS1_PSS_mgf1(rsa, msg, hash, md, nullptr, -1)) {
+      OPENSSL_free(msg);
       return ssl_private_key_failure;
     }
+    padding = RSA_NO_PADDING;
+  } else {
+    if (!RSA_add_pkcs1_prefix(&msg, &msg_len, &prefix_allocated, EVP_MD_type(md), hash, hash_len)) {
+      return ssl_private_key_failure;
+    }
+    padding = RSA_PKCS1_PADDING;
   }
 
-  // Get the signature length for memory allocation.
-  if (!EVP_DigestSign(md_ctx.get(), nullptr, &len, in, in_len)) {
-    return ssl_private_key_failure;
-  }
-
-  if (len == 0 || len > max_out) {
-    return ssl_private_key_failure;
-  }
-
-  ops->out_len_ = len;
-  ops->out_ = static_cast<uint8_t*>(OPENSSL_malloc(len));
+  ops->out_ = static_cast<uint8_t*>(OPENSSL_malloc(max_out));
   if (ops->out_ == nullptr) {
     return ssl_private_key_failure;
   }
 
-  // Run the signing operation.
-  if (!EVP_DigestSign(md_ctx.get(), ops->out_, &len, in, in_len)) {
+  if (!RSA_sign_raw(rsa, &ops->out_len_, ops->out_, max_out, msg, msg_len, padding)) {
+    if (prefix_allocated) {
+      OPENSSL_free(msg);
+    }
     OPENSSL_free(ops->out_);
     return ssl_private_key_failure;
+  }
+
+  if (prefix_allocated) {
+    OPENSSL_free(msg);
   }
 
   if (ops->test_options_.crypto_error_) {
@@ -157,13 +145,8 @@ static ssl_private_key_result_t privateKeyDecrypt(SSL* ssl, uint8_t* out, size_t
     return ssl_private_key_failure;
   }
 
-  EVP_PKEY* rsa_pkey = ops->getPrivateKey();
-  if (!rsa_pkey) {
-    return ssl_private_key_failure;
-  }
-
-  rsa = EVP_PKEY_get0_RSA(rsa_pkey);
-  if (rsa == NULL) {
+  rsa = ops->getPrivateKey();
+  if (rsa == nullptr) {
     return ssl_private_key_failure;
   }
 
