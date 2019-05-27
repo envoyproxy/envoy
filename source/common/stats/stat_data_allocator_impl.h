@@ -116,8 +116,12 @@ public:
 template <class StatData> class GaugeImpl : public Gauge, public MetricImpl {
 public:
   GaugeImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
-            absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
-      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {}
+            absl::string_view tag_extracted_name, const std::vector<Tag>& tags, ImportMode import_mode)
+      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {
+    if (import_mode == ImportMode::Accumulate) {
+      data_.flags_ |= Flags::LogicAccumulate;
+    }
+  }
   ~GaugeImpl() override {
     alloc_.free(data_);
 
@@ -147,20 +151,9 @@ public:
   uint64_t value() const override { return data_.value_; }
   bool used() const override { return data_.flags_ & Flags::Used; }
 
-  // Returns true if values should be added, false if no import.
-  absl::optional<bool> cachedShouldImport() const override {
-    if ((data_.flags_ & Flags::LogicCached) == 0) {
-      return absl::nullopt;
-    }
-    return (data_.flags_ & Flags::LogicAccumulate) != 0;
-  }
-
-  void setShouldImport(bool should_import) override {
-    if (should_import) {
-      data_.flags_ |= Flags::LogicAccumulate;
-    } else {
-      data_.flags_ |= Flags::LogicNeverImport;
-    }
+  ImportMode importMode() const override {
+    return (data_.flags_ & Flags::LogicAccumulate) ? ImportMode::Accumulate
+        : ImportMode::NeverImport;
   }
 
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
@@ -191,8 +184,7 @@ public:
   void set(uint64_t) override {}
   void sub(uint64_t) override {}
   uint64_t value() const override { return 0; }
-  absl::optional<bool> cachedShouldImport() const override { return absl::nullopt; }
-  void setShouldImport(bool) override {}
+  ImportMode importMode() const override { return ImportMode::NeverImport; }
 };
 
 } // namespace Stats

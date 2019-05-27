@@ -13,7 +13,7 @@ namespace Envoy {
  * Define a block of stats like this:
  *   #define MY_COOL_STATS(COUNTER, GAUGE, HISTOGRAM) \
  *     COUNTER(counter1)
- *     GAUGE(gauge1)
+ *     GAUGE(gauge1, mode)
  *     HISTOGRAM(histogram1)
  *     ...
  *
@@ -28,13 +28,14 @@ namespace Envoy {
  */
 
 #define GENERATE_COUNTER_STRUCT(NAME) Stats::Counter& NAME##_;
-#define GENERATE_GAUGE_STRUCT(NAME) Stats::Gauge& NAME##_;
+#define GENERATE_GAUGE_STRUCT(NAME, MODE) Stats::Gauge& NAME##_;
 #define GENERATE_HISTOGRAM_STRUCT(NAME) Stats::Histogram& NAME##_;
 
 #define FINISH_STAT_DECL_(X) + std::string(#X)),
+#define FINISH_STAT_DECL_MODE_(X, MODE) + std::string(#X), Stats::Gauge::ImportMode::MODE),
 
 #define POOL_COUNTER_PREFIX(POOL, PREFIX) (POOL).counter(PREFIX FINISH_STAT_DECL_
-#define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gauge(PREFIX FINISH_STAT_DECL_
+#define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gauge(PREFIX FINISH_STAT_DECL_MODE_
 #define POOL_HISTOGRAM_PREFIX(POOL, PREFIX) (POOL).histogram(PREFIX FINISH_STAT_DECL_
 
 #define POOL_COUNTER(POOL) POOL_COUNTER_PREFIX(POOL, "")
@@ -42,6 +43,7 @@ namespace Envoy {
 #define POOL_HISTOGRAM(POOL) POOL_HISTOGRAM_PREFIX(POOL, "")
 
 #define NULL_STAT_DECL_(X) std::string(#X)),
+#define NULL_STAT_DECL_IGNORE_MODE_(X, MODE) std::string(#X)),
 
-#define NULL_POOL_GAUGE(POOL) (POOL).nullGauge(NULL_STAT_DECL_
+#define NULL_POOL_GAUGE(POOL) (POOL).nullGauge(NULL_STAT_DECL_IGNORE_MODE_
 } // namespace Envoy

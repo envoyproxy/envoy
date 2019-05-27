@@ -90,7 +90,7 @@ public:
   COUNTER(update_success)                      \
   COUNTER(update_failure)                      \
   COUNTER(update_rejected)                     \
-  GAUGE(version)
+  GAUGE(version, NeverImport)
 // clang-format on
 
 /**

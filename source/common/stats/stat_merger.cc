@@ -7,12 +7,7 @@ namespace Stats {
 
 StatMerger::StatMerger(Stats::Store& target_store) : temp_scope_(target_store.createScope("")) {}
 
-bool StatMerger::shouldImport(Gauge& gauge, const std::string& gauge_name) {
-  absl::optional<bool> should_import = gauge.cachedShouldImport();
-  if (should_import.has_value()) {
-    return should_import.value();
-  }
-
+bool StatMerger::shouldImport(const Gauge& gauge, const std::string& gauge_name) {
   // Gauge name *substrings*, and special logic to use for combining those gauges' values.
   static const auto* nonstandard_combine_logic = new std::vector<std::regex>{
       // Any .version is either a static property of the binary, or an opaque identifier for
@@ -46,11 +41,11 @@ bool StatMerger::shouldImport(Gauge& gauge, const std::string& gauge_name) {
   for (const auto& exception : *nonstandard_combine_logic) {
     std::smatch match;
     if (std::regex_match(gauge_name, match, exception)) {
-      gauge.setShouldImport(false);
+      ASSERT(gauge.importMode() == Gauge::ImportMode::NeverImport);
       return false;
     }
   }
-  gauge.setShouldImport(true);
+  ASSERT(gauge.importMode() == Gauge::ImportMode::Accumulate);
   return true;
 }
 
@@ -62,15 +57,20 @@ void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& count
 
 void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges) {
   for (const auto& gauge : gauges) {
-    auto& gauge_ref = temp_scope_->gauge(gauge.first);
+    StatNameManagedStorage storage(gauge.first, temp_scope_->symbolTable());
+    StatName stat_name = storage.statName();
+    absl::optional<std::reference_wrapper<const Gauge>> gauge_opt = temp_scope_->findGauge(stat_name);
+    if (gauge_opt && !StatMerger::shouldImport(*gauge_opt, gauge.first)) {
+      continue;
+    }
+
+    // Looks like this Gauge is accumulated; we can get a non-const copy of it.
+    auto& gauge_ref = temp_scope_->gaugeFromStatName(stat_name, Gauge::ImportMode::Accumulate);
     uint64_t& parent_value_ref = parent_gauge_values_[gauge_ref.statName()];
     uint64_t old_parent_value = parent_value_ref;
     uint64_t new_parent_value = gauge.second;
     parent_value_ref = new_parent_value;
 
-    if (!StatMerger::shouldImport(gauge_ref, gauge.first)) {
-      continue;
-    }
     if (new_parent_value > old_parent_value) {
       gauge_ref.add(new_parent_value - old_parent_value);
     } else {

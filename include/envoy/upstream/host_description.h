@@ -22,13 +22,13 @@ namespace Upstream {
 // clang-format off
 #define ALL_HOST_STATS(COUNTER, GAUGE)                                                             \
   COUNTER(cx_total)                                                                                \
-  GAUGE  (cx_active)                                                                               \
+  GAUGE  (cx_active, Accumulate)                                                                   \
   COUNTER(cx_connect_fail)                                                                         \
   COUNTER(rq_total)                                                                                \
   COUNTER(rq_timeout)                                                                              \
   COUNTER(rq_success)                                                                              \
   COUNTER(rq_error)                                                                                \
-  GAUGE  (rq_active)
+  GAUGE  (rq_active, Accumulate)
 // clang-format on
 
 /**

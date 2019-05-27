@@ -50,9 +50,9 @@ public:
   COUNTER(override_dir_not_exists)                                                                 \
   COUNTER(override_dir_exists)                                                                     \
   COUNTER(load_success)                                                                            \
-  COUNTER(deprecated_feature_use)                                                                \
-  GAUGE  (num_keys)                                                                                \
-  GAUGE  (admin_overrides_active)
+  COUNTER(deprecated_feature_use)                                                                  \
+  GAUGE  (num_keys, NeverImport)                                                                   \
+  GAUGE  (admin_overrides_active, NeverImport)
 // clang-format on
 
 /**

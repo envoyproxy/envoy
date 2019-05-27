@@ -151,7 +151,7 @@ private:
 // clang-format off
 #define ALL_OUTLIER_DETECTION_STATS(COUNTER, GAUGE)                                                \
   COUNTER(ejections_total)                                                                         \
-  GAUGE  (ejections_active)                                                                        \
+  GAUGE  (ejections_active, Accumulate)                                                            \
   COUNTER(ejections_overflow)                                                                      \
   COUNTER(ejections_consecutive_5xx)                                                               \
   COUNTER(ejections_success_rate)                                                                  \

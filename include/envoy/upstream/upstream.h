@@ -516,7 +516,7 @@ public:
   COUNTER  (lb_zone_routing_all_directly)                                                          \
   COUNTER  (lb_zone_routing_sampled)                                                               \
   COUNTER  (lb_zone_routing_cross_zone)                                                            \
-  GAUGE    (lb_subsets_active)                                                                     \
+  GAUGE    (lb_subsets_active, Accumulate)                                      \
   COUNTER  (lb_subsets_created)                                                                    \
   COUNTER  (lb_subsets_removed)                                                                    \
   COUNTER  (lb_subsets_selected)                                                                   \
@@ -524,7 +524,7 @@ public:
   COUNTER  (lb_subsets_fallback_panic)                                                             \
   COUNTER  (original_dst_host_invalid)                                                             \
   COUNTER  (upstream_cx_total)                                                                     \
-  GAUGE    (upstream_cx_active)                                                                    \
+  GAUGE    (upstream_cx_active, Accumulate)                                     \
   COUNTER  (upstream_cx_http1_total)                                                               \
   COUNTER  (upstream_cx_http2_total)                                                               \
   COUNTER  (upstream_cx_connect_fail)                                                              \
@@ -542,20 +542,20 @@ public:
   COUNTER  (upstream_cx_destroy_remote_with_active_rq)                                             \
   COUNTER  (upstream_cx_close_notify)                                                              \
   COUNTER  (upstream_cx_rx_bytes_total)                                                            \
-  GAUGE    (upstream_cx_rx_bytes_buffered)                                                         \
+  GAUGE    (upstream_cx_rx_bytes_buffered, Accumulate)                          \
   COUNTER  (upstream_cx_tx_bytes_total)                                                            \
-  GAUGE    (upstream_cx_tx_bytes_buffered)                                                         \
+  GAUGE    (upstream_cx_tx_bytes_buffered, Accumulate)                          \
   COUNTER  (upstream_cx_protocol_error)                                                            \
   COUNTER  (upstream_cx_max_requests)                                                              \
   COUNTER  (upstream_cx_none_healthy)                                                              \
   COUNTER  (upstream_cx_pool_overflow)                                                             \
   COUNTER  (upstream_rq_total)                                                                     \
-  GAUGE    (upstream_rq_active)                                                                    \
+  GAUGE    (upstream_rq_active, Accumulate)                                     \
   COUNTER  (upstream_rq_completed)                                                                 \
   COUNTER  (upstream_rq_pending_total)                                                             \
   COUNTER  (upstream_rq_pending_overflow)                                                          \
   COUNTER  (upstream_rq_pending_failure_eject)                                                     \
-  GAUGE    (upstream_rq_pending_active)                                                            \
+  GAUGE    (upstream_rq_pending_active, Accumulate)                             \
   COUNTER  (upstream_rq_cancelled)                                                                 \
   COUNTER  (upstream_rq_maintenance_mode)                                                          \
   COUNTER  (upstream_rq_timeout)                                                                   \
@@ -572,12 +572,12 @@ public:
   COUNTER  (upstream_internal_redirect_failed_total)                                               \
   COUNTER  (upstream_internal_redirect_succeeded_total)                                            \
   COUNTER  (bind_errors)                                                                           \
-  GAUGE    (max_host_weight)                                                                       \
+  GAUGE    (max_host_weight, NeverImport)                                       \
   COUNTER  (membership_change)                                                                     \
-  GAUGE    (membership_healthy)                                                                    \
-  GAUGE    (membership_degraded)                                                                   \
-  GAUGE    (membership_excluded)                                                                   \
-  GAUGE    (membership_total)                                                                      \
+  GAUGE    (membership_healthy, NeverImport)                                    \
+  GAUGE    (membership_degraded, NeverImport)                                   \
+  GAUGE    (membership_excluded, NeverImport)                                   \
+  GAUGE    (membership_total, NeverImport)                                      \
   COUNTER  (retry_or_shadow_abandoned)                                                             \
   COUNTER  (update_attempt)                                                                        \
   COUNTER  (update_success)                                                                        \
@@ -586,7 +586,7 @@ public:
   COUNTER  (update_no_rebuild)                                                                     \
   COUNTER  (assignment_timeout_received)                                                           \
   COUNTER  (assignment_stale)                                                                      \
-  GAUGE    (version)
+  GAUGE    (version, NeverImport)
 // clang-format on
 
 /**
@@ -605,16 +605,16 @@ public:
  */
 // clang-format off
 #define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(OPEN_GAUGE, REMAINING_GAUGE)                            \
-  OPEN_GAUGE      (cx_open)                                                                        \
-  OPEN_GAUGE      (rq_pending_open)                                                                \
-  OPEN_GAUGE      (rq_open)                                                                        \
-  OPEN_GAUGE      (rq_retry_open)                                                                  \
-  OPEN_GAUGE      (cx_pool_open)                                                                   \
-  REMAINING_GAUGE (remaining_cx)                                                                   \
-  REMAINING_GAUGE (remaining_pending)                                                              \
-  REMAINING_GAUGE (remaining_rq)                                                                   \
-  REMAINING_GAUGE (remaining_retries)                                                              \
-  REMAINING_GAUGE (remaining_cx_pools)
+  OPEN_GAUGE      (cx_open, Accumulate)                                         \
+  OPEN_GAUGE      (rq_pending_open, Accumulate)                                 \
+  OPEN_GAUGE      (rq_open, Accumulate)                                         \
+  OPEN_GAUGE      (rq_retry_open, Accumulate)                                   \
+  OPEN_GAUGE      (cx_pool_open, Accumulate)                                    \
+  REMAINING_GAUGE (remaining_cx, Accumulate)                                    \
+  REMAINING_GAUGE (remaining_pending, Accumulate)                               \
+  REMAINING_GAUGE (remaining_rq, Accumulate)                                    \
+  REMAINING_GAUGE (remaining_retries, Accumulate)                               \
+  REMAINING_GAUGE (remaining_cx_pools, Accumulate)
 // clang-format on
 
 /**

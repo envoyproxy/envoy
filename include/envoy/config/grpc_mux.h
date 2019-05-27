@@ -15,8 +15,8 @@ namespace Config {
 // clang-format off
 #define ALL_CONTROL_PLANE_STATS(COUNTER, GAUGE)                                                    \
   COUNTER(rate_limit_enforced)                                                                     \
-  GAUGE(connected_state)                                                                           \
-  GAUGE(pending_requests)                                                                          \
+  GAUGE(connected_state, NeverImport)                                           \
+  GAUGE(pending_requests, Accumulate)                                           \
 // clang-format on
 
 /**

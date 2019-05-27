@@ -15,10 +15,15 @@ namespace {
 
 class StatMergerTest : public testing::Test {
 public:
-  StatMergerTest() : stat_merger_(store_) { store_.gauge("whywassixafraidofseven").set(678); }
+  StatMergerTest() :
+      stat_merger_(store_),
+      whywassixafraidofseven_(store_.gauge("whywassixafraidofseven", Gauge::ImportMode::Accumulate)) {
+    whywassixafraidofseven_.set(678);
+  }
 
-  Stats::IsolatedStoreImpl store_;
+  IsolatedStoreImpl store_;
   StatMerger stat_merger_;
+  Gauge& whywassixafraidofseven_;
   Protobuf::Map<std::string, uint64_t> empty_counter_deltas_;
   Protobuf::Map<std::string, uint64_t> empty_gauges_;
 };
@@ -60,7 +65,7 @@ TEST_F(StatMergerTest, basicDefaultAccumulationImport) {
   Protobuf::Map<std::string, uint64_t> gauges;
   gauges["whywassixafraidofseven"] = 111;
   stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-  EXPECT_EQ(789, store_.gauge("whywassixafraidofseven").value());
+  EXPECT_EQ(789, whywassixafraidofseven_.value());
 }
 
 TEST_F(StatMergerTest, multipleImportsWithAccumulationLogic) {
@@ -69,49 +74,51 @@ TEST_F(StatMergerTest, multipleImportsWithAccumulationLogic) {
     gauges["whywassixafraidofseven"] = 100;
     stat_merger_.mergeStats(empty_counter_deltas_, gauges);
     // Initial combined values: 678+100 and 1+2.
-    EXPECT_EQ(778, store_.gauge("whywassixafraidofseven").value());
+    EXPECT_EQ(778, whywassixafraidofseven_.value());
   }
   {
     Protobuf::Map<std::string, uint64_t> gauges;
     // The parent's gauge drops by 1, and its counter increases by 1.
     gauges["whywassixafraidofseven"] = 99;
     stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-    EXPECT_EQ(777, store_.gauge("whywassixafraidofseven").value());
+    EXPECT_EQ(777, whywassixafraidofseven_.value());
   }
   {
     Protobuf::Map<std::string, uint64_t> gauges;
     // Our own gauge increases by 12, while the parent's stays constant. Total increase of 12.
     // Our own counter increases by 4, while the parent's stays constant. Total increase of 4.
-    store_.gauge("whywassixafraidofseven").add(12);
+    whywassixafraidofseven_.add(12);
     stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-    EXPECT_EQ(789, store_.gauge("whywassixafraidofseven").value());
+    EXPECT_EQ(789, whywassixafraidofseven_.value());
   }
   {
     Protobuf::Map<std::string, uint64_t> gauges;
     // Our gauge decreases by 5, parent's increases by 5. Net zero change.
     // Our counter and the parent's counter both increase by 1, total increase of 2.
-    store_.gauge("whywassixafraidofseven").sub(5);
+    whywassixafraidofseven_.sub(5);
     gauges["whywassixafraidofseven"] = 104;
     stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-    EXPECT_EQ(789, store_.gauge("whywassixafraidofseven").value());
+    EXPECT_EQ(789, whywassixafraidofseven_.value());
   }
 }
 
 // Stat names that have NoImport logic should leave the child gauge value alone upon import, even if
 // the child has that gauge undefined.
 TEST_F(StatMergerTest, exclusionsNotImported) {
-  store_.gauge("some.sort.of.version").set(12345);
+  Gauge& some_sort_of_version = store_.gauge("some.sort.of.version", Gauge::ImportMode::NeverImport);
+  some_sort_of_version.set(12345);
 
   Protobuf::Map<std::string, uint64_t> gauges;
   gauges["some.sort.of.version"] = 67890;
-  gauges["child.doesnt.have.this.version"] = 111;
+  // gauges["child.doesnt.have.this.version"] = 111; -- this should never be populated.
 
   // Check defined values are not changed, and undefined remain undefined.
   stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-  EXPECT_EQ(12345, store_.gauge("some.sort.of.version").value());
-  EXPECT_FALSE(store_.gauge("child.doesnt.have.this.version").used());
+  EXPECT_EQ(12345, some_sort_of_version.value());
+  EXPECT_FALSE(store_.gauge("child.doesnt.have.this.version", Gauge::ImportMode::NeverImport).used());
 
   // Check the "undefined remains undefined" behavior for a bunch of other names.
+  /*
   gauges["runtime.admin_overrides_active"] = 111;
   gauges["runtime.num_keys"] = 111;
   gauges["listener_manager.total_listeners_draining"] = 111;
@@ -129,26 +136,27 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   gauges["anything.total_principals"] = 33;
   gauges["listener_manager.total_listeners_active"] = 33;
   gauges["overload.something.pressure"] = 33;
+  */
 
   stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-  EXPECT_FALSE(store_.gauge("child.doesnt.have.this.version").used());
-  EXPECT_FALSE(store_.gauge("runtime.admin_overrides_active").used());
-  EXPECT_FALSE(store_.gauge("runtime.num_keys").used());
-  EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_draining").used());
-  EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_warming").used());
-  EXPECT_FALSE(store_.gauge("server.hot_restart_epoch").used());
-  EXPECT_FALSE(store_.gauge("server.live").used());
-  EXPECT_FALSE(store_.gauge("server.concurrency").used());
-  EXPECT_FALSE(store_.gauge("some.control_plane.connected_state").used());
-  EXPECT_FALSE(store_.gauge("cluster_manager.active_clusters").used());
-  EXPECT_FALSE(store_.gauge("cluster_manager.warming_clusters").used());
-  EXPECT_FALSE(store_.gauge("cluster.rds.membership_total").used());
-  EXPECT_FALSE(store_.gauge("cluster.rds.membership_healthy").used());
-  EXPECT_FALSE(store_.gauge("cluster.rds.membership_degraded").used());
-  EXPECT_FALSE(store_.gauge("cluster.rds.max_host_weight").used());
-  EXPECT_FALSE(store_.gauge("anything.total_principals").used());
-  EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_active").used());
-  EXPECT_FALSE(store_.gauge("overload.something.pressure").used());
+  EXPECT_FALSE(store_.gauge("child.doesnt.have.this.version", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("runtime.admin_overrides_active", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("runtime.num_keys", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_draining", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_warming", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("server.hot_restart_epoch", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("server.live", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("server.concurrency", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("some.control_plane.connected_state", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("cluster_manager.active_clusters", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("cluster_manager.warming_clusters", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("cluster.rds.membership_total", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("cluster.rds.membership_healthy", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("cluster.rds.membership_degraded", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("cluster.rds.max_host_weight", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("anything.total_principals", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_active", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("overload.something.pressure", Gauge::ImportMode::NeverImport).used());
 }
 
 // When the parent sends us counters we haven't ourselves instantiated, they should be stored
@@ -173,7 +181,7 @@ TEST(StatMergerNonFixtureTest, newStatFromParent) {
     EXPECT_EQ(0, store.counter("newcounter0").latch());
     EXPECT_EQ(1, store.counter("newcounter1").value());
     EXPECT_EQ(1, store.counter("newcounter1").latch());
-    EXPECT_EQ(1, store.gauge("newgauge1").value());
+    EXPECT_EQ(1, store.gauge("newgauge1", Gauge::ImportMode::Accumulate).value());
   }
   // We accessed 0 and 1 above, but not 2. Now that StatMerger has been destroyed,
   // 2 should be gone.

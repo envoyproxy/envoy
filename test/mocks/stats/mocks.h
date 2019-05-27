@@ -186,7 +186,7 @@ public:
   MOCK_METHOD1(counter, Counter&(const std::string&));
   MOCK_CONST_METHOD0(counters, std::vector<CounterSharedPtr>());
   MOCK_METHOD1(createScope_, Scope*(const std::string& name));
-  MOCK_METHOD1(gauge, Gauge&(const std::string&));
+  MOCK_METHOD2(gauge, Gauge&(const std::string&, Gauge::ImportMode));
   MOCK_METHOD1(nullGauge, NullGaugeImpl&(const std::string&));
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
@@ -200,7 +200,9 @@ public:
   Counter& counterFromStatName(StatName name) override {
     return counter(symbol_table_->toString(name));
   }
-  Gauge& gaugeFromStatName(StatName name) override { return gauge(symbol_table_->toString(name)); }
+  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
+    return gauge(symbol_table_->toString(name), import_mode);
+  }
   Histogram& histogramFromStatName(StatName name) override {
     return histogram(symbol_table_->toString(name));
   }

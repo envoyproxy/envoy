@@ -25,8 +25,10 @@ namespace Stats {
 template <class Base> class IsolatedStatsCache {
 public:
   using Allocator = std::function<std::shared_ptr<Base>(StatName name)>;
+  using AllocatorImportMode = std::function<std::shared_ptr<Base>(StatName, Gauge::ImportMode)>;
 
   IsolatedStatsCache(Allocator alloc) : alloc_(alloc) {}
+  IsolatedStatsCache(AllocatorImportMode alloc) : alloc_import_(alloc) {}
 
   Base& get(StatName name) {
     auto stat = stats_.find(name);
@@ -34,7 +36,22 @@ public:
       return *stat->second;
     }
 
+    ASSERT(alloc_);
     std::shared_ptr<Base> new_stat = alloc_(name);
+    stats_.emplace(new_stat->statName(), new_stat);
+    return *new_stat;
+  }
+
+  Base& get(StatName name, Gauge::ImportMode import_mode) {
+    auto stat = stats_.find(name);
+    if (stat != stats_.end()) {
+      Base& base = *stat->second;
+      ASSERT(base.importMode() == import_mode);
+      return base;
+    }
+
+    ASSERT(alloc_import_);
+    std::shared_ptr<Base> new_stat = alloc_import_(name, import_mode);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
@@ -62,6 +79,7 @@ private:
 
   StatNameHashMap<std::shared_ptr<Base>> stats_;
   Allocator alloc_;
+  AllocatorImportMode alloc_import_;
 };
 
 class IsolatedStoreImpl : public StoreImpl {
@@ -73,7 +91,9 @@ public:
   Counter& counterFromStatName(StatName name) override { return counters_.get(name); }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugeFromStatName(StatName name) override { return gauges_.get(name); }
+  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
+    return gauges_.get(name, import_mode);
+  }
   NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   Histogram& histogramFromStatName(StatName name) override {
     Histogram& histogram = histograms_.get(name);
@@ -101,9 +121,9 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return counterFromStatName(storage.statName());
   }
-  Gauge& gauge(const std::string& name) override {
+  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return gaugeFromStatName(storage.statName());
+    return gaugeFromStatName(storage.statName(), import_mode);
   }
   Histogram& histogram(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());

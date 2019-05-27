@@ -30,7 +30,7 @@ public:
   // to indicate the logic.
 
   // Returns true if the parent's value can be added in, false if we should do nothing.
-  static bool shouldImport(Gauge& gauge, const std::string& gauge_name);
+  static bool shouldImport(const Gauge& gauge, const std::string& gauge_name);
 
 private:
   void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas);

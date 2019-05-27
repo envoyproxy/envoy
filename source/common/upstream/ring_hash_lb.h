@@ -17,9 +17,9 @@ namespace Upstream {
  */
 // clang-format off
 #define ALL_RING_HASH_LOAD_BALANCER_STATS(GAUGE)                                                   \
-  GAUGE(size)                                                                                      \
-  GAUGE(min_hashes_per_host)                                                                       \
-  GAUGE(max_hashes_per_host)
+  GAUGE(size, Accumulate)                                                          \
+  GAUGE(min_hashes_per_host, Accumulate)                                           \
+  GAUGE(max_hashes_per_host, Accumulate)
 // clang-format on
 
 /**

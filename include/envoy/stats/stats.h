@@ -101,8 +101,6 @@ public:
     // the stat declaration macros themselves. (Now that stats no longer use shared memory, it's
     // safe to mess with what these flag bits mean whenever we want).
     static const uint8_t LogicAccumulate = 0x02;
-    static const uint8_t LogicNeverImport = 0x04;
-    static const uint8_t LogicCached = LogicAccumulate | LogicNeverImport;
   };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;
@@ -130,6 +128,11 @@ typedef std::shared_ptr<Counter> CounterSharedPtr;
  */
 class Gauge : public virtual Metric {
 public:
+  enum class ImportMode {
+    NeverImport,  // On hot-restart, each process starts with gauge at 0.
+    Accumulate,   // Transfers gauge state on hot-restart.
+  };
+
   virtual ~Gauge() {}
 
   virtual void add(uint64_t amount) PURE;
@@ -138,16 +141,7 @@ public:
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
   virtual uint64_t value() const PURE;
-
-  /**
-   * Returns the stat's combine logic, if known.
-   */
-  virtual absl::optional<bool> cachedShouldImport() const PURE;
-
-  /**
-   * Sets the value to be returned by cachedCombineLogic().
-   */
-  virtual void setShouldImport(bool should_import) PURE;
+  virtual ImportMode importMode() const PURE;
 };
 
 typedef std::shared_ptr<Gauge> GaugeSharedPtr;

@@ -49,6 +49,11 @@ public:
            absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
       : Stat(data, alloc, tag_extracted_name, tags) {}
 
+  HeapStat(HeapStatData& data, StatDataAllocatorImpl<HeapStatData>& alloc,
+           absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
+           Gauge::ImportMode import_mode)
+      : Stat(data, alloc, tag_extracted_name, tags, import_mode) {}
+
   StatName statName() const override { return this->data_.statName(); }
 };
 
@@ -68,9 +73,9 @@ public:
   }
 
   GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
-                           const std::vector<Tag>& tags) override {
+                           const std::vector<Tag>& tags, Gauge::ImportMode import_mode) override {
     return std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(alloc(name), *this,
-                                                               tag_extracted_name, tags);
+                                                               tag_extracted_name, tags, import_mode);
   }
 
 #ifndef ENVOY_CONFIG_COVERAGE

@@ -14,8 +14,8 @@ namespace Upstream {
  */
 // clang-format off
 #define ALL_MAGLEV_LOAD_BALANCER_STATS(GAUGE)                                                      \
-  GAUGE(min_entries_per_host)                                                                      \
-  GAUGE(max_entries_per_host)
+  GAUGE(min_entries_per_host, Accumulate)                                          \
+  GAUGE(max_entries_per_host, Accumulate)
 // clang-format on
 
 /**

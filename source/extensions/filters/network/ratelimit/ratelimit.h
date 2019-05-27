@@ -31,7 +31,7 @@ namespace RateLimitFilter {
   COUNTER(ok)                                                                                      \
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(cx_closed)                                                                               \
-  GAUGE  (active)
+  GAUGE  (active, Accumulate)
 // clang-format on
 
 /**

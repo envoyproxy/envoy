@@ -421,7 +421,8 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
   }
 }
 
-Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name) {
+Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
+                                                          Gauge::ImportMode import_mode) {
   if (parent_.rejectsAll()) {
     return parent_.null_gauge_;
   }
@@ -447,9 +448,9 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name) {
 
   return safeMakeStat<Gauge>(
       final_stat_name, central_cache_.gauges_, central_cache_.rejected_stats_,
-      [](StatDataAllocator& allocator, StatName name, absl::string_view tag_extracted_name,
-         const std::vector<Tag>& tags) -> GaugeSharedPtr {
-        return allocator.makeGauge(name, tag_extracted_name, tags);
+      [import_mode](StatDataAllocator& allocator, StatName name, absl::string_view tag_extracted_name,
+                    const std::vector<Tag>& tags) -> GaugeSharedPtr {
+        return allocator.makeGauge(name, tag_extracted_name, tags, import_mode);
       },
       tls_cache, tls_rejected_stats, parent_.null_gauge_);
 }

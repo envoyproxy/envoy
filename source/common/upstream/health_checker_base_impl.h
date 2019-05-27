@@ -23,8 +23,8 @@ namespace Upstream {
   COUNTER(passive_failure)                                                                         \
   COUNTER(network_failure)                                                                         \
   COUNTER(verify_cluster)                                                                          \
-  GAUGE  (healthy)                                                                                 \
-  GAUGE  (degraded)
+  GAUGE  (healthy, Accumulate)                                                                     \
+  GAUGE  (degraded, Accumulate)
 // clang-format on
 
 /**

@@ -45,8 +45,8 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   c1.add(100);
   EXPECT_EQ(200, found_counter->get().value());
 
-  Gauge& g1 = store_.gauge("g1");
-  Gauge& g2 = scope1->gauge("g2");
+  Gauge& g1 = store_.gauge("g1", Gauge::ImportMode::NeverImport);
+  Gauge& g2 = scope1->gauge("g2", Gauge::ImportMode::NeverImport);
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
   EXPECT_EQ("g1", g1.tagExtractedName());
@@ -108,8 +108,8 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
 
-  Gauge& g1 = store_.gaugeFromStatName(makeStatName("g1"));
-  Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"));
+  Gauge& g1 = store_.gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::NeverImport);
+  Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"), Gauge::ImportMode::NeverImport);
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
   EXPECT_EQ("g1", g1.tagExtractedName());
@@ -162,7 +162,7 @@ TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
 // clang-format off
 #define ALL_TEST_STATS(COUNTER, GAUGE, HISTOGRAM)                                                  \
   COUNTER  (test_counter)                                                                          \
-  GAUGE    (test_gauge)                                                                            \
+  GAUGE    (test_gauge, NeverImport)                                                               \
   HISTOGRAM(test_histogram)
 // clang-format on
 
@@ -189,8 +189,7 @@ TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {
   NullCounterImpl c(store_.symbolTable());
   EXPECT_EQ(0, c.latch());
   NullGaugeImpl g(store_.symbolTable());
-  g.setShouldImport(true);
-  EXPECT_EQ(absl::nullopt, g.cachedShouldImport());
+  EXPECT_EQ(0, g.value());
 }
 
 } // namespace Stats

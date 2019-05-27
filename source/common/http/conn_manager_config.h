@@ -26,17 +26,17 @@ namespace Http {
   COUNTER  (downstream_cx_destroy_active_rq)                                                       \
   COUNTER  (downstream_cx_destroy_local_active_rq)                                                 \
   COUNTER  (downstream_cx_destroy_remote_active_rq)                                                \
-  GAUGE    (downstream_cx_active)                                                                  \
-  GAUGE    (downstream_cx_ssl_active)                                                              \
-  GAUGE    (downstream_cx_http1_active)                                                            \
-  GAUGE    (downstream_cx_upgrades_active)                                                        \
-  GAUGE    (downstream_cx_http2_active)                                                            \
+  GAUGE    (downstream_cx_active, Accumulate)                                                      \
+  GAUGE    (downstream_cx_ssl_active, Accumulate)                                                  \
+  GAUGE    (downstream_cx_http1_active, Accumulate)                                                \
+  GAUGE    (downstream_cx_upgrades_active, Accumulate)                                             \
+  GAUGE    (downstream_cx_http2_active, Accumulate)                     \
   COUNTER  (downstream_cx_protocol_error)                                                          \
   HISTOGRAM(downstream_cx_length_ms)                                                               \
   COUNTER  (downstream_cx_rx_bytes_total)                                                          \
-  GAUGE    (downstream_cx_rx_bytes_buffered)                                                       \
+  GAUGE    (downstream_cx_rx_bytes_buffered, Accumulate)                                                       \
   COUNTER  (downstream_cx_tx_bytes_total)                                                          \
-  GAUGE    (downstream_cx_tx_bytes_buffered)                                                       \
+  GAUGE    (downstream_cx_tx_bytes_buffered, Accumulate)                                                       \
   COUNTER  (downstream_cx_drain_close)                                                             \
   COUNTER  (downstream_cx_idle_timeout)                                                            \
   COUNTER  (downstream_cx_overload_disable_keepalive)                                              \
@@ -46,7 +46,7 @@ namespace Http {
   COUNTER  (downstream_rq_total)                                                                   \
   COUNTER  (downstream_rq_http1_total)                                                             \
   COUNTER  (downstream_rq_http2_total)                                                             \
-  GAUGE    (downstream_rq_active)                                                                  \
+  GAUGE    (downstream_rq_active, Accumulate)                            \
   COUNTER  (downstream_rq_response_before_rq_complete)                                             \
   COUNTER  (downstream_rq_rx_reset)                                                                \
   COUNTER  (downstream_rq_tx_reset)                                                                \
