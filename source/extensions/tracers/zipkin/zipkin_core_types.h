@@ -6,8 +6,8 @@
 #include "envoy/common/time.h"
 #include "envoy/network/address.h"
 
-#include "common/common/hex.h"
 #include "common/common/assert.h"
+#include "common/common/hex.h"
 
 #include "extensions/tracers/zipkin/tracer_interface.h"
 #include "extensions/tracers/zipkin/util.h"
