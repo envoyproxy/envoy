@@ -470,13 +470,13 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   auto ctx = EVP_MD_CTX_new();
 
   // Step 3: initialize EVP_MD
-  absl::string_view hashFunc = luaL_checkstring(state, 3);
-  auto md = getDigest(hashFunc);
+  absl::string_view hash_func = luaL_checkstring(state, 3);
+  auto md = getDigest(hash_func);
 
   if (md == nullptr) {
     lua_pushboolean(state, false);
-    auto errMsg = absl::StrCat(hashFunc, " is not supported.");
-    lua_pushlstring(state, errMsg.data(), errMsg.length());
+    auto err_msg = absl::StrCat(hash_func, " is not supported.");
+    lua_pushlstring(state, err_msg.data(), err_msg.length());
     EVP_MD_CTX_free(ctx);
     return 2;
   }
@@ -485,8 +485,8 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   int ok = EVP_DigestVerifyInit(ctx, nullptr, md, nullptr, key);
   if (!ok) {
     lua_pushboolean(state, false);
-    absl::string_view errMsg = "Failed to initialize digest verify.";
-    lua_pushlstring(state, errMsg.data(), errMsg.length());
+    absl::string_view err_msg = "Failed to initialize digest verify.";
+    lua_pushlstring(state, err_msg.data(), err_msg.length());
     EVP_MD_CTX_free(ctx);
     return 2;
   }
@@ -512,8 +512,8 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   }
 
   lua_pushboolean(state, false);
-  auto errMsg = absl::StrCat("Failed to verify digest. Error code: ", ok);
-  lua_pushlstring(state, errMsg.data(), errMsg.length());
+  auto err_msg = absl::StrCat("Failed to verify digest. Error code: ", ok);
+  lua_pushlstring(state, err_msg.data(), err_msg.length());
   EVP_MD_CTX_free(ctx);
   return 2;
 }
