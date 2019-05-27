@@ -114,12 +114,16 @@ TEST_F(ExtAuthzFilterTest, OKWithOnData) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   // Confirm that the invocation of onNewConnection did NOT increment the active or total count!
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.total").value());
-  EXPECT_EQ(0U, stats_store_.gauge("ext_authz.name.active").value());
+  EXPECT_EQ(
+      0U,
+      stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
   // Confirm that the invocation of onData does increment the active and total count!
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
-  EXPECT_EQ(1U, stats_store_.gauge("ext_authz.name.active").value());
+  EXPECT_EQ(
+      1U,
+      stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
 
   EXPECT_CALL(filter_callbacks_, continueReading());
   request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
@@ -151,12 +155,16 @@ TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   // Confirm that the invocation of onNewConnection did NOT increment the active or total count!
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.total").value());
-  EXPECT_EQ(0U, stats_store_.gauge("ext_authz.name.active").value());
+  EXPECT_EQ(
+      0U,
+      stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
   // Confirm that the invocation of onData does increment the active and total count!
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
-  EXPECT_EQ(1U, stats_store_.gauge("ext_authz.name.active").value());
+  EXPECT_EQ(
+      1U,
+      stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*client_, cancel()).Times(0);

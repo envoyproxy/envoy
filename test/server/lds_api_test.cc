@@ -387,7 +387,7 @@ TEST_F(LdsApiTest, Basic) {
 
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
-  EXPECT_EQ(13237225503670494420U, lds.version.value());
+  EXPECT_EQ(13237225503670494420U, lds_version_.value());
 }
 
 // Regression test issue #2188 where an empty ca_cert_file field was created and caused the LDS
@@ -504,7 +504,7 @@ TEST_F(LdsApiTest, Failure) {
   EXPECT_EQ(1UL, store_.counter("listener_manager.lds.update_failure").value());
   // Validate that the schema error increments update_rejected stat.
   EXPECT_EQ(1UL, store_.counter("listener_manager.lds.update_failure").value());
-  EXPECT_EQ(0UL, lds.version_.value());
+  EXPECT_EQ(0UL, lds_version_.value());
 }
 
 TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
@@ -544,7 +544,7 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   callbacks_->onSuccess(std::move(message));
 
   EXPECT_EQ("0", lds_->versionInfo());
-  EXPECT_EQ(7148434200721666028U, lds.version_.value());
+  EXPECT_EQ(7148434200721666028U, lds_version_.value());
   expectRequest();
   interval_timer_->callback_();
 
@@ -582,7 +582,7 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   EXPECT_EQ("1", lds_->versionInfo());
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
-  EXPECT_EQ(13237225503670494420U, lds.version_.value());
+  EXPECT_EQ(13237225503670494420U, lds_version_.value());
 }
 
 } // namespace
