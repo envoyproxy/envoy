@@ -23,7 +23,9 @@ void expectValidBufferedProtoListOfSpans(const SpanBuffer& buffer) {
   id: {}
 )EOF",
         Base64::encode(span.traceIdAsByteString().c_str(), span.traceIdAsByteString().size()),
-        Base64::encode(span.parentIdAsByteString().c_str(), span.parentIdAsByteString().size()),
+        span.isSetParentId() ? Base64::encode(span.parentIdAsByteString().c_str(),
+                                              span.parentIdAsByteString().size())
+                             : "",
         Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()));
     expected_yaml += expected_span_yaml;
   }

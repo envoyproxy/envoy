@@ -327,7 +327,6 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_EQ(0ULL, span.annotations().size());
   EXPECT_EQ(0ULL, span.binaryAnnotations().size());
   EXPECT_EQ("0000000000000000", span.idAsHexString());
-  EXPECT_EQ("0000000000000000", span.parentIdAsHexString());
   EXPECT_EQ("0000000000000000", span.traceIdAsHexString());
   EXPECT_EQ(0LL, span.startTime());
   EXPECT_FALSE(span.debug());
@@ -346,7 +345,9 @@ parentId: {}
 id: {}
 )EOF",
       Base64::encode(span.traceIdAsByteString().c_str(), span.traceIdAsByteString().size()),
-      Base64::encode(span.parentIdAsByteString().c_str(), span.parentIdAsByteString().size()),
+      span.isSetParentId()
+          ? Base64::encode(span.parentIdAsByteString().c_str(), span.parentIdAsByteString().size())
+          : "",
       Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()));
 
   zipkin::proto3::Span expected_msg;
@@ -529,10 +530,6 @@ localEndpoint:
   serviceName: my_service_name
   ipv4: {}
   port: 3306
-remoteEndpoint:
-  serviceName: my_service_name
-  ipv4: {}
-  port: 3306
 tags:
   "http.return_code": "400"
   lc: my_component_name
@@ -540,8 +537,7 @@ tags:
       Base64::encode(span.traceIdAsByteString().c_str(), span.traceIdAsByteString().size()),
       Base64::encode(span.parentIdAsByteString().c_str(), span.parentIdAsByteString().size()),
       Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()), span.timestamp(),
-      /* duration= */ 3000, /* localEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11),
-      /* remoteEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11));
+      /* duration= */ 3000, /* localEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11));
 
   MessageUtil::loadFromYaml(expected_yaml, expected_msg);
   EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());
@@ -597,10 +593,6 @@ localEndpoint:
   serviceName: NEW_SERVICE_NAME
   ipv4: {}
   port: 3306
-remoteEndpoint:
-  serviceName: NEW_SERVICE_NAME
-  ipv4: {}
-  port: 3306
 tags:
   "http.return_code": "400"
   lc: my_component_name
@@ -608,8 +600,7 @@ tags:
       Base64::encode(span.traceIdAsByteString().c_str(), span.traceIdAsByteString().size()),
       Base64::encode(span.parentIdAsByteString().c_str(), span.parentIdAsByteString().size()),
       Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()), span.timestamp(),
-      /* duration= */ 3000, /* localEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11),
-      /* remoteEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11));
+      /* duration= */ 3000, /* localEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11));
 
   MessageUtil::loadFromYaml(expected_yaml, expected_msg);
   EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());

@@ -36,7 +36,7 @@ const std::string Endpoint::toJson() {
     writer.String("");
     writer.Key(ZipkinJsonFieldNames::get().ENDPOINT_PORT.c_str());
     writer.Uint(0);
-  } else {
+  } if (address_) {
     if (address_->ip()->version() == Network::Address::IpVersion::v4) {
       // IPv4
       writer.Key(ZipkinJsonFieldNames::get().ENDPOINT_IPV4.c_str());
