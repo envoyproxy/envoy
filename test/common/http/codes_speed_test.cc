@@ -64,13 +64,13 @@ public:
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
   Stats::StatNamePool pool_;
-  Stats::StatName from_az_;
-  Stats::StatName prefix_;
-  Stats::StatName req_vcluster_name_;
-  Stats::StatName test_cluster_;
-  Stats::StatName test_vhost_;
-  Stats::StatName to_az_;
-  Stats::StatName vhost_name_;
+  const Stats::StatName from_az_;
+  const Stats::StatName prefix_;
+  const Stats::StatName req_vcluster_name_;
+  const Stats::StatName test_cluster_;
+  const Stats::StatName test_vhost_;
+  const Stats::StatName to_az_;
+  const Stats::StatName vhost_name_;
 };
 
 } // namespace Http
