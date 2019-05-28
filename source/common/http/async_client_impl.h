@@ -270,6 +270,7 @@ private:
     const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }
     const Router::RouteEntry* routeEntry() const override { return &route_entry_; }
     const Router::Decorator* decorator() const override { return nullptr; }
+    const Router::RouteTracing* tracingConfig() const override { return nullptr; }
     const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
       return nullptr;
     }

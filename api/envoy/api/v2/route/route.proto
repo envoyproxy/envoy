@@ -230,6 +230,10 @@ message Route {
   // Specifies a list of HTTP headers that should be removed from each response
   // to requests matching this route.
   repeated string response_headers_to_remove = 11;
+
+  // Presence of the object defines whether the connection manager's tracing configuration
+  // is overridden by this route specific instance.
+  Tracing tracing = 15;
 }
 
 // Compared to the :ref:`cluster <envoy_api_field_route.RouteAction.cluster>` field that specifies a
@@ -1005,6 +1009,34 @@ message Decorator {
   //   by the :ref:`x-envoy-decorator-operation
   //   <config_http_filters_router_x-envoy-decorator-operation>` header.
   string operation = 1 [(validate.rules).string.min_bytes = 1];
+}
+
+message Tracing {
+
+  // Target percentage of requests managed by this HTTP connection manager that will be force
+  // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
+  // header is set. This field is a direct analog for the runtime variable
+  // 'tracing.client_sampling' in the :ref:`HTTP Connection Manager
+  // <config_http_conn_man_runtime>`.
+  // Default: 100%
+  envoy.type.FractionalPercent client_sampling = 1;
+
+  // Target percentage of requests managed by this HTTP connection manager that will be randomly
+  // selected for trace generation, if not requested by the client or not forced. This field is
+  // a direct analog for the runtime variable 'tracing.random_sampling' in the
+  // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
+  // Default: 100%
+  envoy.type.FractionalPercent random_sampling = 2;
+
+  // Target percentage of requests managed by this HTTP connection manager that will be traced
+  // after all other sampling checks have been applied (client-directed, force tracing, random
+  // sampling). This field functions as an upper limit on the total configured sampling rate. For
+  // instance, setting client_sampling to 100% but overall_sampling to 1% will result in only 1%
+  // of client requests with the appropriate headers to be force traced. This field is a direct
+  // analog for the runtime variable 'tracing.global_enabled' in the
+  // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
+  // Default: 100%
+  envoy.type.FractionalPercent overall_sampling = 3;
 }
 
 // A virtual cluster is a way of specifying a regex matching rule against

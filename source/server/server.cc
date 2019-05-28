@@ -25,7 +25,6 @@
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/config/bootstrap_json.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/http/codes.h"
