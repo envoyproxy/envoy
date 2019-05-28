@@ -13,4 +13,4 @@ namespace Envoy {
 // This method will replace any of those characters found with spaces.
 std::string filterInvalidCharacters(absl::string_view string);
 
-}  // namespace Envoy
+} // namespace Envoy
