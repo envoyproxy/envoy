@@ -310,6 +310,7 @@ envoy_cc_fuzz_test(
     srcs = ["utility_fuzz_test.cc"],
     corpus = "utility_corpus",
     deps = [
+        ":common_fuzz_lib",
         ":utility_fuzz_proto_cc",
         "//source/common/http:utility_lib",
         "//test/test_common:utility_lib",
