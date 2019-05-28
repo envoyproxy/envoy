@@ -156,10 +156,10 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
                                             Stats::Gauge::ImportMode::Accumulate);
   Stats::Gauge& pressure_gauge1 =
       stats_.gauge("overload.envoy.resource_monitors.fake_resource1.pressure",
-                   Stats::Gauge::ImportMode::Accumulate);
+                   Stats::Gauge::ImportMode::NeverImport);
   Stats::Gauge& pressure_gauge2 =
       stats_.gauge("overload.envoy.resource_monitors.fake_resource2.pressure",
-                   Stats::Gauge::ImportMode::Accumulate);
+                   Stats::Gauge::ImportMode::NeverImport);
   const OverloadActionState& action_state =
       manager->getThreadLocalOverloadState().getState("envoy.overload_actions.dummy_action");
 

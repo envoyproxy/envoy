@@ -451,14 +451,13 @@ protected:
   DeprecatedFieldsTest()
       : loader_(new Runtime::ScopedLoaderSingleton(
             Runtime::LoaderPtr{new Runtime::LoaderImpl({}, rand_, store_, tls_)})),
-        runtime_deprecated_feature_use_(store_.gauge("runtime.deprecated_feature_use",
-                                                     Stats::Gauge::ImportMode::NeverImport)) {}
+        runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")) {}
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::IsolatedStoreImpl store_;
   Runtime::MockRandomGenerator rand_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
-  Stats::Gauge& runtime_deprecated_feature_use_;
+  Stats::Counter& runtime_deprecated_feature_use_;
 };
 
 TEST_F(DeprecatedFieldsTest, NoCrashIfRuntimeMissing) {

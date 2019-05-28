@@ -105,15 +105,15 @@ protected:
     EXPECT_EQ(removed, server_.stats_store_.counter("listener_manager.listener_removed").value());
     EXPECT_EQ(warming, server_.stats_store_
                            .gauge("listener_manager.total_listeners_warming",
-                                  Stats::Gauge::ImportMode::Accumulate)
+                                  Stats::Gauge::ImportMode::NeverImport)
                            .value());
     EXPECT_EQ(active, server_.stats_store_
                           .gauge("listener_manager.total_listeners_active",
-                                 Stats::Gauge::ImportMode::Accumulate)
+                                 Stats::Gauge::ImportMode::NeverImport)
                           .value());
     EXPECT_EQ(draining, server_.stats_store_
                             .gauge("listener_manager.total_listeners_draining",
-                                   Stats::Gauge::ImportMode::Accumulate)
+                                   Stats::Gauge::ImportMode::NeverImport)
                             .value());
   }
 

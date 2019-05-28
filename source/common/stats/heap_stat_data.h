@@ -12,6 +12,7 @@
 #include "common/common/thread_annotations.h"
 #include "common/stats/metric_impl.h"
 #include "common/stats/stat_data_allocator_impl.h"
+#include "common/stats/stat_merger.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -74,8 +75,21 @@ public:
 
   GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
                            const std::vector<Tag>& tags, Gauge::ImportMode import_mode) override {
-    return std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(
+    GaugeSharedPtr gauge = std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(
         alloc(name), *this, tag_extracted_name, tags, import_mode);
+
+    if (gauge->importMode() == Gauge::ImportMode::Accumulate) {
+      if (!StatMerger::shouldImportBasedOnRegex(gauge->name())) {
+        std::cerr << "ImportMode conflict: regex says no, arg says yes: " << gauge->name()
+                  << std::endl;
+        new std::string;
+      }
+    } else if (StatMerger::shouldImportBasedOnRegex(gauge->name())) {
+      std::cerr << "ImportMode conflict: regex says yes, arg says no: " << gauge->name()
+                << std::endl;
+      new std::string;
+    }
+    return gauge;
   }
 
 #ifndef ENVOY_CONFIG_COVERAGE

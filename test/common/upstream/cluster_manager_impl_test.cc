@@ -252,11 +252,11 @@ public:
     EXPECT_EQ(removed, factory_.stats_.counter("cluster_manager.cluster_removed").value());
     EXPECT_EQ(active,
               factory_.stats_
-                  .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::Accumulate)
+                  .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
                   .value());
     EXPECT_EQ(warming,
               factory_.stats_
-                  .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::Accumulate)
+                  .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::NeverImport)
                   .value());
   }
 
@@ -2541,20 +2541,20 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
 
   // Add the updated cluster.
   EXPECT_EQ(2, factory_.stats_
-                   .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::Accumulate)
+                   .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_modified").value());
   EXPECT_EQ(0, factory_.stats_
-                   .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::Accumulate)
+                   .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml_updated), "version2",
                                                    dummyWarmingCb));
   EXPECT_EQ(2, factory_.stats_
-                   .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::Accumulate)
+                   .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_modified").value());
   EXPECT_EQ(1, factory_.stats_
-                   .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::Accumulate)
+                   .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());
 
   // Promote the updated cluster from warming to active & assert the old timer was disabled
@@ -2563,10 +2563,10 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   updated->initialize_callback_();
 
   EXPECT_EQ(2, factory_.stats_
-                   .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::Accumulate)
+                   .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());
   EXPECT_EQ(0, factory_.stats_
-                   .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::Accumulate)
+                   .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());
 }
 

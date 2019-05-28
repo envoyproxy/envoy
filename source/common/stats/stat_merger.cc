@@ -7,15 +7,17 @@ namespace Stats {
 
 StatMerger::StatMerger(Stats::Store& target_store) : temp_scope_(target_store.createScope("")) {}
 
-bool StatMerger::shouldImport(const Gauge& gauge, const std::string& gauge_name) {
+bool StatMerger::shouldImportBasedOnRegex(const std::string& gauge_name) {
   // Gauge name *substrings*, and special logic to use for combining those gauges' values.
   static const auto* nonstandard_combine_logic = new std::vector<std::regex>{
       // Any .version is either a static property of the binary, or an opaque identifier for
       // resources that are not passed across hot restart.
       std::regex(".*\\.version$"),
+      std::regex("^version$"),
       // Once the child is up and reporting stats, its own control plane state and liveness is what
       // we're interested in.
       std::regex(".*\\.control_plane.connected_state$"),
+      std::regex("^control_plane.connected_state$"),
       std::regex("^server.live$"),
       // Properties that should reasonably have some continuity across hot restart. The parent's
       // last value should be a relatively accurate starting point, and then the child can update
@@ -24,7 +26,9 @@ bool StatMerger::shouldImport(const Gauge& gauge, const std::string& gauge_name)
       std::regex("^cluster_manager.active_clusters$"),
       std::regex("^cluster_manager.warming_clusters$"),
       std::regex("^cluster\\..*\\.membership_.*$"),
+      std::regex("^membership_.*$"),
       std::regex("^cluster\\..*\\.max_host_weight$"),
+      std::regex("^max_host_weight$"),
       std::regex(".*\\.total_principals$"),
       std::regex("^listener_manager.total_listeners_active$"),
       std::regex("^overload\\..*\\.pressure$"),
@@ -38,14 +42,12 @@ bool StatMerger::shouldImport(const Gauge& gauge, const std::string& gauge_name)
       std::regex("^runtime.admin_overrides_active$"),
       std::regex("^runtime.num_keys$"),
   };
+  std::smatch match;
   for (const auto& exception : *nonstandard_combine_logic) {
-    std::smatch match;
     if (std::regex_match(gauge_name, match, exception)) {
-      ASSERT(gauge.importMode() == Gauge::ImportMode::NeverImport);
       return false;
     }
   }
-  ASSERT(gauge.importMode() == Gauge::ImportMode::Accumulate);
   return true;
 }
 
@@ -61,11 +63,16 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
     StatName stat_name = storage.statName();
     absl::optional<std::reference_wrapper<const Gauge>> gauge_opt =
         temp_scope_->findGauge(stat_name);
-    if (gauge_opt && !StatMerger::shouldImport(*gauge_opt, gauge.first)) {
+    if (gauge_opt && gauge_opt->get().importMode() == Gauge::ImportMode::NeverImport) {
       continue;
     }
 
-    // Looks like this Gauge is accumulated; we can get a non-const copy of it.
+    // Looks like this Gauge is accumulated -- otherwise it not be in the
+    // map. Independent of whether we already have seen this gauge allocated
+    // before, we'll need a read/write copy now in which to save the old value.
+    //
+    // The corner-case here is if a gauge changes across versions from Accumulate
+    // to NeverImport, we'll drop the old value.
     auto& gauge_ref = temp_scope_->gaugeFromStatName(stat_name, Gauge::ImportMode::Accumulate);
     uint64_t& parent_value_ref = parent_gauge_values_[gauge_ref.statName()];
     uint64_t old_parent_value = parent_value_ref;

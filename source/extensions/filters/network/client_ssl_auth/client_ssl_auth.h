@@ -34,7 +34,7 @@ namespace ClientSslAuth {
   COUNTER(auth_ip_white_list)                                                                      \
   COUNTER(auth_digest_match)                                                                       \
   COUNTER(auth_digest_no_match)                                                                    \
-  GAUGE  (total_principals, Accumulate)
+  GAUGE  (total_principals, NeverImport)
 // clang-format on
 
 /**

@@ -182,7 +182,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(1U,
             stats_store_
-                .gauge("auth.clientssl.vpn.total_principals", Stats::Gauge::ImportMode::Accumulate)
+                .gauge("auth.clientssl.vpn.total_principals", Stats::Gauge::ImportMode::NeverImport)
                 .value());
 
   // Create a new filter for an SSL connection with an authorized cert.

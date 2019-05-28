@@ -86,9 +86,9 @@ typedef std::unique_ptr<ListenerImpl> ListenerImplPtr;
   COUNTER(listener_removed)                                                                        \
   COUNTER(listener_create_success)                                                                 \
   COUNTER(listener_create_failure)                                                                 \
-  GAUGE  (total_listeners_warming, Accumulate)                                     \
-  GAUGE  (total_listeners_active, Accumulate)                                                                  \
-  GAUGE  (total_listeners_draining, Accumulate)
+  GAUGE  (total_listeners_warming, NeverImport)                                                    \
+  GAUGE  (total_listeners_active, NeverImport)                                                     \
+  GAUGE  (total_listeners_draining, NeverImport)
 // clang-format on
 
 /**

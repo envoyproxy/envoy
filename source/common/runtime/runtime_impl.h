@@ -197,6 +197,8 @@ public:
   Snapshot& snapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
 
+  RuntimeStats& stats() { return stats_; }
+
 protected:
   // Identical the public constructor but does not call loadSnapshot(). Subclasses must call
   // loadSnapshot() themselves to create the initial snapshot, since loadSnapshot calls the virtual
