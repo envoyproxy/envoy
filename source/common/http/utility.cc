@@ -93,26 +93,36 @@ std::string Utility::createSslRedirectPath(const HeaderMap& headers) {
 }
 
 Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
-  QueryParams params;
   size_t start = url.find('?');
   if (start == std::string::npos) {
+    QueryParams params;
     return params;
   }
 
   start++;
-  while (start < url.size()) {
-    size_t end = url.find('&', start);
+  return parseParameters(url, start);
+}
+
+Utility::QueryParams Utility::parseFromBody(absl::string_view body) {
+  return parseParameters(body, 0);
+}
+
+Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start) {
+  QueryParams params;
+
+  while (start < data.size()) {
+    size_t end = data.find('&', start);
     if (end == std::string::npos) {
-      end = url.size();
+      end = data.size();
     }
-    absl::string_view param(url.data() + start, end - start);
+    absl::string_view param(data.data() + start, end - start);
 
     const size_t equal = param.find('=');
     if (equal != std::string::npos) {
-      params.emplace(StringUtil::subspan(url, start, start + equal),
-                     StringUtil::subspan(url, start + equal + 1, end));
+      params.emplace(StringUtil::subspan(data, start, start + equal),
+                     StringUtil::subspan(data, start + equal + 1, end));
     } else {
-      params.emplace(StringUtil::subspan(url, start, end), "");
+      params.emplace(StringUtil::subspan(data, start, end), "");
     }
 
     start = end + 1;

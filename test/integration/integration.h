@@ -98,6 +98,7 @@ public:
   void write(const std::string& data, bool end_stream = false, bool verify = true);
   const std::string& data() { return payload_reader_->data(); }
   bool connected() const { return !disconnected_; }
+  void clearData() { payload_reader_->clearData(); }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -353,8 +354,9 @@ protected:
   FakeStreamPtr xds_stream_;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
-  bool create_xds_upstream_{false}; // TODO(alyssawilk) true by default.
+  bool create_xds_upstream_{false};
   bool tls_xds_upstream_{false};
+  bool use_lds_{true}; // Use the integration framework's LDS set up.
   Grpc::SotwOrDelta sotw_or_delta_{Grpc::SotwOrDelta::Sotw};
 
 private:

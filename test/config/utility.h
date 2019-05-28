@@ -143,8 +143,15 @@ public:
   // Modifiers will be applied just before ports are modified in finalize
   void addConfigModifier(HttpModifierFunction function);
 
+  // Apply any outstanding config modifiers, stick all the listeners in a discovery response message
+  // and write it to the lds file.
+  void setLds(absl::string_view version_info);
+
   // Return the bootstrap configuration for hand-off to Envoy.
   const envoy::config::bootstrap::v2::Bootstrap& bootstrap() { return bootstrap_; }
+
+  // Allow a finalized configuration to be edited for generating xDS responses
+  void applyConfigModifiers();
 
 private:
   // Load the first HCM struct from the first listener into a parsed proto.

@@ -18,6 +18,8 @@ public:
   const std::string Secret{"type.googleapis.com/envoy.api.v2.auth.Secret"};
   const std::string RouteConfiguration{"type.googleapis.com/envoy.api.v2.RouteConfiguration"};
   const std::string VirtualHost{"type.googleapis.com/envoy.api.v2.route.VirtualHost"};
+  const std::string ScopedRouteConfiguration{
+      "type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration"};
 };
 
 typedef ConstSingleton<TypeUrlValues> TypeUrl;

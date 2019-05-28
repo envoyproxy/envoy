@@ -589,12 +589,21 @@ public:
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
     EXPECT_TRUE(admin_.setCurrentClientCertDetails().empty());
+    admin_filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                         Buffer::Instance& response, absl::string_view method) {
+                         Buffer::Instance& response, absl::string_view method,
+                         absl::string_view body = absl::string_view()) {
+    if (!body.empty()) {
+      request_headers_.insertContentType().value(
+          Http::Headers::get().ContentTypeValues.FormUrlEncoded);
+      callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>(body);
+    }
+
     request_headers_.insertMethod().value(method.data(), method.size());
     admin_filter_.decodeHeaders(request_headers_, false);
+
     return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
   }
 
@@ -617,6 +626,7 @@ public:
   AdminImpl admin_;
   Http::TestHeaderMapImpl request_headers_;
   Server::AdminFilter admin_filter_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
@@ -994,6 +1004,22 @@ TEST_P(AdminInstanceTest, RuntimeModify) {
   EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
   EXPECT_EQ(Http::Code::OK,
             postCallback("/runtime_modify?foo=bar&x=42&nothing=", header_map, response));
+  EXPECT_EQ("OK\n", response.toString());
+}
+
+TEST_P(AdminInstanceTest, RuntimeModifyParamsInBody) {
+  Runtime::MockLoader loader;
+  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
+
+  const std::string key = "routing.traffic_shift.foo";
+  const std::string value = "numerator: 1\ndenominator: TEN_THOUSAND\n";
+  const std::unordered_map<std::string, std::string> overrides = {{key, value}};
+  EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
+
+  const std::string body = fmt::format("{}={}", key, value);
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(Http::Code::OK, runCallback("/runtime_modify", header_map, response, "POST", body));
   EXPECT_EQ("OK\n", response.toString());
 }
 

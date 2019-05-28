@@ -342,6 +342,14 @@ TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
   tls_.shutdownThread();
 }
 
+TEST_F(StatsThreadLocalStoreTest, ConstSymtabAccessor) {
+  ScopePtr scope = store_->createScope("scope.");
+  const Scope& cscope = *scope;
+  const SymbolTable& const_symbol_table = cscope.constSymbolTable();
+  SymbolTable& symbol_table = scope->symbolTable();
+  EXPECT_EQ(&const_symbol_table, &symbol_table);
+}
+
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -351,15 +359,12 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_EQ(1UL, store_->counters().size());
   CounterSharedPtr c1 = TestUtility::findCounter(*store_, "scope1.c1");
   EXPECT_EQ("scope1.c1", c1->name());
-  EXPECT_EQ(TestUtility::findByName(store_->source().cachedCounters(), "scope1.c1"), c1);
+  EXPECT_EQ(TestUtility::findByName(store_->counters(), "scope1.c1"), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(tls_, runOnAllThreads(_, _));
   scope1.reset();
   EXPECT_EQ(0UL, store_->counters().size());
-  EXPECT_EQ(1UL, store_->source().cachedCounters().size());
-  store_->source().clearCache();
-  EXPECT_EQ(0UL, store_->source().cachedCounters().size());
 
   EXPECT_EQ(1L, c1.use_count());
   c1.reset();
@@ -504,6 +509,13 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(2UL, store_.gauges().size());
 }
 
+TEST_F(LookupWithStatNameTest, NotFound) {
+  StatName not_found(makeStatName("not_found"));
+  EXPECT_FALSE(store_.findCounter(not_found));
+  EXPECT_FALSE(store_.findGauge(not_found));
+  EXPECT_FALSE(store_.findHistogram(not_found));
+}
+
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
   envoy::config::metrics::v2::StatsConfig stats_config_;
@@ -530,6 +542,7 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   EXPECT_EQ(noop_counter.value(), 0);
   Counter& noop_counter_2 = store_->counter("noop_counter_2");
   EXPECT_EQ(&noop_counter, &noop_counter_2);
+  EXPECT_FALSE(noop_counter.used()); // hardcoded to return false in NullMetricImpl.
 
   // Gauge
   Gauge& noop_gauge = store_->gauge("noop_gauge");
