@@ -83,6 +83,7 @@ private:
   Network::PostIoAction doHandshake();
   void drainErrorQueue();
   void shutdownSsl();
+  bool isThreadSafe() const { return run_tid_->isCurrentThreadId(); }
 
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
@@ -96,6 +97,7 @@ private:
   mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
   std::vector<Envoy::Ssl::PrivateKeyConnectionPtr> pk_connections_;
   bool async_handshake_in_progress_{};
+  Thread::ThreadIdPtr run_tid_;
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory,

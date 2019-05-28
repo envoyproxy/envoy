@@ -64,6 +64,7 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   // private key methods).
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> providers =
       ctx_->getPrivateKeyMethodProviders();
+
   for (auto const& provider : providers) {
     Ssl::PrivateKeyConnectionPtr pk_connection =
         provider->getPrivateKeyConnection(ssl_.get(), *this, callbacks_->connection().dispatcher());
@@ -75,6 +76,12 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
     // because they need to associated with the SSL objects so that user data can be passed to the
     // BoringSSL private key methods.
     pk_connections_.emplace_back(std::move(pk_connection));
+
+    if (run_tid_ == nullptr) {
+      // Store the dispatcher thread ID. We will check that the caller is the same when the private
+      // key method callback is received.
+      run_tid_ = callbacks_->connection().dispatcher().getCurrentThreadId();
+    }
   }
 
   BIO* bio = BIO_new_socket(callbacks_->ioHandle().fd(), 0);
@@ -142,6 +149,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 }
 
 void SslSocket::complete() {
+  ASSERT(isThreadSafe());
   ASSERT(async_handshake_in_progress_);
   async_handshake_in_progress_ = false;
 
