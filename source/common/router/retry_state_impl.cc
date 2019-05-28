@@ -207,6 +207,17 @@ RetryStatus RetryStateImpl::shouldRetryReset(Http::StreamResetReason reset_reaso
   return shouldRetry(wouldRetryFromReset(reset_reason), callback);
 }
 
+RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) {
+  // A hedged retry on per try timeout is always retried if there are retries
+  // left. NOTE: this is a bit different than non-hedged per try timeouts which
+  // are only retried if the applicable retry policy specifies either
+  // RETRY_ON_5XX or RETRY_ON_GATEWAY_ERROR. This is because these types of
+  // retries are associated with a stream reset which is analogous to a gateway
+  // error. When hedging on per try timeout is enabled, however, there is no
+  // stream reset.
+  return shouldRetry([]() -> bool { return true; }, callback);
+}
+
 bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_headers) {
   if (response_headers.EnvoyOverloaded() != nullptr) {
     return false;

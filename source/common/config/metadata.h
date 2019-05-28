@@ -55,6 +55,19 @@ public:
   static_assert(std::is_base_of<Config::TypedMetadataFactory, factoryClass>::value,
                 "Factory type must be inherited from Envoy::Config::TypedMetadataFactory.");
   TypedMetadataImpl(const envoy::api::v2::core::Metadata& metadata) : data_() {
+    populateFrom(metadata);
+  }
+
+  const TypedMetadata::Object* getData(const std::string& key) const override {
+    const auto& it = data_.find(key);
+    return it == data_.end() ? nullptr : it->second.get();
+  }
+
+protected:
+  /* Attempt to run each of the registered factories for TypedMetadata, to
+   * populate the data_ map.
+   */
+  void populateFrom(const envoy::api::v2::core::Metadata& metadata) {
     auto& data_by_key = metadata.filter_metadata();
     for (const auto& it : Registry::FactoryRegistry<factoryClass>::factories()) {
       const auto& meta_iter = data_by_key.find(it.first);
@@ -64,12 +77,6 @@ public:
     }
   }
 
-  const TypedMetadata::Object* getData(const std::string& key) const override {
-    const auto& it = data_.find(key);
-    return it == data_.end() ? nullptr : it->second.get();
-  }
-
-private:
   std::unordered_map<std::string, std::unique_ptr<const TypedMetadata::Object>> data_;
 };
 

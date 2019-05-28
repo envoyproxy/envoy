@@ -27,6 +27,9 @@ admin:
     socket_address:
       address: 127.0.0.1
       port_value: 0
+dynamic_resources:
+  lds_config:
+    path: /dev/null
 static_resources:
   clusters:
     name: cluster_0
@@ -240,11 +243,17 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   }
 }
 
-void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
-  RELEASE_ASSERT(!finalized_, "");
+void ConfigHelper::applyConfigModifiers() {
   for (auto config_modifier : config_modifiers_) {
     config_modifier(bootstrap_);
   }
+  config_modifiers_.clear();
+}
+
+void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
+  RELEASE_ASSERT(!finalized_, "");
+
+  applyConfigModifiers();
 
   uint32_t port_idx = 0;
   bool eds_hosts = false;
@@ -316,7 +325,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
                             *cluster->mutable_transport_socket(), tls_config);
     }
   }
-  ASSERT(port_idx == ports.size() || eds_hosts || custom_cluster);
+  ASSERT(port_idx == ports.size() || eds_hosts || custom_cluster ||
+         bootstrap_.dynamic_resources().has_cds_config());
 
   if (!connect_timeout_set_) {
 #ifdef __APPLE__
@@ -598,6 +608,39 @@ void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
   });
 }
 
+void ConfigHelper::setLds(absl::string_view version_info) {
+  applyConfigModifiers();
+
+  envoy::api::v2::DiscoveryResponse lds;
+  lds.set_version_info(std::string(version_info));
+  for (auto& listener : bootstrap_.static_resources().listeners()) {
+    ProtobufWkt::Any* resource = lds.add_resources();
+    resource->PackFrom(listener);
+  }
+
+  const std::string lds_filename = bootstrap().dynamic_resources().lds_config().path();
+  std::string file = TestEnvironment::writeStringToFileForTest(
+      "new_lds_file", MessageUtil::getJsonStringFromMessage(lds));
+  TestUtility::renameFile(file, lds_filename);
+}
+
+CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {}
+
+void CdsHelper::setCds(const std::vector<envoy::api::v2::Cluster>& clusters) {
+  // Write to file the DiscoveryResponse and trigger inotify watch.
+  envoy::api::v2::DiscoveryResponse cds_response;
+  cds_response.set_version_info(std::to_string(cds_version_++));
+  cds_response.set_type_url(Config::TypeUrl::get().Cluster);
+  for (const auto& cluster : clusters) {
+    cds_response.add_resources()->PackFrom(cluster);
+  }
+  // Past the initial write, need move semantics to trigger inotify move event that the
+  // FilesystemSubscriptionImpl is subscribed to.
+  std::string path =
+      TestEnvironment::writeStringToFileForTest("cds.update.pb_text", cds_response.DebugString());
+  TestUtility::renameFile(path, cds_path_);
+}
+
 EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("eds.pb_text", "")) {
   // cluster.cluster_0.update_success will be incremented on the initial
   // load when Envoy comes up.
@@ -605,8 +648,7 @@ EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("ed
 }
 
 void EdsHelper::setEds(
-    const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
-    IntegrationTestServerStats& server_stats) {
+    const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments) {
   // Write to file the DiscoveryResponse and trigger inotify watch.
   envoy::api::v2::DiscoveryResponse eds_response;
   eds_response.set_version_info(std::to_string(eds_version_++));
@@ -619,10 +661,16 @@ void EdsHelper::setEds(
   std::string path =
       TestEnvironment::writeStringToFileForTest("eds.update.pb_text", eds_response.DebugString());
   TestUtility::renameFile(path, eds_path_);
+}
+
+void EdsHelper::setEdsAndWait(
+    const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
+    IntegrationTestServerStats& server_stats) {
+  setEds(cluster_load_assignments);
   // Make sure Envoy has consumed the update now that it is running.
-  server_stats.waitForCounterGe("cluster.cluster_0.update_success", ++update_successes_);
+  ++update_successes_;
+  server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
   RELEASE_ASSERT(
       update_successes_ == server_stats.counter("cluster.cluster_0.update_success")->value(), "");
 }
-
 } // namespace Envoy

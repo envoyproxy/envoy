@@ -22,7 +22,8 @@ public:
   // filesystem delivery to simplify test mechanics.
   void setEndpoints(uint32_t total_endpoints, uint32_t healthy_endpoints,
                     uint32_t degraded_endpoints, bool remaining_unhealthy = true,
-                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) {
+                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
+                    bool await_update = true) {
     ASSERT(total_endpoints >= healthy_endpoints + degraded_endpoints);
     envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("cluster_0");
@@ -45,41 +46,115 @@ public:
                                         : envoy::api::v2::core::HealthStatus::UNKNOWN);
       }
     }
-    eds_helper_.setEds({cluster_load_assignment}, *test_server_);
+
+    if (await_update) {
+      eds_helper_.setEdsAndWait({cluster_load_assignment}, *test_server_);
+    } else {
+      eds_helper_.setEds({cluster_load_assignment});
+    }
   }
 
   void initializeTest(bool http_active_hc) {
     setUpstreamCount(4);
+    if (use_http2_hc_) {
+      setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    }
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      // Switch predefined cluster_0 to CDS filesystem sourcing.
+      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
+      bootstrap.mutable_static_resources()->clear_clusters();
+    });
+
+    // Set validate_clusters to false to allow us to reference a CDS cluster.
     config_helper_.addConfigModifier(
-        [this, http_active_hc](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-          // Switch predefined cluster_0 to EDS filesystem sourcing.
-          auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
-          cluster_0->mutable_hosts()->Clear();
-          cluster_0->set_type(envoy::api::v2::Cluster::EDS);
-          auto* eds_cluster_config = cluster_0->mutable_eds_cluster_config();
-          eds_cluster_config->mutable_eds_config()->set_path(eds_helper_.eds_path());
-          if (http_active_hc) {
-            auto* health_check = cluster_0->add_health_checks();
-            health_check->mutable_timeout()->set_seconds(30);
-            // TODO(mattklein123): Consider using simulated time here.
-            health_check->mutable_interval()->CopyFrom(
-                Protobuf::util::TimeUtil::MillisecondsToDuration(100));
-            health_check->mutable_no_traffic_interval()->CopyFrom(
-                Protobuf::util::TimeUtil::MillisecondsToDuration(100));
-            health_check->mutable_unhealthy_threshold()->set_value(1);
-            health_check->mutable_healthy_threshold()->set_value(1);
-            health_check->mutable_http_health_check()->set_path("/healthcheck");
-          }
-        });
+        [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+               hcm) { hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false); });
+
+    cluster_.mutable_connect_timeout()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+    cluster_.set_name("cluster_0");
+    cluster_.mutable_hosts()->Clear();
+    cluster_.set_type(envoy::api::v2::Cluster::EDS);
+    auto* eds_cluster_config = cluster_.mutable_eds_cluster_config();
+    eds_cluster_config->mutable_eds_config()->set_path(eds_helper_.eds_path());
+    if (http_active_hc) {
+      auto* health_check = cluster_.add_health_checks();
+      health_check->mutable_timeout()->set_seconds(30);
+      // TODO(mattklein123): Consider using simulated time here.
+      health_check->mutable_interval()->CopyFrom(
+          Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+      health_check->mutable_no_traffic_interval()->CopyFrom(
+          Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+      health_check->mutable_unhealthy_threshold()->set_value(1);
+      health_check->mutable_healthy_threshold()->set_value(1);
+      health_check->mutable_http_health_check()->set_path("/healthcheck");
+      health_check->mutable_http_health_check()->set_use_http2(use_http2_hc_);
+    }
+    setEndpoints(0, 0, 0, true, absl::nullopt, false);
+    cds_helper_.setCds({cluster_});
     initialize();
-    setEndpoints(0, 0, 0);
+    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   }
 
+  bool use_http2_hc_{};
   EdsHelper eds_helper_;
+  CdsHelper cds_helper_;
+  envoy::api::v2::Cluster cluster_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, EdsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+// Verifies that a new cluster can we warmed when using HTTP/2 health checking. Regression test
+// of the issue detailed in issue #6951.
+TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
+  use_http2_hc_ = true;
+  initializeTest(true);
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  setEndpoints(1, 0, 0, false);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Wait for the first HC and verify the host is healthy. This should warm the initial cluster.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+
+  // Trigger a CDS update. This should cause a new cluster to require warming, blocked on the host
+  // being health checked.
+  cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
+  cds_helper_.setCds({cluster_});
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  EXPECT_EQ(1, test_server_->gauge("cluster_manager.warming_clusters")->value());
+
+  // We need to do a bunch of work to get a hold of second hc connection.
+  FakeHttpConnectionPtr fake_upstream_connection;
+  auto result = fake_upstreams_[0]->waitForHttpConnection(
+      *dispatcher_, fake_upstream_connection, TestUtility::DefaultTimeout, max_request_headers_kb_);
+  RELEASE_ASSERT(result, result.message());
+
+  FakeStreamPtr upstream_request;
+  result = fake_upstream_connection->waitForNewStream(*dispatcher_, upstream_request);
+  RELEASE_ASSERT(result, result.message());
+  // Wait for the stream to be completely received.
+  result = upstream_request->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Respond with a health check. This will cause the previous cluster to be destroyed inline as
+  // part of processing the response.
+  upstream_request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  EXPECT_EQ(0, test_server_->gauge("cluster_manager.warming_clusters")->value());
+
+  // Since the second connection is not managed by the integration test base we need to close it
+  // ourselves.
+  result = fake_upstream_connection->close();
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  fake_upstream_connection.reset();
+}
 
 // Verify that a host stabilized via active health checking which is first removed from EDS and
 // then fails health checking is removed.
@@ -111,11 +186,7 @@ TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
 
 // Verifies that endpoints are ignored until health checked when configured to.
 TEST_P(EdsIntegrationTest, EndpointWarmingSuccessfulHc) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-    // Switch predefined cluster_0 to EDS filesystem sourcing.
-    auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster_0->mutable_common_lb_config()->set_ignore_new_hosts_until_first_hc(true);
-  });
+  cluster_.mutable_common_lb_config()->set_ignore_new_hosts_until_first_hc(true);
 
   // Endpoints are initially excluded.
   initializeTest(true);
@@ -138,11 +209,7 @@ TEST_P(EdsIntegrationTest, EndpointWarmingSuccessfulHc) {
 // Verifies that endpoints are ignored until health checked when configured to when the first
 // health check fails.
 TEST_P(EdsIntegrationTest, EndpointWarmingFailedHc) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-    // Switch predefined cluster_0 to EDS filesystem sourcing.
-    auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster_0->mutable_common_lb_config()->set_ignore_new_hosts_until_first_hc(true);
-  });
+  cluster_.mutable_common_lb_config()->set_ignore_new_hosts_until_first_hc(true);
 
   // Endpoints are initially excluded.
   initializeTest(true);
@@ -255,7 +322,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
   auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
   setUpstreamAddress(1, *endpoint);
 
-  eds_helper_.setEds({cluster_load_assignment}, *test_server_);
+  eds_helper_.setEdsAndWait({cluster_load_assignment}, *test_server_);
 
   EXPECT_EQ(1, member_update_count);
 }
