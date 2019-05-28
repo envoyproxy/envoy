@@ -24,8 +24,6 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
       init_target_("LDS", [this]() { subscription_->start({}, *this); }) {
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       lds_config, local_info, dispatcher, cm, random, *scope_,
-      "envoy.api.v2.ListenerDiscoveryService.FetchListeners",
-      "envoy.api.v2.ListenerDiscoveryService.StreamListeners",
       Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()), api);
   Config::Utility::checkLocalInfo("lds", local_info);
   init_manager.add(init_target_);

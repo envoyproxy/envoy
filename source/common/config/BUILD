@@ -302,6 +302,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "subscription_factory_lib",
+    srcs = ["subscription_factory.cc"],
     hdrs = ["subscription_factory.h"],
     deps = [
         ":delta_subscription_lib",
