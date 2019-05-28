@@ -24,8 +24,13 @@ envoy_package()
 # See a detailed description of QUIC platform API dependency model at:
 # https://quiche.googlesource.com/quiche/+/refs/heads/master/quic/platform/api/README.md
 
-# These implementations are tested through their APIs with tests mostly brought in from QUICHE, thus new unit tests for them are deliberately ommitted in Envoy tree. These tests are added to @com_googlesource_quiche//:quic_platform_api_test. And all tests under @com_googlesource_quiche// are configured in test/coverage/gen_build.sh to run in CI.
-# For some APIs which are not covered in QUICHE tests, their tests is added into //test/extensions/quic_listeners/quiche/platform/.
+# These implementations are tested through their APIs with tests mostly brought in from
+# QUICHE, thus new unit tests for them are deliberately omitted in Envoy tree. These
+# tests are added to @com_googlesource_quiche//:quic_platform_api_test. And all tests
+# under @com_googlesource_quiche// are configured in test/coverage/gen_build.sh to run in
+# CI.
+# For some APIs which are not covered in QUICHE tests, their tests is added into
+# //test/extensions/quic_listeners/quiche/platform/.
 
 # TODO: add build target for quic_platform_impl_lib
 
