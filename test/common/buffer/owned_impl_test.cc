@@ -64,13 +64,11 @@ TEST_P(OwnedImplTest, MoveConstructAndAssign) {
   buffer.add(str);
   Buffer::OwnedImpl buffer2(std::move(buffer));
   EXPECT_EQ(str, buffer2.toString());
-  EXPECT_EQ(0, buffer.length());
 
   Buffer::OwnedImpl buffer3;
   buffer3.add("aaa");
   buffer3 = std::move(buffer2);
   EXPECT_EQ(str, buffer3.toString());
-  EXPECT_EQ(0, buffer2.length());
 }
 
 TEST_P(OwnedImplTest, AddBufferFragmentNoCleanup) {
