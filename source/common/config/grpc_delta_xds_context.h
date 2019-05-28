@@ -20,6 +20,18 @@
 namespace Envoy {
 namespace Config {
 
+// TODO TODO not actually needed; just an adapter to the old-style subscribe().
+class TokenizedGrpcMuxWatch : public GrpcMuxWatch {
+public:
+  TokenizedGrpcMuxWatch(GrpcDeltaXdsContext& context, WatchToken token)
+      : context_(context), token_(token) {}
+  ~TokenizedGrpcMuxWatch() { context_.removeWatch(token_); }
+
+private:
+  WatchToken token_;
+  GrpcDeltaXdsContext& context_;
+};
+
 // Manages subscriptions to one or more type of resource. The logical protocol
 // state of those subscription(s) is handled by DeltaSubscriptionState.
 // This class owns the GrpcStream used to talk to the server, maintains queuing
@@ -38,41 +50,41 @@ public:
         grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                      rate_limit_settings) {}
 
-  void addSubscription(const std::set<std::string>& resources, const std::string& type_url,
-                       SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
-                       std::chrono::milliseconds init_fetch_timeout) override {
-    subscriptions_.emplace(type_url, std::make_unique<DeltaSubscriptionState>(
-                                         type_url, resources, callbacks, local_info_,
-                                         init_fetch_timeout, dispatcher_, stats));
-    subscription_ordering_.emplace_back(type_url);
-    grpc_stream_.establishNewStream(); // (idempotent) TODO TODO does print warning though...
+  WatchToken addWatch(const std::string& type_url, const std::set<std::string>& resources,
+                      SubscriptionCallbacks& callbacks) override {
+    if
+      type_url not in subscriptons_ /
+          watch_maps_ yet addSubscription()
+
+              WatchToken watch_token = watch_maps_[type_url].addWatch(callbacks);
+    // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed
+    updateWatch(type_url, watch_token, resources);
+    return watch_token;
   }
 
-  // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
-  // added to the passed 'resources' argument, relative to resource_versions_.
-  void updateResources(const std::set<std::string>& resources,
-                       const std::string& type_url) override {
+  void removeWatch(const std::string& type_url, WatchToken watch_token) {
+    // updateWatch() queues a discovery request if any resources were cared about only by this
+    // watch.
+    updateWatch(type_url, watch_token, {});
+    if (watch_maps_[type_url].removeWatch(watch_token)) {
+      removeSubscription(type_url);
+    }
+  }
+
+  // Updates the list of resource names watched by the given watch. If an added name is new across
+  // the whole subscription, or if a removed name has no other watch interested in it, then the
+  // subscription will enqueue and attempt to send an appropriate discovery request.
+  void updateWatch(const std::string& type_url, WatchToken watch_token,
+                   const std::set<std::string>& resources) override {
+    auto added_removed = watch_maps_[type_url].updateWatchInterest(watch_token, resources);
     auto sub = subscriptions_.find(type_url);
     if (sub == subscriptions_.end()) {
-      ENVOY_LOG(warn, "Not updating non-existent subscription {}.", type_url);
+      ENVOY_LOG(error, "Watch of {} has no subscription to update.", type_url);
       return;
     }
-    sub->second->updateResourceInterest(resources);
+    sub->second->updateResourceInterest(added_removed.first, added_removed.second);
     // Tell the server about our new interests, if there are any.
     trySendDiscoveryRequests();
-  }
-
-  void removeSubscription(const std::string& type_url) override {
-    subscriptions_.erase(type_url);
-    // And remove from the subscription_ordering_ list.
-    auto it = subscription_ordering_.begin();
-    while (it != subscription_ordering_.end()) {
-      if (*it == type_url) {
-        it = subscription_ordering_.erase(it);
-      } else {
-        ++it;
-      }
-    }
   }
 
   void pause(const std::string& type_url) override {
@@ -129,21 +141,39 @@ public:
     trySendDiscoveryRequests();
   }
 
-  // TODO(fredlas) remove, only here for compatibility with old-style GrpcMuxImpl.
-  GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
-                            GrpcMuxCallbacks&) override {
-    // don't need any implementation here. only grpc_mux_subscription_impl ever calls it, and there
-    // would never be a GrpcDeltaXdsContext held by one of those.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    return nullptr;
+  // TODO TODO but yeah this should just be gone!!!!!!!!!
+  GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
+                            GrpcMuxCallbacks& callbacks) override {
+    return std::make_unique<TokenizedGrpcMuxWatch>(*this, addWatch(type_url, resources, callbacks));
   }
-  void start() override {
-    // don't need any implementation here. only grpc_mux_subscription_impl ever calls it, and there
-    // would never be a GrpcDeltaXdsContext held by one of those.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  void start() override { grpc_stream_.establishNewStream(); }
 
 private:
+  void addSubscription(const std::string& type_url, SubscriptionStats& stats,
+                       std::chrono::milliseconds init_fetch_timeout) override {
+    watch_maps_.emplace(type_url, std::make_unique<WatchMap>());
+    subscriptions_.emplace(type_url, std::make_unique<DeltaSubscriptionState>(
+                                         type_url, *watch_maps_[type_url], local_info_,
+                                         init_fetch_timeout, dispatcher_, stats));
+    subscription_ordering_.emplace_back(type_url);
+  }
+
+  // TODO do we need this? or should we just let subscriptions hang out even when nobody is
+  // interested in them?
+  void removeSubscription(const std::string& type_url) override {
+    subscriptions_.erase(type_url);
+    watch_maps_.erase(type_url);
+    // And remove from the subscription_ordering_ list.
+    auto it = subscription_ordering_.begin();
+    while (it != subscription_ordering_.end()) {
+      if (*it == type_url) {
+        it = subscription_ordering_.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
+
   void trySendDiscoveryRequests() {
     while (true) {
       // Do any of our subscriptions even want to send a request?
@@ -232,6 +262,7 @@ private:
 
   // Map from type_url strings to a DeltaSubscriptionState for that type.
   absl::flat_hash_map<std::string, std::unique_ptr<DeltaSubscriptionState>> subscriptions_;
+  absl::flat_hash_map<std::string, std::unique_ptr<WatchMap>> watch_maps_;
 
   // Determines the order of initial discovery requests. (Assumes that subscriptions are added in
   // the order of Envoy's dependency ordering).

@@ -22,6 +22,7 @@ void DeltaSubscriptionImpl::start(const std::set<std::string>& resources,
 }
 
 void DeltaSubscriptionImpl::updateResources(const std::set<std::string>& update_to_these_names) {
+  // TODO TODO this should really be like "updateWatch".
   context_->updateResources(update_to_these_names, type_url_);
 }
 

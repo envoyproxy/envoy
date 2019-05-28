@@ -7,7 +7,6 @@ namespace Envoy {
 namespace Config {
 
 DeltaSubscriptionState::DeltaSubscriptionState(const std::string& type_url,
-                                               const std::set<std::string>& resource_names,
                                                SubscriptionCallbacks& callbacks,
                                                const LocalInfo::LocalInfo& local_info,
                                                std::chrono::milliseconds init_fetch_timeout,
@@ -15,10 +14,6 @@ DeltaSubscriptionState::DeltaSubscriptionState(const std::string& type_url,
                                                SubscriptionStats& stats)
     : type_url_(type_url), callbacks_(callbacks), local_info_(local_info),
       init_fetch_timeout_(init_fetch_timeout), stats_(stats) {
-  // In normal usage of updateResourceInterest(), the caller is supposed to cause a discovery
-  // request to be queued if it returns true. We don't need to do that because we know that the
-  // subscription gRPC stream is not yet established, and establishment causes a request.
-  updateResourceInterest(resource_names);
   setInitFetchTimeout(dispatcher);
 }
 
@@ -46,32 +41,23 @@ void DeltaSubscriptionState::resume() {
 
 // Returns true if there is any meaningful change in our subscription interest, worth reporting to
 // the server.
-void DeltaSubscriptionState::updateResourceInterest(
-    const std::set<std::string>& update_to_these_names) {
-  std::vector<std::string> cur_added;
-  std::vector<std::string> cur_removed;
-
-  std::set_difference(update_to_these_names.begin(), update_to_these_names.end(),
-                      resource_names_.begin(), resource_names_.end(),
-                      std::inserter(cur_added, cur_added.begin()));
-  std::set_difference(resource_names_.begin(), resource_names_.end(), update_to_these_names.begin(),
-                      update_to_these_names.end(), std::inserter(cur_removed, cur_removed.begin()));
-
+void DeltaSubscriptionState::updateResourceInterest(std::vector<std::string> cur_added,
+                                                    std::vector<std::string> cur_removed) {
   for (const auto& a : cur_added) {
     setResourceWaitingForServer(a);
-    // Removed->added requires us to keep track of it as a "new" addition, since our user may have
-    // forgotten its copy of the resource after instructing us to remove it, and so needs to be
-    // reminded of it.
+    // If interest in a resource is removed-then-added (all before a discovery request
+    // can be sent), we must treat it as a "new" addition: our user may have forgotten its
+    // copy of the resource after instructing us to remove it, and need to be reminded of it.
     names_removed_.erase(a);
     names_added_.insert(a);
   }
   for (const auto& r : cur_removed) {
     setLostInterestInResource(r);
-    // Ideally, when a resource is added-then-removed in between requests, we would avoid putting
-    // a superfluous "unsubscribe [resource that was never subscribed]" in the request. However,
-    // the removed-then-added case *does* need to go in the request, and due to how we accomplish
-    // that, it's difficult to distinguish remove-add-remove from add-remove (because "remove-add"
-    // has to be treated as equivalent to just "add").
+    // Ideally, when interest in a resource is added-then-removed in between requests,
+    // we would avoid putting a superfluous "unsubscribe [resource that was never subscribed]"
+    // in the request. However, the removed-then-added case *does* need to go in the request,
+    // and due to how we accomplish that, it's difficult to distinguish remove-add-remove from
+    // add-remove (because "remove-add" has to be treated as equivalent to just "add").
     names_added_.erase(r);
     names_removed_.insert(r);
   }

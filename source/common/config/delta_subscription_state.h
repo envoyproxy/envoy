@@ -26,8 +26,8 @@ struct UpdateAck {
 // being multiplexed together by ADS.
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
-  DeltaSubscriptionState(const std::string& type_url, const std::set<std::string>& resource_names,
-                         SubscriptionCallbacks& callbacks, const LocalInfo::LocalInfo& local_info,
+  DeltaSubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
+                         const LocalInfo::LocalInfo& local_info,
                          std::chrono::milliseconds init_fetch_timeout,
                          Event::Dispatcher& dispatcher, SubscriptionStats& stats);
 
@@ -91,6 +91,7 @@ private:
   std::set<std::string> resource_names_;
 
   const std::string type_url_;
+  // callbacks_ is expected to be a WatchMap.
   SubscriptionCallbacks& callbacks_;
   const LocalInfo::LocalInfo& local_info_;
   std::chrono::milliseconds init_fetch_timeout_;
