@@ -15,6 +15,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/overload_manager.h"
+#include "envoy/server/process_context.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -146,6 +147,11 @@ public:
    * @return Http::Context& a reference to the http context.
    */
   virtual Http::Context& httpContext() PURE;
+
+  /**
+   * @return ProcessContext& a reference to the process context.
+   */
+  virtual ProcessContext& processContext() PURE;
 
   /**
    * @return Api::Api& a reference to the api object.

@@ -22,7 +22,6 @@ class Instance;
 namespace Stats {
 
 class Sink;
-class Source;
 
 /**
  * A store for all known counters, gauges, and timers.
@@ -95,12 +94,6 @@ public:
    * method would be asserted.
    */
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
-
-  /**
-   * Returns the Source to provide cached metrics.
-   * @return Source& the source.
-   */
-  virtual Source& source() PURE;
 };
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;

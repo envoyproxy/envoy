@@ -38,6 +38,7 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
                             ConfigHelper::discoveredClustersBootstrap(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+    use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
   }
 
@@ -52,6 +53,7 @@ public:
   // Overridden to insert this stuff into the initialize() at the very beginning of
   // HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse().
   void initialize() override {
+    use_lds_ = false;
     test_skipped_ = false;
     // Controls how many fake_upstreams_.emplace_back(new FakeUpstream) will happen in
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
