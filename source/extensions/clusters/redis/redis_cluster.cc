@@ -7,11 +7,15 @@ namespace Extensions {
 namespace Clusters {
 namespace Redis {
 
+namespace {
+Extensions::NetworkFilters::Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
+} // namespace
+
 RedisCluster::RedisCluster(
     const envoy::api::v2::Cluster& cluster,
     const envoy::config::cluster::redis::RedisClusterConfig& redisCluster,
     NetworkFilters::Common::Redis::Client::ClientFactory& redis_client_factory,
-    Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime,
+    Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime, Api::Api& api,
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
@@ -28,7 +32,7 @@ RedisCluster::RedisCluster(
                            ? cluster.load_assignment()
                            : Config::Utility::translateClusterHosts(cluster.hosts())),
       local_info_(factory_context.localInfo()), random_(factory_context.random()),
-      redis_discovery_session_(*this, redis_client_factory) {
+      redis_discovery_session_(*this, redis_client_factory), api_(api) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -38,7 +42,14 @@ RedisCluster::RedisCluster(
           locality_lb_endpoint, lb_endpoint));
     }
   }
-};
+
+  auto options =
+      info()->extensionProtocolOptionsTyped<NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl>(
+          NetworkFilters::NetworkFilterNames::get().RedisProxy);
+  if (options) {
+    auth_password_datasource_ = options->auth_password_datasource();
+  }
+}
 
 void RedisCluster::startPreInit() {
   for (const DnsDiscoveryResolveTargetPtr& target : dns_discovery_resolve_targets_) {
@@ -221,6 +232,14 @@ void RedisCluster::RedisDiscoverySession::startResolve() {
     client->host_ = current_host_address_;
     client->client_ = client_factory_.create(host, dispatcher_, *this);
     client->client_->addConnectionCallbacks(*client);
+    std::string auth_password =
+        Envoy::Config::DataSource::read(parent_.auth_password_datasource_, true, parent_.api_);
+    if (!auth_password.empty()) {
+      // Send an AUTH command to the upstream server.
+      client->client_->makeRequest(
+          Extensions::NetworkFilters::Common::Redis::Utility::makeAuthCommand(auth_password),
+          null_pool_callbacks);
+    }
   }
 
   current_request_ = client->client_->makeRequest(ClusterSlotsRequest::instance_, *this);
@@ -301,8 +320,9 @@ Upstream::ClusterImplBaseSharedPtr RedisClusterFactory::createClusterWithConfig(
   }
   return std::make_shared<RedisCluster>(
       cluster, proto_config, NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
-      context.clusterManager(), context.runtime(), selectDnsResolver(cluster, context),
-      socket_factory_context, std::move(stats_scope), context.addedViaApi());
+      context.clusterManager(), context.runtime(), context.api(),
+      selectDnsResolver(cluster, context), socket_factory_context, std::move(stats_scope),
+      context.addedViaApi());
 }
 
 REGISTER_FACTORY(RedisClusterFactory, Upstream::ClusterFactory);

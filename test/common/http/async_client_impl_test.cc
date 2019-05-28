@@ -37,7 +37,8 @@ namespace {
 class AsyncClientImplTest : public testing::Test {
 public:
   AsyncClientImplTest()
-      : client_(cm_.thread_local_cluster_.cluster_.info_, stats_store_, dispatcher_, local_info_,
+      : http_context_(stats_store_.symbolTable()),
+        client_(cm_.thread_local_cluster_.cluster_.info_, stats_store_, dispatcher_, local_info_,
                 cm_, runtime_, random_,
                 Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}, http_context_) {
     message_->headers().insertMethod().value(std::string("GET"));
@@ -908,5 +909,46 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
 }
 
 } // namespace
+
+// Must not be in anonymous namespace for friend to work.
+class AsyncClientImplRouteTest : public testing::Test {
+public:
+  AsyncStreamImpl::RouteImpl route_impl{"foo", absl::nullopt};
+};
+
+// Test the extended fake route that AsyncClient uses.
+TEST_F(AsyncClientImplRouteTest, All) {
+  EXPECT_EQ(nullptr, route_impl.decorator());
+  EXPECT_EQ(nullptr, route_impl.tracingConfig());
+  EXPECT_EQ(nullptr, route_impl.perFilterConfig(""));
+  EXPECT_EQ(Code::InternalServerError, route_impl.routeEntry()->clusterNotFoundResponseCode());
+  EXPECT_EQ(nullptr, route_impl.routeEntry()->corsPolicy());
+  EXPECT_EQ(nullptr, route_impl.routeEntry()->hashPolicy());
+  EXPECT_EQ(1, route_impl.routeEntry()->hedgePolicy().initialRequests());
+  EXPECT_EQ(0, route_impl.routeEntry()->hedgePolicy().additionalRequestChance().numerator());
+  EXPECT_FALSE(route_impl.routeEntry()->hedgePolicy().hedgeOnPerTryTimeout());
+  EXPECT_EQ(nullptr, route_impl.routeEntry()->metadataMatchCriteria());
+  EXPECT_TRUE(route_impl.routeEntry()->rateLimitPolicy().empty());
+  EXPECT_TRUE(route_impl.routeEntry()->rateLimitPolicy().getApplicableRateLimit(0).empty());
+  EXPECT_EQ(absl::nullopt, route_impl.routeEntry()->idleTimeout());
+  EXPECT_EQ(absl::nullopt, route_impl.routeEntry()->grpcTimeoutOffset());
+  EXPECT_TRUE(route_impl.routeEntry()->opaqueConfig().empty());
+  EXPECT_TRUE(route_impl.routeEntry()->includeVirtualHostRateLimits());
+  EXPECT_TRUE(route_impl.routeEntry()->metadata().filter_metadata().empty());
+  EXPECT_EQ(nullptr,
+            route_impl.routeEntry()->typedMetadata().get<Config::TypedMetadata::Object>("bar"));
+  EXPECT_EQ(nullptr, route_impl.routeEntry()->perFilterConfig("bar"));
+  EXPECT_TRUE(route_impl.routeEntry()->upgradeMap().empty());
+  EXPECT_EQ(Router::InternalRedirectAction::PassThrough,
+            route_impl.routeEntry()->internalRedirectAction());
+  EXPECT_TRUE(route_impl.routeEntry()->shadowPolicy().runtimeKey().empty());
+  EXPECT_EQ(0, route_impl.routeEntry()->shadowPolicy().defaultValue().numerator());
+  EXPECT_TRUE(route_impl.routeEntry()->virtualHost().rateLimitPolicy().empty());
+  EXPECT_EQ(nullptr, route_impl.routeEntry()->virtualHost().corsPolicy());
+  EXPECT_EQ(nullptr, route_impl.routeEntry()->virtualHost().perFilterConfig("bar"));
+  EXPECT_FALSE(route_impl.routeEntry()->virtualHost().includeAttemptCount());
+  EXPECT_FALSE(route_impl.routeEntry()->virtualHost().routeConfig().usesVhds());
+}
+
 } // namespace Http
 } // namespace Envoy

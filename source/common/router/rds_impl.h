@@ -109,13 +109,11 @@ public:
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
 
   // Config::SubscriptionCallbacks
-  // TODO(fredlas) deduplicate
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
-                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string&) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
@@ -127,6 +125,8 @@ private:
       const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
       const std::string& stat_prefix,
       RouteConfigProviderManagerImpl& route_config_provider_manager);
+
+  bool validateUpdateSize(int num_resources);
 
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const std::string route_config_name_;
