@@ -1,17 +1,40 @@
 #include "common/upstream/cluster_manager_impl.h"
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/network/dns.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
+
+#include "common/common/assert.h"
+#include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
+#include "common/common/utility.h"
 #include "common/config/cds_json.h"
+#include "common/config/utility.h"
 #include "common/grpc/async_client_manager_impl.h"
+#include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
+#include "common/json/config_schemas.h"
 #include "common/network/resolver_impl.h"
+#include "common/network/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
 #include "common/tcp/conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
+#include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/original_dst_cluster.h"
+#include "common/upstream/priority_conn_pool_map_impl.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
 
