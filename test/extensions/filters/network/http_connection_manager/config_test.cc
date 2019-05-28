@@ -124,7 +124,8 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
 
   EXPECT_EQ(100, config.tracingConfig()->client_sampling_.numerator());
   EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
@@ -157,7 +158,8 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
 
   EXPECT_EQ(1, config.tracingConfig()->client_sampling_.numerator());
   EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
