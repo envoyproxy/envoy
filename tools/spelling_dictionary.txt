@@ -315,6 +315,7 @@ argv
 artisanal
 ary
 async
+atomicity
 atomicly
 atomics
 atoull
@@ -709,6 +710,7 @@ strtoull
 struct
 structs
 subexpr
+subdirs
 symlink
 symlinked
 sync
