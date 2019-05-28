@@ -76,7 +76,7 @@ public:
       : start_(start), end_(end), master_(std::move(master)) {}
 
   int64_t start() const { return start_; }
-  int64_t end() const { return  end_; }
+  int64_t end() const { return end_; }
   Network::Address::InstanceConstSharedPtr master() const { return master_; };
 
 private:
@@ -87,7 +87,7 @@ private:
 
 /*
  * This class implements load balancing according to `Redis Cluster
- * <https://redis.io/topics/cluster-spec>`_.  This load balancer is thread local and created through
+ * <https://redis.io/topics/cluster-spec>`_. This load balancer is thread local and created through
  * the RedisClusterLoadBalancerFactory by the cluster manager.
  *
  * The topology is stored in cluster_slots_map_. According to the

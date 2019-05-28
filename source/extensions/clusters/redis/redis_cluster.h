@@ -79,8 +79,9 @@ namespace Redis {
  * the `CLUSTER SLOTS command <https://redis.io/commands/cluster-slots>`_, and the responses and
  * failure cases.
  *
- * Once the topology is fetched from Redis, the cluster will update the RedisClusterLoadBalancerFactory,
- * which will be used by the redis proxy filter for load balancing purpose.
+ * Once the topology is fetched from Redis, the cluster will update the
+ * RedisClusterLoadBalancerFactory, which will be used by the redis proxy filter for load balancing
+ * purpose.
  */
 
 class RedisCluster {
