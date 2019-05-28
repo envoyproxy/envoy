@@ -19,7 +19,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
     const auto& parse_cookie_value = input.parse_cookie_value();
     Http::TestHeaderMapImpl headers;
     for (const std::string& cookie : parse_cookie_value.cookies()) {
-      headers.addCopy("cookie", filterInvalidCharacters(cookie));
+      headers.addCopy("cookie", replaceInvalidCharacters(cookie));
     }
     Http::Utility::parseCookieValue(headers, parse_cookie_value.key());
     break;

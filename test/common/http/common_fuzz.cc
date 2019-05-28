@@ -4,7 +4,7 @@
 
 namespace Envoy {
 
-std::string filterInvalidCharacters(absl::string_view string) {
+std::string replaceInvalidCharacters(absl::string_view string) {
   std::string filtered;
   filtered.reserve(string.length());
   for (const char& c : string) {
