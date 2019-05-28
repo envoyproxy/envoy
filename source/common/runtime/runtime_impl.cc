@@ -513,6 +513,8 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
           layers.emplace_back(std::make_unique<DiskLayer>(layer.name(), path, api_));
           ++disk_layers;
         } catch (EnvoyException& e) {
+          // TODO(htuch): Consider latching here, rather than ignoring the
+          // layer. This would be consistent with filesystem TDS.
           ++error_layers;
           ENVOY_LOG(debug, "error loading runtime values for layer {} from disk: {}",
                     layer.DebugString(), e.what());

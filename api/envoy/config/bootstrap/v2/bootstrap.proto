@@ -269,6 +269,8 @@ message RuntimeLayer {
   string name = 1;
 
   oneof layer_specifier {
+    // Unlike static xDS resources, this static layer is overridable by later
+    // layers in the runtime virtual filesystem.
     google.protobuf.Struct static_layer = 2;
     DiskLayer disk_layer = 3;
     AdminLayer admin_layer = 4;
