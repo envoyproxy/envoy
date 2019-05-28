@@ -19,6 +19,8 @@ const Protobuf::MethodDescriptor& deltaGrpcMethod(absl::string_view type_url) {
   std::string method_name = UnknownMethod;
   if (TYPE_URL_IS(RouteConfiguration)) {
     method_name = "envoy.api.v2.RouteDiscoveryService.DeltaRoutes";
+  } else if (TYPE_URL_IS(ScopedRouteConfiguration)) {
+    method_name = "envoy.api.v2.ScopedRoutesDiscoveryService.DeltaScopedRoutes";
   } else if (TYPE_URL_IS(route::VirtualHost)) {
     method_name = "envoy.api.v2.VirtualHostDiscoveryService.DeltaVirtualHosts";
   } else if (TYPE_URL_IS(auth::Secret)) {
@@ -38,6 +40,8 @@ const Protobuf::MethodDescriptor& sotwGrpcMethod(absl::string_view type_url) {
   std::string method_name = UnknownMethod;
   if (TYPE_URL_IS(RouteConfiguration)) {
     method_name = "envoy.api.v2.RouteDiscoveryService.StreamRoutes";
+  } else if (TYPE_URL_IS(ScopedRouteConfiguration)) {
+    method_name = "envoy.api.v2.ScopedRoutesDiscoveryService.StreamScopedRoutes";
   } else if (TYPE_URL_IS(auth::Secret)) {
     method_name = "envoy.service.discovery.v2.SecretDiscoveryService.StreamSecrets";
   } else if (TYPE_URL_IS(Cluster)) {
@@ -55,6 +59,8 @@ const Protobuf::MethodDescriptor& restMethod(absl::string_view type_url) {
   std::string method_name = UnknownMethod;
   if (TYPE_URL_IS(RouteConfiguration)) {
     method_name = "envoy.api.v2.RouteDiscoveryService.FetchRoutes";
+  } else if (TYPE_URL_IS(ScopedRouteConfiguration)) {
+    method_name = "envoy.api.v2.ScopedRoutesDiscoveryService.FetchScopedRoutes";
   } else if (TYPE_URL_IS(auth::Secret)) {
     method_name = "envoy.service.discovery.v2.SecretDiscoveryService.FetchSecrets";
   } else if (TYPE_URL_IS(Cluster)) {

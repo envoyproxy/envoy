@@ -43,8 +43,7 @@ public:
   void SetUp() override {
     factory_function_ = {[](const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&,
                             Event::Dispatcher&, Upstream::ClusterManager&,
-                            Envoy::Runtime::RandomGenerator&, Stats::Scope&, const std::string&,
-                            const std::string&, absl::string_view,
+                            Envoy::Runtime::RandomGenerator&, Stats::Scope&, absl::string_view,
                             Api::Api&) -> std::unique_ptr<Envoy::Config::Subscription> {
       return std::unique_ptr<Envoy::Config::MockSubscription>();
     }};

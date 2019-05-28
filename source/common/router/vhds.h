@@ -40,8 +40,8 @@ struct VhdsStats {
 
 typedef std::unique_ptr<Envoy::Config::Subscription> (*SubscriptionFactoryFunction)(
     const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&, Event::Dispatcher&,
-    Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&, Stats::Scope&, const std::string&,
-    const std::string&, absl::string_view, Api::Api&);
+    Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&, Stats::Scope&, absl::string_view,
+    Api::Api&);
 
 class VhdsSubscription : Envoy::Config::SubscriptionCallbacks,
                          Logger::Loggable<Logger::Id::router> {
