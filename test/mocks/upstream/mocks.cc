@@ -1,10 +1,5 @@
 #include "test/mocks/upstream/mocks.h"
 
-#include <chrono>
-#include <functional>
-
-#include "envoy/upstream/load_balancer.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -104,6 +99,7 @@ MockCluster::MockCluster() {
         EXPECT_EQ(nullptr, initialize_callback_);
         initialize_callback_ = callback;
       }));
+  ON_CALL(*this, loadBalancerFactory()).WillByDefault(Return(nullptr));
 }
 
 MockCluster::~MockCluster() = default;

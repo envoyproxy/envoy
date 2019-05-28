@@ -1,5 +1,4 @@
 #include <memory>
-#include <string>
 
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -9,11 +8,7 @@
 #include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
-#include "test/extensions/filters/network/redis_proxy/mocks.h"
-#include "test/mocks/network/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/mocks/upstream/mocks.h"
-#include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -51,8 +46,16 @@ public:
     test_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
   }
 
-  void makeSimpleRequest(bool create_client) {
-    EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_));
+  void makeSimpleRequest(bool create_client, const std::string& hash_key, uint64_t hash_value) {
+    auto expectHash = [&](const uint64_t hash) {
+      return [&, hash](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        EXPECT_EQ(context->computeHashKey().value(), hash);
+        return cm_.thread_local_cluster_.lb_.host_;
+      };
+    };
+
+    EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+        .WillOnce(Invoke(expectHash(hash_value)));
     if (create_client) {
       client_ = new NiceMock<Common::Redis::Client::MockClient>();
       EXPECT_CALL(*this, create_(_)).WillOnce(Return(client_));
@@ -65,7 +68,7 @@ public:
     EXPECT_CALL(*client_, makeRequest(Ref(value), Ref(callbacks)))
         .WillOnce(Return(&active_request));
     Common::Redis::Client::PoolRequest* request =
-        conn_pool_->makeRequest("hash_key", value, callbacks);
+        conn_pool_->makeRequest(hash_key, value, callbacks);
     EXPECT_EQ(&active_request, request);
   }
 
@@ -195,7 +198,8 @@ TEST_F(RedisConnPoolImplTest, NoClusterAtConstruction) {
 
   // Now add the cluster. Request to the cluster should succeed.
   update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
-  makeSimpleRequest(true);
+  // MurmurHash of "foo" is 9631199822919835226U
+  makeSimpleRequest(true, "foo", 9631199822919835226U);
 
   // Remove the cluster. Request to the cluster should fail.
   EXPECT_CALL(*client_, close());
@@ -210,17 +214,20 @@ TEST_F(RedisConnPoolImplTest, NoClusterAtConstruction) {
 
   // Add the cluster back. Request to the cluster should succeed.
   update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
-  makeSimpleRequest(true);
+  // MurmurHash of "foo" is 9631199822919835226U
+  makeSimpleRequest(true, "foo", 9631199822919835226U);
 
   // Remove a cluster we don't care about. Request to the cluster should succeed.
   update_callbacks_->onClusterRemoval("some_other_cluster");
-  makeSimpleRequest(false);
+  // MurmurHash of "foo" is 9631199822919835226U
+  makeSimpleRequest(false, "foo", 9631199822919835226U);
 
   // Update the cluster. This should count as a remove followed by an add. Request to the cluster
   // should succeed.
   EXPECT_CALL(*client_, close());
   update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
-  makeSimpleRequest(true);
+  // MurmurHash of "foo" is 9631199822919835226U
+  makeSimpleRequest(true, "foo", 9631199822919835226U);
 
   // Remove the cluster to make sure we safely destruct with no cluster.
   EXPECT_CALL(*client_, close());
@@ -384,31 +391,37 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToRedisCluster) {
   envoy::api::v2::Cluster::CustomClusterType cluster_type;
   cluster_type.set_name("envoy.clusters.redis");
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
-      .WillOnce(ReturnRef(cluster_type));
-
-  std::shared_ptr<Upstream::MockHost> host1(new Upstream::MockHost());
-  NiceMock<Clusters::Redis::MockRedisCluster> redis_cluster(host1);
-  Upstream::ClusterManager::ClusterInfoMap clusters_map;
-  clusters_map.emplace("fake_cluster", redis_cluster);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(clusters_map));
+      .Times(2)
+      .WillRepeatedly(ReturnRef(cluster_type));
 
   setup();
 
-  Common::Redis::RespValue value;
-  Common::Redis::Client::MockPoolRequest active_request;
-  Common::Redis::Client::MockPoolCallbacks callbacks;
-  Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
+  makeSimpleRequest(true, "foo", 44950);
 
-  EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
-  EXPECT_CALL(*host1, address()).WillRepeatedly(Return(test_address_));
-  EXPECT_CALL(*client, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));
-  Common::Redis::Client::PoolRequest* request =
-      conn_pool_->makeRequest("hash_key", value, callbacks);
-  EXPECT_EQ(&active_request, request);
+  makeSimpleRequest(false, "bar", 37829);
 
-  EXPECT_CALL(*client, close());
+  EXPECT_CALL(*client_, close());
   tls_.shutdownThread();
 };
+
+TEST_F(RedisConnPoolImplTest, MakeRequestToRedisClusterHashtag) {
+
+  envoy::api::v2::Cluster::CustomClusterType cluster_type;
+  cluster_type.set_name("envoy.clusters.redis");
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(cluster_type));
+
+  setup();
+
+  makeSimpleRequest(true, "{foo}bar", 44950);
+
+  makeSimpleRequest(false, "foo{bar}", 37829);
+
+  EXPECT_CALL(*client_, close());
+  tls_.shutdownThread();
+};
+
 } // namespace ConnPool
 } // namespace RedisProxy
 } // namespace NetworkFilters

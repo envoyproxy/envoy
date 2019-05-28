@@ -66,10 +66,9 @@ void RedisClusterImpl::updateAllHosts(const Upstream::HostVector& hosts_added,
 
 void RedisClusterImpl::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots) {
   Upstream::HostVector new_hosts;
-  SlotArray slots_;
 
   for (const ClusterSlot& slot : slots) {
-    new_hosts.emplace_back(new RedisHost(info(), "", slot.master_, *this, true));
+    new_hosts.emplace_back(new RedisHost(info(), "", slot.master(), *this, true));
   }
 
   std::unordered_map<std::string, Upstream::HostSharedPtr> updated_hosts;
@@ -85,16 +84,9 @@ void RedisClusterImpl::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots
     info_->stats().update_no_rebuild_.inc();
   }
 
-  for (const ClusterSlot& slot : slots) {
-    auto host = updated_hosts.find(slot.master_->asString());
-    ASSERT(host != updated_hosts.end(), "we expect all address to be found in the updated_hosts");
-    for (auto i = slot.start_; i <= slot.end_; ++i) {
-      slots_[i] = host->second;
-    }
-  }
+  lb_factory_->onClusterSlotUpdate(slots, updated_hosts);
 
   all_hosts_ = std::move(updated_hosts);
-  cluster_slots_map_.swap(slots_);
 
   // TODO(hyang): If there is an initialize callback, fire it now. Note that if the
   // cluster refers to multiple DNS names, this will return initialized after a single
@@ -297,7 +289,10 @@ Upstream::ClusterImplBaseSharedPtr RedisClusterFactory::createClusterWithConfig(
     Envoy::Stats::ScopePtr&& stats_scope) {
   if (!cluster.has_cluster_type() ||
       cluster.cluster_type().name() != Extensions::Clusters::ClusterTypes::get().Redis) {
-    throw EnvoyException("Redis cluster can only created with redis cluster type");
+    throw EnvoyException("Redis cluster can only created with redis cluster type.");
+  }
+  if (cluster.has_lb_subset_config() && cluster.lb_subset_config().subset_selectors_size() > 0) {
+    throw EnvoyException("Redis cluster is not compatible with subset load balancer.");
   }
   return std::make_shared<RedisClusterImpl>(
       cluster, proto_config, NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,

@@ -182,12 +182,9 @@ protected:
    * @param slot2 the ip of the master node of slot2.
    * @return The cluster slot response.
    */
-  std::string twoSlots(const Network::Address::Ip* slot1, const Network::Address::Ip* slot2) {
-    int64_t start_slot1 = 0;
-    int64_t end_slot1 = 10000;
-    int64_t start_slot2 = 10000;
-    int64_t end_slot2 = 16383;
-
+  std::string twoSlots(const Network::Address::Ip* slot1, const Network::Address::Ip* slot2,
+                       int64_t start_slot1 = 0, int64_t end_slot1 = 10000,
+                       int64_t start_slot2 = 10000, int64_t end_slot2 = 16383) {
     std::stringstream resp;
     resp << "*2\r\n"
          << "*3\r\n"
@@ -259,6 +256,34 @@ TEST_P(RedisClusterIntegrationTest, TwoSlot) {
   simpleRequestAndResponse(0, makeBulkStringArray({"get", "bar"}), "$3\r\nbar\r\n");
   // foo hashes to slot 12182 which is in upstream 1
   simpleRequestAndResponse(1, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+}
+
+// This test sends a simple "get foo" command from a fake
+// downstream client through the proxy to a fake upstream
+// Redis cluster with 2 slots before and after the slot
+// allocation are changed.
+
+TEST_P(RedisClusterIntegrationTest, MigrateSlot) {
+  random_index_ = 0;
+
+  on_server_init_function_ = [this]() {
+    std::string cluster_slot_response = twoSlots(fake_upstreams_[0]->localAddress()->ip(),
+                                                 fake_upstreams_[1]->localAddress()->ip());
+    expectCallClusterSlot(random_index_, cluster_slot_response);
+  };
+
+  initialize();
+
+  // bar hashes to slot 5061 which is in upstream 0
+  simpleRequestAndResponse(0, makeBulkStringArray({"get", "bar"}), "$3\r\nbar\r\n");
+
+  std::string cluster_slot_response =
+      twoSlots(fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip(),
+               0, 4999, 5000, 16383);
+  expectCallClusterSlot(random_index_, cluster_slot_response);
+
+  // bar hashes to slot 5061 which is in now upstream 1
+  simpleRequestAndResponse(1, makeBulkStringArray({"get", "bar"}), "$3\r\nbar\r\n");
 }
 
 } // namespace

@@ -50,6 +50,8 @@
 #include "common/upstream/resource_manager_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "source/extensions/clusters/redis/redis_cluster_lb.h"
+
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/clusters/well_known_names.h"
@@ -77,21 +79,13 @@ namespace Redis {
  * the `CLUSTER SLOTS command <https://redis.io/commands/cluster-slots>`_, and the responses and
  * failure cases.
  *
- * The topology is stored in cluster_slots_map_. According to the
- * `Redis Cluster Spec <https://redis.io/topics/cluster-spec#keys-distribution-model`_, the key
- * space is split into a fixed size 16384 slots. The current implementation uses a fixed size
- * std::array() of shared_ptr pointing to the master host. This has a fixed cpu and memory cost and
- * provide a fast lookup constant time lookup similar to Maglev. This will be used by the redis
- * proxy filter for load balancing purpose.
+ * Once the topology is fetched from Redis, the cluster will update the RedisClusterLoadBalancerFactory,
+ * which will be used by the redis proxy filter for load balancing purpose.
  */
-static const int MAX_SLOT = 16384;
-
-typedef std::array<Upstream::HostSharedPtr, MAX_SLOT> SlotArray;
 
 class RedisCluster {
 public:
   virtual ~RedisCluster() = default;
-  virtual const SlotArray& slotArray() const PURE;
 };
 
 class RedisClusterImpl : public RedisCluster, public Upstream::BaseDynamicClusterImpl {
@@ -120,7 +114,7 @@ public:
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
-  const SlotArray& slotArray() const override { return cluster_slots_map_; }
+  Upstream::LoadBalancerFactorySharedPtr loadBalancerFactory() override { return lb_factory_; };
 
 private:
   friend class RedisClusterTest;
@@ -129,15 +123,6 @@ private:
 
   void updateAllHosts(const Upstream::HostVector& hosts_added,
                       const Upstream::HostVector& hosts_removed, uint32_t priority);
-
-  struct ClusterSlot {
-    ClusterSlot(int64_t start, int64_t end, Network::Address::InstanceConstSharedPtr master)
-        : start_(start), end_(end), master_(std::move(master)) {}
-
-    int64_t start_;
-    int64_t end_;
-    Network::Address::InstanceConstSharedPtr master_;
-  };
 
   void onClusterSlotUpdate(const std::vector<ClusterSlot>&);
 
@@ -266,8 +251,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Runtime::RandomGenerator& random_;
   RedisDiscoverySession redis_discovery_session_;
-  // The slot to master node map.
-  SlotArray cluster_slots_map_;
+  std::shared_ptr<RedisClusterLoadBalancerFactory> lb_factory_;
 
   Upstream::HostVector hosts_;
   Upstream::HostMap all_hosts_;

@@ -1,14 +1,5 @@
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include "common/common/assert.h"
-
-#include "source/extensions/clusters/redis/redis_cluster.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -37,49 +28,6 @@ InstanceImpl::makeRequestToHost(const std::string& host_address,
                                 const Common::Redis::RespValue& request,
                                 Common::Redis::Client::PoolCallbacks& callbacks) {
   return tls_->getTyped<ThreadLocalPool>().makeRequestToHost(host_address, request, callbacks);
-}
-
-namespace {
-// Inspired by the redis-cluster hashtagging algorithm
-// https://redis.io/topics/cluster-spec#keys-hash-tags
-absl::string_view hashtag(absl::string_view v, bool enabled) {
-  if (!enabled) {
-    return v;
-  }
-
-  auto start = v.find('{');
-  if (start == std::string::npos) {
-    return v;
-  }
-
-  auto end = v.find('}', start);
-  if (end == std::string::npos || end == start + 1) {
-    return v;
-  }
-
-  return v.substr(start + 1, end - start - 1);
-}
-} // namespace
-
-InstanceImpl::SimpleClusterRequestRouter::SimpleClusterRequestRouter(
-    InstanceImpl& parent, Upstream::ThreadLocalCluster& cluster)
-    : parent_(parent), cluster_(cluster) {}
-
-Upstream::HostConstSharedPtr
-InstanceImpl::SimpleClusterRequestRouter::chooseHost(const std::string& key) {
-  LbContextImpl lb_context(key, parent_.config_.enableHashtagging());
-  return cluster_.loadBalancer().chooseHost(&lb_context);
-}
-
-InstanceImpl::RedisClusterRouter::RedisClusterRouter(
-    InstanceImpl& parent, const Envoy::Extensions::Clusters::Redis::RedisCluster& redis_cluster)
-    : parent_(parent), redis_cluster_(redis_cluster) {}
-
-Upstream::HostConstSharedPtr InstanceImpl::RedisClusterRouter::chooseHost(const std::string& key) {
-  uint64_t slot = Crc16::crc16(hashtag(key, parent_.config_.enableHashtagging())) %
-                  Envoy::Extensions::Clusters::Redis::MAX_SLOT;
-
-  return redis_cluster_.slotArray()[slot];
 }
 
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
@@ -114,18 +62,6 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   }
 
   ASSERT(cluster_ == nullptr);
-  if (cluster.info()->clusterType().name() == Extensions::Clusters::ClusterTypes::get().Redis) {
-    auto clusters = parent_.cm_.clusters();
-    auto clusterInstance = clusters.find(cluster_name_);
-    ASSERT(clusterInstance != clusters.end());
-    const Envoy::Upstream::Cluster& base = clusterInstance->second.get();
-    const Envoy::Extensions::Clusters::Redis::RedisCluster& redis_cluster =
-        dynamic_cast<const Envoy::Extensions::Clusters::Redis::RedisCluster&>(base);
-    request_router_ = std::make_unique<RedisClusterRouter>(parent_, redis_cluster);
-  } else {
-    request_router_ = std::make_unique<SimpleClusterRequestRouter>(parent_, cluster);
-  }
-
   cluster_ = &cluster;
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
   host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
@@ -154,7 +90,6 @@ void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_
   }
 
   cluster_ = nullptr;
-  request_router_ = nullptr;
   host_set_member_update_cb_handle_ = nullptr;
   host_address_map_.clear();
 }
@@ -182,7 +117,9 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
     return nullptr;
   }
 
-  Upstream::HostConstSharedPtr host = request_router_->chooseHost(key);
+  LbContextImpl lb_context(key, parent_.config_.enableHashtagging(),
+                           cluster_->info()->clusterType().name());
+  Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     return nullptr;
   }
@@ -290,8 +227,31 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
   }
 }
 
-InstanceImpl::LbContextImpl::LbContextImpl(const std::string& key, bool enabled_hashtagging)
-    : hash_key_(MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))) {}
+InstanceImpl::LbContextImpl::LbContextImpl(const std::string& key, bool enabled_hashtagging,
+                                           const std::string& cluster_type)
+    : hash_key_(cluster_type == Extensions::Clusters::ClusterTypes::get().Redis
+                    ? Crc16::crc16(hashtag(key, enabled_hashtagging))
+                    : MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))) {}
+
+// Inspired by the redis-cluster hashtagging algorithm
+// https://redis.io/topics/cluster-spec#keys-hash-tags
+absl::string_view InstanceImpl::LbContextImpl::hashtag(absl::string_view v, bool enabled) {
+  if (!enabled) {
+    return v;
+  }
+
+  auto start = v.find('{');
+  if (start == std::string::npos) {
+    return v;
+  }
+
+  auto end = v.find('}', start);
+  if (end == std::string::npos || end == start + 1) {
+    return v;
+  }
+
+  return v.substr(start + 1, end - start - 1);
+}
 
 } // namespace ConnPool
 } // namespace RedisProxy

@@ -1,40 +1,17 @@
 #include "common/upstream/cluster_manager_impl.h"
 
-#include <chrono>
-#include <cstdint>
-#include <functional>
-#include <list>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/network/dns.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
 #include "common/config/cds_json.h"
-#include "common/config/utility.h"
 #include "common/grpc/async_client_manager_impl.h"
-#include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
-#include "common/json/config_schemas.h"
 #include "common/network/resolver_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
 #include "common/tcp/conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
-#include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/original_dst_cluster.h"
-#include "common/upstream/priority_conn_pool_map_impl.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
 
@@ -1064,6 +1041,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
         cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbLeastRequestConfig(),
         cluster->lbConfig());
+  } else if (lb_factory != nullptr) {
+    lb_ = lb_factory_->create();
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
@@ -1090,7 +1069,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::RingHash:
     case LoadBalancerType::Maglev: {
       ASSERT(lb_factory_ != nullptr);
-      lb_ = lb_factory_->create();
+      // should never get here
+      // lb_ = lb_factory_->create();
       break;
     }
     case LoadBalancerType::OriginalDst: {

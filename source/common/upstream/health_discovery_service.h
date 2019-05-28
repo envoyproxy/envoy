@@ -55,6 +55,7 @@ public:
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
+  LoadBalancerFactorySharedPtr loadBalancerFactory() override { return nullptr; }
 
   // Creates and starts healthcheckers to its endpoints
   void startHealthchecks(AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
