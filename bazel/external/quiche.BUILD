@@ -49,6 +49,7 @@ genrule(
     visibility = ["//visibility:private"],
 )
 
+# These options are only used to suppress errors in brought-in QUICHE tests.
 # Use #pragma GCC diagnostic ignored in integration code to suppress these errors.
 quiche_copt = [
     "-Wno-unused-parameter",
