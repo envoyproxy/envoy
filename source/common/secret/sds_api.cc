@@ -6,6 +6,7 @@
 
 #include "common/config/resources.h"
 #include "common/config/subscription_factory.h"
+#include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {

@@ -47,7 +47,7 @@ const Protobuf::MethodDescriptor& sotwGrpcMethod(absl::string_view type_url) {
   } else if (TYPE_URL_IS(v2::Listener)) {
     method_name = "envoy.api.v2.ListenerDiscoveryService.StreamListeners";
   }
-  ASSERT(method_name !=);
+  ASSERT(method_name != UnknownMethod);
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method_name);
 }
 

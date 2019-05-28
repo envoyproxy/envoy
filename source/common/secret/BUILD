@@ -52,6 +52,7 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/config:resources_lib",
         "//source/common/config:subscription_factory_lib",
+        "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
