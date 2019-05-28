@@ -39,6 +39,7 @@
 #include "common/common/callback_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
+#include "common/config/datasource.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
 #include "common/network/address_impl.h"
@@ -56,6 +57,8 @@
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec.h"
+#include "extensions/filters/network/common/redis/utility.h"
+#include "extensions/filters/network/redis_proxy/config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -92,7 +95,7 @@ public:
   RedisCluster(const envoy::api::v2::Cluster& cluster,
                const envoy::config::cluster::redis::RedisClusterConfig& redisCluster,
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-               Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime,
+               Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime, Api::Api& api,
                Network::DnsResolverSharedPtr dns_resolver,
                Server::Configuration::TransportSocketFactoryContext& factory_context,
                Stats::ScopePtr&& stats_scope, bool added_via_api);
@@ -261,6 +264,9 @@ private:
 
   Upstream::HostVector hosts_;
   Upstream::HostMap all_hosts_;
+
+  envoy::api::v2::core::DataSource auth_password_datasource_;
+  Api::Api& api_;
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<

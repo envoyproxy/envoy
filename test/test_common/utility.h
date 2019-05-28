@@ -296,14 +296,6 @@ public:
   }
 
   /**
-   * Parse bootstrap config from v1 JSON static config string.
-   * @param json_string source v1 JSON static config string.
-   * @return envoy::config::bootstrap::v2::Bootstrap.
-   */
-  static envoy::config::bootstrap::v2::Bootstrap
-  parseBootstrapFromJson(const std::string& json_string);
-
-  /**
    * Returns the closest thing to a sensible "name" field for the given xDS resource.
    * @param resource the resource to extract the name of.
    * @return the resource's name.

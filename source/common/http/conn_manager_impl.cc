@@ -708,12 +708,19 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     stream_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
         *request_headers_, connection_manager_.read_callbacks_->connection(),
         connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
-        connection_manager_.runtime_, connection_manager_.local_info_));
+        connection_manager_.local_info_));
   }
   ASSERT(stream_info_.downstreamRemoteAddress() != nullptr);
 
   ASSERT(!cached_route_);
   refreshCachedRoute();
+
+  if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
+    ConnectionManagerUtility::mutateTracingRequestHeader(
+        *request_headers_, connection_manager_.runtime_, connection_manager_.config_,
+        cached_route_.value().get());
+  }
+
   const bool upgrade_rejected = createFilterChain() == false;
 
   // TODO if there are no filters when starting a filter iteration, the connection manager

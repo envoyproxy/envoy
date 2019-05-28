@@ -84,5 +84,5 @@
       },
       "validate": {"path_redirect": "https://new.lyft.com/new_baz"}
     }
-  ]  
+  ]
 }
