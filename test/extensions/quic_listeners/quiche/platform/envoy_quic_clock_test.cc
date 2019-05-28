@@ -43,7 +43,7 @@ TEST(EnvoyQuicClockTest, TestMonotonicityWithReadTimeSystem) {
   Event::TestRealTimeSystem time_system;
   EnvoyQuicClock clock(time_system);
   quic::QuicTime last_now = clock.Now();
-  for (int i = 0; i < 1e5; ++i) {
+  for (int i = 0; i < 1000; ++i) {
     quic::QuicTime now = clock.Now();
     ASSERT_LE(last_now, now);
     last_now = now;
