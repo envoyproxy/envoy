@@ -2,6 +2,7 @@
 
 #include "envoy/service/accesslog/v2/als.pb.h"
 
+#include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/protobuf/protobuf.h"
 
@@ -10,10 +11,11 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
 
-bool validateProtoDescriptors() {
+void validateProtoDescriptors() {
   const auto method = "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs";
 
-  return Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) != nullptr;
+  RELEASE_ASSERT(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) != nullptr,
+                 "");
 };
 } // namespace HttpGrpc
 } // namespace AccessLoggers

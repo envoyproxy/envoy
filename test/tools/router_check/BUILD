@@ -22,6 +22,8 @@ envoy_cc_test_library(
         "router.cc",
         "router.h",
     ],
+    copts = ["-DHAVE_LONG_LONG"],
+    external_deps = ["tclap"],
     deps = [
         ":validation_proto_cc",
         "//source/common/config:rds_json_lib",

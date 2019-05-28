@@ -15,7 +15,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
-#include "common/config/lds_json.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/tracing/http_tracer_impl.h"

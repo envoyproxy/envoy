@@ -46,6 +46,11 @@ struct SupportedCommands {
   }
 
   /**
+   * @return auth command
+   */
+  static const std::string& auth() { CONSTRUCT_ON_FIRST_USE(std::string, "auth"); }
+
+  /**
    * @return mget command
    */
   static const std::string& mget() { CONSTRUCT_ON_FIRST_USE(std::string, "mget"); }

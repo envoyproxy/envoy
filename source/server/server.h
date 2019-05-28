@@ -11,6 +11,7 @@
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/process_context.h"
 #include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
@@ -149,7 +150,8 @@ public:
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
-               Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
+               Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
+               std::unique_ptr<ProcessContext> process_context);
 
   ~InstanceImpl() override;
 
@@ -185,6 +187,7 @@ public:
   time_t startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
   Http::Context& httpContext() override { return http_context_; }
+  ProcessContext& processContext() override { return *process_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
@@ -259,6 +262,7 @@ private:
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
   Envoy::MutexTracer* mutex_tracer_;
   Http::ContextImpl http_context_;
+  std::unique_ptr<ProcessContext> process_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   const std::thread::id main_thread_id_;
 
