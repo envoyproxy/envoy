@@ -379,7 +379,8 @@ def checkSourceLine(line, file_path, reportError):
                   "should be %s" % (invalid_construct, valid_construct))
   for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
     if invalid_construct in line:
-      reportError("term %s should be replaced with standard library term %s" % (invalid_construct, valid_construct))
+      reportError("term %s should be replaced with standard library term %s" % (invalid_construct,
+                                                                                valid_construct))
 
   # Some errors cannot be fixed automatically, and actionable, consistent,
   # navigable messages should be emitted to make it easy to find and fix
