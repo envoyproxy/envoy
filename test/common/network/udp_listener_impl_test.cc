@@ -100,10 +100,10 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
   void_pointer = static_cast<const void*>(second.c_str());
   Buffer::RawSlice second_slice{const_cast<void*>(void_pointer), second.length()};
 
-  auto send_rc = client_socket->ioHandle().sendto(&first_slice, 0, *server_socket->localAddress());
+  auto send_rc = client_socket->ioHandle().sendto(first_slice, 0, *server_socket->localAddress());
   ASSERT_EQ(send_rc.rc_, first.length());
 
-  send_rc = client_socket->ioHandle().sendto(&second_slice, 0, *server_socket->localAddress());
+  send_rc = client_socket->ioHandle().sendto(second_slice, 0, *server_socket->localAddress());
   ASSERT_EQ(send_rc.rc_, second.length());
 
   auto validateCallParams = [&](Address::InstanceConstSharedPtr local_address,
@@ -176,10 +176,10 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
   void_pointer = static_cast<const void*>(second.c_str());
   Buffer::RawSlice second_slice{const_cast<void*>(void_pointer), second.length()};
 
-  auto send_rc = client_socket->ioHandle().sendto(&first_slice, 0, *server_socket->localAddress());
+  auto send_rc = client_socket->ioHandle().sendto(first_slice, 0, *server_socket->localAddress());
   ASSERT_EQ(send_rc.rc_, first.length());
 
-  send_rc = client_socket->ioHandle().sendto(&second_slice, 0, *server_socket->localAddress());
+  send_rc = client_socket->ioHandle().sendto(second_slice, 0, *server_socket->localAddress());
   ASSERT_EQ(send_rc.rc_, second.length());
 
   auto validateCallParams = [&](Address::InstanceConstSharedPtr local_address,
@@ -239,7 +239,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
 
           do {
             auto send_rc =
-                const_cast<Socket*>(&socket)->ioHandle().sendto(&slice, 0, *test_peer_address);
+                const_cast<Socket*>(&socket)->ioHandle().sendto(slice, 0, *test_peer_address);
 
             if (send_rc.ok()) {
               total_sent += send_rc.rc_;
@@ -302,10 +302,10 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
 
   listener.disable();
 
-  auto send_rc = client_socket->ioHandle().sendto(&first_slice, 0, *server_socket->localAddress());
+  auto send_rc = client_socket->ioHandle().sendto(first_slice, 0, *server_socket->localAddress());
   ASSERT_EQ(send_rc.rc_, first.length());
 
-  send_rc = client_socket->ioHandle().sendto(&second_slice, 0, *server_socket->localAddress());
+  send_rc = client_socket->ioHandle().sendto(second_slice, 0, *server_socket->localAddress());
   ASSERT_EQ(send_rc.rc_, second.length());
 
   auto validateCallParams = [&](Address::InstanceConstSharedPtr local_address,
@@ -386,7 +386,7 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvFromError) {
   const void* void_pointer = static_cast<const void*>(first.c_str());
   Buffer::RawSlice first_slice{const_cast<void*>(void_pointer), first.length()};
 
-  auto send_rc = client_socket->ioHandle().sendto(&first_slice, 0, *server_socket->localAddress());
+  auto send_rc = client_socket->ioHandle().sendto(first_slice, 0, *server_socket->localAddress());
   ASSERT_EQ(send_rc.rc_, first.length());
 
   EXPECT_CALL(listener_callbacks, onData_(_)).Times(0);

@@ -171,12 +171,8 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
     buffer.drain(send_result.rc_);
     ENVOY_UDP_LOG(trace, "sendmsg sent:{} bytes", send_result.rc_);
   } else {
-    if (send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-      ENVOY_UDP_LOG(debug, "sendmsg dropped message");
-    } else {
-      ENVOY_UDP_LOG(debug, "sendmsg failed with error {}",
-                    static_cast<int>(send_result.err_->getErrorCode()));
-    }
+    ENVOY_UDP_LOG(debug, "sendmsg failed with error {}",
+                  static_cast<int>(send_result.err_->getErrorCode()));
   }
 
   return send_result;

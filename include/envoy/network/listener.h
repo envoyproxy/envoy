@@ -140,7 +140,7 @@ struct UdpSendData {
 };
 
 /**
- * Udp listener callbacks.
+ * UDP listener callbacks.
  */
 class UdpListenerCallbacks {
 public:
@@ -195,7 +195,7 @@ public:
 typedef std::unique_ptr<Listener> ListenerPtr;
 
 /**
- * A Udp listener interface.
+ * A UDP listener interface.
  */
 class UdpListener : public virtual Listener {
 public:
@@ -214,7 +214,6 @@ public:
   /**
    * Send data through the underlying udp socket. If the send buffer of the socket FD is full, an
    * error code is returned.
-   *
    * TODO(sumukhs): We do not currently handle max MTU size of the datagram. Determine if we could
    * expose the path MTU information to the caller.
    *

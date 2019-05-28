@@ -120,7 +120,7 @@ private:
     Network::UdpListener& udpListener() override;
 
     Network::UdpListener* udp_listener_;
-    std::list<Network::UdpListenerReadFilterPtr> read_filters_;
+    Network::UdpListenerReadFilterPtr read_filter_;
   };
 
   /**

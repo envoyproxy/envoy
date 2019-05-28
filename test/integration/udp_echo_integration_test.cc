@@ -55,7 +55,7 @@ TEST_P(UdpEchoIntegrationTest, HelloWorld) {
   const std::string request("hello world");
   const void* void_pointer = static_cast<const void*>(request.c_str());
   Buffer::RawSlice slice{const_cast<void*>(void_pointer), request.length()};
-  auto send_rc = client_socket->ioHandle().sendto(&slice, 0, *listener_address);
+  auto send_rc = client_socket->ioHandle().sendto(slice, 0, *listener_address);
   ASSERT_EQ(send_rc.rc_, request.length());
 
   Buffer::InstancePtr response_buffer(new Buffer::OwnedImpl());
@@ -68,8 +68,9 @@ TEST_P(UdpEchoIntegrationTest, HelloWorld) {
         result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       break;
     }
+
     // Retry after 10ms
-    ::usleep(10000);
+    timeSystem().sleep(std::chrono::milliseconds(10));
     retry++;
   } while (true);
 

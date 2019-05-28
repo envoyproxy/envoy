@@ -213,9 +213,15 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   if (!config.listener_filters().empty()) {
     switch (socket_type_) {
     case Network::Address::SocketType::Datagram:
+      if (config.listener_filters().size() > 1) {
+        // Currently supports only 1 UDP listener
+        throw EnvoyException(
+            fmt::format("error adding listener '{}': Only 1 UDP filter per listener supported",
+                        address_->asString()));
+      }
       udp_listener_filter_factories_ =
           parent_.factory_.createUdpListenerFilterFactoryList(config.listener_filters(), *this);
-      // Intentional return since udp filters do not need other configuration
+      // Intentional return since UDP filters do not need other configuration
       return;
     case Network::Address::SocketType::Stream:
       listener_filter_factories_ =

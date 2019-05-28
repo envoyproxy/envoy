@@ -320,24 +320,23 @@ ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImp
                                                             Network::ListenerPtr&& listener,
                                                             Network::ListenerConfig& config)
     : ConnectionHandlerImpl::ActiveListenerBase(parent, std::move(listener), config),
-      udp_listener_(dynamic_cast<Network::UdpListener*>(listener_.get())) {
+      udp_listener_(dynamic_cast<Network::UdpListener*>(listener_.get())), read_filter_(nullptr) {
   // TODO(sumukhs): Try to avoid dynamic_cast by coming up with a better interface design
   ASSERT(udp_listener_ != nullptr, "");
 
   // Create the filter chain on creating a new udp listener
   config_.filterChainFactory().createUdpListenerFilterChain(*this, *this);
 
-  // If filter chain is empty, fail the creation of the listener
-  if (read_filters_.empty()) {
-    throw Network::CreateListenerException(fmt::format(
-        "Cannot create listener as no read filters registered for the udp listener: {} ",
-        config_.name()));
+  // If filter is nullptr, fail the creation of the listener
+  if (read_filter_ == nullptr) {
+    throw Network::CreateListenerException(
+        fmt::format("Cannot create listener as no read filter registered for the udp listener: {} ",
+                    config_.name()));
   }
 }
 
 void ConnectionHandlerImpl::ActiveUdpListener::onData(Network::UdpRecvData& data) {
-  ASSERT(read_filters_.size() == 1, "Udp listener only supports 1 filter");
-  read_filters_.front()->onData(data);
+  read_filter_->onData(data);
 }
 
 void ConnectionHandlerImpl::ActiveUdpListener::onWriteReady(const Network::Socket&) {
@@ -355,7 +354,8 @@ void ConnectionHandlerImpl::ActiveUdpListener::onReceiveError(
 
 void ConnectionHandlerImpl::ActiveUdpListener::addReadFilter(
     Network::UdpListenerReadFilterPtr&& filter) {
-  read_filters_.emplace_back(std::move(filter));
+  ASSERT(read_filter_ == nullptr, "Cannot add a 2nd UDP read filter");
+  read_filter_ = std::move(filter);
 }
 
 Network::UdpListener& ConnectionHandlerImpl::ActiveUdpListener::udpListener() {

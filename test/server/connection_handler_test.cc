@@ -706,7 +706,7 @@ TEST_F(ConnectionHandlerTest, UdpListenerNoFilterThrowsException) {
   } catch (const Network::CreateListenerException& e) {
     EXPECT_THAT(
         e.what(),
-        HasSubstr("Cannot create listener as no read filters registered for the udp listener"));
+        HasSubstr("Cannot create listener as no read filter registered for the udp listener"));
   }
 }
 

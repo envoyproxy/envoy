@@ -75,7 +75,7 @@ public:
       Configuration::ListenerFactoryContext& context) PURE;
 
   /**
-   * Creates a list of udp listener filter factories.
+   * Creates a list of UDP listener filter factories.
    * @param filters supplies the configuration.
    * @param context supplies the factory creation context.
    * @return std::vector<Network::UdpListenerFilterFactoryCb> the list of filter factories.

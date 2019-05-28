@@ -122,10 +122,10 @@ message Listener {
   // :ref:`filter_chains <envoy_api_field_Listener.filter_chains>`. Order matters as the
   // filters are processed sequentially right after a socket has been accepted by the listener, and
   // before a connection is created.
-  // Udp Listener filters can be specified when the protocol in the listener socket address in
+  // UDP Listener filters can be specified when the protocol in the listener socket address in
   // :ref:`protocol <envoy_api_field_core.SocketAddress.protocol>` is :ref:'UDP
-  // <envoy_api_field_core.Protocol.UDP>`. Order matters as the filters are processed sequentially
-  // on receiving a packet on the udp socket.
+  // <envoy_api_field_core.Protocol.UDP>`.
+  // UDP listeners currently support a single filter.
   repeated listener.ListenerFilter listener_filters = 9 [(gogoproto.nullable) = false];
 
   // The timeout to wait for all listener filters to complete operation. If the timeout is reached,

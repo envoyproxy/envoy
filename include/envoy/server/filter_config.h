@@ -169,7 +169,7 @@ public:
 };
 
 /**
- * Common interface for listener filters and udp listener filters
+ * Common interface for listener filters and UDP listener filters
  */
 class ListenerFilterConfigFactoryBase {
 public:
@@ -211,7 +211,7 @@ public:
 };
 
 /**
- * Implemented by each udp listener filter and registered via Registry::registerFactory()
+ * Implemented by each UDP listener filter and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
 class NamedUdpListenerFilterConfigFactory : public ListenerFilterConfigFactoryBase {
@@ -219,7 +219,7 @@ public:
   virtual ~NamedUdpListenerFilterConfigFactory() {}
 
   /**
-   * Create a particular udp listener filter factory implementation. If the implementation is unable
+   * Create a particular UDP listener filter factory implementation. If the implementation is unable
    * to produce a factory with the provided parameters, it should throw an EnvoyException.
    * The returned callback should always be initialized.
    * @param config supplies the general protobuf configuration for the filter
