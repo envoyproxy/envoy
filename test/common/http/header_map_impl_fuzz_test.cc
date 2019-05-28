@@ -4,39 +4,11 @@
 #include "common/common/logger.h"
 #include "common/http/header_map_impl.h"
 
+#include "test/common/http/common_fuzz.h"
 #include "test/common/http/header_map_impl_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {
-
-namespace {
-// The HeaderMap code assumes that input does not contain certain characters, and
-// this is validated by the HTTP parser. The fuzzer will create strings with
-// these characters, however, and this creates not very interesting fuzz test
-// failures as an assertion is rapidly hit in the LowerCaseString constructor
-// before we get to anything interesting.
-//
-// This method will replace any of those characters found with spaces.
-std::string filterInvalidCharacters(absl::string_view string) {
-  std::string filtered;
-  filtered.reserve(string.length());
-  for (const char& c : string) {
-    switch (c) {
-    case '\0':
-      FALLTHRU;
-    case '\r':
-      FALLTHRU;
-    case '\n':
-      filtered.push_back(' ');
-      break;
-    default:
-      filtered.push_back(c);
-    }
-  }
-  return filtered;
-}
-
-} // namespace
 
 // Fuzz the header map implementation.
 DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) {
