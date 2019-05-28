@@ -36,6 +36,7 @@ envoy_cc_test(
         "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:configuration_lib",
+        "//test/common/upstream:utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
