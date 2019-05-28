@@ -66,9 +66,9 @@ public:
   virtual const std::string& urlEncodedPemEncodedPeerCertificate() const PURE;
 
   /**
-   * @return std::string the URL-encoded PEM-encoded representation of the full peer certificate
-   *         chain including the leaf certificate. Returns "" if there is no peer certificate or
-   *         encoding fails.
+   * @return std::string the URL-encoded PEM-encoded representation of the peer certificate chain
+   *         excluding the leaf certificate. Returns "" if there is no peer certificate or encoding
+   *         fails.
    **/
   virtual const std::string& urlEncodedPemEncodedPeerCertificateChain() const PURE;
 

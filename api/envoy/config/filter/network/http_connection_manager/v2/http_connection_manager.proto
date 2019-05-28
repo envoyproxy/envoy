@@ -328,8 +328,9 @@ message HttpConnectionManager {
     // Defaults to false.
     bool cert = 3;
 
-    // Whether to forward the entire client cert chain in URL encoded PEM format. This will appear
-    // in the XFCC header comma separated from other values with the value Chain="PEM".
+    // Whether to forward the client cert chain (excluding the leaf) in URL encoded PEM format.
+    // This will appear in the XFCC header comma separated from other values with the value
+    // Chain="PEM".
     // Defaults to false.
     bool chain = 6;
 
