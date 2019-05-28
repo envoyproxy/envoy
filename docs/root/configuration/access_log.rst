@@ -228,6 +228,9 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+%ROUTE_NAME%
+  Name of the route.
+
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
 

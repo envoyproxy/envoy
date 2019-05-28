@@ -104,7 +104,6 @@ envoy_cc_library(
         "quic_flag_utils_impl.h",
         "quic_flags_impl.h",
         "quic_iovec_impl.h",
-        "quic_logging_impl.h",
         "quic_map_util_impl.h",
         "quic_prefetch_impl.h",
         "quic_ptr_util_impl.h",
@@ -129,13 +128,13 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":flags_impl_lib",
-        ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:byte_order_lib",
         "//source/server:backtrace_lib",
         "@com_googlesource_quiche//:quic_core_buffer_allocator_lib",
         "@com_googlesource_quiche//:quic_platform_export",
+        "@com_googlesource_quiche//:quiche_common_platform",
     ],
 )
 
@@ -167,8 +166,31 @@ envoy_cc_library(
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:utility_lib",
-        "@com_googlesource_quiche//:quic_core_types_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_impl_lib",
+    hdrs = [
+        "quiche_logging_impl.h",
+        "quiche_ptr_util_impl.h",
+        "quiche_unordered_containers_impl.h",
+    ],
+    external_deps = [
+        "abseil_hash",
+        "abseil_node_hash_map",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_logging_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_platform_sleep_impl_lib",
+    hdrs = ["quic_sleep_impl.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@com_googlesource_quiche//:quic_core_time_lib"],
 )
 
 envoy_cc_library(
@@ -204,6 +226,7 @@ envoy_cc_library(
         ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
         "//source/common/common:assert_lib",
+        "@com_googlesource_quiche//:quiche_common_lib",
     ],
 )
 
