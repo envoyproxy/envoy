@@ -10,7 +10,6 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/source/common/buffer/_virtual_includes/buffer_lib/common/buffer/buffer_impl.h"
 #include "quiche/quic/core/quic_utils.h"
 
 namespace quic {

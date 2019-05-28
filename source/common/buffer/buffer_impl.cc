@@ -557,12 +557,11 @@ OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, 
 
 OwnedImpl::OwnedImpl(const OwnedImpl& other) : OwnedImpl() { add(other); }
 
-OwnedImpl::OwnedImpl(OwnedImpl&& other)
-    : old_impl_(other.old_impl_), slices_(std::move(other.slices_)), length_(other.length_),
-      buffer_(std::move(other.buffer_)) {}
+OwnedImpl::OwnedImpl(OwnedImpl&& other) : OwnedImpl() { move(other); }
 
 OwnedImpl& OwnedImpl::operator=(const OwnedImpl& other) {
   if (this != &other) {
+    drain(length());
     add(other);
   }
   return *this;
@@ -570,10 +569,8 @@ OwnedImpl& OwnedImpl::operator=(const OwnedImpl& other) {
 
 OwnedImpl& OwnedImpl::operator=(OwnedImpl&& other) {
   if (this != &other) {
-    old_impl_ = other.old_impl_;
-    slices_ = std::move(other.slices_);
-    length_ = other.length_;
-    buffer_ = std::move(other.buffer_);
+    drain(length());
+    move(other);
   }
   return *this;
 }

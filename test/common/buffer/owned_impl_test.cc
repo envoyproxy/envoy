@@ -39,6 +39,40 @@ protected:
 INSTANTIATE_TEST_CASE_P(OwnedImplTest, OwnedImplTest,
                         testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
 
+TEST_P(OwnedImplTest, CopyConstructAndAssign) {
+  std::string str("hello world");
+  Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
+  buffer.add(str);
+  Buffer::OwnedImpl buffer2(buffer);
+  EXPECT_EQ(str, buffer2.toString());
+  buffer2.drain(str.length());
+  EXPECT_EQ(str, buffer.toString());
+
+  Buffer::OwnedImpl buffer3;
+  buffer3.add("aaa");
+  buffer3 = buffer;
+  EXPECT_EQ(str, buffer3.toString());
+  buffer3.drain(str.length());
+  EXPECT_EQ(str, buffer.toString());
+}
+
+TEST_P(OwnedImplTest, MoveConstructAndAssign) {
+  std::string str("hello world");
+  Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
+  buffer.add(str);
+  Buffer::OwnedImpl buffer2(std::move(buffer));
+  EXPECT_EQ(str, buffer2.toString());
+  EXPECT_EQ(0, buffer.length());
+
+  Buffer::OwnedImpl buffer3;
+  buffer3.add("aaa");
+  buffer3 = std::move(buffer2);
+  EXPECT_EQ(str, buffer3.toString());
+  EXPECT_EQ(0, buffer2.length());
+}
+
 TEST_P(OwnedImplTest, AddBufferFragmentNoCleanup) {
   char input[] = "hello world";
   BufferFragmentImpl frag(input, 11, nullptr);
