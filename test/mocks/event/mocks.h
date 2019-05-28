@@ -114,6 +114,7 @@ public:
   MOCK_METHOD1(post, void(std::function<void()> callback));
   MOCK_METHOD1(run, void(RunType type));
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
+  MOCK_METHOD0(getCurrentThreadId, Thread::ThreadIdPtr(void));
 
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;

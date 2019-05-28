@@ -199,6 +199,11 @@ public:
    * @return the watermark buffer factory for this dispatcher.
    */
   virtual Buffer::WatermarkFactory& getWatermarkFactory() PURE;
+
+  /**
+   * @return the current thread id.
+   */
+  virtual Thread::ThreadIdPtr getCurrentThreadId() PURE;
 };
 
 typedef std::unique_ptr<Dispatcher> DispatcherPtr;

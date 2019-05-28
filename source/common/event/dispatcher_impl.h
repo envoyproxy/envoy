@@ -65,6 +65,7 @@ public:
   void post(std::function<void()> callback) override;
   void run(RunType type) override;
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
+  Thread::ThreadIdPtr getCurrentThreadId() override;
 
 private:
   void runPostCallbacks();

@@ -199,5 +199,9 @@ void DispatcherImpl::runPostCallbacks() {
   }
 }
 
+Thread::ThreadIdPtr DispatcherImpl::getCurrentThreadId() {
+  return api_.threadFactory().currentThreadId();
+}
+
 } // namespace Event
 } // namespace Envoy
