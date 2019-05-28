@@ -769,6 +769,34 @@ public:
 typedef std::unique_ptr<const Decorator> DecoratorConstPtr;
 
 /**
+ * An interface representing the Tracing for the route configuration.
+ */
+class RouteTracing {
+public:
+  virtual ~RouteTracing() {}
+
+  /**
+   * This method returns the client sampling percentage.
+   * @return the client sampling percentage
+   */
+  virtual const envoy::type::FractionalPercent& getClientSampling() const PURE;
+
+  /**
+   * This method returns the random sampling percentage.
+   * @return the random sampling percentage
+   */
+  virtual const envoy::type::FractionalPercent& getRandomSampling() const PURE;
+
+  /**
+   * This method returns the overall sampling percentage.
+   * @return the overall sampling percentage
+   */
+  virtual const envoy::type::FractionalPercent& getOverallSampling() const PURE;
+};
+
+typedef std::unique_ptr<const RouteTracing> RouteTracingConstPtr;
+
+/**
  * An interface that holds a DirectResponseEntry or RouteEntry for a request.
  */
 class Route {
@@ -789,6 +817,11 @@ public:
    * @return the decorator or nullptr if not defined for the request.
    */
   virtual const Decorator* decorator() const PURE;
+
+  /**
+   * @return the tracing config or nullptr if not defined for the request.
+   */
+  virtual const RouteTracing* tracingConfig() const PURE;
 
   /**
    * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for

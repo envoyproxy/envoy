@@ -17,11 +17,14 @@
 namespace Envoy {
 namespace Http {
 
-class CodeUtilitySpeedTest {
+template <class SymbolTableClass> class CodeUtilitySpeedTest {
 public:
   CodeUtilitySpeedTest()
       : global_store_(symbol_table_), cluster_scope_(symbol_table_), code_stats_(symbol_table_),
-        pool_(symbol_table_), prefix_(pool_.add("prefix")) {}
+        pool_(symbol_table_), from_az_(pool_.add("from_az")), prefix_(pool_.add("prefix")),
+        req_vcluster_name_(pool_.add("req_vcluster_name")),
+        test_cluster_(pool_.add("test-cluster")), test_vhost_(pool_.add("test-vhost")),
+        to_az_(pool_.add("to_az")), vhost_name_(pool_.add("vhost_name")) {}
 
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    Stats::StatName request_vhost_name = Stats::StatName(),
@@ -44,53 +47,70 @@ public:
     addResponse(300, false, false);
     Stats::StatName empty_stat_name;
     addResponse(500, true, false);
-    addResponse(200, false, false, pool_.add("test-vhost"), pool_.add("test-cluster"));
-    addResponse(200, false, false, empty_stat_name, empty_stat_name, pool_.add("from_az"),
-                pool_.add("to_az"));
+    addResponse(200, false, false, test_vhost_, test_cluster_);
+    addResponse(200, false, false, empty_stat_name, empty_stat_name, from_az_, to_az_);
   }
 
   void responseTiming() {
-    Http::CodeStats::ResponseTimingInfo info{global_store_,
-                                             cluster_scope_,
-                                             prefix_,
-                                             std::chrono::milliseconds(5),
-                                             true,
-                                             true,
-                                             pool_.add("vhost_name"),
-                                             pool_.add("req_vcluster_name"),
-                                             pool_.add("from_az"),
-                                             pool_.add("to_az")};
+    Http::CodeStats::ResponseTimingInfo info{
+        global_store_, cluster_scope_, prefix_,     std::chrono::milliseconds(5),
+        true,          true,           vhost_name_, req_vcluster_name_,
+        from_az_,      to_az_};
     code_stats_.chargeResponseTiming(info);
   }
 
-  Stats::SymbolTableImpl symbol_table_;
+  SymbolTableClass symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
   Stats::StatNamePool pool_;
-  Stats::StatName prefix_;
+  const Stats::StatName from_az_;
+  const Stats::StatName prefix_;
+  const Stats::StatName req_vcluster_name_;
+  const Stats::StatName test_cluster_;
+  const Stats::StatName test_vhost_;
+  const Stats::StatName to_az_;
+  const Stats::StatName vhost_name_;
 };
 
 } // namespace Http
 } // namespace Envoy
 
-static void BM_AddResponses(benchmark::State& state) {
-  Envoy::Http::CodeUtilitySpeedTest context;
+static void BM_AddResponsesFakeSymtab(benchmark::State& state) {
+  Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::FakeSymbolTableImpl> context;
 
   for (auto _ : state) {
     context.addResponses();
   }
 }
-BENCHMARK(BM_AddResponses);
+BENCHMARK(BM_AddResponsesFakeSymtab);
 
-static void BM_ResponseTiming(benchmark::State& state) {
-  Envoy::Http::CodeUtilitySpeedTest context;
+static void BM_ResponseTimingFakeSymtab(benchmark::State& state) {
+  Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::FakeSymbolTableImpl> context;
 
   for (auto _ : state) {
     context.responseTiming();
   }
 }
-BENCHMARK(BM_ResponseTiming);
+BENCHMARK(BM_ResponseTimingFakeSymtab);
+
+static void BM_AddResponsesRealSymtab(benchmark::State& state) {
+  Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context;
+
+  for (auto _ : state) {
+    context.addResponses();
+  }
+}
+BENCHMARK(BM_AddResponsesRealSymtab);
+
+static void BM_ResponseTimingRealSymtab(benchmark::State& state) {
+  Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context;
+
+  for (auto _ : state) {
+    context.responseTiming();
+  }
+}
+BENCHMARK(BM_ResponseTimingRealSymtab);
 
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {
