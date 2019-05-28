@@ -49,7 +49,7 @@ public:
   virtual GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
                                    const std::vector<Tag>& tags) PURE;
 
-  virtual const SymbolTable& symbolTable() const PURE;
+  virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 
   // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At

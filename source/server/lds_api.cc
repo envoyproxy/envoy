@@ -31,61 +31,82 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
   init_manager.add(init_target_);
 }
 
-void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                const std::string& version_info) {
+void LdsApiImpl::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+    const std::string& system_version_info) {
   cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
   Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
 
-  std::vector<envoy::api::v2::Listener> listeners;
-  for (const auto& listener_blob : resources) {
-    listeners.push_back(MessageUtil::anyConvert<envoy::api::v2::Listener>(listener_blob));
-    MessageUtil::validate(listeners.back());
+  // We do all listener removals before adding the new listeners. This allows adding a new listener
+  // with the same address as a listener that is to be removed. Do not change the order.
+  for (const auto& removed_listener : removed_resources) {
+    if (listener_manager_.removeListener(removed_listener)) {
+      ENVOY_LOG(info, "lds: remove listener '{}'", removed_listener);
+    }
   }
+
   std::vector<std::string> exception_msgs;
   std::unordered_set<std::string> listener_names;
-  for (const auto& listener : listeners) {
-    if (!listener_names.insert(listener.name()).second) {
-      throw EnvoyException(fmt::format("duplicate listener {} found", listener.name()));
-    }
-  }
-  // We need to keep track of which listeners we might need to remove.
-  std::unordered_map<std::string, std::reference_wrapper<Network::ListenerConfig>>
-      listeners_to_remove;
-
-  // We build the list of listeners to be removed and remove them before
-  // adding new listeners. This allows adding a new listener with the same
-  // address as a listener that is to be removed. Do not change the order.
-  for (const auto& listener : listener_manager_.listeners()) {
-    listeners_to_remove.emplace(listener.get().name(), listener);
-  }
-  for (const auto& listener : listeners) {
-    listeners_to_remove.erase(listener.name());
-  }
-  for (const auto& listener : listeners_to_remove) {
-    if (listener_manager_.removeListener(listener.first)) {
-      ENVOY_LOG(info, "lds: remove listener '{}'", listener.first);
-    }
-  }
-
-  for (const auto& listener : listeners) {
-    const std::string& listener_name = listener.name();
+  bool any_applied = false;
+  for (const auto& resource : added_resources) {
+    envoy::api::v2::Listener listener;
     try {
-      if (listener_manager_.addOrUpdateListener(listener, version_info, true)) {
-        ENVOY_LOG(info, "lds: add/update listener '{}'", listener_name);
+      listener = MessageUtil::anyConvert<envoy::api::v2::Listener>(resource.resource());
+      MessageUtil::validate(listener);
+      if (!listener_names.insert(listener.name()).second) {
+        // NOTE: at this point, the first of these duplicates has already been successfully applied.
+        throw EnvoyException(fmt::format("duplicate listener {} found", listener.name()));
+      }
+      if (listener_manager_.addOrUpdateListener(listener, resource.version(), true)) {
+        ENVOY_LOG(info, "lds: add/update listener '{}'", listener.name());
+        any_applied = true;
       } else {
-        ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener_name);
+        ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener.name());
       }
     } catch (const EnvoyException& e) {
-      exception_msgs.push_back(fmt::format("{}: {}", listener_name, e.what()));
+      exception_msgs.push_back(fmt::format("{}: {}", listener.name(), e.what()));
     }
   }
 
-  version_info_ = version_info;
+  if (any_applied) {
+    system_version_info_ = system_version_info;
+  }
   init_target_.ready();
   if (!exception_msgs.empty()) {
     throw EnvoyException(fmt::format("Error adding/updating listener(s) {}",
                                      StringUtil::join(exception_msgs, ", ")));
   }
+}
+
+void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                const std::string& version_info) {
+  // We need to keep track of which listeners need to remove.
+  // Specifically, it's [listeners we currently have] - [listeners found in the response].
+  std::unordered_set<std::string> listeners_to_remove;
+  for (const auto& listener : listener_manager_.listeners()) {
+    listeners_to_remove.insert(listener.get().name());
+  }
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> to_add_repeated;
+  for (const auto& listener_blob : resources) {
+    // Add this resource to our delta added/updated pile...
+    envoy::api::v2::Resource* to_add = to_add_repeated.Add();
+    const std::string listener_name =
+        MessageUtil::anyConvert<envoy::api::v2::Listener>(listener_blob).name();
+    to_add->set_name(listener_name);
+    to_add->set_version(version_info);
+    to_add->mutable_resource()->MergeFrom(listener_blob);
+    // ...and remove its name from our delta removed pile.
+    listeners_to_remove.erase(listener_name);
+  }
+
+  // Copy our delta removed pile into the desired format.
+  Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
+  for (const auto& listener : listeners_to_remove) {
+    *to_remove_repeated.Add() = listener;
+  }
+  onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
 }
 
 void LdsApiImpl::onConfigUpdateFailed(const EnvoyException*) {

@@ -138,9 +138,9 @@ Upstream::Host::CreateConnectionData LogicalDnsCluster::LogicalHost::createConne
   ASSERT(data.current_resolved_address_);
   return {HostImpl::createConnection(dispatcher, *parent_.info_, data.current_resolved_address_,
                                      options, transport_socket_options),
-          HostDescriptionConstSharedPtr{
-              new RealHostDescription(data.current_resolved_address_, parent_.localityLbEndpoint(),
-                                      parent_.lbEndpoint(), shared_from_this())}};
+          HostDescriptionConstSharedPtr{new RealHostDescription(
+              data.current_resolved_address_, parent_.localityLbEndpoint(), parent_.lbEndpoint(),
+              shared_from_this(), parent_.symbolTable())}};
 }
 
 ClusterImplBaseSharedPtr LogicalDnsClusterFactory::createClusterImpl(

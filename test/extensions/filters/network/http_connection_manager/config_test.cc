@@ -106,6 +106,66 @@ http_filters:
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  internal_address_config:
+    unix_sockets: true
+  route_config:
+    name: local_route
+  tracing:
+    operation_name: ingress
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+
+  EXPECT_EQ(100, config.tracingConfig()->client_sampling_.numerator());
+  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+            config.tracingConfig()->client_sampling_.denominator());
+  EXPECT_EQ(10000, config.tracingConfig()->random_sampling_.numerator());
+  EXPECT_EQ(envoy::type::FractionalPercent::TEN_THOUSAND,
+            config.tracingConfig()->random_sampling_.denominator());
+  EXPECT_EQ(100, config.tracingConfig()->overall_sampling_.numerator());
+  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+            config.tracingConfig()->overall_sampling_.denominator());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  internal_address_config:
+    unix_sockets: true
+  route_config:
+    name: local_route
+  tracing:
+    operation_name: ingress
+    client_sampling:
+      value: 1
+    random_sampling:
+      value: 2
+    overall_sampling:
+      value: 3
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+
+  EXPECT_EQ(1, config.tracingConfig()->client_sampling_.numerator());
+  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+            config.tracingConfig()->client_sampling_.denominator());
+  EXPECT_EQ(2, config.tracingConfig()->random_sampling_.numerator());
+  EXPECT_EQ(envoy::type::FractionalPercent::TEN_THOUSAND,
+            config.tracingConfig()->random_sampling_.denominator());
+  EXPECT_EQ(3, config.tracingConfig()->overall_sampling_.numerator());
+  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+            config.tracingConfig()->overall_sampling_.denominator());
+}
+
 TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http

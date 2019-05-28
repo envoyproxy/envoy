@@ -71,12 +71,14 @@ void CdsApiImpl::onConfigUpdate(
 
   std::vector<std::string> exception_msgs;
   std::unordered_set<std::string> cluster_names;
+  bool any_applied = false;
   for (const auto& resource : added_resources) {
     envoy::api::v2::Cluster cluster;
     try {
       cluster = MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource.resource());
       MessageUtil::validate(cluster);
       if (!cluster_names.insert(cluster.name()).second) {
+        // NOTE: at this point, the first of these duplicates has already been successfully applied.
         throw EnvoyException(fmt::format("duplicate cluster {} found", cluster.name()));
       }
       if (cm_.addOrUpdateCluster(
@@ -107,6 +109,7 @@ void CdsApiImpl::onConfigUpdate(
                   cm_.adsMux().resume(Config::TypeUrl::get().Cluster);
                 }
               })) {
+        any_applied = true;
         ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster.name());
       }
     } catch (const EnvoyException& e) {
@@ -119,12 +122,14 @@ void CdsApiImpl::onConfigUpdate(
     }
   }
 
+  if (any_applied) {
+    system_version_info_ = system_version_info;
+  }
   runInitializeCallbackIfAny();
   if (!exception_msgs.empty()) {
     throw EnvoyException(
         fmt::format("Error adding/updating cluster(s) {}", StringUtil::join(exception_msgs, ", ")));
   }
-  system_version_info_ = system_version_info;
 }
 
 void CdsApiImpl::onConfigUpdateFailed(const EnvoyException*) {
