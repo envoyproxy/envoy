@@ -211,6 +211,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/health_check:config",
+        "//test/integration/filters:stop_iteration_and_continue",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",

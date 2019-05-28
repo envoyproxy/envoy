@@ -1672,10 +1672,19 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
     doHeaders(complete() && !bufferedData() && !trailers());
   }
 
-  // TODO(mattklein123): If a filter returns StopIterationNoBuffer and then does a continue, we
-  // won't be able to end the stream if there is no buffered data. Need to handle this.
-  if (bufferedData()) {
-    doData(complete() && !trailers());
+  // Make sure we handle filters returning StopIterationNoBuffer and then commonContinue by tracking
+  // if the terminal fin has already been proxied.
+  bool end_stream_with_data = complete() && !trailers();
+  if (bufferedData() || (end_stream_with_data && !end_stream_sent_with_data_)) {
+    if (end_stream_with_data) {
+      if (!bufferedData()) {
+        // In the StopIterationNoBuffer case the ConnectionManagerImpl will not have created a
+        // buffer but encode/decodeData expects the buffer to exist, so create one.
+        bufferedData() = createBuffer();
+      }
+      end_stream_sent_with_data_ = true;
+    }
+    doData(end_stream_with_data);
   }
 
   if (trailers()) {
