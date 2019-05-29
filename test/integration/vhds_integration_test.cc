@@ -249,8 +249,8 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {"vhost.first"}, {},
                                            vhds_stream_));
-  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>({buildVirtualHost2()}, {}, "4",
-                                                                 vhds_stream_);
+  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(
+      Config::TypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "4", vhds_stream_);
 
   waitForNextUpstreamRequest(1);
   // Send response headers, and end_stream if there is no response body.
@@ -312,8 +312,8 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {"vhost.first"}, {},
                                            vhds_stream_));
-  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>({buildVirtualHost2()}, {}, "4",
-                                                                 vhds_stream_);
+  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(
+      Config::TypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "4", vhds_stream_);
 
   waitForNextUpstreamRequest(1);
   // Send response headers, and end_stream if there is no response body.
