@@ -82,9 +82,9 @@ public:
    * @param grpc_method supplies the method name.
    * @param grpc_status supplies the gRPC status.
    */
-  static void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
-                         const std::string& grpc_service, const std::string& grpc_method,
-                         const Http::HeaderEntry* grpc_status);
+  void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
+                  const std::string& grpc_service, const std::string& grpc_method,
+                  const Http::HeaderEntry* grpc_status);
 
   /**
    * Charge a success/failure stat to a cluster/service/method.
@@ -94,9 +94,9 @@ public:
    * @param grpc_method supplies the method name.
    * @param success supplies whether the call succeeded.
    */
-  static void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
-                         const std::string& grpc_service, const std::string& grpc_method,
-                         bool success);
+  void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
+                  const std::string& grpc_service, const std::string& grpc_method,
+                  bool success);
 
   /**
    * Charge a success/failure stat to a cluster/service/method.
@@ -105,8 +105,8 @@ public:
    * @param grpc_method supplies the method name.
    * @param success supplies whether the call succeeded.
    */
-  static void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
-                         const std::string& grpc_method, bool success);
+  void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
+                  const std::string& grpc_method, bool success);
 
   /**
    * Resolve the gRPC service and method from the HTTP2 :path header.

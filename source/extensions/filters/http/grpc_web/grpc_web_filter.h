@@ -8,6 +8,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/non_copyable.h"
 #include "common/grpc/codec.h"
+#include "common/grpc/common.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,6 +20,7 @@ namespace GrpcWeb {
  */
 class GrpcWebFilter : public Http::StreamFilter, NonCopyable {
 public:
+  explicit GrpcWebFilter(Grpc::Common& common) : common_(common) {}
   virtual ~GrpcWebFilter() {}
 
   // Http::StreamFilterBase
@@ -69,6 +71,7 @@ private:
   std::string grpc_method_;
   bool do_stat_tracking_{};
   bool is_grpc_web_request_{};
+  Grpc::Common& common_;
 };
 
 } // namespace GrpcWeb

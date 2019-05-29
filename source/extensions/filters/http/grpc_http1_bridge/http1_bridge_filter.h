@@ -3,6 +3,8 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/grpc/common.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -12,6 +14,8 @@ namespace GrpcHttp1Bridge {
  */
 class Http1BridgeFilter : public Http::StreamFilter {
 public:
+  explicit Http1BridgeFilter(Grpc::Common& common) : common_(common) {}
+
   // Http::StreamFilterBase
   void onDestroy() override {}
 
@@ -53,6 +57,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   std::string grpc_service_;
   std::string grpc_method_;
+  Grpc::Common& common_;
 };
 
 } // namespace GrpcHttp1Bridge

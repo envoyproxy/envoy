@@ -11,8 +11,8 @@ namespace GrpcWeb {
 
 Http::FilterFactoryCb GrpcWebFilterConfig::createFilter(const std::string&,
                                                         Server::Configuration::FactoryContext&) {
-  return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<GrpcWebFilter>());
+  return [this](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<GrpcWebFilter>(common_));
   };
 }
 

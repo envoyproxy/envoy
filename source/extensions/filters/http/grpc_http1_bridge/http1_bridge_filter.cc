@@ -18,7 +18,7 @@ namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
 void Http1BridgeFilter::chargeStat(const Http::HeaderMap& headers) {
-  Grpc::Common::chargeStat(*cluster_, "grpc", grpc_service_, grpc_method_, headers.GrpcStatus());
+  common_.chargeStat(*cluster_, "grpc", grpc_service_, grpc_method_, headers.GrpcStatus());
 }
 
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
