@@ -15,7 +15,7 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "@envoy_api//envoy/config/filter/listener/original_src/v2alpha1:original_src_cc",
+        "@envoy_api//envoy/config/filter/http/original_src/v2alpha1:original_src_cc",
     ],
 )
 
@@ -25,10 +25,7 @@ envoy_cc_library(
     hdrs = ["original_src.h"],
     deps = [
         ":config_lib",
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/network:address_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:filter_interface",
+        "//include/envoy/http:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/extensions/filters/common/original_src:socket_option_factory_lib",
@@ -43,8 +40,8 @@ envoy_cc_library(
         ":config_lib",
         ":original_src_lib",
         "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/listener:well_known_names",
-        "@envoy_api//envoy/config/filter/listener/original_src/v2alpha1:original_src_cc",
+        "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/config/filter/http/original_src/v2alpha1:original_src_cc",
     ],
 )
