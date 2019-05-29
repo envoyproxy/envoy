@@ -411,6 +411,7 @@ envoy_cc_test_library(
         "//source/server:connection_handler_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:listener_hooks_lib",
+        "//source/server:process_context_lib",
         "//source/server:server_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/common/runtime:utility_lib",

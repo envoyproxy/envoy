@@ -159,8 +159,14 @@ private:
 
   // Saved StatNames for fast comparisons in loop.
   Stats::StatNamePool stat_name_pool_;
-  Stats::StatName cluster_name_;
-  Stats::StatName cluster_upstream_rq_time_;
+  const Stats::StatName cluster_name_;
+  const Stats::StatName cluster_upstream_rq_time_;
+  const Stats::StatName membership_total_;
+  const Stats::StatName retry_upstream_rq_4xx_;
+  const Stats::StatName retry_upstream_rq_5xx_;
+  const Stats::StatName upstream_rq_2xx_;
+  const Stats::StatName upstream_rq_4xx_;
+  const Stats::StatName upstream_rq_5xx_;
 };
 
 typedef std::unique_ptr<HystrixSink> HystrixSinkPtr;
