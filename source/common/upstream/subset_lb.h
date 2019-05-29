@@ -17,7 +17,6 @@
 
 #include "absl/types/optional.h"
 
-
 namespace Envoy {
 namespace Upstream {
 
