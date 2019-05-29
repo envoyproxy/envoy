@@ -364,7 +364,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        Server::Configuration::FactoryContext& factory_context)
     : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
       prefix_rewrite_(route.route().prefix_rewrite()), host_rewrite_(route.route().host_rewrite()),
-      vhost_(vhost),
+      path_rewriter_(RewriteBuilder::build(route)), vhost_(vhost),
       auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
       cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
@@ -515,10 +515,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
     headers.Host()->value(host_rewrite_);
   }
 
-  // Handle path rewrite
-  if (!getPathRewrite().empty()) {
-    rewritePathHeader(headers, insert_envoy_original_path);
-  }
+  rewritePathHeader(headers, insert_envoy_original_path);
 }
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers,
@@ -547,18 +544,17 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
                                             const std::string& matched_path,
                                             bool insert_envoy_original_path) const {
-  const auto& rewrite = getPathRewrite();
-  if (rewrite.empty()) {
-    return;
-  }
+  const PathRewriter& path_rewriter = getPathRewriter();
 
-  std::string path(headers.Path()->value().getStringView());
-  if (insert_envoy_original_path) {
-    headers.insertEnvoyOriginalPath().value(*headers.Path());
+  if (!path_rewriter.apply()) {
+    return;
+  } else {
+    std::string path(headers.Path()->value().getStringView());
+    if (insert_envoy_original_path) {
+      headers.insertEnvoyOriginalPath().value(*headers.Path());
+    }
+    headers.Path()->value(path_rewriter.rewrite(path, matched_path, case_sensitive_));
   }
-  ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
-                         : absl::StartsWithIgnoreCase(path, matched_path));
-  headers.Path()->value(path.replace(0, matched_path.size(), rewrite));
 }
 
 absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& headers,

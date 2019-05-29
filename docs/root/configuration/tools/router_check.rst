@@ -76,6 +76,7 @@ expects a cluster name match of "instant-server".::
         "virtual_host_name": "...",
         "host_rewrite": "...",
         "path_rewrite": "...",
+        "regex_rewrite": "...",
         "path_redirect": "...",
         "header_fields" : [
           {
