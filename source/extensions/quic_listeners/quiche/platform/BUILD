@@ -170,6 +170,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "envoy_quic_clock_lib",
+    srcs = ["envoy_quic_clock.cc"],
+    hdrs = ["envoy_quic_clock.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//include/envoy/event:timer_interface",
+        "@com_googlesource_quiche//:quic_platform",
+    ],
+)
+
+envoy_cc_library(
     name = "quiche_common_platform_impl_lib",
     hdrs = [
         "quiche_logging_impl.h",

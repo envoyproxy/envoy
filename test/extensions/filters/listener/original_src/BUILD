@@ -49,16 +49,3 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/filter/listener/original_src/v2alpha1:original_src_cc",
     ],
 )
-
-envoy_extension_cc_test(
-    name = "original_src_socket_option_test",
-    srcs = ["original_src_socket_option_test.cc"],
-    extension_name = "envoy.filters.listener.original_src",
-    deps = [
-        "//source/common/network:address_lib",
-        "//source/extensions/filters/listener/original_src:original_src_socket_option_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/network:network_mocks",
-        "//test/test_common:printers_lib",
-    ],
-)
