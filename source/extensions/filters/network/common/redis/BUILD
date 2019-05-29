@@ -15,6 +15,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "utility_interface",
+    hdrs = ["utility.h"],
+    deps = [":codec_interface"],
+)
+
+envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
@@ -60,5 +66,14 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:load_balancer_lib",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "utility_lib",
+    srcs = ["utility.cc"],
+    hdrs = ["utility.h"],
+    deps = [
+        ":codec_lib",
     ],
 )

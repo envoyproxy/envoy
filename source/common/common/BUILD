@@ -62,6 +62,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "cleanup_lib",
     hdrs = ["cleanup.h"],
+    deps = [
+        ":assert_lib",
+    ],
 )
 
 envoy_cc_library(

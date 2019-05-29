@@ -106,9 +106,13 @@ MockDecorator::MockDecorator() {
 }
 MockDecorator::~MockDecorator() {}
 
+MockRouteTracing::MockRouteTracing() {}
+MockRouteTracing::~MockRouteTracing() {}
+
 MockRoute::MockRoute() {
   ON_CALL(*this, routeEntry()).WillByDefault(Return(&route_entry_));
   ON_CALL(*this, decorator()).WillByDefault(Return(&decorator_));
+  ON_CALL(*this, tracingConfig()).WillByDefault(Return(nullptr));
 }
 MockRoute::~MockRoute() {}
 

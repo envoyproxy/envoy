@@ -2,17 +2,18 @@
 #include <string>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/api/api_impl.h"
-#include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
 #include "common/http/context_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/socket_option_impl.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
@@ -192,6 +193,10 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
   return bootstrap;
 }
 
+std::string clustersJson(const std::vector<std::string>& clusters) {
+  return fmt::sprintf("\"clusters\": [%s]", StringUtil::join(clusters, ","));
+}
+
 const ClusterManager::ClusterWarmingCallback dummyWarmingCb = [](auto, auto) {};
 
 class ClusterManagerImplTest : public testing::Test {
@@ -282,11 +287,13 @@ public:
   Http::ContextImpl http_context_;
 };
 
-envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::BootstrapJson::translateClusterManagerBootstrap(*json_object_ptr, bootstrap);
-  return bootstrap;
+envoy::config::bootstrap::v2::Bootstrap defaultConfig() {
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters: []
+  )EOF";
+
+  return parseBootstrapFromV2Yaml(yaml);
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
@@ -360,78 +367,105 @@ dynamic_warming_clusters:
 TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   const std::string json = R"EOF(
   {
-    "outlier_detection": {
-      "event_log_path": "foo"
+    "cluster_manager": {
+      "outlier_detection": {
+        "event_log_path": "foo"
+      }
     },
-    "clusters": []
+    "static_resources": {
+      "clusters": []
+    }
   }
   )EOF";
 
   EXPECT_CALL(log_manager_, createAccessLog("foo"));
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
 }
 
 TEST_F(ClusterManagerImplTest, NoSdsConfig) {
-  const std::string json = fmt::sprintf("{%s}", clustersJson({defaultSdsClusterJson("cluster_1")}));
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromJson(json)), EnvoyException,
-                            "cannot create sds cluster with no sds config");
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.250s
+    type: eds
+    lb_policy: round_robin
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+                            "cannot create an EDS cluster without an EDS config");
 }
 
 TEST_F(ClusterManagerImplTest, UnknownClusterType) {
   const std::string json = R"EOF(
   {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "foo",
-      "lb_type": "round_robin"
-    }]
-  }
+    "static_resources": {
+      "clusters": [
+        {
+          "name": "cluster_1",
+          "connect_timeout": "0.250s",
+          "type": "foo",
+          "lb_policy": "round_robin"
+        }]
+      }
+    }
   )EOF";
 
-  EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
+  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV2Json(json)), EnvoyException,
+                          "invalid value \"foo\" for type TYPE_ENUM");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
   const std::string json = fmt::sprintf(
       R"EOF(
   {
-    "local_cluster_name": "new_cluster",
-    %s
+    "cluster_manager": {
+      "local_cluster_name": "new_cluster",
+    },
+    "static_resources": {
+      %s
+    }
   }
   )EOF",
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2")}));
 
-  EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
+  EXPECT_THROW(create(parseBootstrapFromV2Json(json)), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
   const std::string json = R"EOF(
   {
-    "outlier_detection": {
-      "event_log_path": "foo"
+    "cluster_manager": {
+      "outlier_detection": {
+        "event_log_path": "foo"
+      },
+      "fake_property" : "fake_property"
     },
-    "clusters": [],
-    "fake_property" : "fake_property"
+    "static_resources": {
+      "clusters": []
+    }
   }
   )EOF";
 
-  EXPECT_THROW(create(parseBootstrapFromJson(json)), Json::Exception);
+  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV2Json(json)), EnvoyException,
+                          "fake_property: Cannot find field");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
   const std::string json = fmt::sprintf(
       R"EOF(
   {
-    "local_cluster_name": "new_cluster",
-    %s
+    "cluster_manager": {
+      "local_cluster_name": "new_cluster",
+    },
+    "static_resources": {
+      %s
+    }
   }
   )EOF",
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2"),
                     defaultStaticClusterJson("new_cluster")}));
 
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
   checkStats(3 /*added*/, 0 /*modified*/, 0 /*removed*/, 3 /*active*/, 0 /*warming*/);
 
   factory_.tls_.shutdownThread();
@@ -439,46 +473,31 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
 
 TEST_F(ClusterManagerImplTest, DuplicateCluster) {
   const std::string json = fmt::sprintf(
-      "{%s}",
+      "{\"static_resources\":{%s}}",
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_1")}));
-  EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
-}
-
-TEST_F(ClusterManagerImplTest, UnknownHcType) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}],
-      "health_check": {
-        "type": "foo"
-      }
-    }]
-  }
-  )EOF";
-
-  EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
+  const auto config = parseBootstrapFromV2Json(json);
+  EXPECT_THROW(create(config), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, ValidClusterName) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster:name",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    }]
-  }
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: cluster:name
+    connect_timeout: 0.250s
+    type: static
+    lb_policy: round_robin
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
   )EOF";
 
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Yaml(yaml));
   cluster_manager_->clusters()
       .find("cluster:name")
       ->second.get()
@@ -490,57 +509,67 @@ TEST_F(ClusterManagerImplTest, ValidClusterName) {
 }
 
 TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "original_dst",
-      "lb_type": "round_robin"
-    }]
-  }
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.250s
+    type: original_dst
+    lb_policy: round_robin
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromJson(json)), EnvoyException,
+      create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
       "cluster: cluster type 'original_dst' may only be used with LB type 'original_dst_lb'");
 }
 
 TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "original_dst_lb",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    }]
-  }
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.250s
+    type: static
+    lb_policy: original_dst_lb
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromJson(json)), EnvoyException,
+      create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
       "cluster: LB type 'original_dst_lb' may only be used with cluster type 'original_dst'");
 }
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:8000"}, {"url": "tcp://127.0.0.1:8001"}]
-    }]
-  }
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.250s
+    type: static
+    lb_policy: round_robin
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8000
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8001
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromV2Yaml(yaml);
   envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
       bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
   subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
@@ -553,19 +582,16 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
 }
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerRestriction) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "original_dst",
-      "lb_type": "original_dst_lb"
-    }]
-  }
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.250s
+    type: original_dst
+    lb_policy: original_dst_lb
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromV2Yaml(yaml);
   envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
       bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
   subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
@@ -577,20 +603,29 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerRestriction) {
 }
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerLocalityAware) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:8000"}, {"url": "tcp://127.0.0.1:8001"}]
-    }]
-  }
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8000
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8001
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromV2Yaml(yaml);
   envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
       bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
   subset_config->set_locality_weight_aware(true);
@@ -601,21 +636,30 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerLocalityAware) {
 }
 
 TEST_F(ClusterManagerImplTest, RingHashLoadBalancerInitialization) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [{
-      "name": "redis_cluster",
-      "lb_type": "ring_hash",
-      "ring_hash_lb_config": {
-        "minimum_ring_size": 125
-      },
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "hosts": [{"url": "tcp://127.0.0.1:8000"}, {"url": "tcp://127.0.0.1:8001"}]
-    }]
-  }
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: redis_cluster
+    lb_policy: RING_HASH
+    ring_hash_lb_config:
+      minimum_ring_size: 125
+    connect_timeout: 0.250s
+    type: STATIC
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8000
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8001
   )EOF";
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Yaml(yaml));
 }
 
 TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
@@ -625,13 +669,19 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
     - name: redis_cluster
       connect_timeout: 0.250s
       lb_policy: RING_HASH
-      hosts:
-      - socket_address:
-          address: 127.0.0.1
-          port_value: 8000
-      - socket_address:
-          address: 127.0.0.1
-          port_value: 8001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 8000
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 8001
       dns_lookup_family: V4_ONLY
       ring_hash_lb_config:
         minimum_ring_size: 125
@@ -655,8 +705,8 @@ TEST_F(ClusterManagerImplTest, EdsClustersRequireEdsConfig) {
 class ClusterManagerImplThreadAwareLbTest : public ClusterManagerImplTest {
 public:
   void doTest(LoadBalancerType lb_type) {
-    const std::string json =
-        fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_0")}));
+    const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                          clustersJson({defaultStaticClusterJson("cluster_0")}));
 
     std::shared_ptr<MockClusterMockPrioritySet> cluster1(
         new NiceMock<MockClusterMockPrioritySet>());
@@ -666,7 +716,7 @@ public:
     InSequence s;
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
     ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-    create(parseBootstrapFromJson(json));
+    create(parseBootstrapFromV2Json(json));
 
     EXPECT_EQ(nullptr, cluster_manager_->get("cluster_0")->loadBalancer().chooseHost(nullptr));
 
@@ -693,30 +743,31 @@ TEST_F(ClusterManagerImplThreadAwareLbTest, MaglevLoadBalancerThreadAwareUpdate)
 }
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}],
-      "health_check": {
-        "type": "tcp",
-        "timeout_ms": 1000,
-        "interval_ms": 1000,
-        "unhealthy_threshold": 2,
-        "healthy_threshold": 2,
-        "send": [
-          {"binary": "01"}
-        ],
-        "receive": [
-          {"binary": "02"}
-        ]
-      }
-    }]
-  }
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    health_checks:
+    - timeout: 1s
+      interval: 1s
+      unhealthy_threshold: 2
+      healthy_threshold: 2
+      tcp_health_check:
+        send:
+          text: '01'
+        receive:
+          - text: '02'
   )EOF";
 
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
@@ -724,30 +775,33 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
               createClientConnection_(
                   PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Yaml(yaml));
   factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}],
-      "health_check": {
-        "type": "http",
-        "timeout_ms": 1000,
-        "interval_ms": 1000,
-        "unhealthy_threshold": 2,
-        "healthy_threshold": 2,
-        "path": "/healthcheck"
-      }
-    }]
-  }
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    health_checks:
+    - timeout: 1s
+      interval: 1s
+      unhealthy_threshold: 2
+      healthy_threshold: 2
+      http_health_check:
+        path: "/healthcheck"
   )EOF";
 
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
@@ -755,15 +809,15 @@ TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
               createClientConnection_(
                   PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Yaml(yaml));
   factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, UnknownCluster) {
-  const std::string json =
-      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_1")}));
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("cluster_1")}));
 
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default,
                                                               Http::Protocol::Http2, nullptr));
@@ -787,21 +841,25 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
  * Test that buffer limits are set on new TCP connections.
  */
 TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "per_connection_buffer_limit_bytes": 8192,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    }]
-  }
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.250s
+    type: static
+    lb_policy: round_robin
+    per_connection_buffer_limit_bytes: 8192
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
   )EOF";
 
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Yaml(yaml));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(8192));
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
@@ -812,10 +870,10 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
 }
 
 TEST_F(ClusterManagerImplTest, ShutdownOrder) {
-  const std::string json =
-      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_1")}));
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("cluster_1")}));
 
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
   EXPECT_EQ("cluster_1", cluster.info()->name());
   EXPECT_EQ(cluster.info(), cluster_manager_->get("cluster_1")->info());
@@ -840,13 +898,23 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   const std::string json = fmt::sprintf(
       R"EOF(
   {
-    "cds": {"cluster": %s},
-    %s
+    "dynamic_resources": {
+      "cds_config": {
+        "api_config_source": {
+          "api_type": "UNSUPPORTED_REST_LEGACY",
+          "refresh_delay": "30s",
+          "cluster_names": ["cds_cluster"]
+        }
+      }
+    },
+    "static_resources": {
+      %s
+    }
   }
   )EOF",
-      defaultStaticClusterJson("cds_cluster"),
-      clustersJson(
-          {defaultStaticClusterJson("fake_cluster"), defaultStaticClusterJson("fake_cluster2")}));
+      clustersJson({defaultStaticClusterJson("cds_cluster"),
+                    defaultStaticClusterJson("fake_cluster"),
+                    defaultStaticClusterJson("fake_cluster2")}));
 
   MockCdsApi* cds = new MockCdsApi();
   std::shared_ptr<MockClusterMockPrioritySet> cds_cluster(
@@ -870,7 +938,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   EXPECT_CALL(*cds_cluster, initialize(_));
   EXPECT_CALL(*cluster1, initialize(_));
 
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
 
   ReadyWatcher initialized;
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -919,7 +987,6 @@ static_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
-      dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -931,7 +998,6 @@ static_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
-      dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -943,7 +1009,6 @@ static_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
-      dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -957,7 +1022,6 @@ dynamic_active_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
-      dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -970,7 +1034,6 @@ dynamic_active_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
-      dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -983,7 +1046,6 @@ dynamic_active_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
-      dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -1015,8 +1077,12 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   // Setup a cluster manager with a static local cluster.
   const std::string json = fmt::sprintf(R"EOF(
   {
-    "local_cluster_name": "foo",
-    %s
+    "cluster_manager": {
+      "local_cluster_name": "foo"
+    },
+    "static_resources": {
+      %s
+    }
   }
   )EOF",
                                         clustersJson({defaultStaticClusterJson("fake")}));
@@ -1027,7 +1093,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   ON_CALL(*foo, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*foo, initialize(_));
 
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
   foo->initialize_callback_();
 
   // Now add a dynamic cluster. This cluster will have a member update callback from the local
@@ -1064,14 +1130,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 
 TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
-
-  const std::string json = R"EOF(
-  {
-    "clusters": []
-  }
-  )EOF";
-
-  create(parseBootstrapFromJson(json));
+  create(defaultConfig());
 
   InSequence s;
   ReadyWatcher initialized;
@@ -1097,7 +1156,6 @@ dynamic_warming_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
-      dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -1111,13 +1169,7 @@ dynamic_warming_clusters:
 
 // Verify that shutting down the cluster manager destroys warming clusters.
 TEST_F(ClusterManagerImplTest, ShutdownWithWarming) {
-  const std::string json = R"EOF(
-  {
-    "clusters": []
-  }
-  )EOF";
-
-  create(parseBootstrapFromJson(json));
+  create(defaultConfig());
 
   InSequence s;
   ReadyWatcher initialized;
@@ -1138,13 +1190,7 @@ TEST_F(ClusterManagerImplTest, ShutdownWithWarming) {
 }
 
 TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
-  const std::string json = R"EOF(
-  {
-    "clusters": []
-  }
-  )EOF";
-
-  create(parseBootstrapFromJson(json));
+  create(defaultConfig());
 
   InSequence s;
   ReadyWatcher initialized;
@@ -1255,15 +1301,15 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 }
 
 TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
-  const std::string json =
-      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("some_cluster")}));
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("fake_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   InSequence s;
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
 
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
 
   ReadyWatcher initialized;
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -1284,15 +1330,15 @@ TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
 
 // Verifies that we correctly propagate the host_set state to the TLS clusters.
 TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
-  const std::string json =
-      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("fake_cluster")}));
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("fake_cluster")}));
   std::shared_ptr<MockClusterRealPrioritySet> cluster1(new NiceMock<MockClusterRealPrioritySet>());
   InSequence s;
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
 
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Json(json));
 
   ReadyWatcher initialized;
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -1331,8 +1377,8 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
 
 // Test that we close all HTTP connection pool connections when there is a host health failure.
 TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
-  const std::string json =
-      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("some_cluster")}));
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("some_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "some_cluster";
   HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
@@ -1359,7 +1405,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
           // Test inline init.
           initialize_callback();
         }));
-    create(parseBootstrapFromJson(json));
+    create(parseBootstrapFromV2Json(json));
 
     EXPECT_CALL(factory_, allocateConnPool_(_, _)).WillOnce(Return(cp1));
     cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
@@ -1393,8 +1439,8 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
 
 // Test that we close all TCP connection pool connections when there is a host health failure.
 TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
-  const std::string json =
-      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("some_cluster")}));
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("some_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "some_cluster";
   HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
@@ -1421,7 +1467,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
           // Test inline init.
           initialize_callback();
         }));
-    create(parseBootstrapFromJson(json));
+    create(parseBootstrapFromV2Json(json));
 
     EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(cp1));
     cluster_manager_->tcpConnPoolForCluster("some_cluster", ResourcePriority::Default, nullptr,
@@ -1582,18 +1628,25 @@ TEST_F(ClusterManagerImplTest, DoNotCloseTcpConnectionsOnHealthFailure) {
 }
 
 TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "strict_dns",
-      "dns_resolvers": [ "1.2.3.4:80" ],
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://localhost:11001"}]
-    }]
-  }
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      dns_resolvers:
+        - socket_address:
+            address: 1.2.3.4
+            port_value: 80
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -1604,7 +1657,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
@@ -1733,10 +1786,14 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
           address: 1.2.3.4
           port_value: 80
       lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: localhost
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -1963,10 +2020,14 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
           address: 1.2.3.4
           port_value: 80
       lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: localhost
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -2039,10 +2100,14 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
           address: 1.2.3.4
           port_value: 80
       lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: localhost
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -2087,22 +2152,25 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
 }
 
 TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
-  const std::string json = R"EOF(
+  const std::string yaml = R"EOF(
   {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "original_dst",
-      "lb_type": "original_dst_lb"
-    }]
+    "static_resources": {
+      "clusters": [
+        {
+          "name": "cluster_1",
+          "connect_timeout": "0.250s",
+          "type": "original_dst",
+          "lb_policy": "original_dst_lb"
+        }
+      ]
+    }
   }
   )EOF";
 
   ReadyWatcher initialized;
   EXPECT_CALL(initialized, ready());
 
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Yaml(yaml));
 
   // Set up for an initialize callback.
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -2395,10 +2463,14 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   connect_timeout: 0.250s
   type: STATIC
   lb_policy: ROUND_ROBIN
-  hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 12001
+  load_assignment:
+    endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 12001
   common_lb_config:
     update_merge_window: 3s
   )EOF";
@@ -2449,10 +2521,14 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   connect_timeout: 0.250s
   type: STATIC
   lb_policy: ROUND_ROBIN
-  hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 12001
+  load_assignment:
+    endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 12001
   common_lb_config:
     update_merge_window: 4s
   )EOF";
@@ -2757,10 +2833,14 @@ TEST_F(SockoptsTest, SockoptsUnset) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   )EOF";
   initialize(yaml);
   expectNoSocketOptions();
@@ -2774,10 +2854,14 @@ TEST_F(SockoptsTest, FreebindClusterOnly) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
       upstream_bind_config:
         freebind: true
   )EOF";
@@ -2793,10 +2877,14 @@ TEST_F(SockoptsTest, FreebindClusterManagerOnly) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   cluster_manager:
     upstream_bind_config:
       freebind: true
@@ -2813,10 +2901,14 @@ TEST_F(SockoptsTest, FreebindClusterOverride) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
       upstream_bind_config:
         freebind: true
   cluster_manager:
@@ -2835,10 +2927,14 @@ TEST_F(SockoptsTest, SockoptsClusterOnly) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
       upstream_bind_config:
         socket_options: [
           { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
@@ -2859,10 +2955,14 @@ TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   cluster_manager:
     upstream_bind_config:
       socket_options: [
@@ -2883,10 +2983,14 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
       upstream_bind_config:
         socket_options: [
           { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
@@ -3010,10 +3114,14 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveUnset) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
   )EOF";
   initialize(yaml);
   expectNoSocketOptions();
@@ -3027,10 +3135,14 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveCluster) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
       upstream_connection_options:
         tcp_keepalive: {}
   )EOF";
@@ -3046,10 +3158,14 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterProbes) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
       upstream_connection_options:
         tcp_keepalive:
           keepalive_probes: 7
@@ -3066,10 +3182,14 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
       upstream_connection_options:
         tcp_keepalive:
           keepalive_probes: 7

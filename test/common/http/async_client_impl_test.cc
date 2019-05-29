@@ -919,6 +919,7 @@ public:
 // Test the extended fake route that AsyncClient uses.
 TEST_F(AsyncClientImplRouteTest, All) {
   EXPECT_EQ(nullptr, route_impl.decorator());
+  EXPECT_EQ(nullptr, route_impl.tracingConfig());
   EXPECT_EQ(nullptr, route_impl.perFilterConfig(""));
   EXPECT_EQ(Code::InternalServerError, route_impl.routeEntry()->clusterNotFoundResponseCode());
   EXPECT_EQ(nullptr, route_impl.routeEntry()->corsPolicy());
