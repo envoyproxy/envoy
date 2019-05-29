@@ -771,13 +771,18 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
     EXPECT_FALSE(headers.has("accept-encoding"));
   }
   {
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_TRUE(headers.has("accept-encoding"));
+    EXPECT_EQ("deflate, gzip, br", headers.get_("accept-encoding"));
+  }
+  {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
     setUpFilter("{}");
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_TRUE(headers.has("accept-encoding"));
     EXPECT_EQ("deflate, test, gzip, br", headers.get_("accept-encoding"));
   }
-  // TODO: verify removeAcceptEncoding is not used when there is no 'test' in 'Accept-Encoding'
 }
 
 } // namespace Compressors
