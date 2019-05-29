@@ -98,6 +98,7 @@ public:
   void write(const std::string& data, bool end_stream = false, bool verify = true);
   const std::string& data() { return payload_reader_->data(); }
   bool connected() const { return !disconnected_; }
+  void clearData() { payload_reader_->clearData(); }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {

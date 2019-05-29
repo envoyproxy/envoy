@@ -87,6 +87,7 @@ public:
   const DirectResponseEntry* directResponseEntry() const override { return &SSL_REDIRECTOR; }
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
+  const RouteTracing* tracingConfig() const override { return nullptr; }
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
     return nullptr;
   }
@@ -347,6 +348,28 @@ private:
 };
 
 /**
+ * Implementation of RouteTracing that reads from the proto route tracing.
+ */
+class RouteTracingImpl : public RouteTracing {
+public:
+  RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing);
+
+  // Tracing::getClientSampling
+  const envoy::type::FractionalPercent& getClientSampling() const override;
+
+  // Tracing::getRandomSampling
+  const envoy::type::FractionalPercent& getRandomSampling() const override;
+
+  // Tracing::getOverallSampling
+  const envoy::type::FractionalPercent& getOverallSampling() const override;
+
+private:
+  envoy::type::FractionalPercent client_sampling_;
+  envoy::type::FractionalPercent random_sampling_;
+  envoy::type::FractionalPercent overall_sampling_;
+};
+
+/**
  * Base implementation for all route entries.
  */
 class RouteEntryImplBase : public RouteEntry,
@@ -436,6 +459,7 @@ public:
   const DirectResponseEntry* directResponseEntry() const override;
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
+  const RouteTracing* tracingConfig() const override { return route_tracing_.get(); }
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
 
 protected:
@@ -535,6 +559,7 @@ private:
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
     const RouteEntry* routeEntry() const override { return this; }
     const Decorator* decorator() const override { return parent_->decorator(); }
+    const RouteTracing* tracingConfig() const override { return parent_->tracingConfig(); }
 
     const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override {
       return parent_->perFilterConfig(name);
@@ -600,6 +625,8 @@ private:
 
   static DecoratorConstPtr parseDecorator(const envoy::api::v2::route::Route& route);
 
+  static RouteTracingConstPtr parseRouteTracing(const envoy::api::v2::route::Route& route);
+
   bool evaluateRuntimeMatch(const uint64_t random_value) const;
 
   HedgePolicyImpl
@@ -656,6 +683,7 @@ private:
   const std::multimap<std::string, std::string> opaque_config_;
 
   const DecoratorConstPtr decorator_;
+  const RouteTracingConstPtr route_tracing_;
   const absl::optional<Http::Code> direct_response_code_;
   std::string direct_response_body_;
   PerFilterConfigs per_filter_configs_;

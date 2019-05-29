@@ -43,7 +43,7 @@ std::string MySQLTestUtils::encodeClientLogin(uint16_t client_cap, std::string u
   return mysql_msg;
 }
 
-std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, int it, int seq_force) {
+std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, uint8_t it, uint8_t seq_force) {
   ClientLoginResponse mysql_loginok_encode{};
   mysql_loginok_encode.setRespCode(srv_resp);
   mysql_loginok_encode.setAffectedRows(MYSQL_SM_AFFECTED_ROWS);
@@ -51,7 +51,7 @@ std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, int it, int 
   mysql_loginok_encode.setServerStatus(MYSQL_SM_SERVER_OK);
   mysql_loginok_encode.setWarnings(MYSQL_SM_SERVER_WARNINGS);
   std::string data = mysql_loginok_encode.encode();
-  int seq = CHALLENGE_RESP_SEQ_NUM + 2 * it;
+  uint8_t seq = CHALLENGE_RESP_SEQ_NUM + 2 * it;
   if (seq_force > 0) {
     seq = seq_force;
   }

@@ -11,6 +11,7 @@
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/process_context.h"
 #include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
@@ -18,6 +19,7 @@
 
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/common/assert.h"
+#include "common/common/cleanup.h"
 #include "common/common/logger_delegates.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/context_impl.h"
@@ -149,7 +151,8 @@ public:
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
-               Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
+               Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
+               std::unique_ptr<ProcessContext> process_context);
 
   ~InstanceImpl() override;
 
@@ -185,6 +188,7 @@ public:
   time_t startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
   Http::Context& httpContext() override { return http_context_; }
+  ProcessContext& processContext() override { return *process_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
@@ -259,21 +263,18 @@ private:
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
   Envoy::MutexTracer* mutex_tracer_;
   Http::ContextImpl http_context_;
+  std::unique_ptr<ProcessContext> process_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   const std::thread::id main_thread_id_;
 
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
 
-  template <class T> class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle {
+  template <class T>
+  class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {
   public:
-    LifecycleCallbackHandle(T& callbacks, typename T::iterator it)
-        : callbacks_(callbacks), it_(it) {}
-    ~LifecycleCallbackHandle() override { callbacks_.erase(it_); }
-
-  private:
-    T& callbacks_;
-    typename T::iterator it_;
+    LifecycleCallbackHandle(std::list<T>& callbacks, T& callback)
+        : RaiiListElement<T>(callbacks, callback) {}
   };
 
   absl::flat_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;

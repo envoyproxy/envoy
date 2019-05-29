@@ -34,7 +34,6 @@
 #include "common/common/stack_array.h"
 #include "common/common/thread_impl.h"
 #include "common/common/utility.h"
-#include "common/config/bootstrap_json.h"
 #include "common/config/resources.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
@@ -177,14 +176,6 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
     }
   }
   return file_names;
-}
-
-envoy::config::bootstrap::v2::Bootstrap
-TestUtility::parseBootstrapFromJson(const std::string& json_string) {
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::BootstrapJson::translateBootstrap(*json_object_ptr, bootstrap);
-  return bootstrap;
 }
 
 std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {

@@ -38,7 +38,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
-        "//source/common/config:lds_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
@@ -281,6 +280,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "process_context_lib",
+    hdrs = ["process_context_impl.h"],
+    deps = ["//include/envoy/server:process_context_interface"],
+)
+
+envoy_cc_library(
     name = "proto_descriptors_lib",
     srcs = ["proto_descriptors.cc"],
     hdrs = ["proto_descriptors.h"],
@@ -326,17 +331,18 @@ envoy_cc_library(
         "//include/envoy/server:instance_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:options_interface",
+        "//include/envoy/server:process_context_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/api:api_lib",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:utility_lib",
         "//source/common/common:version_lib",
-        "//source/common/config:bootstrap_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/http:codes_lib",

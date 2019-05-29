@@ -25,7 +25,6 @@
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/config/bootstrap_json.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/http/codes.h"
@@ -54,7 +53,8 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
                            ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-                           Filesystem::Instance& file_system)
+                           Filesystem::Instance& file_system,
+                           std::unique_ptr<ProcessContext> process_context)
     : secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), shutdown_(false),
       options_(options), time_source_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
@@ -70,7 +70,8 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
       terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
-      http_context_(store.symbolTable()), main_thread_id_(std::this_thread::get_id()) {
+      http_context_(store.symbolTable()), process_context_(std::move(process_context)),
+      main_thread_id_(std::this_thread::get_id()) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -593,16 +594,15 @@ void InstanceImpl::shutdownAdmin() {
 ServerLifecycleNotifier::HandlePtr InstanceImpl::registerCallback(Stage stage,
                                                                   StageCallback callback) {
   auto& callbacks = stage_callbacks_[stage];
-  return std::make_unique<LifecycleCallbackHandle<LifecycleNotifierCallbacks>>(
-      callbacks, callbacks.insert(callbacks.end(), callback));
+  return absl::make_unique<LifecycleCallbackHandle<StageCallback>>(callbacks, callback);
 }
 
 ServerLifecycleNotifier::HandlePtr
 InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
   ASSERT(stage == Stage::ShutdownExit);
   auto& callbacks = stage_completable_callbacks_[stage];
-  return std::make_unique<LifecycleCallbackHandle<LifecycleNotifierCompletionCallbacks>>(
-      callbacks, callbacks.insert(callbacks.end(), callback));
+  return absl::make_unique<LifecycleCallbackHandle<StageCallbackWithCompletion>>(callbacks,
+                                                                                 callback);
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
