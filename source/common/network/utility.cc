@@ -355,6 +355,14 @@ Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress() {
   return any;
 }
 
+const std::string& Utility::getIpv4CidrCatchAllAddress() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "0.0.0.0/0");
+}
+
+const std::string& Utility::getIpv6CidrCatchAllAddress() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "::/0");
+}
+
 Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Instance& address,
                                                             uint32_t port) {
   switch (address.ip()->version()) {

@@ -498,12 +498,12 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
   std::vector<Network::Address::CidrRange> subnets;
   if (cidr == EMPTY_STRING) {
     if (Network::Address::ipFamilySupported(AF_INET)) {
-      static const std::string catch_all_ipv4 = "0.0.0.0/0";
-      subnets.push_back(Network::Address::CidrRange::create(catch_all_ipv4));
+      subnets.push_back(
+          Network::Address::CidrRange::create(Network::Utility::getIpv4CidrCatchAllAddress()));
     }
     if (Network::Address::ipFamilySupported(AF_INET6)) {
-      static const std::string catch_all_ipv6 = "::/0";
-      subnets.push_back(Network::Address::CidrRange::create(catch_all_ipv6));
+      subnets.push_back(
+          Network::Address::CidrRange::create(Network::Utility::getIpv6CidrCatchAllAddress()));
     }
   } else {
     subnets.push_back(Network::Address::CidrRange::create(cidr));
@@ -574,15 +574,23 @@ ListenerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
   return nullptr;
 }
 
+namespace {
+
+// Return a fake address for use when either the source or destination is UDS.
+Network::Address::InstanceConstSharedPtr fakeAddress() {
+  static const Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::parseInternetAddress("255.255.255.255");
+  return address;
+}
+
+} // namespace
+
 const Network::FilterChain*
 ListenerImpl::findFilterChainForDestinationIP(const DestinationIPsTrie& destination_ips_trie,
                                               const Network::ConnectionSocket& socket) const {
-  // Use invalid IP address (matching only filter chains without IP requirements) for UDS.
-  static const auto& fake_address = Network::Utility::parseInternetAddress("255.255.255.255");
-
   auto address = socket.localAddress();
   if (address->type() != Network::Address::Type::Ip) {
-    address = fake_address;
+    address = fakeAddress();
   }
 
   // Match on both: exact IP and wider CIDR ranges using LcTrie.
@@ -708,12 +716,9 @@ ListenerImpl::findFilterChainForSourceTypes(const SourceTypesArray& source_types
 const Network::FilterChain*
 ListenerImpl::findFilterChainForSourceIpAndPort(const SourceIPsTrie& source_ips_trie,
                                                 const Network::ConnectionSocket& socket) const {
-  // Use invalid IP address (matching only filter chains without IP requirements) for UDS.
-  static const auto& fake_address = Network::Utility::parseInternetAddress("255.255.255.255");
-
   auto address = socket.remoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
-    address = fake_address;
+    address = fakeAddress();
   }
 
   // Match on both: exact IP and wider CIDR ranges using LcTrie.
