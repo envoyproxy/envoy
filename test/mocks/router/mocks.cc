@@ -25,6 +25,11 @@ void MockRetryState::expectHeadersRetry() {
       .WillOnce(DoAll(SaveArg<1>(&callback_), Return(RetryStatus::Yes)));
 }
 
+void MockRetryState::expectHedgedPerTryTimeoutRetry() {
+  EXPECT_CALL(*this, shouldHedgeRetryPerTryTimeout(_))
+      .WillOnce(DoAll(SaveArg<0>(&callback_), Return(RetryStatus::Yes)));
+}
+
 void MockRetryState::expectResetRetry() {
   EXPECT_CALL(*this, shouldRetryReset(_, _))
       .WillOnce(DoAll(SaveArg<1>(&callback_), Return(RetryStatus::Yes)));
@@ -101,9 +106,13 @@ MockDecorator::MockDecorator() {
 }
 MockDecorator::~MockDecorator() {}
 
+MockRouteTracing::MockRouteTracing() {}
+MockRouteTracing::~MockRouteTracing() {}
+
 MockRoute::MockRoute() {
   ON_CALL(*this, routeEntry()).WillByDefault(Return(&route_entry_));
   ON_CALL(*this, decorator()).WillByDefault(Return(&decorator_));
+  ON_CALL(*this, tracingConfig()).WillByDefault(Return(nullptr));
 }
 MockRoute::~MockRoute() {}
 

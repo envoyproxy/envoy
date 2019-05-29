@@ -169,24 +169,26 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
-  Stats::FakeSymbolTableImpl symbol_table;
-  Server::HotRestartNopImpl restarter;
-  ThreadLocal::InstanceImpl tls;
-  Stats::HeapStatDataAllocator stats_allocator(symbol_table);
-  Stats::ThreadLocalStoreImpl stat_store(stats_allocator);
-
-  Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
-                              access_log_lock, component_factory, std::move(random_generator), tls,
-                              Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
-                              nullptr);
-  // This is technically thread unsafe (assigning to a shared_ptr accessed
-  // across threads), but because we synchronize below through serverReady(), the only
-  // consumer on the main test thread in ~IntegrationTestServerImpl will not race.
-  admin_address_ = server.admin().socket().localAddress();
-  server_ = &server;
-  stat_store_ = &stat_store;
-  serverReady();
-  server.run();
+  {
+    Stats::FakeSymbolTableImpl symbol_table;
+    Server::HotRestartNopImpl restarter;
+    ThreadLocal::InstanceImpl tls;
+    Stats::HeapStatDataAllocator stats_allocator(symbol_table);
+    Stats::ThreadLocalStoreImpl stat_store(stats_allocator);
+    Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
+                                access_log_lock, component_factory, std::move(random_generator),
+                                tls, Thread::threadFactoryForTest(),
+                                Filesystem::fileSystemForTest(), nullptr);
+    // This is technically thread unsafe (assigning to a shared_ptr accessed
+    // across threads), but because we synchronize below through serverReady(), the only
+    // consumer on the main test thread in ~IntegrationTestServerImpl will not race.
+    admin_address_ = server.admin().socket().localAddress();
+    server_ = &server;
+    stat_store_ = &stat_store;
+    serverReady();
+    server.run();
+  }
+  server_gone_.Notify();
 }
 
 IntegrationTestServerImpl::~IntegrationTestServerImpl() {
@@ -202,6 +204,7 @@ IntegrationTestServerImpl::~IntegrationTestServerImpl() {
         admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    server_gone_.WaitForNotification();
   }
 }
 
