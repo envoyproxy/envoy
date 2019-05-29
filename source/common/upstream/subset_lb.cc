@@ -252,7 +252,6 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
     HostConstSharedPtr host =
         selector_fallback_subset_any_.value()->priority_subset_->lb_->chooseHost(context);
     if (host != nullptr) {
-      // todo incr stats ?
       return host;
     }
 
@@ -261,7 +260,6 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
     HostConstSharedPtr host =
         selector_fallback_subset_default_.value()->priority_subset_->lb_->chooseHost(context);
     if (host != nullptr) {
-      // todo incr stats ?
       return host;
     }
   }
