@@ -23,6 +23,8 @@
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -380,6 +382,7 @@ private:
   Server::Instance* server_{};
   Stats::Store* stat_store_{};
   Network::Address::InstanceConstSharedPtr admin_address_;
+  absl::Notification server_gone_;
 };
 
 } // namespace Envoy
