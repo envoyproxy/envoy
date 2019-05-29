@@ -1140,9 +1140,9 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 }
 
 bool ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(std::function<void()> cb) {
-  // TODO check for an empty header?
+  ASSERT(!request_headers_->Host()->value().empty());
   auto host_header = Http::LowerCaseString(std::string(request_headers_->Host()->value().getStringView())).get();
-  return route_config_provider_.requestConfigUpdate(host_header, cb);
+  return route_config_provider_.requestVirtualHostsUpdate(host_header, cb);
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(

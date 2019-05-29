@@ -205,8 +205,8 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
   return tls_->getTyped<ThreadLocalConfig>().config_;
 }
 
-bool RdsRouteConfigProviderImpl::requestConfigUpdate(const std::string for_domain,
-                                                     std::function<void()> cb) {
+bool RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(const std::string &for_domain,
+                                                           std::function<void()> cb) {
   if (!config()->usesVhds()) {
     return false;
   }

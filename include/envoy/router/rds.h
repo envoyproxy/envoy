@@ -49,7 +49,13 @@ public:
    */
   virtual void onConfigUpdate() PURE;
 
-  virtual bool requestConfigUpdate(const std::string for_domain, std::function<void()> cb) PURE;
+  /**
+   * Callback used to request an update to the route configuration.
+   * @param for_domain supplies the domain name that virtual hosts contained in the VHDS response must match on
+   * @param cb callback to be called when the configuration update has been propagated to worker threads
+   * @return whether a request for a configuration update has been successfully scheduled
+   */
+  virtual bool requestVirtualHostsUpdate(const std::string &for_domain, std::function<void()> cb) PURE;
 };
 
 typedef std::unique_ptr<RouteConfigProvider> RouteConfigProviderPtr;
