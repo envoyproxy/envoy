@@ -102,6 +102,7 @@ PROTO_RST="
   /envoy/config/filter/http/ip_tagging/v2/ip_tagging/envoy/config/filter/http/ip_tagging/v2/ip_tagging.proto.rst
   /envoy/config/filter/http/jwt_authn/v2alpha/jwt_authn/envoy/config/filter/http/jwt_authn/v2alpha/config.proto.rst
   /envoy/config/filter/http/lua/v2/lua/envoy/config/filter/http/lua/v2/lua.proto.rst
+  /envoy/config/filter/http/original_src/v2alpha1/original_src/envoy/config/filter/http/original_src/v2alpha1/original_src.proto.rst
   /envoy/config/filter/http/rate_limit/v2/rate_limit/envoy/config/filter/http/rate_limit/v2/rate_limit.proto.rst
   /envoy/config/filter/http/rbac/v2/rbac/envoy/config/filter/http/rbac/v2/rbac.proto.rst
   /envoy/config/filter/http/router/v2/router/envoy/config/filter/http/router/v2/router.proto.rst
