@@ -96,8 +96,8 @@ private:
   struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks {
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
         : iteration_state_(IterationState::Continue), iterate_from_current_filter_(false),
-          end_stream_sent_with_data_(false), parent_(parent), headers_continued_(false),
-          continue_headers_continued_(false), end_stream_(false), dual_filter_(dual_filter) {}
+          parent_(parent), headers_continued_(false), continue_headers_continued_(false),
+          end_stream_(false), dual_filter_(dual_filter) {}
 
     // Functions in the following block are called after the filter finishes processing
     // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -164,9 +164,6 @@ private:
     // current filter instead of the next one. If true, filter iteration starts with the current
     // filter. Otherwise, starts with the next filter in the chain.
     bool iterate_from_current_filter_;
-    // Tracks if the stream end has been sent with an encode/decodeData call, to handle the case
-    // where commonContinue is called with the only information being a terminal fin.
-    bool end_stream_sent_with_data_;
     ActiveStream& parent_;
     bool headers_continued_ : 1;
     bool continue_headers_continued_ : 1;

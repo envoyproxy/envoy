@@ -1672,17 +1672,14 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
     doHeaders(complete() && !bufferedData() && !trailers());
   }
 
-  // Make sure we handle filters returning StopIterationNoBuffer and then commonContinue by tracking
-  // if the terminal fin has already been proxied.
-  bool end_stream_with_data = complete() && !trailers();
-  if (bufferedData() || (end_stream_with_data && !end_stream_sent_with_data_)) {
-    if (end_stream_with_data) {
-      if (!bufferedData()) {
-        // In the StopIterationNoBuffer case the ConnectionManagerImpl will not have created a
-        // buffer but encode/decodeData expects the buffer to exist, so create one.
-        bufferedData() = createBuffer();
-      }
-      end_stream_sent_with_data_ = true;
+  // Make sure we handle filters returning StopIterationNoBuffer and then commonContinue by flushing
+  // the terminal fin.
+  const bool end_stream_with_data = complete() && !trailers();
+  if (bufferedData() || end_stream_with_data) {
+    if (end_stream_with_data && !bufferedData()) {
+      // In the StopIterationNoBuffer case the ConnectionManagerImpl will not have created a
+      // buffer but encode/decodeData expects the buffer to exist, so create one.
+      bufferedData() = createBuffer();
     }
     doData(end_stream_with_data);
   }
