@@ -168,6 +168,7 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
       socket_.ioHandle().sendmsg(slices.begin(), num_slices, 0, *send_data.send_address_);
 
   if (send_result.ok()) {
+    ASSERT(send_result.rc_ == buffer.length());
     buffer.drain(send_result.rc_);
     ENVOY_UDP_LOG(trace, "sendmsg sent:{} bytes", send_result.rc_);
   } else {
