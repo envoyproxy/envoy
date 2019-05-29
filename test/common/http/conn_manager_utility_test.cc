@@ -36,7 +36,8 @@ public:
 
 class MockConnectionManagerConfig : public ConnectionManagerConfig {
 public:
-  MockConnectionManagerConfig() { ON_CALL(*this, generateRequestId()).WillByDefault(Return(true)); }
+  MockConnectionManagerConfig() { ON_CALL(*this, generateRequestId()).WillByDefault(Return(true));
+    ON_CALL(*this, edgeAcceptRequestId()).WillByDefault(Return(false)); }
 
   // Http::ConnectionManagerConfig
   ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance& instance,
@@ -51,6 +52,7 @@ public:
   MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
   MOCK_METHOD0(generateRequestId, bool());
+  MOCK_METHOD0(edgeAcceptRequestId, bool());
   MOCK_CONST_METHOD0(maxRequestHeadersKb, uint32_t());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());

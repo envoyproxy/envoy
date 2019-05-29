@@ -100,6 +100,7 @@ public:
   std::chrono::milliseconds drainTimeout() override { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return generate_request_id_; }
+  bool edgeAcceptRequestId() override { return edge_accept_request_id_; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
@@ -164,6 +165,7 @@ private:
   Router::RouteConfigProviderPtr route_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
+  bool edge_accept_request_id_;
   Http::DateProvider& date_provider_;
   Http::ConnectionManagerListenerStats listener_stats_;
   const bool proxy_100_continue_;
