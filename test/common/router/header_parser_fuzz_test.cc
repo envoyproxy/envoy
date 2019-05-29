@@ -12,7 +12,6 @@ namespace {
 
 using Envoy::replaceInvalidCharacters;
 
-
 // Remove invalid characters from HeaderValueOptions in headers to add.
 Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> processHeadersToAdd(
     const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add) {
