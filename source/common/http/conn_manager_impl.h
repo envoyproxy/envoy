@@ -319,7 +319,7 @@ private:
 
     void responseDataTooLarge();
     void responseDataDrained();
-    bool requestRouteConfigUpdate(std::function<void()>) { return false; }
+    bool requestRouteConfigUpdate(std::function<void()>) override { return false; }
 
     StreamEncoderFilterSharedPtr handle_;
   };
