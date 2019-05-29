@@ -102,13 +102,13 @@ MockParentHistogram::MockParentHistogram() {
 }
 MockParentHistogram::~MockParentHistogram() {}
 
-MockSource::MockSource() {
-  ON_CALL(*this, cachedCounters()).WillByDefault(ReturnRef(counters_));
-  ON_CALL(*this, cachedGauges()).WillByDefault(ReturnRef(gauges_));
-  ON_CALL(*this, cachedHistograms()).WillByDefault(ReturnRef(histograms_));
+MockMetricSnapshot::MockMetricSnapshot() {
+  ON_CALL(*this, counters()).WillByDefault(ReturnRef(counters_));
+  ON_CALL(*this, gauges()).WillByDefault(ReturnRef(gauges_));
+  ON_CALL(*this, histograms()).WillByDefault(ReturnRef(histograms_));
 }
 
-MockSource::~MockSource() {}
+MockMetricSnapshot::~MockMetricSnapshot() {}
 
 MockSink::MockSink() {}
 MockSink::~MockSink() {}

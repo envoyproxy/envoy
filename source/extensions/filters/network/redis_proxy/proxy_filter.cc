@@ -7,6 +7,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/config/datasource.h"
 #include "common/config/utility.h"
 
 namespace Envoy {
@@ -16,10 +17,12 @@ namespace RedisProxy {
 
 ProxyFilterConfig::ProxyFilterConfig(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy& config, Stats::Scope& scope,
-    const Network::DrainDecision& drain_decision, Runtime::Loader& runtime)
+    const Network::DrainDecision& drain_decision, Runtime::Loader& runtime, Api::Api& api)
     : drain_decision_(drain_decision), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
-      stats_(generateStats(stat_prefix_, scope)) {}
+      stats_(generateStats(stat_prefix_, scope)),
+      downstream_auth_password_(
+          Config::DataSource::read(config.downstream_auth_password(), true, api)) {}
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   return {
@@ -33,6 +36,7 @@ ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
       config_(config) {
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
+  connection_allowed_ = config_->downstream_auth_password_.empty();
 }
 
 ProxyFilter::~ProxyFilter() {
@@ -71,6 +75,23 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
       pending_requests_.pop_front();
     }
   }
+}
+
+void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
+  Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
+  if (config_->downstream_auth_password_.empty()) {
+    response->type(Common::Redis::RespType::Error);
+    response->asString() = "ERR Client sent AUTH, but no password is set";
+  } else if (password == config_->downstream_auth_password_) {
+    response->type(Common::Redis::RespType::SimpleString);
+    response->asString() = "OK";
+    connection_allowed_ = true;
+  } else {
+    response->type(Common::Redis::RespType::Error);
+    response->asString() = "ERR invalid password";
+    connection_allowed_ = false;
+  }
+  request.onResponse(std::move(response));
 }
 
 void ProxyFilter::onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value) {

@@ -27,7 +27,7 @@ public:
 
   std::string encodeServerGreeting(int protocol);
   std::string encodeClientLogin(uint16_t client_cap, std::string user, uint8_t seq);
-  std::string encodeClientLoginResp(uint8_t srv_resp, int it = 0, int seq_force = 0);
+  std::string encodeClientLoginResp(uint8_t srv_resp, uint8_t it = 0, uint8_t seq_force = 0);
   std::string encodeAuthSwitchResp();
 };
 

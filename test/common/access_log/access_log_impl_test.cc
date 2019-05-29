@@ -112,6 +112,31 @@ TEST_F(AccessLogImplTest, DownstreamDisconnect) {
             output_);
 }
 
+TEST_F(AccessLogImplTest, RouteName) {
+  const std::string json = R"EOF(
+  {
+    "path": "/dev/null",
+    "format": "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
+  }
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
+
+  EXPECT_CALL(*file_, write(_));
+  stream_info_.route_name_ = "route-test-name";
+  stream_info_.response_flags_ = StreamInfo::ResponseFlag::UpstreamConnectionFailure;
+  request_headers_.addCopy(Http::Headers::get().UserAgent, "user-agent-set");
+  request_headers_.addCopy(Http::Headers::get().RequestId, "id");
+  request_headers_.addCopy(Http::Headers::get().Host, "host");
+  request_headers_.addCopy(Http::Headers::get().ForwardedFor, "x.x.x.x");
+
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  EXPECT_EQ(
+      "[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF route-test-name 1 2 3 - \"x.x.x.x\" "
+      "\"user-agent-set\" \"id\"  \"host\"\n",
+      output_);
+}
+
 TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
   const std::string json = R"EOF(
   {

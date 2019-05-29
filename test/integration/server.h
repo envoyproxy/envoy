@@ -13,7 +13,6 @@
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
-#include "common/stats/source_impl.h"
 
 #include "server/listener_hooks.h"
 #include "server/options_impl.h"
@@ -23,6 +22,8 @@
 #include "test/integration/tcp_dump.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
+
+#include "absl/synchronization/notification.h"
 
 namespace Envoy {
 namespace Server {
@@ -120,7 +121,9 @@ public:
     return wrapped_scope_->findHistogram(name);
   }
 
-  const SymbolTable& symbolTable() const override { return wrapped_scope_->symbolTable(); }
+  const SymbolTable& constSymbolTable() const override {
+    return wrapped_scope_->constSymbolTable();
+  }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
 
   StatName fastMemoryIntensiveStatNameLookup(absl::string_view name) override {
@@ -138,7 +141,6 @@ private:
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
-  TestIsolatedStoreImpl() : source_(*this) {}
   // Stats::Scope
   Counter& counterFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
@@ -183,7 +185,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.findHistogram(name);
   }
-  const SymbolTable& symbolTable() const override { return store_.symbolTable(); }
+  const SymbolTable& constSymbolTable() const override { return store_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
 
   // Stats::Store
@@ -213,12 +215,10 @@ public:
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
   void mergeHistograms(PostMergeCb) override {}
-  Source& source() override { return source_; }
 
 private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
-  SourceImpl source_;
 };
 
 } // namespace Stats
@@ -391,6 +391,7 @@ private:
   Server::Instance* server_{};
   Stats::Store* stat_store_{};
   Network::Address::InstanceConstSharedPtr admin_address_;
+  absl::Notification server_gone_;
 };
 
 } // namespace Envoy

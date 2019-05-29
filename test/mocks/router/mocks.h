@@ -16,6 +16,7 @@
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
+#include "envoy/router/scopes.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -43,6 +44,7 @@ public:
                      void(Http::HeaderMap& headers, bool insert_envoy_original_path));
   MOCK_CONST_METHOD0(responseCode, Http::Code());
   MOCK_CONST_METHOD0(responseBody, const std::string&());
+  MOCK_CONST_METHOD0(routeName, const std::string&());
 };
 
 class TestCorsPolicy : public CorsPolicy {
@@ -76,11 +78,11 @@ public:
   const envoy::type::FractionalPercent& additionalRequestChance() const override {
     return additional_request_chance_;
   }
-  bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout; }
+  bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout_; }
 
   uint32_t initial_requests_{};
   envoy::type::FractionalPercent additional_request_chance_{};
-  bool hedge_on_per_try_timeout{};
+  bool hedge_on_per_try_timeout_{};
 };
 
 class TestRetryPolicy : public RetryPolicy {
@@ -113,13 +115,16 @@ public:
   ~MockRetryState();
 
   void expectHeadersRetry();
+  void expectHedgedPerTryTimeoutRetry();
   void expectResetRetry();
 
   MOCK_METHOD0(enabled, bool());
   MOCK_METHOD2(shouldRetryHeaders,
                RetryStatus(const Http::HeaderMap& response_headers, DoRetryCallback callback));
+  MOCK_METHOD1(wouldRetryFromHeaders, bool(const Http::HeaderMap& response_headers));
   MOCK_METHOD2(shouldRetryReset,
                RetryStatus(const Http::StreamResetReason reset_reason, DoRetryCallback callback));
+  MOCK_METHOD1(shouldHedgeRetryPerTryTimeout, RetryStatus(DoRetryCallback callback));
   MOCK_METHOD1(onHostAttempted, void(Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Upstream::Host& host));
   MOCK_METHOD2(priorityLoadForRetry,
@@ -299,8 +304,10 @@ public:
   MOCK_CONST_METHOD0(includeAttemptCount, bool());
   MOCK_CONST_METHOD0(upgradeMap, const UpgradeMap&());
   MOCK_CONST_METHOD0(internalRedirectAction, InternalRedirectAction());
+  MOCK_CONST_METHOD0(routeName, const std::string&());
 
   std::string cluster_name_{"fake_cluster"};
+  std::string route_name_{"fake_route_name"};
   std::multimap<std::string, std::string> opaque_config_;
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
@@ -328,6 +335,17 @@ public:
   std::string operation_{"fake_operation"};
 };
 
+class MockRouteTracing : public RouteTracing {
+public:
+  MockRouteTracing();
+  ~MockRouteTracing();
+
+  // Router::RouteTracing
+  MOCK_CONST_METHOD0(getClientSampling, const envoy::type::FractionalPercent&());
+  MOCK_CONST_METHOD0(getRandomSampling, const envoy::type::FractionalPercent&());
+  MOCK_CONST_METHOD0(getOverallSampling, const envoy::type::FractionalPercent&());
+};
+
 class MockRoute : public Route {
 public:
   MockRoute();
@@ -337,10 +355,12 @@ public:
   MOCK_CONST_METHOD0(directResponseEntry, const DirectResponseEntry*());
   MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());
   MOCK_CONST_METHOD0(decorator, const Decorator*());
+  MOCK_CONST_METHOD0(tracingConfig, const RouteTracing*());
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
 
   testing::NiceMock<MockRouteEntry> route_entry_;
   testing::NiceMock<MockDecorator> decorator_;
+  testing::NiceMock<MockRouteTracing> route_tracing_;
 };
 
 class MockConfig : public Config {
@@ -372,6 +392,14 @@ public:
   MOCK_METHOD2(createStaticRouteConfigProvider,
                RouteConfigProviderPtr(const envoy::api::v2::RouteConfiguration& route_config,
                                       Server::Configuration::FactoryContext& factory_context));
+};
+
+class MockScopedConfig : public ScopedConfig {
+public:
+  MockScopedConfig();
+  ~MockScopedConfig();
+
+  MOCK_CONST_METHOD1(getRouterConfig, ConfigConstSharedPtr(const Http::HeaderMap& headers));
 };
 
 } // namespace Router

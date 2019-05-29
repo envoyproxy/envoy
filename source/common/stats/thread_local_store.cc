@@ -12,7 +12,6 @@
 #include "envoy/stats/stats.h"
 
 #include "common/common/lock_guard.h"
-#include "common/stats/scope_prefixer.h"
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
@@ -25,7 +24,7 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(StatDataAllocator& alloc)
     : alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()), heap_allocator_(alloc.symbolTable()),
-      source_(*this), null_counter_(alloc.symbolTable()), null_gauge_(alloc.symbolTable()),
+      null_counter_(alloc.symbolTable()), null_gauge_(alloc.symbolTable()),
       null_histogram_(alloc.symbolTable()) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
@@ -86,7 +85,8 @@ bool ThreadLocalStoreImpl::rejects(StatName stat_name) const {
   // Also note that the elaboration of the stat-name into a string is expensive,
   // so I think it might be better to move the matcher test until after caching,
   // unless its acceptsAll/rejectsAll.
-  return stats_matcher_->rejectsAll() || stats_matcher_->rejects(symbolTable().toString(stat_name));
+  return stats_matcher_->rejectsAll() ||
+         stats_matcher_->rejects(constSymbolTable().toString(stat_name));
 }
 
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {

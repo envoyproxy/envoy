@@ -86,6 +86,11 @@ public:
    */
   virtual void rewritePathHeader(Http::HeaderMap& headers,
                                  bool insert_envoy_original_path) const PURE;
+
+  /**
+   * @return std::string& the name of the route.
+   */
+  virtual const std::string& routeName() const PURE;
 };
 
 /**
@@ -251,6 +256,16 @@ public:
                                          DoRetryCallback callback) PURE;
 
   /**
+   * Determines whether given response headers would be retried by the retry policy, assuming
+   * sufficient retry budget and circuit breaker headroom. This is useful in cases where
+   * the information about whether a response is "good" or not is useful, but a retry should
+   * not be attempted for other reasons.
+   * @param response_headers supplies the response headers.
+   * @return bool true if a retry would be warranted based on the retry policy.
+   */
+  virtual bool wouldRetryFromHeaders(const Http::HeaderMap& response_headers) PURE;
+
+  /**
    * Determine whether a request should be retried after a reset based on the reason for the reset.
    * @param reset_reason supplies the reset reason.
    * @param callback supplies the callback that will be invoked when the retry should take place.
@@ -262,6 +277,19 @@ public:
    */
   virtual RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason,
                                        DoRetryCallback callback) PURE;
+
+  /**
+   * Determine whether a "hedged" retry should be sent after the per try
+   * timeout expires. This means the original request is not canceled, but a
+   * new one is sent to hedge against the original request taking even longer.
+   * @param callback supplies the callback that will be invoked when the retry should take place.
+   *                 This is used to add timed backoff, etc. The callback will never be called
+   *                 inline.
+   * @return RetryStatus if a retry should take place. @param callback will be called at some point
+   *         in the future. Otherwise a retry should not take place and the callback will never be
+   *         called. Calling code should proceed with error handling.
+   */
+  virtual RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) PURE;
 
   /**
    * Called when a host was attempted but the request failed and is eligible for another retry.
@@ -711,6 +739,11 @@ public:
    * @returns the internal redirect action which should be taken on this route.
    */
   virtual InternalRedirectAction internalRedirectAction() const PURE;
+
+  /**
+   * @return std::string& the name of the route.
+   */
+  virtual const std::string& routeName() const PURE;
 };
 
 /**
@@ -736,6 +769,34 @@ public:
 typedef std::unique_ptr<const Decorator> DecoratorConstPtr;
 
 /**
+ * An interface representing the Tracing for the route configuration.
+ */
+class RouteTracing {
+public:
+  virtual ~RouteTracing() {}
+
+  /**
+   * This method returns the client sampling percentage.
+   * @return the client sampling percentage
+   */
+  virtual const envoy::type::FractionalPercent& getClientSampling() const PURE;
+
+  /**
+   * This method returns the random sampling percentage.
+   * @return the random sampling percentage
+   */
+  virtual const envoy::type::FractionalPercent& getRandomSampling() const PURE;
+
+  /**
+   * This method returns the overall sampling percentage.
+   * @return the overall sampling percentage
+   */
+  virtual const envoy::type::FractionalPercent& getOverallSampling() const PURE;
+};
+
+typedef std::unique_ptr<const RouteTracing> RouteTracingConstPtr;
+
+/**
  * An interface that holds a DirectResponseEntry or RouteEntry for a request.
  */
 class Route {
@@ -756,6 +817,11 @@ public:
    * @return the decorator or nullptr if not defined for the request.
    */
   virtual const Decorator* decorator() const PURE;
+
+  /**
+   * @return the tracing config or nullptr if not defined for the request.
+   */
+  virtual const RouteTracing* tracingConfig() const PURE;
 
   /**
    * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for

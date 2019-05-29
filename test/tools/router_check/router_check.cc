@@ -5,19 +5,22 @@
 #include "test/tools/router_check/router.h"
 
 int main(int argc, char* argv[]) {
-  if (argc < 3 || argc > 4) {
-    return EXIT_FAILURE;
-  }
+  Envoy::Options options(argc, argv);
 
   try {
-    Envoy::RouterCheckTool checktool = Envoy::RouterCheckTool::create(argv[1]);
+    Envoy::RouterCheckTool checktool =
+        options.isProto() ? Envoy::RouterCheckTool::create(options.configPath())
+                          : Envoy::RouterCheckTool::create(options.unlabelledConfigPath());
 
-    if (argc == 4 && std::string(argv[3]) == "--details") {
+    if (options.isDetailed()) {
       checktool.setShowDetails();
     }
 
+    bool is_equal = options.isProto()
+                        ? checktool.compareEntries(options.testPath())
+                        : checktool.compareEntriesInJson(options.unlabelledTestPath());
     // Test fails if routes do not match what is expected
-    if (!checktool.compareEntriesInJson(argv[2])) {
+    if (!is_equal) {
       return EXIT_FAILURE;
     }
   } catch (const Envoy::EnvoyException& ex) {
