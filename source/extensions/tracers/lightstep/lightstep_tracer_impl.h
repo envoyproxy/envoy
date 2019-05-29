@@ -9,6 +9,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
@@ -121,6 +122,7 @@ private:
   Runtime::Loader& runtime_;
   std::unique_ptr<lightstep::LightStepTracerOptions> options_;
   const PropagationMode propagation_mode_;
+  Grpc::Common grpc_common_;
 };
 } // namespace Lightstep
 } // namespace Tracers

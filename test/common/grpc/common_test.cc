@@ -104,12 +104,13 @@ TEST(GrpcCommonTest, ToGrpcTimeout) {
 
 TEST(GrpcCommonTest, ChargeStats) {
   NiceMock<Upstream::MockClusterInfo> cluster;
-  Common::chargeStat(cluster, "service", "method", true);
+  Common common;
+  common.chargeStat(cluster, "service", "method", true);
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.success").value());
   EXPECT_EQ(0U, cluster.stats_store_.counter("grpc.service.method.failure").value());
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.total").value());
 
-  Common::chargeStat(cluster, "service", "method", false);
+  common.chargeStat(cluster, "service", "method", false);
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.success").value());
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.failure").value());
   EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.total").value());
@@ -117,14 +118,14 @@ TEST(GrpcCommonTest, ChargeStats) {
   Http::TestHeaderMapImpl trailers;
   Http::HeaderEntry& status = trailers.insertGrpcStatus();
   status.value("0", 1);
-  Common::chargeStat(cluster, "grpc", "service", "method", &status);
+  common.chargeStat(cluster, "grpc", "service", "method", &status);
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.0").value());
   EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.success").value());
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.failure").value());
   EXPECT_EQ(3U, cluster.stats_store_.counter("grpc.service.method.total").value());
 
   status.value("1", 1);
-  Common::chargeStat(cluster, "grpc", "service", "method", &status);
+  common.chargeStat(cluster, "grpc", "service", "method", &status);
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.0").value());
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.1").value());
   EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.success").value());

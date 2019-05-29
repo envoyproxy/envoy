@@ -85,24 +85,24 @@ void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& respons
     if (!active_response_->ParseFromZeroCopyStream(&stream)) {
       throw EnvoyException("Failed to parse LightStep collector response");
     }
-    Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
-                             lightstep::CollectorMethodName(), true);
+    driver_.grpc_common_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
+                                    lightstep::CollectorMethodName(), true);
     active_callback_->OnSuccess();
   } catch (const Grpc::Exception& ex) {
-    Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
-                             lightstep::CollectorMethodName(), false);
+    driver_.grpc_common_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
+                                    lightstep::CollectorMethodName(), false);
     active_callback_->OnFailure(std::make_error_code(std::errc::network_down));
   } catch (const EnvoyException& ex) {
-    Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
-                             lightstep::CollectorMethodName(), false);
+    driver_.grpc_common_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
+                                    lightstep::CollectorMethodName(), false);
     active_callback_->OnFailure(std::make_error_code(std::errc::bad_message));
   }
 }
 
 void LightStepDriver::LightStepTransporter::onFailure(Http::AsyncClient::FailureReason) {
   active_request_ = nullptr;
-  Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
-                           lightstep::CollectorMethodName(), false);
+  driver_.grpc_common_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
+                                  lightstep::CollectorMethodName(), false);
   active_callback_->OnFailure(std::make_error_code(std::errc::network_down));
 }
 

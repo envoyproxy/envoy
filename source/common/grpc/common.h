@@ -95,8 +95,7 @@ public:
    * @param success supplies whether the call succeeded.
    */
   void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
-                  const std::string& grpc_service, const std::string& grpc_method,
-                  bool success);
+                  const std::string& grpc_service, const std::string& grpc_method, bool success);
 
   /**
    * Charge a success/failure stat to a cluster/service/method.
