@@ -292,11 +292,13 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/config:protobuf_link_hacks",
+        "//source/common/grpc:common_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:cds_cc",
         "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/api/v2:lds_cc",
         "@envoy_api//envoy/api/v2:rds_cc",
+        "@envoy_api//envoy/api/v2:srds_cc",
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
         "@envoy_api//envoy/service/discovery/v2:hds_cc",
         "@envoy_api//envoy/service/ratelimit/v2:rls_cc",

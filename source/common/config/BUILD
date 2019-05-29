@@ -314,6 +314,7 @@ envoy_cc_library(
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/protobuf",
+        "//source/server:proto_descriptors_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
