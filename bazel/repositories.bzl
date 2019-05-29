@@ -342,10 +342,13 @@ def _io_opentracing_cpp():
     )
 
 def _com_lightstep_tracer_cpp():
+    location = REPOSITORY_LOCATIONS["com_lightstep_tracer_cpp"]
     _repository_impl("com_lightstep_tracer_cpp")
-    _repository_impl(
-        name = "lightstep_vendored_googleapis",
-        build_file = "@com_lightstep_tracer_cpp//:lightstep-tracer-common/third_party/googleapis/BUILD",
+    http_archive(
+        name = "com_lightstep_tracer_cpp",
+        patch_args = ["-p0"],
+        patches = ["@envoy//bazel/foreign_cc:com_lightstep_tracer_cpp.patch"],
+        **location
     )
     native.bind(
         name = "lightstep",

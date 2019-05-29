@@ -112,12 +112,6 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "lightstep-tracer-cpp-0.8.0",
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.8.0.tar.gz"],
     ),
-    lightstep_vendored_googleapis = dict(
-        sha256 = "d1ef4f790eeaa805e7b364de05b91f9eed66bd6ae46f1483bbf49c33d86998e5",
-        strip_prefix = "googleapis-d6f78d948c53f3b400bb46996eb3084359914f9b",
-        # From: https://github.com/lightstep/lightstep-tracer-cpp/blob/v0.8.0/lightstep-tracer-common/third_party/googleapis/README.lightstep-tracer-common#L6
-        urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
-    ),
     com_github_datadog_dd_opentracing_cpp = dict(
         sha256 = "a3d1c03e7af570fa64c01df259e6e9bb78637a6bd9c65c6bf7e8703e466dc22f",
         strip_prefix = "dd-opentracing-cpp-0.4.2",
