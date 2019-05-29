@@ -4,6 +4,14 @@
 #include <string>
 #include <utility>
 
+#include "envoy/config/subscription.h"
+
+#include "common/common/assert.h"
+#include "common/common/logger.h"
+
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -26,8 +34,10 @@ namespace Config {
 // update the subscription accordingly.
 //
 // A WatchMap is assumed to be dedicated to a single type_url type of resource (EDS, CDS, etc).
-class WatchMap : public SubscriptionCallbacks {
+class WatchMap : public SubscriptionCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
+  WatchMap() {}
+
   // An opaque token given out to users of WatchMap, to identify a given watch.
   using Token = uint64_t;
 
@@ -59,12 +69,13 @@ public:
 
   virtual void onConfigUpdateFailed(const EnvoyException* e) override;
 
-  virtual std::string resourceName(const ProtobufWkt::Any& resource) override {
+  virtual std::string resourceName(const ProtobufWkt::Any&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
 private:
   struct Watch {
+    Watch(SubscriptionCallbacks& callbacks) : callbacks_(callbacks) {}
     std::set<std::string> resource_names_; // must be sorted set, for set_difference.
     SubscriptionCallbacks& callbacks_;
   };
@@ -96,6 +107,9 @@ private:
   absl::flat_hash_map<std::string, absl::flat_hash_set<Token>> watch_interest_;
 
   Token next_watch_{0};
+
+  // A little hack to allow tokensInterestedIn() to return a ref, rather than a copy.
+  const absl::flat_hash_set<WatchMap::Token> empty_token_set_{};
 
   WatchMap(const WatchMap&) = delete;
   WatchMap& operator=(const WatchMap&) = delete;

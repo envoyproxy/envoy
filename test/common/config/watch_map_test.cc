@@ -7,13 +7,6 @@
 #include "common/config/watch_map.h"
 
 #include "test/mocks/config/mocks.h"
-#include "test/mocks/event/mocks.h"
-#include "test/mocks/filesystem/mocks.h"
-#include "test/mocks/local_info/mocks.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/stats/mocks.h"
-#include "test/mocks/upstream/mocks.h"
-#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -21,40 +14,45 @@
 
 using ::testing::_;
 using ::testing::Invoke;
-using ::testing::Return;
+using ::testing::NiceMock;
 
 namespace Envoy {
 namespace Config {
 namespace {
 
 TEST(WatchMapTest, Basic) {
-  MockSubscriptionCallbacks callbacks;
+  NiceMock<MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks;
   WatchMap watch_map;
-  WatchToken token = watch_map.addWatch(callbacks);
+  WatchMap::Token token = watch_map.addWatch(callbacks);
   std::set<std::string> update_to({"alice", "bob"});
   std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-      updateWatchInterest(token, update_to);
+      watch_map.updateWatchInterest(token, update_to);
   EXPECT_EQ(update_to, added_removed.first);
   EXPECT_TRUE(added_removed.second.empty());
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> expected_resources;
+  envoy::api::v2::ClusterLoadAssignment expected_assignment;
+  expected_assignment.set_cluster_name("bob");
+  envoy::api::v2::ClusterLoadAssignment unexpected_assignment;
+  unexpected_assignment.set_cluster_name("carol");
 
-  // TODO TODO can it be this?  EXPECT_CALL(callbacks,
-  // onConfigUpdate(RepeatedProtoEq(expected_resources), "version1"));
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
+  updated_resources.Add()->PackFrom(expected_assignment);
+  updated_resources.Add()->PackFrom(unexpected_assignment);
 
   EXPECT_CALL(callbacks, onConfigUpdate(_, "version1"))
       .WillOnce(Invoke(
-          [](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources, const std::string&) {
+          [expected_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                const std::string&) {
             EXPECT_EQ(1, resources.size());
-            envoy::api::v2::ClusterLoadAssignment expected_assignment;
-            resources[0].UnpackTo(&expected_assignment);
-            EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
+            envoy::api::v2::ClusterLoadAssignment gotten_assignment;
+            resources[0].UnpackTo(&gotten_assignment);
+            EXPECT_TRUE(TestUtility::protoEqual(gotten_assignment, expected_assignment));
           }));
 
-  watch_map.onConfigUpdate(expected_resources, "version1");
+  watch_map.onConfigUpdate(updated_resources, "version1");
 
   std::pair<std::set<std::string>, std::set<std::string>> added_removed2 =
-      updateWatchInterest(token, {});
+      watch_map.updateWatchInterest(token, {});
 
   EXPECT_TRUE(watch_map.removeWatch(token));
 }
