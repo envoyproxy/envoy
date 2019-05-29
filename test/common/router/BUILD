@@ -55,6 +55,7 @@ envoy_cc_fuzz_test(
         ":header_parser_fuzz_proto_cc",
         "//source/common/http:header_map_lib",
         "//source/common/router:header_parser_lib",
+        "//test/common/http:common_fuzz_lib",
         "//test/fuzz:utility_lib",
     ],
 )
