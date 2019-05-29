@@ -1,15 +1,14 @@
 #include "common/network/io_socket_handle_impl.h"
 
 #include <errno.h>
-#include <netinet/in.h>
 
 #include <iostream>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/network/address.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/stack_array.h"
+#include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
 
 using Envoy::Api::SysCallIntResult;
@@ -17,45 +16,6 @@ using Envoy::Api::SysCallSizeResult;
 
 namespace Envoy {
 namespace Network {
-
-namespace {
-
-void getSocketAddressInfo(const Address::Instance& address, sockaddr_storage& addr, socklen_t& sz) {
-  // TODO(sumukhs): Add support for unix domain sockets
-
-  const Address::Ip* ip = address.ip();
-  ASSERT(ip != nullptr);
-  memset(&addr, 0, sizeof(addr));
-
-  switch (ip->version()) {
-  case Address::IpVersion::v4: {
-    addr.ss_family = AF_INET;
-    auto const* ipv4 = ip->ipv4();
-    ASSERT(ipv4 != nullptr);
-    sockaddr_in* addrv4 = reinterpret_cast<sockaddr_in*>(&addr);
-    addrv4->sin_port = htons(ip->port());
-    addrv4->sin_addr.s_addr = ipv4->address();
-    sz = sizeof(sockaddr_in);
-    break;
-  }
-  case Address::IpVersion::v6: {
-    addr.ss_family = AF_INET6;
-    auto const* ipv6 = ip->ipv6();
-    ASSERT(ipv6 != nullptr);
-    sockaddr_in6* addrv6 = reinterpret_cast<sockaddr_in6*>(&addr);
-    addrv6->sin6_port = htons(ip->port());
-
-    const auto address = ipv6->address();
-    memcpy(static_cast<void*>(&addrv6->sin6_addr.s6_addr), static_cast<const void*>(&address),
-           sizeof(absl::uint128));
-
-    sz = sizeof(sockaddr_in6);
-    break;
-  }
-  }
-}
-
-} // namespace
 
 IoSocketHandleImpl::~IoSocketHandleImpl() {
   if (fd_ != -1) {
@@ -112,22 +72,20 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
 
 Api::IoCallUint64Result IoSocketHandleImpl::sendto(const Buffer::RawSlice& slice, int flags,
                                                    const Address::Instance& address) {
-  sockaddr_storage ss;
-  socklen_t ss_len = sizeof ss;
-  getSocketAddressInfo(address, ss, ss_len);
+  const Address::InstanceBase* address_base = dynamic_cast<const Address::InstanceBase*>(&address);
+  sockaddr* sock_addr = const_cast<sockaddr*>(address_base->sockAddr());
 
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result = os_syscalls.sendto(
-      fd_, slice.mem_, slice.len_, flags, reinterpret_cast<sockaddr*>(&ss), ss_len);
+  const Api::SysCallSizeResult result = os_syscalls.sendto(fd_, slice.mem_, slice.len_, flags,
+                                                           sock_addr, address_base->sockAddrLen());
   return sysCallResultToIoCallResult(result);
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
                                                     uint64_t num_slice, int flags,
                                                     const Address::Instance& address) {
-  sockaddr_storage ss;
-  socklen_t ss_len = sizeof ss;
-  getSocketAddressInfo(address, ss, ss_len);
+  const Address::InstanceBase* address_base = dynamic_cast<const Address::InstanceBase*>(&address);
+  sockaddr* sock_addr = const_cast<sockaddr*>(address_base->sockAddr());
 
   STACK_ARRAY(iov, iovec, num_slice);
   uint64_t num_slices_to_write = 0;
@@ -143,8 +101,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   }
 
   struct msghdr message;
-  message.msg_name = reinterpret_cast<void*>(&ss);
-  message.msg_namelen = ss_len;
+  message.msg_name = reinterpret_cast<void*>(sock_addr);
+  message.msg_namelen = address_base->sockAddrLen();
   message.msg_iov = iov.begin();
   message.msg_iovlen = num_slices_to_write;
   message.msg_control = nullptr;
