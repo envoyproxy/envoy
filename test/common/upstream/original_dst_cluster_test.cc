@@ -67,7 +67,6 @@ public:
       : cleanup_timer_(new Event::MockTimer(&dispatcher_)),
         api_(Api::createApiForTest(stats_store_)) {}
 
-  void setupFromJson(const std::string& json) { setup(parseClusterFromJson(json)); }
   void setupFromYaml(const std::string& yaml) { setup(parseClusterFromV2Yaml(yaml)); }
 
   void setup(const envoy::api::v2::Cluster& cluster_config) {
@@ -175,13 +174,11 @@ TEST_F(OriginalDstClusterTest, BadConfigWithDeprecatedHosts) {
 
 TEST_F(OriginalDstClusterTest, CleanupInterval) {
   std::string yaml = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout": "0.25s",
-    "type": "original_dst",
-    "lb_policy": "original_dst_lb",
-    "cleanup_interval": "1s"
-  }
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: ORIGINAL_DST_LB
+    cleanup_interval: 1s
   )EOF"; // Help Emacs balance quotation marks: "
 
   EXPECT_CALL(initialized_, ready());
@@ -195,12 +192,10 @@ TEST_F(OriginalDstClusterTest, CleanupInterval) {
 
 TEST_F(OriginalDstClusterTest, NoContext) {
   std::string yaml = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout": "0.125s",
-    "type": "original_dst",
-    "lb_policy": "original_dst_lb"
-  }
+    name: name,
+    connect_timeout: 0.125s
+    type: ORIGINAL_DST
+    lb_policy: ORIGINAL_DST_LB
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
@@ -258,12 +253,10 @@ TEST_F(OriginalDstClusterTest, NoContext) {
 
 TEST_F(OriginalDstClusterTest, Membership) {
   std::string yaml = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout": "0.125s",
-    "type": "original_dst",
-    "lb_policy": "original_dst_lb"
-  }
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: ORIGINAL_DST_LB
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
@@ -350,12 +343,10 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
 TEST_F(OriginalDstClusterTest, Membership2) {
   std::string yaml = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout": "0.125s",
-    "type": "original_dst",
-    "lb_policy": "original_dst_lb"
-  }
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: ORIGINAL_DST_LB
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
@@ -442,12 +433,10 @@ TEST_F(OriginalDstClusterTest, Membership2) {
 
 TEST_F(OriginalDstClusterTest, Connection) {
   std::string yaml = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout": "0.125s",
-    "type": "original_dst",
-    "lb_policy": "original_dst_lb"
-  }
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: ORIGINAL_DST_LB
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
@@ -485,12 +474,10 @@ TEST_F(OriginalDstClusterTest, Connection) {
 
 TEST_F(OriginalDstClusterTest, MultipleClusters) {
   std::string yaml = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout": "0.125s",
-    "type": "original_dst",
-    "lb_policy": "original_dst_lb"
-  }
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: ORIGINAL_DST_LB
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
@@ -541,7 +528,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
 
 TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
   std::string yaml = R"EOF(
-    name: "name"
+    name: name
     connect_timeout: 1.250s
     type: ORIGINAL_DST
     lb_policy: ORIGINAL_DST_LB
@@ -615,7 +602,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
 
 TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
   std::string yaml = R"EOF(
-    name: "name"
+    name: name
     connect_timeout: 1.250s
     type: ORIGINAL_DST
     lb_policy: ORIGINAL_DST_LB
