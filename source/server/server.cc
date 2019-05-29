@@ -25,7 +25,6 @@
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/config/bootstrap_json.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/http/codes.h"
@@ -595,16 +594,15 @@ void InstanceImpl::shutdownAdmin() {
 ServerLifecycleNotifier::HandlePtr InstanceImpl::registerCallback(Stage stage,
                                                                   StageCallback callback) {
   auto& callbacks = stage_callbacks_[stage];
-  return std::make_unique<LifecycleCallbackHandle<LifecycleNotifierCallbacks>>(
-      callbacks, callbacks.insert(callbacks.end(), callback));
+  return std::make_unique<LifecycleCallbackHandle<StageCallback>>(callbacks, callback);
 }
 
 ServerLifecycleNotifier::HandlePtr
 InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
   ASSERT(stage == Stage::ShutdownExit);
   auto& callbacks = stage_completable_callbacks_[stage];
-  return std::make_unique<LifecycleCallbackHandle<LifecycleNotifierCompletionCallbacks>>(
-      callbacks, callbacks.insert(callbacks.end(), callback));
+  return std::make_unique<LifecycleCallbackHandle<StageCallbackWithCompletion>>(callbacks,
+                                                                                callback);
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {

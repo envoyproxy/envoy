@@ -52,7 +52,7 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
 
 Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequestHeaders(
     HeaderMap& request_headers, Network::Connection& connection, ConnectionManagerConfig& config,
-    const Router::Config& route_config, Runtime::RandomGenerator& random, Runtime::Loader& runtime,
+    const Router::Config& route_config, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info) {
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
@@ -213,7 +213,6 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     request_headers.insertRequestId().value(uuid);
   }
 
-  mutateTracingRequestHeader(request_headers, runtime, config);
   mutateXfccRequestHeader(request_headers, connection, config);
 
   return final_remote_address;
@@ -221,7 +220,8 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
 
 void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_headers,
                                                           Runtime::Loader& runtime,
-                                                          ConnectionManagerConfig& config) {
+                                                          ConnectionManagerConfig& config,
+                                                          const Router::Route* route) {
   if (!config.tracingConfig() || !request_headers.RequestId()) {
     return;
   }
@@ -234,23 +234,31 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
     return;
   }
 
+  const envoy::type::FractionalPercent* client_sampling = &config.tracingConfig()->client_sampling_;
+  const envoy::type::FractionalPercent* random_sampling = &config.tracingConfig()->random_sampling_;
+  const envoy::type::FractionalPercent* overall_sampling =
+      &config.tracingConfig()->overall_sampling_;
+
+  if (route && route->tracingConfig()) {
+    client_sampling = &route->tracingConfig()->getClientSampling();
+    random_sampling = &route->tracingConfig()->getRandomSampling();
+    overall_sampling = &route->tracingConfig()->getOverallSampling();
+  }
+
   // Do not apply tracing transformations if we are currently tracing.
   if (UuidTraceStatus::NoTrace == UuidUtils::isTraceableUuid(x_request_id)) {
     if (request_headers.ClientTraceId() &&
-        runtime.snapshot().featureEnabled("tracing.client_enabled",
-                                          config.tracingConfig()->client_sampling_)) {
+        runtime.snapshot().featureEnabled("tracing.client_enabled", *client_sampling)) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
     } else if (request_headers.EnvoyForceTrace()) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
-    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling",
-                                                 config.tracingConfig()->random_sampling_, result,
-                                                 10000)) {
+    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", *random_sampling,
+                                                 result)) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
     }
   }
 
-  if (!runtime.snapshot().featureEnabled("tracing.global_enabled",
-                                         config.tracingConfig()->overall_sampling_, result)) {
+  if (!runtime.snapshot().featureEnabled("tracing.global_enabled", *overall_sampling, result)) {
     UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::NoTrace);
   }
 

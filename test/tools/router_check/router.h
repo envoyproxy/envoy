@@ -21,6 +21,8 @@
 #include "test/tools/router_check/validation.pb.h"
 #include "test/tools/router_check/validation.pb.validate.h"
 
+#include "tclap/CmdLine.h"
+
 namespace Envoy {
 /**
  * Struct that stores the configuration parameters of the router check tool extracted from a json
@@ -135,5 +137,51 @@ private:
   std::unique_ptr<Router::ConfigImpl> config_;
   std::unique_ptr<Stats::IsolatedStoreImpl> stats_;
   Api::ApiPtr api_;
+};
+
+/**
+ * Parses command line arguments for Router Check Tool.
+ */
+class Options {
+public:
+  Options(int argc, char** argv);
+
+  /**
+   * @return the path to configuration file.
+   */
+  const std::string& configPath() const { return config_path_; }
+
+  /**
+   * @return the path to test file.
+   */
+  const std::string& testPath() const { return test_path_; }
+
+  /**
+   * @return the path to json schema configuration file.
+   */
+  const std::string& unlabelledConfigPath() const { return unlabelled_config_path_; }
+
+  /**
+   * @return the path to json schema test file.
+   */
+  const std::string& unlabelledTestPath() const { return unlabelled_test_path_; }
+
+  /**
+   * @return true if proto schema test is used.
+   */
+  bool isProto() const { return is_proto_; }
+
+  /**
+   * @return true is detailed test execution results are displayed.
+   */
+  bool isDetailed() const { return is_detailed_; }
+
+private:
+  std::string test_path_;
+  std::string config_path_;
+  std::string unlabelled_test_path_;
+  std::string unlabelled_config_path_;
+  bool is_proto_;
+  bool is_detailed_;
 };
 } // namespace Envoy
