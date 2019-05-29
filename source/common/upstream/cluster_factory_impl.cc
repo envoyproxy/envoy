@@ -100,7 +100,7 @@ ClusterFactoryImplBase::create(const envoy::api::v2::Cluster& cluster,
       context.localInfo(), context.dispatcher(), context.random(), context.stats(),
       context.singletonManager(), context.tls(), context.api());
 
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster =
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       createClusterImpl(cluster, context, factory_context, std::move(stats_scope));
 
   if (!cluster.health_checks().empty()) {
@@ -108,16 +108,16 @@ ClusterFactoryImplBase::create(const envoy::api::v2::Cluster& cluster,
     if (cluster.health_checks().size() != 1) {
       throw EnvoyException("Multiple health checks not supported");
     } else {
-      new_cluster.first->setHealthChecker(HealthCheckerFactory::create(
-          cluster.health_checks()[0], *new_cluster.first, context.runtime(), context.random(),
+      new_cluster_pair.first->setHealthChecker(HealthCheckerFactory::create(
+          cluster.health_checks()[0], *new_cluster_pair.first, context.runtime(), context.random(),
           context.dispatcher(), context.logManager()));
     }
   }
 
-  new_cluster.first->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
-      *new_cluster.first, cluster, context.dispatcher(), context.runtime(),
+  new_cluster_pair.first->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
+      *new_cluster_pair.first, cluster, context.dispatcher(), context.runtime(),
       context.outlierEventLogger()));
-  return new_cluster;
+  return new_cluster_pair;
 }
 
 } // namespace Upstream
