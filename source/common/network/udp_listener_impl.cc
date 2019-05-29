@@ -169,12 +169,13 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
 
   if (send_result.ok()) {
     ASSERT(send_result.rc_ == buffer.length());
-    buffer.drain(send_result.rc_);
     ENVOY_UDP_LOG(trace, "sendmsg sent:{} bytes", send_result.rc_);
   } else {
-    ENVOY_UDP_LOG(debug, "sendmsg failed with error {}",
-                  static_cast<int>(send_result.err_->getErrorCode()));
+    ENVOY_UDP_LOG(debug, "sendmsg failed with error {}. Ret {}",
+                  static_cast<int>(send_result.err_->getErrorCode()), send_result.rc_);
   }
+
+  buffer.drain(send_result.rc_);
 
   return send_result;
 }
