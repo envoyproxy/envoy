@@ -77,6 +77,12 @@ public:
   virtual void addConnectionCallbacks(Network::ConnectionCallbacks& callbacks) PURE;
 
   /**
+   * Called to determine if the client has pending requests.
+   * @return bool true if the client is processing requests or false if it is currently idle.
+   */
+  virtual bool active() PURE;
+
+  /**
    * Closes the underlying network connection.
    */
   virtual void close() PURE;
@@ -134,6 +140,18 @@ public:
    * @return timeout for batching commands for a single upstream host.
    */
   virtual std::chrono::milliseconds bufferFlushTimeoutInMs() const PURE;
+
+  /**
+   * @return interval for checking the state of draining upstream connections.
+   *
+   */
+  virtual std::chrono::milliseconds upstreamDrainPollIntervalInMs() const PURE;
+
+  /**
+   * @return the maximum number of upstream connections to unknown hosts when enableRedirection() is
+   * true.
+   */
+  virtual uint32_t maxUpstreamUnknownConnections() const PURE;
 };
 
 /**

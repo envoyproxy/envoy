@@ -69,6 +69,7 @@ public:
   }
 
   MOCK_METHOD1(addConnectionCallbacks, void(Network::ConnectionCallbacks& callbacks));
+  MOCK_METHOD0(active, bool());
   MOCK_METHOD0(close, void());
   MOCK_METHOD2(makeRequest,
                PoolRequest*(const Common::Redis::RespValue& request, PoolCallbacks& callbacks));

@@ -154,6 +154,10 @@ class ConfigBufferSizeGTSingleRequest : public Config {
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return std::chrono::milliseconds(1);
   }
+  std::chrono::milliseconds upstreamDrainPollIntervalInMs() const override {
+    return std::chrono::milliseconds(0);
+  }
+  uint32_t maxUpstreamUnknownConnections() const override { return 0; }
 };
 
 TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
@@ -455,6 +459,10 @@ class ConfigOutlierDisabled : public Config {
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return std::chrono::milliseconds(0);
   }
+  std::chrono::milliseconds upstreamDrainPollIntervalInMs() const override {
+    return std::chrono::milliseconds(0);
+  }
+  uint32_t maxUpstreamUnknownConnections() const override { return 0; }
 };
 
 TEST_F(RedisClientImplTest, OutlierDisabled) {

@@ -84,7 +84,9 @@ private:
     makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                       Common::Redis::Client::PoolCallbacks& callbacks);
     void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
+    void onHostsAdded(const std::vector<Upstream::HostSharedPtr>& hosts_added);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
+    void drainClients();
 
     // Upstream::ClusterUpdateCallbacks
     void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override {
@@ -101,6 +103,9 @@ private:
     Envoy::Common::CallbackHandle* host_set_member_update_cb_handle_{};
     std::unordered_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
     std::string auth_password_;
+    std::list<Upstream::HostSharedPtr> created_hosts_;
+    std::list<ThreadLocalActiveClientPtr> clients_to_drain_;
+    Event::TimerPtr drain_timer_;
   };
 
   struct LbContextImpl : public Upstream::LoadBalancerContextBase {

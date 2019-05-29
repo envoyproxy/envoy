@@ -16,9 +16,12 @@ ConfigImpl::ConfigImpl(
           config.max_buffer_size_before_flush()), // This is a scalar, so default is zero.
       buffer_flush_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
           config, buffer_flush_timeout,
-          3)) // Default timeout is 3ms. If max_buffer_size_before_flush is zero, this is not used
-              // as the buffer is flushed on each request immediately.
-{}
+          3)), // Default timeout is 3ms. If max_buffer_size_before_flush is zero, this is not used
+               // as the buffer is flushed on each request immediately.
+      upstream_drain_poll_interval_(PROTOBUF_GET_MS_OR_DEFAULT(
+          config, upstream_drain_poll_interval, 100)), // The default interval is 100ms.
+      max_upstream_unknown_connections_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)) {}
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
