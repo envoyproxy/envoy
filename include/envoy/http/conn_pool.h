@@ -118,9 +118,9 @@ public:
   virtual Cancellable* newStream(Http::StreamDecoder& response_decoder, Callbacks& callbacks) PURE;
 
   /**
-   * @return Upstream::HostConstSharedPtr the host for which connections are pooled.
+   * @return Upstream::HostDescriptionConstSharedPtr the host for which connections are pooled.
    */
-  virtual Upstream::HostConstSharedPtr host() const PURE;
+  virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
 };
 
 typedef std::unique_ptr<Instance> InstancePtr;

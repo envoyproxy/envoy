@@ -36,7 +36,7 @@ public:
   bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
-  Upstream::HostConstSharedPtr host() const override { return host_; };
+  Upstream::HostDescriptionConstSharedPtr host() const override { return host_; };
 
 protected:
   struct ActiveClient : public Network::ConnectionCallbacks,

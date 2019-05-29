@@ -334,7 +334,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     // The cluster name will be appended to any local or upstream responses from this point.
     modify_headers = [this, debug_config](Http::HeaderMap& headers) {
       headers.addCopy(
-          Http::LowerCaseString(debug_config->cluster_header_.value_or("x-envoy-debug")),
+          Http::LowerCaseString(debug_config->cluster_header_.value_or("x-envoy-cluster")),
           route_entry_->clusterName());
     };
   }
@@ -386,16 +386,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
-  if (debug_config && debug_config->append_host_) {
+  if (debug_config && debug_config->append_upstream_host_) {
     // The hostname and address will be appended to any local or upstream responses from this point,
     // possibly in addition to the cluster name.
     modify_headers = [modify_headers, debug_config, conn_pool](Http::HeaderMap& headers) {
       modify_headers(headers);
-      headers.addCopy(
-          Http::LowerCaseString(debug_config->hostname_header_.value_or("x-envoy-hostname")),
-          conn_pool->host()->hostname());
       headers.addCopy(Http::LowerCaseString(
-                          debug_config->host_address_header_.value_or("x-envoy-host-address")),
+                          debug_config->hostname_header_.value_or("x-envoy-upstream-hostname")),
+                      conn_pool->host()->hostname());
+      headers.addCopy(Http::LowerCaseString(debug_config->host_address_header_.value_or(
+                          "x-envoy-upstream-host-address")),
                       conn_pool->host()->address()->asString());
     };
   }
