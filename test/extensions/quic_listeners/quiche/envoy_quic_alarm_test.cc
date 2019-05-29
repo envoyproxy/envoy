@@ -132,6 +132,17 @@ TEST_F(EnvoyQuicAlarmTest, SetAlarmToPastTime) {
   EXPECT_TRUE(unowned_delegate->fired());
 }
 
+TEST_F(EnvoyQuicAlarmTest, FireAlarmWithPastDeadline) {
+  advanceUsAndLoop(100);
+  EXPECT_EQ(100, (clock_.Now() - quic::QuicTime::Zero()).ToMicroseconds());
+  auto unowned_delegate = new TestDelegate();
+  quic::QuicArenaScopedPtr<quic::QuicAlarm> alarm(alarm_factory_.CreateAlarm(unowned_delegate));
+  // alarm becomes active upon Set().
+  alarm->Set(clock_.Now() - QuicTime::Delta::FromMicroseconds(10));
+  base_scheduler_.run(Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(unowned_delegate->fired());
+}
+
 TEST_F(EnvoyQuicAlarmTest, CancelActiveAlarm) {
   advanceUsAndLoop(100);
   EXPECT_EQ(100, (clock_.Now() - quic::QuicTime::Zero()).ToMicroseconds());

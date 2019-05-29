@@ -15,13 +15,18 @@ void EnvoyQuicAlarm::SetImpl() {
   timer_->enableTimerInUs(std::chrono::microseconds(getDurationBeforeDeadline().ToMicroseconds()));
 }
 
-void EnvoyQuicAlarm::UpdateImpl() { SetImpl(); }
+void EnvoyQuicAlarm::UpdateImpl() {
+  // Since Timer::enableTimer() overrides its deadline from previous calls,
+  // there is no need to disable the timer before enabling it again.
+  SetImpl();
+}
 
 quic::QuicTime::Delta EnvoyQuicAlarm::getDurationBeforeDeadline() {
   quic::QuicTime::Delta duration(quic::QuicTime::Delta::Zero());
   quic::QuicTime now = clock_.ApproximateNow();
-  if (deadline() > now) {
-    duration = deadline() - now;
+  quic::QuicTime tmp = deadline();
+  if (tmp > now) {
+    duration = tmp - now;
   }
   return duration;
 }

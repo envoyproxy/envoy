@@ -9,6 +9,9 @@
 namespace Envoy {
 namespace Quic {
 
+// Implements QUIC interface
+// https://quiche.googlesource.com/quiche/+/refs/heads/master/quic/core/quic_alarm.h This class
+// wraps an Event::Timer object and provide interface for QUIC to interact with the timer.
 class EnvoyQuicAlarm : public quic::QuicAlarm {
 public:
   EnvoyQuicAlarm(Event::Scheduler& scheduler, quic::QuicClock& clock,
@@ -26,7 +29,7 @@ private:
   quic::QuicTime::Delta getDurationBeforeDeadline();
 
   Event::Scheduler& scheduler_;
-  Event::TimerPtr timer_{nullptr};
+  Event::TimerPtr timer_;
   quic::QuicClock& clock_;
 };
 

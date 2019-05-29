@@ -3,6 +3,8 @@
 // QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
+#include "common/common/non_copyable.h"
+
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm.h"
 
 #include "quiche/quic/core/quic_alarm.h"
@@ -13,16 +15,12 @@
 namespace Envoy {
 namespace Quic {
 
-class EnvoyQuicAlarmFactory : public quic::QuicAlarmFactory {
+class EnvoyQuicAlarmFactory : public quic::QuicAlarmFactory, NonCopyable {
 public:
   EnvoyQuicAlarmFactory(Event::Scheduler& scheduler, quic::QuicClock& clock)
       : scheduler_(scheduler), clock_(clock) {}
 
-  EnvoyQuicAlarmFactory(const EnvoyQuicAlarmFactory&) = delete;
-
   ~EnvoyQuicAlarmFactory() override {}
-
-  EnvoyQuicAlarmFactory& operator=(const EnvoyQuicAlarmFactory) = delete;
 
   // QuicAlarmFactory
   quic::QuicAlarm* CreateAlarm(quic::QuicAlarm::Delegate* delegate) override;
