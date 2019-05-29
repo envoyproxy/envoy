@@ -139,7 +139,6 @@ message Cluster {
   // Refer to :ref:`load balancer type <arch_overview_load_balancing_types>` architecture
   // overview section for information on each type.
   enum LbPolicy {
-
     // Refer to the :ref:`round robin load balancing
     // policy<arch_overview_load_balancing_types_round_robin>`
     // for an explanation.
@@ -168,6 +167,11 @@ message Cluster {
     // Refer to the :ref:`Maglev load balancing policy<arch_overview_load_balancing_types_maglev>`
     // for an explanation.
     MAGLEV = 5;
+
+    // This load balancer type must be specified if the configured cluster provides a cluster
+    // specific load balancer. Consult the configured cluster's documentation for whether to set
+    // this option or not.
+    CLUSTER_PROVIDED = 6;
   }
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.

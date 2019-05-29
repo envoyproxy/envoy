@@ -300,7 +300,8 @@ void RedisClusterImpl::RedisDiscoverySession::onFailure() {
 
 RedisClusterImpl::ClusterSlotsRequest RedisClusterImpl::ClusterSlotsRequest::instance_;
 
-Upstream::ClusterImplBaseSharedPtr RedisClusterFactory::createClusterWithConfig(
+std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
+RedisClusterFactory::createClusterWithConfig(
     const envoy::api::v2::Cluster& cluster,
     const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
@@ -313,11 +314,15 @@ Upstream::ClusterImplBaseSharedPtr RedisClusterFactory::createClusterWithConfig(
   if (cluster.has_lb_subset_config() && cluster.lb_subset_config().subset_selectors_size() > 0) {
     throw EnvoyException("Redis cluster is not compatible with subset load balancer.");
   }
-  return std::make_shared<RedisClusterImpl>(
-      cluster, proto_config, NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
-      context.clusterManager(), context.runtime(), context.api(),
-      selectDnsResolver(cluster, context), socket_factory_context, std::move(stats_scope),
-      context.addedViaApi());
+  // TODO(Henry): Implement a thread aware load balancer for Redis Cluster. This can come from
+  //              inside the created cluster.
+  return std::make_pair(std::make_shared<RedisClusterImpl>(
+                            cluster, proto_config,
+                            NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
+                            context.clusterManager(), context.runtime(), context.api(),
+                            selectDnsResolver(cluster, context), socket_factory_context,
+                            std::move(stats_scope), context.addedViaApi()),
+                        nullptr);
 }
 
 REGISTER_FACTORY(RedisClusterFactory, Upstream::ClusterFactory);

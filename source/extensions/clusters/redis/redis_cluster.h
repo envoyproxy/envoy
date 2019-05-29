@@ -273,7 +273,8 @@ public:
 private:
   friend class RedisClusterTest;
 
-  Upstream::ClusterImplBaseSharedPtr createClusterWithConfig(
+  std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
+  createClusterWithConfig(
       const envoy::api::v2::Cluster& cluster,
       const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
