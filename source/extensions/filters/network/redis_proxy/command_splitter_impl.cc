@@ -29,7 +29,7 @@ namespace {
 
 // null_pool_callbacks is used for requests that must be filtered and not redirected such as
 // "asking".
-DoNothingPoolCallbacks null_pool_callbacks;
+Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
 
 // Create an asking command request.
 const Common::Redis::RespValue& askingRequest() {
@@ -558,13 +558,34 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
 
 SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
                                           SplitCallbacks& callbacks) {
-  if (request->type() != Common::Redis::RespType::Array) {
+  if ((request->type() != Common::Redis::RespType::Array) || request->asArray().empty()) {
     onInvalidRequest(callbacks);
     return nullptr;
   }
 
+  for (const Common::Redis::RespValue& value : request->asArray()) {
+    if (value.type() != Common::Redis::RespType::BulkString) {
+      onInvalidRequest(callbacks);
+      return nullptr;
+    }
+  }
+
   std::string to_lower_string(request->asArray()[0].asString());
   to_lower_table_.toLowerCase(to_lower_string);
+
+  if (to_lower_string == Common::Redis::SupportedCommands::auth()) {
+    if (request->asArray().size() < 2) {
+      onInvalidRequest(callbacks);
+      return nullptr;
+    }
+    callbacks.onAuth(request->asArray()[1].asString());
+    return nullptr;
+  }
+
+  if (!callbacks.connectionAllowed()) {
+    callbacks.onResponse(Utility::makeError(Response::get().AuthRequiredError));
+    return nullptr;
+  }
 
   if (to_lower_string == Common::Redis::SupportedCommands::ping()) {
     // Respond to PING locally.
@@ -579,13 +600,6 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     // Commands other than PING all have at least two arguments.
     onInvalidRequest(callbacks);
     return nullptr;
-  }
-
-  for (const Common::Redis::RespValue& value : request->asArray()) {
-    if (value.type() != Common::Redis::RespType::BulkString) {
-      onInvalidRequest(callbacks);
-      return nullptr;
-    }
   }
 
   auto handler = handler_lookup_table_.find(to_lower_string.c_str());

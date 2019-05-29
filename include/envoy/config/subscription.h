@@ -18,7 +18,8 @@ public:
   virtual ~SubscriptionCallbacks() = default;
 
   /**
-   * Called when a configuration update is received.
+   * Called when a state-of-the-world configuration update is received. (State-of-the-world is
+   * everything other than delta gRPC - filesystem, HTTP, non-delta gRPC).
    * @param resources vector of fetched resources corresponding to the configuration update.
    * @param version_info supplies the version information as supplied by the xDS discovery response.
    * @throw EnvoyException with reason if the configuration is rejected. Otherwise the configuration
@@ -28,9 +29,6 @@ public:
   virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                               const std::string& version_info) PURE;
 
-  // TODO(fredlas) it is a HACK that there are two of these. After delta CDS is merged,
-  //               I intend to reimplement all state-of-the-world xDSes' use of onConfigUpdate
-  //               in terms of this delta-style one (and remove the original).
   /**
    * Called when a delta configuration update is received.
    * @param added_resources resources newly added since the previous fetch.
