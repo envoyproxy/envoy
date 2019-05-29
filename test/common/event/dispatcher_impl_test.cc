@@ -218,7 +218,7 @@ TEST(TimerImplTest, TimerValueConversion) {
   EXPECT_EQ(tv.tv_sec, 2);
   EXPECT_EQ(tv.tv_usec, 50000);
 
-  // Check maximium value conversion.
+  // Check maximum value conversion.
   msecs = std::chrono::milliseconds::duration::max();
   t->millisecondsToTimeval(&tv, msecs);
   EXPECT_EQ(tv.tv_sec, msecs.count() / 1000);
