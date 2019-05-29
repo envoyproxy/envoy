@@ -163,8 +163,8 @@ public:
     if (absl::StartsWith(destination_address, "/")) {
       local_address_.reset(new Network::Address::PipeInstance(destination_address));
     } else {
-      local_address_.reset(
-          new Network::Address::Ipv4Instance(destination_address, destination_port));
+      local_address_ =
+          Network::Utility::parseInternetAddress(destination_address, destination_port);
     }
     ON_CALL(*socket_, localAddress()).WillByDefault(ReturnRef(local_address_));
 
@@ -177,7 +177,7 @@ public:
     if (absl::StartsWith(source_address, "/")) {
       remote_address_.reset(new Network::Address::PipeInstance(source_address));
     } else {
-      remote_address_.reset(new Network::Address::Ipv4Instance(source_address, source_port));
+      remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
     ON_CALL(*socket_, remoteAddress()).WillByDefault(ReturnRef(remote_address_));
 
@@ -1588,10 +1588,52 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
+  // IPv6 client. No match.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {},
+                                 "2001:0db8:85a3:0000:0000:8a2e:0370:7334", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+
   // UDS client. No match.
   filter_chain =
       findFilterChain(0, "/tmp/test.sock", "", "tls", {"h2", "http/1.1"}, "/tmp/test.sock", 0);
   ASSERT_EQ(filter_chain, nullptr);
+}
+
+// Verify source IPv6 matches.
+TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpv6Match) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.listener.tls_inspector"
+      config: {}
+    filter_chains:
+    - filter_chain_match:
+        source_prefix_ranges:
+          - address_prefix: 2001:0db8:85a3:0000:0000:0000:0000:0000
+            prefix_len: 64
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // IPv6 client. match.
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {},
+                                      "2001:0db8:85a3:0000:0000:8a2e:0370:7334", 111);
+  EXPECT_NE(filter_chain, nullptr);
+
+  // IPv6 client. No match.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {},
+                                 "2001:0db8:85a3:0001:0000:8a2e:0370:7334", 111);
+  EXPECT_EQ(filter_chain, nullptr);
 }
 
 // Verify source port matches.
