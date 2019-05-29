@@ -76,7 +76,8 @@ void DeltaSubscriptionState::updateResourceInterest(
   }
 }
 
-void DeltaSubscriptionState::updateResourceInterestViaAliases(const std::set<std::string>& updates_to_these_aliases) {
+void DeltaSubscriptionState::updateResourceInterestViaAliases(
+    const std::set<std::string>& updates_to_these_aliases) {
   aliases_added_.insert(updates_to_these_aliases.begin(), updates_to_these_aliases.end());
 }
 
@@ -161,7 +162,7 @@ void DeltaSubscriptionState::handleEstablishmentFailure() {
 
 envoy::api::v2::DeltaDiscoveryRequest DeltaSubscriptionState::getNextRequest() {
   envoy::api::v2::DeltaDiscoveryRequest request;
-  if(!any_request_sent_yet_in_current_stream_) {
+  if (!any_request_sent_yet_in_current_stream_) {
     populateDiscoveryRequest(request);
   } else if (!aliases_added_.empty()) {
     populateDiscoveryRequestWithAliases(request);
@@ -174,19 +175,21 @@ envoy::api::v2::DeltaDiscoveryRequest DeltaSubscriptionState::getNextRequest() {
   return request;
 }
 
-void DeltaSubscriptionState::populateDiscoveryRequestWithAliases(envoy::api::v2::DeltaDiscoveryRequest &request) {
+void DeltaSubscriptionState::populateDiscoveryRequestWithAliases(
+    envoy::api::v2::DeltaDiscoveryRequest& request) {
   std::copy(aliases_added_.begin(), aliases_added_.end(),
             Protobuf::RepeatedFieldBackInserter(request.mutable_resource_names_subscribe()));
   aliases_added_.clear();
 }
 
-void DeltaSubscriptionState::populateDiscoveryRequest(envoy::api::v2::DeltaDiscoveryRequest &request) {
+void DeltaSubscriptionState::populateDiscoveryRequest(
+    envoy::api::v2::DeltaDiscoveryRequest& request) {
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
     // initial_resource_versions "must be populated for first request in a stream".
     // Also, since this might be a new server, we must explicitly state *all* of our subscription
     // interest.
-    for (auto const &resource : resource_versions_) {
+    for (auto const& resource : resource_versions_) {
       // Populate initial_resource_versions with the resource versions we currently have.
       // Resources we are interested in, but are still waiting to get any version of from the
       // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
