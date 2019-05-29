@@ -13,7 +13,7 @@ void translateRuntime(const envoy::config::bootstrap::v2::Runtime& runtime_confi
       layer->mutable_disk_layer()->set_symlink_root(runtime_config.symlink_root() + "/" +
                                                     runtime_config.subdirectory());
     }
-    {
+    if (!runtime_config.override_subdirectory().empty()) {
       auto* layer = layered_runtime_config.add_layers();
       layer->set_name("override");
       layer->mutable_disk_layer()->set_symlink_root(runtime_config.symlink_root() + "/" +
