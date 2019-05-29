@@ -16,7 +16,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "absl/types/optional.h"
-#include "external/envoy_api/envoy/api/v2/cds.pb.h"
+
 
 namespace Envoy {
 namespace Upstream {
