@@ -726,6 +726,87 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
   tls_.shutdownThread();
 }
 
+// This test creates 2 hosts (one with an IPv4 address, and the other with an IPv6
+// address) and pending requests using makeRequestToHost(). After their creation, "new" hosts are
+// discovered (added), and the original hosts are put aside to drain. The cluster is removed and the
+// underlying connections should be closed.
+
+TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
+  setup();
+
+  Common::Redis::RespValue value;
+  Common::Redis::Client::MockPoolRequest auth_request1, active_request1;
+  Common::Redis::Client::MockPoolRequest auth_request2, active_request2;
+  Common::Redis::Client::MockPoolCallbacks callbacks1;
+  Common::Redis::Client::MockPoolCallbacks callbacks2;
+  Common::Redis::Client::MockClient* client1 = new NiceMock<Common::Redis::Client::MockClient>();
+  Common::Redis::Client::MockClient* client2 = new NiceMock<Common::Redis::Client::MockClient>();
+  Upstream::HostConstSharedPtr host1;
+  Upstream::HostConstSharedPtr host2;
+
+  EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client1)));
+  EXPECT_CALL(*client1, makeRequest(Ref(value), Ref(callbacks1)))
+      .WillOnce(Return(&active_request1));
+  Common::Redis::Client::PoolRequest* request1 =
+      conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1);
+  EXPECT_EQ(&active_request1, request1);
+  EXPECT_EQ(host1->address()->asString(), "10.0.0.1:3000");
+
+  // IPv6 address returned from Redis server will not have square brackets
+  // around it, while Envoy represents Address::Ipv6Instance addresses with square brackets around
+  // the address.
+  EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host2), Return(client2)));
+  EXPECT_CALL(*client2, makeRequest(Ref(value), Ref(callbacks2)))
+      .WillOnce(Return(&active_request2));
+  Common::Redis::Client::PoolRequest* request2 =
+      conn_pool_->makeRequestToHost("2001:470:813B:0:0:0:0:1:3333", value, callbacks2);
+  EXPECT_EQ(&active_request2, request2);
+  EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
+
+  std::unordered_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
+      hostAddressMap();
+  EXPECT_EQ(host_address_map.size(), 2); // host1 and host2 have been created.
+  EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
+  EXPECT_EQ(host_address_map[host2->address()->asString()], host2);
+  EXPECT_EQ(clientMap().size(), 2);
+  EXPECT_NE(clientMap().find(host1), clientMap().end());
+  EXPECT_NE(clientMap().find(host2), clientMap().end());
+  EXPECT_EQ(createdHosts().size(), 2);
+  EXPECT_EQ(clientsToDrain().size(), 0);
+  EXPECT_EQ(drainTimer()->enabled(), false);
+
+  std::shared_ptr<Upstream::MockHost> new_host1(new Upstream::MockHost());
+  std::shared_ptr<Upstream::MockHost> new_host2(new Upstream::MockHost());
+  auto new_host1_test_address = Network::Utility::resolveUrl("tcp://10.0.0.1:3000");
+  auto new_host2_test_address = Network::Utility::resolveUrl("tcp://[2001:470:813b::1]:3333");
+  EXPECT_CALL(*new_host1, address()).WillRepeatedly(Return(new_host1_test_address));
+  EXPECT_CALL(*new_host2, address()).WillRepeatedly(Return(new_host2_test_address));
+  EXPECT_CALL(*client1, active()).WillOnce(Return(true));
+  EXPECT_CALL(*client2, active()).WillOnce(Return(true));
+
+  cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0)->runCallbacks(
+      {new_host1, new_host2}, {});
+
+  host_address_map = hostAddressMap();
+  EXPECT_EQ(host_address_map.size(), 2); // new_host1 and new_host2 have been added.
+  EXPECT_EQ(host_address_map[new_host1_test_address->asString()], new_host1);
+  EXPECT_EQ(host_address_map[new_host2_test_address->asString()], new_host2);
+  EXPECT_EQ(clientMap().size(), 0);
+  EXPECT_EQ(createdHosts().size(), 0);
+  EXPECT_EQ(clientsToDrain().size(), 2); // host1 and host2 have been put aside to drain.
+  EXPECT_EQ(drainTimer()->enabled(), true);
+
+  EXPECT_CALL(*client1, close());
+  EXPECT_CALL(*client2, close());
+  update_callbacks_->onClusterRemoval("fake_cluster");
+
+  EXPECT_EQ(hostAddressMap().size(), 0);
+  EXPECT_EQ(clientMap().size(), 0);
+  EXPECT_EQ(clientsToDrain().size(), 0);
+
+  tls_.shutdownThread();
+}
+
 } // namespace ConnPool
 } // namespace RedisProxy
 } // namespace NetworkFilters

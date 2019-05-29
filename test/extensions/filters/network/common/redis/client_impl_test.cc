@@ -80,6 +80,7 @@ public:
                                  *config_);
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
+    EXPECT_EQ(false, client_->active());
 
     // NOP currently.
     upstream_connection_->runHighWatermarkCallbacks();
@@ -95,6 +96,7 @@ public:
     Common::Redis::RespValuePtr response1{new Common::Redis::RespValue()};
     response1->type(Common::Redis::RespType::SimpleString);
     response1->asString() = "OK";
+    EXPECT_EQ(true, client_->active());
     ClientImpl* client_impl = dynamic_cast<ClientImpl*>(client_.get());
     EXPECT_NE(client_impl, nullptr);
     client_impl->onRespValue(std::move(response1));

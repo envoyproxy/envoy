@@ -163,6 +163,8 @@ public:
     EXPECT_TRUE(session->enableRedirection());
     EXPECT_EQ(session->maxBufferSizeBeforeFlush(), 0);
     EXPECT_EQ(session->bufferFlushTimeoutInMs(), std::chrono::milliseconds(1));
+    EXPECT_EQ(session->maxUpstreamUnknownConnections(), 0);
+    EXPECT_EQ(session->upstreamDrainPollIntervalInMs(), std::chrono::milliseconds(0));
     session->onDeferredDeleteBase(); // This must be called to pass assertions in the destructor.
   }
 
