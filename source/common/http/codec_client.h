@@ -11,10 +11,12 @@
 #include "envoy/network/filter.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/http/codec_wrappers.h"
+#include "common/network/connection_impl.h"
 #include "common/network/filter_impl.h"
 
 namespace Envoy {
@@ -112,6 +114,36 @@ public:
   bool remoteClosed() const { return remote_closed_; }
 
   Type type() const { return type_; }
+
+  // void resetDetectEarlyCloseWhenReadDisabled(bool early_detect) {
+  //   connection_->detectEarlyCloseWhenReadDisabled(early_detect);
+  //   connection_->readDisable(false);
+  // }
+
+  bool isAlive() {
+    // private
+    // if (read_end_stream_) {
+    //   return false;
+    // }
+    Network::ClientConnectionImpl* client_connection =
+        dynamic_cast<Network::ClientConnectionImpl*>(connection_.get());
+    if (client_connection == nullptr) {
+      ENVOY_CONN_LOG(error, "Not a ClientConnectionImpl", *connection_);
+      return true;
+    }
+    int fd = client_connection->ioHandle().fd();
+    char buf;
+    auto& os_syscalls = Api::OsSysCallsSingleton::get();
+    auto result = os_syscalls.recv(fd, &buf, 1, MSG_PEEK);
+    ENVOY_CONN_LOG(info, "retrieve peak data, rc = {}, errno = {}", *connection_, result.rc_,
+                   result.errno_);
+    if (result.rc_ == 0) {
+      ENVOY_CONN_LOG(info, "recv EOF", *connection_);
+      return false;
+    }
+    // Expecting ret == -1 and errno == EAGAIN
+    return true;
+  }
 
 protected:
   /**

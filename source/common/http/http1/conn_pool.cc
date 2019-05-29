@@ -92,7 +92,14 @@ void ConnPoolImpl::createNewConnection() {
 
 ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_decoder,
                                                      ConnectionPool::Callbacks& callbacks) {
-  if (!ready_clients_.empty()) {
+  while (!ready_clients_.empty()) {
+    if (!ready_clients_.front()->codec_client_->isAlive()) {
+      // anything else?
+      ready_clients_.pop_front();
+      continue;
+    }
+    // // A client in use should consume read buffer before handling remote close event.
+    // busy_clients_.front()->codec_client_->resetDetectEarlyCloseWhenReadDisabled(true);
     ready_clients_.front()->moveBetweenLists(ready_clients_, busy_clients_);
     ENVOY_CONN_LOG(debug, "using existing connection", *busy_clients_.front()->codec_client_);
     attachRequestToClient(*busy_clients_.front(), response_decoder, callbacks);
@@ -238,6 +245,8 @@ void ConnPoolImpl::processIdleClient(ActiveClient& client, bool delay) {
     // There is nothing to service or delayed processing is requested, so just move the connection
     // into the ready list.
     ENVOY_CONN_LOG(debug, "moving to ready", *client.codec_client_);
+    // // An idle client should watch for remote close.
+    // client.resetDetectEarlyCloseWhenReadDisabled(true);
     client.moveBetweenLists(busy_clients_, ready_clients_);
   } else {
     // There is work to do immediately so bind a request to the client and move it to the busy list.

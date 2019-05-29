@@ -50,6 +50,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/common/network:connection_lib",
         "//source/common/network:filter_lib",
     ],
 )
