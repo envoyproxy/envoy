@@ -46,7 +46,7 @@ private:
  */
 class DetectorImplFactory {
 public:
-  static DetectorSharedPtr createForCluster(Cluster& cluster,
+  static DetectorSharedPtr createForCluster(ClusterSharedPtr cluster,
                                             const envoy::api::v2::Cluster& cluster_config,
                                             Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                                             EventLoggerSharedPtr event_logger);
@@ -119,6 +119,7 @@ public:
   void successRate(double new_success_rate) { success_rate_ = new_success_rate; }
   void resetConsecutive5xx() { consecutive_5xx_ = 0; }
   void resetConsecutiveGatewayFailure() { consecutive_gateway_failure_ = 0; }
+  void resetConsecutiveWrongHost() { consecutive_wrong_host_ = 0; }
   static Http::Code resultToHttpCode(Result result);
 
   // Upstream::Outlier::DetectorHostMonitor
@@ -133,10 +134,13 @@ public:
   double successRate() const override { return success_rate_; }
 
 private:
+  void putNonHttpResult(Result result);
+
   std::weak_ptr<DetectorImpl> detector_;
   std::weak_ptr<Host> host_;
   std::atomic<uint32_t> consecutive_5xx_{0};
   std::atomic<uint32_t> consecutive_gateway_failure_{0};
+  std::atomic<uint32_t> consecutive_wrong_host_{0};
   absl::optional<MonotonicTime> last_ejection_time_;
   absl::optional<MonotonicTime> last_unejection_time_;
   uint32_t num_ejections_{};
@@ -161,7 +165,9 @@ private:
   COUNTER(ejections_detected_success_rate)                                                         \
   COUNTER(ejections_enforced_success_rate)                                                         \
   COUNTER(ejections_detected_consecutive_gateway_failure)                                          \
-  COUNTER(ejections_enforced_consecutive_gateway_failure)
+  COUNTER(ejections_enforced_consecutive_gateway_failure)                                          \
+  COUNTER(detected_consecutive_wrong_host)                                                        \
+  COUNTER(enforced_consecutive_wrong_host)
 // clang-format on
 
 /**
@@ -180,8 +186,10 @@ public:
 
   uint64_t intervalMs() { return interval_ms_; }
   uint64_t baseEjectionTimeMs() { return base_ejection_time_ms_; }
+  uint64_t minWrongHostNotifyTimeMs() { return min_wrong_host_notify_time_ms_; }
   uint64_t consecutive5xx() { return consecutive_5xx_; }
   uint64_t consecutiveGatewayFailure() { return consecutive_gateway_failure_; }
+  uint64_t consecutiveWrongHost() { return consecutive_wrong_host_; }
   uint64_t maxEjectionPercent() { return max_ejection_percent_; }
   uint64_t successRateMinimumHosts() { return success_rate_minimum_hosts_; }
   uint64_t successRateRequestVolume() { return success_rate_request_volume_; }
@@ -193,8 +201,10 @@ public:
 private:
   const uint64_t interval_ms_;
   const uint64_t base_ejection_time_ms_;
+  const uint64_t min_wrong_host_notify_time_ms_;
   const uint64_t consecutive_5xx_;
   const uint64_t consecutive_gateway_failure_;
+  const uint64_t consecutive_wrong_host_;
   const uint64_t max_ejection_percent_;
   const uint64_t success_rate_minimum_hosts_;
   const uint64_t success_rate_request_volume_;
@@ -212,13 +222,14 @@ private:
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
   static std::shared_ptr<DetectorImpl>
-  create(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
+  create(ClusterSharedPtr cluster, const envoy::api::v2::cluster::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
          EventLoggerSharedPtr event_logger);
   ~DetectorImpl();
 
   void onConsecutive5xx(HostSharedPtr host);
   void onConsecutiveGatewayFailure(HostSharedPtr host);
+  void onConsecutiveWrongHost(HostSharedPtr host);
   Runtime::Loader& runtime() { return runtime_; }
   DetectorConfig& config() { return config_; }
 
@@ -228,7 +239,7 @@ public:
   double successRateEjectionThreshold() const override { return success_rate_ejection_threshold_; }
 
 private:
-  DetectorImpl(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
+  DetectorImpl(ClusterSharedPtr cluster, const envoy::api::v2::cluster::OutlierDetection& config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
                EventLoggerSharedPtr event_logger);
 
@@ -248,6 +259,7 @@ private:
   void updateEnforcedEjectionStats(envoy::data::cluster::v2alpha::OutlierEjectionType type);
   void processSuccessRateEjections();
 
+  std::weak_ptr<Cluster> cluster_;
   DetectorConfig config_;
   Event::Dispatcher& dispatcher_;
   Runtime::Loader& runtime_;
@@ -259,6 +271,7 @@ private:
   EventLoggerSharedPtr event_logger_;
   double success_rate_average_;
   double success_rate_ejection_threshold_;
+  std::atomic<uint64_t> last_wrong_host_notify_time_ms_;
 };
 
 class EventLoggerImpl : public EventLogger {

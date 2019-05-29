@@ -95,6 +95,8 @@ void CdsJson::translateOutlierDetection(
   JSON_UTIL_SET_INTEGER(json_outlier_detection, outlier_detection, success_rate_minimum_hosts);
   JSON_UTIL_SET_INTEGER(json_outlier_detection, outlier_detection, success_rate_request_volume);
   JSON_UTIL_SET_INTEGER(json_outlier_detection, outlier_detection, success_rate_stdev_factor);
+  JSON_UTIL_SET_INTEGER(json_outlier_detection, outlier_detection, consecutive_wrong_host);
+  JSON_UTIL_SET_DURATION(json_outlier_detection, outlier_detection, min_wrong_host_notify_time);
 }
 
 void CdsJson::translateCluster(const Json::Object& json_cluster,

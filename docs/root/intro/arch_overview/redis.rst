@@ -58,6 +58,8 @@ If passive healthchecking is desired, also configure
 For the purposes of passive healthchecking, connect timeouts, command timeouts, and connection
 close map to 5xx. All other responses from Redis are counted as a success.
 
+.. _arch_overview_redis_cluster_support:
+
 Redis Cluster Support (Experimental)
 ----------------------------------------
 

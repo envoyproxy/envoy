@@ -22,8 +22,8 @@ namespace Upstream {
 namespace Outlier {
 
 DetectorSharedPtr DetectorImplFactory::createForCluster(
-    Cluster& cluster, const envoy::api::v2::Cluster& cluster_config, Event::Dispatcher& dispatcher,
-    Runtime::Loader& runtime, EventLoggerSharedPtr event_logger) {
+    ClusterSharedPtr cluster, const envoy::api::v2::Cluster& cluster_config,
+    Event::Dispatcher& dispatcher, Runtime::Loader& runtime, EventLoggerSharedPtr event_logger) {
   if (cluster_config.has_outlier_detection()) {
 
     return DetectorImpl::create(cluster, cluster_config.outlier_detection(), dispatcher, runtime,
@@ -63,7 +63,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
         detector->onConsecutiveGatewayFailure(host_.lock());
       }
     } else {
-      consecutive_gateway_failure_ = 0;
+      resetConsecutiveGatewayFailure();
     }
 
     if (++consecutive_5xx_ ==
@@ -73,8 +73,8 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
     }
   } else {
     success_rate_accumulator_bucket_.load()->success_request_counter_++;
-    consecutive_5xx_ = 0;
-    consecutive_gateway_failure_ = 0;
+    resetConsecutive5xx();
+    resetConsecutiveGatewayFailure();
   }
 }
 
@@ -97,23 +97,58 @@ Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
   case Result::SERVER_FAILURE:
     http_code = Http::Code::ServiceUnavailable;
     break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   return http_code;
 }
 
+void DetectorHostMonitorImpl::putNonHttpResult(Result result) {
+  success_rate_accumulator_bucket_.load()->total_request_counter_++;
+  std::shared_ptr<DetectorImpl> detector = detector_.lock();
+  if (!detector) {
+    // It's possible for the cluster/detector to go away while we still have a host in use.
+    return;
+  }
+  if (result == Result::WRONG_HOST) {
+    if (++consecutive_wrong_host_ ==
+        detector->runtime().snapshot().getInteger("outlier_detection.consecutive_wrong_host",
+                                                  detector->config().consecutiveWrongHost())) {
+      detector->onConsecutiveWrongHost(host_.lock());
+      resetConsecutiveWrongHost();
+    }
+  } else {
+    resetConsecutiveWrongHost();
+  }
+}
+
 void DetectorHostMonitorImpl::putResult(Result result) {
-  putHttpResponseCode(enumToInt(resultToHttpCode(result)));
+  switch (result) {
+  case Result::WRONG_HOST:
+    putNonHttpResult(result);
+    resetConsecutive5xx();
+    resetConsecutiveGatewayFailure();
+    break;
+  default:
+    putHttpResponseCode(enumToInt(resultToHttpCode(result)));
+    resetConsecutiveWrongHost();
+    break;
+  }
 }
 
 DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& config)
     : interval_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(config, interval, 10000))),
       base_ejection_time_ms_(
           static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(config, base_ejection_time, 30000))),
+      min_wrong_host_notify_time_ms_(static_cast<uint64_t>(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, min_wrong_host_notify_time, 10000))),
       consecutive_5xx_(
           static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_5xx, 5))),
       consecutive_gateway_failure_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_gateway_failure, 5))),
+      consecutive_wrong_host_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_wrong_host, 1))),
       max_ejection_percent_(
           static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_ejection_percent, 10))),
       success_rate_minimum_hosts_(static_cast<uint64_t>(
@@ -129,15 +164,15 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& 
       enforcing_success_rate_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_success_rate, 100))) {}
 
-DetectorImpl::DetectorImpl(const Cluster& cluster,
+DetectorImpl::DetectorImpl(ClusterSharedPtr cluster,
                            const envoy::api::v2::cluster::OutlierDetection& config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                            TimeSource& time_source, EventLoggerSharedPtr event_logger)
-    : config_(config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
-      stats_(generateStats(cluster.info()->statsScope())),
+    : cluster_(cluster), config_(config), dispatcher_(dispatcher), runtime_(runtime),
+      time_source_(time_source), stats_(generateStats(cluster->info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
-      event_logger_(event_logger), success_rate_average_(-1), success_rate_ejection_threshold_(-1) {
-}
+      event_logger_(event_logger), success_rate_average_(-1), success_rate_ejection_threshold_(-1),
+      last_wrong_host_notify_time_ms_(0) {}
 
 DetectorImpl::~DetectorImpl() {
   for (auto host : host_monitors_) {
@@ -149,13 +184,13 @@ DetectorImpl::~DetectorImpl() {
 }
 
 std::shared_ptr<DetectorImpl>
-DetectorImpl::create(const Cluster& cluster,
+DetectorImpl::create(ClusterSharedPtr cluster,
                      const envoy::api::v2::cluster::OutlierDetection& config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                      TimeSource& time_source, EventLoggerSharedPtr event_logger) {
   std::shared_ptr<DetectorImpl> detector(
       new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger));
-  detector->initialize(cluster);
+  detector->initialize(*cluster);
   return detector;
 }
 
@@ -329,6 +364,51 @@ void DetectorImpl::onConsecutive5xx(HostSharedPtr host) {
 void DetectorImpl::onConsecutiveGatewayFailure(HostSharedPtr host) {
   notifyMainThreadConsecutiveError(
       host, envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_GATEWAY_FAILURE);
+}
+
+void DetectorImpl::onConsecutiveWrongHost(HostSharedPtr host) {
+  // Calls will come from all threads.
+  uint64_t config_notify_time_ms =
+      std::chrono::milliseconds(
+          runtime().snapshot().getInteger("outlier_detection.min_wrong_host_notify_time",
+                                          config_.minWrongHostNotifyTimeMs()))
+          .count();
+  bool proceed;
+
+  stats_.detected_consecutive_wrong_host_.inc();
+
+  do {
+    uint64_t last_notify_time_ms = last_wrong_host_notify_time_ms_.load();
+    uint64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                          time_source_.monotonicTime().time_since_epoch())
+                          .count();
+    proceed = true;
+
+    if (last_notify_time_ms) {
+      proceed = ((now_ms - last_notify_time_ms) >= config_notify_time_ms);
+    }
+
+    if (!proceed) {
+      // Ignore this call since config_notify_time_ms milliseconds have not passed since the last
+      // call.
+      return;
+    }
+
+    proceed = last_wrong_host_notify_time_ms_.compare_exchange_strong(last_notify_time_ms, now_ms);
+  } while (!proceed);
+
+  stats_.enforced_consecutive_wrong_host_.inc();
+
+  // Clusters can be removed, so we only call the cluster's onWrongHost() method if our weak
+  // pointer can be converted into a strong pointer on the main thread (indicating that the
+  // cluster is still there).
+  std::weak_ptr<Cluster> cluster = cluster_;
+  dispatcher_.post([cluster, host]() -> void {
+    ClusterSharedPtr shared_cluster = cluster.lock();
+    if (shared_cluster) {
+      shared_cluster->onWrongHost(host);
+    }
+  });
 }
 
 void DetectorImpl::onConsecutiveErrorWorker(

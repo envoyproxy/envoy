@@ -139,6 +139,8 @@ statistics will be rooted at *cluster.<name>.outlier_detection.* and contain the
   ejections_detected_consecutive_gateway_failure, Counter, Number of detected consecutive gateway failure ejections (even if unenforced)
   ejections_total, Counter, Deprecated. Number of ejections due to any outlier type (even if unenforced)
   ejections_consecutive_5xx, Counter, Deprecated. Number of consecutive 5xx ejections (even if unenforced)
+  detected_consecutive_wrong_host, Counter, Number of detected consecutive wrong host events.
+  enforced_consecutive_wrong_host, Counter, Number of consecutive wrong host events that triggered a cluster update.
 
 .. _config_cluster_manager_cluster_stats_circuit_breakers:
 

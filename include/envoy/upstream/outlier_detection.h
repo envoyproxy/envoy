@@ -35,6 +35,7 @@ enum class Result {
 
   REQUEST_FAILED, // Request was not completed successfully.
   SERVER_FAILURE, // The server indicated it cannot process a request.
+  WRONG_HOST,     // An upstream host has indicated that another host should process a request.
 };
 
 /**

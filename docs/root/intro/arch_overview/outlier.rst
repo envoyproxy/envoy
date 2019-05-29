@@ -11,6 +11,12 @@ form of *passive* health checking. Envoy also supports :ref:`active health check
 <arch_overview_health_checking>`. *Passive* and *active* health checking can be enabled together or
 independently, and form the basis for an overall upstream health checking solution.
 
+Outlier detection actions extend beyond ejection. :ref:`Consecutive wrong host 
+<arch_overview_outlier_detection_consecutive_wrong_host>` outlier detection can trigger :ref:`Redis cluster 
+<arch_overview_redis_cluster_support>` topology rediscovery when :ref:`enable_redirection 
+<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.enable_redirection>` 
+is enabled and redirection errors are received from upstream Redis servers.
+
 Ejection algorithm
 ------------------
 
@@ -57,6 +63,21 @@ return one of these status codes on the upstream's behalf (reset, connection fai
 number of consecutive gateway failures required for ejection is controlled by
 the :ref:`outlier_detection.consecutive_gateway_failure
 <envoy_api_field_cluster.OutlierDetection.consecutive_gateway_failure>` value.
+
+.. _arch_overview_outlier_detection_consecutive_wrong_host:
+
+Consecutive Wrong Host
+^^^^^^^^^^^^^^^^^^^^^^
+If an upstream host that is part of a :ref:`Redis cluster <arch_overview_redis_cluster_support>`
+returns some number of `MOVED or ASK redirection errors 
+<https://redis.io/topics/cluster-spec#redirection-and-resharding>`_ (and :ref:`enable_redirection 
+<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.enable_redirection>` 
+is configured to be true), a cluster topology rediscovery session will be triggered. The number of
+consecutive redirection errors to trigger rediscovery is controlled by 
+:ref:`outlier_detection.consecutive_wrong_host <envoy_api_field_cluster.OutlierDetection.consecutive_wrong_host>`.
+The minimum amount of time that must pass after triggering before a cluster can be triggered again is
+controlled by :ref:`outlier_detection.OutlierDetection.min_wrong_host_notify_time 
+<envoy_api_field_cluster.OutlierDetection.min_wrong_host_notify_time>`.
 
 Success Rate
 ^^^^^^^^^^^^

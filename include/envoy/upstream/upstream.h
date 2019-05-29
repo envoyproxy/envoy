@@ -906,6 +906,13 @@ public:
   virtual InitializePhase initializePhase() const PURE;
 
   /**
+   * Check the cluster's membership and load-balancer state, if appropriate. This is called by the
+   * outlier detector.
+   * @param host supplies a pointer to the "wrong" upstream host.
+   */
+  virtual void onWrongHost(HostSharedPtr host) PURE;
+
+  /**
    * @return the PrioritySet for the cluster.
    */
   virtual PrioritySet& prioritySet() PURE;

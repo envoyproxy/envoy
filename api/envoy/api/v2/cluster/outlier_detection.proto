@@ -80,4 +80,14 @@ message OutlierDetection {
   // used to disable ejection or to ramp it up slowly. Defaults to 0.
   google.protobuf.UInt32Value enforcing_consecutive_gateway_failure = 11
       [(validate.rules).uint32.lte = 100];
+
+  // The number of consecutive wrong-host events from any given upstream host before the cluster
+  // is notified to possibly check its membership or load-balancer state. This value
+  // defaults to 1.
+  google.protobuf.UInt32Value consecutive_wrong_host = 12;
+
+  // The minimum time interval between notifying the cluster of any wrong-host events.
+  // Any cluster notification request generated within this time period after notifying
+  // a cluster of a wrong-host event will be ignored. This value defaults to 10s.
+  google.protobuf.Duration min_wrong_host_notify_time = 13 [(validate.rules).duration.gt = {}];
 }

@@ -161,12 +161,12 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
 void ClientImpl::onRespValue(RespValuePtr&& value) {
   ASSERT(!pending_requests_.empty());
   PendingRequest& request = pending_requests_.front();
+  bool redirected = false;
 
   if (request.canceled_) {
     host_->cluster().stats().upstream_rq_cancelled_.inc();
   } else if (config_.enableRedirection() && (value->type() == Common::Redis::RespType::Error)) {
     std::vector<absl::string_view> err = StringUtil::splitToken(value->asString(), " ", false);
-    bool redirected = false;
     if (err.size() == 3) {
       if (err[0] == RedirectionResponse::get().MOVED || err[0] == RedirectionResponse::get().ASK) {
         redirected = request.callbacks_.onRedirection(*value);
@@ -195,7 +195,8 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
-  putOutlierEvent(Upstream::Outlier::Result::SUCCESS);
+  putOutlierEvent(redirected ? Upstream::Outlier::Result::WRONG_HOST
+                             : Upstream::Outlier::Result::SUCCESS);
 }
 
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)

@@ -680,6 +680,7 @@ public:
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
+  void onWrongHost(HostSharedPtr) override{};
 
 protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,

@@ -100,6 +100,9 @@ public:
                Server::Configuration::TransportSocketFactoryContext& factory_context,
                Stats::ScopePtr&& stats_scope, bool added_via_api);
 
+  // Upstream::Cluster
+  void onWrongHost(Upstream::HostSharedPtr host) override;
+
   struct ClusterSlotsRequest : public Extensions::NetworkFilters::Common::Redis::RespValue {
   public:
     ClusterSlotsRequest() : Extensions::NetworkFilters::Common::Redis::RespValue() {

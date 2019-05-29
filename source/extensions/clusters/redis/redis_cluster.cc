@@ -51,6 +51,10 @@ RedisCluster::RedisCluster(
   }
 }
 
+void RedisCluster::onWrongHost(Upstream::HostSharedPtr) {
+  redis_discovery_session_.resolve_timer_->enableTimer(std::chrono::milliseconds(0));
+}
+
 void RedisCluster::startPreInit() {
   for (const DnsDiscoveryResolveTargetPtr& target : dns_discovery_resolve_targets_) {
     target->startResolve();
