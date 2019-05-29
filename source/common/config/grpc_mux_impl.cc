@@ -23,7 +23,8 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
 GrpcMuxImpl::~GrpcMuxImpl() {
   for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second.watches_) {
-      watch->inserted_ = false;
+      // watch->inserted_ = false;
+      watch->clear();
     }
   }
 }

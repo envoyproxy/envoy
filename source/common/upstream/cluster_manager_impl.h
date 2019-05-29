@@ -20,6 +20,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/cleanup.h"
 #include "common/config/grpc_mux_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/upstream/load_stats_reporter.h"
@@ -378,14 +379,11 @@ private:
     SystemTime last_updated_;
   };
 
-  struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle {
+  struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle,
+                                            RaiiListElement<ClusterUpdateCallbacks*> {
     ClusterUpdateCallbacksHandleImpl(ClusterUpdateCallbacks& cb,
-                                     std::list<ClusterUpdateCallbacks*>& parent);
-    ~ClusterUpdateCallbacksHandleImpl() override;
-
-  private:
-    std::list<ClusterUpdateCallbacks*>::iterator entry;
-    std::list<ClusterUpdateCallbacks*>& list;
+                                     std::list<ClusterUpdateCallbacks*>& parent)
+        : RaiiListElement<ClusterUpdateCallbacks*>(parent, &cb) {}
   };
 
   typedef std::unique_ptr<ClusterData> ClusterDataPtr;
