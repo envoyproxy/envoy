@@ -324,6 +324,39 @@ void DecoratorImpl::apply(Tracing::Span& span) const {
 
 const std::string& DecoratorImpl::getOperation() const { return operation_; }
 
+RouteTracingImpl::RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing) {
+  if (!tracing.has_client_sampling()) {
+    client_sampling_.set_numerator(100);
+    client_sampling_.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  } else {
+    client_sampling_ = tracing.client_sampling();
+  }
+  if (!tracing.has_random_sampling()) {
+    random_sampling_.set_numerator(100);
+    random_sampling_.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  } else {
+    random_sampling_ = tracing.random_sampling();
+  }
+  if (!tracing.has_overall_sampling()) {
+    overall_sampling_.set_numerator(100);
+    overall_sampling_.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  } else {
+    overall_sampling_ = tracing.overall_sampling();
+  }
+}
+
+const envoy::type::FractionalPercent& RouteTracingImpl::getClientSampling() const {
+  return client_sampling_;
+}
+
+const envoy::type::FractionalPercent& RouteTracingImpl::getRandomSampling() const {
+  return random_sampling_;
+}
+
+const envoy::type::FractionalPercent& RouteTracingImpl::getOverallSampling() const {
+  return overall_sampling_;
+}
+
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::route::Route& route,
                                        Server::Configuration::FactoryContext& factory_context)
@@ -360,7 +393,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                                        route.response_headers_to_remove())),
       metadata_(route.metadata()), typed_metadata_(route.metadata()),
       match_grpc_(route.match().has_grpc()), opaque_config_(parseOpaqueConfig(route)),
-      decorator_(parseDecorator(route)),
+      decorator_(parseDecorator(route)), route_tracing_(parseRouteTracing(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route, factory_context.api())),
       per_filter_configs_(route.typed_per_filter_config(), route.per_filter_config(),
@@ -663,6 +696,15 @@ DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::api::v2::route
   DecoratorConstPtr ret;
   if (route.has_decorator()) {
     ret = DecoratorConstPtr(new DecoratorImpl(route.decorator()));
+  }
+  return ret;
+}
+
+RouteTracingConstPtr
+RouteEntryImplBase::parseRouteTracing(const envoy::api::v2::route::Route& route) {
+  RouteTracingConstPtr ret;
+  if (route.has_tracing()) {
+    ret = RouteTracingConstPtr(new RouteTracingImpl(route.tracing()));
   }
   return ret;
 }

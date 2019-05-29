@@ -777,17 +777,6 @@ ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
   return config_dump;
 }
 
-ClusterManagerImpl::ClusterUpdateCallbacksHandleImpl::ClusterUpdateCallbacksHandleImpl(
-    ClusterUpdateCallbacks& cb, std::list<ClusterUpdateCallbacks*>& ll)
-    : list(ll) {
-  entry = ll.emplace(ll.begin(), &cb);
-}
-
-ClusterManagerImpl::ClusterUpdateCallbacksHandleImpl::~ClusterUpdateCallbacksHandleImpl() {
-  ASSERT(std::find(list.begin(), list.end(), *entry) != list.end());
-  list.erase(entry);
-}
-
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
     ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
     const absl::optional<std::string>& local_cluster_name)
