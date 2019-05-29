@@ -8,9 +8,9 @@
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 
-namespace Envoy {
+using Envoy::Fuzz::replaceInvalidCharacters;
 
-using Fuzz::replaceInvalidCharacters;
+namespace Envoy {
 
 // Fuzz the header map implementation.
 DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) {

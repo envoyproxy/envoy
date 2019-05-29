@@ -103,10 +103,10 @@ inline std::string replaceInvalidCharacters(absl::string_view string) {
 }
 
 // Return a new RepeatedPtrField of HeaderValueOptions with invalid characters removed.
-inline Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> processHeadersToAdd(
+inline Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> replaceInvalidHeaders(
     const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add) {
   Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> processed;
-  for (auto header : headers_to_add) {
+  for (const auto& header : headers_to_add) {
     auto* header_value_option = processed.Add();
     auto* mutable_header = header_value_option->mutable_header();
     mutable_header->set_key(replaceInvalidCharacters(header.header().key()));
