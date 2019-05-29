@@ -68,7 +68,9 @@ public:
   }
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
-  bool requestVirtualHostsUpdate(const std::string &, std::function<void()>) override { return false; }
+  bool requestVirtualHostsUpdate(const std::string&, std::function<void()>) override {
+    return false;
+  }
 
 private:
   ConfigConstSharedPtr config_;
@@ -164,7 +166,7 @@ public:
 
   RdsRouteConfigSubscription& subscription() { return *subscription_; }
   void onConfigUpdate() override;
-  bool requestVirtualHostsUpdate(const std::string &for_domain, std::function<void()> cb);
+  bool requestVirtualHostsUpdate(const std::string& for_domain, std::function<void()> cb);
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;

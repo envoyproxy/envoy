@@ -18,9 +18,9 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/server:filter_config_interface",
-        "//source/common/common:enum_to_int",
-        "//source/common/http:header_map_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:enum_to_int",
         "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
     ],
 )

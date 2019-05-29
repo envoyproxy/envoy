@@ -14,7 +14,7 @@ void OnDemandRouteUpdate::requestRouteConfigUpdate() {
     filter_return_ = FilterReturn::ContinueDecoding;
   } else {
     auto config_update_scheduled =
-        callbacks_->requestRouteConfigUpdate([this]() -> void { onComplete(); });
+        callbacks_->requestRouteConfigUpdate([this]() -> void { onRouteConfigUpdateCompletion(); });
     filter_return_ =
         config_update_scheduled ? FilterReturn::StopDecoding : FilterReturn::ContinueDecoding;
   }
@@ -40,7 +40,10 @@ void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCal
   callbacks_ = &callbacks;
 }
 
-void OnDemandRouteUpdate::onComplete() {
+// This is the callback which is called when an update requested in requestRouteConfigUpdate()
+// has been propagated to workers, at which point the request processing is restarted from the
+// beginning.
+void OnDemandRouteUpdate::onRouteConfigUpdateCompletion() {
   filter_return_ = FilterReturn::ContinueDecoding;
 
   if (!callbacks_->decodingBuffer() && // Redirects with body not yet supported.

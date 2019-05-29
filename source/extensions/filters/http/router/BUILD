@@ -19,10 +19,10 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/common/config:filter_json_lib",
         "//source/common/json:config_schemas_lib",
-        "//source/extensions/filters/http/on_demand:on_demand_update_lib",
         "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/on_demand:on_demand_update_lib",
     ],
 )

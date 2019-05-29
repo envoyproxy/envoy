@@ -1141,7 +1141,8 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 
 bool ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(std::function<void()> cb) {
   ASSERT(!request_headers_->Host()->value().empty());
-  auto host_header = Http::LowerCaseString(std::string(request_headers_->Host()->value().getStringView())).get();
+  auto host_header =
+      Http::LowerCaseString(std::string(request_headers_->Host()->value().getStringView())).get();
   return route_config_provider_.requestVirtualHostsUpdate(host_header, cb);
 }
 
