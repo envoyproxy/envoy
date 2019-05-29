@@ -71,7 +71,7 @@ MockClusterInfo::MockClusterInfo()
       .WillByDefault(Invoke([this]() -> const Envoy::Config::TypedMetadata& {
         if (typed_metadata_ == nullptr) {
           typed_metadata_ =
-              absl::make_unique<Config::TypedMetadataImpl<ClusterTypedMetadataFactory>>(metadata_);
+              std::make_unique<Config::TypedMetadataImpl<ClusterTypedMetadataFactory>>(metadata_);
         }
         return *typed_metadata_;
       }));
