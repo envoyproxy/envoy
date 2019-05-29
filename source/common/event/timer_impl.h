@@ -22,6 +22,9 @@ public:
   void enableTimer(const std::chrono::milliseconds& d) override;
   bool enabled() override;
 
+  // Public for testing.
+  void millisecondsToTimeval(timeval* tv, const std::chrono::milliseconds& d);
+
 private:
   TimerCb cb_;
 };

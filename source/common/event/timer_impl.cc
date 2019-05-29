@@ -18,25 +18,21 @@ TimerImpl::TimerImpl(Libevent::BasePtr& libevent, TimerCb cb) : cb_(cb) {
 
 void TimerImpl::disableTimer() { event_del(&raw_event_); }
 
+void TimerImpl::millisecondsToTimeval(timeval* tv, const std::chrono::milliseconds& d) {
+  ASSERT(tv);
+  std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(d);
+  std::chrono::microseconds usecs = std::chrono::duration_cast<std::chrono::microseconds>(d - secs);
+
+  tv->tv_sec = secs.count();
+  tv->tv_usec = usecs.count();
+}
+
 void TimerImpl::enableTimer(const std::chrono::milliseconds& d) {
   if (d.count() == 0) {
     event_active(&raw_event_, EV_TIMEOUT, 0);
   } else {
-    // TODO(#4332): use duration_cast more nicely to clean up this code.
-
-    // Since d is milliseconds, we need to check that the conversion
-    // doesn't overflow std::chrono::microseconds (since signed integer
-    // overflow is undefined behavior). If it would overflow, just use
-    // the maximum duration which can be expressed in microseconds.
-    std::chrono::microseconds us;
-    if (d.count() > std::chrono::microseconds::duration::max().count() / 1000) {
-      us = std::chrono::duration_values<std::chrono::microseconds>::max();
-    } else {
-      us = std::chrono::duration_cast<std::chrono::microseconds>(d);
-    }
     timeval tv;
-    tv.tv_sec = us.count() / 1000000;
-    tv.tv_usec = us.count() % 1000000;
+    millisecondsToTimeval(&tv, d);
     event_add(&raw_event_, &tv);
   }
 }
