@@ -12,13 +12,18 @@ namespace Config {
 // The xDS machinery's "watch" concept accomplishes that, while avoiding parallel reduntant xDS
 // requests for X. Each of those subscriptions is viewed as a "watch" on X, while behind the scenes
 // there is just a single real subscription to that resource name.
-// This class maintains the mapping between those two: it
+//
+// This class maintains the watches<-->subscription mapping: it
 // 1) delivers updates to all interested watches, and
-// 2) adds/removes resource names to/from the subscription when first/last watch is added/removed.
+// 2) tracks which resource names should be {added to,removed from} the subscription when the
+//    {first,last} watch on a resource name is {added,removed}.
 //
 // #1 is accomplished by WatchMap's implementation of the SubscriptionCallbacks interface.
 // This interface allows the xDS client to just throw each xDS update message it receives directly
 // into WatchMap::onConfigUpdate, rather than having to track the various watches' callbacks.
+//
+// The information for #2 is returned by updateWatchInterest(); the caller should use it to
+// update the subscription accordingly.
 //
 // A WatchMap is assumed to be dedicated to a single type_url type of resource (EDS, CDS, etc).
 class WatchMap : public SubscriptionCallbacks {
@@ -26,8 +31,9 @@ public:
   // An opaque token given out to users of WatchMap, to identify a given watch.
   using Token = uint64_t;
 
-  // Adds 'callbacks' to the WatchMap, with no resource names being watched. (Use
-  // updateWatchInterest() to add some names).
+  // Adds 'callbacks' to the WatchMap, with no resource names being watched.
+  // (Use updateWatchInterest() to add some names).
+  // Returns a new token identifying the newly added watch.
   Token addWatch(SubscriptionCallbacks& callbacks);
 
   // Returns true if this was the very last watch in the map.
@@ -46,7 +52,6 @@ public:
   // SubscriptionCallbacks
   virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                               const std::string& version_info) override;
-
   virtual void
   onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                  const Protobuf::RepeatedPtrField<std::string>& removed_resources,
@@ -61,7 +66,7 @@ public:
 private:
   struct Watch {
     std::set<std::string> resource_names_; // must be sorted set, for set_difference.
-    GrpcMuxCallbacks& callbacks_;
+    SubscriptionCallbacks& callbacks_;
   };
 
   // Given a list of names that are new to an individual watch, returns those names that are in fact

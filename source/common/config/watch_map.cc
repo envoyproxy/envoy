@@ -52,7 +52,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
     ENVOY_LOG(warn, "WatchMap::onConfigUpdate: there are no watches!");
     return;
   }
-  GrpcMuxCallbacks& name_getter = watches_.front()->callbacks_;
+  SubscriptionCallbacks& name_getter = watches_.front()->callbacks_;
 
   // Build a map from watches, to the set of updated resources that each watch cares about. Each
   // entry in the map is then a nice little bundle that can be fed directly into the individual
@@ -97,9 +97,9 @@ void WatchMap::onConfigUpdate(
     ENVOY_LOG(warn, "WatchMap::onConfigUpdate: there are no watches!");
     return;
   }
-  // Build two maps: from watches, to the set of resources {added,removed} that each watch cares
-  // about. Each entry in the map-pair is then a nice little bundle that can be fed directly into
-  // the individual onConfigUpdate()s.
+  // Build a pair of maps: from watches, to the set of resources {added,removed} that each watch
+  // cares about. Each entry in the map-pair is then a nice little bundle that can be fed directly
+  // into the individual onConfigUpdate()s.
   absl::flat_hash_map<Token, Protobuf::RepeatedPtrField<envoy::api::v2::Resource>> per_watch_added;
   absl::flat_hash_map<Token, Protobuf::RepeatedPtrField<std::string>> per_watch_removed;
   for (const auto& r : added_resources) {
@@ -117,13 +117,14 @@ void WatchMap::onConfigUpdate(
 
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (const auto& added : per_watch_added) {
-    auto removed = per_watch_removed.find(added.first);
+    const Token& cur_token = added.first;
+    auto removed = per_watch_removed.find(cur_token);
     if (removed == per_watch_removed.end()) {
       // additions only, no removals
-      tryDeliverConfigUpdate(added.first, added.second, {}, system_version_info);
+      tryDeliverConfigUpdate(cur_token, added.second, {}, system_version_info);
     } else {
       // both additions and removals
-      tryDeliverConfigUpdate(added.first, added.second, removed.second, system_version_info);
+      tryDeliverConfigUpdate(cur_token, added.second, removed.second, system_version_info);
       // Drop the removals now, so the final removals-only pass won't use them.
       per_watch_removed.erase(removed);
     }
