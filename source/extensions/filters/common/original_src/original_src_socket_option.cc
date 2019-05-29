@@ -1,10 +1,11 @@
-#include "extensions/filters/listener/original_src/original_src_socket_option.h"
+#include "extensions/filters/common/original_src/original_src_socket_option.h"
 
 #include "common/common/assert.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace ListenerFilters {
+namespace Filters {
+namespace Common {
 namespace OriginalSrc {
 
 OriginalSrcSocketOption::OriginalSrcSocketOption(
@@ -57,6 +58,7 @@ OriginalSrcSocketOption::getOptionDetails(const Network::Socket&,
 }
 
 } // namespace OriginalSrc
-} // namespace ListenerFilters
+} // namespace Common
+} // namespace Filters
 } // namespace Extensions
 } // namespace Envoy
