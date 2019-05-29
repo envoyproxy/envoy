@@ -7,17 +7,26 @@
 
 #include "common/common/assert.h"
 
+#include "extensions/filters/network/redis_proxy/config.h"
+#include "extensions/filters/network/well_known_names.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 namespace ConnPool {
 
+namespace {
+Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
+} // namespace
+
 InstanceImpl::InstanceImpl(
     const std::string& cluster_name, Upstream::ClusterManager& cm,
     Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-    const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config)
-    : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config) {
+    const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
+    Api::Api& api, Stats::SymbolTable& symbol_table)
+    : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config),
+      api_(api), symbol_table_(symbol_table) {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
@@ -44,6 +53,11 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
   cluster_update_handle_ = parent_.cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent_.cm_.get(cluster_name_);
   if (cluster != nullptr) {
+    auto options = cluster->info()->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+        NetworkFilterNames::get().RedisProxy);
+    if (options) {
+      auth_password_ = options->auth_password(parent_.api_);
+    }
     onClusterAddOrUpdateNonVirtual(*cluster);
   }
 }
@@ -114,6 +128,23 @@ void InstanceImpl::ThreadLocalPool::onHostsRemoved(
   }
 }
 
+InstanceImpl::ThreadLocalActiveClientPtr&
+InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstSharedPtr host) {
+  ThreadLocalActiveClientPtr& client = client_map_[host];
+  if (!client) {
+    client = std::make_unique<ThreadLocalActiveClient>(*this);
+    client->host_ = host;
+    client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_);
+    client->redis_client_->addConnectionCallbacks(*client);
+    if (!auth_password_.empty()) {
+      // Send an AUTH command to the upstream server.
+      client->redis_client_->makeRequest(Common::Redis::Utility::makeAuthCommand(auth_password_),
+                                         null_pool_callbacks);
+    }
+  }
+  return client;
+}
+
 Common::Redis::Client::PoolRequest*
 InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
                                            const Common::Redis::RespValue& request,
@@ -130,13 +161,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
     return nullptr;
   }
 
-  ThreadLocalActiveClientPtr& client = client_map_[host];
-  if (!client) {
-    client = std::make_unique<ThreadLocalActiveClient>(*this);
-    client->host_ = host;
-    client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_);
-    client->redis_client_->addConnectionCallbacks(*client);
-  }
+  ThreadLocalActiveClientPtr& client = threadLocalActiveClient(host);
 
   // Keep host_address_map_ in sync with client_map_.
   auto host_cached_by_address = host_address_map_.find(host->address()->asString());
@@ -211,14 +236,7 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
     it = host_address_map_.find(host_address_map_key);
   }
 
-  ThreadLocalActiveClientPtr& client = client_map_[it->second];
-  if (!client) {
-    client = std::make_unique<ThreadLocalActiveClient>(*this);
-    client->host_ = it->second;
-    client->redis_client_ =
-        parent_.client_factory_.create(it->second, dispatcher_, parent_.config_);
-    client->redis_client_->addConnectionCallbacks(*client);
-  }
+  ThreadLocalActiveClientPtr& client = threadLocalActiveClient(it->second);
 
   return client->redis_client_->makeRequest(request, callbacks);
 }

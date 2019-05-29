@@ -251,6 +251,23 @@ TEST_F(EdsTest, OnConfigUpdateSuccess) {
   EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
 }
 
+// Validate that delta-style onConfigUpdate() with the expected cluster accepts config.
+TEST_F(EdsTest, DeltaOnConfigUpdateSuccess) {
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  bool initialized = false;
+  cluster_->initialize([&initialized] { initialized = true; });
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resources;
+  auto* resource = resources.Add();
+  resource->mutable_resource()->PackFrom(cluster_load_assignment);
+  resource->set_version("v1");
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, {}, "v1"));
+
+  EXPECT_TRUE(initialized);
+  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+}
+
 // Validate that onConfigUpdate() with no service name accepts config.
 TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
   resetCluster(R"EOF(

@@ -19,6 +19,8 @@ namespace MetricsService {
 
 Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                           Server::Instance& server) {
+  validateProtoDescriptors();
+
   const auto& sink_config =
       MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::MetricsServiceConfig&>(
           config);

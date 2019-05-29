@@ -14,6 +14,7 @@ Version 1.11.0 (Pending)
 ========================
 * The --max-stats and --max-obj-name-len flags no longer has any effect.
 * Use of :ref:`cluster <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.cluster>` in :ref:`redis_proxy.proto <envoy_api_file_envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto>` is deprecated. Set a :ref:`catch_all_cluster <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>` instead.
+* Use of json based schema in router check tool tests. The tests should follow validation :repo:`schema<test/tools/router_check/validation.proto>`.
 
 Version 1.10.0 (Apr 5, 2019)
 ============================

@@ -93,6 +93,7 @@ public:
   time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Stats::Store& stats() override { return stats_store_; }
   Http::Context& httpContext() override { return http_context_; }
+  ProcessContext& processContext() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
@@ -139,8 +140,12 @@ public:
   }
 
   // ServerLifecycleNotifier
-  void registerCallback(Stage, StageCallback) override {}
-  void registerCallback(Stage, StageCallbackWithCompletion) override {}
+  ServerLifecycleNotifier::HandlePtr registerCallback(Stage, StageCallback) override {
+    return nullptr;
+  }
+  ServerLifecycleNotifier::HandlePtr registerCallback(Stage, StageCallbackWithCompletion) override {
+    return nullptr;
+  }
 
 private:
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,

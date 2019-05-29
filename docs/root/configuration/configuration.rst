@@ -5,7 +5,6 @@ Configuration reference
 
 .. toctree::
   :maxdepth: 2
-  :includehidden:
 
   overview/v2_overview
   listeners/listeners
@@ -25,3 +24,4 @@ Configuration reference
   overload_manager/overload_manager
   secret
   well_known_dynamic_metadata
+  best_practices/best_practices

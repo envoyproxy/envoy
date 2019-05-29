@@ -57,6 +57,59 @@ score >= 4; see below). If the fix relies on another upstream project's disclosu
 will adjust the process as well. We will work with the upstream project to fit their timeline and
 best protect our users.
 
+### Released versions and master branch
+
+If the vulnerability affects the last point release version, e.g. 1.10, then the full security
+release process described in this document will be activated. A security point release will be
+created for 1.10, e.g. 1.10.1, together with a fix to master if necessary. Older point releases,
+e.g. 1.9, are not supported by the Envoy project and will not have any security release created.
+
+If a security vulnerability affects only these older versions but not master or the last supported
+point release, the Envoy security team will share this information with the private distributor
+list, following the standard embargo process, but not create a security release. After the embargo
+expires, the vulnerability will be described as a GitHub issue. A CVE will be filed if warranted by
+severity.
+
+If a vulnerability does not affect any point release but only master, additional caveats apply:
+
+* If the issue is detected and a fix is available within 5 days of the introduction of the
+  vulnerability, the fix will be publicly reviewed and landed on master. A courtesy e-mail will be
+  sent to envoy-users@googlegroups.com, envoy-dev@googlegroups.com and
+  cncf-envoy-distributors-announce@lists.cncf.io if the severity is medium or greater.
+* If the vulnerability has been in existence for more than 5 days, we will activate the security
+  release process for any medium or higher vulnerabilities. Low severity vulnerabilities will still
+  be merged onto master as soon as a fix is available.
+
+We advise distributors and operators working from the master branch to allow at least 3 days soak
+time after cutting a binary release before distribution or rollout, to allow time for our fuzzers to
+detect issues during their execution on ClusterFuzz. A soak period of 5 days provides an even stronger
+guarantee, since we will invoke the security release process for medium or higher severity issues
+for these older bugs.
+
+### Confidentiality, integrity and availability
+
+We consider vulnerabilities leading to the compromise of data confidentiality or integrity to be our
+highest priority concerns. Availability, in particular in areas relating to DoS and resource
+exhaustion, is also a serious security concern for Envoy operators, in particular those utilizing
+Envoy in edge deployments.
+
+The Envoy availability stance around CPU and memory DoS, as well as Query-of-Death (QoD), is still
+evolving. We will continue to iterate and fix well known resource issues in the open, e.g. overload
+manager and watermark improvements. We will activate the security process for disclosures that
+appear to present a risk profile that is significantly greater than the current Envoy availability
+hardening status quo. Examples of disclosures that would elicit this response:
+* QoD; where a single query from a client can bring down an Envoy server.
+* Highly asymmetric resource exhaustion attacks, where very little traffic can cause resource
+  exhaustion, e.g. that delivered by a single client.
+
+Note that we do not currently consider the default settings for Envoy to be safe from an availability
+perspective. It is necessary for operators to explicitly configure watermarks, the overload manager,
+circuit breakers and other resource related features in Envoy to provide a robust availability
+story. We will not act on any security disclosure that relates to a lack of safe defaults. Over
+time, we will work towards improved safe-by-default configuration, but due to backwards
+compatibility and performance concerns, this will require following the breaking change deprecation
+policy.
+
 ### Fix Team Organization
 
 These steps should be completed within the first 24 hours of disclosure.
@@ -327,3 +380,4 @@ CrashOverride will vouch for the "Seven" distribution joining the distribution l
 | secalert@redhat.com                       | Red Hat       |
 | envoy-security@solo.io                    | solo.io       |
 | envoy-security@tetrate.io                 | Tetrate       |
+| security@vmware.com                       | VMware        |

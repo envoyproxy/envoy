@@ -254,6 +254,7 @@ private:
   Http::Code handlerRuntimeModify(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
                                   AdminStream&);
+  bool isFormUrlEncoded(const Http::HeaderEntry* content_type) const;
 
   class AdminListener : public Network::ListenerConfig {
   public:
