@@ -141,7 +141,10 @@ OriginalDstCluster::OriginalDstCluster(
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })) {
-
+  // TODO(dio): Remove hosts check once the hosts field is removed.
+  if (config.has_load_assignment() || !config.hosts().empty()) {
+    throw EnvoyException("ORIGINAL_DST clusters must have no load assignment or hosts configured");
+  }
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
 
