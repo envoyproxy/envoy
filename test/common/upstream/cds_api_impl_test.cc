@@ -197,6 +197,8 @@ TEST_F(CdsApiImplTest, ValidateFail) {
   EXPECT_CALL(request_, cancel());
 }
 
+// Regression test against only updating versionInfo() if at least one cluster
+// is are added/updated even if one or more are removed.
 TEST_F(CdsApiImplTest, UpdateVersionOnClusterRemove) {
   interval_timer_ = new Event::MockTimer(&dispatcher_);
   InSequence s;
