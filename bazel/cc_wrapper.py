@@ -33,10 +33,12 @@ def old_is_cpp_flag(arg):
   return arg in ["-static-libstdc++", "-stdlib=libc++", "-lstdc++", "-lc++"
                 ] or arg.startswith("-std=c++") or arg.startswith("-std=gnu++")
 
+
 # Is the arg a flag indicating that we're building for C++ (rather than C)?
 def new_is_cpp_flag(arg):
   return arg in ["-static-libstdc++\n", "-stdlib=libc++\n", "-lstdc++\n", "-lc++\n"
                 ] or arg.startswith("-std=c++") or arg.startswith("-std=gnu++")
+
 
 def old_modify_driver_command_line_and_execute(sys_argv):
   # Detect if we're building for C++ or vanilla C.
@@ -93,6 +95,7 @@ def old_modify_driver_command_line_and_execute(sys_argv):
 
   os.execv(compiler, [compiler] + argv)
 
+
 def new_modify_driver_command_line_and_execute(flagfile_path, new_flagfile_path, new_flagfile_fd):
   flagfile_contents = open(flagfile_path, "r").readlines()
 
@@ -142,6 +145,7 @@ def new_modify_driver_command_line_and_execute(flagfile_path, new_flagfile_path,
   for arg in argv:
     os.write(new_flagfile_fd, arg)
   os.execv(compiler, [compiler] + ["@" + new_flagfile_path])
+
 
 def main():
   # Append CXXFLAGS to correctly detect include paths for either libstdc++ or libc++.
