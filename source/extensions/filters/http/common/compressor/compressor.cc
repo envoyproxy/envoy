@@ -168,8 +168,8 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
             [](const encPair& a, const encPair& b) -> bool { return a.second > b.second; });
 
   for (const auto pair : pairs) {
-    for (const auto& compr : config_->registeredCompressors()) {
-      if (StringUtil::caseCompare(pair.first, compr) && pair.second > 0) {
+    for (const auto& compr : allowed_compressors) {
+      if (StringUtil::caseCompare(pair.first, compr)) {
         // In case a user specified more than one encodings with the same quality value
         // select the one which is registered first in Envoy's config.
         if (StringUtil::caseCompare(config_->contentEncoding(), compr)) {
