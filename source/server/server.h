@@ -290,7 +290,7 @@ private:
 //                     copying and probably be a cleaner API in general.
 class MetricSnapshotImpl : public Stats::MetricSnapshot {
 public:
-  explict MetricSnapshotImpl(Stats::Store& store);
+  explicit MetricSnapshotImpl(Stats::Store& store);
 
   // Stats::MetricSnapshot
   const std::vector<CounterSnapshot>& counters() override { return counters_; }
