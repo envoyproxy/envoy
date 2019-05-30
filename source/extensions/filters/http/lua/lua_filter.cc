@@ -436,7 +436,7 @@ int StreamHandleWrapper::luaLogCritical(lua_State* state) {
 }
 
 const EVP_MD* StreamHandleWrapper::getDigest(const absl::string_view& name) {
-  auto hash = absl::AsciiStrToLower(name);
+  std::string hash = absl::AsciiStrToLower(name);
 
   // Hash Hash algorithms set refers
   // https://github.com/google/boringssl/blob/ff62b38b4b5a0e7926034b5f93d0c276e55b571d/include/openssl/digest.h
@@ -467,15 +467,15 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   auto key = reinterpret_cast<EVP_PKEY*>(ptr);
 
   // Step 2: initialize EVP_MD_CTX
-  auto ctx = EVP_MD_CTX_new();
+  EVP_MD_CTX* ctx = EVP_MD_CTX_new();
 
   // Step 3: initialize EVP_MD
   absl::string_view hash_func = luaL_checkstring(state, 3);
-  auto md = getDigest(hash_func);
+  const EVP_MD* md = getDigest(hash_func);
 
   if (md == nullptr) {
     lua_pushboolean(state, false);
-    auto err_msg = absl::StrCat(hash_func, " is not supported.");
+    std::string err_msg = absl::StrCat(hash_func, " is not supported.");
     lua_pushlstring(state, err_msg.data(), err_msg.length());
     EVP_MD_CTX_free(ctx);
     return 2;
@@ -512,7 +512,7 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   }
 
   lua_pushboolean(state, false);
-  auto err_msg = absl::StrCat("Failed to verify digest. Error code: ", ok);
+  std::string err_msg = absl::StrCat("Failed to verify digest. Error code: ", ok);
   lua_pushlstring(state, err_msg.data(), err_msg.length());
   EVP_MD_CTX_free(ctx);
   return 2;
@@ -523,7 +523,7 @@ int StreamHandleWrapper::luaDecodeBase64(lua_State* state) {
   absl::string_view str = luaL_checkstring(state, 2);
   std::string output;
 
-  auto ok = absl::Base64Unescape(str, &output);
+  bool ok = absl::Base64Unescape(str, &output);
 
   if (ok) {
     lua_pushlstring(state, output.data(), output.length());
@@ -536,13 +536,13 @@ int StreamHandleWrapper::luaDecodeBase64(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
-  // Get byte array the the length.
+  // Get byte array and the length.
   const char* str = luaL_checkstring(state, 2);
   int n = luaL_checknumber(state, 3);
 
   absl::string_view keyder(str, n);
   CBS cbs({reinterpret_cast<const uint8_t*>(keyder.data()), keyder.length()});
-  auto key = EVP_parse_public_key(&cbs);
+  EVP_PKEY* key = EVP_parse_public_key(&cbs);
   if (key == nullptr) {
     lua_pushnil(state);
   } else {
