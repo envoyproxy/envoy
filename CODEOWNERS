@@ -2,6 +2,8 @@
 # By default, @envoyproxy/maintainers own everything.
 #*       @envoyproxy/maintainers
 
+# api
+/api/ @htuch
 # csrf extension
 /*/extensions/filters/http/csrf @dschaller @mattklein123
 # original_src http filter extension
