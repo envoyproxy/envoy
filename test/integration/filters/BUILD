@@ -214,3 +214,19 @@ envoy_cc_test_library(
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "udp_listener_echo_filter_lib",
+    srcs = [
+        "udp_listener_echo_filter.cc",
+    ],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/network:listener_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/network:connection_lib",
+    ],
+)

@@ -150,6 +150,7 @@ MGET
 MSET
 MSVC
 MTLS
+MTU
 MiB
 NACK
 NACKs
@@ -282,6 +283,7 @@ WS
 Welford's
 Werror
 XDS
+sendto
 vip
 xDSes
 XFCC

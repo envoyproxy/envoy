@@ -45,6 +45,29 @@ static_resources:
         port_value: 0
 )EOF";
 
+const std::string ConfigHelper::BASE_UDP_LISTENER_CONFIG = R"EOF(
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+static_resources:
+  clusters:
+    name: cluster_0
+    hosts:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+  listeners:
+    name: listener_0
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+        protocol: udp
+)EOF";
+
 const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
