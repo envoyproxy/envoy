@@ -98,6 +98,8 @@ private:
 
   // Does a lookup in watch_interest_, returning empty set if not found.
   const absl::flat_hash_set<Token>& tokensInterestedIn(const std::string& resource_name);
+  // A little hack to allow tokensInterestedIn() to return a ref, rather than a copy.
+  const absl::flat_hash_set<WatchMap::Token> empty_token_set_{};
 
   absl::flat_hash_map<Token, Watch> watches_;
 
@@ -107,9 +109,6 @@ private:
   absl::flat_hash_map<std::string, absl::flat_hash_set<Token>> watch_interest_;
 
   Token next_watch_{0};
-
-  // A little hack to allow tokensInterestedIn() to return a ref, rather than a copy.
-  const absl::flat_hash_set<WatchMap::Token> empty_token_set_{};
 
   WatchMap(const WatchMap&) = delete;
   WatchMap& operator=(const WatchMap&) = delete;
