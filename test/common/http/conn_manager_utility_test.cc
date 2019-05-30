@@ -36,8 +36,10 @@ public:
 
 class MockConnectionManagerConfig : public ConnectionManagerConfig {
 public:
-  MockConnectionManagerConfig() { ON_CALL(*this, generateRequestId()).WillByDefault(Return(true));
-    ON_CALL(*this, edgeAcceptRequestId()).WillByDefault(Return(false)); }
+  MockConnectionManagerConfig() {
+    ON_CALL(*this, generateRequestId()).WillByDefault(Return(true));
+    ON_CALL(*this, edgeAcceptRequestId()).WillByDefault(Return(false));
+  }
 
   // Http::ConnectionManagerConfig
   ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance& instance,
