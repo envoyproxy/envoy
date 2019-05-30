@@ -118,6 +118,7 @@ void CdsApiImpl::onConfigUpdate(
   }
   for (auto resource_name : removed_resources) {
     if (cm_.removeCluster(resource_name)) {
+      any_applied = true;
       ENVOY_LOG(debug, "cds: remove cluster '{}'", resource_name);
     }
   }
