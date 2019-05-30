@@ -45,22 +45,7 @@ public:
   Base& get(StatName name, Gauge::ImportMode import_mode) {
     auto stat = stats_.find(name);
     if (stat != stats_.end()) {
-      Base& base = *stat->second;
-      // Do something interesting here, like print a warning. This code here
-      // becomes interesting if we do a hot-restart between binaries where
-      // a stat has changed status. This would only occur if the mode changed
-      // from Accumulated to NeverImport.
-      Gauge::ImportMode base_import_mode = base.importMode();
-      if (base_import_mode != Gauge::ImportMode::Uninitialized && base_import_mode != import_mode) {
-        auto to_string = [](Gauge::ImportMode import_mode) -> std::string {
-          return import_mode == Gauge::ImportMode::Accumulate ? "accumulate" : "never-import";
-        };
-        std::cerr << "ImportMode conflict: initially " << to_string(base.importMode())
-                  << " resetting to " << to_string(import_mode) << ": " << base.name() << std::endl;
-        new std::string;
-      }
-      // ASSERT(base.importMode() == import_mode);
-      return base;
+      return *stat->second;
     }
 
     ASSERT(alloc_import_);
