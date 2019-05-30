@@ -150,6 +150,7 @@ MGET
 MSET
 MSVC
 MTLS
+MTU
 MiB
 NACK
 NACKs
@@ -246,6 +247,7 @@ TBD
 TCLAP
 TCMalloc
 TCP
+TDS
 TE
 TFO
 TID
@@ -281,6 +283,7 @@ WS
 Welford's
 Werror
 XDS
+sendto
 vip
 xDSes
 XFCC
@@ -316,6 +319,7 @@ argv
 artisanal
 ary
 async
+atomicity
 atomicly
 atomics
 atoull
@@ -710,6 +714,7 @@ strtoull
 struct
 structs
 subexpr
+subdirs
 symlink
 symlinked
 sync

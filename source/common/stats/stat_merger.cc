@@ -42,6 +42,7 @@ bool StatMerger::shouldImport(Gauge& gauge, const std::string& gauge_name) {
       std::regex("^server.hot_restart_epoch$"),
       std::regex("^runtime.admin_overrides_active$"),
       std::regex("^runtime.num_keys$"),
+      std::regex("^runtime.num_layers$"),
   };
   for (const auto& exception : *nonstandard_combine_logic) {
     std::smatch match;
