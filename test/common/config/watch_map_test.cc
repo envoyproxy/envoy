@@ -14,21 +14,28 @@
 
 using ::testing::_;
 using ::testing::Invoke;
-using ::testing::NiceMock;
 
 namespace Envoy {
 namespace Config {
 namespace {
+
+class NamedMockSubscriptionCallbacks
+    : public MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> {
+public:
+  std::string resourceName(const ProtobufWkt::Any& resource) override {
+    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+  }
+};
 
 // expectDeltaAndSotwUpdate() EXPECTs two birds with one function call: we want to cover both SotW
 // and delta, which, while mechanically different, can behave identically for our testing purposes.
 // Specifically, as a simplification for these tests, every still-present resource is updated in
 // every update. Therefore, a resource can never show up in the SotW update but not the delta
 // update. We can therefore use the same expected_resources for both.
-void expectDeltaAndSotwUpdate(
-    MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>& callbacks,
-    std::vector<envoy::api::v2::ClusterLoadAssignment> expected_resources,
-    std::vector<std::string> expected_removals, const std::string& version) {
+void expectDeltaAndSotwUpdate(NamedMockSubscriptionCallbacks& callbacks,
+                              std::vector<envoy::api::v2::ClusterLoadAssignment> expected_resources,
+                              std::vector<std::string> expected_removals,
+                              const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, version))
       .WillOnce(Invoke(
           [expected_resources](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& gotten_resources,
@@ -95,7 +102,7 @@ void doDeltaAndSotwUpdate(WatchMap& watch_map,
 // resources it doesn't care about. Checks that the watch can later decide it does care about them,
 // and then receive subsequent updates to them.
 TEST(WatchMapTest, Basic) {
-  NiceMock<MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks;
+  NamedMockSubscriptionCallbacks callbacks;
   WatchMap watch_map;
   WatchMap::Token token = watch_map.addWatch(callbacks);
 
@@ -166,8 +173,8 @@ TEST(WatchMapTest, Basic) {
 // Original watch loses interest ==> nothing
 // Second watch also loses interest ==> "remove it from subscription"
 TEST(WatchMapTest, Overlap) {
-  NiceMock<MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks1;
-  NiceMock<MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks2;
+  NamedMockSubscriptionCallbacks callbacks1;
+  NamedMockSubscriptionCallbacks callbacks2;
   WatchMap watch_map;
   WatchMap::Token token1 = watch_map.addWatch(callbacks1);
   WatchMap::Token token2 = watch_map.addWatch(callbacks2);
@@ -228,8 +235,8 @@ TEST(WatchMapTest, Overlap) {
 // Watch loses interest ==> "remove it from subscription"
 // Second watch on that name ==> "add it to subscription"
 TEST(WatchMapTest, AddRemoveAdd) {
-  NiceMock<MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks1;
-  NiceMock<MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks2;
+  NamedMockSubscriptionCallbacks callbacks1;
+  NamedMockSubscriptionCallbacks callbacks2;
   WatchMap watch_map;
   WatchMap::Token token1 = watch_map.addWatch(callbacks1);
   WatchMap::Token token2 = watch_map.addWatch(callbacks2);
@@ -278,7 +285,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
 
 // Tests that nothing breaks if an update arrives that we entirely do not care about.
 TEST(WatchMapTest, UninterestingUpdate) {
-  NiceMock<MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks;
+  NamedMockSubscriptionCallbacks callbacks;
   WatchMap watch_map;
   WatchMap::Token token = watch_map.addWatch(callbacks);
   watch_map.updateWatchInterest(token, {"alice"});
