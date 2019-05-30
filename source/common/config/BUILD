@@ -301,6 +301,13 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "runtime_utility_lib",
+    srcs = ["runtime_utility.cc"],
+    hdrs = ["runtime_utility.h"],
+    deps = ["@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc"],
+)
+
+envoy_cc_library(
     name = "subscription_factory_lib",
     srcs = ["subscription_factory.cc"],
     hdrs = ["subscription_factory.h"],

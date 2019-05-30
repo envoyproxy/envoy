@@ -448,12 +448,18 @@ TEST(DurationUtilTest, OutOfRange) {
 
 class DeprecatedFieldsTest : public testing::Test {
 protected:
-  DeprecatedFieldsTest()
-      : loader_(new Runtime::ScopedLoaderSingleton(
-            Runtime::LoaderPtr{new Runtime::LoaderImpl({}, rand_, store_, tls_)})) {}
+  DeprecatedFieldsTest() : api_(Api::createApiForTest(store_)) {
+    envoy::config::bootstrap::v2::LayeredRuntime config;
+    config.add_layers()->mutable_admin_layer();
+    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(Runtime::LoaderPtr{
+        new Runtime::LoaderImpl(dispatcher_, tls_, config, "", store_, generator_, *api_)});
+  }
 
+  Event::MockDispatcher dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::IsolatedStoreImpl store_;
+  Runtime::MockRandomGenerator generator_;
+  Api::ApiPtr api_;
   Runtime::MockRandomGenerator rand_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
 };
