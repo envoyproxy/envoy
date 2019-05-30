@@ -25,7 +25,7 @@ public:
   virtual uint64_t numConnections() PURE;
 
   /**
-   * Adds listener to the handler.
+   * Adds a listener to the handler.
    * @param config listener configuration options.
    */
   virtual void addListener(ListenerConfig& config) PURE;

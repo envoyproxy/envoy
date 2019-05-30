@@ -175,10 +175,30 @@ public:
 };
 
 /**
+ * Common interface for listener filters and UDP listener filters
+ */
+class ListenerFilterConfigFactoryBase {
+public:
+  virtual ~ListenerFilterConfigFactoryBase() {}
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message. The filter
+   *         config, which arrives in an opaque message, will be parsed into this empty proto.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+
+  /**
+   * @return std::string the identifying name for a particular implementation of a listener filter
+   * produced by the factory.
+   */
+  virtual std::string name() PURE;
+};
+
+/**
  * Implemented by each listener filter and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
-class NamedListenerFilterConfigFactory {
+class NamedListenerFilterConfigFactory : public ListenerFilterConfigFactoryBase {
 public:
   virtual ~NamedListenerFilterConfigFactory() {}
 
@@ -194,19 +214,27 @@ public:
   virtual Network::ListenerFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
+};
+
+/**
+ * Implemented by each UDP listener filter and registered via Registry::registerFactory()
+ * or the convenience class RegisterFactory.
+ */
+class NamedUdpListenerFilterConfigFactory : public ListenerFilterConfigFactoryBase {
+public:
+  virtual ~NamedUdpListenerFilterConfigFactory() {}
 
   /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque message, will be parsed into this empty proto.
-   *         Optional today, will be compulsory when v1 is deprecated.
+   * Create a particular UDP listener filter factory implementation. If the implementation is unable
+   * to produce a factory with the provided parameters, it should throw an EnvoyException.
+   * The returned callback should always be initialized.
+   * @param config supplies the general protobuf configuration for the filter
+   * @param context supplies the filter's context.
+   * @return Network::UdpListenerFilterFactoryCb the factory creation function.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular implementation of a listener filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
+  virtual Network::UdpListenerFilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config,
+                               ListenerFactoryContext& context) PURE;
 };
 
 /**
