@@ -251,6 +251,23 @@ TEST_F(EdsTest, OnConfigUpdateSuccess) {
   EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
 }
 
+// Validate that delta-style onConfigUpdate() with the expected cluster accepts config.
+TEST_F(EdsTest, DeltaOnConfigUpdateSuccess) {
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  bool initialized = false;
+  cluster_->initialize([&initialized] { initialized = true; });
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resources;
+  auto* resource = resources.Add();
+  resource->mutable_resource()->PackFrom(cluster_load_assignment);
+  resource->set_version("v1");
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, {}, "v1"));
+
+  EXPECT_TRUE(initialized);
+  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+}
+
 // Validate that onConfigUpdate() with no service name accepts config.
 TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
   resetCluster(R"EOF(
@@ -867,6 +884,38 @@ TEST_F(EdsTest, EndpointMoved) {
     // around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   }
+}
+
+// Validates that we correctly update the host list when a new overprovisioning factor is set.
+TEST_F(EdsTest, EndpointAddedWithNewOverprovisioningFactor) {
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  cluster_load_assignment.mutable_policy()->mutable_overprovisioning_factor()->set_value(1000);
+
+  {
+    auto* endpoints = cluster_load_assignment.add_endpoints();
+    auto* locality = endpoints->mutable_locality();
+    locality->set_region("oceania");
+    locality->set_zone("hello");
+    locality->set_sub_zone("world");
+    endpoints->mutable_load_balancing_weight()->set_value(42);
+
+    auto* endpoint_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("1.2.3.4");
+    endpoint_address->set_port_value(80);
+  }
+
+  bool initialized = false;
+  cluster_->initialize([&initialized] { initialized = true; });
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized);
+
+  EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ("1.2.3.4:80",
+            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
 }
 
 // Validate that onConfigUpdate() updates the endpoint locality.

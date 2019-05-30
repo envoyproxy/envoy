@@ -110,7 +110,6 @@ envoy_cc_test_binary(
         "benchmark",
     ],
     deps = [
-        "//source/common/common:empty_string",
         "//source/common/http:codes_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
@@ -127,6 +126,15 @@ envoy_cc_test_library(
         "//source/common/http:codec_client_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "common_fuzz_lib",
+    srcs = ["common_fuzz.cc"],
+    hdrs = ["common_fuzz.h"],
+    deps = [
+        "//source/common/common:macros",
     ],
 )
 
@@ -265,6 +273,7 @@ envoy_cc_fuzz_test(
     srcs = ["header_map_impl_fuzz_test.cc"],
     corpus = "header_map_impl_corpus",
     deps = [
+        ":common_fuzz_lib",
         ":header_map_impl_fuzz_proto_cc",
         "//source/common/http:header_map_lib",
     ],
@@ -301,6 +310,7 @@ envoy_cc_fuzz_test(
     srcs = ["utility_fuzz_test.cc"],
     corpus = "utility_corpus",
     deps = [
+        ":common_fuzz_lib",
         ":utility_fuzz_proto_cc",
         "//source/common/http:utility_lib",
         "//test/test_common:utility_lib",

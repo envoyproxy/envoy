@@ -90,6 +90,21 @@ std::string createSslRedirectPath(const HeaderMap& headers);
 QueryParams parseQueryString(absl::string_view url);
 
 /**
+ * Parse a a request body into query parameters.
+ * @param body supplies the body to parse.
+ * @return QueryParams the parsed parameters, if any.
+ */
+QueryParams parseFromBody(absl::string_view body);
+
+/**
+ * Parse query parameters from a URL or body.
+ * @param data supplies the data to parse.
+ * @param start supplies the offset within the data.
+ * @return QueryParams the parsed parameters, if any.
+ */
+QueryParams parseParameters(absl::string_view data, size_t start);
+
+/**
  * Finds the start of the query string in a path
  * @param path supplies a HeaderString& to search for the query string
  * @return absl::string_view starting at the beginning of the query string,
@@ -105,14 +120,6 @@ absl::string_view findQueryStringStart(const HeaderString& path);
  * @return std::string the parsed cookie value, or "" if none exists
  **/
 std::string parseCookieValue(const HeaderMap& headers, const std::string& key);
-
-/**
- * Check whether a Set-Cookie header for the given cookie name exists
- * @param headers supplies the headers to search for the cookie
- * @param key the name of the cookie to search for
- * @return bool true if the cookie is set, false otherwise
- */
-bool hasSetCookie(const HeaderMap& headers, const std::string& key);
 
 /**
  * Produce the value for a Set-Cookie header with the given parameters.

@@ -36,6 +36,7 @@ envoy_cc_test(
         "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:configuration_lib",
+        "//test/common/upstream:utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
@@ -145,7 +146,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
-        "//source/common/config:utility_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/server:lds_api_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
@@ -200,6 +201,11 @@ envoy_cc_fuzz_test(
     ] + envoy_all_extensions(),
 )
 
+filegroup(
+    name = "runtime_test_data",
+    srcs = glob(["test_data/runtime/**"]),
+)
+
 envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
@@ -213,6 +219,7 @@ envoy_cc_test(
         ":node_bootstrap_no_admin_port.yaml",
         ":node_bootstrap_without_access_log.yaml",
         ":runtime_bootstrap.yaml",
+        ":runtime_test_data",
         ":zipkin_tracing.yaml",
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",

@@ -105,6 +105,15 @@ config_setting(
     values = {"define": "hot_restart=disabled"},
 )
 
+# Used to avoid conflicting selects https://github.com/bazelbuild/bazel/issues/8323
+alias(
+    name = "disable_hot_restart_or_apple",
+    actual = select({
+        ":apple": ":apple",
+        "//conditions:default": ":disable_hot_restart",
+    }),
+)
+
 config_setting(
     name = "disable_google_grpc",
     values = {"define": "google_grpc=disabled"},

@@ -50,6 +50,16 @@ public:
   }
 
 private:
+  friend class IsolatedStoreImpl;
+
+  absl::optional<std::reference_wrapper<const Base>> find(StatName name) const {
+    auto stat = stats_.find(name);
+    if (stat == stats_.end()) {
+      return absl::nullopt;
+    }
+    return std::cref(*stat->second.get());
+  }
+
   StatNameHashMap<std::shared_ptr<Base>> stats_;
   Allocator alloc_;
 };
@@ -68,6 +78,16 @@ public:
   Histogram& histogramFromStatName(StatName name) override {
     Histogram& histogram = histograms_.get(name);
     return histogram;
+  }
+  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+    return counters_.find(name);
+  }
+  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+    return gauges_.find(name);
+  }
+  absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const override {
+    return histograms_.find(name);
   }
 
   // Stats::Store

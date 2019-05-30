@@ -26,6 +26,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrEq;
 using testing::Throw;
 
 namespace Envoy {
@@ -196,6 +197,53 @@ TEST_F(CdsApiImplTest, ValidateFail) {
   EXPECT_CALL(request_, cancel());
 }
 
+// Regression test against only updating versionInfo() if at least one cluster
+// is are added/updated even if one or more are removed.
+TEST_F(CdsApiImplTest, UpdateVersionOnClusterRemove) {
+  interval_timer_ = new Event::MockTimer(&dispatcher_);
+  InSequence s;
+
+  setup();
+
+  const std::string response1_yaml = R"EOF(
+version_info: '0'
+resources:
+- "@type": type.googleapis.com/envoy.api.v2.Cluster
+  name: cluster1
+  type: EDS
+  eds_cluster_config:
+    eds_config:
+      path: eds path
+)EOF";
+
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
+  cm_.expectAdd("cluster1", "0");
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_EQ("", cds_->versionInfo());
+  EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.version").value());
+
+  callbacks_->onSuccess(parseResponseMessageFromYaml(response1_yaml));
+  EXPECT_EQ("0", cds_->versionInfo());
+
+  expectRequest();
+  interval_timer_->callback_();
+
+  const std::string response2_yaml = R"EOF(
+version_info: '1'
+resources:
+)EOF";
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterMap({"cluster1"})));
+
+  EXPECT_CALL(cm_, removeCluster("cluster1")).WillOnce(Return(true));
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  callbacks_->onSuccess(parseResponseMessageFromYaml(response2_yaml));
+
+  EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_attempt").value());
+  EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_success").value());
+  EXPECT_EQ("1", cds_->versionInfo());
+}
+
 // Validate onConfigUpdate throws EnvoyException with duplicate clusters.
 TEST_F(CdsApiImplTest, ValidateDuplicateClusters) {
   InSequence s;
@@ -253,6 +301,55 @@ TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
   cm_.expectAdd("cluster_2");
 
   dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, "");
+}
+
+TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
+  {
+    InSequence s;
+    setup();
+  }
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(request_, cancel());
+
+  {
+    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resources;
+    {
+      envoy::api::v2::Cluster cluster;
+      cluster.set_name("cluster_1");
+      cm_.expectAdd("cluster_1", "v1");
+      auto* resource = resources.Add();
+      resource->mutable_resource()->PackFrom(cluster);
+      resource->set_name("cluster_1");
+      resource->set_version("v1");
+    }
+    {
+      envoy::api::v2::Cluster cluster;
+      cluster.set_name("cluster_2");
+      cm_.expectAdd("cluster_2", "v1");
+      auto* resource = resources.Add();
+      resource->mutable_resource()->PackFrom(cluster);
+      resource->set_name("cluster_2");
+      resource->set_version("v1");
+    }
+    dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(resources, {}, "v1");
+  }
+
+  {
+    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resources;
+    {
+      envoy::api::v2::Cluster cluster;
+      cluster.set_name("cluster_3");
+      cm_.expectAdd("cluster_3", "v2");
+      auto* resource = resources.Add();
+      resource->mutable_resource()->PackFrom(cluster);
+      resource->set_name("cluster_3");
+      resource->set_version("v2");
+    }
+    Protobuf::RepeatedPtrField<std::string> removed;
+    *removed.Add() = "cluster_1";
+    EXPECT_CALL(cm_, removeCluster(StrEq("cluster_1"))).WillOnce(Return(true));
+    dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(resources, removed, "v2");
+  }
 }
 
 TEST_F(CdsApiImplTest, ConfigUpdateAddsSecondClusterEvenIfFirstThrows) {
