@@ -1209,5 +1209,18 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
 }
 
+// test edge_accept_request_id does not reset the passed requestId if passed
+TEST_F(ConnectionManagerUtilityTest, AcceptEdgeRequestId) {
+    ON_CALL(config_, edgeAcceptRequestId()).WillByDefault(Return(true));
+    ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+    {
+        TestHeaderMapImpl headers{
+                {"x-forwarded-for", "10.0.0.1"},
+                {"x-request-id",    "my-request-id"}};
+
+        EXPECT_CALL(random_, uuid()).Times(0);
+        EXPECT_EQ("my-request-id", headers.get_("x-request-id"));
+    }
+}
 } // namespace Http
 } // namespace Envoy
