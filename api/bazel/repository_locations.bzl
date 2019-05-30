@@ -28,12 +28,6 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "protoc-gen-validate-" + PGV_GIT_SHA,
         urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/" + PGV_GIT_SHA + ".tar.gz"],
     ),
-    # Similar to com_envoyproxy_protoc_gen_validate during the migration.
-    com_lyft_protoc_gen_validate = dict(
-        sha256 = PGV_SHA256,
-        strip_prefix = "protoc-gen-validate-" + PGV_GIT_SHA,
-        urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/" + PGV_GIT_SHA + ".tar.gz"],
-    ),
     googleapis = dict(
         # TODO(dio): Consider writing a Skylark macro for importing Google API proto.
         sha256 = GOOGLEAPIS_SHA,
