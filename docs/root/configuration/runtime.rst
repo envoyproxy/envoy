@@ -19,7 +19,23 @@ Virtual file system
 Layering
 ++++++++
 
-The runtime can be viewed as virtual file system consisting of multiple layers:
+The runtime can be viewed as a virtual file system consisting of multiple layers. The :ref:`layered
+runtime <envoy_api_msg_config.bootstrap.v2.LayeredRuntime>` bootstrap configuration specifies this
+layering. Runtime settings in later layers override earlier layers. A typical configuration might
+be:
+
+.. code-block:: yaml
+
+  layers:
+  - static_layer:
+      health_check:
+        min_interval: 5
+  - disk_layer: { symlink_root: /srv/runtime/current/envoy }
+  - disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
+  - admin_layer: {}
+
+In the deprecated :ref:`runtime <envoy_api_msg_config.bootstrap.v2.Runtime>` bootstrap
+configuration, the layering was implicit and fixed:
 
 1. :ref:`Static bootstrap configuration <config_runtime_bootstrap>`
 2. :ref:`Local disk file system <config_runtime_local_disk>`
@@ -64,9 +80,18 @@ file system path (using the symbolic link):
 
 ``/srv/runtime/current/envoy/health_check/min_interval``
 
-Assume that the folder ``/srv/runtime/v1`` points to the actual file system path where global
-runtime configurations are stored. The following would be a typical configuration setting for
-runtime:
+.. _config_runtime_local_disk_overrides:
+
+Overrides
+~~~~~~~~~
+
+An arbitrary number of disk file system layers can be overlaid in the :ref:`layered
+runtime <envoy_api_msg_config.bootstrap.v2.LayeredRuntime>` bootstrap configuration.
+
+In the deprecated :ref:`runtime <envoy_api_msg_config.bootstrap.v2.Runtime>` bootstrap configuration,
+there was a distinguished file system override. Assume that the folder ``/srv/runtime/v1`` points to
+the actual file system path where global runtime configurations are stored. The following would be a
+typical configuration setting for runtime:
 
 * *symlink_root*: ``/srv/runtime/current``
 * *subdirectory*: ``envoy``
@@ -74,7 +99,13 @@ runtime:
 
 Where ``/srv/runtime/current`` is a symbolic link to ``/srv/runtime/v1``.
 
-The *override_subdirectory* is used along with the :option:`--service-cluster` CLI option. Assume
+.. _config_runtime_local_disk_service_cluster_subdirs:
+
+Cluster-specific subdirectories
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the deprecated :ref:`runtime <envoy_api_msg_config.bootstrap.v2.Runtime>` bootstrap configuration,
+the *override_subdirectory* is used along with the :option:`--service-cluster` CLI option. Assume
 that :option:`--service-cluster` has been set to ``my-cluster``. Envoy will first look for the
 *health_check.min_interval* key in the following full file system path:
 
@@ -82,6 +113,11 @@ that :option:`--service-cluster` has been set to ``my-cluster``. Envoy will firs
 
 If found, the value will override any value found in the primary lookup path. This allows the user
 to customize the runtime values for individual clusters on top of global defaults.
+
+With the :ref:`layered runtime <envoy_api_msg_config.bootstrap.v2.LayeredRuntime>` bootstrap
+configuration, it is possible to specialize on service cluster via the :ref:`append_service_cluster
+<envoy_api_field_config.bootstrap.v2.RuntimeLayer.DiskLayer.append_service_cluster>` option at any
+disk layer.
 
 .. _config_runtime_symbolic_link_swap:
 
@@ -114,6 +150,29 @@ built into the code, except for any values added via `/runtime_modify`.
   Use the :ref:`/runtime_modify<operations_admin_interface_runtime_modify>` endpoint with care.
   Changes are effectively immediately. It is **critical** that the admin interface is :ref:`properly
   secured <operations_admin_interface_security>`.
+
+At most one admin layer may be specified. If a non-empty :ref:`layered runtime
+<envoy_api_msg_config.bootstrap.v2.LayeredRuntime>` bootstrap configuration is specified with an
+absent admin layer, any mutating admin console actions will elicit a 503 response.
+
+.. _config_runtime_atomicity:
+
+Atomicity
+---------
+
+The runtime will reload and a new snapshot will be generated in a variety of situations, i.e.:
+
+* When a file move operation is detected under the symlink root or the symlink root changes.
+* When an admin console override is added or modified.
+
+All runtime layers are evaluated during a snapshot. Layers with errors are ignored and excluded from
+the effective layers, see :ref:`num_layers <runtime_stats>`. Walking the symlink root will take a
+non-zero amount of time, so if true atomicity is desired, the runtime directory should be immutable
+and symlink changes should be used to orchestrate updates.
+
+Disk layers with the same symlink root will only trigger a single refresh when a file movement is
+detected. Disk layers with overlapping symlink root paths that are not identical may trigger
+multiple reloads when a file movement is detected.
 
 .. _config_runtime_proto_json:
 
@@ -182,9 +241,11 @@ The file system runtime provider emits some statistics in the *runtime.* namespa
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  load_error, Counter, Total number of load attempts that resulted in an error
-  override_dir_not_exists, Counter, Total number of loads that did not use an override directory
-  override_dir_exists, Counter, Total number of loads that did use an override directory
-  load_success, Counter, Total number of load attempts that were successful
-  deprecated_feature_use, Counter, Total number of times deprecated features were used.
+  admin_overrides_active, Gauge, 1 if any admin overrides are active otherwise 0
+  deprecated_feature_use, Counter, Total number of times deprecated features were used
+  load_error, Counter, Total number of load attempts that resulted in an error in any layer
+  load_success, Counter, Total number of load attempts that were successful at all layers
   num_keys, Gauge, Number of keys currently loaded
+  num_layers, Gauge, Number of layers currently active (without loading errors)
+  override_dir_exists, Counter, Total number of loads that did use an override directory
+  override_dir_not_exists, Counter, Total number of loads that did not use an override directory

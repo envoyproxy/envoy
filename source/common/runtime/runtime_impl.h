@@ -7,6 +7,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/store.h"
@@ -46,13 +47,14 @@ public:
  */
 // clang-format off
 #define ALL_RUNTIME_STATS(COUNTER, GAUGE)                                                          \
+  GAUGE  (admin_overrides_active)                                                                  \
+  COUNTER(deprecated_feature_use)                                                                  \
   COUNTER(load_error)                                                                              \
-  COUNTER(override_dir_not_exists)                                                                 \
-  COUNTER(override_dir_exists)                                                                     \
   COUNTER(load_success)                                                                            \
-  COUNTER(deprecated_feature_use)                                                                \
   GAUGE  (num_keys)                                                                                \
-  GAUGE  (admin_overrides_active)
+  GAUGE  (num_layers)                                                                              \
+  COUNTER(override_dir_exists)                                                                     \
+  COUNTER(override_dir_not_exists)
 // clang-format on
 
 /**
@@ -169,6 +171,7 @@ private:
   const std::string path_;
   // Maximum recursion depth for walkDirectory().
   const uint32_t MaxWalkDepth = 16;
+  const Filesystem::WatcherPtr watcher_;
 };
 
 /**
@@ -188,56 +191,33 @@ private:
  * a new runtime can be swapped in by the main thread while workers are still using the previous
  * version.
  */
-class LoaderImpl : public Loader {
+class LoaderImpl : public Loader, Logger::Loggable<Logger::Id::runtime> {
 public:
-  LoaderImpl(const ProtobufWkt::Struct& base, RandomGenerator& generator, Stats::Store& stats,
-             ThreadLocal::SlotAllocator& tls);
+  LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
+             const envoy::config::bootstrap::v2::LayeredRuntime& config,
+             absl::string_view service_cluster, Stats::Store& store, RandomGenerator& generator,
+             Api::Api& api);
 
   // Runtime::Loader
   Snapshot& snapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
 
-protected:
-  // Identical the public constructor but does not call loadSnapshot(). Subclasses must call
-  // loadSnapshot() themselves to create the initial snapshot, since loadSnapshot calls the virtual
-  // function createNewSnapshot() and is therefore unsuitable for use in a superclass constructor.
-  struct DoNotLoadSnapshot {};
-  LoaderImpl(DoNotLoadSnapshot /* unused */, const ProtobufWkt::Struct& base,
-             RandomGenerator& generator, Stats::Store& stats, ThreadLocal::SlotAllocator& tls);
-
+private:
   // Create a new Snapshot
   virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
+  RuntimeStats generateStats(Stats::Store& store);
 
+  bool config_has_admin_layer_{};
   RandomGenerator& generator_;
   RuntimeStats stats_;
   AdminLayer admin_layer_;
   const ProtobufWkt::Struct base_;
-
-private:
-  RuntimeStats generateStats(Stats::Store& store);
-
   ThreadLocal::SlotPtr tls_;
-};
-
-/**
- * Extension of LoaderImpl that watches a symlink for swapping and loads a specified subdirectory
- * from disk. Values added via mergeValues() are secondary to those loaded from disk.
- */
-class DiskBackedLoaderImpl : public LoaderImpl, Logger::Loggable<Logger::Id::runtime> {
-public:
-  DiskBackedLoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
-                       const ProtobufWkt::Struct& base, const std::string& root_symlink_path,
-                       const std::string& subdir, const std::string& override_dir,
-                       Stats::Store& store, RandomGenerator& generator, Api::Api& api);
-
-private:
-  std::unique_ptr<SnapshotImpl> createNewSnapshot() override;
-
-  const Filesystem::WatcherPtr watcher_;
-  const std::string root_path_;
-  const std::string override_path_;
+  const envoy::config::bootstrap::v2::LayeredRuntime config_;
+  const std::string service_cluster_;
+  Filesystem::WatcherPtr watcher_;
   Api::Api& api_;
 };
 
