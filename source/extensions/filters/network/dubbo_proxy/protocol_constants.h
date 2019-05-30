@@ -1,0 +1,107 @@
+#pragma once
+
+#include <unordered_map>
+
+#include "common/common/assert.h"
+#include "common/common/fmt.h"
+#include "common/singleton/const_singleton.h"
+
+#include "extensions/filters/network/dubbo_proxy/message.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace DubboProxy {
+
+/**
+ * Names of available Protocol implementations.
+ */
+class ProtocolNameValues {
+public:
+  struct ProtocolTypeHash {
+    template <typename T> std::size_t operator()(T t) const { return static_cast<std::size_t>(t); }
+  };
+
+  typedef std::unordered_map<ProtocolType, std::string, ProtocolTypeHash> ProtocolTypeNameMap;
+
+  const ProtocolTypeNameMap protocolTypeNameMap = {
+      {ProtocolType::Dubbo, "dubbo"},
+  };
+
+  const std::string& fromType(ProtocolType type) const {
+    const auto& itor = protocolTypeNameMap.find(type);
+    if (itor != protocolTypeNameMap.end()) {
+      return itor->second;
+    }
+
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+};
+
+typedef ConstSingleton<ProtocolNameValues> ProtocolNames;
+
+/**
+ * Names of available serializer implementations.
+ */
+class SerializerNameValues {
+public:
+  struct SerializationTypeHash {
+    template <typename T> std::size_t operator()(T t) const { return static_cast<std::size_t>(t); }
+  };
+
+  typedef std::unordered_map<SerializationType, std::string, SerializationTypeHash>
+      SerializerTypeNameMap;
+
+  const SerializerTypeNameMap serializerTypeNameMap = {
+      {SerializationType::Hessian2, "hessian2"},
+  };
+
+  const std::string& fromType(SerializationType type) const {
+    const auto& itor = serializerTypeNameMap.find(type);
+    if (itor != serializerTypeNameMap.end()) {
+      return itor->second;
+    }
+
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+};
+
+typedef ConstSingleton<SerializerNameValues> SerializerNames;
+
+class ProtocolSerializerNameValues {
+public:
+  inline uint8_t generateKey(ProtocolType protocol_type,
+                             SerializationType serialization_type) const {
+    return static_cast<uint8_t>(serialization_type) ^ static_cast<uint8_t>(protocol_type);
+  }
+
+  inline std::string generateValue(ProtocolType protocol_type,
+                                   SerializationType serialization_type) const {
+    return fmt::format("{}.{}", ProtocolNames::get().fromType(protocol_type),
+                       SerializerNames::get().fromType(serialization_type));
+  }
+
+#define GENERATE_PAIR(X, Y) generateKey(X, Y), generateValue(X, Y)
+
+  typedef std::unordered_map<uint8_t, std::string> ProtocolSerializerTypeNameMap;
+
+  const ProtocolSerializerTypeNameMap protocolSerializerTypeNameMap = {
+      {GENERATE_PAIR(ProtocolType::Dubbo, SerializationType::Hessian2)},
+  };
+
+  const std::string& fromType(ProtocolType protocol_type, SerializationType type) const {
+    const auto& itor = protocolSerializerTypeNameMap.find(generateKey(protocol_type, type));
+    if (itor != protocolSerializerTypeNameMap.end()) {
+      return itor->second;
+    }
+
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+};
+
+typedef ConstSingleton<ProtocolSerializerNameValues> ProtocolSerializerNames;
+
+} // namespace DubboProxy
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

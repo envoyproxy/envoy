@@ -7,9 +7,9 @@
 #include "common/common/fmt.h"
 
 #include "extensions/filters/network/dubbo_proxy/app_exception.h"
+#include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
 #include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
 #include "extensions/filters/network/dubbo_proxy/heartbeat_response.h"
-#include "extensions/filters/network/dubbo_proxy/hessian_deserializer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,9 +21,8 @@ constexpr uint32_t BufferLimit = UINT32_MAX;
 ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
                                      TimeSource& time_system)
     : config_(config), time_system_(time_system), stats_(config_.stats()),
-      random_generator_(random_generator), deserializer_(config.createDeserializer()),
-      protocol_(config.createProtocol()),
-      decoder_(std::make_unique<Decoder>(*protocol_.get(), *deserializer_.get(), *this)) {}
+      random_generator_(random_generator), protocol_(config.createProtocol()),
+      decoder_(std::make_unique<RequestDecoder>(*protocol_, *this)) {}
 
 Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "dubbo: read {} bytes", data.length());
@@ -32,21 +31,6 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
 
   if (end_stream) {
     ENVOY_CONN_LOG(trace, "downstream half-closed", read_callbacks_->connection());
-
-    // Downstream has closed. Unless we're waiting for an upstream connection to complete a oneway
-    // request, close. The special case for oneway requests allows them to complete before the
-    // ConnectionManager is destroyed.
-    if (stopped_) {
-      ASSERT(!active_message_list_.empty());
-      auto metadata = (*active_message_list_.begin())->metadata();
-      if (metadata && metadata->message_type() == MessageType::Oneway) {
-        ENVOY_CONN_LOG(trace, "waiting for one-way completion", read_callbacks_->connection());
-        half_closed_ = true;
-        return Network::FilterStatus::StopIteration;
-      }
-    }
-
-    ENVOY_LOG(debug, "dubbo: end data processing");
     resetAllMessages(false);
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
@@ -79,13 +63,13 @@ void ConnectionManager::onBelowWriteBufferLowWatermark() {
   read_callbacks_->connection().readDisable(false);
 }
 
-DecoderEventHandler* ConnectionManager::newDecoderEventHandler() {
+StreamHandler& ConnectionManager::newStream() {
   ENVOY_LOG(debug, "dubbo: create the new docoder event handler");
 
   ActiveMessagePtr new_message(std::make_unique<ActiveMessage>(*this));
   new_message->createFilterChain();
   new_message->moveIntoList(std::move(new_message), active_message_list_);
-  return (*active_message_list_.begin()).get();
+  return **active_message_list_.begin();
 }
 
 void ConnectionManager::onHeartbeat(MessageMetadataSharedPtr metadata) {
@@ -97,12 +81,11 @@ void ConnectionManager::onHeartbeat(MessageMetadataSharedPtr metadata) {
   }
 
   metadata->setResponseStatus(ResponseStatus::Ok);
-  metadata->setMessageType(MessageType::Response);
-  metadata->setEventFlag(true);
+  metadata->setMessageType(MessageType::HeartbeatResponse);
 
   HeartbeatResponse heartbeat;
   Buffer::OwnedImpl response_buffer;
-  heartbeat.encode(*metadata, *protocol_, *deserializer_, response_buffer);
+  heartbeat.encode(*metadata, *protocol_, response_buffer);
 
   read_callbacks_->connection().write(response_buffer, false);
 }
@@ -121,11 +104,7 @@ void ConnectionManager::dispatch() {
   try {
     bool underflow = false;
     while (!underflow) {
-      Network::FilterStatus status = decoder_->onData(request_buffer_, underflow);
-      if (status == Network::FilterStatus::StopIteration) {
-        stopped_ = true;
-        break;
-      }
+      decoder_->onData(request_buffer_, underflow);
     }
     return;
   } catch (const EnvoyException& ex) {
@@ -145,7 +124,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata,
 
   Buffer::OwnedImpl buffer;
   const DubboFilters::DirectResponse::ResponseType result =
-      response.encode(metadata, *protocol_, *deserializer_, buffer);
+      response.encode(metadata, *protocol_, buffer);
   read_callbacks_->connection().write(buffer, end_stream);
 
   if (end_stream) {
