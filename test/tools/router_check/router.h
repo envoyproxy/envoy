@@ -130,7 +130,7 @@ private:
   bool compareResults(const std::string& actual, const std::string& expected,
                       const std::string& test_type);
 
-  bool perform_finalize_headers_{false};
+  bool headers_finalized_{false};
 
   bool details_{false};
 
