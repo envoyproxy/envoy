@@ -60,8 +60,7 @@ message Listener {
   //
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
-  repeated listener.FilterChain filter_chains = 3
-      [(validate.rules).repeated .min_items = 1, (gogoproto.nullable) = false];
+  repeated listener.FilterChain filter_chains = 3 [(gogoproto.nullable) = false];
 
   // If a connection is redirected using *iptables*, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to
@@ -123,6 +122,10 @@ message Listener {
   // :ref:`filter_chains <envoy_api_field_Listener.filter_chains>`. Order matters as the
   // filters are processed sequentially right after a socket has been accepted by the listener, and
   // before a connection is created.
+  // UDP Listener filters can be specified when the protocol in the listener socket address in
+  // :ref:`protocol <envoy_api_field_core.SocketAddress.protocol>` is :ref:'UDP
+  // <envoy_api_field_core.Protocol.UDP>`.
+  // UDP listeners currently support a single filter.
   repeated listener.ListenerFilter listener_filters = 9 [(gogoproto.nullable) = false];
 
   // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
