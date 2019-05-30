@@ -27,18 +27,12 @@ public:
   void onDestroy() override {}
 
 private:
-  // State of this filter's communication with the external authorization service.
-  // The filter has either not started calling the external service, in the middle of calling
-  // it or has completed.
-  enum class State { NotStarted, Calling, Complete };
-
   // FilterReturn is used to capture what the return code should be to the filter chain.
   // if this filter is either in the middle of calling the service or the result is denied then
   // the filter chain should stop. Otherwise the filter chain can continue to the next filter.
   enum class FilterReturn { ContinueDecoding, StopDecoding };
 
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
 };
 
