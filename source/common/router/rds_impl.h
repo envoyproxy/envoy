@@ -116,8 +116,8 @@ public:
                       const std::string&) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(
-               resource, factory_context_.messageValidationVisitor())
+    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource,
+                                                                       validation_visitor_)
         .name();
   }
 
@@ -142,6 +142,7 @@ private:
   std::unordered_set<RouteConfigProvider*> route_config_providers_;
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 
   friend class RouteConfigProviderManagerImpl;
 };

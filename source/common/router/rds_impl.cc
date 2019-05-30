@@ -63,7 +63,8 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
-      manager_identifier_(manager_identifier) {
+      manager_identifier_(manager_identifier),
+      validation_visitor_(factory_context_.messageValidationVisitor()) {
   Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
 
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
@@ -79,6 +80,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
+  ENVOY_LOG_MISC(debug, "HTD teardown");
   // If we get destroyed during initialization, make sure we signal that we "initialized".
   init_target_.ready();
 
@@ -96,7 +98,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     return;
   }
   auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(
-      resources[0], factory_context_.messageValidationVisitor());
+      resources[0], validation_visitor_);
   MessageUtil::validate(route_config);
   if (route_config.name() != route_config_name_) {
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
@@ -109,6 +111,8 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     if (config_update_info_->routeConfiguration().has_vhds()) {
       ENVOY_LOG(debug, "rds: vhds configuration present, starting vhds: config_name={} hash={}",
                 route_config_name_, config_update_info_->configHash());
+      // TODO(dmitri-d): It's unsafe to depend directly on factory context here,
+      // the listener might have been torn down, need to remove this.
       vhds_subscription_ = std::make_unique<VhdsSubscription>(
           config_update_info_, factory_context_, stat_prefix_, route_config_providers_);
       vhds_subscription_->registerInitTargetWithInitManager(factory_context_.initManager());
