@@ -17,7 +17,7 @@ namespace Config {
 
 // Manages "watches" of xDS resources. Several xDS callers might ask for a subscription to the same
 // resource name "X". The xDS machinery must return to each their very own subscription to X.
-// The xDS machinery's "watch" concept accomplishes that, while avoiding parallel reduntant xDS
+// The xDS machinery's "watch" concept accomplishes that, while avoiding parallel redundant xDS
 // requests for X. Each of those subscriptions is viewed as a "watch" on X, while behind the scenes
 // there is just a single real subscription to that resource name.
 //

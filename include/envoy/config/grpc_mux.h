@@ -26,7 +26,7 @@ struct ControlPlaneStats {
   ALL_CONTROL_PLANE_STATS(GENERATE_COUNTER_STRUCT,GENERATE_GAUGE_STRUCT)
 };
 
-// TODO(fredlas) reduntant to SubscriptionCallbacks; remove this one.
+// TODO(fredlas) redundant to SubscriptionCallbacks; remove this one.
 class GrpcMuxCallbacks {
 public:
   virtual ~GrpcMuxCallbacks() {}

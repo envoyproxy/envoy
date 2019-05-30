@@ -259,7 +259,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
     EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.second); // remove from subscription
 
     // (The xDS client should have responded to updateWatchInterest()'s return value by removing
-    // alice from the subscription, so onConfigUpdate() calls should be impossible right now.)
+    // Alice from the subscription, so onConfigUpdate() calls should be impossible right now.)
   }
   // Second watch becomes interested.
   {
