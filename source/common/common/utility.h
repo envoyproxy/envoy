@@ -666,7 +666,7 @@ template <class Value> struct TrieLookupTable {
 // If we had instead declared data_[6], then the whole allocation would have fit in 16 bytes.
 // Instead:
 //   - the starting address of data will not be 8-byte aligned. This is not required
-//     by the C++ standard for a uint8_t, but may be suboptimal on some processes.
+//     by the C++ standard for a uint8_t, but may be suboptimal on some processors.
 //   - the 6 bytes of data will be at byte offsets 10 to 15, and bytes 16 to 23 will be
 //     unused. This may be surprising to some users, and suboptimal in resource usage.
 // One possible tweak is to declare data_ as a uint64_t[], or to use an `alignas`
@@ -734,9 +734,9 @@ public:
 private:
   // Constructor is declared private so that no one constructs one without the
   // proper size allocation. to accommodate the variable-size buffer.
-  InlineString(const char* str, size_t size) : size_(size) { memcpy(data_, str, size); }
+  InlineString(const char* str, size_t size);
 
-  size_t size_;
+  uint32_t size_;
   char data_[];
 };
 

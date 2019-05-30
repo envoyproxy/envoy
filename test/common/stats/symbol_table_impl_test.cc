@@ -584,10 +584,10 @@ TEST(SymbolTableTest, Memory) {
     // Make sure we don't regress. Data as of 2019/05/29:
     //
     // string_mem_used:        7759488
-    // symbol_table_mem_used:  1744280 (4.45x)
+    // symbol_table_mem_used:  1726056 (4.5x)
     EXPECT_EQ(string_mem_used, 7759488);
     EXPECT_LT(symbol_table_mem_used, string_mem_used / 3);
-    EXPECT_EQ(symbol_table_mem_used, 1742472);
+    EXPECT_EQ(symbol_table_mem_used, 1726056);
   }
 }
 

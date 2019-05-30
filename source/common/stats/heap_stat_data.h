@@ -26,7 +26,6 @@ namespace Stats {
 struct HeapStatData : public InlineStorage {
 private:
   explicit HeapStatData(StatName stat_name) { stat_name.copyToStorage(symbol_storage_); }
-  ~HeapStatData() = default;
 
 public:
   static HeapStatData* alloc(StatName stat_name, SymbolTable& symbol_table);
@@ -41,7 +40,7 @@ public:
   std::atomic<uint64_t> pending_increment_{0};
   std::atomic<uint16_t> flags_{0};
   std::atomic<uint16_t> ref_count_{1};
-  SymbolTable::Storage symbol_storage_;
+  SymbolTable::Storage symbol_storage_; // This is a 'using' nickname for uint8_t[].
 };
 
 template <class Stat> class HeapStat : public Stat {
