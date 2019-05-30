@@ -110,9 +110,15 @@ message Bootstrap {
 
   reserved 10;
 
-  // Configuration for the runtime configuration provider. If not specified, a
-  // “null” provider will be used which will result in all defaults being used.
-  Runtime runtime = 11;
+  // Configuration for the runtime configuration provider (deprecated). If not
+  // specified, a “null” provider will be used which will result in all defaults
+  // being used.
+  Runtime runtime = 11 [deprecated = true];
+
+  // Configuration for the runtime configuration provider. If not
+  // specified, a “null” provider will be used which will result in all defaults
+  // being used.
+  LayeredRuntime layered_runtime = 17;
 
   // Configuration for the local administration HTTP server.
   Admin admin = 12;
@@ -200,13 +206,14 @@ message Watchdog {
   google.protobuf.Duration multikill_timeout = 4;
 }
 
-// Runtime :ref:`configuration overview <config_runtime>`.
+// Runtime :ref:`configuration overview <config_runtime>` (deprecated).
 message Runtime {
   // The implementation assumes that the file system tree is accessed via a
   // symbolic link. An atomic link swap is used when a new tree should be
   // switched to. This parameter specifies the path to the symbolic link. Envoy
   // will watch the location for changes and reload the file system tree when
-  // they happen. If this parameter is not set, there will be no disk based runtime.
+  // they happen. If this parameter is not set, there will be no disk based
+  // runtime.
   string symlink_root = 1;
 
   // Specifies the subdirectory to load within the root directory. This is
@@ -227,4 +234,52 @@ message Runtime {
   // disk or admin. This follows the :ref:`runtime protobuf JSON representation
   // encoding <config_runtime_proto_json>`.
   google.protobuf.Struct base = 4;
+}
+
+message RuntimeLayer {
+  // :ref:`Static runtime <config_runtime_bootstrap>` layer.
+  message StaticLayer {
+    // This follows the :ref:`runtime protobuf JSON representation encoding
+    // <config_runtime_proto_json>`.
+    google.protobuf.Struct value = 1;
+  }
+
+  // :ref:`Disk runtime <config_runtime_local_disk>` layer.
+  message DiskLayer {
+    // The implementation assumes that the file system tree is accessed via a
+    // symbolic link. An atomic link swap is used when a new tree should be
+    // switched to. This parameter specifies the path to the symbolic link.
+    // Envoy will watch the location for changes and reload the file system tree
+    // when they happen. See documentation on runtime :ref:`atomicity
+    // <config_runtime_atomicity>` for further details on how reloads are
+    // treated.
+    string symlink_root = 1;
+
+    // :ref:`Append <config_runtime_local_disk_service_cluster_subdirs>` the
+    // service cluster to the path under symlink root.
+    bool append_service_cluster = 2;
+  }
+
+  // :ref:`Admin console runtime <config_runtime_admin>` layer.
+  message AdminLayer {
+  }
+
+  // Descriptive name for the runtime layer. This is only used for the runtime
+  // :http:get:`/runtime` output.
+  string name = 1;
+
+  oneof layer_specifier {
+    // Unlike static xDS resources, this static layer is overridable by later
+    // layers in the runtime virtual filesystem.
+    google.protobuf.Struct static_layer = 2;
+    DiskLayer disk_layer = 3;
+    AdminLayer admin_layer = 4;
+  }
+}
+
+// Runtime :ref:`configuration overview <config_runtime>`.
+message LayeredRuntime {
+  // The :ref:`layers <config_runtime_layering>` of the runtime. This is ordered
+  // such that later layers in the list overlay earlier entries.
+  repeated RuntimeLayer layers = 1;
 }

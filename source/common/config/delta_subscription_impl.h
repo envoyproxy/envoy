@@ -33,11 +33,10 @@ public:
   std::shared_ptr<GrpcMux> getContextForTest() { return context_; }
 
 private:
-  std::shared_ptr<GrpcMux>
-      context_; // TODO TODO does it need to be GrpcDeltaXdsContext? hopefully not?
+  std::shared_ptr<GrpcMux> context_;
   const std::string type_url_;
   SubscriptionStats stats_;
-  const std::chrono::milliseconds init_fetch_timeout_;
+  WatchMap::Token watch_token_{WatchMap::InvalidToken};
 };
 
 } // namespace Config

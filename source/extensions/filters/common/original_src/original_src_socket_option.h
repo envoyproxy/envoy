@@ -5,7 +5,8 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace ListenerFilters {
+namespace Filters {
+namespace Common {
 namespace OriginalSrc {
 /**
  * A socket option implementation which allows a connection to spoof its source IP/port using
@@ -40,6 +41,7 @@ private:
 };
 
 } // namespace OriginalSrc
-} // namespace ListenerFilters
+} // namespace Common
+} // namespace Filters
 } // namespace Extensions
 } // namespace Envoy

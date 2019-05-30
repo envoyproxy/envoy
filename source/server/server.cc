@@ -431,25 +431,10 @@ void InstanceImpl::startWorkers() {
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
-  if (!config.baseRuntime().fields().empty()) {
-    ENVOY_LOG(info, "non-empty base runtime layer specified in bootstrap");
-  }
-  if (config.diskRuntime()) {
-    ENVOY_LOG(info, "disk runtime symlink: {}", config.diskRuntime()->symlinkRoot());
-    ENVOY_LOG(info, "disk runtime subdirectory: {}", config.diskRuntime()->subdirectory());
-
-    std::string override_subdirectory =
-        config.diskRuntime()->overrideSubdirectory() + "/" + server.localInfo().clusterName();
-    ENVOY_LOG(info, "disk runtime override subdirectory: {}", override_subdirectory);
-
-    return std::make_unique<Runtime::DiskBackedLoaderImpl>(
-        server.dispatcher(), server.threadLocal(), config.baseRuntime(),
-        config.diskRuntime()->symlinkRoot(), config.diskRuntime()->subdirectory(),
-        override_subdirectory, server.stats(), server.random(), server.api());
-  } else {
-    return std::make_unique<Runtime::LoaderImpl>(config.baseRuntime(), server.random(),
-                                                 server.stats(), server.threadLocal());
-  }
+  ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
+  return std::make_unique<Runtime::LoaderImpl>(server.dispatcher(), server.threadLocal(),
+                                               config.runtime(), server.localInfo().clusterName(),
+                                               server.stats(), server.random(), server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {
@@ -600,16 +585,15 @@ void InstanceImpl::shutdownAdmin() {
 ServerLifecycleNotifier::HandlePtr InstanceImpl::registerCallback(Stage stage,
                                                                   StageCallback callback) {
   auto& callbacks = stage_callbacks_[stage];
-  return std::make_unique<LifecycleCallbackHandle<LifecycleNotifierCallbacks>>(
-      callbacks, callbacks.insert(callbacks.end(), callback));
+  return std::make_unique<LifecycleCallbackHandle<StageCallback>>(callbacks, callback);
 }
 
 ServerLifecycleNotifier::HandlePtr
 InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
   ASSERT(stage == Stage::ShutdownExit);
   auto& callbacks = stage_completable_callbacks_[stage];
-  return std::make_unique<LifecycleCallbackHandle<LifecycleNotifierCompletionCallbacks>>(
-      callbacks, callbacks.insert(callbacks.end(), callback));
+  return std::make_unique<LifecycleCallbackHandle<StageCallbackWithCompletion>>(callbacks,
+                                                                                callback);
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {

@@ -23,12 +23,12 @@ namespace Config {
 // TODO TODO not actually needed; just an adapter to the old-style subscribe().
 class TokenizedGrpcMuxWatch : public GrpcMuxWatch {
 public:
-  TokenizedGrpcMuxWatch(GrpcDeltaXdsContext& context, WatchToken token)
+  TokenizedGrpcMuxWatch(GrpcDeltaXdsContext& context, WatchMap::Token token)
       : context_(context), token_(token) {}
   ~TokenizedGrpcMuxWatch() { context_.removeWatch(token_); }
 
 private:
-  WatchToken token_;
+  WatchMap::Token token_;
   GrpcDeltaXdsContext& context_;
 };
 
@@ -50,23 +50,25 @@ public:
         grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                      rate_limit_settings) {}
 
-  WatchToken addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                      SubscriptionCallbacks& callbacks) override {
-    if
-      type_url not in subscriptons_ /
-          watch_maps_ yet addSubscription()
+  WatchMap::Token addWatch(const std::string& type_url, const std::set<std::string>& resources,
+                           SubscriptionCallbacks& callbacks) override {
+    auto entry = watch_maps_.find(type_url);
+    if (entry == watch_maps_.end()) {
+      // We don't yet have a subscription for type_url! Make one!
+      addSubscription(type_url);
+    }
 
-              WatchToken watch_token = watch_maps_[type_url].addWatch(callbacks);
-    // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed
+    WatchMap::Token watch_token = watch_maps_[type_url].addWatch(callbacks);
+    // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
     updateWatch(type_url, watch_token, resources);
     return watch_token;
   }
 
-  void removeWatch(const std::string& type_url, WatchToken watch_token) {
-    // updateWatch() queues a discovery request if any resources were cared about only by this
-    // watch.
+  void removeWatch(const std::string& type_url, WatchMap::Token watch_token) {
+    // updateWatch() queues a discovery request if any resources were watched only by this watch.
     updateWatch(type_url, watch_token, {});
     if (watch_maps_[type_url].removeWatch(watch_token)) {
+      // removeWatch() told us that watch_token was the last watch on the entire subscription.
       removeSubscription(type_url);
     }
   }
@@ -74,7 +76,7 @@ public:
   // Updates the list of resource names watched by the given watch. If an added name is new across
   // the whole subscription, or if a removed name has no other watch interested in it, then the
   // subscription will enqueue and attempt to send an appropriate discovery request.
-  void updateWatch(const std::string& type_url, WatchToken watch_token,
+  void updateWatch(const std::string& type_url, WatchMap::Token watch_token,
                    const std::set<std::string>& resources) override {
     auto added_removed = watch_maps_[type_url].updateWatchInterest(watch_token, resources);
     auto sub = subscriptions_.find(type_url);
@@ -148,13 +150,18 @@ public:
   }
   void start() override { grpc_stream_.establishNewStream(); }
 
+  // Overwrites previous values for a given type_url.
+  void setInitFetchTimeout(const std::string& type_url,
+                           std::chrono::milliseconds init_fetch_timeout) {
+    init_fetch_timeouts_[type_url] = init_fetch_timeout;
+  }
+
 private:
-  void addSubscription(const std::string& type_url, SubscriptionStats& stats,
-                       std::chrono::milliseconds init_fetch_timeout) override {
+  void addSubscription(const std::string& type_url, SubscriptionStats& stats) override {
     watch_maps_.emplace(type_url, std::make_unique<WatchMap>());
     subscriptions_.emplace(type_url, std::make_unique<DeltaSubscriptionState>(
                                          type_url, *watch_maps_[type_url], local_info_,
-                                         init_fetch_timeout, dispatcher_, stats));
+                                         init_fetch_timeouts_[type_url], dispatcher_, stats));
     subscription_ordering_.emplace_back(type_url);
   }
 

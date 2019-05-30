@@ -4,6 +4,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/codec.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/utility.h"
 
 #include "extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -67,7 +68,9 @@ TEST_F(ReverseBridgeTest, InvalidGrpcRequest) {
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).WillOnce(Invoke([](auto& headers, auto) {
       EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Status, "200"));
       EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
-      EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcMessage, "invalid request body"));
+      EXPECT_THAT(headers,
+                  HeaderValueOf(Http::Headers::get().GrpcMessage,
+                                Http::Utility::PercentEncoding::encode("invalid request body")));
     }));
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, false));
     EXPECT_EQ(decoder_callbacks_.details_, "grpc_bridge_data_too_small");

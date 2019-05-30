@@ -243,6 +243,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "runtime_utility_test",
+    srcs = ["runtime_utility_test.cc"],
+    deps = [
+        "//source/common/config:runtime_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = [

@@ -23,7 +23,9 @@ Version history
 * http: fixed a bug where large unbufferable responses were not tracked in stats and logs correctly.
 * http: fixed a crashing bug where gRPC local replies would cause segfaults when upstream access logging was on.
 * http: mitigated a race condition with the :ref:`delayed_close_timeout<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.delayed_close_timeout>` where it could trigger while actively flushing a pending write buffer for a downstream connection.
+* http: changed `sendLocalReply` to send percent-encoded `GrpcMessage`.
 * jwt_authn: make filter's parsing of JWT more flexible, allowing syntax like ``jwt=eyJhbGciOiJS...ZFnFIw,extra=7,realm=123``
+* original_src filter: added the :ref:`filter<config_http_filters_original_src>`.
 * rbac: migrated from v2alpha to v2.
 * redis: add support for Redis cluster custom cluster type.
 * redis: added :ref:`prefix routing <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.prefix_routes>` to enable routing commands based on their key's prefix to different upstream.
@@ -39,6 +41,8 @@ Version history
 * router: per try timeouts will no longer start before the downstream request has been received
   in full by the router. This ensures that the per try timeout does not account for slow
   downstreams and that will not start before the global timeout.
+* runtime: added support for :ref:`flexible layering configuration
+  <envoy_api_field_config.bootstrap.v2.Bootstrap.layered_runtime>`.
 * runtime: added support for statically :ref:`specifying the runtime in the bootstrap configuration
   <envoy_api_field_config.bootstrap.v2.Runtime.base>`.
 * sandbox: added :ref:`CSRF sandbox <install_sandboxes_csrf>`.

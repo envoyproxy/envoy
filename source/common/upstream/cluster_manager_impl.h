@@ -20,6 +20,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/cleanup.h"
 #include "common/config/grpc_mux_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/upstream/load_stats_reporter.h"
@@ -61,9 +62,9 @@ public:
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
                       Network::TransportSocketOptionsSharedPtr transport_socket_options) override;
-  ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                                    Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                    bool added_via_api) override;
+  std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                   Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
@@ -381,14 +382,11 @@ private:
     SystemTime last_updated_;
   };
 
-  struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle {
+  struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle,
+                                            RaiiListElement<ClusterUpdateCallbacks*> {
     ClusterUpdateCallbacksHandleImpl(ClusterUpdateCallbacks& cb,
-                                     std::list<ClusterUpdateCallbacks*>& parent);
-    ~ClusterUpdateCallbacksHandleImpl() override;
-
-  private:
-    std::list<ClusterUpdateCallbacks*>::iterator entry;
-    std::list<ClusterUpdateCallbacks*>& list;
+                                     std::list<ClusterUpdateCallbacks*>& parent)
+        : RaiiListElement<ClusterUpdateCallbacks*>(parent, &cb) {}
   };
 
   typedef std::unique_ptr<ClusterData> ClusterDataPtr;

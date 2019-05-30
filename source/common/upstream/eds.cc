@@ -260,7 +260,8 @@ void EdsClusterImpl::onConfigUpdateFailed(const EnvoyException* e) {
   onPreInitComplete();
 }
 
-ClusterImplBaseSharedPtr EdsClusterFactory::createClusterImpl(
+std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+EdsClusterFactory::createClusterImpl(
     const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
@@ -268,9 +269,11 @@ ClusterImplBaseSharedPtr EdsClusterFactory::createClusterImpl(
     throw EnvoyException("cannot create an EDS cluster without an EDS config");
   }
 
-  return std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                          std::move(stats_scope), context.addedViaApi(),
-                                          context.clusterManager().xdsIsDelta());
+  return std::make_pair(
+      return std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
+                                              std::move(stats_scope), context.addedViaApi(),
+                                              context.clusterManager().xdsIsDelta()),
+             nullptr);
 }
 
 /**
