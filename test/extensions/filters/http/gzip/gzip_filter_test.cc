@@ -144,13 +144,12 @@ protected:
   }
 
   void expectValidCompressionStrategyAndLevel(
-      std::tuple<Compressor::ZlibCompressorImpl::CompressionStrategy, std::string,
-                 Compressor::ZlibCompressorImpl::CompressionLevel, std::string>
-          compression_settings) {
+      Compressor::ZlibCompressorImpl::CompressionStrategy strategy, absl::string_view strategy_name,
+      Compressor::ZlibCompressorImpl::CompressionLevel level, absl::string_view level_name) {
     setUpFilter(fmt::format(R"EOF({{"compression_strategy": "{}", "compression_level": "{}"}})EOF",
-                            std::get<1>(compression_settings), std::get<3>(compression_settings)));
-    EXPECT_EQ(std::get<0>(compression_settings), config_->compressionStrategy());
-    EXPECT_EQ(std::get<2>(compression_settings), config_->compressionLevel());
+                            strategy_name, level_name));
+    EXPECT_EQ(strategy, config_->compressionStrategy());
+    EXPECT_EQ(level, config_->compressionLevel());
     EXPECT_EQ(5, config_->memoryLevel());
     EXPECT_EQ(30, config_->minimumLength());
     EXPECT_EQ(28, config_->windowBits());
@@ -211,17 +210,17 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
 
 TEST_F(GzipFilterTest, AvailableCombinationCompressionStrategyAndLevelConfig) {
   expectValidCompressionStrategyAndLevel(
-      {Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered, "FILTERED",
-       Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST"});
+      Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered, "FILTERED",
+      Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
   expectValidCompressionStrategyAndLevel(
-      {Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman, "HUFFMAN",
-       Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST"});
+      Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman, "HUFFMAN",
+      Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
   expectValidCompressionStrategyAndLevel(
-      {Compressor::ZlibCompressorImpl::CompressionStrategy::Rle, "RLE",
-       Compressor::ZlibCompressorImpl::CompressionLevel::Speed, "SPEED"});
+      Compressor::ZlibCompressorImpl::CompressionStrategy::Rle, "RLE",
+      Compressor::ZlibCompressorImpl::CompressionLevel::Speed, "SPEED");
   expectValidCompressionStrategyAndLevel(
-      {Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, "DEFAULT",
-       Compressor::ZlibCompressorImpl::CompressionLevel::Standard, "DEFAULT"});
+      Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, "DEFAULT",
+      Compressor::ZlibCompressorImpl::CompressionLevel::Standard, "DEFAULT");
 }
 
 // Acceptance Testing with default configuration.

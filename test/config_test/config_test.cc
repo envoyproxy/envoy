@@ -87,6 +87,14 @@ public:
               return Server::ProdListenerComponentFactory::createListenerFilterFactoryList_(
                   filters, context);
             }));
+    ON_CALL(component_factory_, createUdpListenerFilterFactoryList(_, _))
+        .WillByDefault(Invoke(
+            [&](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+                Server::Configuration::ListenerFactoryContext& context)
+                -> std::vector<Network::UdpListenerFilterFactoryCb> {
+              return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
+                  filters, context);
+            }));
 
     try {
       main_config.initialize(bootstrap, server_, *cluster_manager_factory_);

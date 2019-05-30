@@ -594,6 +594,9 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   case envoy::api::v2::Cluster::MAGLEV:
     lb_type_ = LoadBalancerType::Maglev;
     break;
+  case envoy::api::v2::Cluster::CLUSTER_PROVIDED:
+    lb_type_ = LoadBalancerType::ClusterProvided;
+    break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
