@@ -122,6 +122,7 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   // Check the "undefined remains undefined" behavior for a bunch of other names.
   gauges["runtime.admin_overrides_active"] = 111;
   gauges["runtime.num_keys"] = 111;
+  gauges["runtime.num_layers"] = 111;
   gauges["listener_manager.total_listeners_draining"] = 111;
   gauges["listener_manager.total_listeners_warming"] = 111;
   gauges["server.hot_restart_epoch"] = 111;
@@ -144,6 +145,7 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   EXPECT_FALSE(
       store_.gauge("runtime.admin_overrides_active", Gauge::ImportMode::NeverImport).used());
   EXPECT_FALSE(store_.gauge("runtime.num_keys", Gauge::ImportMode::NeverImport).used());
+  EXPECT_FALSE(store_.gauge("runtime.num_layers", Gauge::ImportMode::NeverImport).used());
   EXPECT_FALSE(
       store_.gauge("listener_manager.total_listeners_draining", Gauge::ImportMode::NeverImport)
           .used());

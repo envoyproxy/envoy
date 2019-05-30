@@ -90,6 +90,7 @@ FIN
 FIPS
 FQDN
 FUZZER
+FUZZERS
 GB
 GC
 GCC
@@ -245,6 +246,7 @@ TBD
 TCLAP
 TCMalloc
 TCP
+TDS
 TE
 TFO
 TID
@@ -315,6 +317,7 @@ argv
 artisanal
 ary
 async
+atomicity
 atomicly
 atomics
 atoull
@@ -709,6 +712,7 @@ strtoull
 struct
 structs
 subexpr
+subdirs
 symlink
 symlinked
 sync

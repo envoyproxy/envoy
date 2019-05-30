@@ -138,8 +138,9 @@ public:
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
   absl::optional<std::string> flagsPath() override { return flags_path_; }
-  const ProtobufWkt::Struct& baseRuntime() override { return base_runtime_; }
-  DiskRuntime* diskRuntime() override { return disk_runtime_.get(); }
+  const envoy::config::bootstrap::v2::LayeredRuntime& runtime() override {
+    return layered_runtime_;
+  }
 
 private:
   struct AdminImpl : public Admin {
@@ -153,21 +154,9 @@ private:
     Network::Address::InstanceConstSharedPtr address_;
   };
 
-  struct DiskRuntimeImpl : public DiskRuntime {
-    // Server::Configuration::DiskRuntime
-    const std::string& symlinkRoot() override { return symlink_root_; }
-    const std::string& subdirectory() override { return subdirectory_; }
-    const std::string& overrideSubdirectory() override { return override_subdirectory_; }
-
-    std::string symlink_root_;
-    std::string subdirectory_;
-    std::string override_subdirectory_;
-  };
-
   AdminImpl admin_;
   absl::optional<std::string> flags_path_;
-  ProtobufWkt::Struct base_runtime_;
-  std::unique_ptr<DiskRuntimeImpl> disk_runtime_;
+  envoy::config::bootstrap::v2::LayeredRuntime layered_runtime_;
 };
 
 } // namespace Configuration

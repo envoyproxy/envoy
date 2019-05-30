@@ -38,17 +38,18 @@ void LdsApiImpl::onConfigUpdate(
   cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
   Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
 
+  bool any_applied = false;
   // We do all listener removals before adding the new listeners. This allows adding a new listener
   // with the same address as a listener that is to be removed. Do not change the order.
   for (const auto& removed_listener : removed_resources) {
     if (listener_manager_.removeListener(removed_listener)) {
       ENVOY_LOG(info, "lds: remove listener '{}'", removed_listener);
+      any_applied = true;
     }
   }
 
   std::vector<std::string> exception_msgs;
   std::unordered_set<std::string> listener_names;
-  bool any_applied = false;
   for (const auto& resource : added_resources) {
     envoy::api::v2::Listener listener;
     try {

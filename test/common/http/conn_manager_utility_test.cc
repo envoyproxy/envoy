@@ -19,6 +19,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::An;
 using testing::InSequence;
 using testing::Matcher;
 using testing::NiceMock;
@@ -87,7 +88,12 @@ public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
 
-    tracing_config_ = {Tracing::OperationName::Ingress, {}, 100, 10000, 100, false};
+    envoy::type::FractionalPercent percent1;
+    percent1.set_numerator(100);
+    envoy::type::FractionalPercent percent2;
+    percent2.set_numerator(10000);
+    percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+    tracing_config_ = {Tracing::OperationName::Ingress, {}, percent1, percent2, percent1, false};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
@@ -109,8 +115,9 @@ public:
     MutateRequestRet ret;
     ret.downstream_address_ =
         ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                       random_, runtime_, local_info_)
+                                                       random_, local_info_)
             ->asString();
+    ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
     ret.internal_ = headers.EnvoyInternalRequest() != nullptr;
     return ret;
   }
@@ -119,6 +126,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
+  NiceMock<Router::MockRoute> route_;
   absl::optional<std::string> user_agent_;
   NiceMock<Runtime::MockLoader> runtime_;
   Http::TracingConnectionManagerConfig tracing_config_;
@@ -338,7 +346,8 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     TestHeaderMapImpl headers{
         {"x-forwarded-for", "10.0.0.1"}, {"x-request-id", uuid}, {"x-envoy-force-trace", "true"}};
     EXPECT_CALL(random_, uuid()).Times(0);
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                   An<const envoy::type::FractionalPercent&>(), _))
         .WillOnce(Return(true));
 
     EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
@@ -352,7 +361,11 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     TestHeaderMapImpl headers{
         {"x-forwarded-for", "34.0.0.1"}, {"x-request-id", uuid}, {"x-envoy-force-trace", "true"}};
     EXPECT_CALL(random_, uuid()).Times(0);
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling",
+                                                   An<const envoy::type::FractionalPercent&>(), _))
+        .WillOnce(Return(false));
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                   An<const envoy::type::FractionalPercent&>(), _))
         .WillOnce(Return(true));
 
     EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
@@ -366,7 +379,8 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
 TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownstream) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("34.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("tracing.global_enabled", An<const envoy::type::FractionalPercent&>(), _))
       .WillByDefault(Return(true));
 
   {
@@ -390,7 +404,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                               {"x-request-id", "will_be_regenerated"},
                               {"x-client-trace-id", "trace-id"}};
     EXPECT_CALL(random_, uuid());
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled",
+                                                   An<const envoy::type::FractionalPercent&>()))
         .WillOnce(Return(false));
 
     EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
@@ -405,7 +420,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                               {"x-request-id", "will_be_regenerated"},
                               {"x-client-trace-id", "trace-id"}};
     EXPECT_CALL(random_, uuid());
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled",
+                                                   An<const envoy::type::FractionalPercent&>()))
         .WillOnce(Return(true));
 
     EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
@@ -977,9 +993,11 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsAlwaysForwardClientCert) {
 
 // Sampling, global on.
 TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
 
   Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
@@ -989,11 +1007,50 @@ TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
             UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
 }
 
+TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
+      .WillOnce(Return(true));
+
+  Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+
+  EXPECT_EQ(UuidTraceStatus::Sampled,
+            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+}
+
+TEST_F(ConnectionManagerUtilityTest, SamplingWithRouteOverride) {
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
+      .WillOnce(Return(false));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
+      .WillOnce(Return(false));
+
+  NiceMock<Router::MockRouteTracing> tracingConfig;
+  EXPECT_CALL(route_, tracingConfig()).WillRepeatedly(Return(&tracingConfig));
+  const envoy::type::FractionalPercent percent;
+  EXPECT_CALL(tracingConfig, getClientSampling()).WillRepeatedly(ReturnRef(percent));
+  EXPECT_CALL(tracingConfig, getRandomSampling()).WillRepeatedly(ReturnRef(percent));
+  EXPECT_CALL(tracingConfig, getOverallSampling()).WillRepeatedly(ReturnRef(percent));
+
+  Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+
+  EXPECT_EQ(UuidTraceStatus::NoTrace,
+            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+}
+
 // Sampling must not be done on client traced.
 TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .Times(0);
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
 
   // The x_request_id has TRACE_FORCED(a) set in the TRACE_BYTE_POSITION(14) character.
@@ -1006,9 +1063,11 @@ TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
 
 // Sampling, global off.
 TEST_F(ConnectionManagerUtilityTest, NoTraceWhenSamplingSetButGlobalNotSet) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(false));
 
   Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
@@ -1020,9 +1079,11 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenSamplingSetButGlobalNotSet) {
 
 // Client, client enabled, global on.
 TEST_F(ConnectionManagerUtilityTest, ClientSamplingWhenGlobalSet) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("tracing.client_enabled", An<const envoy::type::FractionalPercent&>()))
       .WillOnce(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
 
   Http::TestHeaderMapImpl request_headers{
@@ -1036,9 +1097,14 @@ TEST_F(ConnectionManagerUtilityTest, ClientSamplingWhenGlobalSet) {
 
 // Client, client disabled, global on.
 TEST_F(ConnectionManagerUtilityTest, NoTraceWhenClientSamplingNotSetAndGlobalSet) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("tracing.client_enabled", An<const envoy::type::FractionalPercent&>()))
       .WillOnce(Return(false));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
+      .WillOnce(Return(false));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
 
   Http::TestHeaderMapImpl request_headers{
@@ -1058,7 +1124,8 @@ TEST_F(ConnectionManagerUtilityTest, ForcedTracedWhenGlobalSet) {
                             {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"},
                             {"x-envoy-force-trace", "true"}};
   EXPECT_CALL(random_, uuid()).Times(0);
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
@@ -1074,7 +1141,8 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenForcedTracedButGlobalNotSet) {
                             {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"},
                             {"x-envoy-force-trace", "true"}};
   EXPECT_CALL(random_, uuid()).Times(0);
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(false));
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),

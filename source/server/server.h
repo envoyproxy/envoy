@@ -19,6 +19,7 @@
 
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/common/assert.h"
+#include "common/common/cleanup.h"
 #include "common/common/logger_delegates.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/context_impl.h"
@@ -269,15 +270,11 @@ private:
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
 
-  template <class T> class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle {
+  template <class T>
+  class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {
   public:
-    LifecycleCallbackHandle(T& callbacks, typename T::iterator it)
-        : callbacks_(callbacks), it_(it) {}
-    ~LifecycleCallbackHandle() override { callbacks_.erase(it_); }
-
-  private:
-    T& callbacks_;
-    typename T::iterator it_;
+    LifecycleCallbackHandle(std::list<T>& callbacks, T& callback)
+        : RaiiListElement<T>(callbacks, callback) {}
   };
 
   absl::flat_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
