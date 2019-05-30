@@ -5,10 +5,9 @@
 #include "common/config/grpc_mux_subscription_impl.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
+#include "common/config/type_to_endpoint.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
-
-#include "server/proto_descriptors.h"
 
 namespace Envoy {
 namespace Config {
@@ -39,8 +38,8 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
       result = std::make_unique<HttpSubscriptionImpl>(
           local_info, cm, api_config_source.cluster_names()[0], dispatcher, random,
           Utility::apiConfigSourceRefreshDelay(api_config_source),
-          Utility::apiConfigSourceRequestTimeout(api_config_source), Server::restMethod(type_url),
-          stats, Utility::configSourceInitialFetchTimeout(config));
+          Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url), stats,
+          Utility::configSourceInitialFetchTimeout(config));
       break;
     case envoy::api::v2::core::ApiConfigSource::GRPC:
       result = std::make_unique<GrpcSubscriptionImpl>(
@@ -48,7 +47,7 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
           Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
                                                          api_config_source, scope)
               ->create(),
-          dispatcher, random, Server::sotwGrpcMethod(type_url), type_url, stats, scope,
+          dispatcher, random, sotwGrpcMethod(type_url), type_url, stats, scope,
           Utility::parseRateLimitSettings(api_config_source),
           Utility::configSourceInitialFetchTimeout(config));
       break;
@@ -59,7 +58,7 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
           Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
                                                          api_config_source, scope)
               ->create(),
-          dispatcher, Server::deltaGrpcMethod(type_url), type_url, random, scope,
+          dispatcher, deltaGrpcMethod(type_url), type_url, random, scope,
           Utility::parseRateLimitSettings(api_config_source), stats,
           Utility::configSourceInitialFetchTimeout(config));
       break;

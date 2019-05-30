@@ -4,7 +4,6 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/srds.pb.h"
 #include "envoy/service/discovery/v2/ads.pb.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
 #include "envoy/service/ratelimit/v2/rls.pb.h"
@@ -12,7 +11,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/protobuf_link_hacks.h"
-#include "common/grpc/common.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Server {
@@ -21,18 +20,13 @@ void validateProtoDescriptors() {
   const auto methods = {
       "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
       "envoy.api.v2.ClusterDiscoveryService.StreamClusters",
-      "envoy.api.v2.ClusterDiscoveryService.DeltaClusters",
       "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
       "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints",
-      "envoy.api.v2.EndpointDiscoveryService.DeltaEndpoints",
       "envoy.api.v2.ListenerDiscoveryService.FetchListeners",
       "envoy.api.v2.ListenerDiscoveryService.StreamListeners",
-      "envoy.api.v2.ListenerDiscoveryService.DeltaListeners",
       "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
       "envoy.api.v2.RouteDiscoveryService.StreamRoutes",
-      "envoy.api.v2.RouteDiscoveryService.DeltaRoutes",
       "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources",
-      "envoy.service.discovery.v2.AggregatedDiscoveryService.DeltaAggregatedResources",
       "envoy.service.discovery.v2.HealthDiscoveryService.FetchHealthCheck",
       "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck",
       "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit",
@@ -40,84 +34,20 @@ void validateProtoDescriptors() {
 
   for (const auto& method : methods) {
     RELEASE_ASSERT(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) != nullptr,
-                   fmt::format("Unable to find method descriptor for {}", method));
+                   "");
   }
 
   const auto types = {
-      "envoy.api.v2.Cluster",           "envoy.api.v2.ClusterLoadAssignment",
-      "envoy.api.v2.Listener",          "envoy.api.v2.RouteConfiguration",
-      "envoy.api.v2.route.VirtualHost", "envoy.api.v2.auth.Secret",
+      "envoy.api.v2.Cluster",
+      "envoy.api.v2.ClusterLoadAssignment",
+      "envoy.api.v2.Listener",
+      "envoy.api.v2.RouteConfiguration",
   };
 
   for (const auto& type : types) {
     RELEASE_ASSERT(
         Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type) != nullptr, "");
   }
-}
-
-const char UnknownMethod[] = "could_not_lookup_method_due_to_unknown_type_url";
-
-#define TYPE_URL_IS(x)                                                                             \
-  (type_url == Grpc::Common::typeUrl(envoy::api::v2::x().GetDescriptor()->full_name()))
-const Protobuf::MethodDescriptor& deltaGrpcMethod(absl::string_view type_url) {
-  std::string method_name = UnknownMethod;
-  if (TYPE_URL_IS(RouteConfiguration)) {
-    method_name = "envoy.api.v2.RouteDiscoveryService.DeltaRoutes";
-  } else if (TYPE_URL_IS(ScopedRouteConfiguration)) {
-    method_name = "envoy.api.v2.ScopedRoutesDiscoveryService.DeltaScopedRoutes";
-  } else if (TYPE_URL_IS(route::VirtualHost)) {
-    method_name = "envoy.api.v2.VirtualHostDiscoveryService.DeltaVirtualHosts";
-  } else if (TYPE_URL_IS(auth::Secret)) {
-    method_name = "envoy.service.discovery.v2.SecretDiscoveryService.DeltaSecrets";
-  } else if (TYPE_URL_IS(Cluster)) {
-    method_name = "envoy.api.v2.ClusterDiscoveryService.DeltaClusters";
-  } else if (TYPE_URL_IS(ClusterLoadAssignment)) {
-    method_name = "envoy.api.v2.EndpointDiscoveryService.DeltaEndpoints";
-  } else if (TYPE_URL_IS(Listener)) {
-    method_name = "envoy.api.v2.ListenerDiscoveryService.DeltaListeners";
-  }
-  ASSERT(method_name != UnknownMethod);
-  return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method_name);
-}
-
-const Protobuf::MethodDescriptor& sotwGrpcMethod(absl::string_view type_url) {
-  std::string method_name = UnknownMethod;
-  if (TYPE_URL_IS(RouteConfiguration)) {
-    method_name = "envoy.api.v2.RouteDiscoveryService.StreamRoutes";
-  } else if (TYPE_URL_IS(ScopedRouteConfiguration)) {
-    method_name = "envoy.api.v2.ScopedRoutesDiscoveryService.StreamScopedRoutes";
-  } else if (TYPE_URL_IS(auth::Secret)) {
-    method_name = "envoy.service.discovery.v2.SecretDiscoveryService.StreamSecrets";
-  } else if (TYPE_URL_IS(Cluster)) {
-    method_name = "envoy.api.v2.ClusterDiscoveryService.StreamClusters";
-  } else if (TYPE_URL_IS(ClusterLoadAssignment)) {
-    method_name = "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints";
-  } else if (TYPE_URL_IS(Listener)) {
-    method_name = "envoy.api.v2.ListenerDiscoveryService.StreamListeners";
-  }
-  ASSERT(method_name != UnknownMethod);
-  return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method_name);
-}
-
-const Protobuf::MethodDescriptor& restMethod(absl::string_view type_url) {
-  std::string method_name = UnknownMethod;
-  if (TYPE_URL_IS(RouteConfiguration)) {
-    method_name = "envoy.api.v2.RouteDiscoveryService.FetchRoutes";
-  } else if (TYPE_URL_IS(ScopedRouteConfiguration)) {
-    method_name = "envoy.api.v2.ScopedRoutesDiscoveryService.FetchScopedRoutes";
-  } else if (TYPE_URL_IS(auth::Secret)) {
-    method_name = "envoy.service.discovery.v2.SecretDiscoveryService.FetchSecrets";
-  } else if (TYPE_URL_IS(Cluster)) {
-    method_name = "envoy.api.v2.ClusterDiscoveryService.FetchClusters";
-  } else if (TYPE_URL_IS(ClusterLoadAssignment)) {
-    method_name = "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints";
-  } else if (TYPE_URL_IS(Listener)) {
-    method_name = "envoy.api.v2.ListenerDiscoveryService.FetchListeners";
-  }
-  ASSERT(method_name != UnknownMethod);
-  return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method_name);
-}
-#undef TYPE_URL_IS
-
+};
 } // namespace Server
 } // namespace Envoy
