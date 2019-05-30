@@ -175,6 +175,8 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
                   static_cast<int>(send_result.err_->getErrorCode()), send_result.rc_);
   }
 
+  // The send_result normalizes the rc_ value to 0 in error conditions.
+  // The drain call is hence 'safe' in success and failure cases.
   buffer.drain(send_result.rc_);
 
   return send_result;
