@@ -20,7 +20,9 @@ public:
   QuicMemSliceStorageImpl(const struct iovec* iov, int iov_count, QuicBufferAllocator* allocator,
                           const QuicByteCount max_slice_len);
 
-  QuicMemSliceStorageImpl(const QuicMemSliceStorageImpl& other) = default;
+  QuicMemSliceStorageImpl(const QuicMemSliceStorageImpl& other) {
+    buffer_.add(other.buffer_);
+  }
 
   QuicMemSliceStorageImpl& operator=(const QuicMemSliceStorageImpl& other) {
     if (this != &other) {

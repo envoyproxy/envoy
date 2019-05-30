@@ -34,49 +34,10 @@ protected:
   static void commitReservation(Buffer::RawSlice* iovecs, uint64_t num_iovecs, OwnedImpl& buffer) {
     buffer.commit(iovecs, num_iovecs);
   }
-
-  void verifyAndPopulateBufferImpl(Buffer::OwnedImpl& impl, const std::string& data) {
-    verifyImplementation(impl);
-    impl.add(data);
-  }
 };
 
 INSTANTIATE_TEST_CASE_P(OwnedImplTest, OwnedImplTest,
                         testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
-
-TEST_P(OwnedImplTest, CopyConstructAndAssign) {
-  std::string str("hello world");
-  Buffer::OwnedImpl buffer;
-  verifyAndPopulateBufferImpl(buffer, str);
-  Buffer::OwnedImpl buffer2(buffer);
-  EXPECT_EQ(str, buffer2.toString());
-  // Draining buffer2 shouldn't affect buffer.
-  buffer2.drain(str.length());
-  EXPECT_EQ(str, buffer.toString());
-
-  Buffer::OwnedImpl buffer3;
-  verifyAndPopulateBufferImpl(buffer3, "aaa");
-  // Buffer2 should be overridden by buffer.
-  buffer3 = buffer;
-  EXPECT_EQ(str, buffer3.toString());
-  // Draining buffer3 shouldn't affect buffer.
-  buffer3.drain(str.length());
-  EXPECT_EQ(str, buffer.toString());
-}
-
-TEST_P(OwnedImplTest, MoveConstructAndAssign) {
-  std::string str("hello world");
-  Buffer::OwnedImpl buffer;
-  verifyAndPopulateBufferImpl(buffer, str);
-  Buffer::OwnedImpl buffer2(std::move(buffer));
-  EXPECT_EQ(str, buffer2.toString());
-
-  Buffer::OwnedImpl buffer3;
-  verifyAndPopulateBufferImpl(buffer3, "aaa");
-  // buffer3 should be overridden by buffer2.
-  buffer3 = std::move(buffer2);
-  EXPECT_EQ(str, buffer3.toString());
-}
 
 TEST_P(OwnedImplTest, AddBufferFragmentNoCleanup) {
   char input[] = "hello world";
