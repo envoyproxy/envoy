@@ -38,7 +38,7 @@ static_resources:
             op_timeout: 5s
   clusters:
     - name: cluster_0
-      lb_policy: RANDOM
+      lb_policy: CLUSTER_PROVIDED
       hosts:
       - socket_address:
           address: 127.0.0.1
@@ -49,7 +49,7 @@ static_resources:
           "@type": type.googleapis.com/google.protobuf.Struct
           value:
             cluster_refresh_rate: 1s
-            cluster_refresh_timeout: 4s
+            cluster_refresh_timeout: 40s
 )EOF";
 
 // This is the basic redis_proxy configuration with an upstream
@@ -345,8 +345,8 @@ TEST_P(RedisClusterIntegrationTest, MigrateSlot) {
   simpleRequestAndResponse(0, makeBulkStringArray({"get", "bar"}), "$3\r\nbar\r\n");
 
   std::string cluster_slot_response =
-    twoSlots(fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip(),
-             0, 4999, 5000, 16383);
+      twoSlots(fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip(),
+               0, 4999, 5000, 16383);
   expectCallClusterSlot(random_index_, cluster_slot_response);
 
   // bar hashes to slot 5061 which is in now upstream 1

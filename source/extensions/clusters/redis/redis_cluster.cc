@@ -11,14 +11,15 @@ namespace {
 Extensions::NetworkFilters::Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
 } // namespace
 
-RedisClusterImpl::RedisClusterImpl(
+RedisCluster::RedisCluster(
     const envoy::api::v2::Cluster& cluster,
     const envoy::config::cluster::redis::RedisClusterConfig& redisCluster,
     NetworkFilters::Common::Redis::Client::ClientFactory& redis_client_factory,
     Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime, Api::Api& api,
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    Stats::ScopePtr&& stats_scope, bool added_via_api,
+    ClusterSlotUpdateCallBackSharedPtr lb_factory)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                                        added_via_api),
       cluster_manager_(clusterManager),
@@ -32,7 +33,8 @@ RedisClusterImpl::RedisClusterImpl(
                            ? cluster.load_assignment()
                            : Config::Utility::translateClusterHosts(cluster.hosts())),
       local_info_(factory_context.localInfo()), random_(factory_context.random()),
-      redis_discovery_session_(*this, redis_client_factory), api_(api) {
+      redis_discovery_session_(*this, redis_client_factory), lb_factory_(std::move(lb_factory)),
+      api_(api) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -51,15 +53,15 @@ RedisClusterImpl::RedisClusterImpl(
   }
 }
 
-void RedisClusterImpl::startPreInit() {
+void RedisCluster::startPreInit() {
   for (const DnsDiscoveryResolveTargetPtr& target : dns_discovery_resolve_targets_) {
     target->startResolve();
   }
 }
 
-void RedisClusterImpl::updateAllHosts(const Upstream::HostVector& hosts_added,
-                                      const Upstream::HostVector& hosts_removed,
-                                      uint32_t current_priority) {
+void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,
+                                  const Upstream::HostVector& hosts_removed,
+                                  uint32_t current_priority) {
   Upstream::PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
 
   auto locality_lb_endpoint = localityLbEndpoint();
@@ -75,7 +77,7 @@ void RedisClusterImpl::updateAllHosts(const Upstream::HostVector& hosts_added,
       hosts_added, hosts_removed, absl::nullopt);
 }
 
-void RedisClusterImpl::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots) {
+void RedisCluster::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots) {
   Upstream::HostVector new_hosts;
 
   for (const ClusterSlot& slot : slots) {
@@ -95,7 +97,9 @@ void RedisClusterImpl::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots
     info_->stats().update_no_rebuild_.inc();
   }
 
-  lb_factory_->onClusterSlotUpdate(slots, updated_hosts);
+  if (lb_factory_) {
+    lb_factory_->onClusterSlotUpdate(slots, updated_hosts);
+  }
 
   all_hosts_ = std::move(updated_hosts);
 
@@ -107,20 +111,20 @@ void RedisClusterImpl::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots
 }
 
 // DnsDiscoveryResolveTarget
-RedisClusterImpl::DnsDiscoveryResolveTarget::DnsDiscoveryResolveTarget(
-    RedisClusterImpl& parent, const std::string& dns_address, const uint32_t port,
+RedisCluster::DnsDiscoveryResolveTarget::DnsDiscoveryResolveTarget(
+    RedisCluster& parent, const std::string& dns_address, const uint32_t port,
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint)
     : parent_(parent), dns_address_(dns_address), port_(port),
       locality_lb_endpoint_(locality_lb_endpoint), lb_endpoint_(lb_endpoint) {}
 
-RedisClusterImpl::DnsDiscoveryResolveTarget::~DnsDiscoveryResolveTarget() {
+RedisCluster::DnsDiscoveryResolveTarget::~DnsDiscoveryResolveTarget() {
   if (active_query_) {
     active_query_->cancel();
   }
 }
 
-void RedisClusterImpl::DnsDiscoveryResolveTarget::startResolve() {
+void RedisCluster::DnsDiscoveryResolveTarget::startResolve() {
   ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
 
   active_query_ = parent_.dns_resolver_->resolve(
@@ -133,9 +137,9 @@ void RedisClusterImpl::DnsDiscoveryResolveTarget::startResolve() {
       });
 }
 
-// RedisClusterImpl
-RedisClusterImpl::RedisDiscoverySession::RedisDiscoverySession(
-    Envoy::Extensions::Clusters::Redis::RedisClusterImpl& parent,
+// RedisCluster
+RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
+    Envoy::Extensions::Clusters::Redis::RedisCluster& parent,
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
     : parent_(parent), dispatcher_(parent.dispatcher_),
       resolve_timer_(parent.dispatcher_.createTimer([this]() -> void { startResolve(); })),
@@ -165,7 +169,7 @@ ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value) {
 }
 } // namespace
 
-RedisClusterImpl::RedisDiscoverySession::~RedisDiscoverySession() {
+RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() {
   if (current_request_) {
     current_request_->cancel();
     current_request_ = nullptr;
@@ -176,7 +180,7 @@ RedisClusterImpl::RedisDiscoverySession::~RedisDiscoverySession() {
   }
 }
 
-void RedisClusterImpl::RedisDiscoveryClient::onEvent(Network::ConnectionEvent event) {
+void RedisCluster::RedisDiscoveryClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     auto client_to_delete = parent_.client_map_.find(host_);
@@ -186,7 +190,7 @@ void RedisClusterImpl::RedisDiscoveryClient::onEvent(Network::ConnectionEvent ev
   }
 }
 
-void RedisClusterImpl::RedisDiscoverySession::registerDiscoveryAddress(
+void RedisCluster::RedisDiscoverySession::registerDiscoveryAddress(
     const std::list<Envoy::Network::Address::InstanceConstSharedPtr>& address_list,
     const uint32_t port) {
   // Since the address from DNS does not have port, we need to make a new address that has port in
@@ -197,7 +201,7 @@ void RedisClusterImpl::RedisDiscoverySession::registerDiscoveryAddress(
   }
 }
 
-void RedisClusterImpl::RedisDiscoverySession::startResolve() {
+void RedisCluster::RedisDiscoverySession::startResolve() {
   parent_.info_->stats().update_attempt_.inc();
   // If a resolution is currently in progress, skip it.
   if (current_request_) {
@@ -237,7 +241,7 @@ void RedisClusterImpl::RedisDiscoverySession::startResolve() {
   current_request_ = client->client_->makeRequest(ClusterSlotsRequest::instance_, *this);
 }
 
-void RedisClusterImpl::RedisDiscoverySession::onResponse(
+void RedisCluster::RedisDiscoverySession::onResponse(
     NetworkFilters::Common::Redis::RespValuePtr&& value) {
   current_request_ = nullptr;
 
@@ -281,14 +285,14 @@ void RedisClusterImpl::RedisDiscoverySession::onResponse(
   resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
 }
 
-void RedisClusterImpl::RedisDiscoverySession::onUnexpectedResponse(
+void RedisCluster::RedisDiscoverySession::onUnexpectedResponse(
     const NetworkFilters::Common::Redis::RespValuePtr& value) {
   ENVOY_LOG(warn, "Unexpected response to cluster slot command: {}", value->toString());
   this->parent_.info_->stats().update_failure_.inc();
   resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
 }
 
-void RedisClusterImpl::RedisDiscoverySession::onFailure() {
+void RedisCluster::RedisDiscoverySession::onFailure() {
   current_request_ = nullptr;
   if (!current_host_address_.empty()) {
     auto client_to_delete = client_map_.find(current_host_address_);
@@ -298,7 +302,7 @@ void RedisClusterImpl::RedisDiscoverySession::onFailure() {
   resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
 }
 
-RedisClusterImpl::ClusterSlotsRequest RedisClusterImpl::ClusterSlotsRequest::instance_;
+RedisCluster::ClusterSlotsRequest RedisCluster::ClusterSlotsRequest::instance_;
 
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 RedisClusterFactory::createClusterWithConfig(
@@ -311,18 +315,25 @@ RedisClusterFactory::createClusterWithConfig(
       cluster.cluster_type().name() != Extensions::Clusters::ClusterTypes::get().Redis) {
     throw EnvoyException("Redis cluster can only created with redis cluster type.");
   }
-  if (cluster.has_lb_subset_config() && cluster.lb_subset_config().subset_selectors_size() > 0) {
-    throw EnvoyException("Redis cluster is not compatible with subset load balancer.");
+  // TODO(hyang): This is needed to migrate existing cluster, disallow using other lb_policy
+  // in the future
+  if (cluster.lb_policy() != envoy::api::v2::Cluster::CLUSTER_PROVIDED) {
+    return std::make_pair(std::make_shared<RedisCluster>(
+                              cluster, proto_config,
+                              NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
+                              context.clusterManager(), context.runtime(), context.api(),
+                              selectDnsResolver(cluster, context), socket_factory_context,
+                              std::move(stats_scope), context.addedViaApi(), nullptr),
+                          nullptr);
   }
-  // TODO(Henry): Implement a thread aware load balancer for Redis Cluster. This can come from
-  //              inside the created cluster.
-  return std::make_pair(std::make_shared<RedisClusterImpl>(
+  auto lb_factory = std::make_shared<RedisClusterLoadBalancerFactory>();
+  return std::make_pair(std::make_shared<RedisCluster>(
                             cluster, proto_config,
                             NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
                             context.clusterManager(), context.runtime(), context.api(),
                             selectDnsResolver(cluster, context), socket_factory_context,
-                            std::move(stats_scope), context.addedViaApi()),
-                        nullptr);
+                            std::move(stats_scope), context.addedViaApi(), lb_factory),
+                        std::make_unique<RedisClusterThreadAwareLoadBalancer>(lb_factory));
 }
 
 REGISTER_FACTORY(RedisClusterFactory, Upstream::ClusterFactory);

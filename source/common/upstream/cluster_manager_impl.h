@@ -365,7 +365,7 @@ private:
       if (thread_aware_lb_ != nullptr) {
         return thread_aware_lb_->factory();
       } else {
-        return cluster_->loadBalancerFactory();
+        return nullptr;
       }
     }
 

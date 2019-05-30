@@ -11,9 +11,13 @@ namespace Extensions {
 namespace Clusters {
 namespace Redis {
 
-MockRedisCluster::MockRedisCluster(Upstream::HostSharedPtr host) {
-  slot_array_.fill(host);
-  ON_CALL(*this, slotArray()).WillByDefault(ReturnRef(slot_array_));
+MockClusterSlotUpdateCallBack::MockClusterSlotUpdateCallBack() {
+  ON_CALL(*this, onClusterSlotUpdate(_, _))
+      .WillByDefault(
+          Invoke([&](const std::vector<ClusterSlot>& slots, Upstream::HostMap all_hosts) {
+            ASSERT(slots.size() > 0);
+            ASSERT(all_hosts.size() > 0);
+          }));
 }
 
 } // namespace Redis

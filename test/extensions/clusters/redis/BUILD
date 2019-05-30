@@ -19,11 +19,15 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
+        "//source/common/upstream:cluster_factory_lib",
+        "//source/common/upstream:thread_aware_lb_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/redis:redis_cluster",
+        "//source/extensions/clusters/redis:redis_cluster_lb",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/upstream:utility_lib",
+        "//test/extensions/clusters/redis:redis_cluster_mocks",
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/extensions/filters/network/common/redis:test_utils_lib",
         "//test/extensions/filters/network/redis_proxy:redis_mocks",
@@ -47,6 +51,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.clusters.redis",
     deps = [
         "//source/extensions/clusters/redis:redis_cluster",
+        "//source/extensions/clusters/redis:redis_cluster_lb",
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/integration:integration_lib",
     ],

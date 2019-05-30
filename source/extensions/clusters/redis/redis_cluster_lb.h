@@ -109,15 +109,33 @@ private:
   SlotArraySharedPtr slot_array_;
 };
 
+class ClusterSlotUpdateCallBack {
+public:
+  virtual ~ClusterSlotUpdateCallBack() = default;
+
+  /**
+   * Callback when cluster slot is updated
+   * @param slots provides the updated cluster slots.
+   * @param all_hosts provides the updated hosts.
+   */
+  virtual void onClusterSlotUpdate(const std::vector<ClusterSlot>& slots,
+                                   Upstream::HostMap all_hosts) PURE;
+};
+
+typedef std::shared_ptr<ClusterSlotUpdateCallBack> ClusterSlotUpdateCallBackSharedPtr;
+
 /**
  * This factory is created and returned by RedisCluster's factory() method, the create() method will
  * be called on each thread to create a thread local RedisClusterLoadBalancer.
  */
-class RedisClusterLoadBalancerFactory : public Upstream::LoadBalancerFactory {
+class RedisClusterLoadBalancerFactory : public ClusterSlotUpdateCallBack,
+                                        public Upstream::LoadBalancerFactory {
 public:
-  RedisClusterLoadBalancerFactory();
+  RedisClusterLoadBalancerFactory() {}
 
-  void onClusterSlotUpdate(const std::vector<ClusterSlot>& slots, Upstream::HostMap all_hosts);
+  // ClusterSlotUpdateCallBack
+  void onClusterSlotUpdate(const std::vector<ClusterSlot>& slots,
+                           Upstream::HostMap all_hosts) override;
 
   // Upstream::LoadBalancerFactory
   Upstream::LoadBalancerPtr create() override;
@@ -125,6 +143,19 @@ public:
 private:
   absl::Mutex mutex_;
   SlotArraySharedPtr slot_array_ GUARDED_BY(mutex_);
+};
+
+class RedisClusterThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
+public:
+  RedisClusterThreadAwareLoadBalancer(Upstream::LoadBalancerFactorySharedPtr factory)
+      : factory_(std::move(factory)) {}
+
+  // Upstream::ThreadAwareLoadBalancer
+  Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }
+  void initialize() override{};
+
+private:
+  Upstream::LoadBalancerFactorySharedPtr factory_;
 };
 
 } // namespace Redis

@@ -106,8 +106,7 @@ private:
   };
 
   struct LbContextImpl : public Upstream::LoadBalancerContextBase {
-    LbContextImpl(const std::string& key, bool enabled_hashtagging,
-                  const std::string& cluster_type);
+    LbContextImpl(const std::string& key, bool enabled_hashtagging, bool use_crc16);
 
     absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
 

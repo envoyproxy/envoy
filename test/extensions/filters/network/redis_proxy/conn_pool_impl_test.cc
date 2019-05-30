@@ -497,6 +497,9 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToRedisCluster) {
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
       .Times(2)
       .WillRepeatedly(ReturnRef(cluster_type));
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, lbType())
+      .Times(2)
+      .WillRepeatedly(Return(Upstream::LoadBalancerType::ClusterProvided));
 
   setup();
 
@@ -515,6 +518,9 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToRedisClusterHashtag) {
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
       .Times(2)
       .WillRepeatedly(ReturnRef(cluster_type));
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, lbType())
+      .Times(2)
+      .WillRepeatedly(Return(Upstream::LoadBalancerType::ClusterProvided));
 
   setup();
 

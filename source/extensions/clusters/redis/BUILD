@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/upstream:cluster_factory_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/upstream:thread_local_cluster_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/config:metadata_lib",
         "//source/common/event:dispatcher_lib",

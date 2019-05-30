@@ -18,6 +18,12 @@ namespace ConnPool {
 
 namespace {
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
+
+// TODO(hyang): we should disallow Redis cluster to use anything other than ClusterProvided
+static inline bool useRedisClusterLb(Upstream::ClusterInfoConstSharedPtr info) {
+  return info->clusterType().name() == Extensions::Clusters::ClusterTypes::get().Redis &&
+         info->lbType() == Upstream::LoadBalancerType::ClusterProvided;
+}
 } // namespace
 
 InstanceImpl::InstanceImpl(
@@ -156,7 +162,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
   }
 
   LbContextImpl lb_context(key, parent_.config_.enableHashtagging(),
-                           cluster_->info()->clusterType().name());
+                           useRedisClusterLb(cluster_->info()));
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     return nullptr;
@@ -253,10 +259,9 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
 }
 
 InstanceImpl::LbContextImpl::LbContextImpl(const std::string& key, bool enabled_hashtagging,
-                                           const std::string& cluster_type)
-    : hash_key_(cluster_type == Extensions::Clusters::ClusterTypes::get().Redis
-                    ? Crc16::crc16(hashtag(key, enabled_hashtagging))
-                    : MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))) {}
+                                           bool use_crc16)
+    : hash_key_(use_crc16 ? Crc16::crc16(hashtag(key, enabled_hashtagging))
+                          : MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))) {}
 
 // Inspired by the redis-cluster hashtagging algorithm
 // https://redis.io/topics/cluster-spec#keys-hash-tags

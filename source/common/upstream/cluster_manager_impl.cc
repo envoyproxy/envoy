@@ -1071,8 +1071,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
         cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbLeastRequestConfig(),
         cluster->lbConfig());
-  } else if (lb_factory != nullptr) {
-    lb_ = lb_factory_->create();
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
@@ -1100,8 +1098,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::RingHash:
     case LoadBalancerType::Maglev: {
       ASSERT(lb_factory_ != nullptr);
-      // should never get here
-      // lb_ = lb_factory_->create();
+      lb_ = lb_factory_->create();
       break;
     }
     case LoadBalancerType::OriginalDst: {

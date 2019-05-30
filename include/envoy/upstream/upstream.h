@@ -866,9 +866,6 @@ protected:
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;
 
 class HealthChecker;
-class LoadBalancerFactory;
-
-typedef std::shared_ptr<LoadBalancerFactory> LoadBalancerFactorySharedPtr;
 
 /**
  * An upstream cluster (group of hosts). This class is the "primary" singleton cluster used amongst
@@ -923,12 +920,6 @@ public:
    * @return the const PrioritySet for the cluster.
    */
   virtual const PrioritySet& prioritySet() const PURE;
-
-  /**
-   * @return the load balancer factory that will be used to create the load balancer for the
-   * cluster.
-   */
-  virtual LoadBalancerFactorySharedPtr loadBalancerFactory() PURE;
 };
 
 typedef std::shared_ptr<Cluster> ClusterSharedPtr;

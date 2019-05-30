@@ -12,15 +12,12 @@ namespace Extensions {
 namespace Clusters {
 namespace Redis {
 
-class MockRedisCluster : public RedisCluster, public Upstream::MockClusterMockPrioritySet {
+class MockClusterSlotUpdateCallBack : public ClusterSlotUpdateCallBack {
 public:
-  MockRedisCluster(Upstream::HostSharedPtr host);
-  ~MockRedisCluster() = default;
+  MockClusterSlotUpdateCallBack();
+  ~MockClusterSlotUpdateCallBack() = default;
 
-  MOCK_CONST_METHOD0(slotArray, const SlotArray&());
-
-private:
-  SlotArray slot_array_;
+  MOCK_METHOD2(onClusterSlotUpdate, void(const std::vector<ClusterSlot>&, Upstream::HostMap));
 };
 
 } // namespace Redis
