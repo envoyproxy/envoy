@@ -16,7 +16,7 @@ QuicMemSliceImpl::QuicMemSliceImpl(QuicBufferAllocator* /*allocator*/, size_t le
   Envoy::Buffer::RawSlice iovec;
   uint64_t num_iov = single_slice_buffer_.reserve(length, &iovec, 1);
   ASSERT(num_iov == 1);
-  // evbuffer may return a slice longer than needed, trim it to requested length.
+  // OwnedImpl may return a slice longer than needed, trim it to requested length.
   iovec.len_ = length;
   single_slice_buffer_.commit(&iovec, 1);
   ASSERT(this->length() == length);

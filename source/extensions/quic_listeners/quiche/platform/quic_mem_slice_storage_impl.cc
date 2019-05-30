@@ -40,7 +40,7 @@ QuicMemSliceStorageImpl::QuicMemSliceStorageImpl(const struct iovec* iov, int io
     ASSERT(num_slice == 1);
     QuicUtils::CopyToBuffer(iov, iov_count, io_offset, slice_len, static_cast<char*>(slice.mem_));
     io_offset += slice_len;
-    // evbuffer may return a slice longer than needed, trim it to requested length.
+    // OwnedImpl may return a slice longer than needed, trim it to requested length.
     slice.len_ = slice_len;
     buffer.commit(&slice, num_slice);
     buffer_.move(buffer);
