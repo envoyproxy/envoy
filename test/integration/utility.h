@@ -183,6 +183,7 @@ public:
   }
   const std::string& data() { return data_; }
   bool readLastByte() { return read_end_stream_; }
+  void clearData() { data_.clear(); }
 
 private:
   Event::Dispatcher& dispatcher_;

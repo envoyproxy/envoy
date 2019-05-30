@@ -2,8 +2,8 @@
 
 #include "envoy/api/v2/lds.pb.h"
 
-#include "common/config/utility.h"
 #include "common/http/message_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "server/lds_api.h"
 
@@ -33,17 +33,16 @@ public:
   }
 
   void setup() {
-    const std::string config_json = R"EOF(
-    {
-      "api_type": "REST",
-      "cluster": "foo_cluster",
-      "refresh_delay_ms": 1000
-    }
+    const std::string config_yaml = R"EOF(
+api_config_source:
+  api_type: REST
+  cluster_names:
+  - foo_cluster
+  refresh_delay: 1s
     )EOF";
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
     envoy::api::v2::core::ConfigSource lds_config;
-    Config::Utility::translateLdsConfig(*config, lds_config);
+    MessageUtil::loadFromYaml(config_yaml, lds_config);
     lds_config.mutable_api_config_source()->set_api_type(
         envoy::api::v2::core::ApiConfigSource::REST);
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
@@ -153,23 +152,25 @@ TEST_F(LdsApiTest, ValidateFail) {
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> listeners;
   envoy::api::v2::Listener listener;
   listeners.Add()->PackFrom(listener);
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
+  EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(init_watcher_, ready());
 
-  EXPECT_THROW(lds_->onConfigUpdate(listeners, ""), ProtoValidationException);
+  EXPECT_THROW(lds_->onConfigUpdate(listeners, ""), EnvoyException);
   EXPECT_CALL(request_, cancel());
 }
 
 TEST_F(LdsApiTest, UnknownCluster) {
-  const std::string config_json = R"EOF(
-  {
-    "api_type": "REST",
-    "cluster": "foo_cluster",
-    "refresh_delay_ms": 1000
-  }
+  const std::string config_yaml = R"EOF(
+api_config_source:
+  api_type: REST
+  cluster_names:
+  - foo_cluster
+  refresh_delay: 1s
   )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   envoy::api::v2::core::ConfigSource lds_config;
-  Config::Utility::translateLdsConfig(*config, lds_config);
+  MessageUtil::loadFromYaml(config_yaml, lds_config);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
@@ -257,6 +258,8 @@ TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
 }
 
 // Validate onConfigUpdate throws EnvoyException with duplicate listeners.
+// The first of the duplicates will be successfully applied, with the rest adding to
+// the exception message.
 TEST_F(LdsApiTest, ValidateDuplicateListeners) {
   InSequence s;
 
@@ -266,24 +269,29 @@ TEST_F(LdsApiTest, ValidateDuplicateListeners) {
   addListener(listeners, "duplicate_listener");
   addListener(listeners, "duplicate_listener");
 
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
+  EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true)).WillOnce(Return(true));
+  EXPECT_CALL(init_watcher_, ready());
+
   EXPECT_THROW_WITH_MESSAGE(lds_->onConfigUpdate(listeners, ""), EnvoyException,
-                            "duplicate listener duplicate_listener found");
+                            "Error adding/updating listener(s) duplicate_listener: duplicate "
+                            "listener duplicate_listener found");
   EXPECT_CALL(request_, cancel());
 }
 
 TEST_F(LdsApiTest, BadLocalInfo) {
   interval_timer_ = new Event::MockTimer(&dispatcher_);
-  const std::string config_json = R"EOF(
-  {
-    "api_type": "REST",
-    "cluster": "foo_cluster",
-    "refresh_delay_ms": 1000
-  }
+  const std::string config_yaml = R"EOF(
+api_config_source:
+  api_type: REST
+  cluster_names:
+  - foo_cluster
+  refresh_delay: 1s
   )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   envoy::api::v2::core::ConfigSource lds_config;
-  Config::Utility::translateLdsConfig(*config, lds_config);
+  MessageUtil::loadFromYaml(config_yaml, lds_config);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("foo_cluster", cluster);
@@ -456,8 +464,7 @@ TEST_F(LdsApiTest, Failure) {
 
   setup();
 
-  // To test the case of valid JSON with invalid config, create 2 listeners with
-  // the same name.
+  // To test the case of valid JSON with invalid config, create a listener with no address.
   const std::string response_json = R"EOF(
 {
   "version_info": "1",
@@ -465,13 +472,6 @@ TEST_F(LdsApiTest, Failure) {
     {
       "@type": "type.googleapis.com/envoy.api.v2.Listener",
       "name": "listener1",
-      "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 0 } },
-      "filter_chains": [ { "filters": null } ]
-    },
-    {
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
-      "name": "listener1",
-      "address": { "socket_address": { "address": "tcp://0.0.0.3", "port_value": 0 } },
       "filter_chains": [ { "filters": null } ]
     }
   ]
@@ -481,6 +481,9 @@ TEST_F(LdsApiTest, Failure) {
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
+
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
+  EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
 
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));

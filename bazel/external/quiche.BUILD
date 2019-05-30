@@ -103,6 +103,7 @@ envoy_cc_library(
         "quiche/spdy/platform/api/spdy_export.h",
         "quiche/spdy/platform/api/spdy_flags.h",
         "quiche/spdy/platform/api/spdy_logging.h",
+        "quiche/spdy/platform/api/spdy_macros.h",
         "quiche/spdy/platform/api/spdy_mem_slice.h",
         "quiche/spdy/platform/api/spdy_ptr_util.h",
         "quiche/spdy/platform/api/spdy_string.h",
@@ -111,7 +112,10 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     visibility = ["//visibility:public"],
-    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_impl_lib"],
+    deps = [
+        ":quiche_common_lib",
+        "@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_impl_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -139,6 +143,68 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "spdy_core_alt_svc_wire_format_lib",
+    srcs = ["quiche/spdy/core/spdy_alt_svc_wire_format.cc"],
+    hdrs = ["quiche/spdy/core/spdy_alt_svc_wire_format.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [":spdy_platform"],
+)
+
+envoy_cc_library(
+    name = "spdy_core_header_block_lib",
+    srcs = ["quiche/spdy/core/spdy_header_block.cc"],
+    hdrs = ["quiche/spdy/core/spdy_header_block.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":spdy_platform",
+        ":spdy_platform_unsafe_arena_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "spdy_core_headers_handler_interface",
+    hdrs = ["quiche/spdy/core/spdy_headers_handler_interface.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [":spdy_platform"],
+)
+
+envoy_cc_library(
+    name = "spdy_core_protocol_lib",
+    hdrs = [
+        "quiche/spdy/core/spdy_bitmasks.h",
+        "quiche/spdy/core/spdy_protocol.h",
+    ],
+    copts = quiche_copt,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":spdy_core_alt_svc_wire_format_lib",
+        ":spdy_core_header_block_lib",
+        ":spdy_platform",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "spdy_core_test_utils_lib",
+    srcs = ["quiche/spdy/core/spdy_test_utils.cc"],
+    hdrs = ["quiche/spdy/core/spdy_test_utils.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":spdy_core_header_block_lib",
+        ":spdy_core_headers_handler_interface",
+        ":spdy_core_protocol_lib",
+        ":spdy_platform",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_platform",
     srcs = [
         "quiche/quic/platform/api/quic_clock.cc",
@@ -157,6 +223,7 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
+        ":quic_core_time_lib",
         ":quic_platform_base",
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_impl_lib",
     ],
@@ -276,7 +343,9 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_export",
+        ":quiche_common_lib",
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
+        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_logging_impl_lib",
     ],
 )
 
@@ -301,6 +370,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_error_codes.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [":quic_platform_export"],
 )
 
@@ -367,12 +437,50 @@ envoy_cc_test_library(
     deps = [":epoll_server_platform"],
 )
 
+envoy_cc_library(
+    name = "quiche_common_platform",
+    hdrs = [
+        "quiche/common/platform/api/quiche_logging.h",
+        "quiche/common/platform/api/quiche_ptr_util.h",
+        "quiche/common/platform/api/quiche_unordered_containers.h",
+    ],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quiche_common_platform_impl_lib"],
+)
+
+envoy_cc_test_library(
+    name = "quiche_common_platform_test",
+    hdrs = ["quiche/common/platform/api/quiche_test.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quiche_common_platform_test_impl_lib"],
+)
+
+envoy_cc_library(
+    name = "quiche_common_lib",
+    hdrs = ["quiche/common/simple_linked_hash_map.h"],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [":quiche_common_platform"],
+)
+
 envoy_cc_test(
     name = "epoll_server_test",
     srcs = ["quiche/epoll_server/simple_epoll_server_test.cc"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [":epoll_server_lib"],
+)
+
+envoy_cc_test(
+    name = "quiche_common_test",
+    srcs = ["quiche/common/simple_linked_hash_map_test.cc"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":quiche_common_lib",
+        ":quiche_common_platform_test",
+    ],
 )
 
 envoy_cc_test(
@@ -396,8 +504,20 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "spdy_core_header_block_test",
+    srcs = ["quiche/spdy/core/spdy_header_block_test.cc"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":spdy_core_header_block_lib",
+        ":spdy_core_test_utils_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "quic_platform_api_test",
     srcs = [
+        "quiche/quic/platform/api/quic_containers_test.cc",
         "quiche/quic/platform/api/quic_endian_test.cc",
         "quiche/quic/platform/api/quic_reference_counted_test.cc",
         "quiche/quic/platform/api/quic_string_utils_test.cc",
