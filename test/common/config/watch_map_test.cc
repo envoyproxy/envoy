@@ -20,6 +20,77 @@ namespace Envoy {
 namespace Config {
 namespace {
 
+// expectDeltaAndSotwUpdate() EXPECTs two birds with one function call: we want to cover both SotW
+// and delta, which, while mechanically different, can behave identically for our testing purposes.
+// Specifically, as a simplification for these tests, every still-present resource is updated in
+// every update. Therefore, a resource can never show up in the SotW update but not the delta
+// update. We can therefore use the same expected_resources for both.
+void expectDeltaAndSotwUpdate(
+    MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>& callbacks,
+    std::vector<envoy::api::v2::ClusterLoadAssignment> expected_resources,
+    std::vector<std::string> expected_removals, const std::string& version) {
+  EXPECT_CALL(callbacks, onConfigUpdate(_, version))
+      .WillOnce(Invoke(
+          [expected_resources](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& gotten_resources,
+                               const std::string&) {
+            EXPECT_EQ(expected_resources.size(), gotten_resources.size());
+            for (size_t i = 0; i < expected_resources.size(); i++) {
+              envoy::api::v2::ClusterLoadAssignment cur_gotten_resource;
+              gotten_resources[i].UnpackTo(&cur_gotten_resource);
+              EXPECT_TRUE(TestUtility::protoEqual(cur_gotten_resource, expected_resources[i]));
+            }
+          }));
+  EXPECT_CALL(callbacks, onConfigUpdate(_, _, _))
+      .WillOnce(
+          Invoke([expected_resources, expected_removals, version](
+                     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& gotten_resources,
+                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                     const std::string&) {
+            EXPECT_EQ(expected_resources.size(), gotten_resources.size());
+            for (size_t i = 0; i < expected_resources.size(); i++) {
+              EXPECT_EQ(gotten_resources[i].version(), version);
+              envoy::api::v2::ClusterLoadAssignment cur_gotten_resource;
+              gotten_resources[i].resource().UnpackTo(&cur_gotten_resource);
+              EXPECT_TRUE(TestUtility::protoEqual(cur_gotten_resource, expected_resources[i]));
+            }
+            EXPECT_EQ(expected_removals.size(), removed_resources.size());
+            for (size_t i = 0; i < expected_removals.size(); i++) {
+              EXPECT_EQ(expected_removals[i], removed_resources[i]);
+            }
+          }));
+}
+
+Protobuf::RepeatedPtrField<envoy::api::v2::Resource>
+wrapInResource(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& anys,
+               const std::string& version) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> ret;
+  for (const auto& a : anys) {
+    envoy::api::v2::ClusterLoadAssignment cur_endpoint;
+    a.UnpackTo(&cur_endpoint);
+    auto* cur_resource = ret.Add();
+    cur_resource->set_name(cur_endpoint.cluster_name());
+    cur_resource->mutable_resource()->CopyFrom(a);
+    cur_resource->set_version(version);
+  }
+  return ret;
+}
+
+// Similar to expectDeltaAndSotwUpdate(), but making the onConfigUpdate() happen, rather than
+// EXPECTing it.
+void doDeltaAndSotwUpdate(WatchMap& watch_map,
+                          Protobuf::RepeatedPtrField<ProtobufWkt::Any> sotw_resources,
+                          std::vector<std::string> removed_names, std::string version) {
+  watch_map.onConfigUpdate(sotw_resources, version);
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> delta_resources =
+      wrapInResource(sotw_resources, version);
+  Protobuf::RepeatedPtrField<std::string> removed_names_proto;
+  for (auto n : removed_names) {
+    *removed_names_proto.Add() = n;
+  }
+  watch_map.onConfigUpdate(delta_resources, removed_names_proto, "version1");
+}
+
 // Tests the simple case of a single watch. Checks that the watch will not be told of updates to
 // resources it doesn't care about. Checks that the watch can later decide it does care about them,
 // and then receive subsequent updates to them.
@@ -29,72 +100,60 @@ TEST(WatchMapTest, Basic) {
   WatchMap::Token token = watch_map.addWatch(callbacks);
 
   {
-    // The watch is interested in Alice and Bob.
+    // The watch is interested in Alice and Bob...
     std::set<std::string> update_to({"alice", "bob"});
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
         watch_map.updateWatchInterest(token, update_to);
     EXPECT_EQ(update_to, added_removed.first);
     EXPECT_TRUE(added_removed.second.empty());
 
-    // The update is going to contain Bob and Carol.
-    envoy::api::v2::ClusterLoadAssignment expected_assignment;
-    expected_assignment.set_cluster_name("bob");
-    envoy::api::v2::ClusterLoadAssignment unexpected_assignment;
-    unexpected_assignment.set_cluster_name("carol");
-
+    // ...the update is going to contain Bob and Carol...
     Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
-    updated_resources.Add()->PackFrom(expected_assignment);
-    updated_resources.Add()->PackFrom(unexpected_assignment);
+    envoy::api::v2::ClusterLoadAssignment bob;
+    bob.set_cluster_name("bob");
+    updated_resources.Add()->PackFrom(bob);
+    envoy::api::v2::ClusterLoadAssignment carol;
+    carol.set_cluster_name("carol");
+    updated_resources.Add()->PackFrom(carol);
 
-    EXPECT_CALL(callbacks, onConfigUpdate(_, "version1"))
-        .WillOnce(Invoke(
-            [expected_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                  const std::string&) {
-              EXPECT_EQ(1, resources.size());
-              envoy::api::v2::ClusterLoadAssignment gotten_assignment;
-              resources[0].UnpackTo(&gotten_assignment);
-              EXPECT_TRUE(TestUtility::protoEqual(gotten_assignment, expected_assignment));
-            }));
+    // ...so the watch should receive only Bob.
+    std::vector<envoy::api::v2::ClusterLoadAssignment> expected_resources;
+    expected_resources.push_back(bob);
 
-    watch_map.onConfigUpdate(updated_resources, "version1"); // TODO add delta
+    expectDeltaAndSotwUpdate(callbacks, expected_resources, {}, "version1");
+    doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version1");
   }
 
   {
-    // The watch is interested in Bob, Carol, Dave, Eve.
+    // The watch is now interested in Bob, Carol, Dave, Eve...
     std::set<std::string> update_to({"bob", "carol", "dave", "eve"});
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
         watch_map.updateWatchInterest(token, update_to);
     EXPECT_EQ(std::set<std::string>({"carol", "dave", "eve"}), added_removed.first);
     EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.second);
 
-    // The update is going to contain Alice, Carol, Dave.
-    envoy::api::v2::ClusterLoadAssignment alice_assignment;
-    alice_assignment.set_cluster_name("alice");
-    envoy::api::v2::ClusterLoadAssignment carol_assignment;
-    carol_assignment.set_cluster_name("carol");
-    envoy::api::v2::ClusterLoadAssignment dave_assignment;
-    dave_assignment.set_cluster_name("dave");
-
+    // ...the update is going to contain Alice, Carol, Dave...
     Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
-    updated_resources.Add()->PackFrom(alice_assignment);
-    updated_resources.Add()->PackFrom(carol_assignment);
-    updated_resources.Add()->PackFrom(dave_assignment);
+    envoy::api::v2::ClusterLoadAssignment alice;
+    alice.set_cluster_name("alice");
+    updated_resources.Add()->PackFrom(alice);
+    envoy::api::v2::ClusterLoadAssignment carol;
+    carol.set_cluster_name("carol");
+    updated_resources.Add()->PackFrom(carol);
+    envoy::api::v2::ClusterLoadAssignment dave;
+    dave.set_cluster_name("dave");
+    updated_resources.Add()->PackFrom(dave);
 
-    EXPECT_CALL(callbacks, onConfigUpdate(_, "version2"))
-        .WillOnce(Invoke(
-            [carol_assignment, dave_assignment](
-                const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources, const std::string&) {
-              EXPECT_EQ(2, resources.size());
-              envoy::api::v2::ClusterLoadAssignment gotten_assignment;
-              resources[0].UnpackTo(&gotten_assignment);
-              EXPECT_TRUE(TestUtility::protoEqual(gotten_assignment, carol_assignment));
-              resources[1].UnpackTo(&gotten_assignment);
-              EXPECT_TRUE(TestUtility::protoEqual(gotten_assignment, dave_assignment));
-            }));
+    // ...so the watch should receive only Carol and Dave.
+    std::vector<envoy::api::v2::ClusterLoadAssignment> expected_resources;
+    expected_resources.push_back(carol);
+    expected_resources.push_back(dave);
 
-    watch_map.onConfigUpdate(updated_resources, "version2"); // TODO add delta
+    expectDeltaAndSotwUpdate(callbacks, expected_resources, {"bob"}, "version2");
+    doDeltaAndSotwUpdate(watch_map, updated_resources, {"bob"}, "version2");
   }
 
+  // Clean removal of the watch: first update to "interested in nothing", then remove.
   std::pair<std::set<std::string>, std::set<std::string>> added_removed =
       watch_map.updateWatchInterest(token, {});
   EXPECT_EQ(std::set<std::string>({"bob", "carol", "dave", "eve"}), added_removed.second);
@@ -113,6 +172,11 @@ TEST(WatchMapTest, Overlap) {
   WatchMap::Token token1 = watch_map.addWatch(callbacks1);
   WatchMap::Token token2 = watch_map.addWatch(callbacks2);
 
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
+  envoy::api::v2::ClusterLoadAssignment alice;
+  alice.set_cluster_name("alice");
+  updated_resources.Add()->PackFrom(alice);
+
   // First watch becomes interested.
   {
     std::set<std::string> update_to({"alice"});
@@ -122,22 +186,8 @@ TEST(WatchMapTest, Overlap) {
     EXPECT_TRUE(added_removed.second.empty());
 
     // First watch receives update.
-    envoy::api::v2::ClusterLoadAssignment alice_assignment;
-    alice_assignment.set_cluster_name("alice");
-
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
-    updated_resources.Add()->PackFrom(alice_assignment);
-
-    EXPECT_CALL(callbacks1, onConfigUpdate(_, "version1"))
-        .WillOnce(
-            Invoke([alice_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                      const std::string&) {
-              EXPECT_EQ(1, resources.size());
-              envoy::api::v2::ClusterLoadAssignment gotten_assignment;
-              resources[0].UnpackTo(&gotten_assignment);
-              EXPECT_TRUE(TestUtility::protoEqual(gotten_assignment, alice_assignment));
-            }));
-    watch_map.onConfigUpdate(updated_resources, "version1"); // TODO add delta
+    expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version1");
+    doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version1");
   }
   // Second watch becomes interested.
   {
@@ -148,31 +198,9 @@ TEST(WatchMapTest, Overlap) {
     EXPECT_TRUE(added_removed.second.empty());
 
     // Both watches receive update.
-    envoy::api::v2::ClusterLoadAssignment alice_assignment;
-    alice_assignment.set_cluster_name("alice");
-
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
-    updated_resources.Add()->PackFrom(alice_assignment);
-
-    EXPECT_CALL(callbacks1, onConfigUpdate(_, "version2"))
-        .WillOnce(
-            Invoke([alice_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                      const std::string&) {
-              EXPECT_EQ(1, resources.size());
-              envoy::api::v2::ClusterLoadAssignment gotten_assignment;
-              resources[0].UnpackTo(&gotten_assignment);
-              EXPECT_TRUE(TestUtility::protoEqual(gotten_assignment, alice_assignment));
-            }));
-    EXPECT_CALL(callbacks2, onConfigUpdate(_, "version2"))
-        .WillOnce(
-            Invoke([alice_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                      const std::string&) {
-              EXPECT_EQ(1, resources.size());
-              envoy::api::v2::ClusterLoadAssignment gotten_assignment;
-              resources[0].UnpackTo(&gotten_assignment);
-              EXPECT_TRUE(TestUtility::protoEqual(gotten_assignment, alice_assignment));
-            }));
-    watch_map.onConfigUpdate(updated_resources, "version2"); // TODO add delta
+    expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version2");
+    expectDeltaAndSotwUpdate(callbacks2, {alice}, {}, "version2");
+    doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version2");
   }
   // First watch loses interest.
   {
@@ -182,23 +210,9 @@ TEST(WatchMapTest, Overlap) {
     EXPECT_TRUE(added_removed.second.empty());
 
     // *Only* second watch receives update.
-    envoy::api::v2::ClusterLoadAssignment alice_assignment;
-    alice_assignment.set_cluster_name("alice");
-
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
-    updated_resources.Add()->PackFrom(alice_assignment);
-
-    EXPECT_CALL(callbacks1, onConfigUpdate(_, "version3")).Times(0);
-    EXPECT_CALL(callbacks2, onConfigUpdate(_, "version3"))
-        .WillOnce(
-            Invoke([alice_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                      const std::string&) {
-              EXPECT_EQ(1, resources.size());
-              envoy::api::v2::ClusterLoadAssignment gotten_assignment;
-              resources[0].UnpackTo(&gotten_assignment);
-              EXPECT_TRUE(TestUtility::protoEqual(gotten_assignment, alice_assignment));
-            }));
-    watch_map.onConfigUpdate(updated_resources, "version3"); // TODO add delta
+    EXPECT_CALL(callbacks1, onConfigUpdate(_, _)).Times(0);
+    expectDeltaAndSotwUpdate(callbacks2, {alice}, {}, "version3");
+    doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version3");
   }
   // Second watch loses interest.
   {
@@ -220,6 +234,11 @@ TEST(WatchMapTest, AddRemoveAdd) {
   WatchMap::Token token1 = watch_map.addWatch(callbacks1);
   WatchMap::Token token2 = watch_map.addWatch(callbacks2);
 
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
+  envoy::api::v2::ClusterLoadAssignment alice;
+  alice.set_cluster_name("alice");
+  updated_resources.Add()->PackFrom(alice);
+
   // First watch becomes interested.
   {
     std::set<std::string> update_to({"alice"});
@@ -229,22 +248,8 @@ TEST(WatchMapTest, AddRemoveAdd) {
     EXPECT_TRUE(added_removed.second.empty());
 
     // First watch receives update.
-    envoy::api::v2::ClusterLoadAssignment alice_assignment;
-    alice_assignment.set_cluster_name("alice");
-
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
-    updated_resources.Add()->PackFrom(alice_assignment);
-
-    EXPECT_CALL(callbacks1, onConfigUpdate(_, "version1"))
-        .WillOnce(
-            Invoke([alice_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                      const std::string&) {
-              EXPECT_EQ(1, resources.size());
-              envoy::api::v2::ClusterLoadAssignment gotten_assignment;
-              resources[0].UnpackTo(&gotten_assignment);
-              EXPECT_TRUE(TestUtility::protoEqual(gotten_assignment, alice_assignment));
-            }));
-    watch_map.onConfigUpdate(updated_resources, "version1"); // TODO add delta
+    expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version1");
+    doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version1");
   }
   // First watch loses interest.
   {
@@ -265,24 +270,41 @@ TEST(WatchMapTest, AddRemoveAdd) {
     EXPECT_TRUE(added_removed.second.empty());
 
     // *Only* second watch receives update.
-    envoy::api::v2::ClusterLoadAssignment alice_assignment;
-    alice_assignment.set_cluster_name("alice");
-
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
-    updated_resources.Add()->PackFrom(alice_assignment);
-
-    EXPECT_CALL(callbacks1, onConfigUpdate(_, "version2")).Times(0);
-    EXPECT_CALL(callbacks2, onConfigUpdate(_, "version2"))
-        .WillOnce(
-            Invoke([alice_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                      const std::string&) {
-              EXPECT_EQ(1, resources.size());
-              envoy::api::v2::ClusterLoadAssignment gotten_assignment;
-              resources[0].UnpackTo(&gotten_assignment);
-              EXPECT_TRUE(TestUtility::protoEqual(gotten_assignment, alice_assignment));
-            }));
-    watch_map.onConfigUpdate(updated_resources, "version2"); // TODO add delta
+    EXPECT_CALL(callbacks1, onConfigUpdate(_, _)).Times(0);
+    expectDeltaAndSotwUpdate(callbacks2, {alice}, {}, "version2");
+    doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version2");
   }
+}
+
+// Tests that nothing breaks if an update arrives that we entirely do not care about.
+TEST(WatchMapTest, UninterestingUpdate) {
+  NiceMock<MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks;
+  WatchMap watch_map;
+  WatchMap::Token token = watch_map.addWatch(callbacks);
+  watch_map.updateWatchInterest(token, {"alice"});
+
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> alice_update;
+  envoy::api::v2::ClusterLoadAssignment alice;
+  alice.set_cluster_name("alice");
+  alice_update.Add()->PackFrom(alice);
+
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> bob_update;
+  envoy::api::v2::ClusterLoadAssignment bob;
+  bob.set_cluster_name("bob");
+  bob_update.Add()->PackFrom(bob);
+
+  EXPECT_CALL(callbacks, onConfigUpdate(_, _)).Times(0);
+  doDeltaAndSotwUpdate(watch_map, bob_update, {}, "version1");
+
+  expectDeltaAndSotwUpdate(callbacks, {alice}, {}, "version2");
+  doDeltaAndSotwUpdate(watch_map, alice_update, {}, "version2");
+
+  EXPECT_CALL(callbacks, onConfigUpdate(_, _)).Times(0);
+  doDeltaAndSotwUpdate(watch_map, bob_update, {}, "version3");
+
+  // Clean removal of the watch: first update to "interested in nothing", then remove.
+  watch_map.updateWatchInterest(token, {});
+  EXPECT_TRUE(watch_map.removeWatch(token));
 }
 
 } // namespace
