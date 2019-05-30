@@ -21,6 +21,13 @@ public:
     whywassixafraidofseven_.set(678);
   }
 
+  void mergeTest(const std::string& name, Gauge::ImportMode initial, Gauge::ImportMode merge) {
+    Gauge& g1 = store_.gauge(name, initial);
+    EXPECT_EQ(initial, g1.importMode()) << name;
+    g1.mergeImportMode(merge);
+    EXPECT_EQ(merge, g1.importMode()) << name;
+  }
+
   IsolatedStoreImpl store_;
   StatMerger stat_merger_;
   Gauge& whywassixafraidofseven_;
@@ -174,14 +181,40 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   EXPECT_FALSE(store_.gauge("overload.something.pressure", Gauge::ImportMode::NeverImport).used());
 }
 
+// Targeted test of GaugeImpl::mergeImportMode().
+TEST_F(StatMergerTest, gaugeMergeImportMode) {
+  mergeTest("newgauge1", Gauge::ImportMode::Accumulate, Gauge::ImportMode::Accumulate);
+  mergeTest("s1.version", Gauge::ImportMode::NeverImport, Gauge::ImportMode::NeverImport);
+  mergeTest("newgauge2", Gauge::ImportMode::Uninitialized, Gauge::ImportMode::Accumulate);
+  mergeTest("s2.version", Gauge::ImportMode::Uninitialized, Gauge::ImportMode::NeverImport);
+}
+
+class StatMergerThreadLocalTest : public testing::Test {
+protected:
+  FakeSymbolTableImpl symbol_table_;
+  HeapStatDataAllocator alloc_{symbol_table_};
+  ThreadLocalStoreImpl store_{alloc_};
+};
+
+TEST_F(StatMergerThreadLocalTest, filterOutUninitializedGauges) {
+  Gauge& g1 = store_.gauge("newgauge1", Gauge::ImportMode::Uninitialized);
+  Gauge& g2 = store_.gauge("newgauge2", Gauge::ImportMode::Accumulate);
+  std::vector<GaugeSharedPtr> gauges = store_.gauges();
+  ASSERT_EQ(1, gauges.size());
+  EXPECT_EQ(&g2, gauges[0].get());
+
+  // We don't get "newgauge1" in the aggregated list, but we *do* get it if we try to
+  // find it by name.
+  absl::optional<std::reference_wrapper<const Gauge>> find = store_.findGauge(g1.statName());
+  ASSERT_TRUE(find);
+  EXPECT_EQ(&g1, &(find->get()));
+}
+
 // When the parent sends us counters we haven't ourselves instantiated, they should be stored
 // temporarily, but then uninstantiated if hot restart ends without the child accessing them.
-TEST(StatMergerNonFixtureTest, newStatFromParent) {
-  FakeSymbolTableImpl symbol_table;
-  HeapStatDataAllocator alloc(symbol_table);
-  ThreadLocalStoreImpl store(alloc);
+TEST_F(StatMergerThreadLocalTest, newStatFromParent) {
   {
-    StatMerger stat_merger(store);
+    StatMerger stat_merger(store_);
 
     Protobuf::Map<std::string, uint64_t> counter_values;
     Protobuf::Map<std::string, uint64_t> counter_deltas;
@@ -192,19 +225,19 @@ TEST(StatMergerNonFixtureTest, newStatFromParent) {
     gauges["newgauge1"] = 1;
     gauges["newgauge2"] = 2;
     stat_merger.mergeStats(counter_deltas, gauges);
-    EXPECT_EQ(0, store.counter("newcounter0").value());
-    EXPECT_EQ(0, store.counter("newcounter0").latch());
-    EXPECT_EQ(1, store.counter("newcounter1").value());
-    EXPECT_EQ(1, store.counter("newcounter1").latch());
-    EXPECT_EQ(1, store.gauge("newgauge1", Gauge::ImportMode::Accumulate).value());
+    EXPECT_EQ(0, store_.counter("newcounter0").value());
+    EXPECT_EQ(0, store_.counter("newcounter0").latch());
+    EXPECT_EQ(1, store_.counter("newcounter1").value());
+    EXPECT_EQ(1, store_.counter("newcounter1").latch());
+    EXPECT_EQ(1, store_.gauge("newgauge1", Gauge::ImportMode::Accumulate).value());
   }
   // We accessed 0 and 1 above, but not 2. Now that StatMerger has been destroyed,
   // 2 should be gone.
-  EXPECT_TRUE(TestUtility::findCounter(store, "newcounter0"));
-  EXPECT_TRUE(TestUtility::findCounter(store, "newcounter1"));
-  EXPECT_FALSE(TestUtility::findCounter(store, "newcounter2"));
-  EXPECT_TRUE(TestUtility::findGauge(store, "newgauge1"));
-  EXPECT_FALSE(TestUtility::findGauge(store, "newgauge2"));
+  EXPECT_TRUE(TestUtility::findCounter(store_, "newcounter0"));
+  EXPECT_TRUE(TestUtility::findCounter(store_, "newcounter1"));
+  EXPECT_FALSE(TestUtility::findCounter(store_, "newcounter2"));
+  EXPECT_TRUE(TestUtility::findGauge(store_, "newgauge1"));
+  EXPECT_FALSE(TestUtility::findGauge(store_, "newgauge2"));
 }
 
 } // namespace

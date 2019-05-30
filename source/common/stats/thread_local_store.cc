@@ -118,9 +118,11 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   StatNameHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
-    for (auto& gauge : scope->central_cache_.gauges_) {
-      if (names.insert(gauge.first).second) {
-        ret.push_back(gauge.second);
+    for (auto& gauge_iter : scope->central_cache_.gauges_) {
+      const GaugeSharedPtr& gauge = gauge_iter.second;
+      if (gauge->importMode() != Gauge::ImportMode::Uninitialized &&
+          names.insert(gauge_iter.first).second) {
+        ret.push_back(gauge);
       }
     }
   }

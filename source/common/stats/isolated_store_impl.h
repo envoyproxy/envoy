@@ -127,7 +127,14 @@ public:
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
-  std::vector<GaugeSharedPtr> gauges() const override { return gauges_.toVector(); }
+  std::vector<GaugeSharedPtr> gauges() const override {
+    // TODO(jmarantz): should we filter out gauges where
+    // gauge.importMode() != Gauge::ImportMode::Uninitialized ?
+    // I don't think this matters because that should only occur for gauges
+    // received in a hot-restart transfer, and isolated-store gauges should
+    // never be transmitted that way.
+    return gauges_.toVector();
+  }
   std::vector<ParentHistogramSharedPtr> histograms() const override {
     return std::vector<ParentHistogramSharedPtr>{};
   }
