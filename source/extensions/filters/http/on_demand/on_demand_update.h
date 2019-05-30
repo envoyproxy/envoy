@@ -9,7 +9,7 @@ namespace OnDemand {
 
 class OnDemandRouteUpdate : public Http::StreamDecoderFilter {
 public:
-  OnDemandRouteUpdate() {}
+  OnDemandRouteUpdate() = default;
 
   void requestRouteConfigUpdate();
 

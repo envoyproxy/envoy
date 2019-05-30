@@ -154,8 +154,9 @@ void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
 }
 
 void RdsRouteConfigSubscription::ondemandUpdate(const std::set<std::string>& aliases) {
-  if (vhds_subscription_.get() == nullptr)
+  if (vhds_subscription_.get() == nullptr) {
     return;
+  }
   vhds_subscription_->ondemandUpdate(aliases);
 }
 
