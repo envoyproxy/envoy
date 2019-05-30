@@ -15,8 +15,10 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/config/runtime_utility.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -126,12 +128,13 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstra
     flags_path_ = bootstrap.flags_path();
   }
 
-  base_runtime_ = bootstrap.runtime().base();
-  if (!bootstrap.runtime().symlink_root().empty()) {
-    disk_runtime_ = std::make_unique<DiskRuntimeImpl>();
-    disk_runtime_->symlink_root_ = bootstrap.runtime().symlink_root();
-    disk_runtime_->subdirectory_ = bootstrap.runtime().subdirectory();
-    disk_runtime_->override_subdirectory_ = bootstrap.runtime().override_subdirectory();
+  if (bootstrap.has_layered_runtime()) {
+    layered_runtime_.MergeFrom(bootstrap.layered_runtime());
+    if (layered_runtime_.layers().empty()) {
+      layered_runtime_.add_layers()->mutable_admin_layer();
+    }
+  } else {
+    Config::translateRuntime(bootstrap.runtime(), layered_runtime_);
   }
 }
 

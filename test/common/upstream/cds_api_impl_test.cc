@@ -197,6 +197,53 @@ TEST_F(CdsApiImplTest, ValidateFail) {
   EXPECT_CALL(request_, cancel());
 }
 
+// Regression test against only updating versionInfo() if at least one cluster
+// is are added/updated even if one or more are removed.
+TEST_F(CdsApiImplTest, UpdateVersionOnClusterRemove) {
+  interval_timer_ = new Event::MockTimer(&dispatcher_);
+  InSequence s;
+
+  setup();
+
+  const std::string response1_yaml = R"EOF(
+version_info: '0'
+resources:
+- "@type": type.googleapis.com/envoy.api.v2.Cluster
+  name: cluster1
+  type: EDS
+  eds_cluster_config:
+    eds_config:
+      path: eds path
+)EOF";
+
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
+  cm_.expectAdd("cluster1", "0");
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_EQ("", cds_->versionInfo());
+  EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.version").value());
+
+  callbacks_->onSuccess(parseResponseMessageFromYaml(response1_yaml));
+  EXPECT_EQ("0", cds_->versionInfo());
+
+  expectRequest();
+  interval_timer_->callback_();
+
+  const std::string response2_yaml = R"EOF(
+version_info: '1'
+resources:
+)EOF";
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterMap({"cluster1"})));
+
+  EXPECT_CALL(cm_, removeCluster("cluster1")).WillOnce(Return(true));
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  callbacks_->onSuccess(parseResponseMessageFromYaml(response2_yaml));
+
+  EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_attempt").value());
+  EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_success").value());
+  EXPECT_EQ("1", cds_->versionInfo());
+}
+
 // Validate onConfigUpdate throws EnvoyException with duplicate clusters.
 TEST_F(CdsApiImplTest, ValidateDuplicateClusters) {
   InSequence s;

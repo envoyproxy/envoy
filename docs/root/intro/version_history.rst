@@ -40,6 +40,8 @@ Version history
 * router: per try timeouts will no longer start before the downstream request has been received
   in full by the router. This ensures that the per try timeout does not account for slow
   downstreams and that will not start before the global timeout.
+* runtime: added support for :ref:`flexible layering configuration
+  <envoy_api_field_config.bootstrap.v2.Bootstrap.layered_runtime>`.
 * runtime: added support for statically :ref:`specifying the runtime in the bootstrap configuration
   <envoy_api_field_config.bootstrap.v2.Runtime.base>`.
 * sandbox: added :ref:`CSRF sandbox <install_sandboxes_csrf>`.
