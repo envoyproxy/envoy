@@ -166,7 +166,7 @@ public:
 
   RdsRouteConfigSubscription& subscription() { return *subscription_; }
   void onConfigUpdate() override;
-  bool requestVirtualHostsUpdate(const std::string& for_domain, std::function<void()> cb);
+  bool requestVirtualHostsUpdate(const std::string& for_domain, std::function<void()> cb) override;
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;

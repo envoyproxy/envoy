@@ -72,7 +72,7 @@ public:
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
-    bool requestConfigUpdate(const std::string, std::function<void()>) override { return false; }
+    bool requestVirtualHostsUpdate(const std::string&, std::function<void()>) override { return false; }
 
     TimeSource& time_source_;
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
@@ -2919,6 +2919,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _))
       .WillOnce(Return(route1))
       .WillOnce(Return(route2))
+      .WillOnce(Return(nullptr))
       .WillOnce(Return(nullptr));
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
