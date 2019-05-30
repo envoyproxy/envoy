@@ -540,7 +540,12 @@ void Utility::traversePerFilterConfigGeneric(
 std::string Utility::PercentEncoding::encode(absl::string_view value) {
   for (size_t i = 0; i < value.size(); ++i) {
     const char& ch = value[i];
+    // The escaping characters are defined in
     // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses.
+    //
+    // We do checking for each char in the string. If the current char is included in the defined
+    // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded] to
+    // the returned string one by one) started from the current index.
     if (ch < ' ' || ch >= '~' || ch == '%') {
       return PercentEncoding::encode(value, i);
     }
