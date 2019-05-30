@@ -52,7 +52,9 @@ public:
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
-    bool requestVirtualHostsUpdate(const std::string&, std::function<void()>) override { return false; }
+    bool requestVirtualHostsUpdate(const std::string&, std::function<void()>) override {
+      return false;
+    }
 
     TimeSource& time_source_;
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
