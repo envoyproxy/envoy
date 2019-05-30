@@ -78,16 +78,23 @@ public:
     GaugeSharedPtr gauge = std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(
         alloc(name), *this, tag_extracted_name, tags, import_mode);
 
-    if (gauge->importMode() == Gauge::ImportMode::Accumulate) {
+    switch (gauge->importMode()) {
+    case Gauge::ImportMode::Accumulate:
       if (!StatMerger::shouldImportBasedOnRegex(gauge->name())) {
         std::cerr << "ImportMode conflict: regex says no, arg says yes: " << gauge->name()
                   << std::endl;
         new std::string;
       }
-    } else if (StatMerger::shouldImportBasedOnRegex(gauge->name())) {
-      std::cerr << "ImportMode conflict: regex says yes, arg says no: " << gauge->name()
-                << std::endl;
-      new std::string;
+      break;
+    case Gauge::ImportMode::NeverImport:
+      if (StatMerger::shouldImportBasedOnRegex(gauge->name())) {
+        std::cerr << "ImportMode conflict: regex says yes, arg says no: " << gauge->name()
+                  << std::endl;
+        new std::string;
+      }
+      break;
+    case Gauge::ImportMode::Uninitialized:
+      break;
     }
     return gauge;
   }

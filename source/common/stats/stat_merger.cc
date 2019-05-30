@@ -63,17 +63,26 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
     StatName stat_name = storage.statName();
     absl::optional<std::reference_wrapper<const Gauge>> gauge_opt =
         temp_scope_->findGauge(stat_name);
-    if (gauge_opt && gauge_opt->get().importMode() == Gauge::ImportMode::NeverImport) {
-      continue;
+
+    // We the stat named in the protobuf map is already initialized, and has a mode
+    // of NeverImport, then we simply skip over the map entry. This is a case where
+    // a new revision of Envoy has been built where a previously Accumulated gauge
+    // has been switched to NeverImport mode.
+    Gauge::ImportMode import_mode = Gauge::ImportMode::Uninitialized;
+    if (gauge_opt) {
+      import_mode = gauge_opt->get().importMode();
+      if (import_mode == Gauge::ImportMode::NeverImport) {
+        continue;
+      }
     }
 
-    // Looks like this Gauge is accumulated -- otherwise it not be in the
-    // map. Independent of whether we already have seen this gauge allocated
-    // before, we'll need a read/write copy now in which to save the old value.
-    //
-    // The corner-case here is if a gauge changes across versions from Accumulate
-    // to NeverImport, we'll drop the old value.
-    auto& gauge_ref = temp_scope_->gaugeFromStatName(stat_name, Gauge::ImportMode::Accumulate);
+    // We establish here a tentative import-mode of Uninitialized. Gauges in
+    // this mode will not be reported in stats sinks or in the admin /stats
+    // endpoint. However, we'll retain the transferred value, and if the running
+    // system initialized the stat as Accumulate, we'll have the accumulated
+    // value ready to go. If the system re-initializes it as NeverImport, we'll
+    // clear the value during the mergeImportMode call.
+    auto& gauge_ref = temp_scope_->gaugeFromStatName(stat_name, import_mode);
     uint64_t& parent_value_ref = parent_gauge_values_[gauge_ref.statName()];
     uint64_t old_parent_value = parent_value_ref;
     uint64_t new_parent_value = gauge.second;

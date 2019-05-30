@@ -50,7 +50,8 @@ public:
       // becomes interesting if we do a hot-restart between binaries where
       // a stat has changed status. This would only occur if the mode changed
       // from Accumulated to NeverImport.
-      if (base.importMode() != import_mode) {
+      Gauge::ImportMode base_import_mode = base.importMode();
+      if (base_import_mode != Gauge::ImportMode::Uninitialized && base_import_mode != import_mode) {
         auto to_string = [](Gauge::ImportMode import_mode) -> std::string {
           return import_mode == Gauge::ImportMode::Accumulate ? "accumulate" : "never-import";
         };
@@ -104,7 +105,9 @@ public:
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-    return gauges_.get(name, import_mode);
+    Gauge& gauge = gauges_.get(name, import_mode);
+    gauge.mergeImportMode(import_mode);
+    return gauge;
   }
   NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   Histogram& histogramFromStatName(StatName name) override {

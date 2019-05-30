@@ -119,7 +119,9 @@ public:
             absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
             ImportMode import_mode)
       : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {
-    if (import_mode == ImportMode::Accumulate) {
+    if (import_mode == ImportMode::Uninitialized) {
+      data_.flags_ |= Flags::ImportModeUninitialized;
+    } else if (import_mode == ImportMode::Accumulate) {
       data_.flags_ |= Flags::LogicAccumulate;
     }
   }
@@ -153,8 +155,30 @@ public:
   bool used() const override { return data_.flags_ & Flags::Used; }
 
   ImportMode importMode() const override {
-    return (data_.flags_ & Flags::LogicAccumulate) ? ImportMode::Accumulate
-                                                   : ImportMode::NeverImport;
+    if (data_.flags_ & Flags::ImportModeUninitialized) {
+      return ImportMode::Uninitialized;
+    } else if (data_.flags_ & Flags::LogicAccumulate) {
+      return ImportMode::Accumulate;
+    }
+    return ImportMode::NeverImport;
+  }
+
+  void mergeImportMode(ImportMode import_mode) override {
+    if (import_mode != ImportMode::Uninitialized &&
+        (data_.flags_ & Flags::ImportModeUninitialized)) {
+      data_.flags_ &= ~Flags::ImportModeUninitialized;
+      if (import_mode == ImportMode::Accumulate) {
+        data_.flags_ |= Flags::LogicAccumulate;
+      } else {
+        // A previous revision of Envoy must have transferred a gauge that it
+        // thought was Accumulate. But the new version thinks its NeverImport,
+        // so we clear the accumulated value.
+        data_.value_ = 0;
+        data_.flags_ &= ~Flags::Used;
+      }
+    } else {
+      ASSERT(importMode() == import_mode);
+    }
   }
 
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
@@ -186,6 +210,7 @@ public:
   void sub(uint64_t) override {}
   uint64_t value() const override { return 0; }
   ImportMode importMode() const override { return ImportMode::NeverImport; }
+  void mergeImportMode(ImportMode /* import_mode */) override {}
 };
 
 } // namespace Stats

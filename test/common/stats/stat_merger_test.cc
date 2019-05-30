@@ -111,7 +111,7 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
 
   Protobuf::Map<std::string, uint64_t> gauges;
   gauges["some.sort.of.version"] = 67890;
-  // gauges["child.doesnt.have.this.version"] = 111; -- this should never be populated.
+  gauges["child.doesnt.have.this.version"] = 111; // This should never be populated.
 
   // Check defined values are not changed, and undefined remain undefined.
   stat_merger_.mergeStats(empty_counter_deltas_, gauges);
@@ -120,7 +120,6 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
       store_.gauge("child.doesnt.have.this.version", Gauge::ImportMode::NeverImport).used());
 
   // Check the "undefined remains undefined" behavior for a bunch of other names.
-  /*
   gauges["runtime.admin_overrides_active"] = 111;
   gauges["runtime.num_keys"] = 111;
   gauges["listener_manager.total_listeners_draining"] = 111;
@@ -138,7 +137,6 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   gauges["anything.total_principals"] = 33;
   gauges["listener_manager.total_listeners_active"] = 33;
   gauges["overload.something.pressure"] = 33;
-  */
 
   stat_merger_.mergeStats(empty_counter_deltas_, gauges);
   EXPECT_FALSE(

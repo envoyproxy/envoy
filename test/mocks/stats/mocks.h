@@ -107,6 +107,7 @@ public:
   MOCK_METHOD0(inc, void());
   MOCK_METHOD1(set, void(uint64_t value));
   MOCK_METHOD1(sub, void(uint64_t amount));
+  MOCK_METHOD1(mergeImportMode, void(ImportMode));
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(value, uint64_t());
   MOCK_CONST_METHOD0(cachedShouldImport, absl::optional<bool>());
