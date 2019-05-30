@@ -67,6 +67,15 @@ void expectDeltaAndSotwUpdate(NamedMockSubscriptionCallbacks& callbacks,
           }));
 }
 
+// Sometimes we want to verify that a delta onConfigUpdate simply doesn't happen. However, for SotW,
+// every update triggers all onConfigUpdate()s, so we should still expect empty calls for that.
+void expectNoDeltaUpdate(NamedMockSubscriptionCallbacks& callbacks, const std::string& version) {
+  EXPECT_CALL(callbacks, onConfigUpdate(_, version))
+      .WillOnce(Invoke([](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& gotten_resources,
+                          const std::string&) { EXPECT_EQ(0, gotten_resources.size()); }));
+  EXPECT_CALL(callbacks, onConfigUpdate(_, _, _)).Times(0);
+}
+
 Protobuf::RepeatedPtrField<envoy::api::v2::Resource>
 wrapInResource(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& anys,
                const std::string& version) {
@@ -75,6 +84,7 @@ wrapInResource(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& anys,
     envoy::api::v2::ClusterLoadAssignment cur_endpoint;
     a.UnpackTo(&cur_endpoint);
     auto* cur_resource = ret.Add();
+    std::cerr << "wrapping " << cur_endpoint.cluster_name() << std::endl;
     cur_resource->set_name(cur_endpoint.cluster_name());
     cur_resource->mutable_resource()->CopyFrom(a);
     cur_resource->set_version(version);
@@ -94,6 +104,10 @@ void doDeltaAndSotwUpdate(WatchMap& watch_map,
   Protobuf::RepeatedPtrField<std::string> removed_names_proto;
   for (auto n : removed_names) {
     *removed_names_proto.Add() = n;
+  }
+  std::cerr << "removed names:" << std::endl;
+  for (auto n : removed_names_proto) {
+    std::cerr << n << std::endl;
   }
   watch_map.onConfigUpdate(delta_resources, removed_names_proto, "version1");
 }
@@ -194,6 +208,7 @@ TEST(WatchMapTest, Overlap) {
 
     // First watch receives update.
     expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version1");
+    expectNoDeltaUpdate(callbacks2, "version1");
     doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version1");
   }
   // Second watch becomes interested.
@@ -217,7 +232,7 @@ TEST(WatchMapTest, Overlap) {
     EXPECT_TRUE(added_removed.second.empty());
 
     // *Only* second watch receives update.
-    EXPECT_CALL(callbacks1, onConfigUpdate(_, _)).Times(0);
+    expectNoDeltaUpdate(callbacks1, "version3");
     expectDeltaAndSotwUpdate(callbacks2, {alice}, {}, "version3");
     doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version3");
   }
@@ -256,6 +271,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
 
     // First watch receives update.
     expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version1");
+    expectNoDeltaUpdate(callbacks2, "version1");
     doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version1");
   }
   // First watch loses interest.
@@ -277,7 +293,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
     EXPECT_TRUE(added_removed.second.empty());
 
     // *Only* second watch receives update.
-    EXPECT_CALL(callbacks1, onConfigUpdate(_, _)).Times(0);
+    expectNoDeltaUpdate(callbacks1, "version2");
     expectDeltaAndSotwUpdate(callbacks2, {alice}, {}, "version2");
     doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version2");
   }
@@ -300,18 +316,46 @@ TEST(WatchMapTest, UninterestingUpdate) {
   bob.set_cluster_name("bob");
   bob_update.Add()->PackFrom(bob);
 
-  EXPECT_CALL(callbacks, onConfigUpdate(_, _)).Times(0);
+  expectNoDeltaUpdate(callbacks, "version1");
   doDeltaAndSotwUpdate(watch_map, bob_update, {}, "version1");
 
   expectDeltaAndSotwUpdate(callbacks, {alice}, {}, "version2");
   doDeltaAndSotwUpdate(watch_map, alice_update, {}, "version2");
 
-  EXPECT_CALL(callbacks, onConfigUpdate(_, _)).Times(0);
+  expectNoDeltaUpdate(callbacks, "version3");
   doDeltaAndSotwUpdate(watch_map, bob_update, {}, "version3");
 
   // Clean removal of the watch: first update to "interested in nothing", then remove.
   watch_map.updateWatchInterest(token, {});
   EXPECT_TRUE(watch_map.removeWatch(token));
+}
+
+// Delta onConfigUpdate has some slightly subtle details with how it handles the three cases where a
+// watch receives {only updates, updates+removals, only removals} to its resources. This test
+// exercise those cases. Also, the removal-only case tests that SotW does call a watch's
+// onConfigUpdate even if none of the watch's interested resources are among the updated resources.
+// (Which ensures we deliver empty config updates when a resource is dropped.)
+TEST(WatchMapTest, DeltaOnConfigUpdate) {
+  NamedMockSubscriptionCallbacks callbacks1;
+  NamedMockSubscriptionCallbacks callbacks2;
+  NamedMockSubscriptionCallbacks callbacks3;
+  WatchMap watch_map;
+  WatchMap::Token token1 = watch_map.addWatch(callbacks1);
+  WatchMap::Token token2 = watch_map.addWatch(callbacks2);
+  WatchMap::Token token3 = watch_map.addWatch(callbacks3);
+  watch_map.updateWatchInterest(token1, {"updated"});
+  watch_map.updateWatchInterest(token2, {"updated", "removed"});
+  watch_map.updateWatchInterest(token3, {"removed"});
+
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+  envoy::api::v2::ClusterLoadAssignment updated;
+  updated.set_cluster_name("updated");
+  update.Add()->PackFrom(updated);
+
+  expectDeltaAndSotwUpdate(callbacks1, {updated}, {}, "version1");          // only update
+  expectDeltaAndSotwUpdate(callbacks2, {updated}, {"removed"}, "version1"); // update+remove
+  expectDeltaAndSotwUpdate(callbacks3, {}, {"removed"}, "version1");        // only remove
+  doDeltaAndSotwUpdate(watch_map, update, {"removed"}, "version1");
 }
 
 } // namespace

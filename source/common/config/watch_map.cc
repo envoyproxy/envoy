@@ -71,13 +71,16 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   }
 
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
-  for (const auto& updated : per_watch_updates) {
-    auto entry = watches_.find(updated.first);
-    if (entry == watches_.end()) {
-      ENVOY_LOG(error, "A token referred to by watch_interest_ is not present in watches_!");
-      continue;
+  for (auto& watch : watches_) {
+    auto this_watch_updates = per_watch_updates.find(watch.first);
+    if (this_watch_updates == per_watch_updates.end()) {
+      // This update included no resources this watch cares about - so we do an empty
+      // onConfigUpdate(), to notify the watch that its resources - if they existed before this -
+      // were dropped.
+      watch.second.callbacks_.onConfigUpdate({}, version_info);
+    } else {
+      watch.second.callbacks_.onConfigUpdate(this_watch_updates->second, version_info);
     }
-    entry->second.callbacks_.onConfigUpdate(updated.second, version_info);
   }
 }
 
@@ -102,18 +105,19 @@ void WatchMap::onConfigUpdate(
     ENVOY_LOG(warn, "WatchMap::onConfigUpdate: there are no watches!");
     return;
   }
+
   // Build a pair of maps: from watches, to the set of resources {added,removed} that each watch
   // cares about. Each entry in the map-pair is then a nice little bundle that can be fed directly
   // into the individual onConfigUpdate()s.
   absl::flat_hash_map<WatchMap::Token, Protobuf::RepeatedPtrField<envoy::api::v2::Resource>>
       per_watch_added;
-  absl::flat_hash_map<WatchMap::Token, Protobuf::RepeatedPtrField<std::string>> per_watch_removed;
   for (const auto& r : added_resources) {
     const absl::flat_hash_set<WatchMap::Token>& interested_in_r = tokensInterestedIn(r.name());
     for (const auto& interested_token : interested_in_r) {
       per_watch_added[interested_token].Add()->CopyFrom(r);
     }
   }
+  absl::flat_hash_map<WatchMap::Token, Protobuf::RepeatedPtrField<std::string>> per_watch_removed;
   for (const auto& r : removed_resources) {
     const absl::flat_hash_set<WatchMap::Token>& interested_in_r = tokensInterestedIn(r);
     for (const auto& interested_token : interested_in_r) {
