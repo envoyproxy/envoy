@@ -12,6 +12,10 @@ def api_dependencies():
         locations = REPOSITORY_LOCATIONS,
     )
     envoy_http_archive(
+        "com_envoyproxy_protoc_gen_validate",
+        locations = REPOSITORY_LOCATIONS,
+    )
+    envoy_http_archive(
         name = "googleapis",
         locations = REPOSITORY_LOCATIONS,
         build_file_content = GOOGLEAPIS_BUILD_CONTENT,

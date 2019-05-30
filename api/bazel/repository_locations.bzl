@@ -7,8 +7,8 @@ GOGOPROTO_SHA256 = "99e423905ba8921e86817607a5294ffeedb66fdd4a85efce5eb2848f715f
 OPENCENSUS_RELEASE = "0.1.0"
 OPENCENSUS_SHA256 = "4fd21cc6de63d7cb979fd749d8101ff425905aa0826fed26019d1c311fcf19a7"
 
-PGV_RELEASE = "0.0.14"
-PGV_SHA256 = "c45e629e8c174886a73ec251b94d5470526c7c1e2596cf17755065aed15b9254"
+PGV_GIT_SHA = "c15f2c24fb27b136e722fa912accddd0c8db9dfa"
+PGV_SHA256 = "e822d86269823194298557247e92fc60faf6143f46662678e4c1f82ee5c2cf23"
 
 GOOGLEAPIS_GIT_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411"  # May 23, 2018
 GOOGLEAPIS_SHA = "16f5b2e8bf1e747a32f9a62e211f8f33c94645492e9bbd72458061d9a9de1f63"
@@ -23,10 +23,16 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = BAZEL_SKYLIB_SHA256,
         urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/" + BAZEL_SKYLIB_RELEASE + "/bazel-skylib." + BAZEL_SKYLIB_RELEASE + ".tar.gz"],
     ),
+    com_envoyproxy_protoc_gen_validate = dict(
+        sha256 = PGV_SHA256,
+        strip_prefix = "protoc-gen-validate-" + PGV_GIT_SHA,
+        urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/" + PGV_GIT_SHA + ".tar.gz"],
+    ),
+    # Similar to com_envoyproxy_protoc_gen_validate during the migration.
     com_lyft_protoc_gen_validate = dict(
         sha256 = PGV_SHA256,
-        strip_prefix = "protoc-gen-validate-" + PGV_RELEASE,
-        urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/v" + PGV_RELEASE + ".tar.gz"],
+        strip_prefix = "protoc-gen-validate-" + PGV_GIT_SHA,
+        urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/" + PGV_GIT_SHA + ".tar.gz"],
     ),
     googleapis = dict(
         # TODO(dio): Consider writing a Skylark macro for importing Google API proto.
