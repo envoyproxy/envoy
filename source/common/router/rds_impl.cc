@@ -80,7 +80,6 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
-  ENVOY_LOG_MISC(debug, "HTD teardown");
   // If we get destroyed during initialization, make sure we signal that we "initialized".
   init_target_.ready();
 
