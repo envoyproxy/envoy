@@ -102,7 +102,7 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
   }
   // If we fail, we see if we get a clean parse when allowing unknown fields.
   // This is essentially a workaround
-  // for://github.com/protocolbuffers/protobuf/issues/5967.
+  // for https://github.com/protocolbuffers/protobuf/issues/5967.
   // TODO(htuch): clean this up when protobuf supports JSON/YAML unknown field
   // detection directly.
   options.ignore_unknown_fields = true;
