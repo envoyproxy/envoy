@@ -308,7 +308,8 @@ void RedisCluster::RedisDiscoverySession::onFailure() {
 
 RedisCluster::ClusterSlotsRequest RedisCluster::ClusterSlotsRequest::instance_;
 
-Upstream::ClusterImplBaseSharedPtr RedisClusterFactory::createClusterWithConfig(
+std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
+RedisClusterFactory::createClusterWithConfig(
     const envoy::api::v2::Cluster& cluster,
     const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
@@ -318,11 +319,15 @@ Upstream::ClusterImplBaseSharedPtr RedisClusterFactory::createClusterWithConfig(
       cluster.cluster_type().name() != Extensions::Clusters::ClusterTypes::get().Redis) {
     throw EnvoyException("Redis cluster can only created with redis cluster type");
   }
-  return std::make_shared<RedisCluster>(
-      cluster, proto_config, NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
-      context.clusterManager(), context.runtime(), context.api(),
-      selectDnsResolver(cluster, context), socket_factory_context, std::move(stats_scope),
-      context.addedViaApi());
+  // TODO(Henry): Implement a thread aware load balancer for Redis Cluster. This can come from
+  //              inside the created cluster.
+  return std::make_pair(std::make_shared<RedisCluster>(
+                            cluster, proto_config,
+                            NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
+                            context.clusterManager(), context.runtime(), context.api(),
+                            selectDnsResolver(cluster, context), socket_factory_context,
+                            std::move(stats_scope), context.addedViaApi()),
+                        nullptr);
 }
 
 REGISTER_FACTORY(RedisClusterFactory, Upstream::ClusterFactory);

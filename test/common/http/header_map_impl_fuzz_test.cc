@@ -4,9 +4,11 @@
 #include "common/common/logger.h"
 #include "common/http/header_map_impl.h"
 
-#include "test/common/http/common_fuzz.h"
 #include "test/common/http/header_map_impl_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/fuzz/utility.h"
+
+using Envoy::Fuzz::replaceInvalidCharacters;
 
 namespace Envoy {
 

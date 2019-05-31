@@ -201,6 +201,11 @@ envoy_cc_fuzz_test(
     ] + envoy_all_extensions(),
 )
 
+filegroup(
+    name = "runtime_test_data",
+    srcs = glob(["test_data/runtime/**"]),
+)
+
 envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
@@ -214,6 +219,7 @@ envoy_cc_test(
         ":node_bootstrap_no_admin_port.yaml",
         ":node_bootstrap_without_access_log.yaml",
         ":runtime_bootstrap.yaml",
+        ":runtime_test_data",
         ":zipkin_tracing.yaml",
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",

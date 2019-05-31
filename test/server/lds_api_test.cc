@@ -386,6 +386,63 @@ TEST_F(LdsApiTest, Basic) {
   EXPECT_EQ(13237225503670494420U, store_.gauge("listener_manager.lds.version").value());
 }
 
+// Regression test against only updating versionInfo() if at least one listener
+// is added/updated even if one or more are removed.
+TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
+  InSequence s;
+
+  setup();
+
+  const std::string response1_json = R"EOF(
+{
+  "version_info": "0",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.api.v2.Listener",
+      "name": "listener1",
+      "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 0 } },
+      "filter_chains": [ { "filters": null } ]
+    }
+  ]
+}
+)EOF";
+
+  Http::MessagePtr message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
+
+  makeListenersAndExpectCall({});
+  expectAdd("listener1", "0", true);
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  callbacks_->onSuccess(std::move(message));
+
+  EXPECT_EQ("0", lds_->versionInfo());
+  expectRequest();
+  interval_timer_->callback_();
+
+  const std::string response2_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": []
+}
+  )EOF";
+
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+  message->body() = std::make_unique<Buffer::OwnedImpl>(response2_json);
+
+  makeListenersAndExpectCall({"listener1"});
+  EXPECT_CALL(listener_manager_, removeListener("listener1")).WillOnce(Return(true));
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  callbacks_->onSuccess(std::move(message));
+  EXPECT_EQ("1", lds_->versionInfo());
+
+  EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
+  EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
+  EXPECT_EQ(13237225503670494420U, store_.gauge("listener_manager.lds.version").value());
+}
+
 // Regression test issue #2188 where an empty ca_cert_file field was created and caused the LDS
 // update to fail validation.
 TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {

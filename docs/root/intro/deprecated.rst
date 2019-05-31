@@ -18,6 +18,9 @@ Version 1.11.0 (Pending)
 * Use of the v1 style route configuration for the :ref:`TCP proxy filter <config_network_filters_tcp_proxy>`
   is now fully replaced with listener :ref:`filter chain matching <envoy_api_msg_listener.FilterChainMatch>`.
   Use this instead.
+* Use of :ref:`runtime <envoy_api_field_config.bootstrap.v2.Bootstrap.runtime>` in :ref:`Bootstrap
+  <envoy_api_msg_config.bootstrap.v2.Bootstrap>`. Use :ref:`layered_runtime
+  <envoy_api_field_config.bootstrap.v2.Bootstrap.layered_runtime>` instead.
 
 Version 1.10.0 (Apr 5, 2019)
 ============================
