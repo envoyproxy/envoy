@@ -386,6 +386,8 @@ http_logs:
     ON_CALL(connection_info, subjectLocalCertificate()).WillByDefault(Return("localSubject"));
     ON_CALL(connection_info, sessionId())
         .WillByDefault(Return("D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B"));
+    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1.3"));
+    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2CC0));
     stream_info.setDownstreamSslConnection(&connection_info);
     stream_info.requested_server_name_ = "sni";
 
@@ -408,6 +410,8 @@ http_logs:
       start_time:
         seconds: 3600
       tls_properties:
+        tls_version: TLSv1_3
+        tls_cipher_suite: 0x2cc0
         tls_sni_hostname: sni
         local_certificate_properties:
           subject_alt_name:
@@ -426,6 +430,178 @@ http_logs:
     response: {}
 )EOF");
     access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+  }
+
+  // TLSv1.2
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
+
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1.2"));
+    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
+    stream_info.setDownstreamSslConnection(&connection_info);
+    stream_info.requested_server_name_ = "sni";
+
+    Http::TestHeaderMapImpl request_headers{
+        {":method", "WHACKADOO"},
+    };
+
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: "127.0.0.1"
+          port_value: 0
+      downstream_local_address:
+        socket_address:
+          address: "127.0.0.2"
+          port_value: 0
+      start_time:
+        seconds: 3600
+      tls_properties:
+        tls_version: TLSv1_2
+        tls_cipher_suite: 0x2f
+        tls_sni_hostname: sni
+        local_certificate_properties: {}
+        peer_certificate_properties: {}
+    request:
+      request_method: "METHOD_UNSPECIFIED"
+    response: {}
+)EOF");
+    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  }
+
+  // TLSv1.1
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
+
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1.1"));
+    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
+    stream_info.setDownstreamSslConnection(&connection_info);
+    stream_info.requested_server_name_ = "sni";
+
+    Http::TestHeaderMapImpl request_headers{
+        {":method", "WHACKADOO"},
+    };
+
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: "127.0.0.1"
+          port_value: 0
+      downstream_local_address:
+        socket_address:
+          address: "127.0.0.2"
+          port_value: 0
+      start_time:
+        seconds: 3600
+      tls_properties:
+        tls_version: TLSv1_1
+        tls_cipher_suite: 0x2f
+        tls_sni_hostname: sni
+        local_certificate_properties: {}
+        peer_certificate_properties: {}
+    request:
+      request_method: "METHOD_UNSPECIFIED"
+    response: {}
+)EOF");
+    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  }
+
+  // TLSv1
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
+
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1"));
+    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
+    stream_info.setDownstreamSslConnection(&connection_info);
+    stream_info.requested_server_name_ = "sni";
+
+    Http::TestHeaderMapImpl request_headers{
+        {":method", "WHACKADOO"},
+    };
+
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: "127.0.0.1"
+          port_value: 0
+      downstream_local_address:
+        socket_address:
+          address: "127.0.0.2"
+          port_value: 0
+      start_time:
+        seconds: 3600
+      tls_properties:
+        tls_version: TLSv1
+        tls_cipher_suite: 0x2f
+        tls_sni_hostname: sni
+        local_certificate_properties: {}
+        peer_certificate_properties: {}
+    request:
+      request_method: "METHOD_UNSPECIFIED"
+    response: {}
+)EOF");
+    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  }
+
+  // Unknown TLS version (TLSv1.4)
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
+
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1.4"));
+    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
+    stream_info.setDownstreamSslConnection(&connection_info);
+    stream_info.requested_server_name_ = "sni";
+
+    Http::TestHeaderMapImpl request_headers{
+        {":method", "WHACKADOO"},
+    };
+
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: "127.0.0.1"
+          port_value: 0
+      downstream_local_address:
+        socket_address:
+          address: "127.0.0.2"
+          port_value: 0
+      start_time:
+        seconds: 3600
+      tls_properties:
+        tls_version: VERSION_UNSPECIFIED
+        tls_cipher_suite: 0x2f
+        tls_sni_hostname: sni
+        local_certificate_properties: {}
+        peer_certificate_properties: {}
+    request:
+      request_method: "METHOD_UNSPECIFIED"
+    response: {}
+)EOF");
+    access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 }
 
