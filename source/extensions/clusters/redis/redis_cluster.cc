@@ -87,18 +87,19 @@ void RedisCluster::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots) {
   std::unordered_map<std::string, Upstream::HostSharedPtr> updated_hosts;
   Upstream::HostVector hosts_added;
   Upstream::HostVector hosts_removed;
-  if (updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, updated_hosts,
-                            all_hosts_)) {
+  bool host_updated = updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
+                                            updated_hosts, all_hosts_);
+  bool slot_updated = lb_factory_ ? lb_factory_->onClusterSlotUpdate(slots, updated_hosts) : false;
+
+  // If slot is updated, call updateAllHosts regardless of if there's new hosts to force
+  // update of the thread local load balancers.
+  if (host_updated || slot_updated) {
     ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
       return host->priority() == localityLbEndpoint().priority();
     }));
     updateAllHosts(hosts_added, hosts_removed, localityLbEndpoint().priority());
   } else {
     info_->stats().update_no_rebuild_.inc();
-  }
-
-  if (lb_factory_) {
-    lb_factory_->onClusterSlotUpdate(slots, updated_hosts);
   }
 
   all_hosts_ = std::move(updated_hosts);

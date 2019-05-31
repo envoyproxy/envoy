@@ -49,7 +49,7 @@ static_resources:
           "@type": type.googleapis.com/google.protobuf.Struct
           value:
             cluster_refresh_rate: 1s
-            cluster_refresh_timeout: 40s
+            cluster_refresh_timeout: 4s
 )EOF";
 
 // This is the basic redis_proxy configuration with an upstream
@@ -323,34 +323,6 @@ TEST_P(RedisClusterIntegrationTest, TwoSlot) {
   simpleRequestAndResponse(0, makeBulkStringArray({"get", "bar"}), "$3\r\nbar\r\n");
   // foo hashes to slot 12182 which is in upstream 1
   simpleRequestAndResponse(1, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
-}
-
-// This test sends a simple "get foo" command from a fake
-// downstream client through the proxy to a fake upstream
-// Redis cluster with 2 slots before and after the slot
-// allocation are changed.
-
-TEST_P(RedisClusterIntegrationTest, MigrateSlot) {
-  random_index_ = 0;
-
-  on_server_init_function_ = [this]() {
-    std::string cluster_slot_response = twoSlots(fake_upstreams_[0]->localAddress()->ip(),
-                                                 fake_upstreams_[1]->localAddress()->ip());
-    expectCallClusterSlot(random_index_, cluster_slot_response);
-  };
-
-  initialize();
-
-  // bar hashes to slot 5061 which is in upstream 0
-  simpleRequestAndResponse(0, makeBulkStringArray({"get", "bar"}), "$3\r\nbar\r\n");
-
-  std::string cluster_slot_response =
-      twoSlots(fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip(),
-               0, 4999, 5000, 16383);
-  expectCallClusterSlot(random_index_, cluster_slot_response);
-
-  // bar hashes to slot 5061 which is in now upstream 1
-  simpleRequestAndResponse(1, makeBulkStringArray({"get", "bar"}), "$3\r\nbar\r\n");
 }
 
 // This test sends a simple "get foo" command from a fake

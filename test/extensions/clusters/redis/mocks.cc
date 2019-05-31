@@ -17,6 +17,7 @@ MockClusterSlotUpdateCallBack::MockClusterSlotUpdateCallBack() {
           Invoke([&](const std::vector<ClusterSlot>& slots, Upstream::HostMap all_hosts) {
             ASSERT(slots.size() > 0);
             ASSERT(all_hosts.size() > 0);
+            return true;
           }));
 }
 

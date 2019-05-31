@@ -14,9 +14,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
-#include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 
@@ -363,7 +361,7 @@ protected:
     // No change.
     expectRedisResolve();
     resolve_timer_->callback_();
-    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1).WillOnce(Return(false));
     expectClusterSlotResponse(twoSlotsMasters());
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
@@ -697,7 +695,7 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
     expectRedisResolve();
     resolve_timer_->callback_();
     if (flags.all()) {
-      EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
+      EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1).WillOnce(Return(false));
     }
     expectClusterSlotResponse(createResponse(flags));
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));

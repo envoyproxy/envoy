@@ -117,8 +117,9 @@ public:
    * Callback when cluster slot is updated
    * @param slots provides the updated cluster slots.
    * @param all_hosts provides the updated hosts.
+   * @return indicate if the cluster slot is updated or not.
    */
-  virtual void onClusterSlotUpdate(const std::vector<ClusterSlot>& slots,
+  virtual bool onClusterSlotUpdate(const std::vector<ClusterSlot>& slots,
                                    Upstream::HostMap all_hosts) PURE;
 };
 
@@ -134,7 +135,7 @@ public:
   RedisClusterLoadBalancerFactory() {}
 
   // ClusterSlotUpdateCallBack
-  void onClusterSlotUpdate(const std::vector<ClusterSlot>& slots,
+  bool onClusterSlotUpdate(const std::vector<ClusterSlot>& slots,
                            Upstream::HostMap all_hosts) override;
 
   // Upstream::LoadBalancerFactory
