@@ -28,7 +28,7 @@ public:
                           Stats::Scope& scope, Api::Api& api);
 
   // Upstream::CdsApi
-  void initialize() override { subscription_->start({}, *this); }
+  void initialize() override { subscription_->start({}); }
   void setInitializedCb(std::function<void()> callback) override {
     initialize_callback_ = callback;
   }

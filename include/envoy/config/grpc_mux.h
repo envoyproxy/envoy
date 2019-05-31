@@ -113,7 +113,7 @@ public:
   
   // For delta
   virtual /*WatchMap::Token*/uint64_t addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                           SubscriptionCallbacks& callbacks) PURE;
+                           SubscriptionCallbacks& callbacks,std::chrono::milliseconds init_fetch_timeout) PURE;
   virtual void removeWatch(const std::string& type_url, /*WatchMap::Token*/uint64_t watch_token) PURE;
   virtual void updateWatch(const std::string& type_url, /*WatchMap::Token*/uint64_t watch_token,
                    const std::set<std::string>& resources) PURE;

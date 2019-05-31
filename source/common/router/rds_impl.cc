@@ -59,7 +59,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager, bool is_delta)
     : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
       init_target_(fmt::format("RdsRouteConfigSubscription {}", route_config_name_),
-                   [this]() { subscription_->start({route_config_name_}, *this); }),
+                   [this]() { subscription_->start({route_config_name_}); }),
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
@@ -73,7 +73,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       factory_context.clusterManager(), factory_context.random(), *scope_,
       "envoy.api.v2.RouteDiscoveryService.FetchRoutes", grpc_method,
       Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
-      factory_context.api(), is_delta);
+      factory_context.api(), *this, is_delta);
 
   config_update_info_ =
       std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource());

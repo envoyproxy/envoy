@@ -9,9 +9,7 @@ DeltaSubscriptionImpl::DeltaSubscriptionImpl(std::shared_ptr<GrpcMux> context,
                                              SubscriptionStats stats,
                                              std::chrono::milliseconds init_fetch_timeout)
     : context_(context), type_url_(type_url), callbacks_(callbacks), stats_(stats),
-      init_fetch_timeout_(init_fetch_timeout) {
-  // TODO TODO TRIM  context_->setInitFetchTimeout(type_url_, init_fetch_timeout);
-}
+      init_fetch_timeout_(init_fetch_timeout) {}
 
 DeltaSubscriptionImpl::~DeltaSubscriptionImpl() { context_->removeWatch(type_url_, watch_token_); }
 
@@ -20,7 +18,7 @@ void DeltaSubscriptionImpl::pause() { context_->pause(type_url_); }
 void DeltaSubscriptionImpl::resume() { context_->resume(type_url_); }
 
 // Config::DeltaSubscription
-void DeltaSubscriptionImpl::start(const std::set<std::string>& resources, SubscriptionCallbacks&) {
+void DeltaSubscriptionImpl::start(const std::set<std::string>& resources) {
   watch_token_ = context_->addWatch(type_url_, resources, *this, init_fetch_timeout_);
   stats_.update_attempt_.inc();
 }
@@ -53,10 +51,8 @@ void DeltaSubscriptionImpl::onConfigUpdateFailed(const EnvoyException* e) {
   // TODO(htuch): Less fragile signal that this is failure vs. reject.
   if (e == nullptr) {
     stats_.update_failure_.inc();
-    ENVOY_LOG(debug, "gRPC update for {} failed", type_url_);
   } else {
     stats_.update_rejected_.inc();
-    ENVOY_LOG(warn, "gRPC config for {} rejected: {}", type_url_, e->what());
   }
   callbacks_.onConfigUpdateFailed(e);
 }

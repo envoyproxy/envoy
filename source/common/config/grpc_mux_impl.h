@@ -40,7 +40,8 @@ public:
   void resume(const std::string& type_url) override;
 
   /*WatchMap::Token*/ uint64_t addWatch(const std::string&, const std::set<std::string>&,
-                                        SubscriptionCallbacks&) override {
+                                        SubscriptionCallbacks&,
+                                        std::chrono::milliseconds) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   virtual void removeWatch(const std::string&, /*WatchMap::Token*/ uint64_t) override {
@@ -140,7 +141,8 @@ public:
   void resume(const std::string&) override {}
 
   /*WatchMap::Token*/ uint64_t addWatch(const std::string&, const std::set<std::string>&,
-                                        SubscriptionCallbacks&) override {
+                                        SubscriptionCallbacks&,
+                                        std::chrono::milliseconds) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
   virtual void removeWatch(const std::string&, /*WatchMap::Token*/ uint64_t) override {

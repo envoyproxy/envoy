@@ -20,13 +20,14 @@ class FilesystemSubscriptionImpl : public Config::Subscription,
                                    Logger::Loggable<Logger::Id::config> {
 public:
   FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher, absl::string_view path,
-                             SubscriptionStats stats, Api::Api& api);
+                             SubscriptionCallbacks& callbacks, SubscriptionStats stats,
+                             Api::Api& api);
 
   // Config::Subscription
-  void start(const std::set<std::string>& resources,
-             Config::SubscriptionCallbacks& callbacks) override;
-
-  void updateResources(const std::set<std::string>& resources) override;
+  // We report all discovered resources in the watched file, so the resource names arguments are
+  // unused, and updateResources is a no-op (other than updating a stat).
+  void start(const std::set<std::string>&) override;
+  void updateResources(const std::set<std::string>&) override;
 
 private:
   void refresh();
@@ -34,7 +35,7 @@ private:
   bool started_{};
   const std::string path_;
   std::unique_ptr<Filesystem::Watcher> watcher_;
-  SubscriptionCallbacks* callbacks_{};
+  SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;
   Api::Api& api_;
 };

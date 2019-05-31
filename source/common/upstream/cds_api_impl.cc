@@ -42,7 +42,8 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, boo
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
       cds_config, local_info, dispatcher, cm, random, *scope_,
       "envoy.api.v2.ClusterDiscoveryService.FetchClusters", grpc_method,
-      Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()), api, is_delta);
+      Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()), api, *this,
+      is_delta);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

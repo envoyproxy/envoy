@@ -81,8 +81,8 @@ void SdsApi::initialize() {
       "envoy.service.discovery.v2.SecretDiscoveryService.FetchSecrets",
       "envoy.service.discovery.v2.SecretDiscoveryService.StreamSecrets",
       Grpc::Common::typeUrl(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()), api_,
-      /*is_delta=*/false);
-  subscription_->start({sds_config_name_}, *this);
+      *this, /*is_delta=*/false);
+  subscription_->start({sds_config_name_});
 }
 
 } // namespace Secret

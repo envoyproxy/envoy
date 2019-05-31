@@ -82,7 +82,7 @@ public:
   const std::string& name() const { return name_; }
 
   // Envoy::Config::ConfigSubscriptionCommonBase
-  void start() override { subscription_->start({}, *this); }
+  void start() override { subscription_->start({}); }
 
   // Envoy::Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

@@ -53,14 +53,15 @@ public:
                      rate_limit_settings) {}
 
   WatchMap::Token addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                           SubscriptionCallbacks& callbacks) override {
-    auto entry = watch_maps_.find(type_url);
-    if (entry == watch_maps_.end()) {
+                           SubscriptionCallbacks& callbacks,
+                           std::chrono::milliseconds init_fetch_timeout) override {
+    auto entry = subscriptions_.find(type_url);
+    if (entry == subscriptions_.end()) {
       // We don't yet have a subscription for type_url! Make one!
-      addSubscription(type_url);
+      addSubscription(type_url, init_fetch_timeout);
     }
 
-    WatchMap::Token watch_token = watch_maps_[type_url]->addWatch(callbacks);
+    WatchMap::Token watch_token = entry->second->watch_map_.addWatch(callbacks);
     // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
     updateWatch(type_url, watch_token, resources);
     return watch_token;
@@ -72,7 +73,7 @@ public:
     }
     // updateWatch() queues a discovery request if any resources were watched only by this watch.
     updateWatch(type_url, watch_token, {});
-    if (watch_maps_[type_url]->removeWatch(watch_token)) {
+    if (subscriptions_[type_url]->watch_map_.removeWatch(watch_token)) {
       // removeWatch() told us that watch_token was the last watch on the entire subscription.
       removeSubscription(type_url);
     }
@@ -83,13 +84,13 @@ public:
   // subscription will enqueue and attempt to send an appropriate discovery request.
   void updateWatch(const std::string& type_url, WatchMap::Token watch_token,
                    const std::set<std::string>& resources) override {
-    auto added_removed = watch_maps_[type_url]->updateWatchInterest(watch_token, resources);
     auto sub = subscriptions_.find(type_url);
     if (sub == subscriptions_.end()) {
       ENVOY_LOG(error, "Watch of {} has no subscription to update.", type_url);
       return;
     }
-    sub->second->updateSubscriptionInterest(added_removed.first, added_removed.second);
+    auto added_removed = sub->second->watch_map_.updateWatchInterest(watch_token, resources);
+    sub->second->sub_state_.updateSubscriptionInterest(added_removed.first, added_removed.second);
     // Tell the server about our new interests, if there are any.
     trySendDiscoveryRequests();
   }
@@ -100,7 +101,7 @@ public:
       ENVOY_LOG(warn, "Not pausing non-existent subscription {}.", type_url);
       return;
     }
-    sub->second->pause();
+    sub->second->sub_state_.pause();
   }
 
   void resume(const std::string& type_url) override {
@@ -109,7 +110,7 @@ public:
       ENVOY_LOG(warn, "Not resuming non-existent subscription {}.", type_url);
       return;
     }
-    sub->second->resume();
+    sub->second->sub_state_.resume();
     trySendDiscoveryRequests();
   }
 
@@ -125,19 +126,19 @@ public:
                 message->system_version_info(), message->type_url());
       return;
     }
-    kickOffAck(sub->second->handleResponse(*message));
+    kickOffAck(sub->second->sub_state_.handleResponse(*message));
   }
 
   void onStreamEstablished() override {
     for (auto& sub : subscriptions_) {
-      sub.second->markStreamFresh();
+      sub.second->sub_state_.markStreamFresh();
     }
     trySendDiscoveryRequests();
   }
 
   void onEstablishmentFailure() override {
     for (auto& sub : subscriptions_) {
-      sub.second->handleEstablishmentFailure();
+      sub.second->sub_state_.handleEstablishmentFailure();
     }
   }
 
@@ -158,18 +159,10 @@ public:
   }
   void start() override { grpc_stream_.establishNewStream(); }
 
-  // Overwrites previous values for a given type_url.
-  void setInitFetchTimeout(const std::string& type_url,
-                           std::chrono::milliseconds init_fetch_timeout) {
-    init_fetch_timeouts_[type_url] = init_fetch_timeout;
-  }
-
 private:
-  void addSubscription(const std::string& type_url) {
-    watch_maps_.emplace(type_url, std::make_unique<WatchMap>());
-    subscriptions_.emplace(type_url, std::make_unique<DeltaSubscriptionState>(
-                                         type_url, *watch_maps_[type_url], local_info_,
-                                         init_fetch_timeouts_[type_url], dispatcher_));
+  void addSubscription(const std::string& type_url, std::chrono::milliseconds init_fetch_timeout) {
+    subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(
+                                         type_url, init_fetch_timeout, dispatcher_, local_info_));
     subscription_ordering_.emplace_back(type_url);
   }
 
@@ -177,7 +170,6 @@ private:
   // interested in them?
   void removeSubscription(const std::string& type_url) {
     subscriptions_.erase(type_url);
-    watch_maps_.erase(type_url);
     // And remove from the subscription_ordering_ list.
     auto it = subscription_ordering_.begin();
     while (it != subscription_ordering_.end()) {
@@ -210,17 +202,17 @@ private:
         continue;
       }
       // Try again later if paused/rate limited/stream down.
-      if (!canSendDiscoveryRequest(next_request_type_url, sub->second.get())) {
+      if (!canSendDiscoveryRequest(next_request_type_url, sub->second->sub_state_)) {
         break;
       }
       // Get our subscription state to generate the appropriate DeltaDiscoveryRequest, and send.
       if (!ack_queue_.empty()) {
         // Because ACKs take precedence over plain requests, if there is anything in the queue, it's
         // safe to assume it's what we want to send here.
-        grpc_stream_.sendMessage(sub->second->getNextRequestWithAck(ack_queue_.front()));
+        grpc_stream_.sendMessage(sub->second->sub_state_.getNextRequestWithAck(ack_queue_.front()));
         ack_queue_.pop();
       } else {
-        grpc_stream_.sendMessage(sub->second->getNextRequestAckless());
+        grpc_stream_.sendMessage(sub->second->sub_state_.getNextRequestAckless());
       }
     }
     grpc_stream_.maybeUpdateQueueSizeStat(ack_queue_.size());
@@ -228,8 +220,8 @@ private:
 
   // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
   // whether we *want* to send a DeltaDiscoveryRequest).
-  bool canSendDiscoveryRequest(absl::string_view type_url, DeltaSubscriptionState* sub) {
-    if (sub->paused()) {
+  bool canSendDiscoveryRequest(absl::string_view type_url, DeltaSubscriptionState& sub) {
+    if (sub.paused()) {
       ENVOY_LOG(trace, "API {} paused; discovery request on hold for now.", type_url);
       return false;
     } else if (!grpc_stream_.grpcStreamAvailable()) {
@@ -261,7 +253,7 @@ private:
       if (sub == subscriptions_.end()) {
         continue;
       }
-      if (sub->second->subscriptionUpdatePending()) {
+      if (sub->second->sub_state_.subscriptionUpdatePending()) {
         return sub->first;
       }
     }
@@ -275,11 +267,22 @@ private:
   // of our different resource types' ACKs are mixed together in this queue.
   std::queue<UpdateAck> ack_queue_;
 
-  // TODO TODO probably consolidate
-  // Map from type_url strings to a DeltaSubscriptionState for that type.
-  absl::flat_hash_map<std::string, std::unique_ptr<DeltaSubscriptionState>> subscriptions_;
-  absl::flat_hash_map<std::string, std::unique_ptr<WatchMap>> watch_maps_;
-  absl::flat_hash_map<std::string, std::chrono::milliseconds> init_fetch_timeouts_;
+  struct SubscriptionStuff {
+    SubscriptionStuff(const std::string& type_url, std::chrono::milliseconds init_fetch_timeout,
+                      Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info)
+        : sub_state_(type_url, watch_map_, local_info, init_fetch_timeout, dispatcher),
+          init_fetch_timeout_(init_fetch_timeout) {}
+
+    WatchMap watch_map_;
+    DeltaSubscriptionState sub_state_;
+    const std::chrono::milliseconds init_fetch_timeout_;
+
+  private:
+    SubscriptionStuff(const SubscriptionStuff&) = delete;
+    SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;
+  };
+  // Map key is type_url.
+  absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionStuff>> subscriptions_;
 
   // Determines the order of initial discovery requests. (Assumes that subscriptions are added in
   // the order of Envoy's dependency ordering).

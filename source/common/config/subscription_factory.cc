@@ -16,14 +16,14 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
     const envoy::api::v2::core::ConfigSource& config, const LocalInfo::LocalInfo& local_info,
     Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
     Stats::Scope& scope, const std::string& rest_method, const std::string& grpc_method,
-    absl::string_view type_url, Api::Api& api, bool is_delta) {
+    absl::string_view type_url, Api::Api& api, SubscriptionCallbacks& callbacks, bool is_delta) {
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
   switch (config.config_source_specifier_case()) {
   case envoy::api::v2::core::ConfigSource::kPath: {
     Utility::checkFilesystemSubscriptionBackingPath(config.path(), api);
-    result =
-        std::make_unique<Config::FilesystemSubscriptionImpl>(dispatcher, config.path(), stats, api);
+    result = std::make_unique<Config::FilesystemSubscriptionImpl>(dispatcher, config.path(),
+                                                                  callbacks, stats, api);
     break;
   }
   case envoy::api::v2::core::ConfigSource::kApiConfigSource: {
@@ -40,8 +40,8 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
           local_info, cm, api_config_source.cluster_names()[0], dispatcher, random,
           Utility::apiConfigSourceRefreshDelay(api_config_source),
           Utility::apiConfigSourceRequestTimeout(api_config_source),
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method), stats,
-          Utility::configSourceInitialFetchTimeout(config));
+          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method), callbacks,
+          stats, Utility::configSourceInitialFetchTimeout(config));
       break;
     case envoy::api::v2::core::ApiConfigSource::GRPC:
       result = std::make_unique<GrpcSubscriptionImpl>(
@@ -51,7 +51,7 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
               ->create(),
           dispatcher, random,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), type_url,
-          stats, scope, Utility::parseRateLimitSettings(api_config_source),
+          callbacks, stats, scope, Utility::parseRateLimitSettings(api_config_source),
           Utility::configSourceInitialFetchTimeout(config));
       break;
     case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
@@ -64,7 +64,7 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
               dispatcher,
               *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), random,
               scope, Utility::parseRateLimitSettings(api_config_source), local_info),
-          type_url, stats, Utility::configSourceInitialFetchTimeout(config));
+          type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config));
       break;
     }
     default:
@@ -75,12 +75,13 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
   case envoy::api::v2::core::ConfigSource::kAds: {
     if (is_delta) {
       std::cerr << "making a delta " << type_url << std::endl;
-      result = std::make_unique<DeltaSubscriptionImpl>(
-          cm.adsMux(), type_url, stats, Utility::configSourceInitialFetchTimeout(config));
+      result =
+          std::make_unique<DeltaSubscriptionImpl>(cm.adsMux(), type_url, callbacks, stats,
+                                                  Utility::configSourceInitialFetchTimeout(config));
     } else {
       std::cerr << "making a sotw" << type_url << std::endl;
       result = std::make_unique<GrpcMuxSubscriptionImpl>(
-          cm.adsMux(), stats, type_url, dispatcher,
+          cm.adsMux(), callbacks, stats, type_url, dispatcher,
           Utility::configSourceInitialFetchTimeout(config));
     }
     break;
