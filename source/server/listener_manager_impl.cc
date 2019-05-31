@@ -627,9 +627,8 @@ namespace {
 
 // Return a fake address for use when either the source or destination is UDS.
 Network::Address::InstanceConstSharedPtr fakeAddress() {
-  static const Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::parseInternetAddress("255.255.255.255");
-  return address;
+  CONSTRUCT_ON_FIRST_USE(Network::Address::InstanceConstSharedPtr,
+                         Network::Utility::parseInternetAddress("255.255.255.255"));
 }
 
 } // namespace
