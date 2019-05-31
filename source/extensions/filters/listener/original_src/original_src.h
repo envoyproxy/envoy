@@ -6,7 +6,6 @@
 #include "common/common/logger.h"
 
 #include "extensions/filters/listener/original_src/config.h"
-#include "extensions/filters/listener/original_src/original_src_socket_option.h"
 
 namespace Envoy {
 namespace Extensions {

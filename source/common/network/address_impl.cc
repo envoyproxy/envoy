@@ -57,16 +57,16 @@ bool ipFamilySupported(int domain) {
 
 Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len,
                                                     bool v6only) {
-  RELEASE_ASSERT(ss_len == 0 || ss_len >= sizeof(sa_family_t), "");
+  RELEASE_ASSERT(ss_len == 0 || static_cast<unsigned int>(ss_len) >= sizeof(sa_family_t), "");
   switch (ss.ss_family) {
   case AF_INET: {
-    RELEASE_ASSERT(ss_len == 0 || ss_len == sizeof(sockaddr_in), "");
+    RELEASE_ASSERT(ss_len == 0 || static_cast<unsigned int>(ss_len) == sizeof(sockaddr_in), "");
     const struct sockaddr_in* sin = reinterpret_cast<const struct sockaddr_in*>(&ss);
     ASSERT(AF_INET == sin->sin_family);
     return std::make_shared<Address::Ipv4Instance>(sin);
   }
   case AF_INET6: {
-    RELEASE_ASSERT(ss_len == 0 || ss_len == sizeof(sockaddr_in6), "");
+    RELEASE_ASSERT(ss_len == 0 || static_cast<unsigned int>(ss_len) == sizeof(sockaddr_in6), "");
     const struct sockaddr_in6* sin6 = reinterpret_cast<const struct sockaddr_in6*>(&ss);
     ASSERT(AF_INET6 == sin6->sin6_family);
     if (!v6only && IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
@@ -84,7 +84,9 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
   case AF_UNIX: {
     const struct sockaddr_un* sun = reinterpret_cast<const struct sockaddr_un*>(&ss);
     ASSERT(AF_UNIX == sun->sun_family);
-    RELEASE_ASSERT(ss_len == 0 || ss_len >= offsetof(struct sockaddr_un, sun_path) + 1, "");
+    RELEASE_ASSERT(ss_len == 0 || static_cast<unsigned int>(ss_len) >=
+                                      offsetof(struct sockaddr_un, sun_path) + 1,
+                   "");
     return std::make_shared<Address::PipeInstance>(sun, ss_len);
   }
   default:
@@ -220,13 +222,11 @@ bool Ipv4Instance::operator==(const Instance& rhs) const {
 
 Api::SysCallIntResult Ipv4Instance::bind(int fd) const {
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  return os_syscalls.bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
-                          sizeof(ip_.ipv4_.address_));
+  return os_syscalls.bind(fd, sockAddr(), sockAddrLen());
 }
 
 Api::SysCallIntResult Ipv4Instance::connect(int fd) const {
-  const int rc = ::connect(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
-                           sizeof(ip_.ipv4_.address_));
+  const int rc = ::connect(fd, sockAddr(), sockAddrLen());
   return {rc, errno};
 }
 
@@ -311,13 +311,11 @@ bool Ipv6Instance::operator==(const Instance& rhs) const {
 
 Api::SysCallIntResult Ipv6Instance::bind(int fd) const {
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  return os_syscalls.bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
-                          sizeof(ip_.ipv6_.address_));
+  return os_syscalls.bind(fd, sockAddr(), sockAddrLen());
 }
 
 Api::SysCallIntResult Ipv6Instance::connect(int fd) const {
-  const int rc = ::connect(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
-                           sizeof(ip_.ipv6_.address_));
+  const int rc = ::connect(fd, sockAddr(), sockAddrLen());
   return {rc, errno};
 }
 
@@ -336,7 +334,8 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
 #if !defined(__linux__)
     throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
 #endif
-    RELEASE_ASSERT(ss_len >= offsetof(struct sockaddr_un, sun_path) + 1, "");
+    RELEASE_ASSERT(static_cast<unsigned int>(ss_len) >= offsetof(struct sockaddr_un, sun_path) + 1,
+                   "");
     abstract_namespace_ = true;
     address_length_ = ss_len - offsetof(struct sockaddr_un, sun_path);
   }
@@ -370,25 +369,18 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
 
 Api::SysCallIntResult PipeInstance::bind(int fd) const {
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  if (abstract_namespace_) {
-    return os_syscalls.bind(fd, reinterpret_cast<const sockaddr*>(&address_),
-                            offsetof(struct sockaddr_un, sun_path) + address_length_);
+  if (!abstract_namespace_) {
+    // Try to unlink an existing filesystem object at the requested path. Ignore
+    // errors -- it's fine if the path doesn't exist, and if it exists but can't
+    // be unlinked then `::bind()` will generate a reasonable errno.
+    unlink(address_.sun_path);
   }
-  // Try to unlink an existing filesystem object at the requested path. Ignore
-  // errors -- it's fine if the path doesn't exist, and if it exists but can't
-  // be unlinked then `::bind()` will generate a reasonable errno.
-  unlink(address_.sun_path);
-  return os_syscalls.bind(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  return os_syscalls.bind(fd, sockAddr(), sockAddrLen());
 }
 
 Api::SysCallIntResult PipeInstance::connect(int fd) const {
-  if (abstract_namespace_) {
-    const int rc = ::connect(fd, reinterpret_cast<const sockaddr*>(&address_),
-                             offsetof(struct sockaddr_un, sun_path) + address_length_);
-    return {rc, errno};
-  }
-  const int rc = ::connect(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
+  const int rc = ::connect(fd, sockAddr(), sockAddrLen());
   return {rc, errno};
 }
 

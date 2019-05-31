@@ -151,12 +151,19 @@ public:
 
   const std::string& expectedSerialNumber() const { return expected_serial_number_; }
 
-  TestUtilOptions& setExpectedSubjectl(const std::string& expected_subjectl) {
-    expected_subjectl_ = expected_subjectl;
+  TestUtilOptions& setExpectedPeerIssuer(const std::string& expected_peer_issuer) {
+    expected_peer_issuer_ = expected_peer_issuer;
     return *this;
   }
 
-  const std::string& expectedSubjectl() const { return expected_subjectl_; }
+  const std::string& expectedPeerIssuer() const { return expected_peer_issuer_; }
+
+  TestUtilOptions& setExpectedPeerSubject(const std::string& expected_peer_subject) {
+    expected_peer_subject_ = expected_peer_subject;
+    return *this;
+  }
+
+  const std::string& expectedPeerSubject() const { return expected_peer_subject_; }
 
   TestUtilOptions& setExpectedLocalSubject(const std::string& expected_local_subject) {
     expected_local_subject_ = expected_local_subject;
@@ -206,7 +213,8 @@ private:
   std::string expected_digest_;
   std::vector<std::string> expected_local_uri_;
   std::string expected_serial_number_;
-  std::string expected_subjectl_;
+  std::string expected_peer_issuer_;
+  std::string expected_peer_subject_;
   std::string expected_local_subject_;
   std::string expected_peer_cert_;
   std::string expected_peer_cert_chain_;
@@ -290,8 +298,12 @@ void testUtil(const TestUtilOptions& options) {
       }
       EXPECT_EQ(options.expectedSerialNumber(),
                 server_connection->ssl()->serialNumberPeerCertificate());
-      if (!options.expectedSubjectl().empty()) {
-        EXPECT_EQ(options.expectedSubjectl(), server_connection->ssl()->subjectPeerCertificate());
+      if (!options.expectedPeerIssuer().empty()) {
+        EXPECT_EQ(options.expectedPeerIssuer(), server_connection->ssl()->issuerPeerCertificate());
+      }
+      if (!options.expectedPeerSubject().empty()) {
+        EXPECT_EQ(options.expectedPeerSubject(),
+                  server_connection->ssl()->subjectPeerCertificate());
       }
       if (!options.expectedLocalSubject().empty()) {
         EXPECT_EQ(options.expectedLocalSubject(),
@@ -336,6 +348,10 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(EMPTY_STRING,
                   server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
       }
+      // By default, the session is not created with session resumption. The
+      // client should see a session ID but the server should not.
+      EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
+      EXPECT_NE(EMPTY_STRING, client_connection->ssl()->sessionId());
 
       server_connection->close(Network::ConnectionCloseType::NoFlush);
       client_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -424,6 +440,13 @@ public:
 
   const std::string& expectedProtocolVersion() const { return expected_protocol_version_; }
 
+  TestUtilOptionsV2& setExpectedCiphersuite(const std::string& expected_cipher_suite) {
+    expected_cipher_suite_ = expected_cipher_suite;
+    return *this;
+  }
+
+  const std::string& expectedCiphersuite() const { return expected_cipher_suite_; }
+
   TestUtilOptionsV2& setExpectedServerCertDigest(const std::string& expected_server_cert_digest) {
     expected_server_cert_digest_ = expected_server_cert_digest;
     return *this;
@@ -472,6 +495,7 @@ private:
   std::string expected_client_stats_;
 
   std::string client_session_;
+  std::string expected_cipher_suite_;
   std::string expected_protocol_version_;
   std::string expected_server_cert_digest_;
   std::string expected_requested_server_name_;
@@ -571,7 +595,14 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
       const SslSocket* ssl_socket = dynamic_cast<const SslSocket*>(client_connection->ssl());
       SSL* client_ssl_socket = ssl_socket->rawSslForTest();
       if (!options.expectedProtocolVersion().empty()) {
-        EXPECT_EQ(options.expectedProtocolVersion(), SSL_get_version(client_ssl_socket));
+        EXPECT_EQ(options.expectedProtocolVersion(), client_connection->ssl()->tlsVersion());
+      }
+      if (!options.expectedCiphersuite().empty()) {
+        EXPECT_EQ(options.expectedCiphersuite(), client_connection->ssl()->ciphersuiteString());
+        const SSL_CIPHER* cipher =
+            SSL_get_cipher_by_value(client_connection->ssl()->ciphersuiteId());
+        EXPECT_NE(nullptr, cipher);
+        EXPECT_EQ(options.expectedCiphersuite(), SSL_CIPHER_get_name(cipher));
       }
 
       absl::optional<std::string> server_ssl_requested_server_name;
@@ -980,7 +1011,9 @@ TEST_P(SslSocketTest, GetSubjectsWithBothCerts) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
-               .setExpectedSubjectl(
+               .setExpectedPeerIssuer(
+                   "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
+               .setExpectedPeerSubject(
                    "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
                .setExpectedLocalSubject(
                    "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"));
@@ -1014,7 +1047,9 @@ TEST_P(SslSocketTest, GetPeerCert) {
       TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
           "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
-               .setExpectedSubjectl(
+               .setExpectedPeerIssuer(
+                   "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
+               .setExpectedPeerSubject(
                    "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
                .setExpectedLocalSubject(
                    "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
@@ -2375,10 +2410,16 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   // Different tests have different order of whether client or server gets Connected event
   // first, so always wait until both have happened.
   size_t connect_count = 0;
-  auto connect_second_time = [&connect_count, &dispatcher, &server_connection,
-                              &client_connection]() {
+  auto connect_second_time = [&connect_count, &dispatcher, &server_connection, &client_connection,
+                              expect_reuse]() {
     connect_count++;
     if (connect_count == 2) {
+      if (expect_reuse) {
+        EXPECT_NE(EMPTY_STRING, server_connection->ssl()->sessionId());
+        EXPECT_EQ(server_connection->ssl()->sessionId(), client_connection->ssl()->sessionId());
+      } else {
+        EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
+      }
       client_connection->close(Network::ConnectionCloseType::NoFlush);
       server_connection->close(Network::ConnectionCloseType::NoFlush);
       dispatcher->exit();
@@ -3392,6 +3433,7 @@ TEST_P(SslSocketTest, CipherSuites) {
   server_params->add_cipher_suites(common_cipher_suite);
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
   TestUtilOptionsV2 cipher_test_options(listener, client, true, GetParam());
+  cipher_test_options.setExpectedCiphersuite(common_cipher_suite);
   std::string stats = "ssl.ciphers." + common_cipher_suite;
   cipher_test_options.setExpectedServerStats(stats).setExpectedClientStats(stats);
   testUtilV2(cipher_test_options);
@@ -3759,9 +3801,10 @@ protected:
 
     client_ssl_socket_factory_ = std::make_unique<ClientSslSocketFactory>(
         std::move(client_cfg), *manager_, client_stats_store_);
+    auto transport_socket = client_ssl_socket_factory_->createTransportSocket(nullptr);
+    client_transport_socket_ = transport_socket.get();
     client_connection_ = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_,
-        client_ssl_socket_factory_->createTransportSocket(nullptr), nullptr);
+        socket_.localAddress(), source_address_, std::move(transport_socket), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
     read_filter_.reset(new Network::MockReadFilter());
@@ -3937,6 +3980,7 @@ protected:
   Envoy::Ssl::ClientContextSharedPtr client_ctx_;
   Network::TransportSocketFactoryPtr client_ssl_socket_factory_;
   Network::ClientConnectionPtr client_connection_;
+  Network::TransportSocket* client_transport_socket_{};
   Network::ConnectionPtr server_connection_;
   NiceMock<Network::MockConnectionCallbacks> server_callbacks_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
@@ -4001,6 +4045,66 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
   EXPECT_EQ(address_string, server_connection_->remoteAddress()->ip()->addressAsString());
 
   disconnect();
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/6617
+TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
+  // write_size * num_writes must be large enough to cause buffer reserving fragmentation,
+  // but smaller than one reservation so the expected slice to be 1.
+  const uint32_t write_size = 1;
+  const uint32_t num_writes = 12 * 1024;
+  const uint32_t read_buffer_limit = write_size * num_writes;
+  const uint32_t expected_chunk_size = write_size * num_writes;
+
+  initialize();
+
+  EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+            std::move(socket), server_ssl_socket_factory_->createTransportSocket(nullptr));
+        new_connection->setBufferLimits(read_buffer_limit);
+        listener_callbacks_.onNewConnection(std::move(new_connection));
+      }));
+  EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection_ = std::move(conn);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+        EXPECT_EQ("", server_connection_->nextProtocol());
+        EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
+      }));
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  uint32_t filter_seen = 0;
+
+  EXPECT_CALL(*read_filter_, onNewConnection());
+  EXPECT_CALL(*read_filter_, onData(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+        EXPECT_GE(expected_chunk_size, data.length());
+        EXPECT_EQ(1, data.getRawSlices(nullptr, 0));
+        filter_seen += data.length();
+        data.drain(data.length());
+        if (filter_seen == (write_size * num_writes)) {
+          server_connection_->close(Network::ConnectionCloseType::FlushWrite);
+        }
+        return Network::FilterStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        EXPECT_EQ((write_size * num_writes), filter_seen);
+        dispatcher_->exit();
+      }));
+
+  for (uint32_t i = 0; i < num_writes; i++) {
+    Buffer::OwnedImpl data(std::string(write_size, 'a'));
+    client_transport_socket_->doWrite(data, false);
+  }
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 } // namespace Tls

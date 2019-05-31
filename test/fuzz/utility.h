@@ -55,7 +55,8 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) 
   test_stream_info.metadata_ = stream_info.dynamic_metadata();
   // libc++ clocks don't track at nanosecond on macOS.
   const auto start_time =
-      std::numeric_limits<std::chrono::nanoseconds::rep>::max() < stream_info.start_time()
+      static_cast<uint64_t>(std::numeric_limits<std::chrono::nanoseconds::rep>::max()) <
+              stream_info.start_time()
           ? 0
           : stream_info.start_time() / 1000;
   test_stream_info.start_time_ = SystemTime(std::chrono::microseconds(start_time));
@@ -73,6 +74,46 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) 
   test_stream_info.downstream_direct_remote_address_ = address;
   test_stream_info.downstream_remote_address_ = address;
   return test_stream_info;
+}
+
+// The HeaderMap code assumes that input does not contain certain characters, and
+// this is validated by the HTTP parser. Some fuzzers will create strings with
+// these characters, however, and this creates not very interesting fuzz test
+// failures as an assertion is rapidly hit in the LowerCaseString constructor
+// before we get to anything interesting.
+//
+// This method will replace any of those characters found with spaces.
+inline std::string replaceInvalidCharacters(absl::string_view string) {
+  std::string filtered;
+  filtered.reserve(string.length());
+  for (const char& c : string) {
+    switch (c) {
+    case '\0':
+      FALLTHRU;
+    case '\r':
+      FALLTHRU;
+    case '\n':
+      filtered.push_back(' ');
+      break;
+    default:
+      filtered.push_back(c);
+    }
+  }
+  return filtered;
+}
+
+// Return a new RepeatedPtrField of HeaderValueOptions with invalid characters removed.
+inline Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> replaceInvalidHeaders(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> processed;
+  for (const auto& header : headers_to_add) {
+    auto* header_value_option = processed.Add();
+    auto* mutable_header = header_value_option->mutable_header();
+    mutable_header->set_key(replaceInvalidCharacters(header.header().key()));
+    mutable_header->set_value(replaceInvalidCharacters(header.header().value()));
+    header_value_option->mutable_append()->CopyFrom(header.append());
+  }
+  return processed;
 }
 
 } // namespace Fuzz

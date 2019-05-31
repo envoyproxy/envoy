@@ -98,6 +98,31 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
   return ret;
 }
 
+std::vector<Network::UdpListenerFilterFactoryCb>
+ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+    Configuration::ListenerFactoryContext& context) {
+  std::vector<Network::UdpListenerFilterFactoryCb> ret;
+  for (ssize_t i = 0; i < filters.size(); i++) {
+    const auto& proto_config = filters[i];
+    const std::string& string_name = proto_config.name();
+    ENVOY_LOG(debug, "  filter #{}:", i);
+    ENVOY_LOG(debug, "    name: {}", string_name);
+    const Json::ObjectSharedPtr filter_config =
+        MessageUtil::getJsonObjectFromMessage(proto_config.config());
+    ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
+
+    // Now see if there is a factory that will accept the config.
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Configuration::NamedUdpListenerFilterConfigFactory>(
+            string_name);
+
+    auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
+    ret.push_back(factory.createFilterFactoryFromProto(*message, context));
+  }
+  return ret;
+}
+
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Address::SocketType socket_type,
     const Network::Socket::OptionsSharedPtr& options, bool bind_to_port) {
@@ -180,20 +205,44 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   if (config.has_freebind()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpFreebindOptions());
   }
-  if (config.has_tcp_fast_open_queue_length()) {
-    addListenSocketOptions(Network::SocketOptionFactory::buildTcpFastOpenOptions(
-        config.tcp_fast_open_queue_length().value()));
-  }
-
   if (!config.socket_options().empty()) {
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
   }
 
   if (!config.listener_filters().empty()) {
-    listener_filter_factories_ =
-        parent_.factory_.createListenerFilterFactoryList(config.listener_filters(), *this);
+    switch (socket_type_) {
+    case Network::Address::SocketType::Datagram:
+      if (config.listener_filters().size() > 1) {
+        // Currently supports only 1 UDP listener
+        throw EnvoyException(
+            fmt::format("error adding listener '{}': Only 1 UDP filter per listener supported",
+                        address_->asString()));
+      }
+      udp_listener_filter_factories_ =
+          parent_.factory_.createUdpListenerFilterFactoryList(config.listener_filters(), *this);
+      // Intentional return since UDP filters do not need other configuration
+      return;
+    case Network::Address::SocketType::Stream:
+      listener_filter_factories_ =
+          parent_.factory_.createListenerFilterFactoryList(config.listener_filters(), *this);
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
   }
+
+  if (config.filter_chains().empty()) {
+    // If we got here, this is a tcp listener, so ensure there is a filter chain specified
+    throw EnvoyException(fmt::format("error adding listener '{}': no filter chains specified",
+                                     address_->asString()));
+  }
+
+  if (config.has_tcp_fast_open_queue_length()) {
+    addListenSocketOptions(Network::SocketOptionFactory::buildTcpFastOpenOptions(
+        config.tcp_fast_open_queue_length().value()));
+  }
+
   // Add original dst listener filter if 'use_original_dst' flag is set.
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)) {
     auto& factory =
@@ -220,6 +269,12 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
 
   for (const auto& filter_chain : config.filter_chains()) {
     const auto& filter_chain_match = filter_chain.filter_chain_match();
+    if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len() ||
+        filter_chain_match.source_prefix_ranges_size() || filter_chain_match.source_ports_size()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
+                                       "unimplemented fields",
+                                       address_->asString()));
+    }
     if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
       throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
                                        "the same matching rules are defined",
@@ -421,12 +476,11 @@ void ListenerImpl::addFilterChainForSourceTypes(
     const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (source_types_array[source_type] != nullptr) {
-    // We should never get here once all fields in FilterChainMatch are implemented. At this point,
-    // this can become an ASSERT. In principle, we could verify the various missing fields earlier,
-    // but best to have defense-in-depth here, since any mistake leads to potential
-    // heap-use-after-free when filter chains are unexpectedly destructed.
+    // If we got here and found already configured branch, then it means that this FilterChainMatch
+    // is a duplicate, and that there is some overlap in the repeated fields with already processed
+    // FilterChainMatches.
     throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
-                                     "effectively equivalent matching rules are defined",
+                                     "overlapping matching rules are defined",
                                      address_->asString()));
   }
   source_types_array[source_type] = filter_chain;
@@ -613,6 +667,12 @@ bool ListenerImpl::createNetworkFilterChain(
 
 bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& manager) {
   return Configuration::FilterChainUtility::buildFilterChain(manager, listener_filter_factories_);
+}
+
+bool ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManager& manager,
+                                                Network::UdpReadFilterCallbacks& callbacks) {
+  return Configuration::FilterChainUtility::buildUdpFilterChain(manager, callbacks,
+                                                                udp_listener_filter_factories_);
 }
 
 bool ListenerImpl::drainClose() const {

@@ -8,6 +8,7 @@
 #include "envoy/service/discovery/v2/hds.pb.h"
 #include "envoy/service/ratelimit/v2/rls.pb.h"
 
+#include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/protobuf_link_hacks.h"
 #include "common/protobuf/protobuf.h"
@@ -15,7 +16,7 @@
 namespace Envoy {
 namespace Server {
 
-bool validateProtoDescriptors() {
+void validateProtoDescriptors() {
   const auto methods = {
       "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
       "envoy.api.v2.ClusterDiscoveryService.StreamClusters",
@@ -28,13 +29,14 @@ bool validateProtoDescriptors() {
       "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources",
       "envoy.service.discovery.v2.HealthDiscoveryService.FetchHealthCheck",
       "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck",
+      "envoy.service.discovery.v2.RuntimeDiscoveryService.FetchRuntime",
+      "envoy.service.discovery.v2.RuntimeDiscoveryService.StreamRuntime",
       "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit",
   };
 
   for (const auto& method : methods) {
-    if (Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) == nullptr) {
-      return false;
-    }
+    RELEASE_ASSERT(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) != nullptr,
+                   "");
   }
 
   const auto types = {
@@ -45,11 +47,9 @@ bool validateProtoDescriptors() {
   };
 
   for (const auto& type : types) {
-    if (Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type) == nullptr) {
-      return false;
-    }
+    RELEASE_ASSERT(
+        Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type) != nullptr, "");
   }
-  return true;
 };
 } // namespace Server
 } // namespace Envoy

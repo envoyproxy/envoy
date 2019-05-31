@@ -228,6 +228,9 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+%ROUTE_NAME%
+  Name of the route.
+
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
 
@@ -357,4 +360,57 @@ The following command operators are supported:
   TCP
     The subject present in the peer certificate used to establish the downstream TLS connection.
 
+%DOWNSTREAM_PEER_ISSUER%
+  HTTP
+    The issuer present in the peer certificate used to establish the downstream TLS connection.
+  TCP
+    The issuer present in the peer certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_TLS_SESSION_ID%
+  HTTP
+    The session ID for the established downstream TLS connection.
+  TCP
+    The session ID for the established downstream TLS connection.
+
+%DOWNSTREAM_TLS_CIPHER%
+  HTTP
+    The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.
+  TCP
+    The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.
+
+%DOWNSTREAM_TLS_VERSION%
+  HTTP
+    The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
+  TCP
+    The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_FINGERPRINT_256%
+  HTTP
+    The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_SERIAL%
+  HTTP
+    The serial number of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The serial number of the client certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_CERT%
+  HTTP
+    The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
+  TCP
+    The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_CERT_V_START%
+  HTTP
+    The validity start date of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The validity start date of the client certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_CERT_V_END%
+  HTTP
+    The validity end date of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The validity end date of the client certificate used to establish the downstream TLS connection.
 

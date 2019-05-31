@@ -180,7 +180,7 @@ go_proto_library(
     proto = ":rpc_status_protos_lib",
     visibility = ["//visibility:public"],
     deps = [
-      "@com_github_golang_protobuf//ptypes/any:go_default_library",
+      "@io_bazel_rules_go//proto/wkt:any_go_proto",
     ],
 )
 

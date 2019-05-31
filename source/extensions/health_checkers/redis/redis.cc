@@ -25,7 +25,6 @@ RedisHealthChecker::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession
     : ActiveHealthCheckSession(parent, host), parent_(parent) {}
 
 RedisHealthChecker::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {
-  onDeferredDelete();
   ASSERT(current_request_ == nullptr);
   ASSERT(client_ == nullptr);
 }

@@ -150,6 +150,15 @@ public:
               return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
                                                                                     context);
             }));
+    ON_CALL(listener_factory_, createUdpListenerFilterFactoryList(_, _))
+        .WillByDefault(Invoke(
+            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+               Configuration::ListenerFactoryContext& context)
+                -> std::vector<Network::UdpListenerFilterFactoryCb> {
+              return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters,
+                                                                                       context);
+            }));
+
     socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     local_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
     remote_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
@@ -421,6 +430,34 @@ test: a
 
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
                           EnvoyException, "test: Cannot find field");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfigNoFilterChains) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                          EnvoyException, "no filter chains specified");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig2UDPListenerFilters) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    protocol: UDP
+    address: 127.0.0.1
+    port_value: 1234
+listener_filters:
+- name: envoy.listener.tls_inspector
+- name: envoy.listener.original_dst
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                          EnvoyException, "Only 1 UDP filter per listener supported");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterConfig) {
@@ -2201,7 +2238,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
                             "the same matching rules are defined");
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithEffectiveEquivalentMatch) {
+TEST_F(ListenerManagerImplWithRealFiltersTest,
+       MultipleFilterChainsWithSameMatchPlusUnimplementedFields) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
@@ -2219,8 +2257,29 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithEffective
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
                             EnvoyException,
+                            "error adding listener '127.0.0.1:1234': contains filter chains with "
+                            "unimplemented fields");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappingRules) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.listener.tls_inspector"
+      config: {}
+    filter_chains:
+    - filter_chain_match:
+        server_names: "example.com"
+    - filter_chain_match:
+        server_names: ["example.com", "www.example.com"]
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                            EnvoyException,
                             "error adding listener '127.0.0.1:1234': multiple filter chains with "
-                            "effectively equivalent matching rules are defined");
+                            "overlapping matching rules are defined");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TlsFilterChainWithoutTlsInspector) {

@@ -25,7 +25,6 @@
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/config/bootstrap_json.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/http/codes.h"
@@ -54,7 +53,8 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
                            ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-                           Filesystem::Instance& file_system)
+                           Filesystem::Instance& file_system,
+                           std::unique_ptr<ProcessContext> process_context)
     : secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), shutdown_(false),
       options_(options), time_source_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
@@ -70,6 +70,7 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
       terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
+      http_context_(store.symbolTable()), process_context_(std::move(process_context)),
       main_thread_id_(std::this_thread::get_id()) {
   try {
     if (!options.logPath().empty()) {
@@ -128,19 +129,38 @@ void InstanceImpl::drainListeners() {
   drain_manager_->startDrainSequence(nullptr);
 }
 
-void InstanceImpl::failHealthcheck(bool fail) {
-  // We keep liveness state in shared memory so the parent process sees the same state.
-  server_stats_->live_.set(!fail);
+void InstanceImpl::failHealthcheck(bool fail) { server_stats_->live_.set(!fail); }
+
+MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
+  snapped_counters_ = store.counters();
+  counters_.reserve(snapped_counters_.size());
+  for (const auto& counter : snapped_counters_) {
+    counters_.push_back({counter->latch(), *counter});
+  }
+
+  snapped_gauges_ = store.gauges();
+  gauges_.reserve(snapped_gauges_.size());
+  for (const auto& gauge : snapped_gauges_) {
+    gauges_.push_back(*gauge);
+  }
+
+  snapped_histograms_ = store.histograms();
+  histograms_.reserve(snapped_histograms_.size());
+  for (const auto& histogram : snapped_histograms_) {
+    histograms_.push_back(*histogram);
+  }
 }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                       Stats::Source& source) {
+                                       Stats::Store& store) {
+  // Create a snapshot and flush to all sinks.
+  // NOTE: Even if there are no sinks, creating the snapshot has the important property that it
+  //       latches all counters on a periodic basis. The hot restart code assumes this is being
+  //       done so this should not be removed.
+  MetricSnapshotImpl snapshot(store);
   for (const auto& sink : sinks) {
-    sink->flush(source);
+    sink->flush(snapshot);
   }
-  // TODO(mrice32): this reset should be called by the StoreRoot on stat construction/destruction so
-  // that it doesn't need to be reset when the set of stats isn't changing.
-  source.clearCache();
 }
 
 void InstanceImpl::flushStats() {
@@ -160,7 +180,7 @@ void InstanceImpl::flushStats() {
                                           parent_stats.parent_connections_);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
-    InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_.source());
+    InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
     if (stat_flush_timer_ != nullptr) {
       stat_flush_timer_->enableTimer(config_.statsFlushInterval());
@@ -378,25 +398,10 @@ void InstanceImpl::startWorkers() {
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
-  if (!config.baseRuntime().fields().empty()) {
-    ENVOY_LOG(info, "non-empty base runtime layer specified in bootstrap");
-  }
-  if (config.diskRuntime()) {
-    ENVOY_LOG(info, "disk runtime symlink: {}", config.diskRuntime()->symlinkRoot());
-    ENVOY_LOG(info, "disk runtime subdirectory: {}", config.diskRuntime()->subdirectory());
-
-    std::string override_subdirectory =
-        config.diskRuntime()->overrideSubdirectory() + "/" + server.localInfo().clusterName();
-    ENVOY_LOG(info, "disk runtime override subdirectory: {}", override_subdirectory);
-
-    return std::make_unique<Runtime::DiskBackedLoaderImpl>(
-        server.dispatcher(), server.threadLocal(), config.baseRuntime(),
-        config.diskRuntime()->symlinkRoot(), config.diskRuntime()->subdirectory(),
-        override_subdirectory, server.stats(), server.random(), server.api());
-  } else {
-    return std::make_unique<Runtime::LoaderImpl>(config.baseRuntime(), server.random(),
-                                                 server.stats(), server.threadLocal());
-  }
+  ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
+  return std::make_unique<Runtime::LoaderImpl>(server.dispatcher(), server.threadLocal(),
+                                               config.runtime(), server.localInfo().clusterName(),
+                                               server.stats(), server.random(), server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {
@@ -535,9 +540,6 @@ void InstanceImpl::shutdown() {
 
 void InstanceImpl::shutdownAdmin() {
   ENVOY_LOG(warn, "shutting down admin due to child startup");
-  // TODO(mattklein123): Since histograms are not shared between processes, this will also stop
-  //                     histogram flushing. In the future we can consider whether we want to
-  //                     somehow keep flushing histograms from the old process.
   stat_flush_timer_.reset();
   handler_->stopListeners();
   admin_->closeSocket();
@@ -547,13 +549,18 @@ void InstanceImpl::shutdownAdmin() {
   restarter_.sendParentTerminateRequest();
 }
 
-void InstanceImpl::registerCallback(Stage stage, StageCallback callback) {
-  stage_callbacks_[stage].push_back(callback);
+ServerLifecycleNotifier::HandlePtr InstanceImpl::registerCallback(Stage stage,
+                                                                  StageCallback callback) {
+  auto& callbacks = stage_callbacks_[stage];
+  return std::make_unique<LifecycleCallbackHandle<StageCallback>>(callbacks, callback);
 }
 
-void InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
+ServerLifecycleNotifier::HandlePtr
+InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
   ASSERT(stage == Stage::ShutdownExit);
-  stage_completable_callbacks_[stage].push_back(callback);
+  auto& callbacks = stage_completable_callbacks_[stage];
+  return std::make_unique<LifecycleCallbackHandle<StageCallbackWithCompletion>>(callbacks,
+                                                                                callback);
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
