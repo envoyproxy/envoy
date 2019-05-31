@@ -128,7 +128,7 @@ public:
    * with the provided parameters, it should throw an EnvoyException in the case of general error.
    * @param cluster supplies the general protobuf configuration for the cluster.
    * @param context supplies the cluster's context.
-   * @return a pair containing the the cluster instance as well as an option thread aware load
+   * @return a pair containing the cluster instance as well as an option thread aware load
    *         balancer if this cluster has an integrated load balancer.
    */
   virtual std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>

@@ -206,7 +206,7 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // contents into a local that we can hold onto until the TLS cache is cleared
   // of all references.
   //
-  // We use a raw pointer here as it's easier to capture it in in the lambda.
+  // We use a raw pointer here as it's easier to capture it in the lambda.
   auto rejected_stats = new StatNameStorageSet;
   rejected_stats->swap(scope->central_cache_.rejected_stats_);
 

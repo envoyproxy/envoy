@@ -1126,7 +1126,7 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& list
     server_.dispatcher().post([this, success, &listener]() -> void {
       // It is theoretically possible for a listener to get added on 1 worker but not the others.
       // The below check with onListenerCreateFailure() is there to ensure we execute the
-      // removal/logging/stats at most once on failure. Note also that that drain/removal can race
+      // removal/logging/stats at most once on failure. Note also that drain/removal can race
       // with addition. It's guaranteed that workers process remove after add so this should be
       // fine.
       if (!success && !listener.onListenerCreateFailure()) {
