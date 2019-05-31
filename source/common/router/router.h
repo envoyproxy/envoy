@@ -293,10 +293,12 @@ protected:
   RetryStatePtr retry_state_;
 
 private:
-  struct UpstreamRequest : public Http::StreamDecoder,
-                           public Http::StreamCallbacks,
-                           public Http::ConnectionPool::Callbacks,
-                           public LinkedObject<UpstreamRequest> {
+  class UpstreamRequest : Logger::Loggable<Logger::Id::upstream>,
+                          public Http::StreamDecoder,
+                          public Http::StreamCallbacks,
+                          public Http::ConnectionPool::Callbacks,
+                          public LinkedObject<UpstreamRequest> {
+  public:
     UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool);
     ~UpstreamRequest();
 
