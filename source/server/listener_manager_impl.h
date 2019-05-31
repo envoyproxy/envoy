@@ -91,17 +91,15 @@ typedef std::unique_ptr<ListenerImpl> ListenerImplPtr;
 /**
  * All listener manager stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_LISTENER_MANAGER_STATS(COUNTER, GAUGE)                                                 \
   COUNTER(listener_added)                                                                          \
+  COUNTER(listener_create_failure)                                                                 \
+  COUNTER(listener_create_success)                                                                 \
   COUNTER(listener_modified)                                                                       \
   COUNTER(listener_removed)                                                                        \
-  COUNTER(listener_create_success)                                                                 \
-  COUNTER(listener_create_failure)                                                                 \
-  GAUGE  (total_listeners_warming)                                                                 \
-  GAUGE  (total_listeners_active)                                                                  \
-  GAUGE  (total_listeners_draining)
-// clang-format on
+  GAUGE(total_listeners_active, NeverImport)                                                       \
+  GAUGE(total_listeners_draining, NeverImport)                                                     \
+  GAUGE(total_listeners_warming, NeverImport)
 
 /**
  * Struct definition for all listener manager stats. @see stats_macros.h

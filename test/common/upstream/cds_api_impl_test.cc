@@ -37,7 +37,10 @@ MATCHER_P(WithName, expectedName, "") { return arg.name() == expectedName; }
 
 class CdsApiImplTest : public testing::Test {
 protected:
-  CdsApiImplTest() : request_(&cm_.async_client_), api_(Api::createApiForTest(store_)) {}
+  CdsApiImplTest()
+      : request_(&cm_.async_client_), api_(Api::createApiForTest(store_)),
+        cds_version_(
+            store_.gauge("cluster_manager.cds.version", Stats::Gauge::ImportMode::NeverImport)) {}
 
   void setup() {
     const std::string config_yaml = R"EOF(
@@ -179,6 +182,7 @@ api_config_source:
   Http::AsyncClient::Callbacks* callbacks_{};
   ReadyWatcher initialized_;
   Api::ApiPtr api_;
+  Stats::Gauge& cds_version_;
 };
 
 // Negative test for protoc-gen-validate constraints.
@@ -221,7 +225,9 @@ resources:
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_EQ("", cds_->versionInfo());
-  EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.version").value());
+  EXPECT_EQ(
+      0UL,
+      store_.gauge("cluster_manager.cds.version", Stats::Gauge::ImportMode::NeverImport).value());
 
   callbacks_->onSuccess(parseResponseMessageFromYaml(response1_yaml));
   EXPECT_EQ("0", cds_->versionInfo());
@@ -430,10 +436,10 @@ resources:
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_EQ("", cds_->versionInfo());
-  EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.version").value());
+  EXPECT_EQ(0UL, cds_version_.value());
   callbacks_->onSuccess(parseResponseMessageFromYaml(response1_yaml));
   EXPECT_EQ("0", cds_->versionInfo());
-  EXPECT_EQ(7148434200721666028U, store_.gauge("cluster_manager.cds.version").value());
+  EXPECT_EQ(7148434200721666028U, cds_version_.value());
 
   expectRequest();
   interval_timer_->callback_();
@@ -465,7 +471,7 @@ resources:
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_success").value());
   EXPECT_EQ("1", cds_->versionInfo());
-  EXPECT_EQ(13237225503670494420U, store_.gauge("cluster_manager.cds.version").value());
+  EXPECT_EQ(13237225503670494420U, cds_version_.value());
 }
 
 TEST_F(CdsApiImplTest, CdsPauseOnWarming) {
@@ -649,7 +655,7 @@ resources:
   EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_failure").value());
   // Validate that the schema error increments update_rejected stat.
   EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_rejected").value());
-  EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.version").value());
+  EXPECT_EQ(0UL, cds_version_.value());
 }
 
 } // namespace

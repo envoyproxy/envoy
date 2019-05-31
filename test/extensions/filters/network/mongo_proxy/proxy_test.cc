@@ -533,7 +533,7 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
     filter_->callbacks_->decodeQuery(std::move(message));
   }));
   filter_->onData(fake_data_, false);
-  EXPECT_EQ(2U, store_.gauge("test.op_query_active").value());
+  EXPECT_EQ(2U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
 
   Event::MockTimer* drain_timer = nullptr;
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
@@ -560,7 +560,7 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->callback_();
 
-  EXPECT_EQ(0U, store_.gauge("test.op_query_active").value());
+  EXPECT_EQ(0U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
   EXPECT_EQ(1U, store_.counter("test.cx_drain_close").value());
 }
 

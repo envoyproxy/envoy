@@ -26,7 +26,10 @@ namespace {
 
 class LdsApiTest : public testing::Test {
 public:
-  LdsApiTest() : request_(&cluster_manager_.async_client_), api_(Api::createApiForTest(store_)) {
+  LdsApiTest()
+      : request_(&cluster_manager_.async_client_), api_(Api::createApiForTest(store_)),
+        lds_version_(
+            store_.gauge("listener_manager.lds.version", Stats::Gauge::ImportMode::NeverImport)) {
     ON_CALL(init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
     }));
@@ -138,6 +141,7 @@ api_config_source:
   Event::MockTimer* interval_timer_{};
   Http::AsyncClient::Callbacks* callbacks_{};
   Api::ApiPtr api_;
+  Stats::Gauge& lds_version_;
 
 private:
   std::list<NiceMock<Network::MockListenerConfig>> listeners_;
@@ -345,7 +349,7 @@ TEST_F(LdsApiTest, Basic) {
   callbacks_->onSuccess(std::move(message));
 
   EXPECT_EQ("0", lds_->versionInfo());
-  EXPECT_EQ(7148434200721666028U, store_.gauge("listener_manager.lds.version").value());
+  EXPECT_EQ(7148434200721666028U, lds_version_.value());
   expectRequest();
   interval_timer_->callback_();
 
@@ -383,7 +387,7 @@ TEST_F(LdsApiTest, Basic) {
 
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
-  EXPECT_EQ(13237225503670494420U, store_.gauge("listener_manager.lds.version").value());
+  EXPECT_EQ(13237225503670494420U, lds_version_.value());
 }
 
 // Regression test against only updating versionInfo() if at least one listener
@@ -440,7 +444,9 @@ TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
 
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
-  EXPECT_EQ(13237225503670494420U, store_.gauge("listener_manager.lds.version").value());
+  EXPECT_EQ(
+      13237225503670494420U,
+      store_.gauge("listener_manager.lds.version", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
 // Regression test issue #2188 where an empty ca_cert_file field was created and caused the LDS
@@ -557,7 +563,7 @@ TEST_F(LdsApiTest, Failure) {
   EXPECT_EQ(1UL, store_.counter("listener_manager.lds.update_failure").value());
   // Validate that the schema error increments update_rejected stat.
   EXPECT_EQ(1UL, store_.counter("listener_manager.lds.update_failure").value());
-  EXPECT_EQ(0UL, store_.gauge("listener_manager.lds.version").value());
+  EXPECT_EQ(0UL, lds_version_.value());
 }
 
 TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
@@ -597,7 +603,7 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   callbacks_->onSuccess(std::move(message));
 
   EXPECT_EQ("0", lds_->versionInfo());
-  EXPECT_EQ(7148434200721666028U, store_.gauge("listener_manager.lds.version").value());
+  EXPECT_EQ(7148434200721666028U, lds_version_.value());
   expectRequest();
   interval_timer_->callback_();
 
@@ -635,7 +641,7 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   EXPECT_EQ("1", lds_->versionInfo());
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
-  EXPECT_EQ(13237225503670494420U, store_.gauge("listener_manager.lds.version").value());
+  EXPECT_EQ(13237225503670494420U, lds_version_.value());
 }
 
 } // namespace

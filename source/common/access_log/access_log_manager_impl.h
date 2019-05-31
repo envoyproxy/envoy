@@ -15,14 +15,12 @@
 
 namespace Envoy {
 
-// clang-format off
 #define ACCESS_LOG_FILE_STATS(COUNTER, GAUGE)                                                      \
-  COUNTER(write_buffered)                                                                          \
-  COUNTER(write_completed)                                                                         \
   COUNTER(flushed_by_timer)                                                                        \
   COUNTER(reopen_failed)                                                                           \
-  GAUGE  (write_total_buffered)
-// clang-format on
+  COUNTER(write_buffered)                                                                          \
+  COUNTER(write_completed)                                                                         \
+  GAUGE(write_total_buffered, Accumulate)
 
 struct AccessLogFileStats {
   ACCESS_LOG_FILE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)

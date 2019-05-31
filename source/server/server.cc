@@ -141,6 +141,7 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
   snapped_gauges_ = store.gauges();
   gauges_.reserve(snapped_gauges_.size());
   for (const auto& gauge : snapped_gauges_) {
+    ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
     gauges_.push_back(*gauge);
   }
 

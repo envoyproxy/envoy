@@ -103,12 +103,18 @@ protected:
     EXPECT_EQ(added, server_.stats_store_.counter("listener_manager.listener_added").value());
     EXPECT_EQ(modified, server_.stats_store_.counter("listener_manager.listener_modified").value());
     EXPECT_EQ(removed, server_.stats_store_.counter("listener_manager.listener_removed").value());
-    EXPECT_EQ(warming,
-              server_.stats_store_.gauge("listener_manager.total_listeners_warming").value());
-    EXPECT_EQ(active,
-              server_.stats_store_.gauge("listener_manager.total_listeners_active").value());
-    EXPECT_EQ(draining,
-              server_.stats_store_.gauge("listener_manager.total_listeners_draining").value());
+    EXPECT_EQ(warming, server_.stats_store_
+                           .gauge("listener_manager.total_listeners_warming",
+                                  Stats::Gauge::ImportMode::NeverImport)
+                           .value());
+    EXPECT_EQ(active, server_.stats_store_
+                          .gauge("listener_manager.total_listeners_active",
+                                 Stats::Gauge::ImportMode::NeverImport)
+                          .value());
+    EXPECT_EQ(draining, server_.stats_store_
+                            .gauge("listener_manager.total_listeners_draining",
+                                   Stats::Gauge::ImportMode::NeverImport)
+                            .value());
   }
 
   void checkConfigDump(const std::string& expected_dump_yaml) {

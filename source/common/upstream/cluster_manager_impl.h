@@ -139,7 +139,6 @@ private:
 /**
  * All cluster manager stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_CLUSTER_MANAGER_STATS(COUNTER, GAUGE)                                                  \
   COUNTER(cluster_added)                                                                           \
   COUNTER(cluster_modified)                                                                        \
@@ -148,9 +147,8 @@ private:
   COUNTER(cluster_updated_via_merge)                                                               \
   COUNTER(update_merge_cancelled)                                                                  \
   COUNTER(update_out_of_merge_window)                                                              \
-  GAUGE  (active_clusters)                                                                         \
-  GAUGE  (warming_clusters)
-// clang-format on
+  GAUGE(active_clusters, NeverImport)                                                              \
+  GAUGE(warming_clusters, NeverImport)
 
 /**
  * Struct definition for all cluster manager stats. @see stats_macros.h
