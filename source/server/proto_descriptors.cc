@@ -29,6 +29,8 @@ void validateProtoDescriptors() {
       "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources",
       "envoy.service.discovery.v2.HealthDiscoveryService.FetchHealthCheck",
       "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck",
+      "envoy.service.discovery.v2.RuntimeDiscoveryService.FetchRuntime",
+      "envoy.service.discovery.v2.RuntimeDiscoveryService.StreamRuntime",
       "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit",
   };
 

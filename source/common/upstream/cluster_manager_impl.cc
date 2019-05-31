@@ -580,8 +580,10 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
 void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
                                      const std::string& version_info, bool added_via_api,
                                      ClusterMap& cluster_map) {
-  ClusterSharedPtr new_cluster =
+  std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
+  auto& new_cluster = new_cluster_pair.first;
+  Cluster& cluster_reference = *new_cluster;
 
   if (!added_via_api) {
     if (cluster_map.find(new_cluster->info()->name()) != cluster_map.end()) {
@@ -590,7 +592,21 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
     }
   }
 
-  Cluster& cluster_reference = *new_cluster;
+  if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided &&
+      new_cluster_pair.second == nullptr) {
+    throw EnvoyException(fmt::format("cluster manager: cluster provided LB specified but cluster "
+                                     "'{}' did not provide one. Check cluster documentation.",
+                                     new_cluster->info()->name()));
+  }
+
+  if (cluster_reference.info()->lbType() != LoadBalancerType::ClusterProvided &&
+      new_cluster_pair.second != nullptr) {
+    throw EnvoyException(
+        fmt::format("cluster manager: cluster provided LB not specified but cluster "
+                    "'{}' provided one. Check cluster documentation.",
+                    new_cluster->info()->name()));
+  }
+
   if (new_cluster->healthChecker() != nullptr) {
     new_cluster->healthChecker()->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) {
@@ -625,6 +641,8 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
         cluster_reference.prioritySet(), cluster_reference.info()->stats(),
         cluster_reference.info()->statsScope(), runtime_, random_,
         cluster_reference.info()->lbConfig());
+  } else if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided) {
+    cluster_entry_it->second->thread_aware_lb_ = std::move(new_cluster_pair.second);
   }
 
   updateGauges();
@@ -1076,6 +1094,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
                                                      parent.parent_.random_, cluster->lbConfig());
       break;
     }
+    case LoadBalancerType::ClusterProvided:
     case LoadBalancerType::RingHash:
     case LoadBalancerType::Maglev: {
       ASSERT(lb_factory_ != nullptr);
@@ -1223,7 +1242,7 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
       new Tcp::ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options)};
 }
 
-ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
+std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterFactoryImplBase::create(

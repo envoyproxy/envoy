@@ -110,7 +110,7 @@ public:
   /**
    * Static method to get the registered cluster factory and create an instance of cluster.
    */
-  static ClusterSharedPtr
+  static std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
   create(const envoy::api::v2::Cluster& cluster, ClusterManager& cluster_manager,
          Stats::Store& stats, ThreadLocal::Instance& tls,
          Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
@@ -126,8 +126,8 @@ public:
                                                   ClusterFactoryContext& context);
 
   // Upstream::ClusterFactory
-  ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster,
-                          ClusterFactoryContext& context) override;
+  std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  create(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context) override;
   std::string name() override { return name_; }
 
 protected:
@@ -137,7 +137,7 @@ private:
   /**
    * Create an instance of ClusterImplBase.
    */
-  virtual ClusterImplBaseSharedPtr
+  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) PURE;
@@ -161,7 +161,7 @@ protected:
   ConfigurableClusterFactoryBase(const std::string& name) : ClusterFactoryImplBase(name) {}
 
 private:
-  virtual ClusterImplBaseSharedPtr
+  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) override {
@@ -173,7 +173,7 @@ private:
                                    context, socket_factory_context, std::move(stats_scope));
   }
 
-  virtual ClusterImplBaseSharedPtr createClusterWithConfig(
+  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterWithConfig(
       const envoy::api::v2::Cluster& cluster, const ConfigProto& proto_config,
       ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContext& socket_factory_context,

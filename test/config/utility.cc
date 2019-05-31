@@ -45,6 +45,29 @@ static_resources:
         port_value: 0
 )EOF";
 
+const std::string ConfigHelper::BASE_UDP_LISTENER_CONFIG = R"EOF(
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+static_resources:
+  clusters:
+    name: cluster_0
+    hosts:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+  listeners:
+    name: listener_0
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+        protocol: udp
+)EOF";
+
 const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
@@ -258,6 +281,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   uint32_t port_idx = 0;
   bool eds_hosts = false;
   bool custom_cluster = false;
+  bool original_dst_cluster = false;
   auto* static_resources = bootstrap_.mutable_static_resources();
   const auto tap_path = TestEnvironment::getOptionalEnvVar("TAP_PATH");
   if (tap_path) {
@@ -286,6 +310,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
     auto* cluster = static_resources->mutable_clusters(i);
     if (cluster->type() == envoy::api::v2::Cluster::EDS) {
       eds_hosts = true;
+    } else if (cluster->type() == envoy::api::v2::Cluster::ORIGINAL_DST) {
+      original_dst_cluster = true;
     } else if (cluster->has_cluster_type()) {
       custom_cluster = true;
     } else {
@@ -325,7 +351,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
                             *cluster->mutable_transport_socket(), tls_config);
     }
   }
-  ASSERT(port_idx == ports.size() || eds_hosts || custom_cluster ||
+  ASSERT(port_idx == ports.size() || eds_hosts || original_dst_cluster || custom_cluster ||
          bootstrap_.dynamic_resources().has_cds_config());
 
   if (!connect_timeout_set_) {
