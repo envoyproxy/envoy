@@ -11,6 +11,14 @@ namespace Envoy {
 namespace Event {
 
 /**
+ * Utility helper functions for Timer implementation.
+ */
+class TimerUtils {
+public:
+  static void millisecondsToTimeval(const std::chrono::milliseconds& d, timeval& tv);
+};
+
+/**
  * libevent implementation of Timer.
  */
 class TimerImpl : public Timer, ImplBase {
@@ -21,9 +29,6 @@ public:
   void disableTimer() override;
   void enableTimer(const std::chrono::milliseconds& d) override;
   bool enabled() override;
-
-  // Public for testing.
-  void millisecondsToTimeval(timeval* tv, const std::chrono::milliseconds& d);
 
 private:
   TimerCb cb_;

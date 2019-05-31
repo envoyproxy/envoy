@@ -199,28 +199,24 @@ TEST(TimerImplTest, TimerEnabledDisabled) {
 }
 
 TEST(TimerImplTest, TimerValueConversion) {
-  Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher());
-  Event::TimerPtr timer = dispatcher->createTimer([] {});
-  Event::TimerImpl* t = static_cast<Event::TimerImpl*>(timer.get());
   timeval tv;
   std::chrono::milliseconds msecs;
 
   // Basic test with zero milliseconds.
   msecs = std::chrono::milliseconds(0);
-  t->millisecondsToTimeval(&tv, msecs);
+  TimerUtils::millisecondsToTimeval(msecs, tv);
   EXPECT_EQ(tv.tv_sec, 0);
   EXPECT_EQ(tv.tv_usec, 0);
 
   // 2050 milliseconds is 2 seconds and 50000 microseconds.
   msecs = std::chrono::milliseconds(2050);
-  t->millisecondsToTimeval(&tv, msecs);
+  TimerUtils::millisecondsToTimeval(msecs, tv);
   EXPECT_EQ(tv.tv_sec, 2);
   EXPECT_EQ(tv.tv_usec, 50000);
 
   // Check maximum value conversion.
   msecs = std::chrono::milliseconds::duration::max();
-  t->millisecondsToTimeval(&tv, msecs);
+  TimerUtils::millisecondsToTimeval(msecs, tv);
   EXPECT_EQ(tv.tv_sec, msecs.count() / 1000);
   EXPECT_EQ(tv.tv_usec, (msecs.count() % tv.tv_sec) * 1000);
 }
