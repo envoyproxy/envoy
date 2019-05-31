@@ -302,6 +302,7 @@ accessors
 acls
 addr
 agg
+alignas
 alignof
 alloc
 alloca
