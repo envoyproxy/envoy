@@ -159,12 +159,10 @@ TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
 /**
  * Test stats macros. @see stats_macros.h
  */
-// clang-format off
 #define ALL_TEST_STATS(COUNTER, GAUGE, HISTOGRAM)                                                  \
-  COUNTER  (test_counter)                                                                          \
-  GAUGE    (test_gauge, Accumulate)                                                                \
+  COUNTER(test_counter)                                                                            \
+  GAUGE(test_gauge, Accumulate)                                                                    \
   HISTOGRAM(test_histogram)
-// clang-format on
 
 struct TestStats {
   ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
