@@ -270,10 +270,10 @@ EdsClusterFactory::createClusterImpl(
   }
 
   return std::make_pair(
-      return std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                              std::move(stats_scope), context.addedViaApi(),
-                                              context.clusterManager().xdsIsDelta()),
-             nullptr);
+      std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
+                                       std::move(stats_scope), context.addedViaApi(),
+                                       context.clusterManager().xdsIsDelta()),
+      nullptr);
 }
 
 /**

@@ -40,7 +40,7 @@ public:
 
   // An opaque token given out to users of WatchMap, to identify a given watch.
   using Token = uint64_t;
-  constexpr Token InvalidToken = std::numeric_limits<uint64_t>::max();
+  static constexpr Token InvalidToken = std::numeric_limits<uint64_t>::max();
 
   // Adds 'callbacks' to the WatchMap, with no resource names being watched.
   // (Use updateWatchInterest() to add some names).

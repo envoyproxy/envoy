@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/subscription.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/protobuf/protobuf.h"
@@ -109,9 +110,46 @@ public:
    * e.g.type.googleapis.com/envoy.api.v2.Cluster.
    */
   virtual void resume(const std::string& type_url) PURE;
+  
+  // For delta
+  virtual /*WatchMap::Token*/uint64_t addWatch(const std::string& type_url, const std::set<std::string>& resources,
+                           SubscriptionCallbacks& callbacks) PURE;
+  virtual void removeWatch(const std::string& type_url, /*WatchMap::Token*/uint64_t watch_token) PURE;
+  virtual void updateWatch(const std::string& type_url, /*WatchMap::Token*/uint64_t watch_token,
+                   const std::set<std::string>& resources) PURE;
 };
 
 typedef std::unique_ptr<GrpcMux> GrpcMuxPtr;
+
+/**
+ * A grouping of callbacks that a GrpcMux should provide to its GrpcStream.
+ */
+template <class ResponseProto> class GrpcStreamCallbacks {
+public:
+  virtual ~GrpcStreamCallbacks() {}
+
+  /**
+   * For the GrpcStream to prompt the context to take appropriate action in response to the
+   * gRPC stream having been successfully established.
+   */
+  virtual void onStreamEstablished() PURE;
+
+  /**
+   * For the GrpcStream to prompt the context to take appropriate action in response to
+   * failure to establish the gRPC stream.
+   */
+  virtual void onEstablishmentFailure() PURE;
+
+  /**
+   * For the GrpcStream to pass received protos to the context.
+   */
+  virtual void onDiscoveryResponse(std::unique_ptr<ResponseProto>&& message) PURE;
+
+  /**
+   * For the GrpcStream to call when its rate limiting logic allows more requests to be sent.
+   */
+  virtual void onWriteable() PURE;
+};
 
 } // namespace Config
 } // namespace Envoy

@@ -10,10 +10,9 @@ DeltaSubscriptionState::DeltaSubscriptionState(const std::string& type_url,
                                                SubscriptionCallbacks& callbacks,
                                                const LocalInfo::LocalInfo& local_info,
                                                std::chrono::milliseconds init_fetch_timeout,
-                                               Event::Dispatcher& dispatcher,
-                                               SubscriptionStats& stats)
+                                               Event::Dispatcher& dispatcher)
     : type_url_(type_url), callbacks_(callbacks), local_info_(local_info),
-      init_fetch_timeout_(init_fetch_timeout), stats_(stats) {
+      init_fetch_timeout_(init_fetch_timeout) {
   setInitFetchTimeout(dispatcher);
 }
 
@@ -41,8 +40,8 @@ void DeltaSubscriptionState::resume() {
 
 // Returns true if there is any meaningful change in our subscription interest, worth reporting to
 // the server.
-void DeltaSubscriptionState::updateResourceInterest(std::vector<std::string> cur_added,
-                                                    std::vector<std::string> cur_removed) {
+void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
+                                                        const std::set<std::string>& cur_removed) {
   for (const auto& a : cur_added) {
     setResourceWaitingForServer(a);
     // If interest in a resource is removed-then-added (all before a discovery request
@@ -75,7 +74,6 @@ DeltaSubscriptionState::handleResponse(const envoy::api::v2::DeltaDiscoveryRespo
   // We *always* copy the response's nonce into the next request, even if we're going to make that
   // request a NACK by setting error_detail.
   UpdateAck ack(message.nonce(), type_url_);
-  stats_.update_attempt_.inc();
   try {
     handleGoodResponse(message);
   } catch (const EnvoyException& e) {
@@ -119,8 +117,6 @@ void DeltaSubscriptionState::handleGoodResponse(
       setResourceWaitingForServer(resource_name);
     }
   }
-  stats_.update_success_.inc();
-  stats_.version_.set(HashUtil::xxHash64(message.system_version_info()));
   ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", type_url_,
             message.resources().size(), message.removed_resources().size());
 }
@@ -130,15 +126,12 @@ void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAc
   ack.error_detail_.set_code(Grpc::Status::GrpcStatus::Internal);
   ack.error_detail_.set_message(e.what());
   disableInitFetchTimeoutTimer();
-  stats_.update_rejected_.inc();
   ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
   callbacks_.onConfigUpdateFailed(&e);
 }
 
 void DeltaSubscriptionState::handleEstablishmentFailure() {
   disableInitFetchTimeoutTimer();
-  stats_.update_failure_.inc();
-  stats_.update_attempt_.inc();
   callbacks_.onConfigUpdateFailed(nullptr);
 }
 

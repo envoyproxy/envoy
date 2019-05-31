@@ -29,7 +29,7 @@ public:
   DeltaSubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
                          const LocalInfo::LocalInfo& local_info,
                          std::chrono::milliseconds init_fetch_timeout,
-                         Event::Dispatcher& dispatcher, SubscriptionStats& stats);
+                         Event::Dispatcher& dispatcher);
 
   void setInitFetchTimeout(Event::Dispatcher& dispatcher);
 
@@ -38,7 +38,8 @@ public:
   bool paused() const { return paused_; }
 
   // Update which resources we're interested in subscribing to.
-  void updateResourceInterest(const std::set<std::string>& update_to_these_names);
+  void updateSubscriptionInterest(const std::set<std::string>& cur_added,
+                                  const std::set<std::string>& cur_removed);
 
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   bool subscriptionUpdatePending() const;
@@ -105,8 +106,6 @@ private:
   // Feel free to change to unordered if you can figure out how to make it work.
   std::set<std::string> names_added_;
   std::set<std::string> names_removed_;
-
-  SubscriptionStats& stats_;
 
   DeltaSubscriptionState(const DeltaSubscriptionState&) = delete;
   DeltaSubscriptionState& operator=(const DeltaSubscriptionState&) = delete;

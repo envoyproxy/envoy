@@ -216,6 +216,7 @@ envoy_cc_library(
     hdrs = ["grpc_delta_xds_context.h"],
     deps = [
         ":delta_subscription_state_lib",
+        ":watch_map_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
     ],
