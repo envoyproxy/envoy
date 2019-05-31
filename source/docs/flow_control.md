@@ -95,7 +95,7 @@ events have occurred and passes any on to the router filter when it subscribes.
 It is worth noting that the router does not unwind `readDisable(true)` calls on
 destruction. In the case of HTTP/2 the `Envoy::Http::Http2::ConnectionImpl` will consume
 any outstanding flow control window on stream deletion to avoid leaking the connection-level
-window. In the case of HTTP/1, the the Envoy::Http::ConnectionManagerImpl unwinds any readDisable()
+window. In the case of HTTP/1, the Envoy::Http::ConnectionManagerImpl unwinds any readDisable()
 calls downstream to ensure that pipelined requests will be read. For HTTP/1
 upstream connections, the `readDisable(true)` calls are unwound in
 ClientConnectionImpl::onMessageComplete() to make sure that as connections are
