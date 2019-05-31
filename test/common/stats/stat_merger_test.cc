@@ -147,38 +147,29 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   gauges["overload.something.pressure"] = 33;
 
   stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-  EXPECT_FALSE(
-      store_.gauge("child.doesnt.have.this.version", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(
-      store_.gauge("runtime.admin_overrides_active", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("runtime.num_keys", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("runtime.num_layers", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(
-      store_.gauge("listener_manager.total_listeners_draining", Gauge::ImportMode::NeverImport)
-          .used());
-  EXPECT_FALSE(
-      store_.gauge("listener_manager.total_listeners_warming", Gauge::ImportMode::NeverImport)
-          .used());
-  EXPECT_FALSE(store_.gauge("server.hot_restart_epoch", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("server.live", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("server.concurrency", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(
-      store_.gauge("some.control_plane.connected_state", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(
-      store_.gauge("cluster_manager.active_clusters", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(
-      store_.gauge("cluster_manager.warming_clusters", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("cluster.rds.membership_total", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(
-      store_.gauge("cluster.rds.membership_healthy", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(
-      store_.gauge("cluster.rds.membership_degraded", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("cluster.rds.max_host_weight", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(store_.gauge("anything.total_principals", Gauge::ImportMode::NeverImport).used());
-  EXPECT_FALSE(
-      store_.gauge("listener_manager.total_listeners_active", Gauge::ImportMode::NeverImport)
-          .used());
-  EXPECT_FALSE(store_.gauge("overload.something.pressure", Gauge::ImportMode::NeverImport).used());
+#define EXPECT_GAUGE_NOT_USED(name)                                                                \
+  EXPECT_FALSE(store_.gauge(name, Gauge::ImportMode::NeverImport).used())
+
+  EXPECT_GAUGE_NOT_USED("child.doesnt.have.this.version");
+  EXPECT_GAUGE_NOT_USED("runtime.admin_overrides_active");
+  EXPECT_GAUGE_NOT_USED("runtime.num_keys");
+  EXPECT_GAUGE_NOT_USED("runtime.num_layers");
+  EXPECT_GAUGE_NOT_USED("listener_manager.total_listeners_draining");
+  EXPECT_GAUGE_NOT_USED("listener_manager.total_listeners_warming");
+  EXPECT_GAUGE_NOT_USED("server.hot_restart_epoch");
+  EXPECT_GAUGE_NOT_USED("server.live");
+  EXPECT_GAUGE_NOT_USED("server.concurrency");
+  EXPECT_GAUGE_NOT_USED("some.control_plane.connected_state");
+  EXPECT_GAUGE_NOT_USED("cluster_manager.active_clusters");
+  EXPECT_GAUGE_NOT_USED("cluster_manager.warming_clusters");
+  EXPECT_GAUGE_NOT_USED("cluster.rds.membership_total");
+  EXPECT_GAUGE_NOT_USED("cluster.rds.membership_healthy");
+  EXPECT_GAUGE_NOT_USED("cluster.rds.membership_degraded");
+  EXPECT_GAUGE_NOT_USED("cluster.rds.max_host_weight");
+  EXPECT_GAUGE_NOT_USED("anything.total_principals");
+  EXPECT_GAUGE_NOT_USED("listener_manager.total_listeners_active");
+  EXPECT_GAUGE_NOT_USED("overload.something.pressure");
+#undef EXPECT_GAUGE_NOT_USED
 }
 
 // Targeted test of GaugeImpl::mergeImportMode().

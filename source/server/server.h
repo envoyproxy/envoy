@@ -47,20 +47,18 @@ namespace Server {
 /**
  * All server wide stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_SERVER_STATS(COUNTER, GAUGE)                                                           \
-  GAUGE(uptime, Accumulate)                                                                        \
+  COUNTER(debug_assertion_failures)                                                                \
   GAUGE(concurrency, NeverImport)                                                                  \
-  GAUGE(memory_allocated, Accumulate)                                                              \
-  GAUGE(memory_heap_size, Accumulate)                                                              \
-  GAUGE(live, NeverImport)                                                                         \
-  GAUGE(parent_connections, Accumulate)                                                            \
-  GAUGE(total_connections, Accumulate)                                                             \
-  GAUGE(version, NeverImport)                                                                      \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
   GAUGE(hot_restart_epoch, NeverImport)                                                            \
-  COUNTER(debug_assertion_failures)
-// clang-format on
+  GAUGE(live, NeverImport)                                                                         \
+  GAUGE(memory_allocated, Accumulate)                                                              \
+  GAUGE(memory_heap_size, Accumulate)                                                              \
+  GAUGE(parent_connections, Accumulate)                                                            \
+  GAUGE(total_connections, Accumulate)                                                             \
+  GAUGE(uptime, Accumulate)                                                                        \
+  GAUGE(version, NeverImport)
 
 struct ServerStats {
   ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)

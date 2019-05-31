@@ -15,12 +15,10 @@ namespace Upstream {
 /**
  * All ring hash load balancer stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_RING_HASH_LOAD_BALANCER_STATS(GAUGE)                                                   \
-  GAUGE(size, Accumulate)                                                          \
-  GAUGE(min_hashes_per_host, Accumulate)                                           \
-  GAUGE(max_hashes_per_host, Accumulate)
-// clang-format on
+  GAUGE(max_hashes_per_host, Accumulate)                                                           \
+  GAUGE(min_hashes_per_host, Accumulate)                                                           \
+  GAUGE(size, Accumulate)
 
 /**
  * Struct definition for all ring hash load balancer stats. @see stats_macros.h

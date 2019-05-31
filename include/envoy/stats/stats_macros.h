@@ -11,11 +11,16 @@ namespace Envoy {
  * is also easy to mock and test. The general flow looks like this:
  *
  * Define a block of stats like this:
- *   #define MY_COOL_STATS(COUNTER, GAUGE, HISTOGRAM) \
- *     COUNTER(counter1)
- *     GAUGE(gauge1, mode)
+ *   #define MY_COOL_STATS(COUNTER, GAUGE, HISTOGRAM)     \
+ *     COUNTER(counter1)                                  \
+ *     GAUGE(gauge1, mode)                                \
  *     HISTOGRAM(histogram1)
  *     ...
+ *
+ * By convention, starting with #7083, we sort the lines of this macro block, so
+ * all the counters are grouped together, then all the gauges, etc. We do not
+ * use clang-format-on/off etc. "./tools/check_format.py fix" will take care of
+ * lining up the backslashes.
  *
  * Now actually put these stats somewhere, usually as a member of a struct:
  *   struct MyCoolStats {

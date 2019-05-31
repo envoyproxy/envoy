@@ -65,10 +65,10 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
     absl::optional<std::reference_wrapper<const Gauge>> gauge_opt =
         temp_scope_->findGauge(stat_name);
 
-    // We the stat named in the protobuf map is already initialized, and has a mode
-    // of NeverImport, then we simply skip over the map entry. This is a case where
-    // a new revision of Envoy has been built where a previously Accumulated gauge
-    // has been switched to NeverImport mode.
+    // If the stat named in the protobuf map is already initialized, and has a
+    // mode of NeverImport, then we simply skip over the map entry. This is a
+    // case where a new revision of Envoy has been built where a previously
+    // Accumulated gauge has been switched to NeverImport mode.
     Gauge::ImportMode import_mode = Gauge::ImportMode::Uninitialized;
     if (gauge_opt) {
       import_mode = gauge_opt->get().importMode();

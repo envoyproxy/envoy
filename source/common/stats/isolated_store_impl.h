@@ -36,7 +36,6 @@ public:
       return *stat->second;
     }
 
-    ASSERT(alloc_);
     std::shared_ptr<Base> new_stat = alloc_(name);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
@@ -48,7 +47,6 @@ public:
       return *stat->second;
     }
 
-    ASSERT(alloc_import_);
     std::shared_ptr<Base> new_stat = alloc_import_(name, import_mode);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;

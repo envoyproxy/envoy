@@ -84,14 +84,12 @@ public:
 /**
  * Per subscription stats. @see stats_macros.h
  */
-// clang-format off
-#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE) \
-  COUNTER(update_attempt)                      \
-  COUNTER(update_success)                      \
-  COUNTER(update_failure)                      \
-  COUNTER(update_rejected)                     \
+#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE)                                                     \
+  COUNTER(update_attempt)                                                                          \
+  COUNTER(update_failure)                                                                          \
+  COUNTER(update_rejected)                                                                         \
+  COUNTER(update_success)                                                                          \
   GAUGE(version, NeverImport)
-// clang-format on
 
 /**
  * Struct definition for per subscription stats. @see stats_macros.h
