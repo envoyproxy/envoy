@@ -489,7 +489,6 @@ public:
         scale_locality_weight_(subset_config.scale_locality_weight()),
         panic_mode_any_(subset_config.panic_mode_any()) {
     for (const auto& subset : subset_config.subset_selectors()) {
-      //      stat_names_.push_back(std::make_unique<Stats::StatNameStorage>(name, symbol_table_));
       if (!subset.keys().empty()) {
         subset_selectors_.emplace_back(std::make_shared<SubsetSelector>(
             SubsetSelector{std::set<std::string>(subset.keys().begin(), subset.keys().end()),
