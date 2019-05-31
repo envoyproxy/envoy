@@ -80,8 +80,9 @@ void SdsApi::initialize() {
       sds_config_, local_info_, dispatcher_, cluster_manager_, random_, stats_,
       "envoy.service.discovery.v2.SecretDiscoveryService.FetchSecrets",
       "envoy.service.discovery.v2.SecretDiscoveryService.StreamSecrets",
-      Grpc::Common::typeUrl(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()), api_);
-  subscription_->start({sds_config_name_}, *this);
+      Grpc::Common::typeUrl(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()), api_,
+      *this);
+  subscription_->start({sds_config_name_});
 }
 
 } // namespace Secret
