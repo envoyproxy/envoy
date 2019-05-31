@@ -1613,7 +1613,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "10.0.1.1", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
-  // IPv4 client with source 10.0.0.10, Match
+  // IPv4 client with source 10.0.0.10, Match.
   filter_chain =
       findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "10.0.0.10", 111);
   ASSERT_NE(filter_chain, nullptr);
@@ -1662,12 +1662,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpv6Ma
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
-  // IPv6 client. match.
+  // IPv6 client with matching subnet. Match.
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {},
                                       "2001:0db8:85a3:0000:0000:8a2e:0370:7334", 111);
   EXPECT_NE(filter_chain, nullptr);
 
-  // IPv6 client. No match.
+  // IPv6 client with non-matching subnet. No match.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {},
                                  "2001:0db8:85a3:0001:0000:8a2e:0370:7334", 111);
   EXPECT_EQ(filter_chain, nullptr);
@@ -2301,6 +2301,29 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
                             EnvoyException,
                             "error adding listener '127.0.0.1:1234': multiple filter chains with "
                             "the same matching rules are defined");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest,
+       MultipleFilterChainsWithSameMatchPlusUnimplementedFields) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.listener.tls_inspector"
+      config: {}
+    filter_chains:
+    - filter_chain_match:
+        transport_protocol: "tls"
+    - filter_chain_match:
+        transport_protocol: "tls"
+        address_suffix: 127.0.0.0
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                            EnvoyException,
+                            "error adding listener '127.0.0.1:1234': contains filter chains with "
+                            "unimplemented fields");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappingRules) {

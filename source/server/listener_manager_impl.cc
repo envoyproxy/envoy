@@ -269,6 +269,11 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
 
   for (const auto& filter_chain : config.filter_chains()) {
     const auto& filter_chain_match = filter_chain.filter_chain_match();
+    if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
+                                       "unimplemented fields",
+                                       address_->asString()));
+    }
     if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
       throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
                                        "the same matching rules are defined",
