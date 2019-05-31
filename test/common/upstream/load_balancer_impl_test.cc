@@ -1424,14 +1424,14 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   EXPECT_EQ(subset_info.defaultSubset().fields().at("key").string_value(),
             std::string("the value"));
   EXPECT_EQ(subset_info.subsetSelectors().size(), 2);
-  EXPECT_EQ(subset_info.subsetSelectors()[0].first, std::set<std::string>({"selector_key1"}));
-  EXPECT_EQ(subset_info.subsetSelectors()[0].second,
-            absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>(
-                envoy::api::v2::Cluster::LbSubsetConfig::NOT_DEFINED_PER_SELECTOR));
-  EXPECT_EQ(subset_info.subsetSelectors()[1].first, std::set<std::string>({"selector_key2"}));
-  EXPECT_EQ(subset_info.subsetSelectors()[1].second,
-            absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>(
-                envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT_PER_SELECTOR));
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->selector_keys,
+            std::set<std::string>({"selector_key1"}));
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallback_policy,
+            envoy::api::v2::Cluster::LbSubsetConfig::NOT_DEFINED_PER_SELECTOR);
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->selector_keys,
+            std::set<std::string>({"selector_key2"}));
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallback_policy,
+            envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT_PER_SELECTOR);
 }
 
 } // namespace

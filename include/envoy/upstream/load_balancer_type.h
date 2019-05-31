@@ -19,10 +19,12 @@ namespace Upstream {
  */
 enum class LoadBalancerType { RoundRobin, LeastRequest, Random, RingHash, OriginalDst, Maglev };
 
-typedef std::pair<
-    std::set<std::string>,
-    absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>>
-    SubsetSelector;
+struct SubsetSelector {
+  std::set<std::string> selector_keys;
+  envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy fallback_policy;
+};
+
+typedef std::shared_ptr<SubsetSelector> SubsetSelectorPtr;
 
 /**
  * Load Balancer subset configuration.
@@ -53,7 +55,7 @@ public:
    * @return const std:vector<std:set<std::string>>& a vector of
    * sorted keys used to define load balancer subsets.
    */
-  virtual const std::vector<SubsetSelector>& subsetSelectors() const PURE;
+  virtual const std::vector<SubsetSelectorPtr>& subsetSelectors() const PURE;
 
   /*
    * @return bool whether routing to subsets should take locality weights into account.

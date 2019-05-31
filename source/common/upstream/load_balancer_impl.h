@@ -489,11 +489,11 @@ public:
         scale_locality_weight_(subset_config.scale_locality_weight()),
         panic_mode_any_(subset_config.panic_mode_any()) {
     for (const auto& subset : subset_config.subset_selectors()) {
+      //      stat_names_.push_back(std::make_unique<Stats::StatNameStorage>(name, symbol_table_));
       if (!subset.keys().empty()) {
-        subset_selectors_.emplace_back(std::make_pair(
-            std::set<std::string>(subset.keys().begin(), subset.keys().end()),
-            absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>(
-                subset.fallback_policy())));
+        subset_selectors_.emplace_back(std::make_shared<SubsetSelector>(
+            SubsetSelector{std::set<std::string>(subset.keys().begin(), subset.keys().end()),
+                           subset.fallback_policy()}));
       }
     }
   }
@@ -504,7 +504,9 @@ public:
     return fallback_policy_;
   }
   const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
-  const std::vector<SubsetSelector>& subsetSelectors() const override { return subset_selectors_; }
+  const std::vector<SubsetSelectorPtr>& subsetSelectors() const override {
+    return subset_selectors_;
+  }
   bool localityWeightAware() const override { return locality_weight_aware_; }
   bool scaleLocalityWeight() const override { return scale_locality_weight_; }
   bool panicModeAny() const override { return panic_mode_any_; }
@@ -513,7 +515,7 @@ private:
   const bool enabled_;
   const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
   const ProtobufWkt::Struct default_subset_;
-  std::vector<SubsetSelector> subset_selectors_;
+  std::vector<SubsetSelectorPtr> subset_selectors_;
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;
   const bool panic_mode_any_;

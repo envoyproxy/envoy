@@ -189,7 +189,7 @@ private:
 
   const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
   const SubsetMetadata default_subset_metadata_;
-  const std::vector<SubsetSelector> subset_selectors_;
+  const std::vector<SubsetSelectorPtr> subset_selectors_;
 
   const PrioritySet& original_priority_set_;
   const PrioritySet* original_local_priority_set_;

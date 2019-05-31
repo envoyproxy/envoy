@@ -116,7 +116,7 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
   selectors_ = std::make_shared<SubsetSelectorMap>();
   SubsetSelectorMapPtr selectors;
   for (const auto& subset_selector : subset_selectors_) {
-    const auto& selector_keys = subset_selector.first;
+    const auto& selector_keys = subset_selector->selector_keys;
     unsigned long pos = 0;
     selectors = selectors_;
     for (const auto& key : selector_keys) {
@@ -128,10 +128,12 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
         // if this is last key for given selector, check if it has fallback specified
         if (pos == selector_keys.size()) {
           const auto& selector_fallback_policy =
-              (subset_selector.second ==
+              (subset_selector->fallback_policy ==
                envoy::api::v2::Cluster::LbSubsetConfig::NOT_DEFINED_PER_SELECTOR)
                   ? absl::nullopt
-                  : subset_selector.second;
+                  : absl::optional<
+                        envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>{
+                        subset_selector->fallback_policy};
           childSelector->second->fallback_policy = selector_fallback_policy;
           initSelectorFallbackSubset(selector_fallback_policy);
         }
@@ -373,7 +375,7 @@ void SubsetLoadBalancer::processSubsets(
     const bool adding_hosts = step.second;
     for (const auto& host : hosts) {
       for (const auto& subset_selector : subset_selectors_) {
-        const auto& keys = subset_selector.first;
+        const auto& keys = subset_selector->selector_keys;
         // For each host, for each subset key, attempt to extract the metadata corresponding to the
         // key from the host.
         SubsetMetadata kvs = extractSubsetMetadata(keys, *host);
