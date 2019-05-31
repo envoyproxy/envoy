@@ -35,18 +35,9 @@ create(const envoy::config::filter::network::http_connection_manager::v2::HttpCo
     const envoy::config::filter::network::http_connection_manager::v2::
         ScopedRouteConfigurationsList& scoped_route_list =
             config.scoped_routes().scoped_route_configurations_list();
-    ProtobufTypes::ConstMessagePtrVector config_protos;
-    std::transform(scoped_route_list.scoped_route_configurations().begin(),
-                   scoped_route_list.scoped_route_configurations().end(),
-                   std::back_inserter(config_protos),
-                   [](const envoy::api::v2::ScopedRouteConfiguration& scoped_route_config)
-                       -> std::unique_ptr<const Protobuf::Message> {
-                     Protobuf::Message* clone = scoped_route_config.New();
-                     clone->MergeFrom(scoped_route_config);
-                     return std::unique_ptr<const Protobuf::Message>(clone);
-                   });
     return scoped_routes_config_provider_manager.createStaticConfigProvider(
-        std::move(config_protos), factory_context,
+        repeatedPtrFieldToConstMessagePtrVector(scoped_route_list.scoped_route_configurations()),
+        factory_context,
         ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
                                                 config.scoped_routes().rds_config_source(),
                                                 config.scoped_routes().scope_key_builder()));
@@ -59,11 +50,8 @@ create(const envoy::config::filter::network::http_connection_manager::v2::HttpCo
                                                 config.scoped_routes().rds_config_source(),
                                                 config.scoped_routes().scope_key_builder()));
 
-  case envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
-      CONFIG_SPECIFIER_NOT_SET:
-    return nullptr;
-
   default:
+    // Proto validation enforces that is not reached.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }

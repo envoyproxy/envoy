@@ -249,14 +249,15 @@ public:
 
   /**
    * @return Router::RouteConfigProvider* the configuration provider used to acquire a route
-   *         config for each request flow.
+   *         config for each request flow. Pointer ownership is _not_ transferred to the caller of
+   *         this function. This will return nullptr when scoped routing is enabled.
    */
   virtual Router::RouteConfigProvider* routeConfigProvider() PURE;
 
   /**
    * @return Config::ConfigProvider* the configuration provider used to acquire scoped routing
    * configuration for each request flow. Pointer ownership is _not_ transferred to the caller of
-   * this function.
+   * this function. This will return nullptr when scoped routing is not enabled.
    */
   virtual Config::ConfigProvider* scopedRouteConfigProvider() PURE;
 
