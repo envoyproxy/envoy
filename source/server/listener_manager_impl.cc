@@ -66,7 +66,8 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     if (filter_config->getBoolean("deprecated_v1", false)) {
       callback = factory.createFilterFactory(*filter_config->getObject("value", true), context);
     } else {
-      auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
+      auto message = Config::Utility::translateToFactoryConfig(
+          proto_config, context.messageValidationVisitor(), factory);
       callback = factory.createFilterFactoryFromProto(*message, context);
     }
     ret.push_back(callback);
@@ -92,7 +93,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
             string_name);
-    auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
+    auto message = Config::Utility::translateToFactoryConfig(
+        proto_config, context.messageValidationVisitor(), factory);
     ret.push_back(factory.createFilterFactoryFromProto(*message, context));
   }
   return ret;
@@ -117,7 +119,8 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
         Config::Utility::getAndCheckFactory<Configuration::NamedUdpListenerFilterConfigFactory>(
             string_name);
 
-    auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
+    auto message = Config::Utility::translateToFactoryConfig(
+        proto_config, context.messageValidationVisitor(), factory);
     ret.push_back(factory.createFilterFactoryFromProto(*message, context));
   }
   return ret;
@@ -297,8 +300,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
 
     auto& config_factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
-    ProtobufTypes::MessagePtr message =
-        Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        transport_socket, parent_.server_.messageValidationVisitor(), config_factory);
 
     // Validate IP addresses.
     std::vector<std::string> destination_ips;
@@ -335,7 +338,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
         parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
         parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
-        parent_.server_.threadLocal(), parent_.server_.api());
+        parent_.server_.threadLocal(), parent_.server_.messageValidationVisitor(),
+        parent_.server_.api());
     factory_context.setInitManager(initManager());
     addFilterChain(
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,

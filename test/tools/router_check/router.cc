@@ -68,7 +68,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
   envoy::api::v2::RouteConfiguration route_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
-  MessageUtil::loadFromFile(router_config_file, route_config, *api);
+  TestUtility::loadFromFile(router_config_file, route_config, *api);
 
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
@@ -159,7 +159,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
   const std::string contents = api->fileSystem().fileReadToEnd(expected_routes);
-  MessageUtil::loadFromFile(expected_routes, validation_config, *api);
+  TestUtility::loadFromFile(expected_routes, validation_config, *api);
   MessageUtil::validate(validation_config);
 
   bool no_failures = true;

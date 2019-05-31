@@ -88,7 +88,7 @@ Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& p
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::RouteConfiguration route_config;
-  MessageUtil::loadFromYaml(yaml, route_config);
+  TestUtility::loadFromYaml(yaml, route_config);
   MessageUtil::validate(route_config);
   return route_config;
 }

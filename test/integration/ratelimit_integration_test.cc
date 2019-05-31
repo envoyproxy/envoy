@@ -37,7 +37,7 @@ public:
       ratelimit_cluster->mutable_http2_protocol_options();
 
       // enhance rate limit filter config based on the configuration of test.
-      MessageUtil::loadFromYaml(base_filter_config_, proto_config_);
+      TestUtility::loadFromYaml(base_filter_config_, proto_config_);
       proto_config_.set_failure_mode_deny(failure_mode_deny_);
       setGrpcService(*proto_config_.mutable_rate_limit_service()->mutable_grpc_service(),
                      "ratelimit", fake_upstreams_.back()->localAddress());
@@ -45,7 +45,7 @@ public:
       envoy::api::v2::listener::Filter ratelimit_filter;
       ratelimit_filter.set_name("envoy.rate_limit");
       ProtobufWkt::Struct ratelimit_config = ProtobufWkt::Struct();
-      MessageUtil::jsonConvert(proto_config_, ratelimit_config);
+      TestUtility::jsonConvert(proto_config_, ratelimit_config);
       ratelimit_filter.mutable_config()->MergeFrom(ratelimit_config);
       config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ratelimit_filter));
     });

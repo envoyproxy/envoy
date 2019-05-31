@@ -30,10 +30,11 @@ TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
       service_name: fake_file
    )EOF";
   envoy::config::trace::v2::Tracing configuration;
-  MessageUtil::loadFromYaml(yaml_string, configuration);
+  TestUtility::loadFromYaml(yaml_string, configuration);
 
   DatadogTracerFactory factory;
-  auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   Tracing::HttpTracerPtr datadog_tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, datadog_tracer);
 }

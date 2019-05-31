@@ -25,6 +25,7 @@
 #include "common/http/context_impl.h"
 #include "common/init/manager_impl.h"
 #include "common/memory/heap_shrinker.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
@@ -109,10 +110,12 @@ public:
    * @param config_path supplies the config path.
    * @param v2_only supplies whether to attempt v1 fallback.
    * @param api reference to the Api object
+   * @param validation_visitor message validation visitor instance.
    * @return BootstrapVersion to indicate which version of the API was parsed.
    */
-  static BootstrapVersion loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                              const Options& options, Api::Api& api);
+  static BootstrapVersion
+  loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,
+                      ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 };
 
 /**
@@ -193,6 +196,11 @@ public:
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
+  }
+
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return options_.allowUnknownFields() ? ProtobufMessage::getStrictValidationVisitor()
+                                         : ProtobufMessage::getNullValidationVisitor();
   }
 
   // ServerLifecycleNotifier

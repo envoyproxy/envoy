@@ -33,7 +33,7 @@ namespace {
 
 static envoy::api::v2::route::Route parseRouteFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::route::Route route;
-  MessageUtil::loadFromYaml(yaml, route);
+  TestUtility::loadFromYaml(yaml, route);
   return route;
 }
 

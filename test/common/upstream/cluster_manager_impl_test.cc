@@ -26,6 +26,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -68,7 +69,7 @@ public:
               auto result = ClusterFactoryImplBase::create(
                   cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
                   dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-                  outlier_event_logger, added_via_api, *api_);
+                  outlier_event_logger, added_via_api, validation_visitor_, *api_);
               // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
               return std::make_pair(result.first, result.second.release());
             }));
@@ -132,6 +133,7 @@ public:
   NiceMock<Secret::MockSecretManager> secret_manager_;
   NiceMock<AccessLog::MockAccessLogManager> log_manager_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
 };
 
@@ -194,7 +196,7 @@ protected:
 
 envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromYaml(yaml, bootstrap);
+  TestUtility::loadFromYaml(yaml, bootstrap);
   return bootstrap;
 }
 
@@ -271,7 +273,7 @@ public:
         dynamic_cast<const envoy::admin::v2alpha::ClustersConfigDump&>(*message_ptr);
 
     envoy::admin::v2alpha::ClustersConfigDump expected_clusters_config_dump;
-    MessageUtil::loadFromYaml(expected_dump_yaml, expected_clusters_config_dump);
+    TestUtility::loadFromYaml(expected_dump_yaml, expected_clusters_config_dump);
     EXPECT_EQ(expected_clusters_config_dump.DebugString(), clusters_config_dump.DebugString());
   }
 
