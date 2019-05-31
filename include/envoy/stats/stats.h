@@ -143,7 +143,21 @@ public:
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
   virtual uint64_t value() const PURE;
+
+  /**
+   * @return the import mode, dictating behavior of the gauge across hot restarts.
+   */
   virtual ImportMode importMode() const PURE;
+
+  /**
+   * Gauges can be created as ImportMode::Uninitialized when during hot-restart
+   * merges, if they haven't been initialized by the child process yet. When
+   * they do get initialized, mergeImportMode should be called to establish the
+   * import mode. It is only valid to call mergeImportMode when the current
+   * current mode is Uninitialized.
+   *
+   * @param import_mode the new import mode.
+   */
   virtual void mergeImportMode(ImportMode import_mode) PURE;
 };
 
