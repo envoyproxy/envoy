@@ -10,6 +10,7 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(
     const std::vector<Envoy::Extensions::Clusters::Redis::ClusterSlot>& slots,
     Envoy::Upstream::HostMap all_hosts) {
 
+  absl::WriterMutexLock lock(&mutex_);
   bool should_update = !slot_array_;
   auto slots_array = std::make_shared<SlotArray>();
   for (const ClusterSlot& slot : slots) {
@@ -25,7 +26,6 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(
   }
 
   if (should_update) {
-    absl::WriterMutexLock lock(&mutex_);
     slot_array_ = slots_array;
   }
   return should_update;
