@@ -13,6 +13,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/filesystem/directory.h"
+#include "common/grpc/common.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
@@ -448,28 +449,101 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
 
 LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
                        const envoy::config::bootstrap::v2::LayeredRuntime& config,
-                       absl::string_view service_cluster, Stats::Store& store,
-                       RandomGenerator& generator, Api::Api& api)
+                       const LocalInfo::LocalInfo& local_info, Init::Manager& init_manager,
+                       Stats::Store& store, RandomGenerator& generator,
+                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : generator_(generator), stats_(generateStats(store)), admin_layer_(stats_),
-      tls_(tls.allocateSlot()), config_(config), service_cluster_(service_cluster), api_(api) {
+      tls_(tls.allocateSlot()), config_(config), service_cluster_(local_info.clusterName()),
+      api_(api) {
   for (const auto& layer : config_.layers()) {
-    if (layer.has_admin_layer()) {
+    switch (layer.layer_specifier_case()) {
+    case envoy::config::bootstrap::v2::RuntimeLayer::kAdminLayer:
       if (config_has_admin_layer_) {
         throw EnvoyException(
             "Too many admin layers specified in LayeredRuntime, at most one may be specified");
       } else {
         config_has_admin_layer_ = true;
       }
-    } else if (layer.has_disk_layer()) {
+      break;
+    case envoy::config::bootstrap::v2::RuntimeLayer::kDiskLayer:
       if (watcher_ == nullptr) {
         watcher_ = dispatcher.createFilesystemWatcher();
       }
       watcher_->addWatch(layer.disk_layer().symlink_root(), Filesystem::Watcher::Events::MovedTo,
                          [this](uint32_t) -> void { loadNewSnapshot(); });
+      break;
+    case envoy::config::bootstrap::v2::RuntimeLayer::kTdsLayer:
+      subscriptions_.emplace_back(
+          std::make_unique<TdsSubscription>(*this, layer.tds_layer(), store, validation_visitor));
+      init_manager.add(subscriptions_.back()->init_target_);
+      break;
+    default:
+      break;
     }
   }
 
   loadNewSnapshot();
+}
+
+void LoaderImpl::initialize(Upstream::ClusterManager& cm) { cm_ = &cm; }
+
+TdsSubscription::TdsSubscription(
+    LoaderImpl& parent, const envoy::config::bootstrap::v2::RuntimeLayer::TdsLayer& tds_layer,
+    Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor)
+    : parent_(parent), config_source_(tds_layer.tds_config()), store_(store),
+      resource_name_(tds_layer.name()),
+      init_target_("TDS " + resource_name_, [this]() { start(); }),
+      validation_visitor_(validation_visitor) {}
+
+void TdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                     const std::string&) {
+  ENVOY_LOG(debug, "TDS onConfigUpdate");
+  validateUpdateSize(resources.size());
+  auto runtime = MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(
+      resources[0], validation_visitor_);
+  MessageUtil::validate(runtime);
+  if (runtime.name() != resource_name_) {
+    throw EnvoyException(
+        fmt::format("Unexpected TDS runtime (expecting {}): {}", resource_name_, runtime.name()));
+  }
+  ENVOY_LOG(debug, "Reloading TDS snapshot for onConfigUpdate");
+  proto_.CopyFrom(runtime.layer());
+  parent_.loadNewSnapshot();
+  init_target_.ready();
+}
+
+void TdsSubscription::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
+    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+  validateUpdateSize(resources.size());
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
+  *unwrapped_resource.Add() = resources[0].resource();
+  onConfigUpdate(unwrapped_resource, resources[0].version());
+}
+
+void TdsSubscription::onConfigUpdateFailed(const EnvoyException*) {
+  // We need to allow server startup to continue, even if we have a bad
+  // config.
+  init_target_.ready();
+}
+
+void TdsSubscription::start() {
+  // We have to delay the subscription creation until init-time, since the
+  // cluster manager resources are not available in the constructor when
+  // instantiated in the server instance.
+  subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
+      config_source_,
+      Grpc::Common::typeUrl(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()),
+      store_, *this);
+  subscription_->start({resource_name_});
+}
+
+void TdsSubscription::validateUpdateSize(uint32_t num_resources) {
+  if (num_resources != 1) {
+    init_target_.ready();
+    throw EnvoyException(fmt::format("Unexpected TDS resource length: {}", num_resources));
+    // (would be a return false here)
+  }
 }
 
 void LoaderImpl::loadNewSnapshot() {
@@ -500,6 +574,7 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
   std::vector<Snapshot::OverrideLayerConstPtr> layers;
   uint32_t disk_layers = 0;
   uint32_t error_layers = 0;
+  uint32_t tds_layer = 0;
   for (const auto& layer : config_.layers()) {
     switch (layer.layer_specifier_case()) {
     case envoy::config::bootstrap::v2::RuntimeLayer::kStaticLayer:
@@ -527,6 +602,11 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
     case envoy::config::bootstrap::v2::RuntimeLayer::kAdminLayer:
       layers.push_back(std::make_unique<AdminLayer>(admin_layer_));
       break;
+    case envoy::config::bootstrap::v2::RuntimeLayer::kTdsLayer: {
+      auto* subscription = subscriptions_[tds_layer++].get();
+      layers.emplace_back(std::make_unique<const ProtoLayer>(subscription->proto_));
+      break;
+    }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }

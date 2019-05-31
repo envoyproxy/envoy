@@ -704,6 +704,16 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "tds_integration_test",
+    srcs = ["tds_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "@envoy_api//envoy/service/discovery/v2:tds_cc",
+    ],
+)
+
+envoy_cc_test(
     name = "uds_integration_test",
     srcs = [
         "uds_integration_test.cc",

@@ -353,6 +353,7 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2:lds_cc",
         "@envoy_api//envoy/api/v2:rds_cc",
         "@envoy_api//envoy/api/v2:srds_cc",
+        "@envoy_api//envoy/service/discovery/v2:tds_cc",
     ],
 )
 
