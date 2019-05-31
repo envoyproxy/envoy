@@ -45,7 +45,7 @@ using SymbolVec = std::vector<Symbol>;
  * reference-counted so that no-longer-used symbols can be reclaimed.
  *
  * We use a uint8_t array to encode a "."-deliminated stat-name into arrays of
- * integer symbol symbol IDs in order to conserve space, as in practice the
+ * integer symbol IDs in order to conserve space, as in practice the
  * majority of token instances in stat names draw from a fairly small set of
  * common names, typically less than 100. The format is somewhat similar to
  * UTF-8, with a variable-length array of uint8_t. See the implementation for
