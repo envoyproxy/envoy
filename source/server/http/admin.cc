@@ -451,14 +451,16 @@ void AdminImpl::writeListenersAsJson(Buffer::Instance& response) {
   for (auto listener : server_.listenerManager().listeners()) {
     envoy::admin::v2alpha::ListenerStatus& listener_status = *listeners.add_listener_statuses();
     listener_status.set_name(listener.get().name());
-    Network::Utility::addressToProtobufAddress(*listener.get().socket().localAddress(), *listener_status.mutable_local_address());
+    Network::Utility::addressToProtobufAddress(*listener.get().socket().localAddress(),
+                                               *listener_status.mutable_local_address());
   }
   response.add(MessageUtil::getJsonStringFromMessage(listeners, true)); // pretty-print
 }
 
 void AdminImpl::writeListenersAsText(Buffer::Instance& response) {
   for (auto listener : server_.listenerManager().listeners()) {
-    response.add(fmt::format("{}::{}\n", listener.get().name(), listener.get().socket().localAddress()->asString()));
+    response.add(fmt::format("{}::{}\n", listener.get().name(),
+                             listener.get().socket().localAddress()->asString()));
   }
 }
 
