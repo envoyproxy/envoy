@@ -230,7 +230,7 @@ private:
   // The encode map stores both the symbol and the ref count of that symbol.
   // Using absl::string_view lets us only store the complete string once, in the decode map.
   using EncodeMap = absl::flat_hash_map<absl::string_view, SharedSymbol, StringViewHash>;
-  using DecodeMap = absl::flat_hash_map<Symbol, std::unique_ptr<std::string>>;
+  using DecodeMap = absl::flat_hash_map<Symbol, InlineStringPtr>;
   EncodeMap encode_map_ GUARDED_BY(lock_);
   DecodeMap decode_map_ GUARDED_BY(lock_);
 

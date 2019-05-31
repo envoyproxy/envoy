@@ -44,6 +44,16 @@ bool FilterChainUtility::buildFilterChain(
   return true;
 }
 
+bool FilterChainUtility::buildUdpFilterChain(
+    Network::UdpListenerFilterManager& filter_manager, Network::UdpReadFilterCallbacks& callbacks,
+    const std::vector<Network::UdpListenerFilterFactoryCb>& factories) {
+  for (const Network::UdpListenerFilterFactoryCb& factory : factories) {
+    factory(filter_manager, callbacks);
+  }
+
+  return true;
+}
+
 void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {

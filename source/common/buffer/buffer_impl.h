@@ -10,6 +10,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/non_copyable.h"
+#include "common/common/utility.h"
 #include "common/event/libevent.h"
 
 namespace Envoy {
@@ -192,7 +193,7 @@ protected:
 
 using SlicePtr = std::unique_ptr<Slice>;
 
-class OwnedSlice : public Slice {
+class OwnedSlice : public Slice, public InlineStorage {
 public:
   /**
    * Create an empty OwnedSlice.
@@ -219,16 +220,7 @@ public:
     return slice;
   }
 
-  // Custom delete operator to keep C++14 from using the global operator delete(void*, size_t),
-  // which would result in the compiler error:
-  // "exception cleanup for this placement new selects non-placement operator delete"
-  static void operator delete(void* address) { ::operator delete(address); }
-
 private:
-  static void* operator new(size_t object_size, size_t data_size) {
-    return ::operator new(object_size + data_size);
-  }
-
   OwnedSlice(uint64_t size) : Slice(0, 0, size) { base_ = storage_; }
 
   /**

@@ -1,8 +1,8 @@
 #include "common/http/utility.h"
 
-#include "test/common/http/common_fuzz.h"
 #include "test/common/http/utility_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/fuzz/utility.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
