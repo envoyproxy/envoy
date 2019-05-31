@@ -47,8 +47,7 @@ def GenerateNewConfig(original_yaml, admin_address, updated_json):
           path = discovered['local_address']['pipe']['path']
           for index in range(index + 1, len(raw_yaml) - 1):
             if 'pipe:' in raw_yaml[index] and 'path:' in raw_yaml[index + 1]:
-              raw_yaml[index + 1] = re.sub('path:.*', 'path: "' + path + '"',
-                                           raw_yaml[index + 1])
+              raw_yaml[index + 1] = re.sub('path:.*', 'path: "' + path + '"', raw_yaml[index + 1])
               replaced = True
               break
         else:
@@ -66,7 +65,8 @@ def GenerateNewConfig(original_yaml, admin_address, updated_json):
               replaced = True
               break
         if replaced:
-          sys.stderr.write('replaced listener at line ' + str(index) + ' with ' + str(discovered) + '\n')
+          sys.stderr.write('replaced listener at line ' + str(index) + ' with ' + str(discovered) +
+                           '\n')
         else:
           sys.stderr.write('Failed to replace a discovered listener ' + str(discovered) + '\n')
           return False
