@@ -29,20 +29,14 @@ def sanitize_flagfile(in_path, out_fd):
 
 
 # Is the arg a flag indicating that we're building for C++ (rather than C)?
-def old_is_cpp_flag(arg):
+def is_cpp_flag(arg):
   return arg in ["-static-libstdc++", "-stdlib=libc++", "-lstdc++", "-lc++"
                 ] or arg.startswith("-std=c++") or arg.startswith("-std=gnu++")
 
 
-# Is the arg a flag indicating that we're building for C++ (rather than C)?
-def new_is_cpp_flag(arg):
-  return arg in ["-static-libstdc++\n", "-stdlib=libc++\n", "-lstdc++\n", "-lc++\n"
-                ] or arg.startswith("-std=c++") or arg.startswith("-std=gnu++")
-
-
-def old_modify_driver_command_line_and_execute(sys_argv):
+def modify_driver_args(input_driver_flags):
   # Detect if we're building for C++ or vanilla C.
-  if any(map(old_is_cpp_flag, sys_argv[1:])):
+  if any(map(is_cpp_flag, input_driver_flags)):
     compiler = envoy_real_cxx
     # Append CXXFLAGS to all C++ targets (this is mostly for dependencies).
     argv = shlex.split(envoy_cxxflags)
@@ -54,8 +48,8 @@ def old_modify_driver_command_line_and_execute(sys_argv):
   # Either:
   # a) remove all occurrences of -lstdc++ (when statically linking against libstdc++),
   # b) replace all occurrences of -lstdc++ with -lc++ (when linking against libc++).
-  if "-static-libstdc++" in sys_argv[1:] or "-stdlib=libc++" in envoy_cxxflags:
-    for arg in sys_argv[1:]:
+  if "-static-libstdc++" in input_driver_flags or "-stdlib=libc++" in envoy_cxxflags:
+    for arg in input_driver_flags:
       if arg == "-lstdc++":
         if "-stdlib=libc++" in envoy_cxxflags:
           argv.append("-lc++")
@@ -71,7 +65,7 @@ def old_modify_driver_command_line_and_execute(sys_argv):
       else:
         argv.append(arg)
   else:
-    argv += sys_argv[1:]
+    argv += input_driver_flags
 
   # Bazel will add -fuse-ld=gold in some cases, gcc/clang will take the last -fuse-ld argument,
   # so whenever we see lld once, add it to the end.
@@ -93,58 +87,7 @@ def old_modify_driver_command_line_and_execute(sys_argv):
     # See https://github.com/envoyproxy/envoy/issues/2987
     argv.append("-Wno-maybe-uninitialized")
 
-  os.execv(compiler, [compiler] + argv)
-
-
-def new_modify_driver_command_line_and_execute(flagfile_path, new_flagfile_path, new_flagfile_fd):
-  flagfile_contents = open(flagfile_path, "r").readlines()
-
-  # Detect if we're building for C++ or vanilla C.
-  if any(map(new_is_cpp_flag, flagfile_contents)):
-    compiler = envoy_real_cxx
-    # Append CXXFLAGS to all C++ targets (this is mostly for dependencies).
-    argv = shlex.split(envoy_cxxflags)
-  else:
-    compiler = envoy_real_cc
-    # Append CFLAGS to all C targets (this is mostly for dependencies).
-    argv = shlex.split(envoy_cflags)
-
-  # Either:
-  # a) remove all occurrences of -lstdc++ (when statically linking against libstdc++),
-  # b) replace all occurrences of -lstdc++ with -lc++ (when linking against libc++).
-  if "-static-libstdc++\n" in flagfile_contents or "-stdlib=libc++" in envoy_cxxflags:
-    for arg in flagfile_contents:
-      if arg == "-lstdc++\n":
-        if "-stdlib=libc++" in envoy_cxxflags:
-          argv.append("-lc++\n")
-      else:
-        argv.append(arg)
-  else:
-    argv += flagfile_contents
-
-  # Bazel will add -fuse-ld=gold in some cases, gcc/clang will take the last -fuse-ld argument,
-  # so whenever we see lld once, add it to the end.
-  if "-fuse-ld=lld\n" in argv:
-    argv.append("-fuse-ld=lld\n")
-
-  # Add compiler-specific options
-  if "clang" in compiler:
-    # This ensures that STL symbols are included.
-    # See https://github.com/envoyproxy/envoy/issues/1341
-    argv.append("-fno-limit-debug-info\n")
-    argv.append("-Wthread-safety\n")
-    argv.append("-Wgnu-conditional-omitted-operand\n")
-  elif "gcc" in compiler or "g++" in compiler:
-    # -Wmaybe-initialized is warning about many uses of absl::optional. Disable
-    # to prevent build breakage. This option does not exist in clang, so setting
-    # it in clang builds causes a build error because of unknown command line
-    # flag.
-    # See https://github.com/envoyproxy/envoy/issues/2987
-    argv.append("-Wno-maybe-uninitialized\n")
-
-  for arg in argv:
-    os.write(new_flagfile_fd, arg)
-  os.execv(compiler, [compiler] + ["@" + new_flagfile_path])
+  return compiler, argv
 
 
 def main():
@@ -153,14 +96,29 @@ def main():
     os.execv(envoy_real_cxx, [envoy_real_cxx] + sys.argv[1:] + shlex.split(envoy_cxxflags))
 
   if sys.argv[1].startswith("@"):
-    (new_flagfile_fd, new_flagfile_path) = tempfile.mkstemp(dir="./", suffix=".linker-params")
+    # Read flags from file
     flagfile_path = sys.argv[1][1:]
+    with open(flagfile_path, "r") as fd:
+      input_driver_flags = fd.read().splitlines()
+
+    # Compute new args
+    compiler, new_driver_args = modify_driver_args(input_driver_flags)
+
+    # Write args to temp file
+    (new_flagfile_fd, new_flagfile_path) = tempfile.mkstemp(dir="./", suffix=".linker-params")
+
     with closing_fd(new_flagfile_fd):
-      new_modify_driver_command_line_and_execute(flagfile_path, new_flagfile_path, new_flagfile_fd)
+      for arg in new_driver_args:
+        os.write(new_flagfile_fd, arg + "\n")
+
+    # Provide new arguments using the temp file containing the args
+    new_args = ["@" + new_flagfile_path]
   else:
     # TODO(https://github.com/bazelbuild/bazel/issues/7687): Remove this branch
     # when Bazel 0.27 is released.
-    old_modify_driver_command_line_and_execute(sys.argv)
+    compiler, new_args = modify_driver_args(sys.argv[1:])
+
+  os.execv(compiler, [compiler] + new_args)
 
 
 if __name__ == "__main__":
