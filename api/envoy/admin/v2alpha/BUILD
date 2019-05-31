@@ -28,6 +28,15 @@ api_proto_library_internal(
 )
 
 api_proto_library_internal(
+    name = "listeners",
+    srcs = ["listeners.proto"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/api/v2/core:address",
+    ],
+)
+
+api_proto_library_internal(
     name = "metrics",
     srcs = ["metrics.proto"],
     visibility = ["//visibility:public"],
