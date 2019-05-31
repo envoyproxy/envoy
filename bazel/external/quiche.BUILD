@@ -656,14 +656,20 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "epoll_server_lib",
-    srcs = [
-        "quiche/epoll_server/fake_simple_epoll_server.cc",
-        "quiche/epoll_server/simple_epoll_server.cc",
-    ],
-    hdrs = [
-        "quiche/epoll_server/fake_simple_epoll_server.h",
-        "quiche/epoll_server/simple_epoll_server.h",
-    ],
+    srcs = select({
+        "@envoy//bazel:linux": [
+            "quiche/epoll_server/fake_simple_epoll_server.cc",
+            "quiche/epoll_server/simple_epoll_server.cc",
+        ],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "@envoy//bazel:linux": [
+            "quiche/epoll_server/fake_simple_epoll_server.h",
+            "quiche/epoll_server/simple_epoll_server.h",
+        ],
+        "//conditions:default": [],
+    }),
     copts = quiche_copt,
     repository = "@envoy",
     deps = [":epoll_server_platform"],
@@ -699,8 +705,7 @@ envoy_cc_library(
 envoy_cc_test(
     name = "epoll_server_test",
     srcs = select({
-        "@envoy//bazel:linux_x86_64": ["quiche/epoll_server/simple_epoll_server_test.cc"],
-        "@envoy//bazel:linux_aarch64": ["quiche/epoll_server/simple_epoll_server_test.cc"],
+        "@envoy//bazel:linux": ["quiche/epoll_server/simple_epoll_server_test.cc"],
         "//conditions:default": [],
     }),
     copts = quiche_copt,

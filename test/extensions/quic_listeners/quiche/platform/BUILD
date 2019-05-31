@@ -28,8 +28,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_platform_test",
     srcs = select({
-        "//bazel:linux_x86_64": ["quic_platform_test.cc"],
-        "//bazel:linux_aarch64": ["quic_platform_test.cc"],
+        "//bazel:linux": ["quic_platform_test.cc"],
         "//conditions:default": [],
     }),
     copts = ["-Wno-unused-parameter"],
@@ -107,13 +106,11 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "quic_platform_epoll_clock_lib",
     srcs = select({
-        "//bazel:linux_x86_64": ["quic_epoll_clock.cc"],
-        "//bazel:linux_aarch64": ["quic_epoll_clock.cc"],
+        "//bazel:linux": ["quic_epoll_clock.cc"],
         "//conditions:default": [],
     }),
     hdrs = select({
-        "//bazel:linux_x86_64": ["quic_epoll_clock.h"],
-        "//bazel:linux_aarch64": ["quic_epoll_clock.h"],
+        "//bazel:linux": ["quic_epoll_clock.h"],
         "//conditions:default": [],
     }),
     deps = [
