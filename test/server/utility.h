@@ -6,6 +6,8 @@
 
 #include "common/protobuf/utility.h"
 
+#include "test/test_common/utility.h"
+
 namespace Envoy {
 namespace Server {
 namespace {

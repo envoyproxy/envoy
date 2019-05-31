@@ -253,6 +253,7 @@ envoy_cc_test_library(
     hdrs = ["utility.h"],
     deps = [
         "//source/common/protobuf:utility_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:lds_cc",
     ],
 )
