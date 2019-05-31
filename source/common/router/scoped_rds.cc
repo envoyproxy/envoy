@@ -36,7 +36,8 @@ create(const envoy::config::filter::network::http_connection_manager::v2::HttpCo
         ScopedRouteConfigurationsList& scoped_route_list =
             config.scoped_routes().scoped_route_configurations_list();
     return scoped_routes_config_provider_manager.createStaticConfigProvider(
-        repeatedPtrFieldToConstMessagePtrVector(scoped_route_list.scoped_route_configurations()),
+        RepeatedPtrUtil::convertToConstMessagePtrVector(
+            scoped_route_list.scoped_route_configurations()),
         factory_context,
         ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
                                                 config.scoped_routes().rds_config_source(),
