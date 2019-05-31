@@ -32,8 +32,6 @@ std::string getRFC2253NameFromCertificate(X509& cert, CertName desired_name) {
   case CertName::Subject:
     name = X509_get_subject_name(&cert);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   // flags=XN_FLAG_RFC2253 is the documented parameter for single-line output in RFC 2253 format.
