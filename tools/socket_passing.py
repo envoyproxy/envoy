@@ -41,7 +41,7 @@ def GenerateNewConfig(original_yaml, admin_address, updated_json):
     else:
       raw_yaml = original_file.readlines()
       index = 0
-      for discovered in discovered_listeners:
+      for discovered in discovered_listeners['listener_statuses']:
         replaced = False
         if 'pipe' in discovered['local_address']:
           path = discovered['local_address']['pipe']['path']
@@ -52,7 +52,7 @@ def GenerateNewConfig(original_yaml, admin_address, updated_json):
               break
         else:
           addr = discovered['local_address']['socket_address']['address']
-          port = discovered['local_address']['socket_address']['port_value']
+          port = str(discovered['local_address']['socket_address']['port_value'])
           if addr[0] == '[':
             addr = addr[1:-1]  # strip [] from ipv6 address.
           for index in range(index + 1, len(raw_yaml) - 2):
