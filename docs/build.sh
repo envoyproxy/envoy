@@ -85,7 +85,9 @@ PROTO_RST="
   /envoy/config/accesslog/v2/als/envoy/config/accesslog/v2/als.proto.rst
   /envoy/config/accesslog/v2/file/envoy/config/accesslog/v2/file.proto.rst
   /envoy/config/bootstrap/v2/bootstrap/envoy/config/bootstrap/v2/bootstrap.proto.rst
+  /envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster/envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.proto.rst
   /envoy/config/cluster/redis/redis_cluster/envoy/config/cluster/redis/redis_cluster.proto.rst
+  /envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache/envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.proto.rst
   /envoy/config/common/tap/v2alpha/common/envoy/config/common/tap/v2alpha/common.proto.rst
   /envoy/config/ratelimit/v2/rls/envoy/config/ratelimit/v2/rls.proto.rst
   /envoy/config/metrics/v2/metrics_service/envoy/config/metrics/v2/metrics_service.proto.rst
@@ -95,6 +97,7 @@ PROTO_RST="
   /envoy/config/filter/fault/v2/fault/envoy/config/filter/fault/v2/fault.proto.rst
   /envoy/config/filter/http/buffer/v2/buffer/envoy/config/filter/http/buffer/v2/buffer.proto.rst
   /envoy/config/filter/http/csrf/v2/csrf/envoy/config/filter/http/csrf/v2/csrf.proto.rst
+  /envoy/config/filter/http/dynamic_forward_proxy/v2alpha/dynamic_forward_proxy/envoy/config/filter/http/dynamic_forward_proxy/v2alpha/dynamic_forward_proxy.proto.rst
   /envoy/config/filter/http/ext_authz/v2/ext_authz/envoy/config/filter/http/ext_authz/v2/ext_authz.proto.rst
   /envoy/config/filter/http/fault/v2/fault/envoy/config/filter/http/fault/v2/fault.proto.rst
   /envoy/config/filter/http/gzip/v2/gzip/envoy/config/filter/http/gzip/v2/gzip.proto.rst

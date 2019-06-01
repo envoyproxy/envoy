@@ -36,3 +36,9 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/zookeeper_proxy @rgs1 @snowp
 # redis cluster extension
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
+# dynamic forward proxy
+# TODO(mattklein123): Find a 2nd owner or relax the script.
+/*/extensions/clusters/dynamic_forward_proxy @mattklein123 @mattklein123
+/*/extensions/common/dynamic_forward_proxy @mattklein123 @mattklein123
+/*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @mattklein123
+

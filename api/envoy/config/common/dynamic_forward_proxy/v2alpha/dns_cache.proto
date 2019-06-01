@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package envoy.config.common.dynamic_forward_proxy.v2alpha;
+
+option java_outer_classname = "DnsCacheProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.common.dynamic_forward_proxy.v2alpha";
+
+import "envoy/api/v2/cds.proto";
+
+import "google/protobuf/duration.proto";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Dynamic forward proxy common configuration]
+
+// Configuration for the dynamic forward proxy DNS cache. See the :ref:`architecture overview
+// <arch_overview_http_dynamic_forward_proxy>` for more information.
+message DnsCacheConfig {
+  // The name of the cache. Multiple named caches allow independent dynamic forward proxy
+  // configurations to operate within a single Envoy process using different configurations. All
+  // configurations with the same name *must* otherwise have the same settings when referenced
+  // from different configuration components. Configuration will fail to load if this is not
+  // the case.
+  string name = 1 [(validate.rules).string.min_bytes = 1];
+
+  // The DNS lookup family to use during resolution.
+  api.v2.Cluster.DnsLookupFamily dns_lookup_family = 2 [(validate.rules).enum.defined_only = true];
+
+  // The DNS refresh rate for currently cached DNS hosts. If not specified defaults to 60s.
+  google.protobuf.Duration dns_refresh_rate = 3 [(validate.rules).duration.gt = {}];
+
+  // The TTL for hosts that are unused. Hosts that have not been used in the configured time
+  // interval will be purged.
+  google.protobuf.Duration host_ttl = 4 [(validate.rules).duration.gt = {}];
+}
