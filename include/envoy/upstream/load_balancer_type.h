@@ -9,8 +9,6 @@
 
 #include "common/protobuf/protobuf.h"
 
-#include "absl/types/optional.h"
-
 namespace Envoy {
 namespace Upstream {
 

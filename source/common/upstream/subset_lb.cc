@@ -140,7 +140,7 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
         selectors = childSelector->second;
       } else {
         selectors = selector_it->second;
-      };
+      }
     }
     selectors = selectors_;
   }
@@ -153,20 +153,20 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
     return;
   } else if (fallback_policy ==
                  envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT_PER_SELECTOR &&
-             !selector_fallback_subset_any_) {
+             selector_fallback_subset_any_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer for selector");
     HostPredicate predicate = [](const Host&) -> bool { return true; };
-    selector_fallback_subset_any_ = std::make_shared<LbSubsetEntry>();
-    selector_fallback_subset_any_.value()->priority_subset_.reset(
+    selector_fallback_subset_any_ = std::make_unique<LbSubsetEntry>();
+    selector_fallback_subset_any_->priority_subset_.reset(
         new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
   } else if (fallback_policy ==
                  envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET_PER_SELECTOR &&
-             !selector_fallback_subset_default_) {
+             selector_fallback_subset_default_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: creating default subset fallback load balancer for selector");
     HostPredicate predicate = std::bind(&SubsetLoadBalancer::hostMatches, this,
                                         default_subset_metadata_, std::placeholders::_1);
-    selector_fallback_subset_default_ = std::make_shared<LbSubsetEntry>();
-    selector_fallback_subset_default_.value()->priority_subset_.reset(
+    selector_fallback_subset_default_ = std::make_unique<LbSubsetEntry>();
+    selector_fallback_subset_default_->priority_subset_.reset(
         new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
   }
 }
@@ -250,17 +250,17 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
   }
   const auto fallback = fallback_policy.value();
   if (fallback == envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT_PER_SELECTOR &&
-      selector_fallback_subset_any_) {
+      selector_fallback_subset_any_ != nullptr) {
     HostConstSharedPtr host =
-        selector_fallback_subset_any_.value()->priority_subset_->lb_->chooseHost(context);
+        selector_fallback_subset_any_->priority_subset_->lb_->chooseHost(context);
     if (host != nullptr) {
       return host;
     }
 
   } else if (fallback == envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET_PER_SELECTOR &&
-             selector_fallback_subset_default_) {
+             selector_fallback_subset_default_ != nullptr) {
     HostConstSharedPtr host =
-        selector_fallback_subset_default_.value()->priority_subset_->lb_->chooseHost(context);
+        selector_fallback_subset_default_->priority_subset_->lb_->chooseHost(context);
     if (host != nullptr) {
       return host;
     }
@@ -334,13 +334,13 @@ SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
 void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
                                               const HostVector& hosts_removed) {
 
-  if (selector_fallback_subset_any_) {
-    selector_fallback_subset_any_.value()->priority_subset_->update(priority, hosts_added,
+  if (selector_fallback_subset_any_ != nullptr) {
+    selector_fallback_subset_any_->priority_subset_->update(priority, hosts_added,
                                                                     hosts_removed);
   }
 
-  if (selector_fallback_subset_default_) {
-    selector_fallback_subset_default_.value()->priority_subset_->update(priority, hosts_added,
+  if (selector_fallback_subset_default_ != nullptr) {
+    selector_fallback_subset_default_->priority_subset_->update(priority, hosts_added,
                                                                         hosts_removed);
   }
 

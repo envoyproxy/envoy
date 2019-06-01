@@ -198,8 +198,8 @@ private:
   LbSubsetEntryPtr fallback_subset_;
   LbSubsetEntryPtr panic_mode_subset_;
 
-  absl::optional<LbSubsetEntryPtr> selector_fallback_subset_any_;
-  absl::optional<LbSubsetEntryPtr> selector_fallback_subset_default_;
+  LbSubsetEntryPtr selector_fallback_subset_any_;
+  LbSubsetEntryPtr selector_fallback_subset_default_;
 
   // Forms a trie-like structure. Requires lexically sorted Host and Route metadata.
   LbSubsetMap subsets_;
