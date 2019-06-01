@@ -1,6 +1,6 @@
-#include <string>
-
 #include "test/integration/integration_admin_test.h"
+
+#include <string>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/config/metrics/v2/stats.pb.h"
@@ -291,8 +291,8 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_THAT(response->body(), testing::HasSubstr("added_via_api"));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/clusters?format=json", "",
-                                                downstreamProtocol(), version_);
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/clusters?format=json",
+                                                "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
@@ -352,8 +352,8 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/listeners?format=json", "",
-                                                downstreamProtocol(), version_);
+  response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/listeners?format=json", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
@@ -368,7 +368,8 @@ TEST_P(IntegrationAdminTest, Admin) {
     auto local_address = (*listener_info_it)->getObject("local_address");
     auto socket_address = local_address->getObject("socket_address");
     EXPECT_EQ(listener_it->get().socket().localAddress()->asString(),
-      socket_address->getString("address") + ":" + std::to_string(socket_address->getInteger("port_value")));
+              socket_address->getString("address") + ":" +
+                  std::to_string(socket_address->getInteger("port_value")));
   }
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/config_dump", "",
