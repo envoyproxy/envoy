@@ -27,14 +27,6 @@ TEST(Hash, murmurHash2_64) {
   EXPECT_EQ(6142509188972423790U, MurmurHash::murmurHash2_64(""));
 }
 
-TEST(Hash, crc16) {
-  EXPECT_EQ(44950, Crc16::crc16("foo"));
-  EXPECT_EQ(37829, Crc16::crc16("bar"));
-  EXPECT_EQ(3951, Crc16::crc16("foo\nbar"));
-  EXPECT_EQ(53222, Crc16::crc16("lyft"));
-  EXPECT_EQ(0, Crc16::crc16(""));
-}
-
 #if __GLIBCXX__ >= 20130411 && __GLIBCXX__ <= 20180726
 TEST(Hash, stdhash) {
   EXPECT_EQ(std::hash<std::string>()(std::string("foo")), MurmurHash::murmurHash2_64("foo"));

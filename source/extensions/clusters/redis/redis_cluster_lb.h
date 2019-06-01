@@ -1,61 +1,19 @@
 #pragma once
 
 #include <array>
-#include <atomic>
-#include <chrono>
-#include <cstdint>
-#include <functional>
-#include <list>
-#include <memory>
 #include <string>
-#include <tuple>
-#include <utility>
 #include <vector>
 
-#include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
-#include "envoy/config/cluster/redis/redis_cluster.pb.h"
-#include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
-#include "envoy/config/typed_metadata.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
-#include "envoy/http/codec.h"
-#include "envoy/local_info/local_info.h"
-#include "envoy/network/dns.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/secret/secret_manager.h"
-#include "envoy/server/transport_socket_config.h"
-#include "envoy/ssl/context_manager.h"
-#include "envoy/stats/scope.h"
-#include "envoy/thread_local/thread_local.h"
-#include "envoy/upstream/cluster_manager.h"
-#include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
-#include "envoy/upstream/locality.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/callback_impl.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/logger.h"
-#include "common/config/metadata.h"
-#include "common/config/well_known_names.h"
 #include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/stats/isolated_store_impl.h"
-#include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/outlier_detection_impl.h"
-#include "common/upstream/resource_manager_impl.h"
 #include "common/upstream/upstream_impl.h"
 
-#include "server/transport_socket_config_impl.h"
+#include "source/extensions/clusters/redis/crc16.h"
 
 #include "extensions/clusters/well_known_names.h"
-#include "extensions/filters/network/common/redis/client.h"
-#include "extensions/filters/network/common/redis/client_impl.h"
-#include "extensions/filters/network/common/redis/codec.h"
 
 #include "absl/synchronization/mutex.h"
 
@@ -64,9 +22,9 @@ namespace Extensions {
 namespace Clusters {
 namespace Redis {
 
-static const int MAX_SLOT = 16384;
+static const uint64_t MaxSlot = 16384;
 
-typedef std::array<Upstream::HostSharedPtr, MAX_SLOT> SlotArray;
+typedef std::array<Upstream::HostSharedPtr, MaxSlot> SlotArray;
 
 typedef std::shared_ptr<SlotArray> SlotArraySharedPtr;
 
@@ -85,6 +43,19 @@ private:
   Network::Address::InstanceConstSharedPtr master_;
 };
 
+class RedisLoadBalancerContext : public Upstream::LoadBalancerContextBase {
+public:
+  RedisLoadBalancerContext(const std::string& key, bool enabled_hashtagging, bool use_crc16);
+
+  // Upstream::LoadBalancerContextBase
+  absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+
+private:
+  absl::string_view hashtag(absl::string_view v, bool enabled);
+
+  const absl::optional<uint64_t> hash_key_;
+};
+
 /*
  * This class implements load balancing according to `Redis Cluster
  * <https://redis.io/topics/cluster-spec>`_. This load balancer is thread local and created through
@@ -99,8 +70,8 @@ private:
  */
 class RedisClusterLoadBalancer : public Upstream::LoadBalancer {
 public:
-  RedisClusterLoadBalancer(SlotArraySharedPtr slot_array) : slot_array_(slot_array){};
-  virtual ~RedisClusterLoadBalancer() = default;
+  RedisClusterLoadBalancer(SlotArraySharedPtr slot_array) : slot_array_(std::move(slot_array)){};
+  ~RedisClusterLoadBalancer() = default;
 
   // Upstream::LoadBalancerBase
   Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override;
@@ -132,7 +103,7 @@ typedef std::shared_ptr<ClusterSlotUpdateCallBack> ClusterSlotUpdateCallBackShar
 class RedisClusterLoadBalancerFactory : public ClusterSlotUpdateCallBack,
                                         public Upstream::LoadBalancerFactory {
 public:
-  RedisClusterLoadBalancerFactory() {}
+  RedisClusterLoadBalancerFactory() = default;
 
   // ClusterSlotUpdateCallBack
   bool onClusterSlotUpdate(const std::vector<ClusterSlot>& slots,

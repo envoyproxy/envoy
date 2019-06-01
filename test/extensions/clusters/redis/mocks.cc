@@ -14,9 +14,9 @@ namespace Redis {
 MockClusterSlotUpdateCallBack::MockClusterSlotUpdateCallBack() {
   ON_CALL(*this, onClusterSlotUpdate(_, _))
       .WillByDefault(
-          Invoke([&](const std::vector<ClusterSlot>& slots, Upstream::HostMap all_hosts) {
-            ASSERT(slots.size() > 0);
-            ASSERT(all_hosts.size() > 0);
+          Invoke([&](const std::vector<ClusterSlot>& slots, Upstream::HostMap all_hosts) -> bool {
+            EXPECT_FALSE(slots.empty());
+            EXPECT_FALSE(all_hosts.empty());
             return true;
           }));
 }

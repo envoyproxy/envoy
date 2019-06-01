@@ -18,12 +18,6 @@ namespace ConnPool {
 
 namespace {
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
-
-// TODO(hyang): we should disallow Redis cluster to use anything other than ClusterProvided
-static inline bool useRedisClusterLb(Upstream::ClusterInfoConstSharedPtr info) {
-  return info->clusterType().name() == Extensions::Clusters::ClusterTypes::get().Redis &&
-         info->lbType() == Upstream::LoadBalancerType::ClusterProvided;
-}
 } // namespace
 
 InstanceImpl::InstanceImpl(
@@ -161,8 +155,12 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
     return nullptr;
   }
 
-  LbContextImpl lb_context(key, parent_.config_.enableHashtagging(),
-                           useRedisClusterLb(cluster_->info()));
+  Upstream::ClusterInfoConstSharedPtr info = cluster_->info();
+  const bool use_crc16 =
+      info->clusterType().name() == Extensions::Clusters::ClusterTypes::get().Redis &&
+      info->lbType() == Upstream::LoadBalancerType::ClusterProvided;
+  Clusters::Redis::RedisLoadBalancerContext lb_context(key, parent_.config_.enableHashtagging(),
+                                                       use_crc16);
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     return nullptr;
@@ -256,31 +254,6 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
     parent_.dispatcher_.deferredDelete(std::move(client_to_delete->second->redis_client_));
     parent_.client_map_.erase(client_to_delete);
   }
-}
-
-InstanceImpl::LbContextImpl::LbContextImpl(const std::string& key, bool enabled_hashtagging,
-                                           bool use_crc16)
-    : hash_key_(use_crc16 ? Crc16::crc16(hashtag(key, enabled_hashtagging))
-                          : MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))) {}
-
-// Inspired by the redis-cluster hashtagging algorithm
-// https://redis.io/topics/cluster-spec#keys-hash-tags
-absl::string_view InstanceImpl::LbContextImpl::hashtag(absl::string_view v, bool enabled) {
-  if (!enabled) {
-    return v;
-  }
-
-  auto start = v.find('{');
-  if (start == std::string::npos) {
-    return v;
-  }
-
-  auto end = v.find('}', start);
-  if (end == std::string::npos || end == start + 1) {
-    return v;
-  }
-
-  return v.substr(start + 1, end - start - 1);
 }
 
 } // namespace ConnPool

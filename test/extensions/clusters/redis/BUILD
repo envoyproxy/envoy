@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
+    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -100,4 +101,10 @@ envoy_cc_mock(
         "//source/extensions/clusters/redis:redis_cluster",
         "//test/mocks/upstream:upstream_mocks",
     ],
+)
+
+envoy_cc_test(
+    name = "crc16_test",
+    srcs = ["crc16_test.cc"],
+    deps = ["//source/extensions/clusters/redis:crc16_lib"],
 )

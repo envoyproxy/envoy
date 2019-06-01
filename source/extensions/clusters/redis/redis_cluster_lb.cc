@@ -50,10 +50,33 @@ RedisClusterLoadBalancer::chooseHost(Envoy::Upstream::LoadBalancerContext* conte
     return nullptr;
   }
 
-  uint64_t slot = hash.value() % Envoy::Extensions::Clusters::Redis::MAX_SLOT;
-  return slot_array_->at(slot);
+  return slot_array_->at(hash.value() % Envoy::Extensions::Clusters::Redis::MaxSlot);
 }
 
+RedisLoadBalancerContext::RedisLoadBalancerContext(const std::string& key, bool enabled_hashtagging,
+                                                   bool use_crc16)
+    : hash_key_(use_crc16 ? Crc16::crc16(hashtag(key, enabled_hashtagging))
+                          : MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))) {}
+
+// Inspired by the redis-cluster hashtagging algorithm
+// https://redis.io/topics/cluster-spec#keys-hash-tags
+absl::string_view RedisLoadBalancerContext::hashtag(absl::string_view v, bool enabled) {
+  if (!enabled) {
+    return v;
+  }
+
+  auto start = v.find('{');
+  if (start == std::string::npos) {
+    return v;
+  }
+
+  auto end = v.find('}', start);
+  if (end == std::string::npos || end == start + 1) {
+    return v;
+  }
+
+  return v.substr(start + 1, end - start - 1);
+}
 } // namespace Redis
 } // namespace Clusters
 } // namespace Extensions
