@@ -150,11 +150,11 @@ public:
   virtual ImportMode importMode() const PURE;
 
   /**
-   * Gauges can be created as ImportMode::Uninitialized when during hot-restart
-   * merges, if they haven't been initialized by the child process yet. When
-   * they do get initialized, mergeImportMode should be called to establish the
-   * import mode. It is only valid to call mergeImportMode when the current
-   * current mode is Uninitialized.
+   * Gauges can be created with ImportMode::Uninitialized during hot-restart
+   * merges, if they haven't yet been instantiated by the child process. When
+   * they finally get instantiated, mergeImportMode should be called to
+   * initialize the gauge's import mode. It is only valid to call
+   * mergeImportMode when the current mode is ImportMode::Uninitialized.
    *
    * @param import_mode the new import mode.
    */
