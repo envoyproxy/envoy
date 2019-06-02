@@ -131,52 +131,26 @@ void InstanceImpl::drainListeners() {
 
 void InstanceImpl::failHealthcheck(bool fail) { server_stats_->live_.set(!fail); }
 
-// Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could
-// potentially have a single class instance held in a static and have a clear() method to avoid some
-// vector constructions and reservations, but I'm not sure it's worth the extra complexity until it
-// shows up in perf traces.
-// TODO(mattklein123): One thing we probably want to do is switch from returning vectors of metrics
-//                     to a lambda based callback iteration API. This would require less vector
-//                     copying and probably be a cleaner API in general.
-class MetricSnapshotImpl : public Stats::MetricSnapshot {
-public:
-  MetricSnapshotImpl(Stats::Store& store) {
-    snapped_counters_ = store.counters();
-    counters_.reserve(snapped_counters_.size());
-    for (const auto& counter : snapped_counters_) {
-      counters_.push_back({counter->latch(), *counter});
-    }
-
-    snapped_gauges_ = store.gauges();
-    gauges_.reserve(snapped_gauges_.size());
-    for (const auto& gauge : snapped_gauges_) {
-      gauges_.push_back(*gauge);
-    }
-
-    snapped_histograms_ = store.histograms();
-    histograms_.reserve(snapped_histograms_.size());
-    for (const auto& histogram : snapped_histograms_) {
-      histograms_.push_back(*histogram);
-    }
+MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
+  snapped_counters_ = store.counters();
+  counters_.reserve(snapped_counters_.size());
+  for (const auto& counter : snapped_counters_) {
+    counters_.push_back({counter->latch(), *counter});
   }
 
-  // Stats::MetricSnapshot
-  const std::vector<CounterSnapshot>& counters() override { return counters_; }
-  const std::vector<std::reference_wrapper<const Stats::Gauge>>& gauges() override {
-    return gauges_;
-  };
-  const std::vector<std::reference_wrapper<const Stats::ParentHistogram>>& histograms() override {
-    return histograms_;
+  snapped_gauges_ = store.gauges();
+  gauges_.reserve(snapped_gauges_.size());
+  for (const auto& gauge : snapped_gauges_) {
+    ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
+    gauges_.push_back(*gauge);
   }
 
-private:
-  std::vector<Stats::CounterSharedPtr> snapped_counters_;
-  std::vector<CounterSnapshot> counters_;
-  std::vector<Stats::GaugeSharedPtr> snapped_gauges_;
-  std::vector<std::reference_wrapper<const Stats::Gauge>> gauges_;
-  std::vector<Stats::ParentHistogramSharedPtr> snapped_histograms_;
-  std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
-};
+  snapped_histograms_ = store.histograms();
+  histograms_.reserve(snapped_histograms_.size());
+  for (const auto& histogram : snapped_histograms_) {
+    histograms_.push_back(*histogram);
+  }
+}
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
                                        Stats::Store& store) {
@@ -217,9 +191,9 @@ void InstanceImpl::flushStats() {
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
 
-InstanceUtil::BootstrapVersion
-InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                  const Options& options, Api::Api& api) {
+InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
+    envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
 
@@ -231,11 +205,11 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, api);
+    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
-    MessageUtil::loadFromYaml(config_yaml, bootstrap_override);
+    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     bootstrap.MergeFrom(bootstrap_override);
   }
   MessageUtil::validate(bootstrap);
@@ -278,7 +252,7 @@ void InstanceImpl::initialize(const Options& options,
             Buffer::OwnedImpl().usesOldImpl() ? "old (libevent)" : "new");
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options, *api_);
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options, messageValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
@@ -337,7 +311,8 @@ void InstanceImpl::initialize(const Options& options,
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(), *api_);
+      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
+      messageValidationVisitor(), *api_);
 
   heap_shrinker_ =
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
@@ -370,8 +345,8 @@ void InstanceImpl::initialize(const Options& options,
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
-      dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_, *api_,
-      http_context_, access_log_manager_, *singleton_manager_);
+      dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
+      messageValidationVisitor(), *api_, http_context_, access_log_manager_, *singleton_manager_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -397,7 +372,8 @@ void InstanceImpl::initialize(const Options& options,
             ->create(),
         *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
         *random_generator_, info_factory_, access_log_manager_, *config_.clusterManager(),
-        *local_info_, *admin_, *singleton_manager_, thread_local_, *api_);
+        *local_info_, *admin_, *singleton_manager_, thread_local_, messageValidationVisitor(),
+        *api_);
   }
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
@@ -425,25 +401,10 @@ void InstanceImpl::startWorkers() {
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
-  if (!config.baseRuntime().fields().empty()) {
-    ENVOY_LOG(info, "non-empty base runtime layer specified in bootstrap");
-  }
-  if (config.diskRuntime()) {
-    ENVOY_LOG(info, "disk runtime symlink: {}", config.diskRuntime()->symlinkRoot());
-    ENVOY_LOG(info, "disk runtime subdirectory: {}", config.diskRuntime()->subdirectory());
-
-    std::string override_subdirectory =
-        config.diskRuntime()->overrideSubdirectory() + "/" + server.localInfo().clusterName();
-    ENVOY_LOG(info, "disk runtime override subdirectory: {}", override_subdirectory);
-
-    return std::make_unique<Runtime::DiskBackedLoaderImpl>(
-        server.dispatcher(), server.threadLocal(), config.baseRuntime(),
-        config.diskRuntime()->symlinkRoot(), config.diskRuntime()->subdirectory(),
-        override_subdirectory, server.stats(), server.random(), server.api());
-  } else {
-    return std::make_unique<Runtime::LoaderImpl>(config.baseRuntime(), server.random(),
-                                                 server.stats(), server.threadLocal());
-  }
+  ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
+  return std::make_unique<Runtime::LoaderImpl>(server.dispatcher(), server.threadLocal(),
+                                               config.runtime(), server.localInfo().clusterName(),
+                                               server.stats(), server.random(), server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {

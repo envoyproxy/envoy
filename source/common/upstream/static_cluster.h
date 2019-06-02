@@ -36,7 +36,7 @@ public:
       : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().Static) {}
 
 private:
-  ClusterImplBaseSharedPtr
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) override;

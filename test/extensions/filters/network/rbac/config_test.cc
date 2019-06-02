@@ -32,7 +32,7 @@ public:
 private:
   void checkRule(const std::string& policy_json) {
     envoy::config::rbac::v2::Policy policy_proto{};
-    MessageUtil::loadFromJson(policy_json, policy_proto);
+    TestUtility::loadFromJson(policy_json, policy_proto);
 
     envoy::config::filter::network::rbac::v2::RBAC config{};
     config.set_stat_prefix("test");

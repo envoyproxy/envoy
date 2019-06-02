@@ -334,7 +334,7 @@ config:
       path: /dev/null
   )EOF";
         const std::string json = Json::Factory::loadFromYamlString(yaml_string)->asJsonString();
-        MessageUtil::loadFromJson(json, *hcm.mutable_http_filters(1));
+        TestUtility::loadFromJson(json, *hcm.mutable_http_filters(1));
       });
 
   // As with ProtocolIntegrationTest.HittingEncoderFilterLimit use a filter

@@ -76,7 +76,7 @@ public:
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v2::LightstepConfig lightstep_config;
-    MessageUtil::loadFromYaml(yaml_string, lightstep_config);
+    TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     setup(lightstep_config, true, propagation_mode);
   }
@@ -126,7 +126,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v2::LightstepConfig lightstep_config;
-    MessageUtil::loadFromYaml(yaml_string, lightstep_config);
+    TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     EXPECT_THROW(setup(lightstep_config, false), EnvoyException);
   }
@@ -140,7 +140,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v2::LightstepConfig lightstep_config;
-    MessageUtil::loadFromYaml(yaml_string, lightstep_config);
+    TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     EXPECT_THROW(setup(lightstep_config, false), EnvoyException);
   }
@@ -154,7 +154,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v2::LightstepConfig lightstep_config;
-    MessageUtil::loadFromYaml(yaml_string, lightstep_config);
+    TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     setup(lightstep_config, true);
   }
