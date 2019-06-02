@@ -48,15 +48,19 @@ bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_strea
   return hasGrpcContentType(headers);
 }
 
-void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
+static absl::string_view protocolToString(Context::Protocol protocol) {
+  return protocol == Context::Protocol::Grpc ? "grpc" : "grpc-web";
+}
+
+void Common::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
                         const std::string& grpc_service, const std::string& grpc_method,
                         const Http::HeaderEntry* grpc_status) {
   if (!grpc_status) {
     return;
   }
   cluster.statsScope()
-      .counter(fmt::format("{}.{}.{}.{}", protocol, grpc_service, grpc_method,
-                           grpc_status->value().getStringView()))
+      .counter(fmt::format("{}.{}.{}.{}", protocolToString(protocol),
+                           grpc_service, grpc_method, grpc_status->value().getStringView()))
       .inc();
   uint64_t grpc_status_code;
   const bool success = absl::SimpleAtoi(grpc_status->value().getStringView(), &grpc_status_code) &&
@@ -64,21 +68,22 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string&
   chargeStat(cluster, protocol, grpc_service, grpc_method, success);
 }
 
-void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
+void Common::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
                         const std::string& grpc_service, const std::string& grpc_method,
                         bool success) {
+  absl::string_view protocol_str = protocolToString(protocol);
   cluster.statsScope()
-      .counter(fmt::format("{}.{}.{}.{}", protocol, grpc_service, grpc_method,
+      .counter(fmt::format("{}.{}.{}.{}", protocol_str, grpc_service, grpc_method,
                            success ? "success" : "failure"))
       .inc();
   cluster.statsScope()
-      .counter(fmt::format("{}.{}.{}.total", protocol, grpc_service, grpc_method))
+      .counter(fmt::format("{}.{}.{}.total", protocol_str, grpc_service, grpc_method))
       .inc();
 }
 
 void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
                         const std::string& grpc_method, bool success) {
-  chargeStat(cluster, "grpc", grpc_service, grpc_method, success);
+  chargeStat(cluster, Protocol::Grpc, grpc_service, grpc_method, success);
 }
 
 absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers) {

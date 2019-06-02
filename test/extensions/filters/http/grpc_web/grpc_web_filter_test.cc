@@ -7,11 +7,13 @@
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/stats/fake_symbol_table_impl.h"
 
 #include "extensions/filters/http/grpc_web/grpc_web_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -48,7 +50,9 @@ const size_t TRAILERS_SIZE = sizeof(TRAILERS) - 1;
 
 class GrpcWebFilterTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
-  GrpcWebFilterTest() : filter_(common_) {
+  GrpcWebFilterTest() :
+      grpc_context_(*symbol_table_),
+      filter_(grpc_context_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -104,7 +108,8 @@ public:
               request_headers.GrpcAcceptEncoding()->value().getStringView());
   }
 
-  Grpc::Common common_;
+  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Grpc::Common grpc_context_;
   GrpcWebFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;

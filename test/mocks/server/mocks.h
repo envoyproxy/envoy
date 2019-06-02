@@ -364,6 +364,7 @@ public:
   MOCK_METHOD0(startTimeCurrentEpoch, time_t());
   MOCK_METHOD0(startTimeFirstEpoch, time_t());
   MOCK_METHOD0(stats, Stats::Store&());
+  MOCK_METHOD0(grpcContext, Grpc::Context&());
   MOCK_METHOD0(httpContext, Http::Context&());
   MOCK_METHOD0(processContext, ProcessContext&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
@@ -396,6 +397,7 @@ public:
   testing::NiceMock<MockListenerManager> listener_manager_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Singleton::ManagerPtr singleton_manager_;
+  Grpc::Common grpc_context_;
   Http::ContextImpl http_context_;
 };
 
@@ -447,6 +449,7 @@ public:
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
+  Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
   MOCK_METHOD0(processContext, ProcessContext&());
   MOCK_METHOD0(api, Api::Api&());
@@ -468,6 +471,7 @@ public:
   Stats::IsolatedStoreImpl listener_scope_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
+  Grpc::Common grpc_context_;
   Http::ContextImpl http_context_;
   testing::NiceMock<Api::MockApi> api_;
 };

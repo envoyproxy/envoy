@@ -55,7 +55,7 @@ public:
                   Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
                   ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                   std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
-                  PropagationMode propagation_mode);
+                  PropagationMode propagation_mode, Grpc::Context& grpc_context);
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
   Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
@@ -122,7 +122,7 @@ private:
   Runtime::Loader& runtime_;
   std::unique_ptr<lightstep::LightStepTracerOptions> options_;
   const PropagationMode propagation_mode_;
-  Grpc::Common grpc_common_;
+  Grpc::Context& grpc_context_;
 };
 } // namespace Lightstep
 } // namespace Tracers

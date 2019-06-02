@@ -4,9 +4,11 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/stats/fake_symbol_table_impl.h"
 
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
+#include "test/test_common/global.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -104,7 +106,8 @@ TEST(GrpcCommonTest, ToGrpcTimeout) {
 
 TEST(GrpcCommonTest, ChargeStats) {
   NiceMock<Upstream::MockClusterInfo> cluster;
-  Common common;
+  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Common common(*symbol_table_);
   common.chargeStat(cluster, "service", "method", true);
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.success").value());
   EXPECT_EQ(0U, cluster.stats_store_.counter("grpc.service.method.failure").value());
@@ -118,14 +121,14 @@ TEST(GrpcCommonTest, ChargeStats) {
   Http::TestHeaderMapImpl trailers;
   Http::HeaderEntry& status = trailers.insertGrpcStatus();
   status.value("0", 1);
-  common.chargeStat(cluster, "grpc", "service", "method", &status);
+  common.chargeStat(cluster, Context::Protocol::Grpc, "service", "method", &status);
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.0").value());
   EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.success").value());
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.failure").value());
   EXPECT_EQ(3U, cluster.stats_store_.counter("grpc.service.method.total").value());
 
   status.value("1", 1);
-  common.chargeStat(cluster, "grpc", "service", "method", &status);
+  common.chargeStat(cluster, Context::Protocol::Grpc, "service", "method", &status);
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.0").value());
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.1").value());
   EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.success").value());

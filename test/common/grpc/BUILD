@@ -52,8 +52,10 @@ envoy_cc_test(
     deps = [
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
+        "//source/common/stats:fake_symbol_table_lib",
         "//test/mocks/upstream:upstream_mocks",
         "//test/proto:helloworld_proto_cc",
+        "//test/test_common:global_lib",
         "//test/test_common:utility_lib",
     ],
 )

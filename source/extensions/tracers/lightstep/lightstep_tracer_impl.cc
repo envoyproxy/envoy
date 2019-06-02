@@ -85,15 +85,15 @@ void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& respons
     if (!active_response_->ParseFromZeroCopyStream(&stream)) {
       throw EnvoyException("Failed to parse LightStep collector response");
     }
-    driver_.grpc_common_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
+    driver_.grpc_context_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
                                     lightstep::CollectorMethodName(), true);
     active_callback_->OnSuccess();
   } catch (const Grpc::Exception& ex) {
-    driver_.grpc_common_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
+    driver_.grpc_context_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
                                     lightstep::CollectorMethodName(), false);
     active_callback_->OnFailure(std::make_error_code(std::errc::network_down));
   } catch (const EnvoyException& ex) {
-    driver_.grpc_common_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
+    driver_.grpc_context_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
                                     lightstep::CollectorMethodName(), false);
     active_callback_->OnFailure(std::make_error_code(std::errc::bad_message));
   }
@@ -101,7 +101,7 @@ void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& respons
 
 void LightStepDriver::LightStepTransporter::onFailure(Http::AsyncClient::FailureReason) {
   active_request_ = nullptr;
-  driver_.grpc_common_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
+  driver_.grpc_context_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
                                   lightstep::CollectorMethodName(), false);
   active_callback_->OnFailure(std::make_error_code(std::errc::network_down));
 }
@@ -138,11 +138,11 @@ LightStepDriver::LightStepDriver(const envoy::config::trace::v2::LightstepConfig
                                  Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
                                  ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                                  std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
-                                 PropagationMode propagation_mode)
+                                 PropagationMode propagation_mode, Grpc::Context& grpc_context)
     : OpenTracingDriver{stats}, cm_{cluster_manager},
       tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
       tls_{tls.allocateSlot()}, runtime_{runtime}, options_{std::move(options)},
-      propagation_mode_{propagation_mode} {
+      propagation_mode_{propagation_mode}, grpc_context_(grpc_context) {
   Config::Utility::checkCluster(TracerNames::get().Lightstep, lightstep_config.collector_cluster(),
                                 cm_);
   cluster_ = cm_.get(lightstep_config.collector_cluster())->info();

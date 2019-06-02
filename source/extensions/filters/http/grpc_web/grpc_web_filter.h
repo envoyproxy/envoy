@@ -20,7 +20,7 @@ namespace GrpcWeb {
  */
 class GrpcWebFilter : public Http::StreamFilter, NonCopyable {
 public:
-  explicit GrpcWebFilter(Grpc::Common& common) : common_(common) {}
+  explicit GrpcWebFilter(Grpc::Context& context) : context_(context) {}
   virtual ~GrpcWebFilter() {}
 
   // Http::StreamFilterBase
@@ -71,7 +71,7 @@ private:
   std::string grpc_method_;
   bool do_stat_tracking_{};
   bool is_grpc_web_request_{};
-  Grpc::Common& common_;
+  Grpc::Context& context_;
 };
 
 } // namespace GrpcWeb

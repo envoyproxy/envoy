@@ -21,7 +21,7 @@ public:
       : Common::EmptyHttpFilterConfig(HttpFilterNames::get().GrpcHttp1Bridge) {}
 
   Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&);
-  Grpc::Common common_;
+  std::unique_ptr<Grpc::Common> common_;
 };
 
 } // namespace GrpcHttp1Bridge

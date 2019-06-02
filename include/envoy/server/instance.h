@@ -8,6 +8,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/mutex_tracer.h"
 #include "envoy/event/timer.h"
+#include "envoy/grpc/context.h"
 #include "envoy/http/context.h"
 #include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
@@ -181,6 +182,11 @@ public:
    * @return the server-wide stats store.
    */
   virtual Stats::Store& stats() PURE;
+
+  /**
+   * @return the server-wide grpc context.
+   */
+  virtual Grpc::Context& grpcContext() PURE;
 
   /**
    * @return the server-wide http context.

@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/grpc/context.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -25,8 +26,11 @@ public:
   const absl::optional<uint64_t> grpc_status_;
 };
 
-class Common {
+// TODO(jmarantz): Rename 'Common' to 'ContextImpl'.
+class Common : public Context {
 public:
+  explicit Common(Stats::SymbolTable& /*symbol_table*/) /*: symbol_table_(symbol_table)*/ {}
+
   /**
    * @param headers the headers to parse.
    * @return bool indicating whether content-type is gRPC.
@@ -74,38 +78,15 @@ public:
    */
   static void toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::HeaderString& value);
 
-  /**
-   * Charge a success/failure stat to a cluster/service/method.
-   * @param cluster supplies the target cluster.
-   * @param protocol supplies the downstream protocol in use, either gRPC or gRPC-Web.
-   * @param grpc_service supplies the service name.
-   * @param grpc_method supplies the method name.
-   * @param grpc_status supplies the gRPC status.
-   */
-  void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
+  // Context
+  void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
                   const std::string& grpc_service, const std::string& grpc_method,
-                  const Http::HeaderEntry* grpc_status);
-
-  /**
-   * Charge a success/failure stat to a cluster/service/method.
-   * @param cluster supplies the target cluster.
-   * @param protocol supplies the downstream protocol in use, either "grpc" or "grpc-web".
-   * @param grpc_service supplies the service name.
-   * @param grpc_method supplies the method name.
-   * @param success supplies whether the call succeeded.
-   */
-  void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
-                  const std::string& grpc_service, const std::string& grpc_method, bool success);
-
-  /**
-   * Charge a success/failure stat to a cluster/service/method.
-   * @param cluster supplies the target cluster.
-   * @param grpc_service supplies the service name.
-   * @param grpc_method supplies the method name.
-   * @param success supplies whether the call succeeded.
-   */
+                  const Http::HeaderEntry* grpc_status) override;
+  void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
+                  const std::string& grpc_service, const std::string& grpc_method, bool success)
+      override;
   void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
-                  const std::string& grpc_method, bool success);
+                  const std::string& grpc_method, bool success) override;
 
   /**
    * Resolve the gRPC service and method from the HTTP2 :path header.
@@ -160,6 +141,8 @@ public:
 
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);
+
+  //Stats::SymbolTable& symbol_table_;
 };
 
 } // namespace Grpc

@@ -64,6 +64,7 @@ envoy_cc_library(
     hdrs = ["common.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        "//include/envoy/grpc:context_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",
         "//include/envoy/stats:stats_interface",

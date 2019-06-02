@@ -235,7 +235,8 @@ void GrpcWebFilter::setupStatTracking(const Http::HeaderMap& headers) {
 }
 
 void GrpcWebFilter::chargeStat(const Http::HeaderMap& headers) {
-  common_.chargeStat(*cluster_, "grpc-web", grpc_service_, grpc_method_, headers.GrpcStatus());
+  context_.chargeStat(*cluster_, Grpc::Common::Protocol::GrpcWeb, grpc_service_, grpc_method_,
+                      headers.GrpcStatus());
 }
 
 } // namespace GrpcWeb
