@@ -50,9 +50,7 @@ const size_t TRAILERS_SIZE = sizeof(TRAILERS) - 1;
 
 class GrpcWebFilterTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
-  GrpcWebFilterTest() :
-      grpc_context_(*symbol_table_),
-      filter_(grpc_context_) {
+  GrpcWebFilterTest() : grpc_context_(*symbol_table_), filter_(grpc_context_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }

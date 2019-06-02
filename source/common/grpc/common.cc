@@ -59,8 +59,8 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
     return;
   }
   cluster.statsScope()
-      .counter(fmt::format("{}.{}.{}.{}", protocolToString(protocol),
-                           grpc_service, grpc_method, grpc_status->value().getStringView()))
+      .counter(fmt::format("{}.{}.{}.{}", protocolToString(protocol), grpc_service, grpc_method,
+                           grpc_status->value().getStringView()))
       .inc();
   uint64_t grpc_status_code;
   const bool success = absl::SimpleAtoi(grpc_status->value().getStringView(), &grpc_status_code) &&

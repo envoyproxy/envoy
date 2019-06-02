@@ -83,8 +83,8 @@ public:
                   const std::string& grpc_service, const std::string& grpc_method,
                   const Http::HeaderEntry* grpc_status) override;
   void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                  const std::string& grpc_service, const std::string& grpc_method, bool success)
-      override;
+                  const std::string& grpc_service, const std::string& grpc_method,
+                  bool success) override;
   void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
                   const std::string& grpc_method, bool success) override;
 
@@ -142,7 +142,7 @@ public:
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);
 
-  //Stats::SymbolTable& symbol_table_;
+  // Stats::SymbolTable& symbol_table_;
 };
 
 } // namespace Grpc

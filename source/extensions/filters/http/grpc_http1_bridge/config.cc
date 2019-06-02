@@ -16,7 +16,7 @@ GrpcHttp1BridgeFilterConfig::createFilter(const std::string&,
     common_ = std::make_unique<Grpc::Common>(factory_context.scope().symbolTable());
   }
   return [this](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-           callbacks.addStreamFilter(std::make_shared<Http1BridgeFilter>(*common_));
+    callbacks.addStreamFilter(std::make_shared<Http1BridgeFilter>(*common_));
   };
 }
 

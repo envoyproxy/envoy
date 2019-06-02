@@ -86,15 +86,15 @@ void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& respons
       throw EnvoyException("Failed to parse LightStep collector response");
     }
     driver_.grpc_context_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
-                                    lightstep::CollectorMethodName(), true);
+                                     lightstep::CollectorMethodName(), true);
     active_callback_->OnSuccess();
   } catch (const Grpc::Exception& ex) {
     driver_.grpc_context_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
-                                    lightstep::CollectorMethodName(), false);
+                                     lightstep::CollectorMethodName(), false);
     active_callback_->OnFailure(std::make_error_code(std::errc::network_down));
   } catch (const EnvoyException& ex) {
     driver_.grpc_context_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
-                                    lightstep::CollectorMethodName(), false);
+                                     lightstep::CollectorMethodName(), false);
     active_callback_->OnFailure(std::make_error_code(std::errc::bad_message));
   }
 }
@@ -102,7 +102,7 @@ void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& respons
 void LightStepDriver::LightStepTransporter::onFailure(Http::AsyncClient::FailureReason) {
   active_request_ = nullptr;
   driver_.grpc_context_.chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
-                                  lightstep::CollectorMethodName(), false);
+                                   lightstep::CollectorMethodName(), false);
   active_callback_->OnFailure(std::make_error_code(std::errc::network_down));
 }
 

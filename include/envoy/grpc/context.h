@@ -38,7 +38,7 @@ public:
    * @param success supplies whether the call succeeded.
    */
   virtual void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                          const std::string& grpc_service, const std::string& grpc_method, 
+                          const std::string& grpc_service, const std::string& grpc_method,
                           bool success) PURE;
 
   /**
@@ -49,10 +49,11 @@ public:
    * @param success supplies whether the call succeeded.
    */
   virtual void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
-                          const std::string& grpc_method, bool success) PURE;;
+                          const std::string& grpc_method, bool success) PURE;
+  ;
 };
 
 using ContextPtr = std::unique_ptr<Context>;
 
-} // namespace Http
+} // namespace Grpc
 } // namespace Envoy
