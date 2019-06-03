@@ -11,6 +11,7 @@
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -29,7 +30,7 @@ public:
   FilesystemSubscriptionTestHarness()
       : path_(TestEnvironment::temporaryPath("eds.json")),
         api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
-        subscription_(*dispatcher_, path_, stats_, *api_) {}
+        subscription_(*dispatcher_, path_, stats_, validation_visitor_, *api_) {}
 
   ~FilesystemSubscriptionTestHarness() {
     if (::access(path_.c_str(), F_OK) != -1) {
@@ -74,7 +75,7 @@ public:
     file_json.pop_back();
     file_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
-    MessageUtil::loadFromJson(file_json, response_pb);
+    TestUtility::loadFromJson(file_json, response_pb);
     EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response_pb.resources()), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
@@ -112,6 +113,7 @@ public:
   const std::string path_;
   std::string version_;
   Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;

@@ -26,6 +26,8 @@ AccessLog::InstanceSharedPtr
 HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
                                                   AccessLog::FilterPtr&& filter,
                                                   Server::Configuration::FactoryContext& context) {
+  validateProtoDescriptors();
+
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig&>(config);
   std::shared_ptr<GrpcAccessLogStreamer> grpc_access_log_streamer =

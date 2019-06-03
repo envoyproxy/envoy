@@ -8,7 +8,6 @@
 #include "envoy/server/instance.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/sink.h"
-#include "envoy/stats/source.h"
 
 #include "common/stats/symbol_table_impl.h"
 
@@ -51,7 +50,7 @@ public:
   HystrixSink(Server::Instance& server, uint64_t num_buckets);
   Http::Code handlerHystrixEventStream(absl::string_view, Http::HeaderMap& response_headers,
                                        Buffer::Instance&, Server::AdminStream& admin_stream);
-  void flush(Stats::Source& source) override;
+  void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override{};
 
   /**
@@ -160,8 +159,14 @@ private:
 
   // Saved StatNames for fast comparisons in loop.
   Stats::StatNamePool stat_name_pool_;
-  Stats::StatName cluster_name_;
-  Stats::StatName cluster_upstream_rq_time_;
+  const Stats::StatName cluster_name_;
+  const Stats::StatName cluster_upstream_rq_time_;
+  const Stats::StatName membership_total_;
+  const Stats::StatName retry_upstream_rq_4xx_;
+  const Stats::StatName retry_upstream_rq_5xx_;
+  const Stats::StatName upstream_rq_2xx_;
+  const Stats::StatName upstream_rq_4xx_;
+  const Stats::StatName upstream_rq_5xx_;
 };
 
 typedef std::unique_ptr<HystrixSink> HystrixSinkPtr;

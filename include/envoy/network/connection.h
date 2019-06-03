@@ -191,7 +191,7 @@ public:
   };
 
   /**
-   * @return The unix socket peer credentials of the the remote client. Note that this is only
+   * @return The unix socket peer credentials of the remote client. Note that this is only
    * supported for unix socket connections.
    */
   virtual absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;

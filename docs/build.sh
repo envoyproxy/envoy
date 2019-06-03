@@ -102,6 +102,7 @@ PROTO_RST="
   /envoy/config/filter/http/ip_tagging/v2/ip_tagging/envoy/config/filter/http/ip_tagging/v2/ip_tagging.proto.rst
   /envoy/config/filter/http/jwt_authn/v2alpha/jwt_authn/envoy/config/filter/http/jwt_authn/v2alpha/config.proto.rst
   /envoy/config/filter/http/lua/v2/lua/envoy/config/filter/http/lua/v2/lua.proto.rst
+  /envoy/config/filter/http/original_src/v2alpha1/original_src/envoy/config/filter/http/original_src/v2alpha1/original_src.proto.rst
   /envoy/config/filter/http/rate_limit/v2/rate_limit/envoy/config/filter/http/rate_limit/v2/rate_limit.proto.rst
   /envoy/config/filter/http/rbac/v2/rbac/envoy/config/filter/http/rbac/v2/rbac.proto.rst
   /envoy/config/filter/http/router/v2/router/envoy/config/filter/http/router/v2/router.proto.rst
@@ -126,7 +127,7 @@ PROTO_RST="
   /envoy/config/filter/thrift/router/v2alpha1/router/envoy/config/filter/thrift/router/v2alpha1/router.proto.rst
   /envoy/config/health_checker/redis/v2/redis/envoy/config/health_checker/redis/v2/redis.proto.rst
   /envoy/config/overload/v2alpha/overload/envoy/config/overload/v2alpha/overload.proto.rst
-  /envoy/config/rbac/v2alpha/rbac/envoy/config/rbac/v2alpha/rbac.proto.rst
+  /envoy/config/rbac/v2/rbac/envoy/config/rbac/v2/rbac.proto.rst
   /envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap/envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.proto.rst
   /envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource/envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.proto.rst
   /envoy/config/transport_socket/tap/v2alpha/tap/envoy/config/transport_socket/tap/v2alpha/tap.proto.rst

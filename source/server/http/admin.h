@@ -81,6 +81,10 @@ public:
   createNetworkFilterChain(Network::Connection& connection,
                            const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager&) override { return true; }
+  bool createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
+                                    Network::UdpReadFilterCallbacks&) override {
+    return true;
+  }
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -195,7 +199,7 @@ private:
   std::vector<const UrlHandler*> sortedHandlers() const;
   static const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>
   sortedRuntime(const std::unordered_map<std::string, const Runtime::Snapshot::Entry>& entries);
-
+  envoy::admin::v2alpha::ServerInfo::State serverState();
   /**
    * URL handlers.
    */
@@ -241,6 +245,8 @@ private:
                                   AdminStream&);
   Http::Code handlerServerInfo(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
+  Http::Code handlerReady(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                          Buffer::Instance& response, AdminStream&);
   Http::Code handlerStats(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response, AdminStream&);
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
@@ -251,6 +257,7 @@ private:
   Http::Code handlerRuntimeModify(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
                                   AdminStream&);
+  bool isFormUrlEncoded(const Http::HeaderEntry* content_type) const;
 
   class AdminListener : public Network::ListenerConfig {
   public:

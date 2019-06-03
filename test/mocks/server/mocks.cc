@@ -126,7 +126,8 @@ MockWorker::~MockWorker() = default;
 MockInstance::MockInstance()
     : secret_manager_(new Secret::SecretManagerImpl()), cluster_manager_(timeSource()),
       ssl_context_manager_(timeSource()), singleton_manager_(new Singleton::ManagerImpl(
-                                              Thread::threadFactoryForTest().currentThreadId())) {
+                                              Thread::threadFactoryForTest().currentThreadId())),
+      http_context_(stats_store_.symbolTable()) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, httpContext()).WillByDefault(ReturnRef(http_context_));
@@ -149,6 +150,8 @@ MockInstance::MockInstance()
   ON_CALL(*this, mutexTracer()).WillByDefault(Return(nullptr));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
+  ON_CALL(*this, messageValidationVisitor())
+      .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }
 
 MockInstance::~MockInstance() = default;
@@ -167,7 +170,8 @@ MockMain::~MockMain() = default;
 
 MockFactoryContext::MockFactoryContext()
     : singleton_manager_(
-          new Singleton::ManagerImpl(Thread::threadFactoryForTest().currentThreadId())) {
+          new Singleton::ManagerImpl(Thread::threadFactoryForTest().currentThreadId())),
+      http_context_(scope_.symbolTable()) {
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
@@ -185,6 +189,8 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
+  ON_CALL(*this, messageValidationVisitor())
+      .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
 }
 
@@ -193,6 +199,8 @@ MockFactoryContext::~MockFactoryContext() = default;
 MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
     : secret_manager_(new Secret::SecretManagerImpl()) {
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
+  ON_CALL(*this, messageValidationVisitor())
+      .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }
 
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() = default;
@@ -207,6 +215,8 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
   ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_));
   ON_CALL(*this, eventLogger_()).WillByDefault(Return(event_logger_));
+  ON_CALL(*this, messageValidationVisitor())
+      .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;

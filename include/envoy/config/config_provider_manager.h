@@ -81,7 +81,7 @@ public:
    * @return ConfigProviderPtr a newly allocated static config provider.
    */
   virtual ConfigProviderPtr
-  createStaticConfigProvider(std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
+  createStaticConfigProvider(ProtobufTypes::ConstMessagePtrVector&& config_protos,
                              Server::Configuration::FactoryContext& factory_context,
                              const OptionalArg& optarg) {
     UNREFERENCED_PARAMETER(config_protos);

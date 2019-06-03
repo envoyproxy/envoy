@@ -27,14 +27,18 @@ public:
   HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster, Envoy::Runtime::Loader& runtime,
                                   Envoy::Runtime::RandomGenerator& random,
                                   Event::Dispatcher& dispatcher,
-                                  HealthCheckEventLoggerPtr&& event_logger)
+                                  HealthCheckEventLoggerPtr&& event_logger,
+                                  ProtobufMessage::ValidationVisitor& validation_visitor)
       : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
-        event_logger_(std::move(event_logger)) {}
+        event_logger_(std::move(event_logger)), validation_visitor_(validation_visitor) {}
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Envoy::Runtime::RandomGenerator& random() override { return random_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   HealthCheckEventLoggerPtr eventLogger() override { return std::move(event_logger_); }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return validation_visitor_;
+  }
 
 private:
   Upstream::Cluster& cluster_;
@@ -42,13 +46,15 @@ private:
   Envoy::Runtime::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
   HealthCheckEventLoggerPtr event_logger_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 HealthCheckerSharedPtr
 HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& health_check_config,
                              Upstream::Cluster& cluster, Runtime::Loader& runtime,
                              Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                             AccessLog::AccessLogManager& log_manager) {
+                             AccessLog::AccessLogManager& log_manager,
+                             ProtobufMessage::ValidationVisitor& validation_visitor) {
   HealthCheckEventLoggerPtr event_logger;
   if (!health_check_config.event_log_path().empty()) {
     event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
@@ -74,7 +80,7 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& health_che
             health_check_config.custom_health_check().name());
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,
-                                            std::move(event_logger)));
+                                            std::move(event_logger), validation_visitor));
     return factory.createCustomHealthChecker(health_check_config, *context);
   }
   default:
@@ -154,7 +160,6 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
       local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
-  onDeferredDelete();
   ASSERT(client_ == nullptr);
 }
 
@@ -268,20 +273,43 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     break;
   }
 
-  // It is possible for this session to have been deferred destroyed inline in handleFailure()
-  // above so make sure we still have a connection that we might need to close.
-  if (client_ != nullptr &&
-      ((response_headers_->Connection() &&
-        absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
-                               Http::Headers::get().ConnectionValues.Close)) ||
-       (response_headers_->ProxyConnection() && protocol_ != Http::Protocol::Http2 &&
-        absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
-                               Http::Headers::get().ConnectionValues.Close)) ||
-       !parent_.reuse_connection_)) {
+  if (shouldClose()) {
     client_->close();
   }
 
   response_headers_.reset();
+}
+
+// It is possible for this session to have been deferred destroyed inline in handleFailure()
+// above so make sure we still have a connection that we might need to close.
+bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
+  if (client_ == nullptr) {
+    return false;
+  }
+
+  if (response_headers_->Connection()) {
+    const bool close =
+        absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
+                               Http::Headers::get().ConnectionValues.Close);
+    if (close) {
+      return true;
+    }
+  }
+
+  if (response_headers_->ProxyConnection() && protocol_ != Http::Protocol::Http2) {
+    const bool close =
+        absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
+                               Http::Headers::get().ConnectionValues.Close);
+    if (close) {
+      return true;
+    }
+  }
+
+  if (!parent_.reuse_connection_) {
+    return true;
+  }
+
+  return false;
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
@@ -356,7 +384,6 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
       receive_bytes_(TcpHealthCheckMatcher::loadProtoBytes(config.tcp_health_check().receive())) {}
 
 TcpHealthCheckerImpl::TcpActiveHealthCheckSession::~TcpActiveHealthCheckSession() {
-  onDeferredDelete();
   ASSERT(client_ == nullptr);
 }
 
@@ -464,7 +491,6 @@ GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::GrpcActiveHealthCheckSessio
     : ActiveHealthCheckSession(parent, host), parent_(parent) {}
 
 GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::~GrpcActiveHealthCheckSession() {
-  onDeferredDelete();
   ASSERT(client_ == nullptr);
 }
 

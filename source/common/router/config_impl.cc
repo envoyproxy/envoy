@@ -65,7 +65,8 @@ HedgePolicyImpl::HedgePolicyImpl(const envoy::api::v2::route::HedgePolicy& hedge
 HedgePolicyImpl::HedgePolicyImpl()
     : initial_requests_(1), additional_request_chance_({}), hedge_on_per_try_timeout_(false) {}
 
-RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy) {
+RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy,
+                                 ProtobufMessage::ValidationVisitor& validation_visitor) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
@@ -75,7 +76,8 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
   for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
         host_predicate.name());
-    auto config = Envoy::Config::Utility::translateToFactoryConfig(host_predicate, factory);
+    auto config = Envoy::Config::Utility::translateToFactoryConfig(host_predicate,
+                                                                   validation_visitor, factory);
     retry_host_predicate_configs_.emplace_back(host_predicate.name(), std::move(config));
   }
 
@@ -84,8 +86,8 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
         retry_priority.name());
     retry_priority_config_ =
-        std::make_pair(retry_priority.name(),
-                       Envoy::Config::Utility::translateToFactoryConfig(retry_priority, factory));
+        std::make_pair(retry_priority.name(), Envoy::Config::Utility::translateToFactoryConfig(
+                                                  retry_priority, validation_visitor, factory));
   }
 
   auto host_selection_attempts = retry_policy.host_selection_retry_max_attempts();
@@ -324,6 +326,39 @@ void DecoratorImpl::apply(Tracing::Span& span) const {
 
 const std::string& DecoratorImpl::getOperation() const { return operation_; }
 
+RouteTracingImpl::RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing) {
+  if (!tracing.has_client_sampling()) {
+    client_sampling_.set_numerator(100);
+    client_sampling_.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  } else {
+    client_sampling_ = tracing.client_sampling();
+  }
+  if (!tracing.has_random_sampling()) {
+    random_sampling_.set_numerator(100);
+    random_sampling_.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  } else {
+    random_sampling_ = tracing.random_sampling();
+  }
+  if (!tracing.has_overall_sampling()) {
+    overall_sampling_.set_numerator(100);
+    overall_sampling_.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  } else {
+    overall_sampling_ = tracing.overall_sampling();
+  }
+}
+
+const envoy::type::FractionalPercent& RouteTracingImpl::getClientSampling() const {
+  return client_sampling_;
+}
+
+const envoy::type::FractionalPercent& RouteTracingImpl::getRandomSampling() const {
+  return random_sampling_;
+}
+
+const envoy::type::FractionalPercent& RouteTracingImpl::getOverallSampling() const {
+  return overall_sampling_;
+}
+
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::route::Route& route,
                                        Server::Configuration::FactoryContext& factory_context)
@@ -349,7 +384,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
       strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
-      retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route())),
+      retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route(),
+                                     factory_context.messageValidationVisitor())),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       total_cluster_weight_(
@@ -360,12 +396,12 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                                        route.response_headers_to_remove())),
       metadata_(route.metadata()), typed_metadata_(route.metadata()),
       match_grpc_(route.match().has_grpc()), opaque_config_(parseOpaqueConfig(route)),
-      decorator_(parseDecorator(route)),
+      decorator_(parseDecorator(route)), route_tracing_(parseRouteTracing(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route, factory_context.api())),
       per_filter_configs_(route.typed_per_filter_config(), route.per_filter_config(),
                           factory_context),
-      time_source_(factory_context.dispatcher().timeSource()),
+      route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()),
       internal_redirect_action_(convertInternalRedirectAction(route.route())) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
@@ -644,15 +680,16 @@ HedgePolicyImpl RouteEntryImplBase::buildHedgePolicy(
 
 RetryPolicyImpl RouteEntryImplBase::buildRetryPolicy(
     const absl::optional<envoy::api::v2::route::RetryPolicy>& vhost_retry_policy,
-    const envoy::api::v2::route::RouteAction& route_config) const {
+    const envoy::api::v2::route::RouteAction& route_config,
+    ProtobufMessage::ValidationVisitor& validation_visitor) const {
   // Route specific policy wins, if available.
   if (route_config.has_retry_policy()) {
-    return RetryPolicyImpl(route_config.retry_policy());
+    return RetryPolicyImpl(route_config.retry_policy(), validation_visitor);
   }
 
   // If not, we fallback to the virtual host policy if there is one.
   if (vhost_retry_policy) {
-    return RetryPolicyImpl(vhost_retry_policy.value());
+    return RetryPolicyImpl(vhost_retry_policy.value(), validation_visitor);
   }
 
   // Otherwise, an empty policy will do.
@@ -663,6 +700,15 @@ DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::api::v2::route
   DecoratorConstPtr ret;
   if (route.has_decorator()) {
     ret = DecoratorConstPtr(new DecoratorImpl(route.decorator()));
+  }
+  return ret;
+}
+
+RouteTracingConstPtr
+RouteEntryImplBase::parseRouteTracing(const envoy::api::v2::route::Route& route) {
+  RouteTracingConstPtr ret;
+  if (route.has_tracing()) {
+    ret = RouteTracingConstPtr(new RouteTracingImpl(route.tracing()));
   }
   return ret;
 }
@@ -876,15 +922,18 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
                                  const ConfigImpl& global_route_config,
                                  Server::Configuration::FactoryContext& factory_context,
                                  bool validate_clusters)
-    : name_(virtual_host.name()), rate_limit_policy_(virtual_host.rate_limits()),
-      global_route_config_(global_route_config),
+    : stat_name_pool_(factory_context.scope().symbolTable()),
+      stat_name_(stat_name_pool_.add(virtual_host.name())),
+      rate_limit_policy_(virtual_host.rate_limits()), global_route_config_(global_route_config),
       request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add(),
                                                       virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
       per_filter_configs_(virtual_host.typed_per_filter_config(), virtual_host.per_filter_config(),
                           factory_context),
-      include_attempt_count_(virtual_host.include_request_attempt_count()) {
+      include_attempt_count_(virtual_host.include_request_attempt_count()),
+      virtual_cluster_catch_all_(stat_name_pool_) {
+
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::route::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::NONE;
@@ -935,7 +984,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
   }
 
   for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
-    virtual_clusters_.push_back(VirtualClusterEntry(virtual_cluster));
+    virtual_clusters_.push_back(VirtualClusterEntry(virtual_cluster, stat_name_pool_));
   }
 
   if (virtual_host.has_cors()) {
@@ -944,13 +993,12 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
 }
 
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
-    const envoy::api::v2::route::VirtualCluster& virtual_cluster) {
+    const envoy::api::v2::route::VirtualCluster& virtual_cluster, Stats::StatNamePool& pool)
+    : pattern_(RegexUtil::parseRegex(virtual_cluster.pattern())),
+      stat_name_(pool.add(virtual_cluster.name())) {
   if (virtual_cluster.method() != envoy::api::v2::core::RequestMethod::METHOD_UNSPECIFIED) {
     method_ = envoy::api::v2::core::RequestMethod_Name(virtual_cluster.method());
   }
-
-  pattern_ = RegexUtil::parseRegex(virtual_cluster.pattern());
-  name_ = virtual_cluster.name();
 }
 
 const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }
@@ -1087,7 +1135,6 @@ RouteConstSharedPtr RouteMatcher::route(const Http::HeaderMap& headers,
   }
 }
 
-const VirtualHostImpl::CatchAllVirtualCluster VirtualHostImpl::VIRTUAL_CLUSTER_CATCH_ALL;
 const SslRedirector SslRedirectRoute::SSL_REDIRECTOR;
 const std::shared_ptr<const SslRedirectRoute> VirtualHostImpl::SSL_REDIRECT_ROUTE{
     new SslRedirectRoute()};
@@ -1105,7 +1152,7 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
   }
 
   if (!virtual_clusters_.empty()) {
-    return &VIRTUAL_CLUSTER_CATCH_ALL;
+    return &virtual_cluster_catch_all_;
   }
 
   return nullptr;
@@ -1114,7 +1161,8 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
 ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
                        Server::Configuration::FactoryContext& factory_context,
                        bool validate_clusters_default)
-    : name_(config.name()), uses_vhds_(config.has_vhds()) {
+    : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
+      uses_vhds_(config.has_vhds()) {
   route_matcher_ = std::make_unique<RouteMatcher>(
       config, *this, factory_context,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));
@@ -1138,7 +1186,8 @@ createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any&
   auto& factory = Envoy::Config::Utility::getAndCheckFactory<
       Server::Configuration::NamedHttpFilterConfigFactory>(name);
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, *proto_config);
+  Envoy::Config::Utility::translateOpaqueConfig(
+      typed_config, config, factory_context.messageValidationVisitor(), *proto_config);
   return factory.createRouteSpecificFilterConfig(*proto_config, factory_context);
 }
 

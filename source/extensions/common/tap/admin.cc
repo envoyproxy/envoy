@@ -4,6 +4,7 @@
 #include "envoy/admin/v2alpha/tap.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
@@ -49,7 +50,8 @@ Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::In
 
   envoy::admin::v2alpha::TapRequest tap_request;
   try {
-    MessageUtil::loadFromYamlAndValidate(admin_stream.getRequestBody()->toString(), tap_request);
+    MessageUtil::loadFromYamlAndValidate(admin_stream.getRequestBody()->toString(), tap_request,
+                                         ProtobufMessage::getStrictValidationVisitor());
   } catch (EnvoyException& e) {
     return badRequest(response, e.what());
   }

@@ -91,6 +91,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/upstream:load_balancer_lib",
         "//test/config:utility_lib",
+        "//test/integration/filters:eds_ready_filter_config_lib",
         "//test/test_common:network_utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
     ],
@@ -210,6 +211,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/health_check:config",
+        "//test/integration/filters:stop_iteration_and_continue",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -410,7 +412,9 @@ envoy_cc_test_library(
         "//source/server:connection_handler_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:listener_hooks_lib",
+        "//source/server:process_context_lib",
         "//source/server:server_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
         "//test/common/runtime:utility_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
@@ -442,6 +446,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
+        "//test/integration/filters:clear_route_cache_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -484,6 +489,20 @@ envoy_cc_test(
     deps = [
         ":integration_lib",
         "//source/extensions/filters/network/echo:config",
+        "//test/server:utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "udp_echo_integration_test",
+    srcs = [
+        "udp_echo_integration_test.cc",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/common/network:listen_socket_lib",
+        "//test/integration/filters:udp_listener_echo_filter_lib",
         "//test/server:utility_lib",
         "//test/test_common:utility_lib",
     ],
@@ -706,6 +725,8 @@ envoy_cc_test(
     data = ["//test/config/integration:server_xds_files"],
     deps = [
         ":http_integration_lib",
+        ":http_protocol_integration_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )

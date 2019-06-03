@@ -51,7 +51,7 @@ public:
         alts_config.add_peer_service_accounts(server_peer_identity_);
       }
       alts_config.set_handshaker_service(fakeHandshakerServerAddress(server_connect_handshaker_));
-      MessageUtil::jsonConvert(alts_config, *transport_socket->mutable_config());
+      TestUtility::jsonConvert(alts_config, *transport_socket->mutable_config());
     });
     HttpIntegrationTest::initialize();
     registerTestServerPorts({"http"});
@@ -94,7 +94,7 @@ public:
       alts_config.add_peer_service_accounts(client_peer_identity_);
     }
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
-    MessageUtil::jsonConvert(alts_config, *config);
+    TestUtility::jsonConvert(alts_config, *config);
     ENVOY_LOG_MISC(info, "{}", config->DebugString());
 
     client_alts_ = factory.createTransportSocketFactory(*config, mock_factory_ctx);
