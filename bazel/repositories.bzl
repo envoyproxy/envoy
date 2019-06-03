@@ -515,7 +515,13 @@ def _com_google_protobuf():
     )
 
 def _io_opencensus_cpp():
-    _repository_impl("io_opencensus_cpp")
+    location = REPOSITORY_LOCATIONS["io_opencensus_cpp"]
+    http_archive(
+        name = "io_opencensus_cpp",
+        patch_args = ["-p0"],
+        patches = ["@envoy//bazel/foreign_cc:io_opencensus_cpp.patch"],
+        **location
+    )
     native.bind(
         name = "opencensus_trace",
         actual = "@io_opencensus_cpp//opencensus/trace",
