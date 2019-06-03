@@ -292,7 +292,7 @@ bool Utility::allowDeprecatedV1Config(Runtime::Loader& runtime, const Json::Obje
     return false;
   }
 
-  const char error[] =
+  constexpr char error[] =
       "Using deprecated v1 JSON config load via 'deprecated_v1: true'. This configuration will "
       "be removed from Envoy soon. Please see "
       "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details.";
