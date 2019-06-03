@@ -445,7 +445,7 @@ public:
                                                 ProtobufMessage::getStrictValidationVisitor());
   }
 
-  static void jsonConvert(const ProtobufWkt::Message& source, Protobuf::Message& dest) {
+  static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
     // Explicit round-tripping to support conversions inside tests between arbitrary messages as a
     // convenience.
     ProtobufWkt::Struct tmp;
