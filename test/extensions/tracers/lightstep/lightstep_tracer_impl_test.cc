@@ -91,9 +91,9 @@ public:
   Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   Grpc::Common grpc_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::IsolatedStoreImpl stats_;
   std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
-  Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;

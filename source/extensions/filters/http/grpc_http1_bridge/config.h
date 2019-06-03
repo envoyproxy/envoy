@@ -2,8 +2,6 @@
 
 #include "envoy/server/filter_config.h"
 
-#include "common/grpc/common.h"
-
 #include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -20,8 +18,8 @@ public:
   GrpcHttp1BridgeFilterConfig()
       : Common::EmptyHttpFilterConfig(HttpFilterNames::get().GrpcHttp1Bridge) {}
 
-  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&);
-  std::unique_ptr<Grpc::Common> common_;
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext&) override;
 };
 
 } // namespace GrpcHttp1Bridge

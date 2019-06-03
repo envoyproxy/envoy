@@ -123,6 +123,8 @@ private:
   std::unique_ptr<lightstep::LightStepTracerOptions> options_;
   const PropagationMode propagation_mode_;
   Grpc::Context& grpc_context_;
+  Stats::StatNamePool pool_;
+  const Grpc::Context::RequestNames request_names_;
 };
 } // namespace Lightstep
 } // namespace Tracers

@@ -104,7 +104,6 @@ struct HeterogeneousStringHash {
   using is_transparent = void;
 
   size_t operator()(absl::string_view a) const { return HashUtil::xxHash64(a); }
-  // size_t operator()(const std::string& a) const { return HashUtil::xxHash64(a); }
   size_t operator()(const SharedString& a) const { return HashUtil::xxHash64(*a); }
 };
 
@@ -114,11 +113,8 @@ struct HeterogeneousStringEqual {
 
   size_t operator()(absl::string_view a, absl::string_view b) const { return a == b; }
   size_t operator()(const SharedString& a, const SharedString& b) const { return *a == *b; }
-  // size_t operator()(const std::string& a, const std::string& b) const { return a == b; }
   size_t operator()(absl::string_view a, const SharedString& b) const { return a == *b; }
-  // size_t operator()(absl::string_view a, const std::string& b) const { return a == b; }
   size_t operator()(const SharedString& a, absl::string_view b) const { return *a == b; }
-  // size_t operator()(const std::string& a, absl::string_view b) const { return a == b; }
 };
 
 // We use heterogeneous hash/equal functors to do a find() without constructing

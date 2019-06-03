@@ -12,11 +12,8 @@ namespace GrpcHttp1Bridge {
 Http::FilterFactoryCb
 GrpcHttp1BridgeFilterConfig::createFilter(const std::string&,
                                           Server::Configuration::FactoryContext& factory_context) {
-  if (common_ == nullptr) {
-    common_ = std::make_unique<Grpc::Common>(factory_context.scope().symbolTable());
-  }
-  return [this](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<Http1BridgeFilter>(*common_));
+  return [&factory_context](Http::FilterChainFactoryCallbacks& callbacks) {
+    callbacks.addStreamFilter(std::make_shared<Http1BridgeFilter>(factory_context.grpcContext()));
   };
 }
 
