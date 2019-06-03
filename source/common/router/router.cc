@@ -315,9 +315,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // that get handled by earlier filters.
   config_.stats_.rq_total_.inc();
 
-  // Start the `modify_headers` function off defined but empty (so we don't have to remember to
-  // check it against nullptr before calling it), and feed it behavior later if/when we have cluster
-  // info headers to append.
+  // Initialize the `modify_headers` function as a no-op (so we don't have to remember to check it
+  // against nullptr before calling it), and feed it behavior later if/when we have cluster info
+  // headers to append.
   std::function<void(Http::HeaderMap&)> modify_headers = [](Http::HeaderMap&) {};
 
   // Determine if there is a route entry or a direct response for the request.
@@ -359,9 +359,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (debug_config && debug_config->append_cluster_) {
     // The cluster name will be appended to any local or upstream responses from this point.
     modify_headers = [this, debug_config](Http::HeaderMap& headers) {
-      headers.addCopy(
-          Http::LowerCaseString(debug_config->cluster_header_.value_or("x-envoy-cluster")),
-          route_entry_->clusterName());
+      headers.addCopy(debug_config->cluster_header_.value_or(Http::Headers::get().EnvoyCluster),
+                      route_entry_->clusterName());
     };
   }
   Upstream::ThreadLocalCluster* cluster = config_.cm_.get(route_entry_->clusterName());
@@ -422,17 +421,21 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     // possibly in addition to the cluster name.
     modify_headers = [modify_headers, debug_config, conn_pool](Http::HeaderMap& headers) {
       modify_headers(headers);
-      headers.addCopy(Http::LowerCaseString(
-                          debug_config->hostname_header_.value_or("x-envoy-upstream-hostname")),
-                      conn_pool->host()->hostname());
-      headers.addCopy(Http::LowerCaseString(debug_config->host_address_header_.value_or(
-                          "x-envoy-upstream-host-address")),
+      headers.addCopy(
+          debug_config->hostname_header_.value_or(Http::Headers::get().EnvoyUpstreamHostname),
+          conn_pool->host()->hostname());
+      headers.addCopy(debug_config->host_address_header_.value_or(
+                          Http::Headers::get().EnvoyUpstreamHostAddress),
                       conn_pool->host()->address()->asString());
     };
   }
 
   // If we've been instructed not to forward the request upstream, send an empty local response.
   if (debug_config && debug_config->do_not_forward_) {
+    modify_headers = [modify_headers](Http::HeaderMap& headers) {
+      modify_headers(headers);
+      headers.addCopy(Http::Headers::get().EnvoyNotForwarded, "true");
+    };
     callbacks_->sendLocalReply(Http::Code::NoContent, "", modify_headers, absl::nullopt, "");
     return Http::FilterHeadersStatus::StopIteration;
   }

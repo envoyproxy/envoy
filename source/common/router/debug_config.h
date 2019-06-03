@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/http/header_map.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "absl/types/optional.h"
@@ -35,16 +36,16 @@ struct DebugConfig : public StreamInfo::FilterState::Object {
    * use `cluster_header_` as the header name, if specified, or "x-envoy-cluster" by default.
    */
   bool append_cluster_{};
-  absl::optional<std::string> cluster_header_;
+  absl::optional<Http::LowerCaseString> cluster_header_;
 
   /**
-   * Append upstream host name and address as response headers, if `append_host_` is true. The
-   * router will use `hostname_header_` and `host_address_header_` as the header names, if
+   * Append upstream host name and address as response headers, if `append_upstream_host_` is true.
+   * The router will use `hostname_header_` and `host_address_header_` as the header names, if
    * specified, or "x-envoy-upstream-hostname" and "x-envoy-upstream-host-address" by default.
    */
   bool append_upstream_host_{};
-  absl::optional<std::string> hostname_header_;
-  absl::optional<std::string> host_address_header_;
+  absl::optional<Http::LowerCaseString> hostname_header_;
+  absl::optional<Http::LowerCaseString> host_address_header_;
 
   /**
    * Do not forward the associated request to the upstream cluster, if `do_not_forward_` is true.

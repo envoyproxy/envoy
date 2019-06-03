@@ -54,6 +54,15 @@ public:
     lower();
   }
 
+  LowerCaseString& operator=(LowerCaseString&& rhs) {
+    string_ = std::move(rhs.string_);
+    return *this;
+  }
+  LowerCaseString& operator=(const LowerCaseString& rhs) {
+    string_ = rhs.string_;
+    return *this;
+  }
+
   const std::string& get() const { return string_; }
   bool operator==(const LowerCaseString& rhs) const { return string_ == rhs.string_; }
   bool operator!=(const LowerCaseString& rhs) const { return string_ != rhs.string_; }
