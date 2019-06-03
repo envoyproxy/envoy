@@ -168,6 +168,7 @@ private:
   const Stats::StatName success_;
   const Stats::StatName failure_;
   const Stats::StatName total_;
+  const Stats::StatName zero_;
 };
 
 } // namespace Grpc

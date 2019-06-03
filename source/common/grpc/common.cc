@@ -29,7 +29,7 @@ Common::Common(Stats::SymbolTable& symbol_table)
     : symbol_table_(symbol_table), stat_name_pool_(symbol_table),
       grpc_(stat_name_pool_.add("grpc")), grpc_web_(stat_name_pool_.add("grpc-web")),
       success_(stat_name_pool_.add("success")), failure_(stat_name_pool_.add("failure")),
-      total_(stat_name_pool_.add("total")) {}
+      total_(stat_name_pool_.add("total")), zero_(stat_name_pool_.add("0")) {}
 
 Stats::StatName Common::makeDynamicStatName(absl::string_view name) {
   Thread::LockGuard lock(mutex_);
@@ -70,14 +70,19 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
   if (!grpc_status) {
     return;
   }
-  const Stats::StatName status = makeDynamicStatName(grpc_status->value().getStringView());
-  const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(
-      {protocolStatName(protocol), request_names.service_, request_names.method_, status});
+
+  absl::string_view status_str = grpc_status->value().getStringView();
+  const bool success = (status_str == "0");
+
+  // TODO(jmarantz): Perhaps the universe of likely grpc status codes is
+  // sufficiently bounded that we should precompute status StatNames for popular
+  // ones beyond "0".
+  const Stats::StatName status_stat_name = success ? zero_ : makeDynamicStatName(status_str);
+  const Stats::SymbolTable::StoragePtr stat_name_storage =
+      symbol_table_.join({protocolStatName(protocol), request_names.service_, request_names.method_,
+                          status_stat_name});
 
   cluster.statsScope().counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
-  uint64_t grpc_status_code;
-  const bool success = absl::SimpleAtoi(grpc_status->value().getStringView(), &grpc_status_code) &&
-                       grpc_status_code == 0;
   chargeStat(cluster, protocol, request_names, success);
 }
 
