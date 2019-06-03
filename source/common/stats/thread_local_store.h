@@ -11,7 +11,6 @@
 #include "common/common/hash.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/histogram_impl.h"
-#include "common/stats/source_impl.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
 
@@ -52,7 +51,6 @@ public:
   // Stats::Metric
   StatName statName() const override { return name_.statName(); }
   SymbolTable& symbolTable() override { return symbol_table_; }
-  const SymbolTable& symbolTable() const override { return symbol_table_; }
 
 private:
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
@@ -99,7 +97,6 @@ public:
   // Stats::Metric
   StatName statName() const override { return name_.statName(); }
   SymbolTable& symbolTable() override { return parent_.symbolTable(); }
-  const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
 
 private:
   bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
@@ -151,16 +148,18 @@ public:
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
-  Gauge& gaugeFromStatName(StatName name) override {
-    return default_scope_->gaugeFromStatName(name);
+  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
+    return default_scope_->gaugeFromStatName(name, import_mode);
   }
-  Gauge& gauge(const std::string& name) override { return default_scope_->gauge(name); }
+  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
+    return default_scope_->gauge(name, import_mode);
+  }
   Histogram& histogramFromStatName(StatName name) override {
     return default_scope_->histogramFromStatName(name);
   }
   Histogram& histogram(const std::string& name) override { return default_scope_->histogram(name); }
   NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
-  const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
+  const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   const TagProducer& tagProducer() const { return *tag_producer_; }
   absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
@@ -211,10 +210,7 @@ public:
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
-
   void mergeHistograms(PostMergeCb mergeCb) override;
-
-  Source& source() override { return source_; }
 
 private:
   template <class Stat> using StatMap = StatNameHashMap<Stat>;
@@ -248,22 +244,22 @@ private:
     // Stats::Scope
     Counter& counterFromStatName(StatName name) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
-    Gauge& gaugeFromStatName(StatName name) override;
+    Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
     Histogram& histogramFromStatName(StatName name) override;
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }
-    const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
+    const SymbolTable& constSymbolTable() const override { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() override { return parent_.symbolTable(); }
 
     Counter& counter(const std::string& name) override {
       StatNameManagedStorage storage(name, symbolTable());
       return counterFromStatName(storage.statName());
     }
-    Gauge& gauge(const std::string& name) override {
+    Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
       StatNameManagedStorage storage(name, symbolTable());
-      return gaugeFromStatName(storage.statName());
+      return gaugeFromStatName(storage.statName(), import_mode);
     }
     Histogram& histogram(const std::string& name) override {
       StatNameManagedStorage storage(name, symbolTable());
@@ -362,7 +358,6 @@ private:
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   HeapStatDataAllocator heap_allocator_;
-  SourceImpl source_;
 
   NullCounterImpl null_counter_;
   NullGaugeImpl null_gauge_;

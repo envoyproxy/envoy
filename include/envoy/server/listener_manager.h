@@ -75,6 +75,16 @@ public:
       Configuration::ListenerFactoryContext& context) PURE;
 
   /**
+   * Creates a list of UDP listener filter factories.
+   * @param filters supplies the configuration.
+   * @param context supplies the factory creation context.
+   * @return std::vector<Network::UdpListenerFilterFactoryCb> the list of filter factories.
+   */
+  virtual std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      Configuration::ListenerFactoryContext& context) PURE;
+
+  /**
    * @return DrainManagerPtr a new drain manager.
    * @param drain_type supplies the type of draining to do for the owning listener.
    */

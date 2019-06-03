@@ -708,12 +708,19 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     stream_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
         *request_headers_, connection_manager_.read_callbacks_->connection(),
         connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
-        connection_manager_.runtime_, connection_manager_.local_info_));
+        connection_manager_.local_info_));
   }
   ASSERT(stream_info_.downstreamRemoteAddress() != nullptr);
 
   ASSERT(!cached_route_);
   refreshCachedRoute();
+
+  if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
+    ConnectionManagerUtility::mutateTracingRequestHeader(
+        *request_headers_, connection_manager_.runtime_, connection_manager_.config_,
+        cached_route_.value().get());
+  }
+
   const bool upgrade_rejected = createFilterChain() == false;
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
@@ -1665,10 +1672,16 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
     doHeaders(complete() && !bufferedData() && !trailers());
   }
 
-  // TODO(mattklein123): If a filter returns StopIterationNoBuffer and then does a continue, we
-  // won't be able to end the stream if there is no buffered data. Need to handle this.
-  if (bufferedData()) {
-    doData(complete() && !trailers());
+  // Make sure we handle filters returning StopIterationNoBuffer and then commonContinue by flushing
+  // the terminal fin.
+  const bool end_stream_with_data = complete() && !trailers();
+  if (bufferedData() || end_stream_with_data) {
+    if (end_stream_with_data && !bufferedData()) {
+      // In the StopIterationNoBuffer case the ConnectionManagerImpl will not have created a
+      // buffer but encode/decodeData expects the buffer to exist, so create one.
+      bufferedData() = createBuffer();
+    }
+    doData(end_stream_with_data);
   }
 
   if (trailers()) {
