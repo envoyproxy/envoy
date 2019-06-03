@@ -63,7 +63,7 @@ public:
     collector_endpoint: /api/v1/spans
     )EOF";
     envoy::config::trace::v2::ZipkinConfig zipkin_config;
-    MessageUtil::loadFromYaml(yaml_string, zipkin_config);
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     setup(zipkin_config, true);
   }
@@ -110,7 +110,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     collector_endpoint: /api/v1/spans
     )EOF";
     envoy::config::trace::v2::ZipkinConfig zipkin_config;
-    MessageUtil::loadFromYaml(yaml_string, zipkin_config);
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     EXPECT_THROW(setup(zipkin_config, false), EnvoyException);
   }
@@ -125,7 +125,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     collector_endpoint: /api/v1/spans
     )EOF";
     envoy::config::trace::v2::ZipkinConfig zipkin_config;
-    MessageUtil::loadFromYaml(yaml_string, zipkin_config);
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     setup(zipkin_config, true);
   }

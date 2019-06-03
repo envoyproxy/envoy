@@ -58,7 +58,7 @@ public:
   // TODO(fredlas) deduplicate
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override {
-    auto config = MessageUtil::anyConvert<test::common::config::DummyConfig>(resources[0]);
+    auto config = TestUtility::anyConvert<test::common::config::DummyConfig>(resources[0]);
     if (checkAndApplyConfigUpdate(config, "dummy_config", version_info)) {
       config_proto_ = config;
     }
@@ -237,7 +237,7 @@ protected:
 
 test::common::config::DummyConfig parseDummyConfigFromYaml(const std::string& yaml) {
   test::common::config::DummyConfig config;
-  MessageUtil::loadFromYaml(yaml, config);
+  TestUtility::loadFromYaml(yaml, config);
   return config;
 }
 
@@ -407,7 +407,7 @@ TEST_F(ConfigProviderImplTest, ConfigDump) {
       static_cast<const test::common::config::DummyConfigsDump&>(*message_ptr);
 
   test::common::config::DummyConfigsDump expected_config_dump;
-  MessageUtil::loadFromYaml(R"EOF(
+  TestUtility::loadFromYaml(R"EOF(
 static_dummy_configs:
 dynamic_dummy_configs:
 )EOF",
@@ -424,7 +424,7 @@ dynamic_dummy_configs:
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"]();
   const auto& dummy_config_dump2 =
       static_cast<const test::common::config::DummyConfigsDump&>(*message_ptr);
-  MessageUtil::loadFromYaml(R"EOF(
+  TestUtility::loadFromYaml(R"EOF(
 static_dummy_configs:
   - dummy_config: { a: a static dummy config }
     last_updated: { seconds: 1234567891, nanos: 234000000 }
@@ -451,7 +451,7 @@ dynamic_dummy_configs:
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"]();
   const auto& dummy_config_dump3 =
       static_cast<const test::common::config::DummyConfigsDump&>(*message_ptr);
-  MessageUtil::loadFromYaml(R"EOF(
+  TestUtility::loadFromYaml(R"EOF(
 static_dummy_configs:
   - dummy_config: { a: a static dummy config }
     last_updated: { seconds: 1234567891, nanos: 234000000 }
@@ -469,7 +469,7 @@ dynamic_dummy_configs:
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"]();
   const auto& dummy_config_dump4 =
       static_cast<const test::common::config::DummyConfigsDump&>(*message_ptr);
-  MessageUtil::loadFromYaml(R"EOF(
+  TestUtility::loadFromYaml(R"EOF(
 static_dummy_configs:
   - dummy_config: { a: another static dummy config }
     last_updated: { seconds: 1234567891, nanos: 567000000 }
@@ -669,7 +669,7 @@ void DeltaDummyConfigSubscription::onConfigUpdate(
   // proto set (i.e., this is append only). Real xDS APIs will need to track additions, updates and
   // removals to the config set and apply the diffs to the underlying config implementations.
   for (const auto& resource_any : resources) {
-    auto dummy_config = MessageUtil::anyConvert<test::common::config::DummyConfig>(resource_any);
+    auto dummy_config = TestUtility::anyConvert<test::common::config::DummyConfig>(resource_any);
     proto_map_[version_info] = dummy_config;
     // Propagate the new config proto to all worker threads.
     applyDeltaConfigUpdate([&dummy_config](const ConfigSharedPtr& config) {

@@ -452,7 +452,7 @@ def checkSourceLine(line, file_path, reportError):
   if not whitelistedForJsonStringToMessage(file_path) and "JsonStringToMessage" in line:
     # Centralize all usage of JSON parsing so it is easier to make changes in JSON parsing
     # behavior.
-    reportError("Don't use Protobuf::util::JsonStringToMessage, use MessageUtil::loadFromJson.")
+    reportError("Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
 
 
 def checkBuildLine(line, file_path, reportError):

@@ -72,7 +72,7 @@ void ValidationInstance::initialize(const Options& options,
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  InstanceUtil::loadBootstrapConfig(bootstrap, options, *api_);
+  InstanceUtil::loadBootstrapConfig(bootstrap, options, messageValidationVisitor(), *api_);
 
   Config::Utility::createTagProducer(bootstrap);
 
@@ -84,7 +84,8 @@ void ValidationInstance::initialize(const Options& options,
 
   Configuration::InitialImpl initial_config(bootstrap);
   overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
-                                                            bootstrap.overload_manager(), *api_);
+                                                            bootstrap.overload_manager(),
+                                                            messageValidationVisitor(), *api_);
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
@@ -93,8 +94,8 @@ void ValidationInstance::initialize(const Options& options,
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
-      dispatcher(), localInfo(), *secret_manager_, *api_, http_context_, accessLogManager(),
-      singletonManager(), time_system_);
+      dispatcher(), localInfo(), *secret_manager_, messageValidationVisitor(), *api_, http_context_,
+      accessLogManager(), singletonManager(), time_system_);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   http_context_.setTracer(config_.httpTracer());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });

@@ -25,7 +25,8 @@ public:
   LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
              Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
              Init::Manager& init_manager, const LocalInfo::LocalInfo& local_info,
-             Stats::Scope& scope, ListenerManager& lm, Api::Api& api);
+             Stats::Scope& scope, ListenerManager& lm,
+             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Server::LdsApi
   std::string versionInfo() const override { return system_version_info_; }
@@ -38,7 +39,7 @@ public:
                       const std::string& system_version_info) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
+    return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource, validation_visitor_).name();
   }
 
 private:
@@ -48,6 +49,7 @@ private:
   Stats::ScopePtr scope_;
   Upstream::ClusterManager& cm_;
   Init::TargetImpl init_target_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 } // namespace Server

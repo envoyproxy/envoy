@@ -154,6 +154,12 @@ public:
   virtual ProcessContext& processContext() PURE;
 
   /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
    * @return Api::Api& a reference to the api object.
    */
   virtual Api::Api& api() PURE;

@@ -14,6 +14,7 @@
 #include "common/api/api_impl.h"
 #include "common/common/assert.h"
 #include "common/event/real_time_system.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/isolated_store_impl.h"
 
@@ -34,7 +35,8 @@ int main(int argc, char** argv) {
                        platform_impl_.fileSystem());
 
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  Envoy::MessageUtil::loadFromFile(argv[1], bootstrap, api);
+  Envoy::MessageUtil::loadFromFile(argv[1], bootstrap,
+                                   Envoy::ProtobufMessage::getStrictValidationVisitor(), api);
   std::ofstream bootstrap_file(argv[2]);
   bootstrap_file << bootstrap.DebugString();
   return EXIT_SUCCESS;
