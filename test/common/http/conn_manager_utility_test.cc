@@ -1211,25 +1211,24 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
 
 // test edge_accept_request_id does not reset the passed requestId if passed
 TEST_F(ConnectionManagerUtilityTest, AcceptEdgeRequestId) {
-    connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
-    ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-    ON_CALL(config_, edgeAcceptRequestId()).WillByDefault(Return(true));
-    TestHeaderMapImpl headers{
-            {"x-request-id",    "my-request-id"}};
-    EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
-              callMutateRequestHeaders(headers, Protocol::Http2));
-    EXPECT_CALL(random_, uuid()).Times(0);
-    EXPECT_EQ("my-request-id", headers.get_("x-request-id"));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, edgeAcceptRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-request-id", "my-request-id"}};
+  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_CALL(random_, uuid()).Times(0);
+  EXPECT_EQ("my-request-id", headers.get_("x-request-id"));
 }
 
 // test edge_accept_request_id true but generates new request id when not passed
 TEST_F(ConnectionManagerUtilityTest, AcceptEdgeRequestIdNoReqId) {
-    connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
-    ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-    TestHeaderMapImpl headers{{}};
-    EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
-              callMutateRequestHeaders(headers, Protocol::Http2));
-    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{}};
+  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
 }
 } // namespace Http
 } // namespace Envoy
