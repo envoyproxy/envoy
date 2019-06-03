@@ -50,7 +50,7 @@ public:
 
   void SetUpTest(const std::string& yaml) {
     envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
-    MessageUtil::loadFromYaml(yaml, proto_config);
+    TestUtility::loadFromYaml(yaml, proto_config);
 
     config_.reset(
         new FilterConfig(proto_config, local_info_, stats_store_, runtime_, http_context_));

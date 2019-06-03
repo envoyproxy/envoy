@@ -45,7 +45,8 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
           factory_context.timeSource().systemTime(), factory_context.localInfo()),
       name_(name),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
-      stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}) {
+      stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
+      validation_visitor_(factory_context.messageValidationVisitor()) {
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       scoped_rds.scoped_rds_config_source(), factory_context.localInfo(),
       factory_context.dispatcher(), factory_context.clusterManager(), factory_context.random(),
@@ -53,7 +54,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       "envoy.api.v2.ScopedRoutesDiscoveryService.StreamScopedRoutes",
       Grpc::Common::typeUrl(
           envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
-      factory_context.api());
+      validation_visitor_, factory_context.api());
 }
 
 void ScopedRdsConfigSubscription::onConfigUpdate(
@@ -61,8 +62,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     const std::string& version_info) {
   std::vector<envoy::api::v2::ScopedRouteConfiguration> scoped_routes;
   for (const auto& resource_any : resources) {
-    scoped_routes.emplace_back(
-        MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource_any));
+    scoped_routes.emplace_back(MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
+        resource_any, validation_visitor_));
   }
 
   std::unordered_set<std::string> resource_names;

@@ -33,7 +33,7 @@ rules:
 )";
 
   JwtAuthentication proto_config;
-  MessageUtil::loadFromYaml(config, proto_config);
+  TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterConfig filter_conf(proto_config, "", context);
@@ -75,7 +75,7 @@ filter_state_rules:
 )";
 
   JwtAuthentication proto_config;
-  MessageUtil::loadFromYaml(config, proto_config);
+  TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterConfig filter_conf(proto_config, "", context);

@@ -8,7 +8,7 @@ def api_dependencies():
         locations = REPOSITORY_LOCATIONS,
     )
     envoy_http_archive(
-        "com_lyft_protoc_gen_validate",
+        "com_envoyproxy_protoc_gen_validate",
         locations = REPOSITORY_LOCATIONS,
     )
     envoy_http_archive(

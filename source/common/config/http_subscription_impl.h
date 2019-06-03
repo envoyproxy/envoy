@@ -25,7 +25,8 @@ public:
                        Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
                        std::chrono::milliseconds request_timeout,
                        const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats,
-                       std::chrono::milliseconds init_fetch_timeout);
+                       std::chrono::milliseconds init_fetch_timeout,
+                       ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Config::Subscription
   void start(const std::set<std::string>& resources,
@@ -50,6 +51,7 @@ private:
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds init_fetch_timeout_;
   Event::TimerPtr init_fetch_timeout_timer_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 } // namespace Config

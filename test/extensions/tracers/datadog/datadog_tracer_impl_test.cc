@@ -62,7 +62,7 @@ public:
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v2::DatadogConfig datadog_config;
-    MessageUtil::loadFromYaml(yaml_string, datadog_config);
+    TestUtility::loadFromYaml(yaml_string, datadog_config);
 
     setup(datadog_config, true);
   }
@@ -100,7 +100,7 @@ TEST_F(DatadogDriverTest, InitializeDriver) {
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v2::DatadogConfig datadog_config;
-    MessageUtil::loadFromYaml(yaml_string, datadog_config);
+    TestUtility::loadFromYaml(yaml_string, datadog_config);
 
     EXPECT_THROW(setup(datadog_config, false), EnvoyException);
   }
@@ -114,7 +114,7 @@ TEST_F(DatadogDriverTest, InitializeDriver) {
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v2::DatadogConfig datadog_config;
-    MessageUtil::loadFromYaml(yaml_string, datadog_config);
+    TestUtility::loadFromYaml(yaml_string, datadog_config);
 
     setup(datadog_config, true);
   }

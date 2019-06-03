@@ -40,7 +40,7 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
   )EOF";
 
   envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
-  MessageUtil::loadFromYaml(yaml, proto_config);
+  TestUtility::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 

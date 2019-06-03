@@ -463,7 +463,7 @@ void Filter::sendNoHealthyUpstreamResponse() {
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   // upstream_requests_.size() cannot be 0 because we add to it unconditionally
   // in decodeHeaders(). It cannot be > 1 because that only happens when a per
-  // try timeout occurs with hedge_on_per_try_timeout enabled but the the per
+  // try timeout occurs with hedge_on_per_try_timeout enabled but the per
   // try timeout timer is not started until onUpstreamComplete().
   ASSERT(upstream_requests_.size() == 1);
 
@@ -505,7 +505,7 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
 
   // upstream_requests_.size() cannot be 0 because we add to it unconditionally
   // in decodeHeaders(). It cannot be > 1 because that only happens when a per
-  // try timeout occurs with hedge_on_per_try_timeout enabled but the the per
+  // try timeout occurs with hedge_on_per_try_timeout enabled but the per
   // try timeout timer is not started until onUpstreamComplete().
   ASSERT(upstream_requests_.size() == 1);
   downstream_trailers_ = &trailers;

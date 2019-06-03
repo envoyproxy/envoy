@@ -47,6 +47,7 @@ proto_library(
         "//envoy/config/filter/http/ip_tagging/v2:ip_tagging",
         "//envoy/config/filter/http/jwt_authn/v2alpha:jwt_authn",
         "//envoy/config/filter/http/lua/v2:lua",
+        "//envoy/config/filter/http/original_src/v2alpha1:original_src",
         "//envoy/config/filter/http/rate_limit/v2:rate_limit",
         "//envoy/config/filter/http/rbac/v2:rbac",
         "//envoy/config/filter/http/router/v2:router",

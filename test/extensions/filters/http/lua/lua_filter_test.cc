@@ -84,7 +84,7 @@ public:
   }
 
   void setupMetadata(const std::string& yaml) {
-    MessageUtil::loadFromYaml(yaml, metadata_);
+    TestUtility::loadFromYaml(yaml, metadata_);
     EXPECT_CALL(decoder_callbacks_.route_->route_entry_, metadata())
         .WillOnce(testing::ReturnRef(metadata_));
   }

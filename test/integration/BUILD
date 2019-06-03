@@ -214,6 +214,7 @@ envoy_cc_test(
         "//test/integration/filters:metadata_stop_all_filter_config_lib",
         "//test/integration/filters:request_metadata_filter_config_lib",
         "//test/integration/filters:response_metadata_filter_config_lib",
+        "//test/integration/filters:stop_iteration_and_continue",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -490,6 +491,20 @@ envoy_cc_test(
     deps = [
         ":integration_lib",
         "//source/extensions/filters/network/echo:config",
+        "//test/server:utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "udp_echo_integration_test",
+    srcs = [
+        "udp_echo_integration_test.cc",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/common/network:listen_socket_lib",
+        "//test/integration/filters:udp_listener_echo_filter_lib",
         "//test/server:utility_lib",
         "//test/test_common:utility_lib",
     ],

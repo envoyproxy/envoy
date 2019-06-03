@@ -59,7 +59,9 @@ public:
 
 class OutlierDetectorImplTest : public testing::Test {
 public:
-  OutlierDetectorImplTest() {
+  OutlierDetectorImplTest()
+      : outlier_detection_ejections_active_(cluster_.info_->stats_store_.gauge(
+            "outlier_detection.ejections_active", Stats::Gauge::ImportMode::Accumulate)) {
     ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))
         .WillByDefault(Return(true));
     ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_success_rate", 100))
@@ -101,6 +103,7 @@ public:
   Event::SimulatedTimeSystem time_system_;
   std::shared_ptr<MockEventLogger> event_logger_{new MockEventLogger()};
   envoy::api::v2::cluster::OutlierDetection empty_outlier_detection_;
+  Stats::Gauge& outlier_detection_ejections_active_;
 };
 
 TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
@@ -157,7 +160,7 @@ TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
                        envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX, true));
   loadRq(hosts_[0], 1, 500);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   loadRq(failover_hosts_[0], 4, 500);
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
@@ -167,10 +170,10 @@ TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
                        envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX, true));
   loadRq(failover_hosts_[0], 1, 500);
   EXPECT_TRUE(failover_hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_EQ(2UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(2UL, outlier_detection_ejections_active_.value());
 
   detector.reset();
-  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
 }
 
 TEST_F(OutlierDetectorImplTest, DestroyHostInUse) {
@@ -211,7 +214,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   loadRq(hosts_[0], 1, 500);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
   time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
@@ -240,11 +243,11 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
                        envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX, true));
   loadRq(hosts_[0], 1, 500);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, hosts_);
 
-  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
   EXPECT_EQ(2UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
   EXPECT_EQ(
       2UL,
@@ -297,7 +300,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
   loadRq(hosts_[0], 1, 503);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
   time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
@@ -328,11 +331,11 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
                true));
   loadRq(hosts_[0], 1, 503);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, hosts_);
 
-  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
   // Check preserves deprecated counter behaviour
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
   EXPECT_EQ(
@@ -393,7 +396,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
   loadRq(hosts_[0], 1, 503);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
   time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
@@ -424,11 +427,11 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
                        envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX, true));
   loadRq(hosts_[0], 1, 500);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, hosts_);
 
-  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
   // Deprecated counter, check we're preserving old behaviour
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
   EXPECT_EQ(
@@ -502,14 +505,14 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   EXPECT_EQ(90, detector->successRateAverage());
   EXPECT_EQ(52, detector->successRateEjectionThreshold());
   EXPECT_TRUE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
   time_system_.setMonotonicTime(std::chrono::milliseconds(19999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_TRUE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that does bring the host back in.
   time_system_.setMonotonicTime(std::chrono::milliseconds(50001));
@@ -519,7 +522,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_FALSE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
 
   // Expect non-enforcing logging to happen every time the consecutive_5xx_ counter
   // gets saturated (every 5 times).
@@ -541,7 +544,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   time_system_.setMonotonicTime(std::chrono::milliseconds(60001));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
-  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
   EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate());
   EXPECT_EQ(-1, detector->successRateAverage());
   EXPECT_EQ(-1, detector->successRateEjectionThreshold());
@@ -580,12 +583,12 @@ TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
   loadRq(hosts_[0], 1, 500);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   HostVector old_hosts = std::move(hosts_);
   cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, old_hosts);
 
-  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
@@ -616,7 +619,7 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
   loadRq(hosts_[1], 5, 500);
   EXPECT_FALSE(hosts_[1]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
   EXPECT_EQ(1UL,
             cluster_.info_->stats_store_.counter("outlier_detection.ejections_overflow").value());
 }
@@ -644,7 +647,7 @@ TEST_F(OutlierDetectorImplTest, NotEnforcing) {
   loadRq(hosts_[0], 1, 503);
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
-  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
   EXPECT_EQ(
       0UL,
@@ -685,7 +688,7 @@ TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
   cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, old_hosts);
   post_cb();
 
-  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
 }
 
 TEST_F(OutlierDetectorImplTest, CrossThreadDestroyRace) {
@@ -708,7 +711,7 @@ TEST_F(OutlierDetectorImplTest, CrossThreadDestroyRace) {
   EXPECT_EQ(nullptr, weak_detector.lock());
   post_cb();
 
-  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
 }
 
 TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
@@ -736,7 +739,7 @@ TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   post_cb();
 
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 }
 
 TEST_F(OutlierDetectorImplTest, Consecutive_5xxAlreadyEjected) {
