@@ -5,8 +5,6 @@
 #include "envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/config/filter_json.h"
-#include "common/json/json_loader.h"
 
 #include "extensions/filters/network/ratelimit/ratelimit.h"
 
@@ -95,23 +93,6 @@ failure_mode_deny: true
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   Filters::Common::RateLimit::RequestCallbacks* request_callbacks_{};
 };
-
-TEST_F(RateLimitFilterTest, BadRatelimitConfig) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "domain" : "fake_domain",
-    "descriptors": [[{ "key" : "my_key",  "value" : "my_value" }]],
-    "ip_white_list": "12"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
-
-  EXPECT_THROW(Envoy::Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config),
-               Json::Exception);
-}
 
 TEST_F(RateLimitFilterTest, OK) {
   InSequence s;
