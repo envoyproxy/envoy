@@ -30,6 +30,7 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/filesystem:directory_lib",
+        "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],

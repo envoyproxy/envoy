@@ -88,7 +88,8 @@ bool OverloadAction::isActive() const { return !fired_triggers_.empty(); }
 OverloadManagerImpl::OverloadManagerImpl(
     Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
     ThreadLocal::SlotAllocator& slot_allocator,
-    const envoy::config::overload::v2alpha::OverloadManager& config, Api::Api& api)
+    const envoy::config::overload::v2alpha::OverloadManager& config,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : started_(false), dispatcher_(dispatcher), tls_(slot_allocator.allocateSlot()),
       refresh_interval_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))) {
@@ -98,7 +99,7 @@ OverloadManagerImpl::OverloadManagerImpl(
     ENVOY_LOG(debug, "Adding resource monitor for {}", name);
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::ResourceMonitorFactory>(name);
-    auto config = Config::Utility::translateToFactoryConfig(resource, factory);
+    auto config = Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
     auto monitor = factory.createResourceMonitor(*config, context);
 
     auto result =

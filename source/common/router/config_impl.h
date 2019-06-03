@@ -226,7 +226,8 @@ typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
 class RetryPolicyImpl : public RetryPolicy {
 
 public:
-  RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy);
+  RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy,
+                  ProtobufMessage::ValidationVisitor& validation_visitor);
   RetryPolicyImpl() {}
 
   // Router::RetryPolicy
@@ -635,7 +636,8 @@ private:
 
   RetryPolicyImpl
   buildRetryPolicy(const absl::optional<envoy::api::v2::route::RetryPolicy>& vhost_retry_policy,
-                   const envoy::api::v2::route::RouteAction& route_config) const;
+                   const envoy::api::v2::route::RouteAction& route_config,
+                   ProtobufMessage::ValidationVisitor& validation_visitor) const;
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;

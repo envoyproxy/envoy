@@ -13,6 +13,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -52,14 +53,15 @@ api_config_source:
     )EOF";
 
     envoy::api::v2::core::ConfigSource cds_config;
-    MessageUtil::loadFromYamlAndValidate(config_yaml, cds_config);
+    TestUtility::loadFromYamlAndValidate(config_yaml, cds_config);
     cluster_map_.emplace("foo_cluster", mock_cluster_);
     EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
     EXPECT_CALL(mock_cluster_, info()).Times(AnyNumber());
     EXPECT_CALL(*mock_cluster_.info_, addedViaApi());
     EXPECT_CALL(mock_cluster_, info()).Times(AnyNumber());
     EXPECT_CALL(*mock_cluster_.info_, type());
-    cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_);
+    cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_,
+                              validation_visitor_, *api_);
     resetCdsInitializedCb();
 
     expectRequest();
@@ -181,6 +183,7 @@ api_config_source:
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_{};
   ReadyWatcher initialized_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Stats::Gauge& cds_version_;
 };
@@ -401,10 +404,10 @@ api_config_source:
   local_info_.node_.set_cluster("");
   local_info_.node_.set_id("");
   envoy::api::v2::core::ConfigSource cds_config;
-  MessageUtil::loadFromYamlAndValidate(config_yaml, cds_config);
-  EXPECT_THROW(
-      CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_),
-      EnvoyException);
+  TestUtility::loadFromYamlAndValidate(config_yaml, cds_config);
+  EXPECT_THROW(CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_,
+                                  validation_visitor_, *api_),
+               EnvoyException);
 }
 
 TEST_F(CdsApiImplTest, Basic) {

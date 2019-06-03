@@ -40,7 +40,7 @@ public:
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
 private:
-  // SymbolTable encodes encodes stat names as back into strings. This does not
+  // SymbolTable encodes stat names as back into strings. This does not
   // get guarded by a mutex, since it has its own internal mutex to guarantee
   // thread safety.
   SymbolTable& symbol_table_;
