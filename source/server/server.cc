@@ -191,9 +191,9 @@ void InstanceImpl::flushStats() {
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
 
-InstanceUtil::BootstrapVersion
-InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                  const Options& options, Api::Api& api) {
+InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
+    envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
 
@@ -205,11 +205,11 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, api);
+    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
-    MessageUtil::loadFromYaml(config_yaml, bootstrap_override);
+    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     bootstrap.MergeFrom(bootstrap_override);
   }
   MessageUtil::validate(bootstrap);
@@ -252,7 +252,7 @@ void InstanceImpl::initialize(const Options& options,
             Buffer::OwnedImpl().usesOldImpl() ? "old (libevent)" : "new");
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options, *api_);
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options, messageValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
@@ -311,7 +311,8 @@ void InstanceImpl::initialize(const Options& options,
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(), *api_);
+      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
+      messageValidationVisitor(), *api_);
 
   heap_shrinker_ =
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
@@ -344,8 +345,8 @@ void InstanceImpl::initialize(const Options& options,
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
-      dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_, *api_,
-      http_context_, access_log_manager_, *singleton_manager_);
+      dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
+      messageValidationVisitor(), *api_, http_context_, access_log_manager_, *singleton_manager_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -371,7 +372,8 @@ void InstanceImpl::initialize(const Options& options,
             ->create(),
         *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
         *random_generator_, info_factory_, access_log_manager_, *config_.clusterManager(),
-        *local_info_, *admin_, *singleton_manager_, thread_local_, *api_);
+        *local_info_, *admin_, *singleton_manager_, thread_local_, messageValidationVisitor(),
+        *api_);
   }
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {

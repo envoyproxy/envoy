@@ -63,7 +63,8 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
-      manager_identifier_(manager_identifier) {
+      manager_identifier_(manager_identifier),
+      validation_visitor_(factory_context_.messageValidationVisitor()) {
   Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
 
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
@@ -72,10 +73,10 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
       "envoy.api.v2.RouteDiscoveryService.StreamRoutes",
       Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
-      factory_context.api());
+      factory_context.messageValidationVisitor(), factory_context.api());
 
-  config_update_info_ =
-      std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource());
+  config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(
+      factory_context.timeSource(), factory_context.messageValidationVisitor());
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -95,7 +96,8 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   if (!validateUpdateSize(resources.size())) {
     return;
   }
-  auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resources[0]);
+  auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(
+      resources[0], validation_visitor_);
   MessageUtil::validate(route_config);
   if (route_config.name() != route_config_name_) {
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
@@ -108,6 +110,8 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     if (config_update_info_->routeConfiguration().has_vhds()) {
       ENVOY_LOG(debug, "rds: vhds configuration present, starting vhds: config_name={} hash={}",
                 route_config_name_, config_update_info_->configHash());
+      // TODO(dmitri-d): It's unsafe to depend directly on factory context here,
+      // the listener might have been torn down, need to remove this.
       vhds_subscription_ = std::make_unique<VhdsSubscription>(
           config_update_info_, factory_context_, stat_prefix_, route_config_providers_);
       vhds_subscription_->registerInitTargetWithInitManager(factory_context_.initManager());

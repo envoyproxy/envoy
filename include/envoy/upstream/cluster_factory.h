@@ -113,6 +113,12 @@ public:
    * @return Outlier::EventLoggerSharedPtr sink for outlier detection event logs.
    */
   virtual Outlier::EventLoggerSharedPtr outlierEventLogger() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
 /**

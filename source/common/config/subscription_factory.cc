@@ -15,14 +15,15 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
     const envoy::api::v2::core::ConfigSource& config, const LocalInfo::LocalInfo& local_info,
     Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
     Stats::Scope& scope, const std::string& rest_method, const std::string& grpc_method,
-    absl::string_view type_url, Api::Api& api) {
+    absl::string_view type_url, ProtobufMessage::ValidationVisitor& validation_visitor,
+    Api::Api& api) {
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
   switch (config.config_source_specifier_case()) {
   case envoy::api::v2::core::ConfigSource::kPath: {
     Utility::checkFilesystemSubscriptionBackingPath(config.path(), api);
-    result =
-        std::make_unique<Config::FilesystemSubscriptionImpl>(dispatcher, config.path(), stats, api);
+    result = std::make_unique<Config::FilesystemSubscriptionImpl>(dispatcher, config.path(), stats,
+                                                                  validation_visitor, api);
     break;
   }
   case envoy::api::v2::core::ConfigSource::kApiConfigSource: {
@@ -40,7 +41,7 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
           Utility::apiConfigSourceRefreshDelay(api_config_source),
           Utility::apiConfigSourceRequestTimeout(api_config_source),
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method), stats,
-          Utility::configSourceInitialFetchTimeout(config));
+          Utility::configSourceInitialFetchTimeout(config), validation_visitor);
       break;
     case envoy::api::v2::core::ApiConfigSource::GRPC:
       result = std::make_unique<GrpcSubscriptionImpl>(

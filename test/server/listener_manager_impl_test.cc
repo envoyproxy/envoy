@@ -123,7 +123,7 @@ protected:
         dynamic_cast<const envoy::admin::v2alpha::ListenersConfigDump&>(*message_ptr);
 
     envoy::admin::v2alpha::ListenersConfigDump expected_listeners_config_dump;
-    MessageUtil::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
+    TestUtility::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
   }
 

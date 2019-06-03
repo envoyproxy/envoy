@@ -133,6 +133,7 @@ envoy_cc_test(
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "//source/server:overload_manager_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
@@ -148,6 +149,7 @@ envoy_cc_test(
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/server:lds_api_lib",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
@@ -251,6 +253,7 @@ envoy_cc_test_library(
     hdrs = ["utility.h"],
     deps = [
         "//source/common/protobuf:utility_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:lds_cc",
     ],
 )

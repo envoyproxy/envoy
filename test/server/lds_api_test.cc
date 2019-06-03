@@ -7,6 +7,7 @@
 
 #include "server/lds_api.h"
 
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -45,7 +46,7 @@ api_config_source:
     )EOF";
 
     envoy::api::v2::core::ConfigSource lds_config;
-    MessageUtil::loadFromYaml(config_yaml, lds_config);
+    TestUtility::loadFromYaml(config_yaml, lds_config);
     lds_config.mutable_api_config_source()->set_api_type(
         envoy::api::v2::core::ApiConfigSource::REST);
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
@@ -58,9 +59,9 @@ api_config_source:
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(init_manager_, add(_));
-    lds_ =
-        std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, dispatcher_, random_,
-                                     init_manager_, local_info_, store_, listener_manager_, *api_);
+    lds_ = std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, dispatcher_, random_,
+                                        init_manager_, local_info_, store_, listener_manager_,
+                                        validation_visitor_, *api_);
 
     expectRequest();
     init_target_handle_->initialize(init_watcher_);
@@ -140,6 +141,7 @@ api_config_source:
   std::unique_ptr<LdsApiImpl> lds_;
   Event::MockTimer* interval_timer_{};
   Http::AsyncClient::Callbacks* callbacks_{};
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Stats::Gauge& lds_version_;
 
@@ -174,12 +176,12 @@ api_config_source:
   )EOF";
 
   envoy::api::v2::core::ConfigSource lds_config;
-  MessageUtil::loadFromYaml(config_yaml, lds_config);
+  TestUtility::loadFromYaml(config_yaml, lds_config);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
       LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_manager_, local_info_,
-                 store_, listener_manager_, *api_),
+                 store_, listener_manager_, validation_visitor_, *api_),
       EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS "
       "cluster: 'foo_cluster' does not exist, was added via api, or is an "
@@ -295,7 +297,7 @@ api_config_source:
   )EOF";
 
   envoy::api::v2::core::ConfigSource lds_config;
-  MessageUtil::loadFromYaml(config_yaml, lds_config);
+  TestUtility::loadFromYaml(config_yaml, lds_config);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("foo_cluster", cluster);
@@ -306,7 +308,7 @@ api_config_source:
   ON_CALL(local_info_, clusterName()).WillByDefault(ReturnRef(EMPTY_STRING));
   EXPECT_THROW_WITH_MESSAGE(
       LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_manager_, local_info_,
-                 store_, listener_manager_, *api_),
+                 store_, listener_manager_, validation_visitor_, *api_),
       EnvoyException,
       "lds: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");

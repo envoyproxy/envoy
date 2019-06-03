@@ -16,6 +16,7 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -46,7 +47,8 @@ public:
     }));
     subscription_ = std::make_unique<HttpSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
-        std::chrono::milliseconds(1000), *method_descriptor_, stats_, init_fetch_timeout);
+        std::chrono::milliseconds(1000), *method_descriptor_, stats_, init_fetch_timeout,
+        validation_visitor_);
   }
 
   ~HttpSubscriptionTestHarness() {
@@ -121,7 +123,7 @@ public:
     response_json.pop_back();
     response_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
-    MessageUtil::loadFromJson(response_json, response_pb);
+    TestUtility::loadFromJson(response_json, response_pb);
     Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
     message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
@@ -176,6 +178,7 @@ public:
   std::unique_ptr<HttpSubscriptionImpl> subscription_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Event::MockTimer* init_timeout_timer_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
 } // namespace Config

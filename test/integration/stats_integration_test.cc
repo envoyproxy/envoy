@@ -212,6 +212,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/04/24  6161     49415               Pack tags and tag extracted names
   // 2019/05/07  6794     49957               Stats for excluded hosts in cluster
   // 2019/04/27  6733     50213               Use SymbolTable API for HTTP codes
+  // 2019/05/31  6866     50157               libstdc++ upgrade in CI
   // 2019/06/03  7146     49193               absl update
 
   EXPECT_EQ(m_per_cluster, 49193);

@@ -58,6 +58,7 @@ public:
 
   /**
    * @param name The name of the stat, obtained from the SymbolTable.
+   * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
   virtual Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) PURE;
@@ -65,6 +66,7 @@ public:
   /**
    * TODO(#6667): this variant is deprecated: use gaugeFromStatName.
    * @param name The name, expressed as a string.
+   * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
   virtual Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) PURE;
