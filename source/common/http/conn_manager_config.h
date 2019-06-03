@@ -13,58 +13,56 @@ namespace Http {
 /**
  * All stats for the connection manager. @see stats_macros.h
  */
-// clang-format off
 #define ALL_HTTP_CONN_MAN_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
-  COUNTER  (downstream_cx_total)                                                                   \
-  COUNTER  (downstream_cx_ssl_total)                                                               \
-  COUNTER  (downstream_cx_http1_total)                                                             \
-  COUNTER  (downstream_cx_upgrades_total)                                                         \
-  COUNTER  (downstream_cx_http2_total)                                                             \
-  COUNTER  (downstream_cx_destroy)                                                                 \
-  COUNTER  (downstream_cx_destroy_remote)                                                          \
-  COUNTER  (downstream_cx_destroy_local)                                                           \
-  COUNTER  (downstream_cx_destroy_active_rq)                                                       \
-  COUNTER  (downstream_cx_destroy_local_active_rq)                                                 \
-  COUNTER  (downstream_cx_destroy_remote_active_rq)                                                \
-  GAUGE    (downstream_cx_active)                                                                  \
-  GAUGE    (downstream_cx_ssl_active)                                                              \
-  GAUGE    (downstream_cx_http1_active)                                                            \
-  GAUGE    (downstream_cx_upgrades_active)                                                        \
-  GAUGE    (downstream_cx_http2_active)                                                            \
-  COUNTER  (downstream_cx_protocol_error)                                                          \
+  COUNTER(downstream_cx_delayed_close_timeout)                                                     \
+  COUNTER(downstream_cx_destroy)                                                                   \
+  COUNTER(downstream_cx_destroy_active_rq)                                                         \
+  COUNTER(downstream_cx_destroy_local)                                                             \
+  COUNTER(downstream_cx_destroy_local_active_rq)                                                   \
+  COUNTER(downstream_cx_destroy_remote)                                                            \
+  COUNTER(downstream_cx_destroy_remote_active_rq)                                                  \
+  COUNTER(downstream_cx_drain_close)                                                               \
+  COUNTER(downstream_cx_http1_total)                                                               \
+  COUNTER(downstream_cx_http2_total)                                                               \
+  COUNTER(downstream_cx_idle_timeout)                                                              \
+  COUNTER(downstream_cx_overload_disable_keepalive)                                                \
+  COUNTER(downstream_cx_protocol_error)                                                            \
+  COUNTER(downstream_cx_rx_bytes_total)                                                            \
+  COUNTER(downstream_cx_ssl_total)                                                                 \
+  COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_cx_tx_bytes_total)                                                            \
+  COUNTER(downstream_cx_upgrades_total)                                                            \
+  COUNTER(downstream_flow_control_paused_reading_total)                                            \
+  COUNTER(downstream_flow_control_resumed_reading_total)                                           \
+  COUNTER(downstream_rq_1xx)                                                                       \
+  COUNTER(downstream_rq_2xx)                                                                       \
+  COUNTER(downstream_rq_3xx)                                                                       \
+  COUNTER(downstream_rq_4xx)                                                                       \
+  COUNTER(downstream_rq_5xx)                                                                       \
+  COUNTER(downstream_rq_completed)                                                                 \
+  COUNTER(downstream_rq_http1_total)                                                               \
+  COUNTER(downstream_rq_http2_total)                                                               \
+  COUNTER(downstream_rq_idle_timeout)                                                              \
+  COUNTER(downstream_rq_non_relative_path)                                                         \
+  COUNTER(downstream_rq_overload_close)                                                            \
+  COUNTER(downstream_rq_response_before_rq_complete)                                               \
+  COUNTER(downstream_rq_rx_reset)                                                                  \
+  COUNTER(downstream_rq_timeout)                                                                   \
+  COUNTER(downstream_rq_too_large)                                                                 \
+  COUNTER(downstream_rq_total)                                                                     \
+  COUNTER(downstream_rq_tx_reset)                                                                  \
+  COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
+  COUNTER(rs_too_large)                                                                            \
+  GAUGE(downstream_cx_active, Accumulate)                                                          \
+  GAUGE(downstream_cx_http1_active, Accumulate)                                                    \
+  GAUGE(downstream_cx_http2_active, Accumulate)                                                    \
+  GAUGE(downstream_cx_rx_bytes_buffered, Accumulate)                                               \
+  GAUGE(downstream_cx_ssl_active, Accumulate)                                                      \
+  GAUGE(downstream_cx_tx_bytes_buffered, Accumulate)                                               \
+  GAUGE(downstream_cx_upgrades_active, Accumulate)                                                 \
+  GAUGE(downstream_rq_active, Accumulate)                                                          \
   HISTOGRAM(downstream_cx_length_ms)                                                               \
-  COUNTER  (downstream_cx_rx_bytes_total)                                                          \
-  GAUGE    (downstream_cx_rx_bytes_buffered)                                                       \
-  COUNTER  (downstream_cx_tx_bytes_total)                                                          \
-  GAUGE    (downstream_cx_tx_bytes_buffered)                                                       \
-  COUNTER  (downstream_cx_drain_close)                                                             \
-  COUNTER  (downstream_cx_idle_timeout)                                                            \
-  COUNTER  (downstream_cx_overload_disable_keepalive)                                              \
-  COUNTER  (downstream_cx_delayed_close_timeout)                                                   \
-  COUNTER  (downstream_flow_control_paused_reading_total)                                          \
-  COUNTER  (downstream_flow_control_resumed_reading_total)                                         \
-  COUNTER  (downstream_rq_total)                                                                   \
-  COUNTER  (downstream_rq_http1_total)                                                             \
-  COUNTER  (downstream_rq_http2_total)                                                             \
-  GAUGE    (downstream_rq_active)                                                                  \
-  COUNTER  (downstream_rq_response_before_rq_complete)                                             \
-  COUNTER  (downstream_rq_rx_reset)                                                                \
-  COUNTER  (downstream_rq_tx_reset)                                                                \
-  COUNTER  (downstream_rq_non_relative_path)                                                       \
-  COUNTER  (downstream_rq_ws_on_non_ws_route)                                                      \
-  COUNTER  (downstream_rq_too_large)                                                               \
-  COUNTER  (downstream_rq_completed)                                                               \
-  COUNTER  (downstream_rq_1xx)                                                                     \
-  COUNTER  (downstream_rq_2xx)                                                                     \
-  COUNTER  (downstream_rq_3xx)                                                                     \
-  COUNTER  (downstream_rq_4xx)                                                                     \
-  COUNTER  (downstream_rq_5xx)                                                                     \
-  HISTOGRAM(downstream_rq_time)                                                                    \
-  COUNTER  (downstream_rq_idle_timeout)                                                            \
-  COUNTER  (downstream_rq_overload_close)                                                          \
-  COUNTER  (downstream_rq_timeout)                                                            \
-  COUNTER  (rs_too_large)
-// clang-format on
+  HISTOGRAM(downstream_rq_time)
 
 /**
  * Wrapper struct for connection manager stats. @see stats_macros.h
@@ -82,14 +80,12 @@ struct ConnectionManagerStats {
 /**
  * Connection manager tracing specific stats. @see stats_macros.h
  */
-// clang-format off
 #define CONN_MAN_TRACING_STATS(COUNTER)                                                            \
   COUNTER(random_sampling)                                                                         \
   COUNTER(service_forced)                                                                          \
   COUNTER(client_enabled)                                                                          \
   COUNTER(not_traceable)                                                                           \
   COUNTER(health_check)
-// clang-format on
 
 /**
  * Wrapper struct for connection manager tracing stats. @see stats_macros.h
@@ -117,15 +113,13 @@ typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManager
 /**
  * Connection manager per listener stats. @see stats_macros.h
  */
-// clang-format off
 #define CONN_MAN_LISTENER_STATS(COUNTER)                                                           \
-  COUNTER(downstream_rq_completed)                                                                 \
   COUNTER(downstream_rq_1xx)                                                                       \
   COUNTER(downstream_rq_2xx)                                                                       \
   COUNTER(downstream_rq_3xx)                                                                       \
   COUNTER(downstream_rq_4xx)                                                                       \
-  COUNTER(downstream_rq_5xx)
-// clang-format on
+  COUNTER(downstream_rq_5xx)                                                                       \
+  COUNTER(downstream_rq_completed)
 
 /**
  * Wrapper struct for connection manager listener stats. @see stats_macros.h

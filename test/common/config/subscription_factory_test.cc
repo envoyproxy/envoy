@@ -10,6 +10,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -36,7 +37,7 @@ public:
   subscriptionFromConfigSource(const envoy::api::v2::core::ConfigSource& config) {
     return SubscriptionFactory::subscriptionFromConfigSource(
         config, local_info_, dispatcher_, cm_, random_, stats_store_,
-        Config::TypeUrl::get().ClusterLoadAssignment, *api_);
+        Config::TypeUrl::get().ClusterLoadAssignment, validation_visitor_, *api_);
   }
 
   Upstream::MockClusterManager cm_;
@@ -46,6 +47,7 @@ public:
   Http::MockAsyncClientRequest http_request_;
   Stats::MockIsolatedStatsStore stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
 };
 

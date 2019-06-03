@@ -64,6 +64,8 @@ message Filter {
 // 4. Transport protocol.
 // 5. Application protocols (e.g. ALPN for TLS protocol).
 // 6. Source type (e.g. any, local or external network).
+// 7. Source IP address.
+// 8. Source port.
 //
 // For criteria that allow ranges or wildcards, the most specific value in any
 // of the configured filter chains that matches the incoming connection is going
@@ -108,14 +110,12 @@ message FilterChainMatch {
   // connection is contained in at least one of the specified subnets. If the
   // parameter is not specified or the list is empty, the source IP address is
   // ignored.
-  // [#not-implemented-hide:]
   repeated core.CidrRange source_prefix_ranges = 6;
 
   // The criteria is satisfied if the source port of the downstream connection
   // is contained in at least one of the specified ports. If the parameter is
   // not specified, the source port is ignored.
-  // [#not-implemented-hide:]
-  repeated google.protobuf.UInt32Value source_ports = 7;
+  repeated uint32 source_ports = 7 [(validate.rules).repeated .items.uint32 = {gte: 1, lte: 65535}];
 
   // If non-empty, a list of server names (e.g. SNI for TLS protocol) to consider when determining
   // a filter chain match. Those values will be compared against the server names of a new

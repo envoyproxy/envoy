@@ -5,6 +5,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "common/common/logger.h"
 
@@ -20,7 +21,8 @@ class FilesystemSubscriptionImpl : public Config::Subscription,
                                    Logger::Loggable<Logger::Id::config> {
 public:
   FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher, absl::string_view path,
-                             SubscriptionStats stats, Api::Api& api);
+                             SubscriptionStats stats,
+                             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Config::Subscription
   void start(const std::set<std::string>& resources,
@@ -37,6 +39,7 @@ private:
   SubscriptionCallbacks* callbacks_{};
   SubscriptionStats stats_;
   Api::Api& api_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 } // namespace Config

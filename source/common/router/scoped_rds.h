@@ -95,7 +95,9 @@ public:
     ConfigSubscriptionCommonBase::onConfigUpdateFailed();
   }
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource).name();
+    return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource,
+                                                                             validation_visitor_)
+        .name();
   }
   const ScopedConfigManager::ScopedRouteMap& scopedRouteMap() const {
     return scoped_config_manager_.scopedRouteMap();
@@ -107,6 +109,7 @@ private:
   Stats::ScopePtr scope_;
   ScopedRdsStats stats_;
   ScopedConfigManager scoped_config_manager_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubscription>;

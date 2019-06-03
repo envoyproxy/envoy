@@ -885,7 +885,7 @@ TEST_P(AdminInstanceTest, Memory) {
   EXPECT_EQ(Http::Code::OK, getCallback("/memory", header_map, response));
   const std::string output_json = response.toString();
   envoy::admin::v2alpha::Memory output_proto;
-  MessageUtil::loadFromJson(output_json, output_proto);
+  TestUtility::loadFromJson(output_json, output_proto);
   EXPECT_THAT(output_proto,
               AllOf(Property(&envoy::admin::v2alpha::Memory::allocated, Ge(0)),
                     Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0)),
@@ -1070,8 +1070,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   store.counter("test_counter").add(10);
   store.counter("rest_counter").add(10);
   store.counter("arest_counter").add(5);
-  store.gauge("test_gauge").set(11);
-  store.gauge("atest_gauge").set(10);
+  store.gauge("test_gauge", Stats::Gauge::ImportMode::Accumulate).set(11);
+  store.gauge("atest_gauge", Stats::Gauge::ImportMode::Accumulate).set(10);
   ON_CALL(*host, gauges()).WillByDefault(Invoke([&store]() { return store.gauges(); }));
   ON_CALL(*host, counters()).WillByDefault(Invoke([&store]() { return store.counters(); }));
 
@@ -1096,7 +1096,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json", header_map, response));
   std::string output_json = response.toString();
   envoy::admin::v2alpha::Clusters output_proto;
-  MessageUtil::loadFromJson(output_json, output_proto);
+  TestUtility::loadFromJson(output_json, output_proto);
 
   const std::string expected_json = R"EOF({
  "cluster_statuses": [
@@ -1161,7 +1161,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 )EOF";
 
   envoy::admin::v2alpha::Clusters expected_proto;
-  MessageUtil::loadFromJson(expected_json, expected_proto);
+  TestUtility::loadFromJson(expected_json, expected_proto);
 
   // Ensure the protos created from each JSON are equivalent.
   EXPECT_THAT(output_proto, ProtoEq(expected_proto));
@@ -1170,7 +1170,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters", header_map, response));
   std::string text_output = response.toString();
   envoy::admin::v2alpha::Clusters failed_conversion_proto;
-  EXPECT_THROW(MessageUtil::loadFromJson(text_output, failed_conversion_proto), EnvoyException);
+  EXPECT_THROW(TestUtility::loadFromJson(text_output, failed_conversion_proto), EnvoyException);
 }
 
 TEST_P(AdminInstanceTest, GetRequest) {
@@ -1196,7 +1196,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
 
     // We only test that it parses as the proto and that some fields are correct, since
     // values such as timestamps + Envoy version are tricky to test for.
-    MessageUtil::loadFromJson(body, server_info_proto);
+    TestUtility::loadFromJson(body, server_info_proto);
     EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::LIVE);
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
@@ -1214,7 +1214,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
 
     // We only test that it parses as the proto and that some fields are correct, since
     // values such as timestamps + Envoy version are tricky to test for.
-    MessageUtil::loadFromJson(body, server_info_proto);
+    TestUtility::loadFromJson(body, server_info_proto);
     EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING);
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
@@ -1231,7 +1231,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
 
   // We only test that it parses as the proto and that some fields are correct, since
   // values such as timestamps + Envoy version are tricky to test for.
-  MessageUtil::loadFromJson(body, server_info_proto);
+  TestUtility::loadFromJson(body, server_info_proto);
   EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::INITIALIZING);
   EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
   EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
@@ -1329,7 +1329,8 @@ protected:
 
   void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
     Stats::StatNameManagedStorage storage(name, symbol_table_);
-    gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags));
+    gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags,
+                                       Stats::Gauge::ImportMode::Accumulate));
   }
 
   void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {

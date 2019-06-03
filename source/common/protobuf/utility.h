@@ -5,6 +5,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
 #include "envoy/json/json_object.h"
+#include "envoy/protobuf/message_validator.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/type/percent.pb.h"
 
@@ -146,8 +147,6 @@ public:
   ProtoValidationException(const std::string& validation_error, const Protobuf::Message& message);
 };
 
-enum class ProtoUnknownFieldsMode { Strict, Allow };
-
 class MessageUtil {
 public:
   // std::hash
@@ -184,21 +183,20 @@ public:
     return HashUtil::xxHash64(text);
   }
 
-  static ProtoUnknownFieldsMode proto_unknown_fields;
-
-  static void checkUnknownFields(const Protobuf::Message& message) {
-    if (MessageUtil::proto_unknown_fields == ProtoUnknownFieldsMode::Strict &&
-        !message.GetReflection()->GetUnknownFields(message).empty()) {
-      throw EnvoyException("Protobuf message (type " + message.GetTypeName() +
-                           ") has unknown fields");
+  static void checkUnknownFields(const Protobuf::Message& message,
+                                 ProtobufMessage::ValidationVisitor& validation_visitor) {
+    if (!message.GetReflection()->GetUnknownFields(message).empty()) {
+      validation_visitor.onUnknownField("type " + message.GetTypeName());
     }
   }
 
-  static void loadFromJson(const std::string& json, Protobuf::Message& message);
-  static void loadFromJsonEx(const std::string& json, Protobuf::Message& message,
-                             ProtoUnknownFieldsMode proto_unknown_fields);
-  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message);
-  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api);
+  static void loadFromJson(const std::string& json, Protobuf::Message& message,
+                           ProtobufMessage::ValidationVisitor& validation_visitor);
+  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
+  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
+                           ProtobufMessage::ValidationVisitor& validation_visitor);
+  static void loadFromFile(const std::string& path, Protobuf::Message& message,
+                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
@@ -229,14 +227,16 @@ public:
   }
 
   template <class MessageType>
-  static void loadFromFileAndValidate(const std::string& path, MessageType& message) {
-    loadFromFile(path, message);
+  static void loadFromFileAndValidate(const std::string& path, MessageType& message,
+                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
+    loadFromFile(path, message, validation_visitor);
     validate(message);
   }
 
   template <class MessageType>
-  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
-    loadFromYaml(yaml, message);
+  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
+                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
+    loadFromYaml(yaml, message, validation_visitor);
     validate(message);
   }
 
@@ -258,15 +258,18 @@ public:
   /**
    * Convert from google.protobuf.Any to a typed message.
    * @param message source google.protobuf.Any message.
+   * @param validation_visitor message validation visitor instance.
+   *
    * @return MessageType the typed message inside the Any.
    */
   template <class MessageType>
-  static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
+  static inline MessageType anyConvert(const ProtobufWkt::Any& message,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor) {
     MessageType typed_message;
     if (!message.UnpackTo(&typed_message)) {
       throw EnvoyException("Unable to unpack " + message.DebugString());
     }
-    checkUnknownFields(typed_message);
+    checkUnknownFields(typed_message, validation_visitor);
     return typed_message;
   };
 
@@ -278,7 +281,10 @@ public:
    * @param source message.
    * @param dest message.
    */
-  static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest);
+  static void jsonConvert(const Protobuf::Message& source, ProtobufWkt::Struct& dest);
+  static void jsonConvert(const ProtobufWkt::Struct& source,
+                          ProtobufMessage::ValidationVisitor& validation_visitor,
+                          Protobuf::Message& dest);
 
   /**
    * Extract YAML as string from a google.protobuf.Message.

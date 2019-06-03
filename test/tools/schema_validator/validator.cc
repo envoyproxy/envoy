@@ -58,13 +58,13 @@ void Validator::validate(const std::string& config_path, Schema::Type schema_typ
   switch (schema_type) {
   case Schema::Type::DiscoveryResponse: {
     envoy::api::v2::DiscoveryResponse discovery_response_config;
-    MessageUtil::loadFromFile(config_path, discovery_response_config, *api_);
+    TestUtility::loadFromFile(config_path, discovery_response_config, *api_);
     MessageUtil::validate(discovery_response_config);
     break;
   }
   case Schema::Type::Route: {
     envoy::api::v2::RouteConfiguration route_config;
-    MessageUtil::loadFromFile(config_path, route_config, *api_);
+    TestUtility::loadFromFile(config_path, route_config, *api_);
     MessageUtil::validate(route_config);
     break;
   }

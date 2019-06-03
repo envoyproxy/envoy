@@ -63,6 +63,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
+        "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
     ],
 )
