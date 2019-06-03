@@ -154,7 +154,10 @@ private:
   // Names a stat name from a string, if we don't already have one for it.
   // This always takes a lock on mutex_, and if we haven't seen the name
   // before, it also takes a lock on the symbol table.
-  Stats::StatName makeStatName(absl::string_view name);
+  //
+  // TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/7008 for
+  // a lock-free approach to creating dynamic stat-names based on requests.
+  Stats::StatName makeDynamicStatName(absl::string_view name);
 
   Stats::SymbolTable& symbol_table_;
   mutable Thread::MutexBasicLockable mutex_;

@@ -31,7 +31,7 @@ Common::Common(Stats::SymbolTable& symbol_table)
       success_(stat_name_pool_.add("success")), failure_(stat_name_pool_.add("failure")),
       total_(stat_name_pool_.add("total")) {}
 
-Stats::StatName Common::makeStatName(absl::string_view name) {
+Stats::StatName Common::makeDynamicStatName(absl::string_view name) {
   Thread::LockGuard lock(mutex_);
   auto iter = stat_name_map_.find(name);
   if (iter != stat_name_map_.end()) {
@@ -70,7 +70,7 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
   if (!grpc_status) {
     return;
   }
-  const Stats::StatName status = makeStatName(grpc_status->value().getStringView());
+  const Stats::StatName status = makeDynamicStatName(grpc_status->value().getStringView());
   const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(
       {protocolStatName(protocol), request_names.service_, request_names.method_, status});
 
@@ -128,8 +128,8 @@ Common::resolveServiceAndMethod(const Http::HeaderEntry* path) {
   if (parts.size() != 2) {
     return request_names;
   }
-  const Stats::StatName service = makeStatName(absl::string_view(parts[0].data(), parts[0].size()));
-  const Stats::StatName method = makeStatName(absl::string_view(parts[1].data(), parts[1].size()));
+  const Stats::StatName service = makeDynamicStatName(parts[0]);
+  const Stats::StatName method = makeDynamicStatName(parts[1]);
   request_names = RequestNames{service, method};
   return request_names;
 }

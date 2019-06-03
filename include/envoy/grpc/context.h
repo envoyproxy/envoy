@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Grpc {
 
 /**
- * Captures http-related structures with cardinality of one per server.
+ * Captures grpc-related structures with cardinality of one per server.
  */
 class Context {
 public:
@@ -19,6 +19,16 @@ public:
 
   struct RequestNames;
 
+  /**
+   * Parses out request grpc service-name and method from the path, returning a
+   * populated RequestNames if successful. See the implementation
+   * (source/common/grpc/common.h) for the definition of RequestNames. It is
+   * hidden in the implementation since it references StatName, which is defined
+   * only in the stats implementation.
+   *
+   * @parram path the request path.
+   * @return the request names, expressed as StatName.
+   */
   virtual absl::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path) PURE;
 
   /**
