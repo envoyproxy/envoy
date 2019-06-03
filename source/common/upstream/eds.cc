@@ -133,7 +133,9 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
 void EdsClusterImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
     const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-  validateUpdateSize(resources.size());
+  if (!validateUpdateSize(resources.size())) {
+    return;
+  }
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
   *unwrapped_resource.Add() = resources[0].resource();
   onConfigUpdate(unwrapped_resource, resources[0].version());
