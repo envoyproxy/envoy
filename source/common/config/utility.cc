@@ -287,5 +287,25 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
   }
 }
 
+bool Utility::allowDeprecatedV1Config(Runtime::Loader& runtime, const Json::Object& config) {
+  if (!config.getBoolean("deprecated_v1", false)) {
+    return false;
+  }
+
+  const char error[] =
+      "Using deprecated v1 JSON config load via 'deprecated_v1: true'. This configuration will "
+      "be removed from Envoy soon. Please see "
+      "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details.";
+
+  if (!runtime.snapshot().deprecatedFeatureEnabled(
+          "envoy.deprecated_features.v1_filter_json_config")) {
+    throw EnvoyException(error);
+  } else {
+    ENVOY_LOG_MISC(warn, "{}", error);
+  }
+
+  return true;
+}
+
 } // namespace Config
 } // namespace Envoy

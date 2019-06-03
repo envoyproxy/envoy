@@ -287,6 +287,11 @@ public:
                                     const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto);
+
+  /**
+   * fixfix
+   */
+  static bool allowDeprecatedV1Config(Runtime::Loader& runtime, const Json::Object& config);
 };
 
 } // namespace Config
