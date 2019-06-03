@@ -16,6 +16,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -49,7 +50,7 @@ protected:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
-        singleton_manager_, tls_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_);
     cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
                                          factory_context, std::move(scope), false));
     cluster_->prioritySet().addPriorityUpdateCb(
@@ -68,7 +69,7 @@ protected:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
-        singleton_manager_, tls_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_);
     cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
                                          factory_context, std::move(scope), false));
     cluster_->prioritySet().addPriorityUpdateCb(
@@ -215,6 +216,7 @@ protected:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
 };
 

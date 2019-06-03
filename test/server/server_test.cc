@@ -40,7 +40,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   Stats::IsolatedStoreImpl store;
   Stats::Counter& c = store.counter("hello");
   c.inc();
-  store.gauge("world").set(5);
+  store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
   store.histogram("histogram");
 
   std::list<Stats::SinkPtr> sinks;

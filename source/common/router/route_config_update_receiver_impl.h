@@ -15,8 +15,10 @@ namespace Router {
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
-  RouteConfigUpdateReceiverImpl(TimeSource& time_source)
-      : time_source_(time_source), last_config_hash_(0ull) {}
+  RouteConfigUpdateReceiverImpl(TimeSource& time_source,
+                                ProtobufMessage::ValidationVisitor& validation_visitor)
+      : time_source_(time_source), last_config_hash_(0ull),
+        validation_visitor_(validation_visitor) {}
 
   void initializeVhosts(const envoy::api::v2::RouteConfiguration& route_configuration);
   void removeVhosts(std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
@@ -52,6 +54,7 @@ private:
   SystemTime last_updated_;
   std::unordered_map<std::string, envoy::api::v2::route::VirtualHost> virtual_hosts_;
   absl::optional<RouteConfigProvider::ConfigInfo> config_info_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 } // namespace Router

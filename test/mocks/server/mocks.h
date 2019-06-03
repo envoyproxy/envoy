@@ -59,6 +59,7 @@ public:
   MOCK_CONST_METHOD0(concurrency, uint32_t());
   MOCK_CONST_METHOD0(configPath, const std::string&());
   MOCK_CONST_METHOD0(configYaml, const std::string&());
+  MOCK_CONST_METHOD0(allowUnknownFields, bool());
   MOCK_CONST_METHOD0(adminAddressPath, const std::string&());
   MOCK_CONST_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_CONST_METHOD0(drainTime, std::chrono::seconds());
@@ -373,6 +374,7 @@ public:
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
+  MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
 
   TimeSource& timeSource() override { return time_system_; }
 
@@ -453,6 +455,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Http::Context& httpContext() override { return http_context_; }
   MOCK_METHOD0(processContext, ProcessContext&());
+  MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   MOCK_METHOD0(api, Api::Api&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
@@ -495,6 +498,7 @@ public:
   MOCK_METHOD0(initManager, Init::Manager*());
   MOCK_METHOD0(singletonManager, Singleton::Manager&());
   MOCK_METHOD0(threadLocal, ThreadLocal::SlotAllocator&());
+  MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   MOCK_METHOD0(api, Api::Api&());
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
@@ -530,6 +534,7 @@ public:
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
   MOCK_METHOD0(eventLogger_, Upstream::HealthCheckEventLogger*());
+  MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   Upstream::HealthCheckEventLoggerPtr eventLogger() override {
     return Upstream::HealthCheckEventLoggerPtr(eventLogger_());
   }

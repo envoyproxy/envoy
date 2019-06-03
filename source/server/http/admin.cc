@@ -710,6 +710,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
 
   for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
     if (shouldShowMetric(gauge, used_only, regex)) {
+      ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
       all_stats.emplace(gauge->name(), gauge->value());
     }
   }

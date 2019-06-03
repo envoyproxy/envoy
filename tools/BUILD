@@ -31,6 +31,7 @@ envoy_cc_binary(
     deps = [
         "//source/common/api:api_lib",
         "//source/common/common:assert_lib",
+        "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:isolated_store_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",

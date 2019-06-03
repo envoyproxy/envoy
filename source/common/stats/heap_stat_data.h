@@ -12,6 +12,7 @@
 #include "common/common/thread_annotations.h"
 #include "common/stats/metric_impl.h"
 #include "common/stats/stat_data_allocator_impl.h"
+#include "common/stats/stat_merger.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -49,6 +50,11 @@ public:
            absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
       : Stat(data, alloc, tag_extracted_name, tags) {}
 
+  HeapStat(HeapStatData& data, StatDataAllocatorImpl<HeapStatData>& alloc,
+           absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
+           Gauge::ImportMode import_mode)
+      : Stat(data, alloc, tag_extracted_name, tags, import_mode) {}
+
   StatName statName() const override { return this->data_.statName(); }
 };
 
@@ -68,9 +74,33 @@ public:
   }
 
   GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
-                           const std::vector<Tag>& tags) override {
-    return std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(alloc(name), *this,
-                                                               tag_extracted_name, tags);
+                           const std::vector<Tag>& tags, Gauge::ImportMode import_mode) override {
+    GaugeSharedPtr gauge = std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(
+        alloc(name), *this, tag_extracted_name, tags, import_mode);
+
+    // TODO(jmarantz): Remove this double-checking ASAP. This is left in only
+    // for the transition while #7083 gets reviewed, while new code may be
+    // concurrently added that updates the regex library. Once #7083 is merged
+    // the regex table and this double-check can be deleted.
+    switch (gauge->importMode()) {
+    case Gauge::ImportMode::Accumulate:
+      if (!StatMerger::shouldImportBasedOnRegex(gauge->name())) {
+        std::cerr << "ImportMode conflict: regex says no, arg says yes: " << gauge->name()
+                  << std::endl;
+        new std::string; // Makes tests fail due to leak, but allows the process to keep running.
+      }
+      break;
+    case Gauge::ImportMode::NeverImport:
+      if (StatMerger::shouldImportBasedOnRegex(gauge->name())) {
+        std::cerr << "ImportMode conflict: regex says yes, arg says no: " << gauge->name()
+                  << std::endl;
+        new std::string; // Makes tests fail due to leak, but allows the process to keep running.
+      }
+      break;
+    case Gauge::ImportMode::Uninitialized:
+      break;
+    }
+    return gauge;
   }
 
 #ifndef ENVOY_CONFIG_COVERAGE

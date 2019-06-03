@@ -21,11 +21,12 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
     Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
     std::chrono::milliseconds request_timeout, const Protobuf::MethodDescriptor& service_method,
     SubscriptionCallbacks& callbacks, SubscriptionStats stats,
-    std::chrono::milliseconds init_fetch_timeout)
+    std::chrono::milliseconds init_fetch_timeout,
+    ProtobufMessage::ValidationVisitor& validation_visitor)
     : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval,
                            request_timeout),
       callbacks_(callbacks), stats_(stats), dispatcher_(dispatcher),
-      init_fetch_timeout_(init_fetch_timeout) {
+      init_fetch_timeout_(init_fetch_timeout), validation_visitor_(validation_visitor) {
   request_.mutable_node()->CopyFrom(local_info.node());
   ASSERT(service_method.options().HasExtension(google::api::http));
   const auto& http_rule = service_method.options().GetExtension(google::api::http);
@@ -72,7 +73,7 @@ void HttpSubscriptionImpl::parseResponse(const Http::Message& response) {
   disableInitFetchTimeoutTimer();
   envoy::api::v2::DiscoveryResponse message;
   try {
-    MessageUtil::loadFromJson(response.bodyAsString(), message);
+    MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "REST config JSON conversion error: {}", e.what());
     handleFailure(nullptr);

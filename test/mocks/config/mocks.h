@@ -10,6 +10,8 @@
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
+#include "test/test_common/utility.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -20,7 +22,7 @@ public:
   MockSubscriptionCallbacks() {
     ON_CALL(*this, resourceName(testing::_))
         .WillByDefault(testing::Invoke([](const ProtobufWkt::Any& resource) -> std::string {
-          return resourceName_(MessageUtil::anyConvert<ResourceType>(resource));
+          return resourceName_(TestUtility::anyConvert<ResourceType>(resource));
         }));
   }
   ~MockSubscriptionCallbacks() override {}

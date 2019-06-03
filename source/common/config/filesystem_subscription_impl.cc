@@ -8,12 +8,11 @@
 namespace Envoy {
 namespace Config {
 
-FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher,
-                                                       absl::string_view path,
-                                                       SubscriptionCallbacks& callbacks,
-                                                       SubscriptionStats stats, Api::Api& api)
+FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
+    Event::Dispatcher& dispatcher, absl::string_view path, SubscriptionCallbacks& callbacks,
+    SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : path_(path), watcher_(dispatcher.createFilesystemWatcher()), callbacks_(callbacks),
-      stats_(stats), api_(api) {
+      stats_(stats), api_(api), validation_visitor_(validation_visitor) {
   watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
     if (started_) {
       refresh();
@@ -39,7 +38,7 @@ void FilesystemSubscriptionImpl::refresh() {
   bool config_update_available = false;
   envoy::api::v2::DiscoveryResponse message;
   try {
-    MessageUtil::loadFromFile(path_, message, api_);
+    MessageUtil::loadFromFile(path_, message, validation_visitor_, api_);
     config_update_available = true;
     callbacks_.onConfigUpdate(message.resources(), message.version_info());
     stats_.version_.set(HashUtil::xxHash64(message.version_info()));
