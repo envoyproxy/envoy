@@ -134,7 +134,8 @@ public:
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
       expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Internal, "bad config", {});
     }
-    subscription_->getContextForTest()->onDiscoveryResponse(std::move(response));
+    static_cast<GrpcDeltaXdsContext*>(subscription_->getContextForTest().get())
+        ->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 

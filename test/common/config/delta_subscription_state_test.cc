@@ -22,9 +22,8 @@ const char TypeUrl[] = "type.googleapis.com/envoy.api.v2.Cluster";
 class DeltaSubscriptionStateTest : public testing::Test {
 protected:
   DeltaSubscriptionStateTest()
-      : stats_(Utility::generateStats(store_)),
-        state_(TypeUrl, {"name1", "name2", "name3"}, callbacks_, local_info_,
-               std::chrono::milliseconds(0U), dispatcher_, stats_) {
+      : state_(TypeUrl, callbacks_, local_info_, std::chrono::milliseconds(0U), dispatcher_) {
+    state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
     EXPECT_THAT(cur_request.resource_names_subscribe(),
                 UnorderedElementsAre("name1", "name2", "name3"));
@@ -62,8 +61,6 @@ protected:
   NiceMock<MockSubscriptionCallbacks<envoy::api::v2::Cluster>> callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  Stats::IsolatedStoreImpl store_;
-  SubscriptionStats stats_;
   // We start out interested in three resources: name1, name2, and name3.
   DeltaSubscriptionState state_;
 };
@@ -82,13 +79,13 @@ populateRepeatedResource(std::vector<std::pair<std::string, std::string>> items)
 // Basic gaining/losing interest in resources should lead to (un)subscriptions.
 TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
   {
-    state_.updateResourceInterest({"name2", "name3", "name4"}); // drop name1, add name4
+    state_.updateSubscriptionInterest({"name1"}, {"name4"});
     envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
     EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
     EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name1"));
   }
   {
-    state_.updateResourceInterest({"name1", "name2"}); // add back name1, drop name3 and 4
+    state_.updateSubscriptionInterest({"name1"}, {"name3", "name4"});
     envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
     EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name1"));
     EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name3", "name4"));
@@ -105,8 +102,8 @@ TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
 // interpret the resource_names_subscribe field as "send these resources even if you think Envoy
 // already has them".
 TEST_F(DeltaSubscriptionStateTest, RemoveThenAdd) {
-  state_.updateResourceInterest({"name1", "name2"});
-  state_.updateResourceInterest({"name1", "name2", "name3"});
+  state_.updateSubscriptionInterest({}, {"name3"});
+  state_.updateSubscriptionInterest({"name3"}, {});
   envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name3"));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
@@ -121,8 +118,8 @@ TEST_F(DeltaSubscriptionStateTest, RemoveThenAdd) {
 // should be like this. What *is* important: the server must happily and cleanly ignore
 // "unsubscribe from [resource name I have never before referred to]" requests.
 TEST_F(DeltaSubscriptionStateTest, AddThenRemove) {
-  state_.updateResourceInterest({"name1", "name2", "name3", "name4"});
-  state_.updateResourceInterest({"name1", "name2", "name3"});
+  state_.updateSubscriptionInterest({"name4"}, {});
+  state_.updateSubscriptionInterest({}, {"name4"});
   envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
   EXPECT_TRUE(cur_request.resource_names_subscribe().empty());
   EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name4"));
@@ -130,9 +127,9 @@ TEST_F(DeltaSubscriptionStateTest, AddThenRemove) {
 
 // add/remove/add == add.
 TEST_F(DeltaSubscriptionStateTest, AddRemoveAdd) {
-  state_.updateResourceInterest({"name1", "name2", "name3", "name4"});
-  state_.updateResourceInterest({"name1", "name2", "name3"});
-  state_.updateResourceInterest({"name1", "name2", "name3", "name4"});
+  state_.updateSubscriptionInterest({"name4"}, {});
+  state_.updateSubscriptionInterest({}, {"name4"});
+  state_.updateSubscriptionInterest({"name4"}, {});
   envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
@@ -140,9 +137,9 @@ TEST_F(DeltaSubscriptionStateTest, AddRemoveAdd) {
 
 // remove/add/remove == remove.
 TEST_F(DeltaSubscriptionStateTest, RemoveAddRemove) {
-  state_.updateResourceInterest({"name1", "name2"});
-  state_.updateResourceInterest({"name1", "name2", "name3"});
-  state_.updateResourceInterest({"name1", "name2"});
+  state_.updateSubscriptionInterest({}, {"name3"});
+  state_.updateSubscriptionInterest({"name3"}, {});
+  state_.updateSubscriptionInterest({}, {"name3"});
   envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
   EXPECT_TRUE(cur_request.resource_names_subscribe().empty());
   EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name3"));
@@ -151,9 +148,9 @@ TEST_F(DeltaSubscriptionStateTest, RemoveAddRemove) {
 // Starts with 1,2,3. 4 is added/removed/added. In those same updates, 1,2,3 are
 // removed/added/removed. End result should be 4 added and 1,2,3 removed.
 TEST_F(DeltaSubscriptionStateTest, BothAddAndRemove) {
-  state_.updateResourceInterest({"name4"});
-  state_.updateResourceInterest({"name1", "name2", "name3"});
-  state_.updateResourceInterest({"name4"});
+  state_.updateSubscriptionInterest({"name4"}, {"name1", "name2", "name3"});
+  state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {"name4"});
+  state_.updateSubscriptionInterest({"name4"}, {"name1", "name2", "name3"});
   envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
   EXPECT_THAT(cur_request.resource_names_unsubscribe(),
@@ -161,8 +158,8 @@ TEST_F(DeltaSubscriptionStateTest, BothAddAndRemove) {
 }
 
 TEST_F(DeltaSubscriptionStateTest, CumulativeUpdates) {
-  state_.updateResourceInterest({"name1", "name2", "name3", "name4"});
-  state_.updateResourceInterest({"name1", "name2", "name3", "name4", "name5"});
+  state_.updateSubscriptionInterest({"name4"}, {});
+  state_.updateSubscriptionInterest({"name5"}, {});
   envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4", "name5"));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
@@ -253,7 +250,7 @@ TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
   {
     // ...but our own map should remember our interest. In particular, losing interest in a
     // resource should cause its name to appear in the next request's resource_names_unsubscribe.
-    state_.updateResourceInterest({"name3", "name4"}); // note the lack of 1 and 2
+    state_.updateSubscriptionInterest({"name4"}, {"name1", "name2"});
     envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
     EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
     EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name1", "name2"));
@@ -273,8 +270,8 @@ TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
-  state_.updateResourceInterest({"name2", "name3", "name4"}); // drop name1, add name4
-  state_.markStreamFresh();                                   // simulate a stream reconnection
+  state_.updateSubscriptionInterest({"name4"}, {"name1"});
+  state_.markStreamFresh(); // simulate a stream reconnection
   envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
   // Regarding the resource_names_subscribe field:
   // name1: do not include: we lost interest.
@@ -304,7 +301,7 @@ TEST_F(DeltaSubscriptionStateTest, InitialVersionMapFirstMessageOnly) {
   // Then, after updating the resources but not reconnecting the stream, verify that initial
   // versions are not sent.
   {
-    state_.updateResourceInterest({"name1", "name2", "name3", "name4"});
+    state_.updateSubscriptionInterest({"name4"}, {});
     // The xDS server updates our resources, and gives us our newly requested one too.
     Protobuf::RepeatedPtrField<envoy::api::v2::Resource> add_all =
         populateRepeatedResource({{"name1", "version1B"},
@@ -321,13 +318,13 @@ TEST_F(DeltaSubscriptionStateTest, CheckUpdatePending) {
   // Note that the test fixture ctor causes the first request to be "sent", so we start in the
   // middle of a stream, with our initially interested resources having been requested already.
   EXPECT_FALSE(state_.subscriptionUpdatePending());
-  state_.updateResourceInterest({"name1", "name2", "name3"}); // no change
+  state_.updateSubscriptionInterest({}, {}); // no change
   EXPECT_FALSE(state_.subscriptionUpdatePending());
   state_.markStreamFresh();
-  EXPECT_TRUE(state_.subscriptionUpdatePending());   // no change, BUT fresh stream
-  state_.updateResourceInterest({"name1", "name2"}); // one removed
+  EXPECT_TRUE(state_.subscriptionUpdatePending());  // no change, BUT fresh stream
+  state_.updateSubscriptionInterest({}, {"name3"}); // one removed
   EXPECT_TRUE(state_.subscriptionUpdatePending());
-  state_.updateResourceInterest({"name1", "name2", "name3"}); // one added
+  state_.updateSubscriptionInterest({"name3"}, {}); // one added
   EXPECT_TRUE(state_.subscriptionUpdatePending());
 }
 

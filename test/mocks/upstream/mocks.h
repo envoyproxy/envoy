@@ -335,7 +335,7 @@ public:
   NiceMock<Tcp::ConnectionPool::MockInstance> tcp_conn_pool_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   envoy::api::v2::core::BindConfig bind_config_;
-  std::shared_ptr<NiceMock<Config::GrpcMux>> ads_mux_;
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   std::string local_cluster_name_;
   NiceMock<MockClusterManagerFactory> cluster_manager_factory_;

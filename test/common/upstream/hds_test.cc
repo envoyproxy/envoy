@@ -12,6 +12,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
@@ -67,7 +68,7 @@ protected:
     hds_delegate_ = std::make_unique<HdsDelegate>(
         stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_, runtime_, stats_store_,
         ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_, admin_,
-        singleton_manager_, tls_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_);
   }
 
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
@@ -117,6 +118,7 @@ protected:
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
   Runtime::MockLoader runtime_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
   NiceMock<Runtime::MockRandomGenerator> random_;

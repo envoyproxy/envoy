@@ -28,7 +28,7 @@ envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManag
 parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
       http_connection_manager;
-  MessageUtil::loadFromYaml(yaml, http_connection_manager);
+  TestUtility::loadFromYaml(yaml, http_connection_manager);
   return http_connection_manager;
 }
 

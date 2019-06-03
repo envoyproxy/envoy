@@ -13,18 +13,16 @@ namespace Config {
 /**
  * All control plane related stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_CONTROL_PLANE_STATS(COUNTER, GAUGE)                                                    \
   COUNTER(rate_limit_enforced)                                                                     \
-  GAUGE(connected_state)                                                                           \
-  GAUGE(pending_requests)                                                                          \
-// clang-format on
+  GAUGE(connected_state, NeverImport)                                                              \
+  GAUGE(pending_requests, Accumulate)
 
 /**
  * Struct definition for all control plane stats. @see stats_macros.h
  */
 struct ControlPlaneStats {
-  ALL_CONTROL_PLANE_STATS(GENERATE_COUNTER_STRUCT,GENERATE_GAUGE_STRUCT)
+  ALL_CONTROL_PLANE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 class GrpcMuxCallbacks {
@@ -110,13 +108,16 @@ public:
    * e.g.type.googleapis.com/envoy.api.v2.Cluster.
    */
   virtual void resume(const std::string& type_url) PURE;
-  
+
   // For delta
-  virtual /*WatchMap::Token*/uint64_t addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                           SubscriptionCallbacks& callbacks,std::chrono::milliseconds init_fetch_timeout) PURE;
-  virtual void removeWatch(const std::string& type_url, /*WatchMap::Token*/uint64_t watch_token) PURE;
-  virtual void updateWatch(const std::string& type_url, /*WatchMap::Token*/uint64_t watch_token,
-                   const std::set<std::string>& resources) PURE;
+  virtual /*WatchMap::Token*/ uint64_t addWatch(const std::string& type_url,
+                                                const std::set<std::string>& resources,
+                                                SubscriptionCallbacks& callbacks,
+                                                std::chrono::milliseconds init_fetch_timeout) PURE;
+  virtual void removeWatch(const std::string& type_url,
+                           /*WatchMap::Token*/ uint64_t watch_token) PURE;
+  virtual void updateWatch(const std::string& type_url, /*WatchMap::Token*/ uint64_t watch_token,
+                           const std::set<std::string>& resources) PURE;
 };
 
 typedef std::unique_ptr<GrpcMux> GrpcMuxPtr;

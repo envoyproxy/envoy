@@ -180,7 +180,10 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
       api_->fileSystem().fileReadToEnd(TestEnvironment::runfilesPath(
           "test/extensions/filters/network/client_ssl_auth/test_data/vpn_response_1.json")));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ(1U, stats_store_.gauge("auth.clientssl.vpn.total_principals").value());
+  EXPECT_EQ(1U,
+            stats_store_
+                .gauge("auth.clientssl.vpn.total_principals", Stats::Gauge::ImportMode::NeverImport)
+                .value());
 
   // Create a new filter for an SSL connection with an authorized cert.
   createAuthFilter();

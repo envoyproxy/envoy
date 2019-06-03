@@ -25,6 +25,7 @@ public:
    *        description).
    * @param grpc_method fully qualified name of v2 gRPC API bidi streaming method (as per protobuf
    *        service description).
+   * @param validation_visitor message validation visitor instance.
    * @param api reference to the Api object
    * @param callbacks the callbacks needed by all Subscription objects, to deliver config updates.
    *                  The callbacks must not result in the deletion of the Subscription object.
@@ -34,7 +35,8 @@ public:
       const envoy::api::v2::core::ConfigSource& config, const LocalInfo::LocalInfo& local_info,
       Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
       Stats::Scope& scope, const std::string& rest_method, const std::string& grpc_method,
-      absl::string_view type_url, Api::Api& api, SubscriptionCallbacks& callbacks, bool is_delta);
+      absl::string_view type_url, ProtobufMessage::ValidationVisitor& validation_visitor,
+      Api::Api& api, SubscriptionCallbacks& callbacks, bool is_delta);
 };
 
 } // namespace Config

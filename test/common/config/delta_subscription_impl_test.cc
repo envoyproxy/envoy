@@ -64,7 +64,8 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    subscription_->getContextForTest()->onDiscoveryResponse(std::move(message));
+    static_cast<GrpcDeltaXdsContext*>(subscription_->getContextForTest().get())
+        ->onDiscoveryResponse(std::move(message));
   }
   // The server gives us our first version of resource name2.
   // subscription_ now wants to ACK name1 and then name2 (but can't due to pause).
@@ -77,7 +78,8 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    subscription_->getContextForTest()->onDiscoveryResponse(std::move(message));
+    static_cast<GrpcDeltaXdsContext*>(subscription_->getContextForTest().get())
+        ->onDiscoveryResponse(std::move(message));
   }
   // The server gives us an updated version of resource name1.
   // subscription_ now wants to ACK name1A, then name2, then name1B (but can't due to pause).
@@ -90,7 +92,8 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    subscription_->getContextForTest()->onDiscoveryResponse(std::move(message));
+    static_cast<GrpcDeltaXdsContext*>(subscription_->getContextForTest().get())
+        ->onDiscoveryResponse(std::move(message));
   }
   // All ACK sendMessage()s will happen upon calling resume().
   EXPECT_CALL(async_stream_, sendMessage(_, _))

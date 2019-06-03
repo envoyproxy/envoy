@@ -343,6 +343,7 @@ public:
     Runtime::RandomGenerator& random_;
     Singleton::Manager& singleton_manager_;
     ThreadLocal::SlotAllocator& tls_;
+    ProtobufMessage::ValidationVisitor& validation_visitor_;
     Api::Api& api_;
   };
 

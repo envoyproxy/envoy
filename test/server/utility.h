@@ -6,13 +6,15 @@
 
 #include "common/protobuf/utility.h"
 
+#include "test/test_common/utility.h"
+
 namespace Envoy {
 namespace Server {
 namespace {
 
 inline envoy::api::v2::Listener parseListenerFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::Listener listener;
-  MessageUtil::loadFromYaml(yaml, listener);
+  TestUtility::loadFromYaml(yaml, listener);
   return listener;
 }
 

@@ -206,7 +206,7 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
     if (new_listener != nullptr) {
       // TODO(sumukhs): Try to avoid dynamic_cast by coming up with a better interface design
       ActiveTcpListener* tcp_listener = dynamic_cast<ActiveTcpListener*>(new_listener);
-      ASSERT(tcp_listener != nullptr, "ActiveSocket listner is expected to be tcp");
+      ASSERT(tcp_listener != nullptr, "ActiveSocket listener is expected to be tcp");
       // Hands off connections redirected by iptables to the listener associated with the
       // original destination address. Pass 'hand_off_restored_destination_connections' as false to
       // prevent further redirection.

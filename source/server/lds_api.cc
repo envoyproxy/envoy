@@ -19,17 +19,19 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
                        Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, Init::Manager& init_manager,
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                       ListenerManager& lm, Api::Api& api, bool is_delta)
+                       ListenerManager& lm, ProtobufMessage::ValidationVisitor& validation_visitor,
+                       Api::Api& api, bool is_delta)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
-      init_target_("LDS", [this]() { subscription_->start({}); }) {
+      init_target_("LDS", [this]() { subscription_->start({}); }),
+      validation_visitor_(validation_visitor) {
   const std::string grpc_method = is_delta
                                       ? "envoy.api.v2.ListenerDiscoveryService.DeltaListeners"
                                       : "envoy.api.v2.ListenerDiscoveryService.StreamListeners";
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       lds_config, local_info, dispatcher, cm, random, *scope_,
       "envoy.api.v2.ListenerDiscoveryService.FetchListeners", grpc_method,
-      Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()), api, *this,
-      is_delta);
+      Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()),
+      validation_visitor_, api, *this, is_delta);
   Config::Utility::checkLocalInfo("lds", local_info);
   init_manager.add(init_target_);
 }
@@ -56,7 +58,8 @@ void LdsApiImpl::onConfigUpdate(
   for (const auto& resource : added_resources) {
     envoy::api::v2::Listener listener;
     try {
-      listener = MessageUtil::anyConvert<envoy::api::v2::Listener>(resource.resource());
+      listener = MessageUtil::anyConvert<envoy::api::v2::Listener>(resource.resource(),
+                                                                   validation_visitor_);
       MessageUtil::validate(listener);
       if (!listener_names.insert(listener.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
@@ -97,7 +100,8 @@ void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
     // Add this resource to our delta added/updated pile...
     envoy::api::v2::Resource* to_add = to_add_repeated.Add();
     const std::string listener_name =
-        MessageUtil::anyConvert<envoy::api::v2::Listener>(listener_blob).name();
+        MessageUtil::anyConvert<envoy::api::v2::Listener>(listener_blob, validation_visitor_)
+            .name();
     to_add->set_name(listener_name);
     to_add->set_version(version_info);
     to_add->mutable_resource()->MergeFrom(listener_blob);

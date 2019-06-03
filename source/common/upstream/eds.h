@@ -36,7 +36,9 @@ public:
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource,
+                                                                          validation_visitor_)
+        .cluster_name();
   }
 
 private:
@@ -75,6 +77,7 @@ private:
   std::vector<LocalityWeightsMap> locality_weights_map_;
   HostMap all_hosts_;
   Event::TimerPtr assignment_timeout_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 class EdsClusterFactory : public ClusterFactoryImplBase {

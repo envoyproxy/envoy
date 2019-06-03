@@ -40,7 +40,7 @@ public:
 
     // Set gauge value.
     membership_total_gauge_.name_ = "membership_total";
-    ON_CALL(cluster_stats_scope_, gauge("membership_total"))
+    ON_CALL(cluster_stats_scope_, gauge("membership_total", Stats::Gauge::ImportMode::Accumulate))
         .WillByDefault(ReturnRef(membership_total_gauge_));
     ON_CALL(membership_total_gauge_, value()).WillByDefault(Return(5));
 
