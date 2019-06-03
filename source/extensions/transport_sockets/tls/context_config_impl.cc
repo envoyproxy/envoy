@@ -26,7 +26,6 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
   if (!config.tls_certificates().empty()) {
     std::vector<Secret::TlsCertificateConfigProviderSharedPtr> providers;
     for (const auto& tls_certificate : config.tls_certificates()) {
-      Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider = nullptr;
       if (!tls_certificate.has_private_key_method() && !tls_certificate.has_certificate_chain() &&
           !tls_certificate.has_private_key()) {
         continue;

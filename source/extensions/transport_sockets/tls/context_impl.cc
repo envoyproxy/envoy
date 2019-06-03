@@ -312,7 +312,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
           private_key_method_provider->getBoringSslPrivateKeyMethod();
       if (private_key_method == nullptr) {
         throw EnvoyException(
-            fmt::format("Failed to get BoringSsl private key method from provider"));
+            fmt::format("Failed to get BoringSSL private key method from provider"));
       }
       SSL_CTX_set_private_key_method(ctx.ssl_ctx_.get(), private_key_method.get());
     } else {

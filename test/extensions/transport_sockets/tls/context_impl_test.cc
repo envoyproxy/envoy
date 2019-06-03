@@ -1259,7 +1259,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   EXPECT_THROW_WITH_MESSAGE(
       Envoy::Ssl::ServerContextSharedPtr server_ctx(
           manager.createSslServerContext(store, server_context_config, std::vector<std::string>{})),
-      EnvoyException, "Failed to get BoringSsl private key method from provider");
+      EnvoyException, "Failed to get BoringSSL private key method from provider");
 }
 
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {
