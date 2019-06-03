@@ -88,16 +88,10 @@ static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* o
     padding = RSA_PKCS1_PADDING;
   }
 
-  ops->out_ = static_cast<uint8_t*>(OPENSSL_malloc(max_out));
-  if (ops->out_ == nullptr) {
-    return ssl_private_key_failure;
-  }
-
-  if (!RSA_sign_raw(rsa, &ops->out_len_, ops->out_, max_out, msg, msg_len, padding)) {
+  if (!RSA_sign_raw(rsa, out_len, out, max_out, msg, msg_len, padding)) {
     if (prefix_allocated) {
       OPENSSL_free(msg);
     }
-    OPENSSL_free(ops->out_);
     return ssl_private_key_failure;
   }
 
@@ -107,16 +101,15 @@ static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* o
 
   if (ops->test_options_.crypto_error_) {
     // Flip the bits in the first byte to cause the handshake to fail.
-    ops->out_[0] ^= ops->out_[0];
+    out[0] ^= out[0];
   }
 
   if (ops->test_options_.sync_mode_) {
     // Return immediately with the results.
-    memcpy(out, ops->out_, ops->out_len_);
-    *out_len = ops->out_len_;
-    OPENSSL_free(ops->out_);
     return ssl_private_key_success;
   }
+
+  ops->output_.assign(out, out + *out_len);
 
   // Tell SSL socket that the operation is ready to be called again.
   ops->delayed_op();
@@ -150,23 +143,16 @@ static ssl_private_key_result_t privateKeyDecrypt(SSL* ssl, uint8_t* out, size_t
     return ssl_private_key_failure;
   }
 
-  ops->out_ = static_cast<uint8_t*>(OPENSSL_malloc(max_out));
-  if (ops->out_ == nullptr) {
-    return ssl_private_key_failure;
-  }
-
-  if (!RSA_decrypt(rsa, &ops->out_len_, ops->out_, max_out, in, in_len, RSA_NO_PADDING)) {
-    OPENSSL_free(ops->out_);
+  if (!RSA_decrypt(rsa, out_len, out, max_out, in, in_len, RSA_NO_PADDING)) {
     return ssl_private_key_failure;
   }
 
   if (ops->test_options_.sync_mode_) {
     // Return immediately with the results.
-    memcpy(out, ops->out_, ops->out_len_);
-    *out_len = ops->out_len_;
-    OPENSSL_free(ops->out_);
     return ssl_private_key_success;
   }
+
+  ops->output_.assign(out, out + *out_len);
 
   ops->delayed_op();
 
@@ -184,19 +170,15 @@ static ssl_private_key_result_t privateKeyComplete(SSL* ssl, uint8_t* out, size_
   }
 
   if (ops->test_options_.async_method_error_) {
-    OPENSSL_free(ops->out_);
     return ssl_private_key_failure;
   }
 
-  if (ops->out_len_ > max_out) {
-    OPENSSL_free(ops->out_);
+  if (ops->output_.size() > max_out) {
     return ssl_private_key_failure;
   }
 
-  memcpy(out, ops->out_, ops->out_len_);
-  *out_len = ops->out_len_;
-
-  OPENSSL_free(ops->out_);
+  std::copy(ops->output_.begin(), ops->output_.end(), out);
+  *out_len = ops->output_.size();
 
   return ssl_private_key_success;
 }

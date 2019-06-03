@@ -28,8 +28,7 @@ public:
   void delayed_op();
 
   // Store the output data temporarily.
-  uint8_t* out_;
-  unsigned int out_len_;
+  std::vector<uint8_t> output_;
   // Is the operation finished?
   bool finished_{};
   EcdsaPrivateKeyConnectionTestOptions& test_options_;

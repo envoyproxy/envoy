@@ -26,52 +26,44 @@ void EcdsaPrivateKeyConnection::delayed_op() {
 static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* out_len,
                                                size_t max_out, uint16_t signature_algorithm,
                                                const uint8_t* in, size_t in_len) {
-  (void)out;
   (void)out_len;
+  (void)max_out;
   (void)signature_algorithm;
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int hash_len;
-  EC_KEY* ec_key;
   const EVP_MD* md;
   bssl::ScopedEVP_MD_CTX ctx;
   EcdsaPrivateKeyConnection* ops = static_cast<EcdsaPrivateKeyConnection*>(
       SSL_get_ex_data(ssl, EcdsaPrivateKeyMethodProvider::ssl_ecdsa_connection_index));
+  unsigned int result_len;
 
   if (!ops) {
     return ssl_private_key_failure;
   }
 
-  ec_key = ops->getPrivateKey();
+  bssl::UniquePtr<EC_KEY> ec_key(ops->getPrivateKey());
   if (!ec_key) {
     return ssl_private_key_failure;
   }
 
   md = SSL_get_signature_algorithm_digest(signature_algorithm);
   if (!md) {
-    EC_KEY_free(ec_key);
     return ssl_private_key_failure;
   }
 
   // Calculate the digest for signing.
   if (!EVP_DigestInit_ex(ctx.get(), md, nullptr) || !EVP_DigestUpdate(ctx.get(), in, in_len) ||
       !EVP_DigestFinal_ex(ctx.get(), hash, &hash_len)) {
-    EC_KEY_free(ec_key);
     return ssl_private_key_failure;
   }
 
-  ops->out_ = static_cast<uint8_t*>(OPENSSL_malloc(max_out));
-  if (ops->out_ == nullptr) {
-    EC_KEY_free(ec_key);
+  // Borrow "out" because it has been already initialized to the max_out size.
+  if (!ECDSA_sign(0, hash, hash_len, out, &result_len, ec_key.get())) {
     return ssl_private_key_failure;
   }
 
-  if (!ECDSA_sign(0, hash, hash_len, ops->out_, &ops->out_len_, ec_key)) {
-    EC_KEY_free(ec_key);
-    OPENSSL_free(ops->out_);
-    return ssl_private_key_failure;
-  }
+  ops->output_.assign(out, out + result_len);
 
-  EC_KEY_free(ec_key);
   // Tell SSL socket that the operation is ready to be called again.
   ops->delayed_op();
 
@@ -102,19 +94,15 @@ static ssl_private_key_result_t privateKeyComplete(SSL* ssl, uint8_t* out, size_
   }
 
   if (ops->test_options_.async_method_error_) {
-    OPENSSL_free(ops->out_);
     return ssl_private_key_failure;
   }
 
-  if (ops->out_len_ > max_out) {
-    OPENSSL_free(ops->out_);
+  if (ops->output_.size() > max_out) {
     return ssl_private_key_failure;
   }
 
-  memcpy(out, ops->out_, ops->out_len_);
-  *out_len = ops->out_len_;
-
-  OPENSSL_free(ops->out_);
+  std::copy(ops->output_.begin(), ops->output_.end(), out);
+  *out_len = ops->output_.size();
 
   return ssl_private_key_success;
 }
