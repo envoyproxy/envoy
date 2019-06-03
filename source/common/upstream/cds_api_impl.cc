@@ -20,14 +20,18 @@ CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_confi
                              ClusterManager& cm, Event::Dispatcher& dispatcher,
                              Runtime::RandomGenerator& random,
                              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+                             ProtobufMessage::ValidationVisitor& validation_visitor,
                              Api::Api& api) {
-  return CdsApiPtr{new CdsApiImpl(cds_config, cm, dispatcher, random, local_info, scope, api)};
+  return CdsApiPtr{new CdsApiImpl(cds_config, cm, dispatcher, random, local_info, scope,
+                                  validation_visitor, api)};
 }
 
 CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api)
-    : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
+                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+    : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
+      validation_visitor_(validation_visitor) {
   Config::Utility::checkLocalInfo("cds", local_info);
 
   const bool is_delta = (cds_config.api_config_source().api_type() ==
@@ -37,7 +41,8 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, Clu
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
       cds_config, local_info, dispatcher, cm, random, *scope_,
       "envoy.api.v2.ClusterDiscoveryService.FetchClusters", grpc_method,
-      Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()), api);
+      Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()),
+      validation_visitor, api);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -45,7 +50,8 @@ void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
   std::vector<envoy::api::v2::Cluster> clusters;
   for (const auto& cluster_blob : resources) {
-    clusters.push_back(MessageUtil::anyConvert<envoy::api::v2::Cluster>(cluster_blob));
+    clusters.push_back(
+        MessageUtil::anyConvert<envoy::api::v2::Cluster>(cluster_blob, validation_visitor_));
     clusters_to_remove.erase(clusters.back().name());
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
@@ -75,7 +81,8 @@ void CdsApiImpl::onConfigUpdate(
   for (const auto& resource : added_resources) {
     envoy::api::v2::Cluster cluster;
     try {
-      cluster = MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource.resource());
+      cluster = MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource.resource(),
+                                                                 validation_visitor_);
       MessageUtil::validate(cluster);
       if (!cluster_names.insert(cluster.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
@@ -118,6 +125,7 @@ void CdsApiImpl::onConfigUpdate(
   }
   for (auto resource_name : removed_resources) {
     if (cm_.removeCluster(resource_name)) {
+      any_applied = true;
       ENVOY_LOG(debug, "cds: remove cluster '{}'", resource_name);
     }
   }

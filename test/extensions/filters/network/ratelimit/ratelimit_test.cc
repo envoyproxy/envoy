@@ -41,7 +41,7 @@ public:
         .WillByDefault(Return(true));
 
     envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
-    MessageUtil::loadFromYaml(yaml, proto_config);
+    TestUtility::loadFromYaml(yaml, proto_config);
     config_.reset(new Config(proto_config, stats_store_, runtime_));
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});

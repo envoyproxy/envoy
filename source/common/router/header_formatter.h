@@ -40,8 +40,10 @@ public:
   const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const override;
   bool append() const override { return append_; }
 
+  using FieldExtractor = std::function<std::string(const Envoy::StreamInfo::StreamInfo&)>;
+
 private:
-  std::function<std::string(const Envoy::StreamInfo::StreamInfo&)> field_extractor_;
+  FieldExtractor field_extractor_;
   const bool append_;
   std::unordered_map<std::string, std::vector<Envoy::AccessLog::FormatterProviderPtr>>
       start_time_formatters_;

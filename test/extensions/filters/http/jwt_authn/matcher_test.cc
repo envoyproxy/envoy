@@ -31,7 +31,7 @@ TEST_F(MatcherTest, TestMatchPrefix) {
   const char config[] = R"(match:
   prefix: "/match")";
   RequirementRule rule;
-  MessageUtil::loadFromYaml(config, rule);
+  TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);
   auto headers = TestHeaderMapImpl{{":path", "/match/this"}};
   EXPECT_TRUE(matcher->matches(headers));
@@ -49,7 +49,7 @@ TEST_F(MatcherTest, TestMatchRegex) {
   const char config[] = R"(match:
   regex: "/[^c][au]t")";
   RequirementRule rule;
-  MessageUtil::loadFromYaml(config, rule);
+  TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);
   auto headers = TestHeaderMapImpl{{":path", "/but"}};
   EXPECT_TRUE(matcher->matches(headers));
@@ -68,7 +68,7 @@ TEST_F(MatcherTest, TestMatchPath) {
   path: "/match"
   case_sensitive: false)";
   RequirementRule rule;
-  MessageUtil::loadFromYaml(config, rule);
+  TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);
   auto headers = TestHeaderMapImpl{{":path", "/match"}};
   EXPECT_TRUE(matcher->matches(headers));
@@ -91,7 +91,7 @@ TEST_F(MatcherTest, TestMatchQuery) {
   - name: foo
     value: bar)";
   RequirementRule rule;
-  MessageUtil::loadFromYaml(config, rule);
+  TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);
   auto headers = TestHeaderMapImpl{{":path", "/boo?foo=bar"}};
   EXPECT_TRUE(matcher->matches(headers));
@@ -111,7 +111,7 @@ TEST_F(MatcherTest, TestMatchHeader) {
   headers:
   - name: a)";
   RequirementRule rule;
-  MessageUtil::loadFromYaml(config, rule);
+  TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);
   auto headers = TestHeaderMapImpl{{":path", "/"}, {"a", ""}};
   EXPECT_TRUE(matcher->matches(headers));
@@ -132,7 +132,7 @@ TEST_F(MatcherTest, TestMatchPathAndHeader) {
   - name: foo
     value: bar)";
   RequirementRule rule;
-  MessageUtil::loadFromYaml(config, rule);
+  TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);
   auto headers = TestHeaderMapImpl{{":path", "/boo?foo=bar"}};
   EXPECT_TRUE(matcher->matches(headers));

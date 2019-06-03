@@ -63,6 +63,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
+        "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
     ],
 )
@@ -298,6 +299,13 @@ envoy_cc_library(
         "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/api/v2:rds_cc",
     ],
+)
+
+envoy_cc_library(
+    name = "runtime_utility_lib",
+    srcs = ["runtime_utility.cc"],
+    hdrs = ["runtime_utility.h"],
+    deps = ["@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc"],
 )
 
 envoy_cc_library(

@@ -58,25 +58,6 @@ typedef ConstSingleton<ApiTypeValues> ApiType;
 class Utility {
 public:
   /**
-   * Extract typed resources from a DiscoveryResponse.
-   * @param response reference to DiscoveryResponse.
-   * @return Protobuf::RepeatedPtrField<ResourceType> vector of typed resources in response.
-   */
-  template <class ResourceType>
-  static Protobuf::RepeatedPtrField<ResourceType>
-  getTypedResources(const envoy::api::v2::DiscoveryResponse& response) {
-    Protobuf::RepeatedPtrField<ResourceType> typed_resources;
-    for (const auto& resource : response.resources()) {
-      auto* typed_resource = typed_resources.Add();
-      if (!resource.UnpackTo(typed_resource)) {
-        throw EnvoyException("Unable to unpack " + resource.DebugString());
-      }
-      MessageUtil::checkUnknownFields(*typed_resource);
-    }
-    return typed_resources;
-  }
-
-  /**
    * Legacy APIs uses JSON and do not have an explicit version.
    * @param input the input to hash.
    * @return std::pair<std::string, uint64_t> the string is the hash converted into
@@ -240,18 +221,22 @@ public:
    * @param enclosing_message proto that contains a field 'config'. Note: the enclosing proto is
    * provided because for statically registered implementations, a custom config is generally
    * optional, which means the conversion must be done conditionally.
+   * @param validation_visitor message validation visitor instance.
    * @param factory implementation factory with the method 'createEmptyConfigProto' to produce a
    * proto to be filled with the translated configuration.
    */
   template <class ProtoMessage, class Factory>
-  static ProtobufTypes::MessagePtr translateToFactoryConfig(const ProtoMessage& enclosing_message,
-                                                            Factory& factory) {
+  static ProtobufTypes::MessagePtr
+  translateToFactoryConfig(const ProtoMessage& enclosing_message,
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
 
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
 
-    translateOpaqueConfig(enclosing_message.typed_config(), enclosing_message.config(), *config);
+    translateOpaqueConfig(enclosing_message.typed_config(), enclosing_message.config(),
+                          validation_visitor, *config);
 
     return config;
   }
@@ -295,10 +280,12 @@ public:
    * message.
    * @param typed_config opaque config packed in google.protobuf.Any
    * @param config the deprecated google.protobuf.Struct config, empty struct if doesn't exist.
+   * @param validation_visitor message validation visitor instance.
    * @param out_proto the proto message instantiated by extensions
    */
   static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     const ProtobufWkt::Struct& config,
+                                    ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto);
 };
 

@@ -45,7 +45,7 @@ using SymbolVec = std::vector<Symbol>;
  * reference-counted so that no-longer-used symbols can be reclaimed.
  *
  * We use a uint8_t array to encode a "."-deliminated stat-name into arrays of
- * integer symbol symbol IDs in order to conserve space, as in practice the
+ * integer symbol IDs in order to conserve space, as in practice the
  * majority of token instances in stat names draw from a fairly small set of
  * common names, typically less than 100. The format is somewhat similar to
  * UTF-8, with a variable-length array of uint8_t. See the implementation for
@@ -230,7 +230,7 @@ private:
   // The encode map stores both the symbol and the ref count of that symbol.
   // Using absl::string_view lets us only store the complete string once, in the decode map.
   using EncodeMap = absl::flat_hash_map<absl::string_view, SharedSymbol, StringViewHash>;
-  using DecodeMap = absl::flat_hash_map<Symbol, std::unique_ptr<std::string>>;
+  using DecodeMap = absl::flat_hash_map<Symbol, InlineStringPtr>;
   EncodeMap encode_map_ GUARDED_BY(lock_);
   DecodeMap decode_map_ GUARDED_BY(lock_);
 

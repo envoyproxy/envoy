@@ -15,6 +15,8 @@
 #include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 
@@ -70,11 +72,12 @@ protected:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
-        singleton_manager_, tls_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_);
 
     envoy::config::cluster::redis::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(), config);
+                                           ProtobufWkt::Struct::default_instance(),
+                                           ProtobufMessage::getStrictValidationVisitor(), config);
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
     cluster_.reset(new RedisCluster(
         cluster_config,
@@ -99,11 +102,12 @@ protected:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
-        singleton_manager_, tls_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_);
 
     envoy::config::cluster::redis::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(), config);
+                                           ProtobufWkt::Struct::default_instance(),
+                                           validation_visitor_, config);
 
     NiceMock<AccessLog::MockAccessLogManager> log_manager;
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
@@ -111,7 +115,7 @@ protected:
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
         cm, stats_store_, tls_, std::move(dns_resolver_), ssl_context_manager_, runtime_, random_,
         dispatcher_, log_manager, local_info_, admin_, singleton_manager_,
-        std::move(outlier_event_logger), false, api);
+        std::move(outlier_event_logger), false, validation_visitor_, api);
 
     RedisClusterFactory factory = RedisClusterFactory();
     factory.createClusterWithConfig(cluster_config, config, cluster_factory_context,
@@ -404,6 +408,7 @@ protected:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   std::shared_ptr<Upstream::MockClusterMockPrioritySet> hosts_;
   Upstream::MockHealthCheckEventLogger* event_logger_{};
