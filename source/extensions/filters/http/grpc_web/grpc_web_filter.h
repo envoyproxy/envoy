@@ -50,6 +50,8 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
+  bool doStatTracking() const { return request_names_.has_value(); }
+
 private:
   friend class GrpcWebFilterTest;
 
@@ -67,9 +69,7 @@ private:
   bool is_text_response_{};
   Buffer::OwnedImpl decoding_buffer_;
   Grpc::Decoder decoder_;
-  std::string grpc_service_;
-  std::string grpc_method_;
-  bool do_stat_tracking_{};
+  absl::optional<Grpc::Context::RequestNames> request_names_;
   bool is_grpc_web_request_{};
   Grpc::Context& context_;
 };

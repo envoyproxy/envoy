@@ -81,7 +81,7 @@ public:
            request_accept() == Http::Headers::get().ContentTypeValues.GrpcWebProto;
   }
 
-  bool doStatTracking() const { return filter_.do_stat_tracking_; }
+  bool doStatTracking() const { return filter_.doStatTracking(); }
 
   void expectErrorResponse(const Http::Code& expected_code, const std::string& expected_message) {
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))

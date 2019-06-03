@@ -10,8 +10,10 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 
+#include "common/common/hash.h"
 #include "common/grpc/status.h"
 #include "common/protobuf/protobuf.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -26,10 +28,15 @@ public:
   const absl::optional<uint64_t> grpc_status_;
 };
 
+struct Context::RequestNames {
+  Stats::StatName service_; // supplies the service name.
+  Stats::StatName method_;  // supplies the method name.
+};
+
 // TODO(jmarantz): Rename 'Common' to 'ContextImpl'.
 class Common : public Context {
 public:
-  explicit Common(Stats::SymbolTable& /*symbol_table*/) /*: symbol_table_(symbol_table)*/ {}
+  explicit Common(Stats::SymbolTable& symbol_table);
 
   /**
    * @param headers the headers to parse.
@@ -80,13 +87,11 @@ public:
 
   // Context
   void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                  const std::string& grpc_service, const std::string& grpc_method,
-                  const Http::HeaderEntry* grpc_status) override;
+                  const RequestNames& request_names, const Http::HeaderEntry* grpc_status) override;
   void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                  const std::string& grpc_service, const std::string& grpc_method,
+                  const RequestNames& request_names, bool success) override;
+  void chargeStat(const Upstream::ClusterInfo& cluster, const RequestNames& request_names,
                   bool success) override;
-  void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
-                  const std::string& grpc_method, bool success) override;
 
   /**
    * Resolve the gRPC service and method from the HTTP2 :path header.
@@ -95,8 +100,7 @@ public:
    * @param method supplies the output pointer of the gRPC method.
    * @return bool true if both gRPC serve and method have been resolved successfully.
    */
-  static bool resolveServiceAndMethod(const Http::HeaderEntry* path, std::string* service,
-                                      std::string* method);
+  absl::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path) override;
 
   /**
    * Serialize protobuf message with gRPC frame header.
@@ -139,10 +143,28 @@ public:
    */
   static void prependGrpcFrameHeader(Buffer::Instance& buffer);
 
+  Stats::StatName successStatName(bool success) const { return success ? success_ : failure_; }
+  Stats::StatName protocolStatName(Protocol protocol) const {
+    return protocol == Context::Protocol::Grpc ? grpc_ : grpc_web_;
+  }
+
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);
 
-  // Stats::SymbolTable& symbol_table_;
+  // Names a stat name from a string, if we don't already have one for it.
+  // This always takes a lock on mutex_, and if we haven't seen the name
+  // before, it also takes a lock on the symbol table.
+  Stats::StatName makeStatName(absl::string_view name);
+
+  Stats::SymbolTable& symbol_table_;
+  mutable Thread::MutexBasicLockable mutex_;
+  Stats::StatNamePool stat_name_pool_ GUARDED_BY(mutex_);
+  StringMap<Stats::StatName> stat_name_map_ GUARDED_BY(mutex_);
+  const Stats::StatName grpc_;
+  const Stats::StatName grpc_web_;
+  const Stats::StatName success_;
+  const Stats::StatName failure_;
+  const Stats::StatName total_;
 };
 
 } // namespace Grpc

@@ -17,39 +17,39 @@ public:
 
   enum class Protocol { Grpc, GrpcWeb };
 
+  struct RequestNames;
+
+  virtual absl::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path) PURE;
+
   /**
    * Charge a success/failure stat to a cluster/service/method.
    * @param cluster supplies the target cluster.
    * @param protocol supplies the downstream protocol in use.
-   * @param grpc_service supplies the service name.
-   * @param grpc_method supplies the method name.
+   * @param request_names supplies the request names.
    * @param grpc_status supplies the gRPC status.
    */
   virtual void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                          const std::string& grpc_service, const std::string& grpc_method,
+                          const RequestNames& request_names,
                           const Http::HeaderEntry* grpc_status) PURE;
 
   /**
    * Charge a success/failure stat to a cluster/service/method.
    * @param cluster supplies the target cluster.
    * @param protocol supplies the downstream protocol in use.
-   * @param grpc_service supplies the service name.
-   * @param grpc_method supplies the method name.
+   * @param request_names supplies the request names.
    * @param success supplies whether the call succeeded.
    */
   virtual void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                          const std::string& grpc_service, const std::string& grpc_method,
-                          bool success) PURE;
+                          const RequestNames& request_names, bool success) PURE;
 
   /**
    * Charge a success/failure stat to a cluster/service/method.
    * @param cluster supplies the target cluster.
-   * @param grpc_service supplies the service name.
-   * @param grpc_method supplies the method name.
+   * @param request_names supplies the request names.
    * @param success supplies whether the call succeeded.
    */
-  virtual void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
-                          const std::string& grpc_method, bool success) PURE;
+  virtual void chargeStat(const Upstream::ClusterInfo& cluster, const RequestNames& request_names,
+                          bool success) PURE;
   ;
 };
 

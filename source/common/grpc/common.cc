@@ -25,6 +25,23 @@
 namespace Envoy {
 namespace Grpc {
 
+Common::Common(Stats::SymbolTable& symbol_table)
+    : symbol_table_(symbol_table), stat_name_pool_(symbol_table),
+      grpc_(stat_name_pool_.add("grpc")), grpc_web_(stat_name_pool_.add("grpc-web")),
+      success_(stat_name_pool_.add("success")), failure_(stat_name_pool_.add("failure")),
+      total_(stat_name_pool_.add("total")) {}
+
+Stats::StatName Common::makeStatName(absl::string_view name) {
+  Thread::LockGuard lock(mutex_);
+  auto iter = stat_name_map_.find(name);
+  if (iter != stat_name_map_.end()) {
+    return iter->second;
+  }
+  const Stats::StatName stat_name = stat_name_pool_.add(name);
+  stat_name_map_[std::string(name)] = stat_name;
+  return stat_name;
+}
+
 bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
   const Http::HeaderEntry* content_type = headers.ContentType();
   // Content type is gRPC if it is exactly "application/grpc" or starts with
@@ -48,42 +65,38 @@ bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_strea
   return hasGrpcContentType(headers);
 }
 
-static absl::string_view protocolToString(Context::Protocol protocol) {
-  return protocol == Context::Protocol::Grpc ? "grpc" : "grpc-web";
-}
-
 void Common::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                        const std::string& grpc_service, const std::string& grpc_method,
-                        const Http::HeaderEntry* grpc_status) {
+                        const RequestNames& request_names, const Http::HeaderEntry* grpc_status) {
   if (!grpc_status) {
     return;
   }
-  cluster.statsScope()
-      .counter(fmt::format("{}.{}.{}.{}", protocolToString(protocol), grpc_service, grpc_method,
-                           grpc_status->value().getStringView()))
-      .inc();
+  const Stats::StatName status = makeStatName(grpc_status->value().getStringView());
+  const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(
+      {protocolStatName(protocol), request_names.service_, request_names.method_, status});
+
+  cluster.statsScope().counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
   uint64_t grpc_status_code;
   const bool success = absl::SimpleAtoi(grpc_status->value().getStringView(), &grpc_status_code) &&
                        grpc_status_code == 0;
-  chargeStat(cluster, protocol, grpc_service, grpc_method, success);
+  chargeStat(cluster, protocol, request_names, success);
 }
 
 void Common::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                        const std::string& grpc_service, const std::string& grpc_method,
-                        bool success) {
-  absl::string_view protocol_str = protocolToString(protocol);
-  cluster.statsScope()
-      .counter(fmt::format("{}.{}.{}.{}", protocol_str, grpc_service, grpc_method,
-                           success ? "success" : "failure"))
-      .inc();
-  cluster.statsScope()
-      .counter(fmt::format("{}.{}.{}.total", protocol_str, grpc_service, grpc_method))
-      .inc();
+                        const RequestNames& request_names, bool success) {
+  const Stats::SymbolTable::StoragePtr prefix_storage = symbol_table_.join(
+      {protocolStatName(protocol), request_names.service_, request_names.method_});
+  const Stats::StatName prefix(prefix_storage.get());
+  const Stats::SymbolTable::StoragePtr status =
+      symbol_table_.join({prefix, successStatName(success)});
+  const Stats::SymbolTable::StoragePtr total = symbol_table_.join({prefix, total_});
+
+  cluster.statsScope().counterFromStatName(Stats::StatName(status.get())).inc();
+  cluster.statsScope().counterFromStatName(Stats::StatName(total.get())).inc();
 }
 
-void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
-                        const std::string& grpc_method, bool success) {
-  chargeStat(cluster, Protocol::Grpc, grpc_service, grpc_method, success);
+void Common::chargeStat(const Upstream::ClusterInfo& cluster, const RequestNames& request_names,
+                        bool success) {
+  chargeStat(cluster, Protocol::Grpc, request_names, success);
 }
 
 absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers) {
@@ -105,18 +118,20 @@ std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {
   return entry ? std::string(entry->value().getStringView()) : EMPTY_STRING;
 }
 
-bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string* service,
-                                     std::string* method) {
+absl::optional<Common::RequestNames>
+Common::resolveServiceAndMethod(const Http::HeaderEntry* path) {
+  absl::optional<RequestNames> request_names;
   if (path == nullptr) {
-    return false;
+    return request_names;
   }
   const auto parts = StringUtil::splitToken(path->value().getStringView(), "/");
   if (parts.size() != 2) {
-    return false;
+    return request_names;
   }
-  service->assign(parts[0].data(), parts[0].size());
-  method->assign(parts[1].data(), parts[1].size());
-  return true;
+  const Stats::StatName service = makeStatName(absl::string_view(parts[0].data(), parts[0].size()));
+  const Stats::StatName method = makeStatName(absl::string_view(parts[1].data(), parts[1].size()));
+  request_names = RequestNames{service, method};
+  return request_names;
 }
 
 Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& message) {
