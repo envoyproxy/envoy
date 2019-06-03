@@ -14,6 +14,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -29,6 +30,7 @@ namespace {
 TEST(ValidationClusterManagerTest, MockedMethods) {
   Stats::IsolatedStoreImpl stats_store;
   Event::SimulatedTimeSystem time_system;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   Api::ApiPtr api(Api::createApiForTest(stats_store, time_system));
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<ThreadLocal::MockInstance> tls;
@@ -43,9 +45,10 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   AccessLog::MockAccessLogManager log_manager;
   Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest().currentThreadId()};
 
-  ValidationClusterManagerFactory factory(
-      admin, runtime, stats_store, tls, random, dns_resolver, ssl_context_manager, dispatcher,
-      local_info, secret_manager, *api, http_context, log_manager, singleton_manager, time_system);
+  ValidationClusterManagerFactory factory(admin, runtime, stats_store, tls, random, dns_resolver,
+                                          ssl_context_manager, dispatcher, local_info,
+                                          secret_manager, validation_visitor, *api, http_context,
+                                          log_manager, singleton_manager, time_system);
 
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;
   Stats::FakeSymbolTableImpl symbol_table;

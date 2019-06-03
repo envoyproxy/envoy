@@ -25,7 +25,7 @@ public:
   static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
                           Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                           const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                          Api::Api& api);
+                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Upstream::CdsApi
   void initialize() override { subscription_->start({}, *this); }
@@ -42,13 +42,14 @@ public:
                       const std::string& system_version_info) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
+    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource, validation_visitor_).name();
   }
 
 private:
   CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
              Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api);
+             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
   void runInitializeCallbackIfAny();
 
   ClusterManager& cm_;
@@ -56,6 +57,7 @@ private:
   std::string system_version_info_;
   std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 } // namespace Upstream

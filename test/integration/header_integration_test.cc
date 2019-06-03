@@ -265,10 +265,10 @@ public:
         [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
                 hcm) {
           // Overwrite default config with our own.
-          MessageUtil::loadFromYaml(http_connection_mgr_config, hcm);
+          TestUtility::loadFromYaml(http_connection_mgr_config, hcm);
           envoy::config::filter::http::router::v2::Router router_config;
           router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
-          MessageUtil::jsonConvert(router_config, *hcm.mutable_http_filters(0)->mutable_config());
+          TestUtility::jsonConvert(router_config, *hcm.mutable_http_filters(0)->mutable_config());
 
           const bool append = mode == HeaderMode::Append;
 

@@ -53,7 +53,7 @@ public:
   void initialize(std::string&& yaml) {
     envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
     if (!yaml.empty()) {
-      MessageUtil::loadFromYaml(yaml, proto_config);
+      TestUtility::loadFromYaml(yaml, proto_config);
     }
     config_.reset(
         new FilterConfig(proto_config, local_info_, stats_store_, runtime_, http_context_));
@@ -115,7 +115,7 @@ envoy::config::filter::http::ext_authz::v2::ExtAuthz GetFilterConfig() {
   )EOF";
 
   envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
-  MessageUtil::loadFromYaml(http_client ? http_config : grpc_config, proto_config);
+  TestUtility::loadFromYaml(http_client ? http_config : grpc_config, proto_config);
   proto_config.set_failure_mode_allow(failure_mode_allow_value);
   return proto_config;
 }
@@ -304,7 +304,7 @@ TEST_F(HttpFilterTest, BadConfig) {
   failure_mode_allow: true
   )EOF";
   envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
-  MessageUtil::loadFromYaml(filter_config, proto_config);
+  TestUtility::loadFromYaml(filter_config, proto_config);
   EXPECT_THROW(
       MessageUtil::downcastAndValidate<const envoy::config::filter::http::ext_authz::v2::ExtAuthz&>(
           proto_config),

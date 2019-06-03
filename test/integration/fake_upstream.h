@@ -557,6 +557,8 @@ public:
   createNetworkFilterChain(Network::Connection& connection,
                            const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
+  bool createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
+                                    Network::UdpReadFilterCallbacks& callbacks) override;
   void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }

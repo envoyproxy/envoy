@@ -107,13 +107,15 @@ public:
   MOCK_METHOD0(inc, void());
   MOCK_METHOD1(set, void(uint64_t value));
   MOCK_METHOD1(sub, void(uint64_t amount));
+  MOCK_METHOD1(mergeImportMode, void(ImportMode));
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(value, uint64_t());
   MOCK_CONST_METHOD0(cachedShouldImport, absl::optional<bool>());
-  MOCK_METHOD1(setShouldImport, void(bool should_import));
+  MOCK_CONST_METHOD0(importMode, ImportMode());
 
   bool used_;
   uint64_t value_;
+  ImportMode import_mode_;
 };
 
 class MockHistogram : public Histogram, public MockMetric {
@@ -186,7 +188,7 @@ public:
   MOCK_METHOD1(counter, Counter&(const std::string&));
   MOCK_CONST_METHOD0(counters, std::vector<CounterSharedPtr>());
   MOCK_METHOD1(createScope_, Scope*(const std::string& name));
-  MOCK_METHOD1(gauge, Gauge&(const std::string&));
+  MOCK_METHOD2(gauge, Gauge&(const std::string&, Gauge::ImportMode));
   MOCK_METHOD1(nullGauge, NullGaugeImpl&(const std::string&));
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
@@ -200,7 +202,9 @@ public:
   Counter& counterFromStatName(StatName name) override {
     return counter(symbol_table_->toString(name));
   }
-  Gauge& gaugeFromStatName(StatName name) override { return gauge(symbol_table_->toString(name)); }
+  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
+    return gauge(symbol_table_->toString(name), import_mode);
+  }
   Histogram& histogramFromStatName(StatName name) override {
     return histogram(symbol_table_->toString(name));
   }

@@ -44,12 +44,19 @@ public:
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context);
 
+  /**
+   * Static worker for createUdpListenerFilterFactoryList() that can be used directly in tests.
+   */
+  static std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList_(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      Configuration::ListenerFactoryContext& context);
+
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
-    return std::make_unique<LdsApiImpl>(lds_config, server_.clusterManager(), server_.dispatcher(),
-                                        server_.random(), server_.initManager(),
-                                        server_.localInfo(), server_.stats(),
-                                        server_.listenerManager(), server_.api());
+    return std::make_unique<LdsApiImpl>(
+        lds_config, server_.clusterManager(), server_.dispatcher(), server_.random(),
+        server_.initManager(), server_.localInfo(), server_.stats(), server_.listenerManager(),
+        server_.messageValidationVisitor(), server_.api());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -60,6 +67,11 @@ public:
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return createListenerFilterFactoryList_(filters, context);
+  }
+  std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      Configuration::ListenerFactoryContext& context) override {
+    return createUdpListenerFilterFactoryList_(filters, context);
   }
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
                                               Network::Address::SocketType socket_type,
@@ -79,17 +91,15 @@ typedef std::unique_ptr<ListenerImpl> ListenerImplPtr;
 /**
  * All listener manager stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_LISTENER_MANAGER_STATS(COUNTER, GAUGE)                                                 \
   COUNTER(listener_added)                                                                          \
+  COUNTER(listener_create_failure)                                                                 \
+  COUNTER(listener_create_success)                                                                 \
   COUNTER(listener_modified)                                                                       \
   COUNTER(listener_removed)                                                                        \
-  COUNTER(listener_create_success)                                                                 \
-  COUNTER(listener_create_failure)                                                                 \
-  GAUGE  (total_listeners_warming)                                                                 \
-  GAUGE  (total_listeners_active)                                                                  \
-  GAUGE  (total_listeners_draining)
-// clang-format on
+  GAUGE(total_listeners_active, NeverImport)                                                       \
+  GAUGE(total_listeners_draining, NeverImport)                                                     \
+  GAUGE(total_listeners_warming, NeverImport)
 
 /**
  * Struct definition for all listener manager stats. @see stats_macros.h
@@ -298,6 +308,9 @@ public:
     Network::Socket::appendOptions(listen_socket_options_, options);
   }
   const Network::ListenerConfig& listenerConfig() const override { return *this; }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return parent_.server_.messageValidationVisitor();
+  }
   Api::Api& api() override { return parent_.server_.api(); }
   ServerLifecycleNotifier& lifecycleNotifier() override {
     return parent_.server_.lifecycleNotifier();
@@ -315,23 +328,30 @@ public:
   bool createNetworkFilterChain(Network::Connection& connection,
                                 const std::vector<Network::FilterFactoryCb>& factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& manager) override;
+  bool createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
+                                    Network::UdpReadFilterCallbacks& callbacks) override;
 
   SystemTime last_updated_;
 
 private:
-  typedef std::array<Network::FilterChainSharedPtr, 3> SourceTypesArray;
-  typedef std::unordered_map<std::string, SourceTypesArray> ApplicationProtocolsMap;
-  typedef std::unordered_map<std::string, ApplicationProtocolsMap> TransportProtocolsMap;
+  using SourcePortsMap = absl::flat_hash_map<uint16_t, Network::FilterChainSharedPtr>;
+  using SourcePortsMapSharedPtr = std::shared_ptr<SourcePortsMap>;
+  using SourceIPsMap = absl::flat_hash_map<std::string, SourcePortsMapSharedPtr>;
+  using SourceIPsTrie = Network::LcTrie::LcTrie<SourcePortsMapSharedPtr>;
+  using SourceIPsTriePtr = std::unique_ptr<SourceIPsTrie>;
+  using SourceTypesArray = std::array<std::pair<SourceIPsMap, SourceIPsTriePtr>, 3>;
+  using ApplicationProtocolsMap = absl::flat_hash_map<std::string, SourceTypesArray>;
+  using TransportProtocolsMap = absl::flat_hash_map<std::string, ApplicationProtocolsMap>;
   // Both exact server names and wildcard domains are part of the same map, in which wildcard
   // domains are prefixed with "." (i.e. ".example.com" for "*.example.com") to differentiate
   // between exact and wildcard entries.
-  typedef std::unordered_map<std::string, TransportProtocolsMap> ServerNamesMap;
-  typedef std::unordered_map<std::string, ServerNamesMap> DestinationIPsMap;
-  typedef std::shared_ptr<ServerNamesMap> ServerNamesMapSharedPtr;
-  typedef Network::LcTrie::LcTrie<ServerNamesMapSharedPtr> DestinationIPsTrie;
-  typedef std::unique_ptr<DestinationIPsTrie> DestinationIPsTriePtr;
-  typedef std::unordered_map<uint16_t, std::pair<DestinationIPsMap, DestinationIPsTriePtr>>
-      DestinationPortsMap;
+  using ServerNamesMap = absl::flat_hash_map<std::string, TransportProtocolsMap>;
+  using ServerNamesMapSharedPtr = std::shared_ptr<ServerNamesMap>;
+  using DestinationIPsMap = absl::flat_hash_map<std::string, ServerNamesMapSharedPtr>;
+  using DestinationIPsTrie = Network::LcTrie::LcTrie<ServerNamesMapSharedPtr>;
+  using DestinationIPsTriePtr = std::unique_ptr<DestinationIPsTrie>;
+  using DestinationPortsMap =
+      absl::flat_hash_map<uint16_t, std::pair<DestinationIPsMap, DestinationIPsTriePtr>>;
 
   void
   addFilterChain(uint16_t destination_port, const std::vector<std::string>& destination_ips,
@@ -339,6 +359,8 @@ private:
                  const std::string& transport_protocol,
                  const std::vector<std::string>& application_protocols,
                  const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+                 const std::vector<std::string>& source_ips,
+                 const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
                  Network::TransportSocketFactoryPtr&& transport_socket_factory,
                  std::vector<Network::FilterFactoryCb> filters_factory);
   void addFilterChainForDestinationPorts(
@@ -346,29 +368,45 @@ private:
       const std::vector<std::string>& destination_ips, const std::vector<std::string>& server_names,
       const std::string& transport_protocol, const std::vector<std::string>& application_protocols,
       const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+      const std::vector<std::string>& source_ips,
+      const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForDestinationIPs(
       DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
       const std::vector<std::string>& server_names, const std::string& transport_protocol,
       const std::vector<std::string>& application_protocols,
       const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+      const std::vector<std::string>& source_ips,
+      const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForServerNames(
-      ServerNamesMap& server_names_map, const std::vector<std::string>& server_names,
+      ServerNamesMapSharedPtr& server_names_map_ptr, const std::vector<std::string>& server_names,
       const std::string& transport_protocol, const std::vector<std::string>& application_protocols,
       const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+      const std::vector<std::string>& source_ips,
+      const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForApplicationProtocols(
       ApplicationProtocolsMap& application_protocol_map,
       const std::vector<std::string>& application_protocols,
       const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+      const std::vector<std::string>& source_ips,
+      const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForSourceTypes(
       SourceTypesArray& source_types_array,
       const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+      const std::vector<std::string>& source_ips,
+      const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
+  void addFilterChainForSourceIPs(SourceIPsMap& source_ips_map, const std::string& source_ip,
+                                  const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
+                                  const Network::FilterChainSharedPtr& filter_chain);
+  void addFilterChainForSourcePorts(SourcePortsMapSharedPtr& source_ports_map_ptr,
+                                    uint32_t source_port,
+                                    const Network::FilterChainSharedPtr& filter_chain);
 
-  void convertDestinationIPsMapToTrie();
+  void convertIPsToTries();
 
   const Network::FilterChain*
   findFilterChainForDestinationIP(const DestinationIPsTrie& destination_ips_trie,
@@ -385,6 +423,10 @@ private:
   const Network::FilterChain*
   findFilterChainForSourceTypes(const SourceTypesArray& source_types,
                                 const Network::ConnectionSocket& socket) const;
+
+  const Network::FilterChain*
+  findFilterChainForSourceIpAndPort(const SourceIPsTrie& source_ips_trie,
+                                    const Network::ConnectionSocket& socket) const;
 
   static bool isWildcardServerName(const std::string& name);
 
@@ -415,6 +457,7 @@ private:
   // initialization is complete. It may be reset to cancel interest.
   std::unique_ptr<Init::WatcherImpl> init_watcher_;
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
+  std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
   DrainManagerPtr local_drain_manager_;
   bool saw_listener_create_failure_{};
   const envoy::api::v2::Listener config_;

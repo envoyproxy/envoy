@@ -412,9 +412,23 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
                                                defer_listener_finalization_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
+
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.
-    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+    auto end_time = time_system_.monotonicTime() + TestUtility::DefaultTimeout;
+    const char* success = "listener_manager.listener_create_success";
+    const char* failure = "listener_manager.lds.update_rejected";
+    while (test_server_->counter(success) == nullptr ||
+           test_server_->counter(success)->value() == 0) {
+      if (time_system_.monotonicTime() >= end_time) {
+        RELEASE_ASSERT(0, "Timed out waiting for listeners.");
+      }
+      RELEASE_ASSERT(test_server_->counter(failure) == nullptr ||
+                         test_server_->counter(failure)->value() == 0,
+                     "Lds update failed");
+      time_system_.sleep(std::chrono::milliseconds(10));
+    }
+
     registerTestServerPorts(port_names);
   }
 }

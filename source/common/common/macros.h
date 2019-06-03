@@ -33,6 +33,10 @@ namespace Envoy {
   static const type* objectptr = new type{__VA_ARGS__};                                            \
   return *objectptr;
 
+#define MUTABLE_CONSTRUCT_ON_FIRST_USE(type, ...)                                                  \
+  static type* objectptr = new type{__VA_ARGS__};                                                  \
+  return *objectptr;
+
 /**
  * Have a generic fall-through for different versions of C++
  */
