@@ -289,7 +289,7 @@ public:
                                     Protobuf::Message& out_proto);
 
   /**
-   * fixfix
+   * Return whether v1-style JSON filter config loading is allowed via 'deprecated_v1: true'.
    */
   static bool allowDeprecatedV1Config(Runtime::Loader& runtime, const Json::Object& config);
 };
