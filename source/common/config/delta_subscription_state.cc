@@ -38,8 +38,6 @@ void DeltaSubscriptionState::resume() {
   paused_ = false;
 }
 
-// Returns true if there is any meaningful change in our subscription interest, worth reporting to
-// the server.
 void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
                                                         const std::set<std::string>& cur_removed) {
   for (const auto& a : cur_added) {

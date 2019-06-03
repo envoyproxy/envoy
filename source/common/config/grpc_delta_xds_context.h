@@ -59,6 +59,7 @@ public:
     if (entry == subscriptions_.end()) {
       // We don't yet have a subscription for type_url! Make one!
       addSubscription(type_url, init_fetch_timeout);
+      return addWatch(type_url, resources, callbacks, init_fetch_timeout);
     }
 
     WatchMap::Token watch_token = entry->second->watch_map_.addWatch(callbacks);
