@@ -22,10 +22,11 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracer) {
   )EOF";
 
   envoy::config::trace::v2::Tracing configuration;
-  MessageUtil::loadFromYaml(yaml_string, configuration);
+  TestUtility::loadFromYaml(yaml_string, configuration);
 
   OpenCensusTracerFactory factory;
-  auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, tracer);
 }
@@ -57,10 +58,11 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
   )EOF";
 
   envoy::config::trace::v2::Tracing configuration;
-  MessageUtil::loadFromYaml(yaml_string, configuration);
+  TestUtility::loadFromYaml(yaml_string, configuration);
 
   OpenCensusTracerFactory factory;
-  auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, tracer);
 
