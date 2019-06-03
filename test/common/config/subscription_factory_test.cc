@@ -39,7 +39,7 @@ public:
         config, local_info_, dispatcher_, cm_, random_, stats_store_,
         "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
         "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints",
-        Config::TypeUrl::get().ClusterLoadAssignment, validation_visitor_, *api_);
+        Config::TypeUrl::get().ClusterLoadAssignment, validation_visitor_, *api_, callbacks_);
   }
 
   Upstream::MockClusterManager cm_;
@@ -188,14 +188,13 @@ TEST_F(SubscriptionFactoryTest, FilesystemSubscription) {
   EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(test_path, _, _));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
-  subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
+  subscriptionFromConfigSource(config)->start({"foo"});
 }
 
 TEST_F(SubscriptionFactoryTest, FilesystemSubscriptionNonExistentFile) {
   envoy::api::v2::core::ConfigSource config;
   config.set_path("/blahblah");
-  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_),
-                            EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}), EnvoyException,
                             "envoy::api::v2::Path must refer to an existing path in the system: "
                             "'/blahblah' does not exist")
 }
@@ -211,9 +210,8 @@ TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_THROW_WITH_REGEX(
-      subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_), EnvoyException,
-      "REST_LEGACY no longer a supported ApiConfigSource.*");
+  EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config)->start({"static_cluster"}),
+                          EnvoyException, "REST_LEGACY no longer a supported ApiConfigSource.*");
 }
 
 TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
@@ -234,7 +232,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
   EXPECT_CALL(
       cm_.async_client_,
       send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(5000))));
-  subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_);
+  subscriptionFromConfigSource(config)->start({"static_cluster"});
 }
 
 TEST_F(SubscriptionFactoryTest, HttpSubscription) {
@@ -262,7 +260,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
         return &http_request_;
       }));
   EXPECT_CALL(http_request_, cancel());
-  subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_);
+  subscriptionFromConfigSource(config)->start({"static_cluster"});
 }
 
 // Confirm error when no refresh delay is set (not checked by schema).
@@ -277,9 +275,9 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionNoRefreshDelay) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_), EnvoyException,
-      "refresh_delay is required for REST API configuration sources");
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"static_cluster"}),
+                            EnvoyException,
+                            "refresh_delay is required for REST API configuration sources");
 }
 
 TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
@@ -306,7 +304,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   EXPECT_CALL(random_, random());
   EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
-  subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_);
+  subscriptionFromConfigSource(config)->start({"static_cluster"});
 }
 
 INSTANTIATE_TEST_SUITE_P(SubscriptionFactoryTestApiConfigSource,
@@ -327,7 +325,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_), EnvoyException,
+      subscriptionFromConfigSource(config)->start({"static_cluster"}), EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a statically defined "
       "non-EDS cluster: 'static_cluster' does not exist, was added via api, or is an EDS cluster");
 }
@@ -349,7 +347,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
   EXPECT_CALL(cluster, info());
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
   EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_), EnvoyException,
+      subscriptionFromConfigSource(config)->start({"static_cluster"}), EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a statically defined "
       "non-EDS cluster: 'static_cluster' does not exist, was added via api, or is an EDS cluster");
 }
@@ -372,7 +370,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::EDS));
   EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_), EnvoyException,
+      subscriptionFromConfigSource(config)->start({"static_cluster"}), EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a statically defined "
       "non-EDS cluster: 'static_cluster' does not exist, was added via api, or is an EDS cluster");
 }

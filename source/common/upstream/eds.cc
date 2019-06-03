@@ -30,10 +30,10 @@ EdsClusterImpl::EdsClusterImpl(
       "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
       "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints",
       Grpc::Common::typeUrl(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
-      factory_context.messageValidationVisitor(), factory_context.api());
+      factory_context.messageValidationVisitor(), factory_context.api(), *this);
 }
 
-void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }
+void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
 
 void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
   std::unordered_map<std::string, HostSharedPtr> updated_hosts;
