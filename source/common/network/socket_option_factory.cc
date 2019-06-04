@@ -105,7 +105,7 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpPacketInfoOptions()
 std::unique_ptr<Socket::Options> SocketOptionFactory::buildRxQueueOverFlowOptions() {
   std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
-     envoy::api::v2::core::SocketOption::STATE_BOUND, ENVOY_RXQ_OVFL, 1));
+      envoy::api::v2::core::SocketOption::STATE_BOUND, ENVOY_RXQ_OVFL, 1));
   return options;
 }
 

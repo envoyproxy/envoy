@@ -142,8 +142,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   // The minimum cmsg buffer size to filled in destination address and packets dropped when
   // receiving a packet. It is possible for a received packet to contain both IPv4 and IPv6
   // addresses.
-  const int cmsg_space = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(in_pktinfo)) +
-                         CMSG_SPACE(sizeof(in6_pktinfo));
+  const int cmsg_space =
+      CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(in_pktinfo)) + CMSG_SPACE(sizeof(in6_pktinfo));
   char cbuf[cmsg_space];
 
   STACK_ARRAY(iov, iovec, num_slice);

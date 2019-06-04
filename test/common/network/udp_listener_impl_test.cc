@@ -30,8 +30,7 @@ namespace {
 class UdpListenerImplTest : public ListenerImplTestBase {
 public:
   UdpListenerImplTest()
-      : server_socket_(createServerSocket(true)),
-        send_to_addr_(getServerLoopbackAddress()) {
+      : server_socket_(createServerSocket(true)), send_to_addr_(getServerLoopbackAddress()) {
     time_system_.sleep(std::chrono::milliseconds(100));
   }
 

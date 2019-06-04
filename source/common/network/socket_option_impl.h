@@ -103,7 +103,7 @@ namespace Network {
 #ifndef SO_RXQ_OVFL
 #define SO_RXQ_OVFL 40
 #endif
-#define ENVOY_RXQ_OVFL  Network::SocketOptionName(std::make_pair(SOL_SOCKET, SO_RXQ_OVFL))
+#define ENVOY_RXQ_OVFL Network::SocketOptionName(std::make_pair(SOL_SOCKET, SO_RXQ_OVFL))
 
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
