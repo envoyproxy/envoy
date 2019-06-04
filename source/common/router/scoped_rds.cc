@@ -54,7 +54,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       "envoy.api.v2.ScopedRoutesDiscoveryService.StreamScopedRoutes",
       Grpc::Common::typeUrl(
           envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
-      validation_visitor_, factory_context.api());
+      validation_visitor_, factory_context.api(), *this);
 }
 
 void ScopedRdsConfigSubscription::onConfigUpdate(

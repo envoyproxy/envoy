@@ -9,22 +9,21 @@
 namespace Envoy {
 namespace Config {
 
-GrpcMuxSubscriptionImpl::GrpcMuxSubscriptionImpl(GrpcMux& grpc_mux, SubscriptionStats stats,
+GrpcMuxSubscriptionImpl::GrpcMuxSubscriptionImpl(GrpcMux& grpc_mux,
+                                                 SubscriptionCallbacks& callbacks,
+                                                 SubscriptionStats stats,
                                                  absl::string_view type_url,
                                                  Event::Dispatcher& dispatcher,
                                                  std::chrono::milliseconds init_fetch_timeout)
-    : grpc_mux_(grpc_mux), stats_(stats), type_url_(type_url), dispatcher_(dispatcher),
-      init_fetch_timeout_(init_fetch_timeout) {}
+    : grpc_mux_(grpc_mux), callbacks_(callbacks), stats_(stats), type_url_(type_url),
+      dispatcher_(dispatcher), init_fetch_timeout_(init_fetch_timeout) {}
 
 // Config::Subscription
-void GrpcMuxSubscriptionImpl::start(const std::set<std::string>& resources,
-                                    SubscriptionCallbacks& callbacks) {
-  callbacks_ = &callbacks;
-
+void GrpcMuxSubscriptionImpl::start(const std::set<std::string>& resources) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       ENVOY_LOG(warn, "gRPC config: initial fetch timed out for {}", type_url_);
-      callbacks_->onConfigUpdateFailed(nullptr);
+      callbacks_.onConfigUpdateFailed(nullptr);
     });
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
@@ -54,7 +53,7 @@ void GrpcMuxSubscriptionImpl::onConfigUpdate(
   // supply those versions to onConfigUpdate() along with the xDS response ("system")
   // version_info. This way, both types of versions can be tracked and exposed for debugging by
   // the configuration update targets.
-  callbacks_->onConfigUpdate(resources, version_info);
+  callbacks_.onConfigUpdate(resources, version_info);
   stats_.update_success_.inc();
   stats_.update_attempt_.inc();
   stats_.version_.set(HashUtil::xxHash64(version_info));
@@ -73,11 +72,11 @@ void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(const EnvoyException* e) {
     ENVOY_LOG(warn, "gRPC config for {} rejected: {}", type_url_, e->what());
   }
   stats_.update_attempt_.inc();
-  callbacks_->onConfigUpdateFailed(e);
+  callbacks_.onConfigUpdateFailed(e);
 }
 
 std::string GrpcMuxSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {
-  return callbacks_->resourceName(resource);
+  return callbacks_.resourceName(resource);
 }
 
 void GrpcMuxSubscriptionImpl::disableInitFetchTimeoutTimer() {

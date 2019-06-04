@@ -42,7 +42,7 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, Clu
       cds_config, local_info, dispatcher, cm, random, *scope_,
       "envoy.api.v2.ClusterDiscoveryService.FetchClusters", grpc_method,
       Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()),
-      validation_visitor, api);
+      validation_visitor, api, *this);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

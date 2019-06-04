@@ -42,7 +42,7 @@ typedef std::unique_ptr<Envoy::Config::Subscription> (*SubscriptionFactoryFuncti
     const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&, Event::Dispatcher&,
     Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&, Stats::Scope&, const std::string&,
     const std::string&, absl::string_view, ProtobufMessage::ValidationVisitor& validation_visitor,
-    Api::Api&);
+    Api::Api&, Envoy::Config::SubscriptionCallbacks&);
 
 class VhdsSubscription : Envoy::Config::SubscriptionCallbacks,
                          Logger::Loggable<Logger::Id::router> {
