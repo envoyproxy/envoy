@@ -221,10 +221,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.18.5/rules_go-0.18.5.tar.gz"],
     ),
     rules_foreign_cc = dict(
-        sha256 = "ccffb49fb24aee3f0a005fa59810dc596228fe86eacacbe0c004d59ed1881bd8",
-        strip_prefix = "rules_foreign_cc-bf99a0bf0080bcd50431aa7124ef23e5afd58325",
-        # 2019-05-17
-        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/bf99a0bf0080bcd50431aa7124ef23e5afd58325.tar.gz"],
+        sha256 = "980c1b74f5c18ea099889b0fb0479ee34b8a02845d3d302ecb16b15d73d624c8",
+        strip_prefix = "rules_foreign_cc-a0dc109915cea85909bef586e2b2a9bbdc6c8ff5",
+        # 2019-06-04
+        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/a0dc109915cea85909bef586e2b2a9bbdc6c8ff5.tar.gz"],
     ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
