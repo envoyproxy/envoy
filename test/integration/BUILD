@@ -778,3 +778,20 @@ envoy_cc_fuzz_test(
     corpus = "h1_corpus",
     deps = [":h1_fuzz_lib"],
 )
+
+envoy_cc_test(
+    name = "scoped_rds_integration_test",
+    srcs = [
+        "scoped_rds_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/config:resources_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:connection_lib",
+        "//source/common/network:utility_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

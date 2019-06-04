@@ -366,7 +366,9 @@ TEST_P(IntegrationAdminTest, Admin) {
       "type.googleapis.com/envoy.admin.v2alpha.BootstrapConfigDump",
       "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump",
       "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump",
+      "type.googleapis.com/envoy.admin.v2alpha.ScopedRoutesConfigDump",
       "type.googleapis.com/envoy.admin.v2alpha.RoutesConfigDump"};
+
   for (Json::ObjectSharedPtr obj_ptr : json->getObjectArray("configs")) {
     EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
     index++;
@@ -375,11 +377,11 @@ TEST_P(IntegrationAdminTest, Admin) {
   // Validate we can parse as proto.
   envoy::admin::v2alpha::ConfigDump config_dump;
   TestUtility::loadFromJson(response->body(), config_dump);
-  EXPECT_EQ(4, config_dump.configs_size());
+  EXPECT_EQ(5, config_dump.configs_size());
 
   // .. and that we can unpack one of the entries.
   envoy::admin::v2alpha::RoutesConfigDump route_config_dump;
-  config_dump.configs(3).UnpackTo(&route_config_dump);
+  config_dump.configs(4).UnpackTo(&route_config_dump);
   EXPECT_EQ("route_config_0", route_config_dump.static_route_configs(0).route_config().name());
 }
 

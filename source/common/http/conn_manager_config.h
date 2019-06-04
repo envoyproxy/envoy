@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/config_provider.h"
 #include "envoy/http/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
@@ -241,10 +242,18 @@ public:
   virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
 
   /**
-   * @return Router::RouteConfigProvider& the configuration provider used to acquire a route
-   *         config for each request flow.
+   * @return Router::RouteConfigProvider* the configuration provider used to acquire a route
+   *         config for each request flow. Pointer ownership is _not_ transferred to the caller of
+   *         this function. This will return nullptr when scoped routing is enabled.
    */
-  virtual Router::RouteConfigProvider& routeConfigProvider() PURE;
+  virtual Router::RouteConfigProvider* routeConfigProvider() PURE;
+
+  /**
+   * @return Config::ConfigProvider* the configuration provider used to acquire scoped routing
+   * configuration for each request flow. Pointer ownership is _not_ transferred to the caller of
+   * this function. This will return nullptr when scoped routing is not enabled.
+   */
+  virtual Config::ConfigProvider* scopedRouteConfigProvider() PURE;
 
   /**
    * @return const std::string& the server name to write into responses.
