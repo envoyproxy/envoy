@@ -126,6 +126,7 @@ def envoy_dependencies(skip_targets = []):
     # dependencies and name conflicts.
     _com_github_c_ares_c_ares()
     _com_github_circonus_labs_libcircllhist()
+    _com_github_curl()
     _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_opentracing_cpp()
     _com_github_eile_tclap()
@@ -194,6 +195,20 @@ def _com_github_c_ares_c_ares():
     native.bind(
         name = "ares",
         actual = "@envoy//bazel/foreign_cc:ares",
+    )
+
+def _com_github_curl():
+    location = REPOSITORY_LOCATIONS["com_github_curl"]
+    http_archive(
+        name = "com_github_curl",
+        build_file_content = BUILD_ALL_CONTENT + """
+cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
+""",
+        **location
+    )
+    native.bind(
+        name = "curl",
+        actual = "@envoy//bazel/foreign_cc:curl",
     )
 
 def _com_github_cyan4973_xxhash():

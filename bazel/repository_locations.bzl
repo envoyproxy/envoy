@@ -37,6 +37,11 @@ REPOSITORY_LOCATIONS = dict(
         # 2019-02-11
         urls = ["https://github.com/circonus-labs/libcircllhist/archive/63a16dd6f2fc7bc841bb17ff92be8318df60e2e1.tar.gz"],
     ),
+    com_github_curl = dict(
+        sha256 = "d483b89062832e211c887d7cf1b65c902d591b48c11fe7d174af781681580b41",
+        strip_prefix = "curl-7.63.0",
+        urls = ["https://github.com/curl/curl/releases/download/curl-7_63_0/curl-7.63.0.tar.gz"],
+    ),
     com_github_cyan4973_xxhash = dict(
         sha256 = "b34792646d5e19964bb7bba24f06cb13aecaac623ab91a54da08aa19d3686d7e",
         strip_prefix = "xxHash-0.7.0",
