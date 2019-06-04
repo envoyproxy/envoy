@@ -199,7 +199,7 @@ public:
   MOCK_METHOD1(duplicateParentListenSocket, int(const std::string& address));
   MOCK_METHOD0(getParentStats, std::unique_ptr<envoy::HotRestartMessage>());
   MOCK_METHOD2(initialize, void(Event::Dispatcher& dispatcher, Server::Instance& server));
-  MOCK_METHOD1(sendParentAdminShutdownRequest, void(Envoy::SystemTime& original_start_time));
+  MOCK_METHOD1(sendParentAdminShutdownRequest, void(MonotonicTime& original_start_time));
   MOCK_METHOD0(sendParentTerminateRequest, void());
   MOCK_METHOD1(mergeParentStatsIfAny, ServerStatsFromParent(Stats::StoreRoot& stats_store));
   MOCK_METHOD0(shutdown, void());
@@ -367,8 +367,8 @@ public:
   MOCK_METHOD0(isShutdown, bool());
   MOCK_METHOD0(shutdownAdmin, void());
   MOCK_METHOD0(singletonManager, Singleton::Manager&());
-  MOCK_METHOD0(startTimeCurrentEpoch, Envoy::SystemTime());
-  MOCK_METHOD0(startTimeFirstEpoch, Envoy::SystemTime());
+  MOCK_METHOD0(startTimeCurrentEpoch, MonotonicTime());
+  MOCK_METHOD0(startTimeFirstEpoch, MonotonicTime());
   MOCK_METHOD0(stats, Stats::Store&());
   MOCK_METHOD0(httpContext, Http::Context&());
   MOCK_METHOD0(processContext, ProcessContext&());

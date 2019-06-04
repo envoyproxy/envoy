@@ -1,5 +1,7 @@
 #include "server/hot_restarting_parent.h"
 
+#include <chrono>
+
 #include "envoy/server/instance.h"
 
 #include "common/memory/stats.h"
@@ -83,8 +85,11 @@ void HotRestartingParent::shutdown() { socket_event_.reset(); }
 HotRestartMessage HotRestartingParent::Internal::shutdownAdmin() {
   server_->shutdownAdmin();
   HotRestartMessage wrapped_reply;
+  const uint64_t first_epoch = std::chrono::duration_cast<std::chrono::seconds>(
+                                   server_->startTimeFirstEpoch().time_since_epoch())
+                                   .count();
   wrapped_reply.mutable_reply()->mutable_shutdown_admin()->set_original_start_time_unix_seconds(
-      server_->startTimeFirstEpoch());
+      first_epoch);
   return wrapped_reply;
 }
 

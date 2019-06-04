@@ -1,6 +1,7 @@
 #include "server/hot_restarting_child.h"
 
 #include <chrono>
+#include <ratio>
 
 #include "envoy/common/time.h"
 
@@ -61,7 +62,7 @@ void HotRestartingChild::drainParentListeners() {
   sendHotRestartMessage(parent_address_, wrapped_request);
 }
 
-void HotRestartingChild::sendParentAdminShutdownRequest(Envoy::SystemTime& original_start_time) {
+void HotRestartingChild::sendParentAdminShutdownRequest(MonotonicTime& original_start_time) {
   if (restart_epoch_ == 0 || parent_terminated_) {
     return;
   }
@@ -73,8 +74,10 @@ void HotRestartingChild::sendParentAdminShutdownRequest(Envoy::SystemTime& origi
   std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
   RELEASE_ASSERT(replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kShutdownAdmin),
                  "Hot restart parent did not respond as expected to ShutdownParentAdmin.");
-  using u64_secs = std::chrono::duration<uint64_t, std::chrono::seconds>;
-  original_start_time = std::chrono::time_point<std::chrono::system_clock, u64_secs>(
+
+  using u64_secs = std::chrono::duration<uint64_t, std::ratio<1>>;
+  using time_point = std::chrono::time_point<std::chrono::steady_clock, u64_secs>;
+  original_start_time = time_point(
       u64_secs{wrapped_reply->reply().shutdown_admin().original_start_time_unix_seconds()});
 }
 

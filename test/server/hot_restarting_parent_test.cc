@@ -1,3 +1,4 @@
+#include <chrono>
 #include <memory>
 
 #include "server/hot_restarting_parent.h"
@@ -16,17 +17,24 @@ namespace {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
+int64_t timeToSeconds(MonotonicTime monotonic_time) {
+  return std::chrono::duration_cast<std::chrono::seconds>(monotonic_time.time_since_epoch()).count();
+}
+
 class HotRestartingParentTest : public testing::Test {
 public:
   MockInstance server_;
   HotRestartingParent::Internal hot_restarting_parent_{&server_};
+  Event::TestRealTimeSystem time_system_{};
 };
 
 TEST_F(HotRestartingParentTest, shutdownAdmin) {
+  const auto now = time_system_.monotonicTime();
+  const auto now_seconds = timeToSeconds(now);
   EXPECT_CALL(server_, shutdownAdmin());
-  EXPECT_CALL(server_, startTimeFirstEpoch()).WillOnce(Return(12345));
+  EXPECT_CALL(server_, startTimeFirstEpoch()).WillOnce(Return(now));
   HotRestartMessage message = hot_restarting_parent_.shutdownAdmin();
-  EXPECT_EQ(12345, message.reply().shutdown_admin().original_start_time_unix_seconds());
+  EXPECT_EQ(now_seconds, message.reply().shutdown_admin().original_start_time_unix_seconds());
 }
 
 TEST_F(HotRestartingParentTest, getListenSocketsForChildNotFound) {

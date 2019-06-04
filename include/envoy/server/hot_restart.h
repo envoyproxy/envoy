@@ -57,7 +57,7 @@ public:
    * to start up in the new process.
    * @param original_start_time will be filled with information from our parent, if retrieved.
    */
-  virtual void sendParentAdminShutdownRequest(Envoy::SystemTime& original_start_time) PURE;
+  virtual void sendParentAdminShutdownRequest(MonotonicTime& original_start_time) PURE;
 
   /**
    * Tell our parent process to gracefully terminate itself.
