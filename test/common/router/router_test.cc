@@ -950,8 +950,7 @@ void RouterTestBase::testDoNotForward(
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "204"},
-      {not_forwarded_header_name.value_or(Http::LowerCaseString("x-envoy-not-forwarded")).get(),
-       "true"}};
+      {not_forwarded_header_name.value_or(Http::Headers::get().EnvoyNotForwarded).get(), "true"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
   Http::TestHeaderMapImpl headers;
