@@ -192,20 +192,15 @@ RsaPrivateKeyConnection::RsaPrivateKeyConnection(SSL* ssl, Ssl::PrivateKeyConnec
                                                  Event::Dispatcher& dispatcher,
                                                  bssl::UniquePtr<EVP_PKEY> pkey,
                                                  RsaPrivateKeyConnectionTestOptions& test_options)
-    : test_options_(test_options), cb_(cb), dispatcher_(dispatcher), pkey_(move(pkey)) {
+    : test_options_(test_options), cb_(cb), dispatcher_(dispatcher), pkey_(std::move(pkey)) {
   SSL_set_ex_data(ssl, RsaPrivateKeyMethodProvider::ssl_rsa_connection_index, this);
 }
 
 Ssl::PrivateKeyConnectionPtr RsaPrivateKeyMethodProvider::getPrivateKeyConnection(
     SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher) {
-  bssl::UniquePtr<BIO> bio(
-      BIO_new_mem_buf(const_cast<char*>(private_key_.data()), private_key_.size()));
-  bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
-  if (pkey == nullptr) {
-    return nullptr;
-  }
 
-  return std::make_unique<RsaPrivateKeyConnection>(ssl, cb, dispatcher, move(pkey), test_options_);
+  return std::make_unique<RsaPrivateKeyConnection>(ssl, cb, dispatcher, bssl::UpRef(pkey_),
+                                                   test_options_);
 }
 
 RsaPrivateKeyMethodProvider::RsaPrivateKeyMethodProvider(
@@ -248,7 +243,14 @@ RsaPrivateKeyMethodProvider::RsaPrivateKeyMethodProvider(
     }
   }
 
-  private_key_ = factory_context.api().fileSystem().fileReadToEnd(private_key_path);
+  std::string private_key = factory_context.api().fileSystem().fileReadToEnd(private_key_path);
+  bssl::UniquePtr<BIO> bio(
+      BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
+  bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+  if (pkey == nullptr) {
+    throw EnvoyException("Failed to read private key from disk.");
+  }
+  pkey_ = std::move(pkey);
 
   method_ = std::make_shared<SSL_PRIVATE_KEY_METHOD>();
   method_->sign = privateKeySign;

@@ -49,6 +49,7 @@ public:
   Ssl::PrivateKeyConnectionPtr getPrivateKeyConnection(SSL* ssl,
                                                        Ssl::PrivateKeyConnectionCallbacks& cb,
                                                        Event::Dispatcher& dispatcher) override;
+  bool checkFips() override { return false; };
   Ssl::BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() override;
 
   static int ssl_ecdsa_connection_index;

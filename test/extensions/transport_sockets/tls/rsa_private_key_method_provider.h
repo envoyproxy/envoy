@@ -65,13 +65,14 @@ public:
   Ssl::PrivateKeyConnectionPtr getPrivateKeyConnection(SSL* ssl,
                                                        Ssl::PrivateKeyConnectionCallbacks& cb,
                                                        Event::Dispatcher& dispatcher) override;
+  bool checkFips() override { return false; };
   Ssl::BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() override;
 
   static int ssl_rsa_connection_index;
 
 private:
   Ssl::BoringSslPrivateKeyMethodSharedPtr method_{};
-  std::string private_key_;
+  bssl::UniquePtr<EVP_PKEY> pkey_;
   RsaPrivateKeyConnectionTestOptions test_options_;
 };
 

@@ -46,6 +46,12 @@ public:
                                                           Event::Dispatcher& dispatcher) PURE;
 
   /**
+   * Check whether the private key method satisfies FIPS requirements.
+   * @return true if FIPS key requirements are satisfied, false if not.
+   */
+  virtual bool checkFips() PURE;
+
+  /**
    * Get the private key methods from the provider.
    * @return the private key methods associated with this provider and
    * configuration.
