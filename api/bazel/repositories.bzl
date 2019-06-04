@@ -39,6 +39,7 @@ def api_dependencies():
 GOOGLEAPIS_BUILD_CONTENT = """
 load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 
 filegroup(
     name = "api_httpbody_protos_src",
@@ -177,6 +178,37 @@ py_proto_library(
      visibility = ["//visibility:public"],
      deps = ["@com_google_protobuf//:protobuf_python"],
 )
+
+proto_library(
+    name = "tracing_proto_proto",
+    srcs = [
+        "google/devtools/cloudtrace/v2/trace.proto",
+        "google/devtools/cloudtrace/v2/tracing.proto",
+    ],
+    deps = [
+        ":http_api_protos_proto",
+        ":rpc_status_protos_lib",
+        "@com_google_protobuf//:timestamp_proto",
+        "@com_google_protobuf//:wrappers_proto",
+        "@com_google_protobuf//:empty_proto",
+    ],
+    #visibility = ["@io_opencensus_cpp//opencensus:__subpackages__"],
+)
+
+cc_proto_library(
+    name = "tracing_proto_cc",
+    deps = [":tracing_proto_proto"],
+    #visibility = ["@io_opencensus_cpp//opencensus:__subpackages__"],
+)
+
+cc_grpc_library(
+    name = "tracing_proto",
+    srcs = [":tracing_proto_proto"],
+    deps = [":tracing_proto_cc"],
+    grpc_only = True,
+    visibility = ["@io_opencensus_cpp//opencensus:__subpackages__"],
+)
+
 """
 
 GOGOPROTO_BUILD_CONTENT = """
