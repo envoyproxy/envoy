@@ -77,6 +77,7 @@ envoy_cmake_external(
         "CMAKE_USE_OPENSSL": "off",
         "CURL_CA_PATH": "none",
         "CURL_HIDDEN_SYMBOLS": "off",
+        "CMAKE_USE_LIBSSH2": "off",
     },
     lib_source = "@com_github_curl//:all",
     static_libraries = select({
