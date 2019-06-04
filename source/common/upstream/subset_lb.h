@@ -38,11 +38,11 @@ private:
   typedef std::function<bool(const Host&)> HostPredicate;
   void initSubsetSelectorMap();
   void initSelectorFallbackSubset(
-      const absl::optional<
-          envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>&);
+      const absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
+                               LbSubsetSelectorFallbackPolicy>&);
   HostConstSharedPtr chooseHostForSelectorFallbackPolicy(
-      const absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>&
-          fallback_policy,
+      const absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
+                               LbSubsetSelectorFallbackPolicy>& fallback_policy,
       LoadBalancerContext* context);
 
   // Represents a subset of an original HostSet.
@@ -128,7 +128,8 @@ private:
 
   struct SubsetSelectorMap {
     std::unordered_map<std::string, SubsetSelectorMapPtr> subset_keys;
-    absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>
+    absl::optional<
+        envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy>
         fallback_policy;
   };
 
@@ -163,7 +164,8 @@ private:
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
 
-  absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>
+  absl::optional<
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy>
   tryFindSelectorFallbackPolicy(LoadBalancerContext* context);
 
   bool hostMatches(const SubsetMetadata& kvs, const Host& host);

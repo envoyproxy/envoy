@@ -129,10 +129,10 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
         if (pos == selector_keys.size()) {
           const auto& selector_fallback_policy =
               (subset_selector->fallback_policy ==
-               envoy::api::v2::Cluster::LbSubsetConfig::NOT_DEFINED_PER_SELECTOR)
+               envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED_PER_SELECTOR)
                   ? absl::nullopt
-                  : absl::optional<
-                        envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>{
+                  : absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
+                                       LbSubsetSelectorFallbackPolicy>{
                         subset_selector->fallback_policy};
           childSelector->second->fallback_policy = selector_fallback_policy;
           initSelectorFallbackSubset(selector_fallback_policy);
@@ -147,20 +147,19 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
 }
 
 void SubsetLoadBalancer::initSelectorFallbackSubset(
-    const absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>&
+    const absl::optional<
+        envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy>&
         fallback_policy) {
-  if (fallback_policy == envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK_PER_SELECTOR) {
-    return;
-  } else if (fallback_policy ==
-                 envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT_PER_SELECTOR &&
-             selector_fallback_subset_any_ == nullptr) {
+  if (fallback_policy ==
+          envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT_PER_SELECTOR &&
+      selector_fallback_subset_any_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer for selector");
     HostPredicate predicate = [](const Host&) -> bool { return true; };
     selector_fallback_subset_any_ = std::make_unique<LbSubsetEntry>();
     selector_fallback_subset_any_->priority_subset_.reset(
         new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
-  } else if (fallback_policy ==
-                 envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET_PER_SELECTOR &&
+  } else if (fallback_policy == envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
+                                    DEFAULT_SUBSET_PER_SELECTOR &&
              selector_fallback_subset_default_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: creating default subset fallback load balancer for selector");
     HostPredicate predicate = std::bind(&SubsetLoadBalancer::hostMatches, this,
@@ -180,7 +179,8 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) 
       return host;
     }
     // otherwise check if there is fallback policy configured for given route metadata
-    absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>
+    absl::optional<
+        envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy>
         selector_fallback_policy = tryFindSelectorFallbackPolicy(context);
     if (selector_fallback_policy) {
       // return result according to configured fallback policy
@@ -212,7 +212,8 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) 
   return nullptr;
 }
 
-absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>
+absl::optional<
+    envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy>
 SubsetLoadBalancer::tryFindSelectorFallbackPolicy(LoadBalancerContext* context) {
   const Router::MetadataMatchCriteria* match_criteria = context->metadataMatchCriteria();
   if (!match_criteria) {
@@ -242,14 +243,16 @@ SubsetLoadBalancer::tryFindSelectorFallbackPolicy(LoadBalancerContext* context) 
 }
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
-    const absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy>&
+    const absl::optional<
+        envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy>&
         fallback_policy,
     LoadBalancerContext* context) {
   if (!fallback_policy) {
     return nullptr;
   }
   const auto fallback = fallback_policy.value();
-  if (fallback == envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT_PER_SELECTOR &&
+  if (fallback ==
+          envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT_PER_SELECTOR &&
       selector_fallback_subset_any_ != nullptr) {
     HostConstSharedPtr host =
         selector_fallback_subset_any_->priority_subset_->lb_->chooseHost(context);
@@ -257,7 +260,8 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
       return host;
     }
 
-  } else if (fallback == envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET_PER_SELECTOR &&
+  } else if (fallback == envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
+                             DEFAULT_SUBSET_PER_SELECTOR &&
              selector_fallback_subset_default_ != nullptr) {
     HostConstSharedPtr host =
         selector_fallback_subset_default_->priority_subset_->lb_->chooseHost(context);
@@ -335,13 +339,12 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVecto
                                               const HostVector& hosts_removed) {
 
   if (selector_fallback_subset_any_ != nullptr) {
-    selector_fallback_subset_any_->priority_subset_->update(priority, hosts_added,
-                                                                    hosts_removed);
+    selector_fallback_subset_any_->priority_subset_->update(priority, hosts_added, hosts_removed);
   }
 
   if (selector_fallback_subset_default_ != nullptr) {
     selector_fallback_subset_default_->priority_subset_->update(priority, hosts_added,
-                                                                        hosts_removed);
+                                                                hosts_removed);
   }
 
   if (fallback_subset_ == nullptr) {

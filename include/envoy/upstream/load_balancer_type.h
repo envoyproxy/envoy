@@ -19,7 +19,8 @@ enum class LoadBalancerType { RoundRobin, LeastRequest, Random, RingHash, Origin
 
 struct SubsetSelector {
   std::set<std::string> selector_keys;
-  envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelectorFallbackPolicy fallback_policy;
+  envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+      fallback_policy;
 };
 
 typedef std::shared_ptr<SubsetSelector> SubsetSelectorPtr;
