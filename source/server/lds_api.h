@@ -2,9 +2,9 @@
 
 #include <functional>
 
-#include "envoy/api/api.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/subscription_factory.h"
 #include "envoy/init/manager.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
@@ -23,14 +23,13 @@ class LdsApiImpl : public LdsApi,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
   LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
-             Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-             Init::Manager& init_manager, const LocalInfo::LocalInfo& local_info,
-             Stats::Scope& scope, ListenerManager& lm,
-             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+             Init::Manager& init_manager, Stats::Scope& scope, ListenerManager& lm,
+             ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Server::LdsApi
   std::string versionInfo() const override { return system_version_info_; }
 
+private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
@@ -42,7 +41,6 @@ public:
     return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource, validation_visitor_).name();
   }
 
-private:
   std::unique_ptr<Config::Subscription> subscription_;
   std::string system_version_info_;
   ListenerManager& listener_manager_;

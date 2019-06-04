@@ -39,6 +39,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "subscription_factory_interface",
+    hdrs = ["subscription_factory.h"],
+    deps = [
+        ":subscription_interface",
+        "@envoy_api//envoy/api/v2/core:config_source_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "subscription_interface",
     hdrs = ["subscription.h"],
     deps = [

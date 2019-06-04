@@ -47,6 +47,21 @@ public:
   MOCK_METHOD1(updateResources, void(const std::set<std::string>& update_to_these_names));
 };
 
+class MockSubscriptionFactory : public SubscriptionFactory {
+public:
+  MockSubscriptionFactory();
+  ~MockSubscriptionFactory();
+
+  MOCK_METHOD4(subscriptionFromConfigSource,
+               SubscriptionPtr(const envoy::api::v2::core::ConfigSource& config,
+                               absl::string_view type_url, Stats::Scope& scope,
+                               SubscriptionCallbacks& callbacks));
+  MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
+
+  MockSubscription* subscription_{};
+  SubscriptionCallbacks* callbacks_{};
+};
+
 class MockGrpcMuxWatch : public GrpcMuxWatch {
 public:
   MockGrpcMuxWatch();

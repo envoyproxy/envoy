@@ -6,6 +6,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Eq;
 using testing::NiceMock;
 using testing::Return;
 
@@ -17,7 +18,7 @@ namespace {
 
 TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
   NiceMock<Server::MockInstance> server;
-  EXPECT_CALL(server.cluster_manager_, get("fake_cluster"))
+  EXPECT_CALL(server.cluster_manager_, get(Eq("fake_cluster")))
       .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
   ON_CALL(*server.cluster_manager_.thread_local_cluster_.cluster_.info_, features())
       .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));

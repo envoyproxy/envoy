@@ -5,6 +5,7 @@
 #include "envoy/api/api.h"
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/subscription_factory.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/stats/scope.h"
@@ -23,9 +24,8 @@ class CdsApiImpl : public CdsApi,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
   static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-                          Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                          const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+                          Stats::Scope& scope,
+                          ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Upstream::CdsApi
   void initialize() override { subscription_->start({}); }
@@ -34,6 +34,7 @@ public:
   }
   const std::string versionInfo() const override { return system_version_info_; }
 
+private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
@@ -45,11 +46,8 @@ public:
     return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource, validation_visitor_).name();
   }
 
-private:
   CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-             Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+             Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
   void runInitializeCallbackIfAny();
 
   ClusterManager& cm_;

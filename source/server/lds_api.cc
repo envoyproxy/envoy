@@ -8,7 +8,6 @@
 
 #include "common/common/cleanup.h"
 #include "common/config/resources.h"
-#include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -16,19 +15,15 @@ namespace Envoy {
 namespace Server {
 
 LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
-                       Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                       Runtime::RandomGenerator& random, Init::Manager& init_manager,
-                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                       ListenerManager& lm, ProtobufMessage::ValidationVisitor& validation_visitor,
-                       Api::Api& api)
+                       Upstream::ClusterManager& cm, Init::Manager& init_manager,
+                       Stats::Scope& scope, ListenerManager& lm,
+                       ProtobufMessage::ValidationVisitor& validation_visitor)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
       init_target_("LDS", [this]() { subscription_->start({}); }),
       validation_visitor_(validation_visitor) {
-  subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
-      lds_config, local_info, dispatcher, cm, random, *scope_,
-      Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()),
-      validation_visitor_, api, *this);
-  Config::Utility::checkLocalInfo("lds", local_info);
+  subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
+      lds_config, Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()),
+      *scope_, *this);
   init_manager.add(init_target_);
 }
 

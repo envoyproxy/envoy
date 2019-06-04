@@ -7,6 +7,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::testing::Eq;
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -15,7 +17,7 @@ namespace {
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   NiceMock<Server::MockInstance> server;
-  EXPECT_CALL(server.cluster_manager_, get("fake_cluster"))
+  EXPECT_CALL(server.cluster_manager_, get(Eq("fake_cluster")))
       .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
 
   const std::string yaml_string = R"EOF(
@@ -38,7 +40,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   NiceMock<Server::MockInstance> server;
-  EXPECT_CALL(server.cluster_manager_, get("fake_cluster"))
+  EXPECT_CALL(server.cluster_manager_, get(Eq("fake_cluster")))
       .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
 
   const std::string yaml_string = R"EOF(

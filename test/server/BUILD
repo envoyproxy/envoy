@@ -149,6 +149,7 @@ envoy_cc_test(
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/server:lds_api_lib",
+        "//test/mocks/config:config_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",

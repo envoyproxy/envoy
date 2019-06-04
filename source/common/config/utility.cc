@@ -44,7 +44,7 @@ void Utility::translateApiConfigSource(const std::string& cluster, uint32_t refr
       Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
 }
 
-void Utility::checkCluster(const std::string& error_prefix, const std::string& cluster_name,
+void Utility::checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
                            Upstream::ClusterManager& cm) {
   Upstream::ThreadLocalCluster* cluster = cm.get(cluster_name);
   if (cluster == nullptr) {
@@ -58,15 +58,14 @@ void Utility::checkCluster(const std::string& error_prefix, const std::string& c
   }
 }
 
-void Utility::checkClusterAndLocalInfo(const std::string& error_prefix,
-                                       const std::string& cluster_name,
-                                       Upstream::ClusterManager& cm,
+void Utility::checkClusterAndLocalInfo(absl::string_view error_prefix,
+                                       absl::string_view cluster_name, Upstream::ClusterManager& cm,
                                        const LocalInfo::LocalInfo& local_info) {
   checkCluster(error_prefix, cluster_name, cm);
   checkLocalInfo(error_prefix, local_info);
 }
 
-void Utility::checkLocalInfo(const std::string& error_prefix,
+void Utility::checkLocalInfo(absl::string_view error_prefix,
                              const LocalInfo::LocalInfo& local_info) {
   if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
     throw EnvoyException(

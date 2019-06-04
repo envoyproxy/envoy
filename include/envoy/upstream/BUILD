@@ -18,6 +18,7 @@ envoy_cc_library(
         ":upstream_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/config:grpc_mux_interface",
+        "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/grpc:async_client_manager_interface",
         "//include/envoy/http:async_client_interface",
         "//include/envoy/http:conn_pool_interface",

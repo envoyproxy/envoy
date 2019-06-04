@@ -11,6 +11,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
@@ -24,7 +25,7 @@ public:
   void expectShadowWriter(absl::string_view host, absl::string_view shadowed_host) {
     Http::MessagePtr message(new Http::RequestMessageImpl());
     message->headers().insertHost().value(std::string(host));
-    EXPECT_CALL(cm_, get("foo"));
+    EXPECT_CALL(cm_, get(Eq("foo")));
     EXPECT_CALL(cm_, httpAsyncClientForCluster("foo")).WillOnce(ReturnRef(cm_.async_client_));
     Http::MockAsyncClientRequest request(&cm_.async_client_);
     EXPECT_CALL(
@@ -65,7 +66,7 @@ TEST_F(ShadowWriterImplTest, NoCluster) {
   InSequence s;
 
   Http::MessagePtr message(new Http::RequestMessageImpl());
-  EXPECT_CALL(cm_, get("foo")).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, get(Eq("foo"))).WillOnce(Return(nullptr));
   EXPECT_CALL(cm_, httpAsyncClientForCluster("foo")).Times(0);
   writer_.shadow("foo", std::move(message), std::chrono::milliseconds(5));
 }

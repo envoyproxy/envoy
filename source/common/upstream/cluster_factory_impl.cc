@@ -29,7 +29,6 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
     Server::Admin& admin, Singleton::Manager& singleton_manager,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
-
   std::string cluster_type;
 
   if (!cluster.has_cluster_type()) {
@@ -94,7 +93,6 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::api::v2::Cluster& cluster
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
 ClusterFactoryImplBase::create(const envoy::api::v2::Cluster& cluster,
                                ClusterFactoryContext& context) {
-
   auto stats_scope = generateStatsScope(cluster, context.stats());
   Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       context.admin(), context.sslContextManager(), *stats_scope, context.clusterManager(),

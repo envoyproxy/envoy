@@ -4,7 +4,6 @@
 
 #include "envoy/api/v2/srds.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
-#include "envoy/config/subscription.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/config_provider_impl.h"
@@ -94,6 +93,11 @@ public:
 
   const std::string& name() const { return name_; }
 
+  const ScopedConfigManager::ScopedRouteMap& scopedRouteMap() const {
+    return scoped_config_manager_.scopedRouteMap();
+  }
+
+private:
   // Envoy::Config::ConfigSubscriptionCommonBase
   void start() override { subscription_->start({}); }
 
@@ -112,11 +116,7 @@ public:
                                                                              validation_visitor_)
         .name();
   }
-  const ScopedConfigManager::ScopedRouteMap& scopedRouteMap() const {
-    return scoped_config_manager_.scopedRouteMap();
-  }
 
-private:
   const std::string name_;
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   Stats::ScopePtr scope_;

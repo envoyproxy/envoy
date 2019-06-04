@@ -79,6 +79,8 @@ public:
   virtual void updateResources(const std::set<std::string>& update_to_these_names) PURE;
 };
 
+using SubscriptionPtr = std::unique_ptr<Subscription>;
+
 /**
  * Per subscription stats. @see stats_macros.h
  */
