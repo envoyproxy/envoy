@@ -81,6 +81,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "scoped_rds_test",
     srcs = ["scoped_rds_test.cc"],
+    external_deps = [
+        "abseil_strings",
+    ],
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",
