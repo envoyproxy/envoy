@@ -14,6 +14,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"

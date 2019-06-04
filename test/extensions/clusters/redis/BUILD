@@ -20,8 +20,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
-        "//source/common/upstream:cluster_factory_lib",
-        "//source/common/upstream:thread_aware_lb_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/redis:redis_cluster",
         "//source/extensions/clusters/redis:redis_cluster_lb",
@@ -35,6 +33,7 @@ envoy_extension_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
