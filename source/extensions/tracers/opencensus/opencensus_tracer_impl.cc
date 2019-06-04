@@ -2,6 +2,8 @@
 
 #include "envoy/http/header_map.h"
 
+#include "common/common/base64.h"
+
 #include "absl/strings/str_cat.h"
 #include "opencensus/exporters/trace/stackdriver/stackdriver_exporter.h"
 #include "opencensus/exporters/trace/stdout/stdout_exporter.h"
@@ -81,8 +83,13 @@ startSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& req
       const Http::HeaderEntry* header = request_headers.get(Constants::get().GRPC_TRACE_BIN);
       if (header != nullptr) {
         found = true;
-        parent_ctx = ::opencensus::trace::propagation::FromGrpcTraceBinHeader(
-            header->value().getStringView());
+        std::string val = std::string(header->value().getStringView());
+        // Add padding before decoding.
+        int pad = 4 - (val.size() % 4);
+        if (pad != 4) {
+          val += std::string(pad, '=');
+        }
+        parent_ctx = ::opencensus::trace::propagation::FromGrpcTraceBinHeader(Base64::decode(val));
       }
       break;
     }
@@ -149,23 +156,27 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
 void Span::finishSpan() { span_.End(); }
 
 void Span::injectContext(Http::HeaderMap& request_headers) {
+  if (!span_.context().IsValid()) {
+    return;
+  }
   using OpenCensusConfig = envoy::config::trace::v2::OpenCensusConfig;
   for (const auto& outgoing : oc_config_.outgoing_trace_context()) {
     switch (outgoing) {
     case OpenCensusConfig::trace_context:
-      request_headers.addReferenceKey(
+      request_headers.setReferenceKey(
           Constants::get().TRACEPARENT,
           ::opencensus::trace::propagation::ToTraceParentHeader(span_.context()));
       break;
 
-    case OpenCensusConfig::grpc_trace_bin:
-      request_headers.addReferenceKey(
-          Constants::get().GRPC_TRACE_BIN,
-          ::opencensus::trace::propagation::ToGrpcTraceBinHeader(span_.context()));
+    case OpenCensusConfig::grpc_trace_bin: {
+      std::string val = ::opencensus::trace::propagation::ToGrpcTraceBinHeader(span_.context());
+      val = Base64::encode(val.data(), val.size(), /*add_padding=*/false);
+      request_headers.setReferenceKey(Constants::get().GRPC_TRACE_BIN, val);
       break;
+    }
 
     case OpenCensusConfig::cloud_trace_context:
-      request_headers.addReferenceKey(
+      request_headers.setReferenceKey(
           Constants::get().X_CLOUD_TRACE_CONTEXT,
           ::opencensus::trace::propagation::ToCloudTraceContextHeader(span_.context()));
       break;
