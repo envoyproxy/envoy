@@ -281,7 +281,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyBufferLimits) {
  * Tests a request that generates a new connection, completes, and then a second request that uses
  * the same connection.
  */
-TEST_F(Http1ConnPoolImplTest, MultipleRequestAndResponse) {
+TEST_F(Http1ConnPoolImplTest, Http10MultipleRequestAndResponse) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
@@ -444,7 +444,7 @@ TEST_F(Http1ConnPoolImplTest, DisconnectWhileBound) {
 /**
  * Test that we correctly handle reaching max connections.
  */
-TEST_F(Http1ConnPoolImplTest, MaxConnections) {
+TEST_F(Http1ConnPoolImplTest, Http10MaxConnections) {
   InSequence s;
 
   EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.cx_open_.value());
@@ -628,7 +628,7 @@ TEST_F(Http1ConnPoolImplTest, ProxyConnectionCloseHeader) {
 /**
  * Test when upstream is HTTP/1.0 and does not send 'connection: keep-alive'
  */
-TEST_F(Http1ConnPoolImplTest, NoConnectionKeepAlive) {
+TEST_F(Http1ConnPoolImplTest, Http10NoConnectionKeepAlive) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
@@ -694,7 +694,7 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_max_requests_.value());
 }
 
-TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
+TEST_F(Http1ConnPoolImplTest, Http10ConcurrentConnections) {
   cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
   InSequence s;
 
