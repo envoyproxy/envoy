@@ -3,6 +3,7 @@
 #include <signal.h>
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -10,6 +11,7 @@
 #include <unordered_set>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v2//bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"

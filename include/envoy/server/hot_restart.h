@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/store.h"

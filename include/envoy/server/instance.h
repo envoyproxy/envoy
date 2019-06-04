@@ -7,6 +7,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/common/mutex_tracer.h"
+#include "envoy/common/time.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/context.h"
 #include "envoy/init/manager.h"

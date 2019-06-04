@@ -9,6 +9,7 @@
 #include <string>
 
 #include "envoy/common/platform.h"
+#include "envoy/common/time.h"
 #include "envoy/server/hot_restart.h"
 
 #include "common/common/assert.h"

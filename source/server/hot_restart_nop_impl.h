@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/common/time.h"
 #include "envoy/server/hot_restart.h"
 
 #include "common/common/thread.h"

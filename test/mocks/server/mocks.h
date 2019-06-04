@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/common/mutex_tracer.h"
+#include "envoy/common/time.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"

@@ -138,6 +138,7 @@ envoy_cc_library(
     hdrs = envoy_select_hot_restart(["hot_restarting_child.h"]),
     deps = [
         ":hot_restarting_base",
+        "//include/envoy/common:time_interface",
         "//source/common/stats:stat_merger_lib",
     ],
 )
@@ -160,6 +161,7 @@ envoy_cc_library(
         ":hot_restarting_child",
         ":hot_restarting_parent",
         "//include/envoy/api:os_sys_calls_interface",
+        "//include/envoy/common:time_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
         "//include/envoy/server:hot_restart_interface",
@@ -175,6 +177,7 @@ envoy_cc_library(
     name = "hot_restart_nop_lib",
     hdrs = ["hot_restart_nop_impl.h"],
     deps = [
+        "//include/envoy/common:time_interface",
         "//include/envoy/server:hot_restart_interface",
         "//source/common/stats:heap_stat_data_lib",
     ],
@@ -326,6 +329,7 @@ envoy_cc_library(
         ":listener_hooks_lib",
         ":listener_manager_lib",
         ":worker_lib",
+        "//include/envoy/common:time_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:signal_interface",
         "//include/envoy/event:timer_interface",

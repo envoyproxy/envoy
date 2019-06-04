@@ -78,6 +78,7 @@ envoy_cc_library(
     name = "hot_restart_interface",
     hdrs = ["hot_restart.h"],
     deps = [
+        "//include/envoy/common:time_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/thread:thread_interface",
         "//source/server:hot_restart_cc",
@@ -97,6 +98,7 @@ envoy_cc_library(
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
         "//include/envoy/common:mutex_tracer",
+        "//include/envoy/common:time_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/http:context_interface",
         "//include/envoy/http:query_params_interface",

@@ -88,6 +88,7 @@ envoy_cc_library(
         ":api_lib",
         ":cluster_manager_lib",
         ":dns_lib",
+        "//include/envoy/common:time_interface",
         "//include/envoy/server:drain_manager_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/ssl:context_manager_interface",

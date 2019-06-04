@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/server/instance.h"

@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+#include "envoy/common/time.h"
+
 #include "common/common/utility.h"
 
 namespace Envoy {

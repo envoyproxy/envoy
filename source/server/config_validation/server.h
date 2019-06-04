@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include "envoy/common/time.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
