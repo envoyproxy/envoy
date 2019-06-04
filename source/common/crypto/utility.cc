@@ -50,34 +50,30 @@ VerificationOutput Utility::verifySignature(const absl::string_view& hash, void*
   auto pubkey = reinterpret_cast<EVP_PKEY*>(ptr);
 
   // Step 2: initialize EVP_MD_CTX
-  EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+  bssl::ScopedEVP_MD_CTX ctx;
 
   // Step 3: initialize EVP_MD
   const EVP_MD* md = Utility::getHashFunction(hash);
 
   if (md == nullptr) {
-    EVP_MD_CTX_free(ctx);
     return {false, absl::StrCat(hash, " is not supported.")};
   }
 
   // Step 4: initialize EVP_DigestVerify
-  int ok = EVP_DigestVerifyInit(ctx, nullptr, md, nullptr, pubkey);
+  int ok = EVP_DigestVerifyInit(ctx.get(), nullptr, md, nullptr, pubkey);
   if (!ok) {
-    EVP_MD_CTX_free(ctx);
     return {false, "Failed to initialize digest verify."};
   }
 
   // Step 5: verify signature
-  ok =
-      EVP_DigestVerify(ctx, signature.data(), signature.size(), clearText.data(), clearText.size());
+  ok = EVP_DigestVerify(ctx.get(), signature.data(), signature.size(), clearText.data(),
+                        clearText.size());
 
   // Step 6: check result
   if (ok == 1) {
-    EVP_MD_CTX_free(ctx);
     return {true, ""};
   }
 
-  EVP_MD_CTX_free(ctx);
   std::string err_msg;
   absl::StrAppend(&err_msg, "Failed to verify digest. Error code: ", ok);
   return {false, err_msg};
