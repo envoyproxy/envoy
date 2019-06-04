@@ -208,8 +208,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   // Generate x-request-id for all edge requests, or if there is none.
   if (config.generateRequestId()) {
     // TODO(PiotrSikora) PERF: Write UUID directly to the header map.
-    if ((!config.edgeAcceptRequestId() && (edge_request || !request_headers.RequestId())) ||
-        (config.edgeAcceptRequestId() && !request_headers.RequestId())) {
+    if ((! config.edgeAcceptRequestId() && edge_request) || ! request_headers.RequestId()) {
       const std::string uuid = random.uuid();
       ASSERT(!uuid.empty());
       request_headers.insertRequestId().value(uuid);

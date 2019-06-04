@@ -221,7 +221,7 @@ public:
   /**
    * @return whether the x-request-id should be reset on edge entry inside mesh
    */
-  virtual bool edgeAcceptRequestId() PURE;
+  const virtual bool edgeAcceptRequestId() PURE;
 
   /**
    * @return optional idle timeout for incoming connection manager connections.
