@@ -1592,9 +1592,9 @@ TEST_F(LuaHttpFilterTest, ImportandReleasePublicKey) {
       if key == nil then
         request_handle:logTrace("failed to import public key")
       else
-        request_handle:releasePublicKey(key)
         request_handle:logTrace("succeeded to import public key")
       end
+      request_handle:releasePublicKey(key)
     end
   )EOF"};
 
@@ -1622,9 +1622,9 @@ TEST_F(LuaHttpFilterTest, InvalidPublicKey) {
       if key == nil then
         request_handle:logTrace("failed to import public key")
       else
-        request_handle:releasePublicKey(key)
         request_handle:logTrace("succeeded to import public key")
       end
+      request_handle:releasePublicKey(key)
     end
   )EOF"};
 

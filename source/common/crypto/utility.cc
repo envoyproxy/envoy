@@ -47,7 +47,7 @@ VerificationOutput Utility::verifySignature(const absl::string_view& hash, void*
                                             const std::vector<uint8_t>& signature,
                                             const std::vector<uint8_t>& clearText) {
   // Step 1: get public key
-  auto pubkey = reinterpret_cast<EVP_PKEY*>(ptr);
+  auto pub_key = reinterpret_cast<EVP_PKEY*>(ptr);
 
   // Step 2: initialize EVP_MD_CTX
   bssl::ScopedEVP_MD_CTX ctx;
@@ -60,7 +60,7 @@ VerificationOutput Utility::verifySignature(const absl::string_view& hash, void*
   }
 
   // Step 4: initialize EVP_DigestVerify
-  int ok = EVP_DigestVerifyInit(ctx.get(), nullptr, md, nullptr, pubkey);
+  int ok = EVP_DigestVerifyInit(ctx.get(), nullptr, md, nullptr, pub_key);
   if (!ok) {
     return {false, "Failed to initialize digest verify."};
   }
@@ -87,7 +87,7 @@ void* Utility::importPublicKey(const std::vector<uint8_t>& key) {
 void Utility::releasePublicKey(void* ptr) { EVP_PKEY_free(reinterpret_cast<EVP_PKEY*>(ptr)); }
 
 const EVP_MD* Utility::getHashFunction(const absl::string_view& name) {
-  std::string hash = absl::AsciiStrToLower(name);
+  const std::string hash = absl::AsciiStrToLower(name);
 
   // Hash algorithms set refers
   // https://github.com/google/boringssl/blob/master/include/openssl/digest.h

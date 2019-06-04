@@ -438,16 +438,16 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
 
   // Step 3: get signature
   const char* signature = luaL_checkstring(state, 4);
-  int sigLen = luaL_checknumber(state, 5);
-  std::vector<uint8_t> sigVec(signature, signature + sigLen);
+  int sig_len = luaL_checknumber(state, 5);
+  const std::vector<uint8_t> sig_vec(signature, signature + sig_len);
 
   // Step 4: get clear text
-  const char* clearText = luaL_checkstring(state, 6);
-  int textLen = luaL_checknumber(state, 7);
-  std::vector<uint8_t> textVec(clearText, clearText + textLen);
+  const char* clear_text = luaL_checkstring(state, 6);
+  int text_len = luaL_checknumber(state, 7);
+  const std::vector<uint8_t> text_vec(clear_text, clear_text + text_len);
 
   // Step 5: verify signature
-  auto output = Common::Crypto::Utility::verifySignature(hash, ptr, sigVec, textVec);
+  auto output = Common::Crypto::Utility::verifySignature(hash, ptr, sig_vec, text_vec);
 
   lua_pushboolean(state, output.result_);
   if (output.result_) {

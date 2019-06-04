@@ -59,18 +59,15 @@ TEST(UtilityTest, TestImportPublicKey) {
              "d5af8136a9630a6cc0cde157dc8e00f39540628d5f335b2c36c54c7c8bc3738a6b21acff815405afa28e5"
              "183f550dac19abcf1145a7f9ced987db680e4a229cac75dee347ec9ebce1fc3dbbbb0203010001";
 
-  auto keyvec = Hex::decode(key);
-
-  auto pubKey = Utility::importPublicKey(keyvec);
-  EXPECT_NE(nullptr, pubKey);
-  Utility::releasePublicKey(pubKey);
+  auto pub_key = Utility::importPublicKey(Hex::decode(key));
+  EXPECT_NE(nullptr, pub_key);
+  Utility::releasePublicKey(pub_key);
 
   key = "badkey";
-  keyvec = Hex::decode(key);
 
-  pubKey = Utility::importPublicKey(keyvec);
-  EXPECT_EQ(nullptr, pubKey);
-  Utility::releasePublicKey(pubKey);
+  pub_key = Utility::importPublicKey(Hex::decode(key));
+  EXPECT_EQ(nullptr, pub_key);
+  Utility::releasePublicKey(pub_key);
 }
 
 TEST(UtilityTest, TestVerifySignature) {
@@ -81,7 +78,7 @@ TEST(UtilityTest, TestVerifySignature) {
              "395c0b8442ec5aa1ef8051529ea0e375883cefc72c04e360b4ef8f5760650589ca814918f678eee39b884"
              "d5af8136a9630a6cc0cde157dc8e00f39540628d5f335b2c36c54c7c8bc3738a6b21acff815405afa28e5"
              "183f550dac19abcf1145a7f9ced987db680e4a229cac75dee347ec9ebce1fc3dbbbb0203010001";
-  auto hashFunc = "sha256";
+  auto hash_func = "sha256";
   auto signature =
       "345ac3a167558f4f387a81c2d64234d901a7ceaa544db779d2f797b0ea4ef851b740905a63e2f4d5af42cee093a2"
       "9c7155db9a63d3d483e0ef948f5ac51ce4e10a3a6606fd93ef68ee47b30c37491103039459122f78e1c7ea71a1a5"
@@ -91,42 +88,37 @@ TEST(UtilityTest, TestVerifySignature) {
       "295234f7c14fa46303b7e977d2c89ba8a39a46a35f33eb07a332";
   auto data = "hello";
 
-  auto keyvec = Hex::decode(key);
-  auto pubKey = Utility::importPublicKey(keyvec);
+  auto pub_key = Utility::importPublicKey(Hex::decode(key));
 
-  auto sig = Hex::decode(signature);
   std::vector<uint8_t> text(data, data + strlen(data));
 
-  auto result = Utility::verifySignature(hashFunc, pubKey, sig, text);
+  auto sig = Hex::decode(signature);
+  auto result = Utility::verifySignature(hash_func, pub_key, sig, text);
 
   EXPECT_EQ(true, result.result_);
   EXPECT_EQ("", result.error_message_);
 
-  hashFunc = "unknown";
-  result = Utility::verifySignature(hashFunc, pubKey, sig, text);
+  result = Utility::verifySignature("unknown", pub_key, sig, text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("unknown is not supported.", result.error_message_);
 
-  hashFunc = "sha256";
-  result = Utility::verifySignature(hashFunc, nullptr, sig, text);
+  result = Utility::verifySignature(hash_func, nullptr, sig, text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("Failed to initialize digest verify.", result.error_message_);
 
   data = "baddata";
   text = std::vector<uint8_t>(data, data + strlen(data));
-  result = Utility::verifySignature(hashFunc, pubKey, sig, text);
+  result = Utility::verifySignature(hash_func, pub_key, sig, text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("Failed to verify digest. Error code: 0", result.error_message_);
 
   data = "hello";
   text = std::vector<uint8_t>(data, data + strlen(data));
-  signature = "000000";
-  sig = Hex::decode(signature);
-  result = Utility::verifySignature(hashFunc, pubKey, sig, text);
+  result = Utility::verifySignature(hash_func, pub_key, Hex::decode("000000"), text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("Failed to verify digest. Error code: 0", result.error_message_);
 
-  Utility::releasePublicKey(pubKey);
+  Utility::releasePublicKey(pub_key);
 }
 
 } // namespace

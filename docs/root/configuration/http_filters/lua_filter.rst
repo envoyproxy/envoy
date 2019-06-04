@@ -317,7 +317,7 @@ importPublicKey()
 
 .. code-block:: lua
   
-  pubkey = handle:importPublicKey(keyder, keyderLenght)
+  pubkey = handle:importPublicKey(keyder, keyderLength)
 
 Returns public key which is used by :ref:`verifySignature <verify_signature>` to verify digital signature. 
 
