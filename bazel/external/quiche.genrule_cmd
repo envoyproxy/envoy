@@ -26,6 +26,7 @@ cat <<EOF >sed_commands
 /^#include/ s!net/quic/platform/impl/quic_sleep_impl.h!test/extensions/quic_listeners/quiche/platform/quic_sleep_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_system_event_loop_impl.h!test/extensions/quic_listeners/quiche/platform/quic_system_event_loop_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_test_impl.h!test/extensions/quic_listeners/quiche/platform/quic_test_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_test_mem_slice_vector_impl.h!test/extensions/quic_listeners/quiche/platform/quic_test_mem_slice_vector_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_test_output_impl.h!test/extensions/quic_listeners/quiche/platform/quic_test_output_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_thread_impl.h!test/extensions/quic_listeners/quiche/platform/quic_thread_impl.h!
 /^#include/ s!net/quiche/common/platform/impl/quiche_test_impl.h!test/extensions/quic_listeners/quiche/platform/quiche_test_impl.h!

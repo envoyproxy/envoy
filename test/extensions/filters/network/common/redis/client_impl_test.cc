@@ -172,7 +172,7 @@ TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
-  // Pretend the the flush timer fires.
+  // Pretend the flush timer fires.
   // The timer callback is the general-purpose flush function, also used when
   // the buffer is filled. If the buffer fills before the timer fires, we need
   // to check if the timer is active and cancel it. However, if the timer fires

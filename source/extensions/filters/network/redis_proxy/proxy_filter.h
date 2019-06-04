@@ -24,19 +24,17 @@ namespace RedisProxy {
 /**
  * All redis proxy stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_REDIS_PROXY_STATS(COUNTER, GAUGE)                                                      \
-  COUNTER(downstream_cx_rx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_rx_bytes_buffered)                                                         \
-  COUNTER(downstream_cx_tx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
-  COUNTER(downstream_cx_protocol_error)                                                            \
-  COUNTER(downstream_cx_total)                                                                     \
-  GAUGE  (downstream_cx_active)                                                                    \
   COUNTER(downstream_cx_drain_close)                                                               \
+  COUNTER(downstream_cx_protocol_error)                                                            \
+  COUNTER(downstream_cx_rx_bytes_total)                                                            \
+  COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_cx_tx_bytes_total)                                                            \
   COUNTER(downstream_rq_total)                                                                     \
-  GAUGE  (downstream_rq_active)
-// clang-format on
+  GAUGE(downstream_cx_active, Accumulate)                                                          \
+  GAUGE(downstream_cx_rx_bytes_buffered, Accumulate)                                               \
+  GAUGE(downstream_cx_tx_bytes_buffered, Accumulate)                                               \
+  GAUGE(downstream_rq_active, Accumulate)
 
 /**
  * Struct definition for all redis proxy stats. @see stats_macros.h

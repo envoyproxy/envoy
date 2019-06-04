@@ -63,6 +63,7 @@ envoy_cc_test_library(
         "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",
         "//test/mocks/config:config_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
@@ -167,6 +168,7 @@ envoy_cc_test_library(
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -183,6 +185,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -238,6 +241,15 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "runtime_utility_test",
+    srcs = ["runtime_utility_test.cc"],
+    deps = [
+        "//source/common/config:runtime_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

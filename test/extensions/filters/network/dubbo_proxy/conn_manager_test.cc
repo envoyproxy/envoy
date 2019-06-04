@@ -94,7 +94,7 @@ public:
     }
 
     if (!yaml.empty()) {
-      MessageUtil::loadFromYaml(yaml, proto_config_);
+      TestUtility::loadFromYaml(yaml, proto_config_);
       MessageUtil::validate(proto_config_);
     }
 
@@ -306,7 +306,7 @@ TEST_F(ConnectionManagerTest, OnDataHandlesRequestTwoWay) {
   EXPECT_EQ(0U, store_.counter("test.request_oneway").value());
   EXPECT_EQ(0U, store_.counter("test.request_event").value());
   EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 
@@ -320,11 +320,11 @@ TEST_F(ConnectionManagerTest, OnDataHandlesRequestOneWay) {
   EXPECT_EQ(1U, store_.counter("test.request_oneway").value());
   EXPECT_EQ(0U, store_.counter("test.request_event").value());
   EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(ConnectionManagerTest, OnDataHandlesHeartbeatEvent) {
@@ -428,7 +428,7 @@ TEST_F(ConnectionManagerTest, OnDataStopsSniffingWithTooManyPendingCalls) {
   EXPECT_CALL(*decoder_filter_, messageEnd(_)).Times(64);
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(64U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(64U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 
   // Sniffing is now disabled.
   writeInvalidRequestMessage(buffer_);
@@ -437,7 +437,7 @@ TEST_F(ConnectionManagerTest, OnDataStopsSniffingWithTooManyPendingCalls) {
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(ConnectionManagerTest, OnWriteHandlesResponse) {
@@ -451,7 +451,7 @@ TEST_F(ConnectionManagerTest, OnWriteHandlesResponse) {
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 
   writeHessianResponseMessage(write_buffer_, false, request_id);
 
@@ -473,7 +473,7 @@ TEST_F(ConnectionManagerTest, OnWriteHandlesResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
   EXPECT_EQ(0U, store_.counter("test.response_exception").value());
   EXPECT_EQ(0U, store_.counter("test.response_decoding_error").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(ConnectionManagerTest, HandlesResponseContainExceptionInfo) {
@@ -487,7 +487,7 @@ TEST_F(ConnectionManagerTest, HandlesResponseContainExceptionInfo) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_decoding_success").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 
   writeHessianExceptionResponseMessage(write_buffer_, false, 1);
 
@@ -506,7 +506,7 @@ TEST_F(ConnectionManagerTest, HandlesResponseContainExceptionInfo) {
   EXPECT_EQ(1U, store_.counter("test.response_decoding_success").value());
   EXPECT_EQ(1U, store_.counter("test.response_business_exception").value());
   EXPECT_EQ(0U, store_.counter("test.response_decoding_error").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(ConnectionManagerTest, HandlesResponseError) {
@@ -519,7 +519,7 @@ TEST_F(ConnectionManagerTest, HandlesResponseError) {
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 
   writeHessianErrorResponseMessage(write_buffer_, false, 1);
 
@@ -536,7 +536,7 @@ TEST_F(ConnectionManagerTest, HandlesResponseError) {
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
   EXPECT_EQ(0U, store_.counter("test.response_decoding_error").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(ConnectionManagerTest, OnWriteHandlesResponseException) {
@@ -562,7 +562,7 @@ TEST_F(ConnectionManagerTest, OnWriteHandlesResponseException) {
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
   EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(1U, store_.counter("test.local_response_business_exception").value());
@@ -596,7 +596,8 @@ TEST_F(ConnectionManagerTest, OnDataResumesWithNextFilter) {
     EXPECT_CALL(*filter, transportBegin()).WillOnce(Return(Network::FilterStatus::StopIteration));
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
     EXPECT_EQ(0U, store_.counter("test.request").value());
-    EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+    EXPECT_EQ(1U,
+              store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
   }
 
   // Resume processing.
@@ -610,7 +611,7 @@ TEST_F(ConnectionManagerTest, OnDataResumesWithNextFilter) {
   }
 
   EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 // Tests multiple filters are invoked in the correct order.
@@ -638,7 +639,7 @@ TEST_F(ConnectionManagerTest, OnDataHandlesDubboCallWithMultipleFilters) {
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(ConnectionManagerTest, PipelinedRequestAndResponse) {
@@ -653,7 +654,7 @@ TEST_F(ConnectionManagerTest, PipelinedRequestAndResponse) {
           [&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks.push_back(&cb); }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(2U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(2U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
   EXPECT_EQ(2U, store_.counter("test.request").value());
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(2);
@@ -679,7 +680,7 @@ TEST_F(ConnectionManagerTest, PipelinedRequestAndResponse) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(ConnectionManagerTest, ResetDownstreamConnection) {
@@ -692,14 +693,14 @@ TEST_F(ConnectionManagerTest, ResetDownstreamConnection) {
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   callbacks->resetDownstreamConnection();
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(ConnectionManagerTest, OnEvent) {
@@ -842,7 +843,7 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
 
   EXPECT_EQ(1U, store_.counter("test.local_response_success").value());
   EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
@@ -892,7 +893,7 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
 
   EXPECT_EQ(1U, store_.counter("test.local_response_error").value());
   EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(ConnectionManagerTest, TwoWayRequestWithEndStream) {
@@ -1071,7 +1072,7 @@ TEST_F(ConnectionManagerTest, NeedMoreDataForHandleResponse) {
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 
   writePartialHessianRequestMessage(write_buffer_, false, false, 0x0F, true);
 
@@ -1097,7 +1098,7 @@ TEST_F(ConnectionManagerTest, PendingMessageEnd) {
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(ConnectionManagerTest, Routing) {
@@ -1132,7 +1133,7 @@ route_config:
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 
   Router::RouteConstSharedPtr route = callbacks->route();
   EXPECT_NE(nullptr, route);

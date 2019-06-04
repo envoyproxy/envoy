@@ -2,7 +2,7 @@
 
 #include "common/network/utility.h"
 
-#include "extensions/filters/listener/original_src/original_src_socket_option.h"
+#include "extensions/filters/common/original_src/original_src_socket_option.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
@@ -16,7 +16,8 @@ using testing::Eq;
 
 namespace Envoy {
 namespace Extensions {
-namespace ListenerFilters {
+namespace Filters {
+namespace Common {
 namespace OriginalSrc {
 namespace {
 
@@ -105,6 +106,7 @@ TEST_F(OriginalSrcSocketOptionTest, TestOptionDetailsNotSupported) {
 
 } // namespace
 } // namespace OriginalSrc
-} // namespace ListenerFilters
+} // namespace Common
+} // namespace Filters
 } // namespace Extensions
 } // namespace Envoy

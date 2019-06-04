@@ -55,11 +55,12 @@ class ConfigurationImplTest : public testing::Test {
 protected:
   ConfigurationImplTest()
       : api_(Api::createApiForTest()),
-        cluster_manager_factory_(
-            server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
-            server_.random(), server_.dnsResolver(), server_.sslContextManager(),
-            server_.dispatcher(), server_.localInfo(), server_.secretManager(), *api_,
-            server_.httpContext(), server_.accessLogManager(), server_.singletonManager()) {}
+        cluster_manager_factory_(server_.admin(), server_.runtime(), server_.stats(),
+                                 server_.threadLocal(), server_.random(), server_.dnsResolver(),
+                                 server_.sslContextManager(), server_.dispatcher(),
+                                 server_.localInfo(), server_.secretManager(),
+                                 server_.messageValidationVisitor(), *api_, server_.httpContext(),
+                                 server_.accessLogManager(), server_.singletonManager()) {}
 
   Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
@@ -366,6 +367,88 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
                             "Provided name for static registration lookup was empty.");
+}
+
+// An explicit non-empty LayeredRuntime is available to the server with no
+// changes made.
+TEST(InitialImplTest, LayeredRuntime) {
+  const std::string yaml = R"EOF(
+  layered_runtime:
+    layers:
+    - static_layer:
+        health_check:
+          min_interval: 5
+    - disk_layer: { symlink_root: /srv/runtime/current/envoy }
+    - disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
+    - admin_layer: {}
+  )EOF";
+  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v2::Bootstrap>(yaml);
+  InitialImpl config(bootstrap);
+  EXPECT_THAT(config.runtime(), ProtoEq(bootstrap.layered_runtime()));
+}
+
+// An empty LayeredRuntime has an admin layer injected.
+TEST(InitialImplTest, EmptyLayeredRuntime) {
+  const std::string bootstrap_yaml = R"EOF(
+  layered_runtime: {}
+  )EOF";
+  const auto bootstrap =
+      TestUtility::parseYaml<envoy::config::bootstrap::v2::Bootstrap>(bootstrap_yaml);
+  InitialImpl config(bootstrap);
+
+  const std::string expected_yaml = R"EOF(
+  layers:
+  - admin_layer: {}
+  )EOF";
+  const auto expected_runtime =
+      TestUtility::parseYaml<envoy::config::bootstrap::v2::LayeredRuntime>(expected_yaml);
+  EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
+}
+
+// An empty deprecated Runtime has an empty static and admin layer injected.
+TEST(InitialImplTest, EmptyDeprecatedRuntime) {
+  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v2::Bootstrap>("{}");
+  InitialImpl config(bootstrap);
+
+  const std::string expected_yaml = R"EOF(
+  layers:
+  - static_layer: {}
+  - admin_layer: {}
+  )EOF";
+  const auto expected_runtime =
+      TestUtility::parseYaml<envoy::config::bootstrap::v2::LayeredRuntime>(expected_yaml);
+  EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
+}
+
+// A deprecated Runtime is transformed to the equivalent LayeredRuntime.
+TEST(InitialImplTest, DeprecatedRuntimeTranslation) {
+  const std::string bootstrap_yaml = R"EOF(
+  runtime:
+    symlink_root: /srv/runtime/current
+    subdirectory: envoy
+    override_subdirectory: envoy_override
+    base:
+      health_check:
+        min_interval: 5
+  )EOF";
+  const auto bootstrap =
+      TestUtility::parseYaml<envoy::config::bootstrap::v2::Bootstrap>(bootstrap_yaml);
+  InitialImpl config(bootstrap);
+
+  const std::string expected_yaml = R"EOF(
+  layers:
+  - static_layer:
+      health_check:
+        min_interval: 5
+  - name: root
+    disk_layer: { symlink_root: /srv/runtime/current/envoy }
+  - name: override
+    disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
+  - admin_layer: {}
+  )EOF";
+  const auto expected_runtime =
+      TestUtility::parseYaml<envoy::config::bootstrap::v2::LayeredRuntime>(expected_yaml);
+  EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
 }
 
 } // namespace

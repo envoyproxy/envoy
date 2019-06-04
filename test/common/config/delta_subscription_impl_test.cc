@@ -108,7 +108,7 @@ TEST_F(DeltaSubscriptionImplTest, NoGrpcStream) {
   // start() also tries to start the GrpcStream. So, have that attempt return nullptr.
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(async_stream_, sendMessage(_, _)).Times(0);
-  subscription_->start({"name1"}, callbacks_);
+  subscription_->start({"name1"});
   subscription_->updateResources({"name1", "name2"});
 }
 

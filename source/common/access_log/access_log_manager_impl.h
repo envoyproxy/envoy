@@ -15,14 +15,12 @@
 
 namespace Envoy {
 
-// clang-format off
 #define ACCESS_LOG_FILE_STATS(COUNTER, GAUGE)                                                      \
-  COUNTER(write_buffered)                                                                          \
-  COUNTER(write_completed)                                                                         \
   COUNTER(flushed_by_timer)                                                                        \
   COUNTER(reopen_failed)                                                                           \
-  GAUGE  (write_total_buffered)
-// clang-format on
+  COUNTER(write_buffered)                                                                          \
+  COUNTER(write_completed)                                                                         \
+  GAUGE(write_total_buffered, Accumulate)
 
 struct AccessLogFileStats {
   ACCESS_LOG_FILE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
@@ -56,7 +54,7 @@ private:
 /**
  * This is a file implementation geared for writing out access logs. It turn out that in certain
  * cases even if a standard file is opened with O_NONBLOCK, the kernel can still block when writing.
- * This implementation uses a flush thread per file, with the idea there there aren't that many
+ * This implementation uses a flush thread per file, with the idea there aren't that many
  * files. If this turns out to be a good implementation we can potentially have a single flush
  * thread that flushes all files, but we will start with this.
  */

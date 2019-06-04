@@ -44,7 +44,7 @@ parseAccessLogFromJson(const std::string& json_string) {
 
 envoy::config::filter::accesslog::v2::AccessLog parseAccessLogFromV2Yaml(const std::string& yaml) {
   envoy::config::filter::accesslog::v2::AccessLog access_log;
-  MessageUtil::loadFromYaml(yaml, access_log);
+  TestUtility::loadFromYaml(yaml, access_log);
   return access_log;
 }
 

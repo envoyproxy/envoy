@@ -279,6 +279,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":header_map_impl_fuzz_proto_cc",
         "//source/common/http:header_map_lib",
+        "//test/fuzz:utility_lib",
     ],
 )
 
@@ -315,6 +316,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":utility_fuzz_proto_cc",
         "//source/common/http:utility_lib",
+        "//test/fuzz:utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
