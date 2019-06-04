@@ -120,6 +120,7 @@ struct UdpRecvData {
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr peer_address_; // TODO(conquerAtapple): Fix ownership semantics.
   Buffer::InstancePtr buffer_;
+  MonotonicTime receive_time_;
 
   // TODO(conquerAtapple):
   // Add UdpReader here so that the callback handler can
@@ -171,7 +172,7 @@ public:
    * @param error_code ErrorCode for the error event.
    * @param error_number System error number.
    */
-  virtual void onReceiveError(const ErrorCode& error_code, int error_number) PURE;
+  virtual void onReceiveError(const ErrorCode& error_code, Api::IoError::IoErrorCode err) PURE;
 };
 
 /**

@@ -82,6 +82,24 @@ namespace Network {
 #define ENVOY_SOCKET_TCP_FASTOPEN Network::SocketOptionName()
 #endif
 
+#ifdef IP_RECVDSTADDR
+#define ENVOY_RECV_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_RECVDSTADDR))
+#elif IP_PKTINFO
+#define ENVOY_RECV_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_PKTINFO))
+#else
+#define ENVOY_RECV_IP_PKT_INFO Network::SocketOptionName()
+#endif
+
+#ifdef IPV6_RECVPKTINFO
+#define ENVOY_RECV_IPV6_PKT_INFO                                                                   \
+  Network::SocketOptionName(std::make_pair(IPPROTO_IPV6, IPV6_RECVPKTINFO))
+#elif IPV6_PKTINFO
+#define ENVOY_RECV_IPV6_PKT_INFO                                                                   \
+  Network::SocketOptionName(std::make_pair(IPPROTO_IPV6, IPV6_PKTINFO))
+#else
+#define ENVOY_RECV_IPV6_PKT_INFO Network::SocketOptionName()
+#endif
+
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
   SocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,

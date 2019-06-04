@@ -191,7 +191,8 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
-        "//test/test_common:test_time_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
     ],
 )

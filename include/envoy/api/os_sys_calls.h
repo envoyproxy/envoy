@@ -53,6 +53,12 @@ public:
    */
   virtual SysCallSizeResult recvfrom(int sockfd, void* buffer, size_t length, int flags,
                                      struct sockaddr* addr, socklen_t* addrlen) PURE;
+
+  /**
+   * @see recvmsg (man 2 recvmsg)
+   */
+  virtual SysCallSizeResult recvmsg(int sockfd, struct msghdr* msg, int flags) PURE;
+
   /**
    * Release all resources allocated for fd.
    * @return zero on success, -1 returned otherwise.

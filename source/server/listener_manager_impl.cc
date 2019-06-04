@@ -25,6 +25,7 @@
 #include "extensions/filters/network/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
+#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/source/common/network/_virtual_includes/socket_option_factory_lib/common/network/socket_option_factory.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
@@ -208,6 +209,10 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   if (!config.socket_options().empty()) {
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
+  }
+  if (socket_type_ == Network::Address::SocketType::Datagram) {
+    // Needed for recvmsg to return destination address in IP header.
+    addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   }
 
   if (!config.listener_filters().empty()) {

@@ -3,6 +3,8 @@
 #include "common/network/addr_family_aware_socket_option_impl.h"
 #include "common/network/socket_option_impl.h"
 
+#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/source/common/network/_virtual_includes/socket_option_lib/common/network/socket_option_impl.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -91,6 +93,14 @@ SocketOptionFactory::buildTcpFastOpenOptions(uint32_t queue_length) {
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
       envoy::api::v2::core::SocketOption::STATE_LISTENING, ENVOY_SOCKET_TCP_FASTOPEN,
       queue_length));
+  return options;
+}
+
+std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpPacketInfoOptions() {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
+      envoy::api::v2::core::SocketOption::STATE_BOUND, ENVOY_RECV_IP_PKT_INFO,
+      ENVOY_RECV_IPV6_PKT_INFO, 1));
   return options;
 }
 

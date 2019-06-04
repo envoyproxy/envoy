@@ -10,6 +10,8 @@
 
 #include "common/api/os_sys_calls_impl.h"
 
+#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/include/envoy/api/_virtual_includes/os_sys_calls_interface/envoy/api/os_sys_calls_common.h"
+
 #if defined(__linux__)
 #include "common/api/os_sys_calls_impl_linux.h"
 #endif
@@ -61,10 +63,12 @@ public:
   MOCK_METHOD3(ioctl, SysCallIntResult(int sockfd, unsigned long int request, void* argp));
   MOCK_METHOD1(close, SysCallIntResult(int));
   MOCK_METHOD3(writev, SysCallSizeResult(int, const iovec*, int));
+  MOCK_METHOD3(sendmsg, SysCallSizeResult(int fd, const msghdr* message, int flags));
   MOCK_METHOD3(readv, SysCallSizeResult(int, const iovec*, int));
   MOCK_METHOD4(recv, SysCallSizeResult(int socket, void* buffer, size_t length, int flags));
   MOCK_METHOD6(recvfrom, SysCallSizeResult(int sockfd, void* buffer, size_t length, int flags,
                                            struct sockaddr* addr, socklen_t* addrlen));
+  MOCK_METHOD3(recvmsg, SysCallSizeResult(int socket, struct msghdr* msg, int flags));
   MOCK_METHOD2(ftruncate, SysCallIntResult(int fd, off_t length));
   MOCK_METHOD6(mmap, SysCallPtrResult(void* addr, size_t length, int prot, int flags, int fd,
                                       off_t offset));

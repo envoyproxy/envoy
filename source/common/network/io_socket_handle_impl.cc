@@ -1,6 +1,9 @@
 #include "common/network/io_socket_handle_impl.h"
 
 #include <errno.h>
+#include <sys/cdefs.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
 #include <iostream>
 
@@ -129,6 +132,104 @@ IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& re
            ? Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                              IoSocketError::deleteIoError)
            : Api::IoErrorPtr(new IoSocketError(result.errno_), IoSocketError::deleteIoError)));
+}
+
+Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
+                                                    const uint64_t num_slice, uint32_t self_port,
+                                                    bool v6only, uint32_t* dropped_packets,
+                                                    Address::InstanceConstSharedPtr& local_address,
+                                                    Address::InstanceConstSharedPtr& peer_address) {
+
+  // The minimum cmsg buffer size when receiving a packet. It is possible for a
+  // received packet to contain both IPv4 and IPv6 addresses.
+  const int cmsg_space = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(in_pktinfo)) +
+                         CMSG_SPACE(sizeof(in6_pktinfo)) + CMSG_SPACE(sizeof(LinuxTimestamping)) +
+                         CMSG_SPACE(sizeof(int));
+
+  std::cerr << "cmsg_space =" << cmsg_space << "\n";
+  char cbuf[cmsg_space];
+
+  STACK_ARRAY(iov, iovec, num_slice);
+  uint64_t num_slices_for_read = 0;
+  for (uint64_t i = 0; i < num_slice; i++) {
+    if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
+      iov[num_slices_for_read].iov_base = slices[i].mem_;
+      iov[num_slices_for_read].iov_len = slices[i].len_;
+      ++num_slices_for_read;
+    }
+  }
+
+  sockaddr_storage peer_addr;
+  msghdr hdr;
+  hdr.msg_name = &peer_addr;
+  hdr.msg_namelen = sizeof(sockaddr_storage);
+  hdr.msg_iov = iov.begin();
+  hdr.msg_iovlen = num_slices_for_read;
+  hdr.msg_flags = 0;
+
+  struct cmsghdr* cmsg = reinterpret_cast<struct cmsghdr*>(cbuf);
+  cmsg->cmsg_len = cmsg_space;
+  hdr.msg_control = cmsg;
+  hdr.msg_controllen = cmsg_space;
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+  const Api::SysCallSizeResult result = os_sys_calls.recvmsg(fd_, &hdr, 0);
+  if (result.rc_ < 0) {
+    return sysCallResultToIoCallResult(result);
+  }
+  if (hdr.msg_flags & MSG_CTRUNC) {
+    ENVOY_LOG(error, "Incorrectly set control message length: {}", hdr.msg_controllen);
+    return sysCallResultToIoCallResult(result);
+  }
+
+  std::cerr << "msg_controllen = " << hdr.msg_controllen << "";
+  RELEASE_ASSERT(hdr.msg_namelen > 0,
+                 fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
+  try {
+    peer_address = Address::addressFromSockAddr(peer_addr, hdr.msg_namelen, v6only);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG(error, "Invalid remote address for fd: {}, error: {}", fd_, e.what());
+  }
+
+  // Get overflow, local addresses from control message.
+  if (hdr.msg_controllen > 0) {
+    struct cmsghdr* cmsg;
+    for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+      if (cmsg->cmsg_type == IPV6_PKTINFO) {
+        in6_pktinfo* info = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
+        sockaddr_in6 ipv6_addr;
+        memset(&ipv6_addr, 0, sizeof(sockaddr_in6));
+        ipv6_addr.sin6_family = AF_INET6;
+        ipv6_addr.sin6_addr = info->ipi6_addr;
+        ipv6_addr.sin6_port = htons(self_port);
+        local_address = Address::addressFromSockAddr(reinterpret_cast<sockaddr_storage&>(ipv6_addr),
+                                                     sizeof(sockaddr_in6), v6only);
+      }
+#if defined(IP_PKTINFO)
+      if (cmsg->cmsg_type == IP_PKTINFO) {
+        struct in_pktinfo* info = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
+#else
+      if (cmsgptr->cmsg_type == IP_RECVDSTADDR) {
+        struct in_addr* addr = reinterpret_cast<in_addr*>(CMSG_DATA(cmsg));
+#endif
+        sockaddr_in ipv4_addr;
+        memset(&ipv4_addr, 0, sizeof(sockaddr_in));
+        ipv4_addr.sin_family = AF_INET;
+        ipv4_addr.sin_addr =
+#if defined(IP_PKTINFO)
+            info->ipi_addr;
+#else
+            ipv4_addr.sin_addr = addr;
+#endif
+        ipv4_addr.sin_port = htons(self_port);
+        local_address = Address::addressFromSockAddr(reinterpret_cast<sockaddr_storage&>(ipv4_addr),
+                                                     sizeof(sockaddr_in), v6only);
+      }
+      if (dropped_packets != nullptr && cmsg->cmsg_type == SO_RXQ_OVFL) {
+        *dropped_packets = *(reinterpret_cast<uint32_t*> CMSG_DATA(cmsg));
+      }
+    }
+  }
+  return sysCallResultToIoCallResult(result);
 }
 
 } // namespace Network
