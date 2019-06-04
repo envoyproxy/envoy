@@ -74,7 +74,13 @@ public:
     }
     // updateWatch() queues a discovery request if any resources were watched only by this watch.
     updateWatch(type_url, watch_token, {});
-    if (subscriptions_[type_url]->watch_map_.removeWatch(watch_token)) {
+
+    auto entry = subscriptions_.find(type_url);
+    if (entry == subscriptions_.end()) {
+      ENVOY_LOG(error, "Asked to remove watch of {}, but there is no subscription...", type_url);
+      return;
+    }
+    if (entry->second->watch_map_.removeWatch(watch_token)) {
       // removeWatch() told us that watch_token was the last watch on the entire subscription.
       removeSubscription(type_url);
     }
@@ -183,10 +189,12 @@ private:
   }
 
   void trySendDiscoveryRequests() {
+    std::cerr << "====================================\ntrySendDiscoveryRequests....." << std::endl;
     while (true) {
       // Do any of our subscriptions even want to send a request?
       absl::optional<std::string> maybe_request_type = whoWantsToSendDiscoveryRequest();
       if (!maybe_request_type.has_value()) {
+        std::cerr << "nobody wants to send.\n====================================" << std::endl;
         break;
       }
       // If so, which one (by type_url)?
@@ -194,6 +202,7 @@ private:
       // If we don't have a subscription object for this request's type_url, drop the request.
       auto sub = subscriptions_.find(next_request_type_url);
       if (sub == subscriptions_.end()) {
+        std::cerr << "NONEXISTENT!!!!!!!!!!! SKIPPING!!!!!!!!!!!!" << std::endl;
         ENVOY_LOG(warn, "Not sending discovery request for non-existent subscription {}.",
                   next_request_type_url);
         // It's safe to assume the front of the ACK queue is of this type, because that's the only
@@ -204,15 +213,18 @@ private:
       }
       // Try again later if paused/rate limited/stream down.
       if (!canSendDiscoveryRequest(next_request_type_url, sub->second->sub_state_)) {
+        std::cerr << "not available to send\n====================================" << std::endl;
         break;
       }
       // Get our subscription state to generate the appropriate DeltaDiscoveryRequest, and send.
       if (!ack_queue_.empty()) {
         // Because ACKs take precedence over plain requests, if there is anything in the queue, it's
         // safe to assume it's what we want to send here.
+        std::cerr << "sending " << next_request_type_url << " with ACK" << std::endl;
         grpc_stream_.sendMessage(sub->second->sub_state_.getNextRequestWithAck(ack_queue_.front()));
         ack_queue_.pop();
       } else {
+        std::cerr << "sending " << next_request_type_url << " without ACK" << std::endl;
         grpc_stream_.sendMessage(sub->second->sub_state_.getNextRequestAckless());
       }
     }

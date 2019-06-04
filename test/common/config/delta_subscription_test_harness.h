@@ -33,11 +33,19 @@ public:
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_));
+    xds_context_ = std::make_shared<GrpcDeltaXdsContext>(
+        std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
+        random_, stats_store_, rate_limit_settings_, local_info_);
     subscription_ = std::make_unique<DeltaSubscriptionImpl>(
-        std::make_shared<GrpcDeltaXdsContext>(std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
-                                              dispatcher_, *method_descriptor_, random_,
-                                              stats_store_, rate_limit_settings_, local_info_),
-        Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_, init_fetch_timeout);
+        xds_context_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
+        init_fetch_timeout);
+  }
+
+  void doSubscriptionTearDown() override {
+    if (subscription_started_) {
+      EXPECT_CALL(async_stream_, sendMessage(_, _));
+      subscription_.reset();
+    }
   }
 
   ~DeltaSubscriptionTestHarness() {
@@ -56,10 +64,12 @@ public:
   }
 
   void startSubscription(const std::set<std::string>& cluster_names) override {
-    EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+    subscription_started_ = true;
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "");
+    EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
     subscription_->start(cluster_names);
+    xds_context_->start();
   }
 
   void expectSendMessage(const std::set<std::string>& cluster_names,
@@ -175,6 +185,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
+  std::shared_ptr<GrpcDeltaXdsContext> xds_context_;
   std::unique_ptr<DeltaSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
@@ -184,6 +195,7 @@ public:
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
   std::queue<std::string> nonce_acks_required_;
   std::queue<std::string> nonce_acks_sent_;
+  bool subscription_started_{};
 };
 
 } // namespace

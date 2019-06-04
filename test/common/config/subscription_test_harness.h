@@ -75,6 +75,8 @@ public:
 
   virtual void callInitFetchTimeoutCb() PURE;
 
+  virtual void doSubscriptionTearDown() {}
+
   Stats::IsolatedStoreImpl stats_store_;
   SubscriptionStats stats_;
 };

@@ -309,10 +309,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   // clusters have already initialized. (E.g., if all static).
   init_helper_.onStaticLoadComplete();
 
-  if (!xds_is_delta_) {
-    // TODO TODO i think just have the same approach for start() with both, i.e. remove the if.
-    ads_mux_->start();
-  }
+  ads_mux_->start();
 
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();

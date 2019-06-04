@@ -7,6 +7,17 @@ namespace {
 class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness, public testing::Test {
 protected:
   DeltaSubscriptionImplTest() : DeltaSubscriptionTestHarness() {}
+
+  // We need to destroy the subscription before the test's destruction, because the subscription's
+  // destructor removes its watch from the GrpcDeltaXdsContext, and that removal process involves
+  // some things held by the test fixture.
+  void TearDown() override {
+    //  if (subscription_started_) {
+    //  EXPECT_CALL(async_stream_, sendMessage(_,_));
+    //     subscription_.reset();
+    // }
+    doSubscriptionTearDown();
+  }
 };
 
 TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
@@ -110,9 +121,6 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
 }
 
 TEST_F(DeltaSubscriptionImplTest, NoGrpcStream) {
-  // Have to call start() to get state_ populated (which this test needs to not segfault), but
-  // start() also tries to start the GrpcStream. So, have that attempt return nullptr.
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(async_stream_, sendMessage(_, _)).Times(0);
   subscription_->start({"name1"});
   subscription_->updateResources({"name1", "name2"});

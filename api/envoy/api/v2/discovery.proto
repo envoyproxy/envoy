@@ -196,7 +196,7 @@ message DeltaDiscoveryResponse {
   // The version of the response data (used for debugging).
   string system_version_info = 1;
 
-  // The response resources. The Resource proto's Any field named 'resource' should be
+  // The response resources. The Resource proto's Any field ('resource') should be
   // of type type_url.
   repeated Resource resources = 2 [(gogoproto.nullable) = false];
 

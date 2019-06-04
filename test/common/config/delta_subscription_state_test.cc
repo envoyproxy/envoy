@@ -79,7 +79,7 @@ populateRepeatedResource(std::vector<std::pair<std::string, std::string>> items)
 // Basic gaining/losing interest in resources should lead to (un)subscriptions.
 TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
   {
-    state_.updateSubscriptionInterest({"name1"}, {"name4"});
+    state_.updateSubscriptionInterest({"name4"}, {"name1"});
     envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
     EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
     EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name1"));

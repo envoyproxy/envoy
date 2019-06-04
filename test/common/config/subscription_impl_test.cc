@@ -39,6 +39,8 @@ public:
     }
   }
 
+  void TearDown() override { test_harness_->doSubscriptionTearDown(); }
+
   void startSubscription(const std::set<std::string>& cluster_names) {
     test_harness_->startSubscription(cluster_names);
   }
