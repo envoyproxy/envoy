@@ -207,6 +207,7 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
              (client.codec_client_->protocol() == Protocol::Http10 &&
               !client.stream_wrapper_->saw_keep_alive_header_)) {
     ENVOY_CONN_LOG(debug, "saw upstream close connection", *client.codec_client_);
+    host_->cluster().stats().upstream_cx_close_notify_.inc();
     onDownstreamReset(client);
   } else if (client.remaining_requests_ > 0 && --client.remaining_requests_ == 0) {
     ENVOY_CONN_LOG(debug, "maximum requests per connection", *client.codec_client_);
@@ -279,7 +280,6 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end
     if (absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
                                Headers::get().ConnectionValues.Close)) {
       saw_close_header_ = true;
-      parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
     } else if (absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
                                       Headers::get().ConnectionValues.KeepAlive)) {
       saw_keep_alive_header_ = true;
@@ -289,7 +289,6 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end
       absl::EqualsIgnoreCase(headers->ProxyConnection()->value().getStringView(),
                              Headers::get().ConnectionValues.Close)) {
     saw_close_header_ = true;
-    parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
   }
 
   StreamDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
