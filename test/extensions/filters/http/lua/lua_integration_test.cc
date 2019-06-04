@@ -402,14 +402,31 @@ config:
       end))
     end
 
+    -- decoding
+    function dec(data)
+      local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+      data = string.gsub(data, '[^'..b..'=]', '')
+      return (data:gsub('.', function(x)
+        if (x == '=') then return '' end
+        local r,f='',(b:find(x)-1)
+        for i=6,1,-1 do r=r..(f%2^i-f%2^(i-1)>0 and '1' or '0') end
+        return r;
+      end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
+        if (#x ~= 8) then return '' end
+        local c=0
+        for i=1,8 do c=c+(x:sub(i,i)=='1' and 2^(8-i) or 0) end
+        return string.char(c)
+      end))
+    end
+
     function envoy_on_request(request_handle)
       local metadata = request_handle:metadata():get("keyset")
       local keyder = metadata[request_handle:headers():get("keyid")]
 
-      local rawkeyder = request_handle:decodeBase64(keyder)
-      local key = request_handle:importPublicKey(rawkeyder, string.len(rawkeyder)) 
+      local rawkeyder = dec(keyder)
+      local pubkey = request_handle:importPublicKey(rawkeyder, string.len(rawkeyder)) 
 
-      if key == nil then
+      if pubkey == nil then
         request_handle:logErr("log test")
         request_handle:headers():add("signature_verification", "rejected")
         return
@@ -419,7 +436,7 @@ config:
       local sig = request_handle:headers():get("signature")
       local rawsig = sig:fromhex()
       local data = request_handle:headers():get("message")
-      local ok, error = request_handle:verifySignature(key, hash, rawsig, string.len(rawsig), data, string.len(data)) 
+      local ok, error = request_handle:verifySignature(hash, pubkey, rawsig, string.len(rawsig), data, string.len(data)) 
 
       if ok then
         request_handle:headers():add("signature_verification", "approved")
@@ -428,7 +445,7 @@ config:
         request_handle:headers():add("signature_verification", "rejected")
       end
 
-      request_handle:releasePublicKey(key)
+      request_handle:releasePublicKey(pubkey)
     end
 )EOF";
 

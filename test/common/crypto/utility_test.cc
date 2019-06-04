@@ -97,24 +97,24 @@ TEST(UtilityTest, TestVerifySignature) {
   auto sig = Hex::decode(signature);
   std::vector<uint8_t> text(data, data + strlen(data));
 
-  auto result = Utility::verifySignature(pubKey, hashFunc, sig, text);
+  auto result = Utility::verifySignature(hashFunc, pubKey, sig, text);
 
   EXPECT_EQ(true, result.result_);
   EXPECT_EQ("", result.error_message_);
 
   hashFunc = "unknown";
-  result = Utility::verifySignature(pubKey, hashFunc, sig, text);
+  result = Utility::verifySignature(hashFunc, pubKey, sig, text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("unknown is not supported.", result.error_message_);
 
   hashFunc = "sha256";
-  result = Utility::verifySignature(nullptr, hashFunc, sig, text);
+  result = Utility::verifySignature(hashFunc, nullptr, sig, text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("Failed to initialize digest verify.", result.error_message_);
 
   data = "baddata";
   text = std::vector<uint8_t>(data, data + strlen(data));
-  result = Utility::verifySignature(pubKey, hashFunc, sig, text);
+  result = Utility::verifySignature(hashFunc, pubKey, sig, text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("Failed to verify digest. Error code: 0", result.error_message_);
 
@@ -122,7 +122,7 @@ TEST(UtilityTest, TestVerifySignature) {
   text = std::vector<uint8_t>(data, data + strlen(data));
   signature = "000000";
   sig = Hex::decode(signature);
-  result = Utility::verifySignature(pubKey, hashFunc, sig, text);
+  result = Utility::verifySignature(hashFunc, pubKey, sig, text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("Failed to verify digest. Error code: 0", result.error_message_);
 

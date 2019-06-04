@@ -432,11 +432,11 @@ int StreamHandleWrapper::luaLogCritical(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
-  // Step 1: get key pointer
-  auto ptr = lua_touserdata(state, 2);
+  // Step 1: get hash function
+  absl::string_view hash = luaL_checkstring(state, 2);
 
-  // Step 2: get hash function
-  absl::string_view hash = luaL_checkstring(state, 3);
+  // Step 2: get key pointer
+  auto ptr = lua_touserdata(state, 3);
 
   // Step 3: get signature
   const char* signature = luaL_checkstring(state, 4);
@@ -449,7 +449,7 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   std::vector<uint8_t> textVec(clearText, clearText + textLen);
 
   // Step 5: verify signature
-  auto output = Common::Crypto::Utility::verifySignature(ptr, hash, sigVec, textVec);
+  auto output = Common::Crypto::Utility::verifySignature(hash, ptr, sigVec, textVec);
 
   lua_pushboolean(state, output.result_);
   if (output.result_) {
@@ -458,23 +458,6 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
     lua_pushlstring(state, output.error_message_.data(), output.error_message_.length());
   }
   return 2;
-}
-
-int StreamHandleWrapper::luaDecodeBase64(lua_State* state) {
-  // Get input string
-  absl::string_view str = luaL_checkstring(state, 2);
-  std::string output;
-
-  bool ok = absl::Base64Unescape(str, &output);
-
-  if (ok) {
-    lua_pushlstring(state, output.data(), output.length());
-  } else {
-    // If decode failed, push a nil into stack.
-    lua_pushnil(state);
-  }
-
-  return 1;
 }
 
 int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {

@@ -43,11 +43,11 @@ std::vector<uint8_t> Utility::getSha256Hmac(const std::vector<uint8_t>& key,
   return hmac;
 }
 
-VerificationOutput Utility::verifySignature(void* ptr, const absl::string_view& hash,
+VerificationOutput Utility::verifySignature(const absl::string_view& hash, void* ptr,
                                             const std::vector<uint8_t>& signature,
                                             const std::vector<uint8_t>& clearText) {
   // Step 1: get public key
-  auto key = reinterpret_cast<EVP_PKEY*>(ptr);
+  auto pubkey = reinterpret_cast<EVP_PKEY*>(ptr);
 
   // Step 2: initialize EVP_MD_CTX
   EVP_MD_CTX* ctx = EVP_MD_CTX_new();
@@ -61,7 +61,7 @@ VerificationOutput Utility::verifySignature(void* ptr, const absl::string_view& 
   }
 
   // Step 4: initialize EVP_DigestVerify
-  int ok = EVP_DigestVerifyInit(ctx, nullptr, md, nullptr, key);
+  int ok = EVP_DigestVerifyInit(ctx, nullptr, md, nullptr, pubkey);
   if (!ok) {
     EVP_MD_CTX_free(ctx);
     return {false, "Failed to initialize digest verify."};
@@ -95,11 +95,7 @@ const EVP_MD* Utility::getHashFunction(const absl::string_view& name) {
 
   // Hash algorithms set refers
   // https://github.com/google/boringssl/blob/master/include/openssl/digest.h
-  if (hash == "md4") {
-    return EVP_md4();
-  } else if (hash == "md5") {
-    return EVP_md5();
-  } else if (hash == "sha1") {
+  if (hash == "sha1") {
     return EVP_sha1();
   } else if (hash == "sha224") {
     return EVP_sha224();
@@ -109,8 +105,6 @@ const EVP_MD* Utility::getHashFunction(const absl::string_view& name) {
     return EVP_sha384();
   } else if (hash == "sha512") {
     return EVP_sha512();
-  } else if (hash == "md5_sha1") {
-    return EVP_md5_sha1();
   } else {
     return nullptr;
   }

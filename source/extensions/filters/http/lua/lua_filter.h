@@ -7,8 +7,6 @@
 #include "extensions/filters/http/lua/wrappers.h"
 #include "extensions/filters/http/well_known_names.h"
 
-#include "openssl/evp.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -144,7 +142,6 @@ public:
             {"respond", static_luaRespond},
             {"streamInfo", static_luaStreamInfo},
             {"connection", static_luaConnection},
-            {"decodeBase64", static_luaDecodeBase64},
             {"importPublicKey", static_luaImportPublicKey},
             {"releasePublicKey", static_luaReleasePublicKey},
             {"verifySignature", static_luaVerifySignature}};
@@ -224,9 +221,8 @@ private:
 
   /**
    * Verify cryptographic signatures.
-   * @param 1 (void*)  pointer to public key
-   * @param 2 (string) hash function(including MD4, MD5, SHA1, SHA224, SHA256, SHA384, SHA512,
-   * MD5_SHA1)
+   * @param 1 (string) hash function(including SHA1, SHA224, SHA256, SHA384, SHA512)
+   * @param 2 (void*)  pointer to public key
    * @param 3 (string) signature
    * @param 4 (int)    length of signature
    * @param 5 (string) clear text
@@ -235,13 +231,6 @@ private:
    * the second element stores the error message
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaVerifySignature);
-
-  /**
-   * Decode string encoded in base64.
-   * @param 1 (string) string encoded in base64
-   * @return nil or raw string
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaDecodeBase64);
 
   /**
    * Import public key.

@@ -14,13 +14,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "absl/strings/escaping.h"
-#include "fmt/printf.h"
 #include "gmock/gmock.h"
-#include "openssl/base64.h"
-#include "openssl/bytestring.h"
-#include "openssl/evp.h"
-#include "openssl/pem.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -1583,50 +1577,6 @@ TEST_F(LuaHttpFilterTest, CheckConnection) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-// Check base64 decode.
-TEST_F(LuaHttpFilterTest, CheckBase64Decode) {
-  const std::string SCRIPT{R"EOF(
-    function envoy_on_request(request_handle)
-      str = request_handle:decodeBase64("aGVsbG8=")
-      if str == nil then
-        request_handle:logTrace("fail")
-      else
-        request_handle:logTrace(str)
-      end
-    end
-  )EOF"};
-
-  InSequence s;
-  setup(SCRIPT);
-
-  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
-
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("hello")));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-}
-
-// Check base64 decode.
-TEST_F(LuaHttpFilterTest, CheckBase64DecodeFailure) {
-  const std::string SCRIPT{R"EOF(
-    function envoy_on_request(request_handle)
-      str = request_handle:decodeBase64(".")
-      if str == nil then
-        request_handle:logTrace("fail")
-      else
-        request_handle:logTrace(str)
-      end
-    end
-  )EOF"};
-
-  InSequence s;
-  setup(SCRIPT);
-
-  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
-
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("fail")));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-}
-
 TEST_F(LuaHttpFilterTest, ImportandReleasePublicKey) {
   const std::string SCRIPT{R"EOF(
     function string.fromhex(str)
@@ -1701,44 +1651,44 @@ TEST_F(LuaHttpFilterTest, SignatureVerify) {
       data = "hello"
 
       rawkey = key:fromhex()
-      pkey = request_handle:importPublicKey(rawkey, string.len(rawkey))
+      pubkey = request_handle:importPublicKey(rawkey, string.len(rawkey))
 
-      if pkey == nil then
+      if pubkey == nil then
         request_handle:logTrace("failed to import public key")
         return
       end
 
       rawsig = signature:fromhex()
 
-      ok, error = request_handle:verifySignature(pkey, hashFunc, rawsig, string.len(rawsig), data, string.len(data)) 
+      ok, error = request_handle:verifySignature(hashFunc, pubkey, rawsig, string.len(rawsig), data, string.len(data)) 
       if ok then
         request_handle:logTrace("signature is valid")
       else
         request_handle:logTrace(error)
       end
 
-      ok, error = request_handle:verifySignature(pkey, "unknown", rawsig, string.len(rawsig), data, string.len(data)) 
+      ok, error = request_handle:verifySignature("unknown", pubkey, rawsig, string.len(rawsig), data, string.len(data)) 
       if ok then
         request_handle:logTrace("signature is valid")
       else
         request_handle:logTrace(error)
       end
 
-      ok, error = request_handle:verifySignature(pkey, hashFunc, "0000", 4, data, string.len(data)) 
+      ok, error = request_handle:verifySignature(hashFunc, pubkey, "0000", 4, data, string.len(data)) 
       if ok then
         request_handle:logTrace("signature is valid")
       else
         request_handle:logTrace(error)
       end
 
-      ok, error = request_handle:verifySignature(pkey, hashFunc, rawsig, string.len(rawsig), "xxxx", 4) 
+      ok, error = request_handle:verifySignature(hashFunc, pubkey, rawsig, string.len(rawsig), "xxxx", 4) 
       if ok then
         request_handle:logTrace("signature is valid")
       else
         request_handle:logTrace(error)
       end
 
-      request_handle:releasePublicKey(pkey)
+      request_handle:releasePublicKey(pubkey)
     end
   )EOF"};
 
