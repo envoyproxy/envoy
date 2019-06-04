@@ -190,8 +190,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   if (hdr.msg_controllen > 0) {
     struct cmsghdr* cmsg;
     for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+#if defined(IPV6_PKTINFO)
       if (cmsg->cmsg_type == IPV6_PKTINFO) {
-        in6_pktinfo* info = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
+#else
+      if (cms->cmsg_type == IPV6_RECVPKTINFO) {
+
+#endif
+        struct in6_pktinfo* info = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
         sockaddr_in6 ipv6_addr;
         memset(&ipv6_addr, 0, sizeof(sockaddr_in6));
         ipv6_addr.sin6_family = AF_INET6;
