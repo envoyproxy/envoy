@@ -12,6 +12,10 @@
 using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
 
+#ifndef SO_RXQ_OVFL
+#define SO_RXQ_OVFL 40
+#endif
+
 namespace Envoy {
 namespace Network {
 
@@ -182,7 +186,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     ENVOY_LOG(error, "Invalid remote address for fd: {}, error: {}", fd_, e.what());
   }
 
-  // Get overflow, local addresses from control message.
+  // Get overflow, local and peer addresses from control message.
   if (hdr.msg_controllen > 0) {
     struct cmsghdr* cmsg;
     for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
