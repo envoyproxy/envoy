@@ -39,7 +39,6 @@
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
