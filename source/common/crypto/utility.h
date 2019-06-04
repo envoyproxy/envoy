@@ -6,10 +6,23 @@
 #include "envoy/buffer/buffer.h"
 
 #include "absl/strings/string_view.h"
+#include "openssl/evp.h"
 
 namespace Envoy {
 namespace Common {
 namespace Crypto {
+
+struct VerificationOutput {
+  /**
+   * Verification result. If result_ is true, error_message_ is empty.
+   */
+  bool result_;
+
+  /**
+   * Error message when verification failed.
+   */
+  std::string error_message_;
+};
 
 class Utility {
 public:
@@ -28,6 +41,36 @@ public:
    */
   static std::vector<uint8_t> getSha256Hmac(const std::vector<uint8_t>& key,
                                             absl::string_view message);
+
+  /**
+   * Verify cryptographic signatures.
+   * @param key pointer to public key
+   * @param hash hash function(including MD4, MD5, SHA1, SHA224, SHA256, SHA384, SHA512,
+   * MD5_SHA1)
+   * @param signature signature
+   * @param clearText clear text
+   * @return If the result_ is true, the error_message_ is empty; otherwise,
+   * the error_message_ stores the error message
+   */
+  static VerificationOutput verifySignature(void* key, const absl::string_view& hash,
+                                            const std::vector<uint8_t>& signature,
+                                            const std::vector<uint8_t>& clearText);
+
+  /**
+   * Import public key.
+   * @param key key string
+   * @return pointer to public key
+   */
+  static void* importPublicKey(const std::vector<uint8_t>& key);
+
+  /**
+   * Release public key.
+   * @param key pointer to public key
+   */
+  static void releasePublicKey(void* key);
+
+private:
+  static const EVP_MD* getHashFunction(const absl::string_view& name);
 };
 
 } // namespace Crypto

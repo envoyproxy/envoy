@@ -264,8 +264,6 @@ private:
 
   static Http::HeaderMapPtr buildHeadersFromTable(lua_State* state, int table_index);
 
-  static const EVP_MD* getDigest(const absl::string_view& hash_name);
-
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
     // Headers/body/trailers wrappers do not survive any yields. The user can request them

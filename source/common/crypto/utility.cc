@@ -3,7 +3,9 @@
 #include "common/common/assert.h"
 #include "common/common/stack_array.h"
 
-#include "openssl/evp.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
+#include "openssl/bytestring.h"
 #include "openssl/hmac.h"
 #include "openssl/sha.h"
 
@@ -39,6 +41,79 @@ std::vector<uint8_t> Utility::getSha256Hmac(const std::vector<uint8_t>& key,
            message.size(), hmac.data(), &len);
   RELEASE_ASSERT(ret != nullptr, "Failed to create HMAC");
   return hmac;
+}
+
+VerificationOutput Utility::verifySignature(void* ptr, const absl::string_view& hash,
+                                            const std::vector<uint8_t>& signature,
+                                            const std::vector<uint8_t>& clearText) {
+  // Step 1: get public key
+  auto key = reinterpret_cast<EVP_PKEY*>(ptr);
+
+  // Step 2: initialize EVP_MD_CTX
+  EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+
+  // Step 3: initialize EVP_MD
+  const EVP_MD* md = Utility::getHashFunction(hash);
+
+  if (md == nullptr) {
+    EVP_MD_CTX_free(ctx);
+    return {false, absl::StrCat(hash, " is not supported.")};
+  }
+
+  // Step 4: initialize EVP_DigestVerify
+  int ok = EVP_DigestVerifyInit(ctx, nullptr, md, nullptr, key);
+  if (!ok) {
+    EVP_MD_CTX_free(ctx);
+    return {false, "Failed to initialize digest verify."};
+  }
+
+  // Step 5: verify signature
+  ok =
+      EVP_DigestVerify(ctx, signature.data(), signature.size(), clearText.data(), clearText.size());
+
+  // Step 6: check result
+  if (ok == 1) {
+    EVP_MD_CTX_free(ctx);
+    return {true, ""};
+  }
+
+  EVP_MD_CTX_free(ctx);
+  std::string err_msg;
+  absl::StrAppend(&err_msg, "Failed to verify digest. Error code: ", ok);
+  return {false, err_msg};
+}
+
+void* Utility::importPublicKey(const std::vector<uint8_t>& key) {
+  CBS cbs({key.data(), key.size()});
+  return EVP_parse_public_key(&cbs);
+}
+
+void Utility::releasePublicKey(void* ptr) { EVP_PKEY_free(reinterpret_cast<EVP_PKEY*>(ptr)); }
+
+const EVP_MD* Utility::getHashFunction(const absl::string_view& name) {
+  std::string hash = absl::AsciiStrToLower(name);
+
+  // Hash algorithms set refers
+  // https://github.com/google/boringssl/blob/master/include/openssl/digest.h
+  if (hash == "md4") {
+    return EVP_md4();
+  } else if (hash == "md5") {
+    return EVP_md5();
+  } else if (hash == "sha1") {
+    return EVP_sha1();
+  } else if (hash == "sha224") {
+    return EVP_sha224();
+  } else if (hash == "sha256") {
+    return EVP_sha256();
+  } else if (hash == "sha384") {
+    return EVP_sha384();
+  } else if (hash == "sha512") {
+    return EVP_sha512();
+  } else if (hash == "md5_sha1") {
+    return EVP_md5_sha1();
+  } else {
+    return nullptr;
+  }
 }
 
 } // namespace Crypto

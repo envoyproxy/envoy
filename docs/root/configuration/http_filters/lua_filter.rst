@@ -323,7 +323,7 @@ Returns public key which is used by :ref:`verifySignature <verify_signature>` to
 
 .. attention::
 
-  Remember to call :ref:`releasePublicKey <release_public_key>` if *pkey* is not needed to avoid memory leak.
+  Remember to call :ref:`releasePublicKey <release_public_key>` when *pkey* is not needed to avoid memory leak.
 
 .. _release_public_key:
 

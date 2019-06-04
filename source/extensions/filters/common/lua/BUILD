@@ -14,7 +14,6 @@ envoy_cc_library(
     hdrs = ["lua.h"],
     external_deps = [
         "luajit",
-        "ssl",
     ],
     deps = [
         "//include/envoy/thread_local:thread_local_interface",
