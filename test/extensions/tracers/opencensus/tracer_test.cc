@@ -226,7 +226,6 @@ TEST(OpenCensusTracerTest, PropagateTraceContext) {
   };
 
   helper("traceparent", "00-404142434445464748494a4b4c4d4e4f-6162636465666768-01");
-  // echo 00 00 404142434445464748494a4b4c4d4e4f 01 6162636465666768 02 01 | xxd -r -p | base64
   helper("grpc-trace-bin", "AABAQUJDREVGR0hJSktMTU5PAWFiY2RlZmdoAgE");
   helper("x-cloud-trace-context", "404142434445464748494a4b4c4d4e4f/7017280452245743464;o=1");
 }
