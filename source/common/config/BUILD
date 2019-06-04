@@ -318,6 +318,7 @@ envoy_cc_library(
         ":grpc_mux_subscription_lib",
         ":grpc_subscription_lib",
         ":http_subscription_lib",
+        ":type_to_endpoint_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -335,6 +336,21 @@ envoy_cc_library(
         "//include/envoy/json:json_object_interface",
         "//source/common/common:utility_lib",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "type_to_endpoint_lib",
+    srcs = ["type_to_endpoint.cc"],
+    hdrs = ["type_to_endpoint.h"],
+    deps = [
+        "//source/common/grpc:common_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:lds_cc",
+        "@envoy_api//envoy/api/v2:rds_cc",
+        "@envoy_api//envoy/api/v2:srds_cc",
     ],
 )
 
