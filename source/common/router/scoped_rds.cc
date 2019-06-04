@@ -43,14 +43,12 @@ create(const envoy::config::filter::network::http_connection_manager::v2::HttpCo
                                                 config.scoped_routes().rds_config_source(),
                                                 config.scoped_routes().scope_key_builder()));
   }
-
   case envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::kScopedRds:
     return scoped_routes_config_provider_manager.createXdsConfigProvider(
         config.scoped_routes().scoped_rds(), factory_context, stat_prefix,
         ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
                                                 config.scoped_routes().rds_config_source(),
                                                 config.scoped_routes().scope_key_builder()));
-
   default:
     // Proto validation enforces that is not reached.
     NOT_REACHED_GCOVR_EXCL_LINE;

@@ -52,7 +52,7 @@ fragments:
 )EOF";
           envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
               scope_key_builder;
-          MessageUtil::loadFromYaml(scope_key_builder_config_yaml, scope_key_builder);
+          TestUtility::loadFromYaml(scope_key_builder_config_yaml, scope_key_builder);
           auto* scoped_routes = http_connection_manager.mutable_scoped_routes();
           scoped_routes->set_name("foo-scoped-routes");
           *scoped_routes->mutable_scope_key_builder() = scope_key_builder;
@@ -134,7 +134,7 @@ fragments:
 
     for (const auto& resource_proto : resource_protos) {
       envoy::api::v2::ScopedRouteConfiguration scoped_route_proto;
-      MessageUtil::loadFromYaml(resource_proto, scoped_route_proto);
+      TestUtility::loadFromYaml(resource_proto, scoped_route_proto);
       response.add_resources()->PackFrom(scoped_route_proto);
     }
 
