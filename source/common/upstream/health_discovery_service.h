@@ -43,7 +43,8 @@ public:
              ClusterInfoFactory& info_factory, ClusterManager& cm,
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
              Runtime::RandomGenerator& random, Singleton::Manager& singleton_manager,
-             ThreadLocal::SlotAllocator& tls, Api::Api& api);
+             ThreadLocal::SlotAllocator& tls,
+             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -80,6 +81,7 @@ private:
   HostVectorSharedPtr initial_hosts_;
   ClusterInfoConstSharedPtr info_;
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 typedef std::shared_ptr<HdsCluster> HdsClusterPtr;
@@ -118,7 +120,7 @@ public:
               ClusterInfoFactory& info_factory, AccessLog::AccessLogManager& access_log_manager,
               ClusterManager& cm, const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
               Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-              Api::Api& api);
+              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Grpc::TypedAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
@@ -190,6 +192,8 @@ private:
 
   // How often envoy reports the healthcheck results to the server
   uint32_t server_response_ms_ = 0;
+
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
 };
 

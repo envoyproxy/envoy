@@ -30,10 +30,11 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
       access_token_file: fake_file
    )EOF";
   envoy::config::trace::v2::Tracing configuration;
-  MessageUtil::loadFromYaml(yaml_string, configuration);
+  TestUtility::loadFromYaml(yaml_string, configuration);
 
   LightstepTracerFactory factory;
-  auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   Tracing::HttpTracerPtr lightstep_tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, lightstep_tracer);
 }

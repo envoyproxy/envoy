@@ -16,6 +16,10 @@ message SdsDummy {
 }
 
 service SecretDiscoveryService {
+  rpc DeltaSecrets(stream envoy.api.v2.DeltaDiscoveryRequest)
+      returns (stream envoy.api.v2.DeltaDiscoveryResponse) {
+  }
+
   rpc StreamSecrets(stream envoy.api.v2.DiscoveryRequest)
       returns (stream envoy.api.v2.DiscoveryResponse) {
   }

@@ -56,6 +56,13 @@ TEST(UtilityTest, TestGetSubject) {
             Utility::getSubjectFromCertificate(*cert));
 }
 
+TEST(UtilityTest, TestGetIssuer) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  EXPECT_EQ("CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US",
+            Utility::getIssuerFromCertificate(*cert));
+}
+
 TEST(UtilityTest, TestGetSerialNumber) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));

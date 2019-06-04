@@ -42,7 +42,10 @@ namespace {
 // is provided in [grpc_]subscription_impl_test.cc.
 class GrpcMuxImplTestBase : public testing::Test {
 public:
-  GrpcMuxImplTestBase() : async_client_(new Grpc::MockAsyncClient()) {}
+  GrpcMuxImplTestBase()
+      : async_client_(new Grpc::MockAsyncClient()),
+        control_plane_connected_state_(
+            stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)) {}
 
   void setup() {
     grpc_mux_ = std::make_unique<GrpcMuxImpl>(
@@ -92,6 +95,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
+  Stats::Gauge& control_plane_connected_state_;
 };
 
 class GrpcMuxImplTest : public GrpcMuxImplTestBase {
@@ -110,7 +114,7 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
   grpc_mux_->start();
-  EXPECT_EQ(1, stats_.gauge("control_plane.connected_state").value());
+  EXPECT_EQ(1, control_plane_connected_state_.value());
   expectSendMessage("bar", {"z"}, "");
   auto bar_z_sub = grpc_mux_->subscribe("bar", {"z"}, callbacks_);
   expectSendMessage("bar", {"zz", "z"}, "");
@@ -148,7 +152,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   ASSERT_TRUE(timer != nullptr); // initialized from dispatcher mock.
   EXPECT_CALL(*timer, enableTimer(_));
   grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
-  EXPECT_EQ(0, stats_.gauge("control_plane.connected_state").value());
+  EXPECT_EQ(0, control_plane_connected_state_.value());
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
@@ -475,7 +479,9 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSetti
   EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(100)));
   onReceiveMessage(99);
   EXPECT_EQ(1, stats_.counter("control_plane.rate_limit_enforced").value());
-  EXPECT_EQ(1, stats_.gauge("control_plane.pending_requests").value());
+  EXPECT_EQ(
+      1,
+      stats_.gauge("control_plane.pending_requests", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 //  Verifies that rate limiting is enforced with custom RateLimitSettings.

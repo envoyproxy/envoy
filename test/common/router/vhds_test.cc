@@ -41,13 +41,14 @@ namespace {
 class VhdsTest : public testing::Test {
 public:
   void SetUp() override {
-    factory_function_ = {[](const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&,
-                            Event::Dispatcher&, Upstream::ClusterManager&,
-                            Envoy::Runtime::RandomGenerator&, Stats::Scope&, const std::string&,
-                            const std::string&, absl::string_view,
-                            Api::Api&) -> std::unique_ptr<Envoy::Config::Subscription> {
-      return std::unique_ptr<Envoy::Config::MockSubscription>();
-    }};
+    factory_function_ = {
+        [](const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&,
+           Event::Dispatcher&, Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&,
+           Stats::Scope&, const std::string&, const std::string&, absl::string_view,
+           ProtobufMessage::ValidationVisitor&, Api::Api&,
+           Envoy::Config::SubscriptionCallbacks&) -> std::unique_ptr<Envoy::Config::Subscription> {
+          return std::unique_ptr<Envoy::Config::MockSubscription>();
+        }};
 
     default_vhds_config_ = R"EOF(
 name: my_route
@@ -92,8 +93,8 @@ vhds:
     return Protobuf::RepeatedPtrField<std::string>{removed.begin(), removed.end()};
   }
   RouteConfigUpdatePtr makeRouteConfigUpdate(const envoy::api::v2::RouteConfiguration& rc) {
-    RouteConfigUpdatePtr config_update_info =
-        std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context_.timeSource());
+    RouteConfigUpdatePtr config_update_info = std::make_unique<RouteConfigUpdateReceiverImpl>(
+        factory_context_.timeSource(), factory_context_.messageValidationVisitor());
     config_update_info->onRdsUpdate(rc, "1");
     return config_update_info;
   }

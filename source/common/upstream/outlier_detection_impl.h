@@ -203,25 +203,23 @@ private:
 /**
  * All outlier detection stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_OUTLIER_DETECTION_STATS(COUNTER, GAUGE)                                                \
-  COUNTER(ejections_total)                                                                         \
-  GAUGE  (ejections_active)                                                                        \
-  COUNTER(ejections_overflow)                                                                      \
   COUNTER(ejections_consecutive_5xx)                                                               \
-  COUNTER(ejections_success_rate)                                                                  \
-  COUNTER(ejections_enforced_total)                                                                \
   COUNTER(ejections_detected_consecutive_5xx)                                                      \
-  COUNTER(ejections_enforced_consecutive_5xx)                                                      \
-  COUNTER(ejections_detected_success_rate)                                                         \
-  COUNTER(ejections_enforced_success_rate)                                                         \
   COUNTER(ejections_detected_consecutive_gateway_failure)                                          \
+  COUNTER(ejections_detected_success_rate)                                                         \
+  COUNTER(ejections_enforced_consecutive_5xx)                                                      \
   COUNTER(ejections_enforced_consecutive_gateway_failure)                                          \
+  COUNTER(ejections_enforced_success_rate)                                                         \
   COUNTER(ejections_detected_consecutive_local_origin_failure)                                     \
   COUNTER(ejections_enforced_consecutive_local_origin_failure)                                     \
   COUNTER(ejections_detected_local_origin_success_rate)                                            \
-  COUNTER(ejections_enforced_local_origin_success_rate)
-// clang-format on
+  COUNTER(ejections_enforced_local_origin_success_rate)                                            \
+  COUNTER(ejections_enforced_total)                                                                \
+  COUNTER(ejections_overflow)                                                                      \
+  COUNTER(ejections_success_rate)                                                                  \
+  COUNTER(ejections_total)                                                                         \
+  GAUGE(ejections_active, Accumulate)
 
 /**
  * Struct definition for all outlier detection stats. @see stats_macros.h

@@ -374,7 +374,7 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   // Validate we can parse as proto.
   envoy::admin::v2alpha::ConfigDump config_dump;
-  MessageUtil::loadFromJson(response->body(), config_dump);
+  TestUtility::loadFromJson(response->body(), config_dump);
   EXPECT_EQ(4, config_dump.configs_size());
 
   // .. and that we can unpack one of the entries.

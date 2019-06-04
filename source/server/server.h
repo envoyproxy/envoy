@@ -25,6 +25,7 @@
 #include "common/http/context_impl.h"
 #include "common/init/manager_impl.h"
 #include "common/memory/heap_shrinker.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
@@ -47,20 +48,18 @@ namespace Server {
 /**
  * All server wide stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_SERVER_STATS(COUNTER, GAUGE)                                                           \
-  GAUGE(uptime)                                                                                    \
-  GAUGE(concurrency)                                                                               \
-  GAUGE(memory_allocated)                                                                          \
-  GAUGE(memory_heap_size)                                                                          \
-  GAUGE(live)                                                                                      \
-  GAUGE(parent_connections)                                                                        \
-  GAUGE(total_connections)                                                                         \
-  GAUGE(version)                                                                                   \
-  GAUGE(days_until_first_cert_expiring)                                                            \
-  GAUGE(hot_restart_epoch)                                                                         \
-  COUNTER(debug_assertion_failures)
-// clang-format on
+  COUNTER(debug_assertion_failures)                                                                \
+  GAUGE(concurrency, NeverImport)                                                                  \
+  GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
+  GAUGE(hot_restart_epoch, NeverImport)                                                            \
+  GAUGE(live, NeverImport)                                                                         \
+  GAUGE(memory_allocated, Accumulate)                                                              \
+  GAUGE(memory_heap_size, Accumulate)                                                              \
+  GAUGE(parent_connections, Accumulate)                                                            \
+  GAUGE(total_connections, Accumulate)                                                             \
+  GAUGE(uptime, Accumulate)                                                                        \
+  GAUGE(version, NeverImport)
 
 struct ServerStats {
   ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
@@ -111,10 +110,12 @@ public:
    * @param config_path supplies the config path.
    * @param v2_only supplies whether to attempt v1 fallback.
    * @param api reference to the Api object
+   * @param validation_visitor message validation visitor instance.
    * @return BootstrapVersion to indicate which version of the API was parsed.
    */
-  static BootstrapVersion loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                              const Options& options, Api::Api& api);
+  static BootstrapVersion
+  loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,
+                      ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 };
 
 /**
@@ -195,6 +196,11 @@ public:
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
+  }
+
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return options_.allowUnknownFields() ? ProtobufMessage::getStrictValidationVisitor()
+                                         : ProtobufMessage::getNullValidationVisitor();
   }
 
   // ServerLifecycleNotifier
@@ -279,6 +285,35 @@ private:
 
   absl::flat_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
   absl::flat_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
+};
+
+// Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could
+// potentially have a single class instance held in a static and have a clear() method to avoid some
+// vector constructions and reservations, but I'm not sure it's worth the extra complexity until it
+// shows up in perf traces.
+// TODO(mattklein123): One thing we probably want to do is switch from returning vectors of metrics
+//                     to a lambda based callback iteration API. This would require less vector
+//                     copying and probably be a cleaner API in general.
+class MetricSnapshotImpl : public Stats::MetricSnapshot {
+public:
+  explicit MetricSnapshotImpl(Stats::Store& store);
+
+  // Stats::MetricSnapshot
+  const std::vector<CounterSnapshot>& counters() override { return counters_; }
+  const std::vector<std::reference_wrapper<const Stats::Gauge>>& gauges() override {
+    return gauges_;
+  };
+  const std::vector<std::reference_wrapper<const Stats::ParentHistogram>>& histograms() override {
+    return histograms_;
+  }
+
+private:
+  std::vector<Stats::CounterSharedPtr> snapped_counters_;
+  std::vector<CounterSnapshot> counters_;
+  std::vector<Stats::GaugeSharedPtr> snapped_gauges_;
+  std::vector<std::reference_wrapper<const Stats::Gauge>> gauges_;
+  std::vector<Stats::ParentHistogramSharedPtr> snapped_histograms_;
+  std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
 };
 
 } // namespace Server

@@ -27,7 +27,7 @@ namespace Extensions {
 // correctly templatize it.
 MATCHER_P(TraceEqual, rhs, "") {
   envoy::data::tap::v2alpha::TraceWrapper expected_trace;
-  MessageUtil::loadFromYaml(rhs, expected_trace);
+  TestUtility::loadFromYaml(rhs, expected_trace);
   return TestUtility::protoEqual(expected_trace, arg);
 }
 
