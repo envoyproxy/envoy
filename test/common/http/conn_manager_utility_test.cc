@@ -1214,12 +1214,9 @@ TEST_F(ConnectionManagerUtilityTest, AcceptEdgeRequestId) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, edgeAcceptRequestId()).WillByDefault(Return(true));
-  TestHeaderMapImpl headers {
-          { "x-request-id", "my-request-id" },
-          {"x-forwarded-for", "198.51.100.1"}
-  };
+  TestHeaderMapImpl headers{{"x-request-id", "my-request-id"}, {"x-forwarded-for", "198.51.100.1"}};
   EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
-          callMutateRequestHeaders(headers, Protocol::Http2));
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_CALL(random_, uuid()).Times(0);
   EXPECT_EQ("my-request-id", headers.get_("x-request-id"));
 }
@@ -1228,9 +1225,7 @@ TEST_F(ConnectionManagerUtilityTest, AcceptEdgeRequestId) {
 TEST_F(ConnectionManagerUtilityTest, AcceptEdgeRequestIdNoReqId) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  TestHeaderMapImpl headers {
-          {"x-forwarded-for", "198.51.100.1"}
-  };
+  TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
   EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
