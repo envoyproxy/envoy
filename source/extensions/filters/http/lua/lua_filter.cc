@@ -10,8 +10,6 @@
 #include "common/crypto/utility.h"
 #include "common/http/message_impl.h"
 
-#include "absl/strings/escaping.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
