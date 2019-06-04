@@ -6,6 +6,8 @@
 
 #include "envoy/config/trace/v2/trace.pb.validate.h"
 
+#include "common/common/base64.h"
+
 #include "extensions/tracers/opencensus/opencensus_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
@@ -160,16 +162,14 @@ TEST(OpenCensusTracerTest, Span) {
 // Test that trace context propagation works.
 TEST(OpenCensusTracerTest, PropagateTraceContext) {
   registerSpanCatcher();
+  // The test calls the helper with each kind of incoming context in turn.
   auto helper = [](const std::string& header, const std::string& value) {
     OpenCensusConfig oc_config;
     oc_config.add_incoming_trace_context(OpenCensusConfig::trace_context);
     oc_config.add_incoming_trace_context(OpenCensusConfig::grpc_trace_bin);
     oc_config.add_incoming_trace_context(OpenCensusConfig::cloud_trace_context);
     oc_config.add_outgoing_trace_context(OpenCensusConfig::trace_context);
-    // TODO: Add test for (binary) grpc-trace-bin header.
-    if (0) {
-      oc_config.add_outgoing_trace_context(OpenCensusConfig::grpc_trace_bin);
-    }
+    oc_config.add_outgoing_trace_context(OpenCensusConfig::grpc_trace_bin);
     oc_config.add_outgoing_trace_context(OpenCensusConfig::cloud_trace_context);
     std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config));
     NiceMock<Tracing::MockConfig> config;
@@ -210,7 +210,13 @@ TEST(OpenCensusTracerTest, PropagateTraceContext) {
       EXPECT_EQ(::opencensus::trace::propagation::ToTraceParentHeader(sd.context()),
                 val->value().getStringView());
     }
-    // TODO: Add grpc-trace-bin.
+    {
+      auto val = injected_headers.get(LowerCaseString("grpc-trace-bin"));
+      ASSERT_NE(nullptr, val);
+      std::string expected = ::opencensus::trace::propagation::ToGrpcTraceBinHeader(sd.context());
+      expected = Base64::encode(expected.data(), expected.size(), /*add_padding=*/false);
+      EXPECT_EQ(expected, val->value().getStringView());
+    }
     {
       auto val = injected_headers.get(LowerCaseString("x-cloud-trace-context"));
       ASSERT_NE(nullptr, val);
@@ -220,6 +226,8 @@ TEST(OpenCensusTracerTest, PropagateTraceContext) {
   };
 
   helper("traceparent", "00-404142434445464748494a4b4c4d4e4f-6162636465666768-01");
+  // echo 00 00 404142434445464748494a4b4c4d4e4f 01 6162636465666768 02 01 | xxd -r -p | base64
+  helper("grpc-trace-bin", "AABAQUJDREVGR0hJSktMTU5PAWFiY2RlZmdoAgE");
   helper("x-cloud-trace-context", "404142434445464748494a4b4c4d4e4f/7017280452245743464;o=1");
 }
 
