@@ -317,6 +317,7 @@ message HttpConnectionManager {
   ForwardClientCertDetails forward_client_cert_details = 16
       [(validate.rules).enum.defined_only = true];
 
+  // [#comment:next free field: 7]
   message SetCurrentClientCertDetails {
     // Whether to forward the subject of the client cert. Defaults to false.
     google.protobuf.BoolValue subject = 1;
