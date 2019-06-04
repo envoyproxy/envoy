@@ -43,19 +43,6 @@ public:
                                   std::shared_ptr<const Address::Instance>& peer_address) override;
 
 private:
-  // This is the structure that SO_TIMESTAMPING fills into the cmsg header. It is
-  // well-defined, but does not have a definition in a public header. See
-  // https://www.kernel.org/doc/Documentation/networking/timestamping.txt for more
-  // information.
-  struct LinuxTimestamping {
-    // The converted system time of the timestamp.
-    struct timespec systime;
-    // Deprecated; serves only as padding.
-    struct timespec hwtimetrans;
-    // The raw hardware timestamp.
-    struct timespec hwtimeraw;
-  };
-
   // Converts a SysCallSizeResult to IoCallUint64Result.
   Api::IoCallUint64Result sysCallResultToIoCallResult(const Api::SysCallSizeResult& result);
 

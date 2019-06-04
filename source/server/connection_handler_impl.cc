@@ -346,7 +346,7 @@ void ConnectionHandlerImpl::ActiveUdpListener::onWriteReady(const Network::Socke
 }
 
 void ConnectionHandlerImpl::ActiveUdpListener::onReceiveError(
-    const Network::UdpListenerCallbacks::ErrorCode&, int) {
+    const Network::UdpListenerCallbacks::ErrorCode&, Api::IoError::IoErrorCode) {
   // TODO(sumukhs): Determine what to do on receive error.
   // Would the filters need to know on error? Can't foresee a scenario where they
   // would take an action
