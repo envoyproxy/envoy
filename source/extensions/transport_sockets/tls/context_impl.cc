@@ -315,8 +315,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
             fmt::format("Failed to get BoringSSL private key method from provider"));
       }
 #ifdef BORINGSSL_FIPS
-      if (!ctx.private_key_method_provider_.checkFips()) {
-          throw EnvoyException(fmt::format("Private key method doesn't support FIPS mode with current parameters");
+      if (!ctx.private_key_method_provider_->checkFips()) {
+        throw EnvoyException(
+            fmt::format("Private key method doesn't support FIPS mode with current parameters"));
       }
 #endif
       SSL_CTX_set_private_key_method(ctx.ssl_ctx_.get(), private_key_method.get());
