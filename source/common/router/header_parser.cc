@@ -261,7 +261,9 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   }
 
   for (const auto& formatter : headers_to_add_) {
-    const std::string value = formatter.second->format(stream_info);
+    // Remove any invalid characters the formatter may have introduced.
+    const std::string value =
+        absl::StrReplaceAll(formatter.second->format(stream_info), {{"\n", ""}, {"\r", ""}});
     if (!value.empty()) {
       if (formatter.second->append()) {
         headers.addReferenceKey(formatter.first, value);
