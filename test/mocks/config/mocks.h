@@ -44,9 +44,8 @@ public:
 
 class MockSubscription : public Subscription {
 public:
-  MOCK_METHOD2_T(start,
-                 void(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks));
-  MOCK_METHOD1_T(updateResources, void(const std::set<std::string>& update_to_these_names));
+  MOCK_METHOD1(start, void(const std::set<std::string>& resources));
+  MOCK_METHOD1(updateResources, void(const std::set<std::string>& update_to_these_names));
 };
 
 class MockGrpcMuxWatch : public GrpcMuxWatch {

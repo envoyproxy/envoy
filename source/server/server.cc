@@ -575,23 +575,21 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
     }
   }
 
+  // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
+  // have finished their work.
+  std::shared_ptr<Event::PostCb> cb_guard(new Event::PostCb([] {}),
+                                          [this, completion_cb](Event::PostCb* cb) {
+                                            ASSERT(std::this_thread::get_id() == main_thread_id_);
+                                            completion_cb();
+                                            delete cb;
+                                          });
+
   auto it2 = stage_completable_callbacks_.find(stage);
   if (it2 != stage_completable_callbacks_.end()) {
-    ASSERT(!it2->second.empty());
-    // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
-    // have finished their work.
-    auto completion_cb_count = std::make_shared<int>(it2->second.size());
-    Event::PostCb wrapped_cb = [this, completion_cb, completion_cb_count] {
-      ASSERT(std::this_thread::get_id() == main_thread_id_);
-      if (--*completion_cb_count == 0) {
-        completion_cb();
-      }
-    };
+    ENVOY_LOG(info, "Notifying {} callback(s) with completion.", it2->second.size());
     for (const StageCallbackWithCompletion& callback : it2->second) {
-      callback(wrapped_cb);
+      callback([cb_guard] { (*cb_guard)(); });
     }
-  } else {
-    completion_cb();
   }
 }
 
