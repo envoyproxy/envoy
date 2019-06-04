@@ -23,8 +23,7 @@ Tracing::HttpTracerPtr OpenCensusTracerFactory::createHttpTracerTyped(
 /**
  * Static registration for the OpenCensus tracer. @see RegisterFactory.
  */
-static Registry::RegisterFactory<OpenCensusTracerFactory, Server::Configuration::TracerFactory>
-    register_;
+REGISTER_FACTORY(OpenCensusTracerFactory, Server::Configuration::TracerFactory);
 
 } // namespace OpenCensus
 } // namespace Tracers

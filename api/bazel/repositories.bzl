@@ -192,13 +192,11 @@ proto_library(
         "@com_google_protobuf//:wrappers_proto",
         "@com_google_protobuf//:empty_proto",
     ],
-    #visibility = ["@io_opencensus_cpp//opencensus:__subpackages__"],
 )
 
 cc_proto_library(
     name = "tracing_proto_cc",
     deps = [":tracing_proto_proto"],
-    #visibility = ["@io_opencensus_cpp//opencensus:__subpackages__"],
 )
 
 cc_grpc_library(

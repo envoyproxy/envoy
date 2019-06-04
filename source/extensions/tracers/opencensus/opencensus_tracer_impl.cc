@@ -1,5 +1,7 @@
 #include "extensions/tracers/opencensus/opencensus_tracer_impl.h"
 
+#include "envoy/http/header_map.h"
+
 #include "absl/strings/str_cat.h"
 #include "opencensus/exporters/trace/stackdriver/stackdriver_exporter.h"
 #include "opencensus/exporters/trace/stdout/stdout_exporter.h"
@@ -20,17 +22,26 @@ namespace OpenCensus {
 
 namespace {
 
+class ConstantValues {
+public:
+  const Http::LowerCaseString TRACEPARENT{"traceparent"};
+  const Http::LowerCaseString GRPC_TRACE_BIN{"grpc-trace-bin"};
+  const Http::LowerCaseString X_CLOUD_TRACE_CONTEXT{"x-cloud-trace-context"};
+};
+
+typedef ConstSingleton<ConstantValues> Constants;
+
 /**
  * OpenCensus tracing implementation of the Envoy Span object.
  */
 class Span : public Tracing::Span {
 public:
-  Span(const Tracing::Config& config, const envoy::config::trace::v2::OpenCensusConfig* oc_config,
+  Span(const Tracing::Config& config, const envoy::config::trace::v2::OpenCensusConfig& oc_config,
        Http::HeaderMap& request_headers, const std::string& operation_name, SystemTime start_time,
        const Tracing::Decision tracing_decision);
 
   // Used by spawnChild().
-  Span(const envoy::config::trace::v2::OpenCensusConfig* oc_config,
+  Span(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
        ::opencensus::trace::Span&& span);
 
   void setOperation(absl::string_view operation) override;
@@ -44,11 +55,11 @@ public:
 
 private:
   ::opencensus::trace::Span span_;
-  const envoy::config::trace::v2::OpenCensusConfig* oc_config_;
+  const envoy::config::trace::v2::OpenCensusConfig& oc_config_;
 };
 
 ::opencensus::trace::Span
-StartSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& request_headers,
+startSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& request_headers,
                 const envoy::config::trace::v2::OpenCensusConfig& oc_config) {
   // Determine if there is a parent context.
   using OpenCensusConfig = envoy::config::trace::v2::OpenCensusConfig;
@@ -57,7 +68,7 @@ StartSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& req
     bool found = false;
     switch (incoming) {
     case OpenCensusConfig::trace_context: {
-      const Http::HeaderEntry* header = request_headers.get(Http::LowerCaseString{"traceparent"});
+      const Http::HeaderEntry* header = request_headers.get(Constants::get().TRACEPARENT);
       if (header != nullptr) {
         found = true;
         parent_ctx = ::opencensus::trace::propagation::FromTraceParentHeader(
@@ -67,8 +78,7 @@ StartSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& req
     }
 
     case OpenCensusConfig::grpc_trace_bin: {
-      const Http::HeaderEntry* header =
-          request_headers.get(Http::LowerCaseString{"grpc-trace-bin"});
+      const Http::HeaderEntry* header = request_headers.get(Constants::get().GRPC_TRACE_BIN);
       if (header != nullptr) {
         found = true;
         parent_ctx = ::opencensus::trace::propagation::FromGrpcTraceBinHeader(
@@ -78,8 +88,7 @@ StartSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& req
     }
 
     case OpenCensusConfig::cloud_trace_context: {
-      const Http::HeaderEntry* header =
-          request_headers.get(Http::LowerCaseString{"x-cloud-trace-context"});
+      const Http::HeaderEntry* header = request_headers.get(Constants::get().X_CLOUD_TRACE_CONTEXT);
       if (header != nullptr) {
         found = true;
         parent_ctx = ::opencensus::trace::propagation::FromCloudTraceContextHeader(
@@ -110,17 +119,17 @@ StartSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& req
 }
 
 Span::Span(const Tracing::Config& config,
-           const envoy::config::trace::v2::OpenCensusConfig* oc_config,
+           const envoy::config::trace::v2::OpenCensusConfig& oc_config,
            Http::HeaderMap& request_headers, const std::string& operation_name,
            SystemTime /*start_time*/, const Tracing::Decision tracing_decision)
-    : span_(StartSpanHelper(operation_name, tracing_decision.traced, request_headers, *oc_config)),
+    : span_(startSpanHelper(operation_name, tracing_decision.traced, request_headers, oc_config)),
       oc_config_(oc_config) {
   span_.AddAttribute("OperationName", config.operationName() == Tracing::OperationName::Ingress
                                           ? "Ingress"
                                           : "Egress");
 }
 
-Span::Span(const envoy::config::trace::v2::OpenCensusConfig* oc_config,
+Span::Span(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
            ::opencensus::trace::Span&& span)
     : span_(std::move(span)), oc_config_(oc_config) {}
 
@@ -141,23 +150,23 @@ void Span::finishSpan() { span_.End(); }
 
 void Span::injectContext(Http::HeaderMap& request_headers) {
   using OpenCensusConfig = envoy::config::trace::v2::OpenCensusConfig;
-  for (const auto& outgoing : oc_config_->outgoing_trace_context()) {
+  for (const auto& outgoing : oc_config_.outgoing_trace_context()) {
     switch (outgoing) {
     case OpenCensusConfig::trace_context:
-      request_headers.addCopy(
-          Http::LowerCaseString{"traceparent"},
+      request_headers.addReferenceKey(
+          Constants::get().TRACEPARENT,
           ::opencensus::trace::propagation::ToTraceParentHeader(span_.context()));
       break;
 
     case OpenCensusConfig::grpc_trace_bin:
-      request_headers.addCopy(
-          Http::LowerCaseString{"grpc-trace-bin"},
+      request_headers.addReferenceKey(
+          Constants::get().GRPC_TRACE_BIN,
           ::opencensus::trace::propagation::ToGrpcTraceBinHeader(span_.context()));
       break;
 
     case OpenCensusConfig::cloud_trace_context:
-      request_headers.addCopy(
-          Http::LowerCaseString{"x-cloud-trace-context"},
+      request_headers.addReferenceKey(
+          Constants::get().X_CLOUD_TRACE_CONTEXT,
           ::opencensus::trace::propagation::ToCloudTraceContextHeader(span_.context()));
       break;
     }
@@ -238,7 +247,7 @@ void Driver::applyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& c
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMap& request_headers,
                                    const std::string& operation_name, SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
-  return std::make_unique<Span>(config, &oc_config_, request_headers, operation_name, start_time,
+  return std::make_unique<Span>(config, oc_config_, request_headers, operation_name, start_time,
                                 tracing_decision);
 }
 
