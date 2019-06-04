@@ -432,9 +432,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // If we've been instructed not to forward the request upstream, send an empty local response.
   if (debug_config && debug_config->do_not_forward_) {
-    modify_headers = [modify_headers](Http::HeaderMap& headers) {
+    modify_headers = [modify_headers, debug_config](Http::HeaderMap& headers) {
       modify_headers(headers);
-      headers.addCopy(Http::Headers::get().EnvoyNotForwarded, "true");
+      headers.addCopy(
+          debug_config->not_forwarded_header_.value_or(Http::Headers::get().EnvoyNotForwarded),
+          "true");
     };
     callbacks_->sendLocalReply(Http::Code::NoContent, "", modify_headers, absl::nullopt, "");
     return Http::FilterHeadersStatus::StopIteration;

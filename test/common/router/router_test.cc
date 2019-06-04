@@ -224,6 +224,7 @@ public:
   void testAppendCluster(absl::optional<Http::LowerCaseString> cluster_header_name);
   void testAppendUpstreamHost(absl::optional<Http::LowerCaseString> hostname_header_name,
                               absl::optional<Http::LowerCaseString> host_address_header_name);
+  void testDoNotForward(absl::optional<Http::LowerCaseString> not_forwarded_header_name);
 
   Event::SimulatedTimeSystem test_time_;
   std::string upstream_zone_{"to_az"};
@@ -814,9 +815,14 @@ TEST_F(RouterTest, EnvoyUpstreamServiceTime) {
 
 // Validate that the cluster is appended to the response when configured.
 void RouterTestBase::testAppendCluster(absl::optional<Http::LowerCaseString> cluster_header_name) {
-  auto debug_config = std::make_unique<DebugConfig>();
-  debug_config->append_cluster_ = true;
-  debug_config->cluster_header_ = cluster_header_name;
+  auto debug_config = std::make_unique<DebugConfig>(
+      /* append_cluster */ true,
+      /* cluster_header */ cluster_header_name,
+      /* append_upstream_host */ false,
+      /* hostname_header */ absl::nullopt,
+      /* host_address_header */ absl::nullopt,
+      /* do_not_forward */ false,
+      /* not_forwarded_header */ absl::nullopt);
   callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
                                                 StreamInfo::FilterState::StateType::ReadOnly);
 
@@ -860,10 +866,14 @@ TEST_F(RouterTest, AppendCluster1) {
 void RouterTestBase::testAppendUpstreamHost(
     absl::optional<Http::LowerCaseString> hostname_header_name,
     absl::optional<Http::LowerCaseString> host_address_header_name) {
-  auto debug_config = std::make_unique<DebugConfig>();
-  debug_config->append_upstream_host_ = true;
-  debug_config->hostname_header_ = hostname_header_name;
-  debug_config->host_address_header_ = host_address_header_name;
+  auto debug_config = std::make_unique<DebugConfig>(
+      /* append_cluster */ false,
+      /* cluster_header */ absl::nullopt,
+      /* append_upstream_host */ true,
+      /* hostname_header */ hostname_header_name,
+      /* host_address_header */ host_address_header_name,
+      /* do_not_forward */ false,
+      /* not_forwarded_header */ absl::nullopt);
   callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
                                                 StreamInfo::FilterState::StateType::ReadOnly);
   cm_.conn_pool_.host_->hostname_ = "scooby.doo";
@@ -925,13 +935,23 @@ TEST_F(RouterTest, AppendUpstreamHost11) {
 }
 
 // Validate that the request is not forwarded upstream when configured.
-TEST_F(RouterTest, DoNotForward) {
-  auto debug_config = std::make_unique<DebugConfig>();
-  debug_config->do_not_forward_ = true;
+void RouterTestBase::testDoNotForward(
+    absl::optional<Http::LowerCaseString> not_forwarded_header_name) {
+  auto debug_config = std::make_unique<DebugConfig>(
+      /* append_cluster */ false,
+      /* cluster_header */ absl::nullopt,
+      /* append_upstream_host */ false,
+      /* hostname_header */ absl::nullopt,
+      /* host_address_header */ absl::nullopt,
+      /* do_not_forward */ true,
+      /* not_forwarded_header */ not_forwarded_header_name);
   callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
                                                 StreamInfo::FilterState::StateType::ReadOnly);
 
-  Http::TestHeaderMapImpl response_headers{{":status", "204"}, {"x-envoy-not-forwarded", "true"}};
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "204"},
+      {not_forwarded_header_name.value_or(Http::LowerCaseString("x-envoy-not-forwarded")).get(),
+       "true"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
   Http::TestHeaderMapImpl headers;
@@ -940,12 +960,24 @@ TEST_F(RouterTest, DoNotForward) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
+// Do not forward, with default not-forwarded header name
+TEST_F(RouterTest, DoNotForward0) { testDoNotForward(absl::nullopt); }
+
+// Do not forward, with custom not-forwarded header name
+TEST_F(RouterTest, DoNotForward1) {
+  testDoNotForward(absl::make_optional(Http::LowerCaseString("x-custom-not-forwarded")));
+}
+
 // Validate that all DebugConfig options play nicely with each other.
 TEST_F(RouterTest, AllDebugConfig) {
-  auto debug_config = std::make_unique<DebugConfig>();
-  debug_config->append_cluster_ = true;
-  debug_config->append_upstream_host_ = true;
-  debug_config->do_not_forward_ = true;
+  auto debug_config = std::make_unique<DebugConfig>(
+      /* append_cluster */ true,
+      /* cluster_header */ absl::nullopt,
+      /* append_upstream_host */ true,
+      /* hostname_header */ absl::nullopt,
+      /* host_address_header */ absl::nullopt,
+      /* do_not_forward */ true,
+      /* not_forwarded_header */ absl::nullopt);
   callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
                                                 StreamInfo::FilterState::StateType::ReadOnly);
   cm_.conn_pool_.host_->hostname_ = "scooby.doo";

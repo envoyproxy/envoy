@@ -26,6 +26,12 @@ namespace Router {
  * TODO(mergeconflict): Keep this promise.
  */
 struct DebugConfig : public StreamInfo::FilterState::Object {
+
+  DebugConfig(bool append_cluster, absl::optional<Http::LowerCaseString> cluster_header,
+              bool append_upstream_host, absl::optional<Http::LowerCaseString> hostname_header,
+              absl::optional<Http::LowerCaseString> host_address_header, bool do_not_forward,
+              absl::optional<Http::LowerCaseString> not_forwarded_header);
+
   /**
    * @return the string key for finding DebugConfig, if present, in FilterState.
    */
@@ -50,10 +56,12 @@ struct DebugConfig : public StreamInfo::FilterState::Object {
   /**
    * Do not forward the associated request to the upstream cluster, if `do_not_forward_` is true.
    * If the router would have forwarded it (assuming all other preconditions are met), it will
-   * instead respond with a 204 "no content." Any debug headers specified above (or others
-   * introduced by other filters) will be appended to this empty response.
+   * instead respond with a 204 "no content." Append `not_forwarded_header_`, if specified, or
+   * "x-envoy-not-forwarded" by default. Any debug headers specified above (or others introduced by
+   * other filters) will be appended to this empty response.
    */
   bool do_not_forward_{};
+  absl::optional<Http::LowerCaseString> not_forwarded_header_;
 };
 
 } // namespace Router
