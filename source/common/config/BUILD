@@ -163,7 +163,6 @@ envoy_cc_library(
         "@envoy_api//envoy/config/filter/network/client_ssl_auth/v2:client_ssl_auth_cc",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
         "@envoy_api//envoy/config/filter/network/mongo_proxy/v2:mongo_proxy_cc",
-        "@envoy_api//envoy/config/filter/network/rate_limit/v2:rate_limit_cc",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
         "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:tcp_proxy_cc",
     ],
