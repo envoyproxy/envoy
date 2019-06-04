@@ -11,5 +11,5 @@ rather than the address at which the listener is listening at. Furthermore, :ref
 destination cluster <arch_overview_service_discovery_types_original_destination>` may be used to
 forward HTTP requests or TCP connections to the restored destination address.
 
-* :ref:`v2 API reference <envoy_api_field_listener.Filter.name>`
+* :ref:`v2 API reference <envoy_api_field_listener.ListenerFilter.name>`
 * This filter should be configured with the name *envoy.listener.original_dst*.

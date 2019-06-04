@@ -188,6 +188,11 @@ public:
   virtual Http::Context& httpContext() PURE;
 
   /**
+   * @return the server-wide process context.
+   */
+  virtual ProcessContext& processContext() PURE;
+
+  /**
    * @return ThreadLocal::Instance& the thread local storage engine for the server. This is used to
    *         allow runtime lockless updates to configuration, etc. across multiple threads.
    */
@@ -207,6 +212,12 @@ public:
    * @return the flush interval of stats sinks.
    */
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
 } // namespace Server

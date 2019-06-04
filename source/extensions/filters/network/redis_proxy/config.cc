@@ -31,7 +31,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   ASSERT(proto_config.has_settings());
 
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
-      proto_config, context.scope(), context.drainDecision(), context.runtime()));
+      proto_config, context.scope(), context.drainDecision(), context.runtime(), context.api()));
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes prefix_routes(
       proto_config.prefix_routes());
@@ -61,7 +61,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
     upstreams.emplace(cluster, std::make_shared<ConnPool::InstanceImpl>(
                                    cluster, context.clusterManager(),
                                    Common::Redis::Client::ClientFactoryImpl::instance_,
-                                   context.threadLocal(), proto_config.settings()));
+                                   context.threadLocal(), proto_config.settings(), context.api(),
+                                   context.scope().symbolTable()));
   }
 
   auto router =

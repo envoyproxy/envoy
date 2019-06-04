@@ -51,6 +51,7 @@ public:
     Router::ConfigConstSharedPtr config() override { return route_config_; }
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
+    void onConfigUpdate() override {}
 
     TimeSource& time_source_;
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
@@ -387,7 +388,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   NiceMock<Network::MockDrainDecision> drain_close;
   NiceMock<Runtime::MockRandomGenerator> random;
   Stats::FakeSymbolTableImpl symbol_table;
-  Http::ContextImpl http_context;
+  Http::ContextImpl http_context(symbol_table);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Upstream::MockClusterManager> cluster_manager;

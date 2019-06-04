@@ -23,6 +23,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
-        "//source/common/network:io_socket_handle_lib",
+        "//source/common/network:address_lib",
     ],
 )

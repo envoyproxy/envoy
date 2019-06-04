@@ -708,17 +708,24 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     stream_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
         *request_headers_, connection_manager_.read_callbacks_->connection(),
         connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
-        connection_manager_.runtime_, connection_manager_.local_info_));
+        connection_manager_.local_info_));
   }
   ASSERT(stream_info_.downstreamRemoteAddress() != nullptr);
 
   ASSERT(!cached_route_);
   refreshCachedRoute();
+
+  if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
+    ConnectionManagerUtility::mutateTracingRequestHeader(
+        *request_headers_, connection_manager_.runtime_, connection_manager_.config_,
+        cached_route_.value().get());
+  }
+
   const bool upgrade_rejected = createFilterChain() == false;
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
-  if (protocol == Protocol::Http11 && cached_route_.value()) {
+  if (protocol == Protocol::Http11 && hasCachedRoute()) {
     if (upgrade_rejected) {
       // Do not allow upgrades if the route does not support it.
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
@@ -730,7 +737,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     // Allow non websocket requests to go through websocket enabled routes.
   }
 
-  if (cached_route_.value()) {
+  if (hasCachedRoute()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     if (route_entry != nullptr && route_entry->idleTimeout()) {
       idle_timeout_ms_ = route_entry->idleTimeout().value();
@@ -778,7 +785,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
   // be broken in the case a filter changes the route.
 
   // If a decorator has been defined, apply it to the active span.
-  if (cached_route_.value() && cached_route_.value()->decorator()) {
+  if (hasCachedRoute() && cached_route_.value()->decorator()) {
     cached_route_.value()->decorator()->apply(*active_span_);
 
     // Cache decorated operation.
@@ -1607,7 +1614,7 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
 
     // We must check if the 'cached_route_' optional is populated since this function can be called
     // early via sendLocalReply(), before the cached route is populated.
-    if (cached_route_.has_value() && cached_route_.value() && cached_route_.value()->routeEntry()) {
+    if (hasCachedRoute() && cached_route_.value()->routeEntry()) {
       upgrade_map = &cached_route_.value()->routeEntry()->upgradeMap();
     }
 
@@ -1665,10 +1672,16 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
     doHeaders(complete() && !bufferedData() && !trailers());
   }
 
-  // TODO(mattklein123): If a filter returns StopIterationNoBuffer and then does a continue, we
-  // won't be able to end the stream if there is no buffered data. Need to handle this.
-  if (bufferedData()) {
-    doData(complete() && !trailers());
+  // Make sure we handle filters returning StopIterationNoBuffer and then commonContinue by flushing
+  // the terminal fin.
+  const bool end_stream_with_data = complete() && !trailers();
+  if (bufferedData() || end_stream_with_data) {
+    if (end_stream_with_data && !bufferedData()) {
+      // In the StopIterationNoBuffer case the ConnectionManagerImpl will not have created a
+      // buffer but encode/decodeData expects the buffer to exist, so create one.
+      bufferedData() = createBuffer();
+    }
+    doData(end_stream_with_data);
   }
 
   if (trailers()) {

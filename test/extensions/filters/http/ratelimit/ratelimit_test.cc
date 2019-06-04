@@ -39,7 +39,7 @@ namespace {
 
 class HttpRateLimitFilterTest : public testing::Test {
 public:
-  HttpRateLimitFilterTest() {
+  HttpRateLimitFilterTest() : http_context_(stats_store_.symbolTable()) {
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.http_filter_enabled", 100))
         .WillByDefault(Return(true));
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.http_filter_enforcing", 100))
@@ -50,7 +50,7 @@ public:
 
   void SetUpTest(const std::string& yaml) {
     envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
-    MessageUtil::loadFromYaml(yaml, proto_config);
+    TestUtility::loadFromYaml(yaml, proto_config);
 
     config_.reset(
         new FilterConfig(proto_config, local_info_, stats_store_, runtime_, http_context_));

@@ -27,7 +27,7 @@ ProcessWide::ProcessWide() : initialization_depth_(process_wide_initialized) {
 #endif
     ares_library_init(ARES_LIB_INIT_ALL);
     Event::Libevent::Global::initialize();
-    RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
+    Envoy::Server::validateProtoDescriptors();
     Http::Http2::initializeNghttp2Logging();
   }
 }

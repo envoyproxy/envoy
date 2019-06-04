@@ -22,7 +22,7 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   NiceMock<Stats::MockGauge> gauge;
   NiceMock<Stats::MockStore> store;
 
-  ON_CALL(store, gauge(_)).WillByDefault(ReturnRef(gauge));
+  ON_CALL(store, gauge(_, _)).WillByDefault(ReturnRef(gauge));
 
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1, 0,

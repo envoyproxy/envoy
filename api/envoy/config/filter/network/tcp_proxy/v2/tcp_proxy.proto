@@ -30,25 +30,11 @@ message TcpProxy {
 
     // The upstream cluster to connect to.
     //
-    // .. note::
-    //
-    //  Complex routing (based on connection properties) is being implemented in listeners. Once
-    //  fully implemented, this field (or `weighted_clusters`) will be the only way to configure
-    //  the target cluster. In the interim, complex routing requires using a :ref:`deprecated_v1
-    //  <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.deprecated_v1>` configuration.
-    //  This field is ignored if a `deprecated_v1` configuration is set.
-    //
     string cluster = 2;
 
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
     // assigned to each cluster.
-    //
-    // .. note::
-    //
-    //  This field is ignored if the :ref:`deprecated_v1
-    //  <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.deprecated_v1>`
-    //  configuration is set.
     WeightedCluster weighted_clusters = 10;
   }
 
@@ -79,9 +65,8 @@ message TcpProxy {
   // emitted by the this tcp_proxy.
   repeated envoy.config.filter.accesslog.v2.AccessLog access_log = 5;
 
-  // TCP Proxy filter configuration using V1 format, until Envoy gets the
-  // ability to match source/destination at the listener level (called
-  // :ref:`filter chain match <envoy_api_msg_listener.FilterChainMatch>`).
+  // [#not-implemented-hide:] Deprecated.
+  // TCP Proxy filter configuration using V1 format.
   message DeprecatedV1 {
     // A TCP proxy route consists of a set of optional L4 criteria and the
     // name of a cluster. If a downstream connection matches all the
@@ -134,46 +119,8 @@ message TcpProxy {
     repeated TCPRoute routes = 1 [(validate.rules).repeated .min_items = 1];
   }
 
-  // TCP Proxy filter configuration using deprecated V1 format. This is required for complex
-  // routing until filter chain matching in the listener is implemented.
-  //
-  // Example:
-  //
-  // .. code-block:: yaml
-  //
-  //     - name: "envoy.tcp_proxy"
-  //       config:
-  //         deprecated_v1: true
-  //         value:
-  //           stat_prefix: "prefix"
-  //           access_log:
-  //             - ...
-  //           route_config:
-  //             routes:
-  //               - cluster: "cluster"
-  //                 destination_ip_list:
-  //                   - "10.1.0.0/8"
-  //                 destination_ports: "8080"
-  //                 source_ip_list:
-  //                   - "10.1.0.0/16"
-  //                   - "2001:db8::/32"
-  //                 source_ports: "8000,9000-9999"
-  //
-  // .. attention::
-  //
-  //   Using the deprecated V1 configuration excludes the use of any V2 configuration options. Only
-  //   the V1 configuration is used. All available fields are shown in the example, although the
-  //   access log configuration is omitted for simplicity. The access log configuration uses the
-  //   :repo:`deprecated V1 access log configuration<source/common/json/config_schemas.cc>`.
-  //
-  // .. attention::
-  //
-  //   In the deprecated V1 configuration, source and destination CIDR ranges are specified as a
-  //   list of strings with each string in CIDR notation. Source and destination ports are
-  //   specified as single strings containing a comma-separated list of ports and/or port ranges.
-  //
-  // Deprecation pending https://github.com/envoyproxy/envoy/issues/4457
-  DeprecatedV1 deprecated_v1 = 6;
+  // [#not-implemented-hide:] Deprecated.
+  DeprecatedV1 deprecated_v1 = 6 [deprecated = true];
 
   // The maximum number of unsuccessful connection attempts that will be made before
   // giving up. If the parameter is not specified, 1 connection attempt will be made.
