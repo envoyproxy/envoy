@@ -21,7 +21,6 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
 
-#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/include/envoy/api/_virtual_includes/io_error_interface/envoy/api/io_error.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {

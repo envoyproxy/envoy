@@ -80,7 +80,6 @@ void UdpListenerImpl::handleReadCallback() {
 
     uint32_t old_packets_dropped = packets_dropped_;
     MonotonicTime receive_time = time_source_.monotonicTime();
-    std::cerr << "pass in port number " << (socket_.localAddress()->ip()->port());
     Api::IoCallUint64Result result = socket_.ioHandle().recvmsg(
         &slice, num_slices, socket_.localAddress()->ip()->port(),
         /*v6only=*/socket_.localAddress()->ip()->version() == Address::IpVersion::v6,

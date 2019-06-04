@@ -1,7 +1,5 @@
 #pragma once
 
-#include <iostream>
-
 #include "envoy/event/timer.h"
 
 #include "common/common/assert.h"
@@ -92,7 +90,6 @@ public:
   }
 
   SchedulerPtr createScheduler(Scheduler& base_scheduler) override {
-    std::cerr << "createScheduler() Delegate" << &timeSystem();
     return timeSystem().createScheduler(base_scheduler);
   }
   SystemTime systemTime() override { return timeSystem().systemTime(); }
@@ -115,10 +112,7 @@ class DelegatingTestTimeSystem : public DelegatingTestTimeSystemBase<TimeSystemV
 public:
   DelegatingTestTimeSystem() : time_system_(initTimeSystem()) {}
 
-  TimeSystemVariant& timeSystem() override {
-    std::cerr << "timeSystem() Deletate\n";
-    return time_system_;
-  }
+  TimeSystemVariant& timeSystem() override { return time_system_; }
 
 private:
   TimeSystemVariant& initTimeSystem() {
@@ -127,7 +121,6 @@ private:
     };
     auto time_system = dynamic_cast<TimeSystemVariant*>(&singleton_->timeSystem(make_time_system));
     RELEASE_ASSERT(time_system, "Two different types of time-systems allocated");
-    std::cerr << "initTimeSystem " << this << "with real time system" << time_system << "\n";
     return *time_system;
   }
 

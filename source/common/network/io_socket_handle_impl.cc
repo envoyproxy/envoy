@@ -1,11 +1,6 @@
 #include "common/network/io_socket_handle_impl.h"
 
 #include <errno.h>
-#include <sys/cdefs.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-
-#include <iostream>
 
 #include "envoy/buffer/buffer.h"
 
@@ -145,8 +140,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   const int cmsg_space = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(in_pktinfo)) +
                          CMSG_SPACE(sizeof(in6_pktinfo)) + CMSG_SPACE(sizeof(LinuxTimestamping)) +
                          CMSG_SPACE(sizeof(int));
-
-  std::cerr << "cmsg_space =" << cmsg_space << "\n";
   char cbuf[cmsg_space];
 
   STACK_ARRAY(iov, iovec, num_slice);
@@ -181,7 +174,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     return sysCallResultToIoCallResult(result);
   }
 
-  std::cerr << "msg_controllen = " << hdr.msg_controllen << "";
   RELEASE_ASSERT(hdr.msg_namelen > 0,
                  fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
   try {

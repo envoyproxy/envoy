@@ -10,8 +10,6 @@
 
 #include "common/api/os_sys_calls_impl.h"
 
-#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/include/envoy/api/_virtual_includes/os_sys_calls_interface/envoy/api/os_sys_calls_common.h"
-
 #if defined(__linux__)
 #include "common/api/os_sys_calls_impl_linux.h"
 #endif

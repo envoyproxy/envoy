@@ -33,15 +33,11 @@ DispatcherImpl::DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system)
 
 DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
                                Event::TimeSystem& time_system)
-    : api_(api), buffer_factory_(std::move(factory)) {
-  std::cerr << "createScheduler with time system " << &time_system << "\n";
-  scheduler_ = time_system.createScheduler(base_scheduler_);
-  std::cerr << "createTimer "
-            << "createTimer\n";
-  deferred_delete_timer_ = createTimer([this]() -> void { clearDeferredDeleteList(); });
-  post_timer_ = createTimer([this]() -> void { runPostCallbacks(); });
-  current_to_delete_ = &to_delete_1_;
-}
+    : api_(api), buffer_factory_(std::move(factory)),
+      scheduler_(time_system.createScheduler(base_scheduler_)),
+      deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
+      post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
+      current_to_delete_(&to_delete_1_) {}
 
 DispatcherImpl::~DispatcherImpl() {}
 

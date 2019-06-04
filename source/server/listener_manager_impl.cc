@@ -25,7 +25,6 @@
 #include "extensions/filters/network/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
-#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/source/common/network/_virtual_includes/socket_option_factory_lib/common/network/socket_option_factory.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 

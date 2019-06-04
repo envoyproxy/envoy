@@ -292,7 +292,6 @@ void SimulatedTimeSystemHelper::addAlarmLockHeld(
 void SimulatedTimeSystemHelper::removeAlarmLockHeld(Alarm* alarm) { alarms_.erase(alarm); }
 
 SchedulerPtr SimulatedTimeSystemHelper::createScheduler(Scheduler& base_scheduler) {
-  std::cerr << "createScheduler\n";
   return std::make_unique<SimulatedScheduler>(*this, base_scheduler);
 }
 
