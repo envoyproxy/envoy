@@ -53,7 +53,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       *scope_,
       Grpc::Common::typeUrl(
           envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
-      validation_visitor_, factory_context.api());
+      validation_visitor_, factory_context.api(), *this);
 }
 
 void ScopedRdsConfigSubscription::onConfigUpdate(

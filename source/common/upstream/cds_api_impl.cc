@@ -37,7 +37,7 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, Clu
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
       cds_config, local_info, dispatcher, cm, random, *scope_,
       Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()),
-      validation_visitor, api);
+      validation_visitor, api, *this);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

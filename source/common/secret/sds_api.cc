@@ -81,8 +81,8 @@ void SdsApi::initialize() {
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       sds_config_, local_info_, dispatcher_, cluster_manager_, random_, stats_,
       Grpc::Common::typeUrl(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()),
-      validation_visitor_, api_);
-  subscription_->start({sds_config_name_}, *this);
+      validation_visitor_, api_, *this);
+  subscription_->start({sds_config_name_});
 }
 
 } // namespace Secret
