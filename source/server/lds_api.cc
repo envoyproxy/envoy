@@ -24,12 +24,8 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
       init_target_("LDS", [this]() { subscription_->start({}); }),
       validation_visitor_(validation_visitor) {
-  const std::string grpc_method = is_delta
-                                      ? "envoy.api.v2.ListenerDiscoveryService.DeltaListeners"
-                                      : "envoy.api.v2.ListenerDiscoveryService.StreamListeners";
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       lds_config, local_info, dispatcher, cm, random, *scope_,
-      "envoy.api.v2.ListenerDiscoveryService.FetchListeners", grpc_method,
       Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()),
       validation_visitor_, api, *this, is_delta);
   Config::Utility::checkLocalInfo("lds", local_info);

@@ -66,13 +66,9 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       manager_identifier_(manager_identifier),
       validation_visitor_(factory_context_.messageValidationVisitor()) {
   Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
-
-  const std::string grpc_method = is_delta ? "envoy.api.v2.RouteDiscoveryService.DeltaRoutes"
-                                           : "envoy.api.v2.RouteDiscoveryService.StreamRoutes";
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       rds.config_source(), factory_context.localInfo(), factory_context.dispatcher(),
       factory_context.clusterManager(), factory_context.random(), *scope_,
-      "envoy.api.v2.RouteDiscoveryService.FetchRoutes", grpc_method,
       Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
       factory_context.messageValidationVisitor(), factory_context.api(), *this, is_delta);
 

@@ -25,12 +25,8 @@ EdsClusterImpl::EdsClusterImpl(
   Upstream::ClusterManager& cm = factory_context.clusterManager();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
-  const std::string grpc_method = is_delta
-                                      ? "envoy.api.v2.EndpointDiscoveryService.DeltaEndpoints"
-                                      : "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints";
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
       eds_config, local_info_, dispatcher, cm, random, info_->statsScope(),
-      "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints", grpc_method,
       Grpc::Common::typeUrl(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
       factory_context.messageValidationVisitor(), factory_context.api(), *this, is_delta);
 }

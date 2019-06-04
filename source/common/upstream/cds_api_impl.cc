@@ -28,9 +28,6 @@ CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_confi
 
 // TODO(fredlas) the is_delta argument can be removed upon delta+SotW ADS Envoy code unification. It
 // is only actually needed to choose the grpc_method, which is irrelevant if ADS is used.
-// TODO(fredlas) actually the whole "pass the grpc_method as an argument to SubscriptionFactory"
-// seems like it could be streamlined/centralized, given that we're also passing type_url. I'm
-// thinking, have a (type_url, is_delta) -> grpc_method map that SubscriptionFactory can look up in.
 CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
                        ClusterManager& cm, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
@@ -39,12 +36,8 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, boo
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
       validation_visitor_(validation_visitor) {
   Config::Utility::checkLocalInfo("cds", local_info);
-
-  const std::string grpc_method = is_delta ? "envoy.api.v2.ClusterDiscoveryService.DeltaClusters"
-                                           : "envoy.api.v2.ClusterDiscoveryService.StreamClusters";
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
       cds_config, local_info, dispatcher, cm, random, *scope_,
-      "envoy.api.v2.ClusterDiscoveryService.FetchClusters", grpc_method,
       Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()),
       validation_visitor, api, *this, is_delta);
 }
