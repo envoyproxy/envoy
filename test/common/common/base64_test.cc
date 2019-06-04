@@ -87,7 +87,23 @@ TEST(Base64Test, DecodeFailure) {
   EXPECT_EQ("", Base64::decode("Zg.."));
   EXPECT_EQ("", Base64::decode("..Zg"));
   EXPECT_EQ("", Base64::decode("A==="));
+  EXPECT_EQ("", Base64::decode("===="));
   EXPECT_EQ("", Base64::decode("123"));
+}
+
+TEST(Base64Test, DecodeWithoutPadding) {
+  EXPECT_EQ("foo", Base64::decode_without_padding("Zm9v"));
+  EXPECT_EQ("fo", Base64::decode_without_padding("Zm8"));
+  EXPECT_EQ("f", Base64::decode_without_padding("Zg"));
+  EXPECT_EQ("foobar", Base64::decode_without_padding("Zm9vYmFy"));
+  EXPECT_EQ("fooba", Base64::decode_without_padding("Zm9vYmE"));
+  EXPECT_EQ("foob", Base64::decode_without_padding("Zm9vYg"));
+
+  EXPECT_EQ("", Base64::decode_without_padding(""));
+  EXPECT_EQ("", Base64::decode_without_padding("="));
+  EXPECT_EQ("", Base64::decode_without_padding("=="));
+  EXPECT_EQ("", Base64::decode_without_padding("==="));
+  EXPECT_EQ("", Base64::decode_without_padding("===="));
 }
 
 TEST(Base64Test, MultiSlicesBufferEncode) {

@@ -43,6 +43,15 @@ public:
    * bytes.
    */
   static std::string decode(const std::string& input);
+
+  /**
+   * Base64 decode an input string. Padding is not required.
+   * @param input supplies the input to decode.
+   *
+   * Note, decoded string may contain '\0' at any position, it should be treated as a sequence of
+   * bytes.
+   */
+  static std::string decode_without_padding(const std::string& input);
 };
 
 /**
