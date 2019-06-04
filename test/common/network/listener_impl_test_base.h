@@ -17,14 +17,11 @@ namespace Network {
 // Captures common infrastructure needed by both ListenerImplTest and UdpListenerImplTest.
 class ListenerImplTestBase : public testing::TestWithParam<Address::IpVersion> {
 protected:
-  ListenerImplTestBase() : ListenerImplTestBase(false) {}
-
-  ListenerImplTestBase(bool use_simulated_time_system)
+  ListenerImplTestBase()
       : version_(GetParam()),
         alt_address_(Network::Test::findOrCheckFreePort(
             Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
-        api_(use_simulated_time_system ? Api::createApiForTest(time_system_)
-                                       : Api::createApiForTest()),
+        api_(Api::createApiForTest()),
         dispatcher_(api_->allocateDispatcher()) {}
 
   Event::DispatcherImpl& dispatcherImpl() {
@@ -39,8 +36,8 @@ protected:
 
   const Address::IpVersion version_;
   const Address::InstanceConstSharedPtr alt_address_;
-  Api::ApiPtr api_;
   Event::SimulatedTimeSystem time_system_;
+  Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
 };
 
