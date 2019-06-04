@@ -318,7 +318,10 @@ envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
-    external_deps = ["abseil_optional"],
+    external_deps = [
+        "abseil_node_hash_map",
+        "abseil_optional",
+    ],
     deps = [
         ":configuration_lib",
         ":connection_handler_lib",
