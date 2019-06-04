@@ -83,13 +83,9 @@ startSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& req
       const Http::HeaderEntry* header = request_headers.get(Constants::get().GRPC_TRACE_BIN);
       if (header != nullptr) {
         found = true;
-        std::string val = std::string(header->value().getStringView());
-        // Add padding before decoding.
-        int pad = 4 - (val.size() % 4);
-        if (pad != 4) {
-          val += std::string(pad, '=');
-        }
-        parent_ctx = ::opencensus::trace::propagation::FromGrpcTraceBinHeader(Base64::decode(val));
+        const std::string val = std::string(header->value().getStringView());
+        parent_ctx = ::opencensus::trace::propagation::FromGrpcTraceBinHeader(
+            Base64::decode_without_padding(val));
       }
       break;
     }
