@@ -18,7 +18,7 @@ public:
    * provider will communicate the success status when SSL_do_handshake()
    * is called the next time.
    */
-  virtual void complete() PURE;
+  virtual void onPrivateKeyMethodComplete() PURE;
 };
 
 } // namespace Ssl
