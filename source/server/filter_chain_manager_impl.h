@@ -6,29 +6,41 @@
 #include "envoy/server/transport_socket_config.h"
 
 #include "common/common/logger.h"
+#include "common/init/manager_impl.h"
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
+
+#include "server/fcds_api.h"
+#include "server/lds_api.h"
 
 #include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Server {
 
+class FilterChainImpl;
+
 class FilterChainFactoryBuilder {
 public:
   virtual ~FilterChainFactoryBuilder() = default;
+  virtual void setInitManager(Init::Manager& init_manager) PURE;
   virtual std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const PURE;
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) PURE;
 };
 
 /**
  * Implementation of FilterChainManager.
+ * Encapulating the subscription from FCDS Api.
  */
 class FilterChainManagerImpl : public Network::FilterChainManager,
+                               public Config::SubscriptionCallbacks,
                                Logger::Loggable<Logger::Id::config> {
+
+  using FcProto = ::envoy::api::v2::listener::FilterChain;
+
 public:
-  explicit FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address)
-      : address_(address) {}
+  FilterChainManagerImpl(Init::Manager& init_manager,
+                         Network::Address::InstanceConstSharedPtr address);
 
   // Network::FilterChainManager
   const Network::FilterChain*
@@ -37,10 +49,32 @@ public:
   void
   addFilterChain(absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
                  FilterChainFactoryBuilder& b);
+
+  void addFilterChainInternalForFcds(
+      absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
+      FilterChainFactoryBuilder& b);
+  void addFilterChainInternal(
+      absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
+      FilterChainFactoryBuilder& b);
+
   static bool isWildcardServerName(const std::string& name);
 
-private:
-  void convertIPsToTries();
+  // TODO(silentdai): implement Config::SubscriptionCallbacks
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override {
+    ENVOY_LOG(info, "{}{}", resources.size(), version_info);
+  }
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string& system_version_info) override {
+    ENVOY_LOG(info, "{}{}{}", added_resources.size(), removed_resources.size(),
+              system_version_info);
+  }
+  void onConfigUpdateFailed(const EnvoyException* e) override { throw *e; }
+
+  std::string resourceName(const ProtobufWkt::Any& resource) override;
+
+  // In order to share between internal class
   using SourcePortsMap = absl::flat_hash_map<uint16_t, Network::FilterChainSharedPtr>;
   using SourcePortsMapSharedPtr = std::shared_ptr<SourcePortsMap>;
   using SourceIPsMap = absl::flat_hash_map<std::string, SourcePortsMapSharedPtr>;
@@ -59,7 +93,9 @@ private:
   using DestinationIPsTriePtr = std::unique_ptr<DestinationIPsTrie>;
   using DestinationPortsMap =
       absl::flat_hash_map<uint16_t, std::pair<DestinationIPsMap, DestinationIPsTriePtr>>;
+  static void convertIPsToTries(DestinationPortsMap& destination_ports_map);
 
+private:
   void addFilterChainForDestinationPorts(
       DestinationPortsMap& destination_ports_map, uint16_t destination_port,
       const std::vector<std::string>& destination_ips,
@@ -128,10 +164,59 @@ private:
   findFilterChainForSourceIpAndPort(const SourceIPsTrie& source_ips_trie,
                                     const Network::ConnectionSocket& socket) const;
 
-  // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
-  // and application protocols, using structures defined above.
-  DestinationPortsMap destination_ports_map_;
-  const Network::Address::InstanceConstSharedPtr address_;
+  struct FilterChainLookup {
+    // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
+    // and application protocols, using structures defined above.
+    DestinationPortsMap destination_ports_map_;
+
+    std::unordered_map<FcProto, std::shared_ptr<Network::FilterChain>, MessageUtil, MessageUtil>
+        existing_active_filter_chains_;
+
+    // Used during warm up, notified by dependencies, and notify parent that the index is ready.
+    Init::ManagerImpl dynamic_init_manager_{"lookup_init_manager"};
+
+    // `has_active_lookup_` is tricky here. It seems the condition is mutable. However, if we
+    // maintain the invariable below, in each lifetime of `FilterChainLookup` the value never
+    // change. To `FilterChainLookup` user Only transform the current `warming_lookup_` to
+    // `active_lookup_` Access `has_active_lookup_` at the beginning of `FilterChainLookup`. The
+    // value is stale soon after. Consider the case
+    //   another FCDS update request comes and new warming lookup is created.
+    // Access `has_active_lookup_` from main thread.
+    bool has_active_lookup_{false};
+
+    std::unique_ptr<Init::Watcher> init_watcher_;
+
+    Init::Manager& getInitManager() { return dynamic_init_manager_; }
+    void initialize();
+  };
+
+  std::unique_ptr<FilterChainLookup> createFilterChainLookup();
+
+  void warmed(FilterChainLookup* warming_lookup);
+
+  // The invariant:
+  // Once the active one is ready, there is always an active one until shutdown.
+  // Warming one could be replaced by another warming lookup. The user is responsible for not
+  // overriding a new warming one by elder one. The warming lookup may replace the active_lookup
+  // atomically, or replaced by another warming up. If warming one is replaced by another warming
+  // one, the former one should have no side effect. If the warming eventually replaces the active
+  // one, the warming one could assume the active one never changed durign the warm up.
+  std::shared_ptr<FilterChainLookup> active_lookup_;
+  std::shared_ptr<FilterChainLookup> warming_lookup_;
+
+  Init::Manager& init_manager_;
+  bool target_ready_{false};
+  Init::TargetImpl init_target_{"filter_chain_manager", [this]() {
+                                  ENVOY_LOG(debug, "initializing filter chain manager");
+                                  // It's possible that the dependency is completed before adding to
+                                  // init manager.
+                                  if (target_ready_) {
+                                    init_target_.ready();
+                                  }
+                                }};
+
+  // The address should never change during the lifetime of the filter chain manager.
+  Network::Address::InstanceConstSharedPtr address_;
 };
 
 class FilterChainImpl : public Network::FilterChain {

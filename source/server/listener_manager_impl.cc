@@ -186,7 +186,6 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
                            ListenerManagerImpl& parent, const std::string& name, bool modifiable,
                            bool workers_started, uint64_t hash)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
-      filter_chain_manager_(address_),
       socket_type_(Network::Utility::protobufAddressSocketType(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
@@ -199,6 +198,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), modifiable_(modifiable),
       workers_started_(workers_started), hash_(hash),
       dynamic_init_manager_(fmt::format("Listener {}", name)),
+      filter_chain_manager_(getInitManager(), address_),
       init_watcher_(std::make_unique<Init::WatcherImpl>(
           "ListenerImpl", [this] { parent_.onListenerWarmed(*this); })),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
@@ -275,15 +275,6 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
   }
 
-  Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
-      parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
-      parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
-      parent_.server_.threadLocal(), parent_.server_.messageValidationVisitor(),
-      parent_.server_.api());
-  factory_context.setInitManager(initManager());
-  ListenerFilterChainFactoryBuilder builder(*this, factory_context);
-  filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
   const bool need_tls_inspector =
       std::any_of(
           config.filter_chains().begin(), config.filter_chains().end(),
@@ -384,15 +375,23 @@ void ListenerImpl::initialize() {
   if (workers_started_) {
     dynamic_init_manager_.initialize(*init_watcher_);
   }
+
+  // moved from constructor
+  Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
+      parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
+      parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
+      parent_.server_.threadLocal(), parent_.server_.messageValidationVisitor(),
+      parent_.server_.api());
+  // moved to filter_chain_manager_
+  // factory_context.setInitManager(initManager());
+  ListenerFilterChainFactoryBuilder filter_chain_factory_builder(*this, factory_context);
+  filter_chain_manager_.addFilterChain(config_.filter_chains(), filter_chain_factory_builder);
 }
 
 Init::Manager& ListenerImpl::initManager() {
-  // See initialize() for why we choose different init managers to return.
-  if (workers_started_) {
-    return dynamic_init_manager_;
-  } else {
-    return parent_.server_.initManager();
-  }
+  // delegate to non-virtual function
+  return getInitManager();
 }
 
 void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
@@ -509,7 +508,6 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   ListenerImplPtr new_listener(
       new ListenerImpl(config, version_info, *this, name, modifiable, workers_started_, hash));
   ListenerImpl& new_listener_ref = *new_listener;
-
   // We mandate that a listener with the same name must have the same configured address. This
   // avoids confusion during updates and allows us to use the same bound address. Note that in
   // the case of port 0 binding, the new listener will implicitly use the same bound port from
@@ -541,7 +539,13 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
       warming_listeners_.emplace_back(std::move(new_listener));
     } else {
       new_listener->debugLog("update active listener");
+      updateWarmingActiveGauges();
+      stats_.listener_modified_.inc();
+      // Initialize before free the existing listener. Otherwise the existing listener might be the
+      // last one in warming state and notify the global init manager that all targets are done.
+      new_listener_ref.initialize();
       *existing_active_listener = std::move(new_listener);
+      return true;
     }
   } else {
     // Typically we catch address issues when we try to bind to the same address multiple times.
@@ -803,8 +807,12 @@ ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
     : parent_(listener), factory_context_(factory_context) {}
 
+void ListenerFilterChainFactoryBuilder::setInitManager(Init::Manager& init_manager) {
+  factory_context_.setInitManager(init_manager);
+}
+
 std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
-    const ::envoy::api::v2::listener::FilterChain& filter_chain) const {
+    const ::envoy::api::v2::listener::FilterChain& filter_chain) {
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
   // We copy by value first then override if necessary.

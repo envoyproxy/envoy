@@ -25,6 +25,7 @@ void ManagerImpl::add(const Target& target) {
     // it's important in this case that count_ was incremented above before calling the target,
     // because if the target calls the init manager back immediately, count_ will be decremented
     // here (see the definition of watcher_ above).
+    ENVOY_LOG(debug, "initializing {} on {}", target.name(), name_);
     target_handle->initialize(watcher_);
     return;
   case State::Initialized:
@@ -65,6 +66,7 @@ void ManagerImpl::onTargetReady() {
 
   // If there are no uninitialized targets remaining when called back by a target, that means it was
   // the last. Signal `ready` to the handle we saved in `initialize`.
+  ENVOY_LOG(debug, "FOO: init manager {} has count {} and desc counter ", name_, count_);
   if (--count_ == 0) {
     ready();
   }

@@ -276,17 +276,42 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "fcds_api_lib",
+    srcs = ["fcds_api.cc"],
+    hdrs = ["fcds_api.h"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/init:manager_interface",
+        "//include/envoy/server:listener_manager_interface",
+        "//source/common/common:cleanup_lib",
+        "//source/common/config:resources_lib",
+        "//source/common/config:subscription_factory_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/init:target_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2:fcds_cc",
+        "@envoy_api//envoy/api/v2:lds_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_chain_manager_lib",
     srcs = ["filter_chain_manager_impl.cc"],
     hdrs = ["filter_chain_manager_impl.h"],
     deps = [
+        ":configuration_lib",
+        ":drain_manager_lib",
+        ":fcds_api_lib",
+        ":lds_api_lib",
+        ":transport_socket_config_lib",
+        "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
+        "//source/common/init:manager_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:lc_trie_lib",
-        "//source/server:configuration_lib",
     ],
 )
 

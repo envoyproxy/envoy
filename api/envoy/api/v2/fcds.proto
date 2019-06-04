@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package envoy.api.v2;
+
+option java_outer_classname = "FcdsProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.api.v2";
+
+option java_generic_services = true;
+
+import "envoy/api/v2/core/address.proto";
+import "envoy/api/v2/core/base.proto";
+import "envoy/api/v2/discovery.proto";
+
+import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.equal_all) = true;
+
+// [#protodoc-title: FilterChain]
+// FilterChain :ref:`configuration overview <config_filterchains>`
+
+// The Envoy instance initiates an RPC at startup to discover a list of
+// FilterChains. Existing connections which bind to obsoleted filterchains
+// will be drained.
+// [#not-implemented-hide:]
+service FilterChainDiscoveryService {
+  rpc StreamFilterChains(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
+  }
+
+  rpc DeltaFilterChains(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  }
+
+  rpc FetchFilterChains(DiscoveryRequest) returns (DiscoveryResponse) {
+    option (google.api.http) = {
+      post: "/v2/discovery:filterchains"
+      body: "*"
+    };
+  }
+}

@@ -18,6 +18,7 @@
 
 #include "server/filter_chain_manager_impl.h"
 #include "server/lds_api.h"
+#include "server/transport_socket_config_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -336,9 +337,18 @@ public:
   SystemTime last_updated_;
 
 private:
+  // A non-virtual implementation that could be used in constuctor.
+  Init::Manager& getInitManager() {
+    // See initialize() for why we choose different init managers to return.
+    if (workers_started_) {
+      return dynamic_init_manager_;
+    } else {
+      return parent_.server_.initManager();
+    }
+  }
+
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
-  FilterChainManagerImpl filter_chain_manager_;
 
   Network::Address::SocketType socket_type_;
   Network::SocketSharedPtr socket_;
@@ -356,6 +366,9 @@ private:
   // This init manager is populated with targets from the filter chain factories, namely
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
   Init::ManagerImpl dynamic_init_manager_;
+
+  // filter_chain_manager depends on dynamic_init_manager_
+  FilterChainManagerImpl filter_chain_manager_;
 
   // This init watcher, if available, notifies the "parent" listener manager when listener
   // initialization is complete. It may be reset to cancel interest.
@@ -375,13 +388,15 @@ private:
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
   ListenerFilterChainFactoryBuilder(
+      // TODO(silentdai): move construct factory_context
       ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
+  void setInitManager(Init::Manager& init_manager) override;
   std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const override;
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) override;
 
 private:
   ListenerImpl& parent_;
-  Configuration::TransportSocketFactoryContextImpl& factory_context_;
+  Configuration::TransportSocketFactoryContextImpl factory_context_;
 };
 
 } // namespace Server

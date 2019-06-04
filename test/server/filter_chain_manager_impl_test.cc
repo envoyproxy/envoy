@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/init/manager.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -51,9 +52,14 @@ namespace Server {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 
   std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&) const override {
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) override {
+    UNREFERENCED_PARAMETER(filter_chain);
     // Won't dereference but requires not nullptr.
     return std::make_unique<Network::MockFilterChain>();
+  }
+  // Not yet used by the this test
+  void setInitManager(Init::Manager& init_manager) override {
+    UNREFERENCED_PARAMETER(init_manager);
   }
 };
 
@@ -65,6 +71,18 @@ public:
     TestUtility::loadFromYaml(
         TestEnvironment::substitute(filter_chain_yaml, Network::Address::IpVersion::v4),
         filter_chain_template_);
+    TestUtility::loadFromYaml(
+        TestEnvironment::substitute(filter_chain_yaml_peer, Network::Address::IpVersion::v4),
+        filter_chain_template_peer_);
+    init_manager_ =
+        std::make_unique<Init::ManagerImpl>("filter_chain_manager_init_manager_in_test");
+
+    filter_chain_manager_ = std::make_unique<FilterChainManagerImpl>(
+        *init_manager_, std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+    init_watcher_ = std::make_unique<Init::WatcherImpl>("filter_chain_manager_watcher", []() {
+      ENVOY_LOG_MISC(warn, "filter chain manager initialized.");
+    });
+    init_manager_->initialize(*init_watcher_);
   }
 
   const Network::FilterChain*
@@ -96,11 +114,11 @@ public:
       remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
     ON_CALL(*mock_socket, remoteAddress()).WillByDefault(ReturnRef(remote_address_));
-    return filter_chain_manager_.findFilterChain(*mock_socket);
+    return filter_chain_manager_->findFilterChain(*mock_socket);
   }
 
   void addSingleFilterChainHelper(const envoy::api::v2::listener::FilterChain& filter_chain) {
-    filter_chain_manager_.addFilterChain(
+    filter_chain_manager_->addFilterChain(
         std::vector<const envoy::api::v2::listener::FilterChain*>{&filter_chain},
         filter_chain_factory_builder_);
   }
@@ -123,12 +141,25 @@ public:
           keys:
           - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
   )EOF";
+  const std::string filter_chain_yaml_peer = R"EOF(
+      filter_chain_match:
+        destination_port: 10001
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+        session_ticket_keys:
+          keys:
+          - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+  )EOF";
   envoy::api::v2::listener::FilterChain filter_chain_template_;
+  envoy::api::v2::listener::FilterChain filter_chain_template_peer_;
   MockFilterChainFactoryBuilder filter_chain_factory_builder_;
-
-  // Test target.
-  FilterChainManagerImpl filter_chain_manager_{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
+  std::unique_ptr<Init::Manager> init_manager_;
+  std::unique_ptr<Init::Watcher> init_watcher_;
+  // Test target
+  std::unique_ptr<FilterChainManagerImpl> filter_chain_manager_;
 };
 
 TEST_F(FilterChainManagerImplTest, FilterChainMatchNothing) {
@@ -138,8 +169,28 @@ TEST_F(FilterChainManagerImplTest, FilterChainMatchNothing) {
 
 TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
   addSingleFilterChainHelper(filter_chain_template_);
-  auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
-  EXPECT_NE(filter_chain, nullptr);
+  auto* filter_chain_10000 =
+      findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_NE(filter_chain_10000, nullptr);
+  auto* filter_chain_10001 =
+      findFilterChainHelper(10001, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain_10001, nullptr);
+}
+
+TEST_F(FilterChainManagerImplTest, OverrideSingleFilterChain) {
+  addSingleFilterChainHelper(filter_chain_template_);
+  auto* filter_chain_10000 =
+      findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_NE(filter_chain_10000, nullptr);
+  auto* filter_chain_10001 =
+      findFilterChainHelper(10001, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain_10001, nullptr);
+  // replace port 10000 by 10001
+  addSingleFilterChainHelper(filter_chain_template_peer_);
+  filter_chain_10000 = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  filter_chain_10001 = findFilterChainHelper(10001, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_NE(filter_chain_10001, nullptr);
+  EXPECT_EQ(filter_chain_10000, nullptr);
 }
 } // namespace Server
 } // namespace Envoy
