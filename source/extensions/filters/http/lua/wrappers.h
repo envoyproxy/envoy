@@ -208,10 +208,8 @@ private:
  */
 class PublicKeyWrapper : public Filters::Common::Lua::BaseLuaObject<PublicKeyWrapper> {
 public:
-  PublicKeyWrapper(const Envoy::Common::Crypto::PublicKeyPtr* key) : public_key_(key) {}
+  PublicKeyWrapper(Envoy::Common::Crypto::PublicKeyPtr key) : public_key_(std::move(key)) {}
   static ExportedFunctions exportedFunctions() { return {{"get", static_luaGet}}; }
-
-  ~PublicKeyWrapper() { delete public_key_; }
 
 private:
   /**
@@ -220,7 +218,7 @@ private:
    */
   DECLARE_LUA_FUNCTION(PublicKeyWrapper, luaGet);
 
-  const Envoy::Common::Crypto::PublicKeyPtr* public_key_;
+  Envoy::Common::Crypto::PublicKeyPtr public_key_;
 };
 
 } // namespace Lua

@@ -73,14 +73,12 @@ const VerificationOutput Utility::verifySignature(const absl::string_view& hash,
     return {true, ""};
   }
 
-  std::string err_msg;
-  absl::StrAppend(&err_msg, "Failed to verify digest. Error code: ", ok);
-  return {false, err_msg};
+  return {false, absl::StrCat("Failed to verify digest. Error code: ", ok)};
 }
 
-const PublicKeyPtr* Utility::importPublicKey(const std::vector<uint8_t>& key) {
+PublicKeyPtr Utility::importPublicKey(const std::vector<uint8_t>& key) {
   CBS cbs({key.data(), key.size()});
-  return new PublicKeyPtr(EVP_parse_public_key(&cbs));
+  return PublicKeyPtr(EVP_parse_public_key(&cbs));
 }
 
 const EVP_MD* Utility::getHashFunction(const absl::string_view& name) {

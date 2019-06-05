@@ -60,14 +60,12 @@ TEST(UtilityTest, TestImportPublicKey) {
              "183f550dac19abcf1145a7f9ced987db680e4a229cac75dee347ec9ebce1fc3dbbbb0203010001";
 
   auto pub_key = Utility::importPublicKey(Hex::decode(key));
-  EXPECT_NE(nullptr, pub_key->get());
-  delete pub_key;
+  EXPECT_NE(nullptr, pub_key.get());
 
   key = "badkey";
 
   pub_key = Utility::importPublicKey(Hex::decode(key));
-  EXPECT_EQ(nullptr, pub_key->get());
-  delete pub_key;
+  EXPECT_EQ(nullptr, pub_key.get());
 }
 
 TEST(UtilityTest, TestVerifySignature) {
@@ -93,12 +91,12 @@ TEST(UtilityTest, TestVerifySignature) {
   std::vector<uint8_t> text(data, data + strlen(data));
 
   auto sig = Hex::decode(signature);
-  auto result = Utility::verifySignature(hash_func, pub_key->get(), sig, text);
+  auto result = Utility::verifySignature(hash_func, pub_key.get(), sig, text);
 
   EXPECT_EQ(true, result.result_);
   EXPECT_EQ("", result.error_message_);
 
-  result = Utility::verifySignature("unknown", pub_key->get(), sig, text);
+  result = Utility::verifySignature("unknown", pub_key.get(), sig, text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("unknown is not supported.", result.error_message_);
 
@@ -108,17 +106,15 @@ TEST(UtilityTest, TestVerifySignature) {
 
   data = "baddata";
   text = std::vector<uint8_t>(data, data + strlen(data));
-  result = Utility::verifySignature(hash_func, pub_key->get(), sig, text);
+  result = Utility::verifySignature(hash_func, pub_key.get(), sig, text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("Failed to verify digest. Error code: 0", result.error_message_);
 
   data = "hello";
   text = std::vector<uint8_t>(data, data + strlen(data));
-  result = Utility::verifySignature(hash_func, pub_key->get(), Hex::decode("000000"), text);
+  result = Utility::verifySignature(hash_func, pub_key.get(), Hex::decode("000000"), text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("Failed to verify digest. Error code: 0", result.error_message_);
-
-  delete pub_key;
 }
 
 } // namespace

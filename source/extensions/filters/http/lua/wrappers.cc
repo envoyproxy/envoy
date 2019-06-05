@@ -175,10 +175,10 @@ int DynamicMetadataMapWrapper::luaPairs(lua_State* state) {
 }
 
 int PublicKeyWrapper::luaGet(lua_State* state) {
-  if (public_key_ == nullptr || public_key_->get() == nullptr) {
+  if (public_key_ == nullptr || public_key_.get() == nullptr) {
     lua_pushnil(state);
   } else {
-    lua_pushlightuserdata(state, public_key_->get());
+    lua_pushlightuserdata(state, public_key_.get());
   }
   return 1;
 }

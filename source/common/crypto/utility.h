@@ -62,7 +62,7 @@ public:
    * @param key key string
    * @return pointer to public key
    */
-  static const PublicKeyPtr* importPublicKey(const std::vector<uint8_t>& key);
+  static PublicKeyPtr importPublicKey(const std::vector<uint8_t>& key);
 
 private:
   static const EVP_MD* getHashFunction(const absl::string_view& name);
