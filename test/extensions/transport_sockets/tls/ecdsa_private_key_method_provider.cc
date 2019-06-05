@@ -112,6 +112,14 @@ EcdsaPrivateKeyMethodProvider::getBoringSslPrivateKeyMethod() {
   return method_;
 }
 
+bool EcdsaPrivateKeyMethodProvider::checkFips() {
+  const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey_.get());
+  if (ecdsa_private_key == nullptr || !EC_KEY_check_fips(ecdsa_private_key)) {
+    return false;
+  }
+  return true;
+}
+
 EcdsaPrivateKeyConnection::EcdsaPrivateKeyConnection(
     SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher,
     bssl::UniquePtr<EVP_PKEY> pkey, EcdsaPrivateKeyConnectionTestOptions& test_options)
@@ -121,14 +129,7 @@ EcdsaPrivateKeyConnection::EcdsaPrivateKeyConnection(
 
 Ssl::PrivateKeyConnectionPtr EcdsaPrivateKeyMethodProvider::getPrivateKeyConnection(
     SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher) {
-  bssl::UniquePtr<BIO> bio(
-      BIO_new_mem_buf(const_cast<char*>(private_key_.data()), private_key_.size()));
-  bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
-  if (pkey == nullptr) {
-    return nullptr;
-  }
-
-  return std::make_unique<EcdsaPrivateKeyConnection>(ssl, cb, dispatcher, move(pkey),
+  return std::make_unique<EcdsaPrivateKeyConnection>(ssl, cb, dispatcher, bssl::UpRef(pkey_),
                                                      test_options_);
 }
 
@@ -155,7 +156,19 @@ EcdsaPrivateKeyMethodProvider::EcdsaPrivateKeyMethodProvider(
     }
   }
 
-  private_key_ = factory_context.api().fileSystem().fileReadToEnd(private_key_path);
+  std::string private_key = factory_context.api().fileSystem().fileReadToEnd(private_key_path);
+  bssl::UniquePtr<BIO> bio(
+      BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
+  bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+  if (pkey == nullptr) {
+    throw EnvoyException("Failed to read private key from disk.");
+  }
+
+  if (EVP_PKEY_id(pkey.get()) != EVP_PKEY_EC) {
+    throw EnvoyException("Private key is of wrong type.");
+  }
+
+  pkey_ = std::move(pkey);
 
   method_ = std::make_shared<SSL_PRIVATE_KEY_METHOD>();
   method_->sign = privateKeySign;

@@ -49,14 +49,14 @@ public:
   Ssl::PrivateKeyConnectionPtr getPrivateKeyConnection(SSL* ssl,
                                                        Ssl::PrivateKeyConnectionCallbacks& cb,
                                                        Event::Dispatcher& dispatcher) override;
-  bool checkFips() override { return false; };
+  bool checkFips() override;
   Ssl::BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() override;
 
   static int ssl_ecdsa_connection_index;
 
 private:
   Ssl::BoringSslPrivateKeyMethodSharedPtr method_{};
-  std::string private_key_;
+  bssl::UniquePtr<EVP_PKEY> pkey_;
   EcdsaPrivateKeyConnectionTestOptions test_options_;
 };
 

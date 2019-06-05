@@ -4432,9 +4432,8 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertFail) {
 )EOF";
 
   TestUtilOptions failing_test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
-  testUtil(failing_test_options.setPrivateKeyMethodExpected(true)
-               .setExpectedServerCloseEvent(Network::ConnectionEvent::RemoteClose)
-               .setExpectedServerStats("ssl.connection_error"));
+  EXPECT_THROW_WITH_MESSAGE(testUtil(failing_test_options.setPrivateKeyMethodExpected(true)),
+                            EnvoyException, "Private key is of wrong type.")
 }
 
 // Test ECDSA private key method provider.

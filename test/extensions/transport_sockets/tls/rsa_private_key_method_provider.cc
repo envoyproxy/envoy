@@ -188,6 +188,14 @@ RsaPrivateKeyMethodProvider::getBoringSslPrivateKeyMethod() {
   return method_;
 }
 
+bool RsaPrivateKeyMethodProvider::checkFips() {
+  RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey_.get());
+  if (rsa_private_key == nullptr || !RSA_check_fips(rsa_private_key)) {
+    return false;
+  }
+  return true;
+}
+
 RsaPrivateKeyConnection::RsaPrivateKeyConnection(SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb,
                                                  Event::Dispatcher& dispatcher,
                                                  bssl::UniquePtr<EVP_PKEY> pkey,
@@ -198,7 +206,6 @@ RsaPrivateKeyConnection::RsaPrivateKeyConnection(SSL* ssl, Ssl::PrivateKeyConnec
 
 Ssl::PrivateKeyConnectionPtr RsaPrivateKeyMethodProvider::getPrivateKeyConnection(
     SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher) {
-
   return std::make_unique<RsaPrivateKeyConnection>(ssl, cb, dispatcher, bssl::UpRef(pkey_),
                                                    test_options_);
 }
@@ -250,6 +257,11 @@ RsaPrivateKeyMethodProvider::RsaPrivateKeyMethodProvider(
   if (pkey == nullptr) {
     throw EnvoyException("Failed to read private key from disk.");
   }
+
+  if (EVP_PKEY_id(pkey.get()) != EVP_PKEY_RSA) {
+    throw EnvoyException("Private key is of wrong type.");
+  }
+
   pkey_ = std::move(pkey);
 
   method_ = std::make_shared<SSL_PRIVATE_KEY_METHOD>();

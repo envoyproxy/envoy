@@ -65,7 +65,7 @@ public:
   Ssl::PrivateKeyConnectionPtr getPrivateKeyConnection(SSL* ssl,
                                                        Ssl::PrivateKeyConnectionCallbacks& cb,
                                                        Event::Dispatcher& dispatcher) override;
-  bool checkFips() override { return false; };
+  bool checkFips() override;
   Ssl::BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() override;
 
   static int ssl_rsa_connection_index;
