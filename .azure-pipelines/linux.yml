@@ -1,7 +1,7 @@
 resources:
   containers:
   - container: envoy-build
-    image: envoyproxy/envoy-build:07f65995ece0b8a21bb2888d07a8c1d060e7daaa
+    image: envoyproxy/envoy-build:ec38ecb88fd1abe55ab1daa2f6bd239ffccc9d98
 
 jobs:
 - job: BuildEnvoy

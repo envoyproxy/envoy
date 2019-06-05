@@ -61,7 +61,7 @@ REGISTER_FACTORY(HeaderToFilterStateFilterConfig,
 
 std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks) {
   JwtAuthentication proto_config;
-  MessageUtil::loadFromYaml(config_str, proto_config);
+  TestUtility::loadFromYaml(config_str, proto_config);
 
   if (use_local_jwks) {
     auto& provider0 = (*proto_config.mutable_providers())[std::string(ProviderName)];
@@ -72,7 +72,7 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
 
   HttpFilter filter;
   filter.set_name(HttpFilterNames::get().JwtAuthn);
-  MessageUtil::jsonConvert(proto_config, *filter.mutable_config());
+  TestUtility::jsonConvert(proto_config, *filter.mutable_config());
   return MessageUtil::getJsonStringFromMessage(filter);
 }
 

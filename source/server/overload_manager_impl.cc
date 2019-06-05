@@ -41,7 +41,8 @@ std::string StatsName(const std::string& a, const std::string& b) {
 
 OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadAction& config,
                                Stats::Scope& stats_scope)
-    : active_gauge_(stats_scope.gauge(StatsName(config.name(), "active"))) {
+    : active_gauge_(stats_scope.gauge(StatsName(config.name(), "active"),
+                                      Stats::Gauge::ImportMode::Accumulate)) {
   for (const auto& trigger_config : config.triggers()) {
     TriggerPtr trigger;
 
@@ -87,7 +88,8 @@ bool OverloadAction::isActive() const { return !fired_triggers_.empty(); }
 OverloadManagerImpl::OverloadManagerImpl(
     Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
     ThreadLocal::SlotAllocator& slot_allocator,
-    const envoy::config::overload::v2alpha::OverloadManager& config, Api::Api& api)
+    const envoy::config::overload::v2alpha::OverloadManager& config,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : started_(false), dispatcher_(dispatcher), tls_(slot_allocator.allocateSlot()),
       refresh_interval_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))) {
@@ -97,7 +99,7 @@ OverloadManagerImpl::OverloadManagerImpl(
     ENVOY_LOG(debug, "Adding resource monitor for {}", name);
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::ResourceMonitorFactory>(name);
-    auto config = Config::Utility::translateToFactoryConfig(resource, factory);
+    auto config = Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
     auto monitor = factory.createResourceMonitor(*config, context);
 
     auto result =
@@ -210,7 +212,8 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
 OverloadManagerImpl::Resource::Resource(const std::string& name, ResourceMonitorPtr monitor,
                                         OverloadManagerImpl& manager, Stats::Scope& stats_scope)
     : name_(name), monitor_(std::move(monitor)), manager_(manager), pending_update_(false),
-      pressure_gauge_(stats_scope.gauge(StatsName(name, "pressure"))),
+      pressure_gauge_(
+          stats_scope.gauge(StatsName(name, "pressure"), Stats::Gauge::ImportMode::NeverImport)),
       failed_updates_counter_(stats_scope.counter(StatsName(name, "failed_updates"))),
       skipped_updates_counter_(stats_scope.counter(StatsName(name, "skipped_updates"))) {}
 

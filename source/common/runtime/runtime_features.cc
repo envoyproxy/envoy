@@ -5,7 +5,7 @@ namespace Runtime {
 
 // Add additional features here to enable the new code paths by default.
 //
-// Per documentation in CONTRIBUTING.md is is expected that new high risk code paths be guarded
+// Per documentation in CONTRIBUTING.md is expected that new high risk code paths be guarded
 // by runtime feature guards, i.e
 //
 // if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.my_feature_name")) {
@@ -19,7 +19,7 @@ namespace Runtime {
 // New features should be true-by-default for an Envoy release cycle before the
 // old code path is removed.
 //
-// If issues are found that that require a runtime feature to be disabled, it should be reported
+// If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 constexpr const char* runtime_features[] = {

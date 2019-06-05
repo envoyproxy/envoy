@@ -17,7 +17,8 @@ EdsClusterImpl::EdsClusterImpl(
       cm_(factory_context.clusterManager()), local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
-                        : cluster.eds_cluster_config().service_name()) {
+                        : cluster.eds_cluster_config().service_name()),
+      validation_visitor_(factory_context.messageValidationVisitor()) {
   Config::Utility::checkLocalInfo("eds", local_info_);
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   Runtime::RandomGenerator& random = factory_context.random();
@@ -26,13 +27,11 @@ EdsClusterImpl::EdsClusterImpl(
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
       eds_config, local_info_, dispatcher, cm, random, info_->statsScope(),
-      "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-      "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints",
       Grpc::Common::typeUrl(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
-      factory_context.api());
+      factory_context.messageValidationVisitor(), factory_context.api(), *this);
 }
 
-void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }
+void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
 
 void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
   std::unordered_map<std::string, HostSharedPtr> updated_hosts;
@@ -104,8 +103,8 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
   if (!validateUpdateSize(resources.size())) {
     return;
   }
-  auto cluster_load_assignment =
-      MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[0]);
+  auto cluster_load_assignment = MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(
+      resources[0], validation_visitor_);
   MessageUtil::validate(cluster_load_assignment);
   if (cluster_load_assignment.cluster_name() != cluster_name_) {
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
@@ -132,7 +131,9 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
 void EdsClusterImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
     const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-  validateUpdateSize(resources.size());
+  if (!validateUpdateSize(resources.size())) {
+    return;
+  }
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
   *unwrapped_resource.Add() = resources[0].resource();
   onConfigUpdate(unwrapped_resource, resources[0].version());

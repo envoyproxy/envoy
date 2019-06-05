@@ -18,6 +18,7 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/router/rds.h"
+#include "envoy/router/scopes.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/ssl/connection.h"
@@ -491,6 +492,7 @@ private:
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
+    Router::ScopedConfigConstSharedPtr snapped_scoped_route_config_;
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};

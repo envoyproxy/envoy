@@ -212,6 +212,12 @@ public:
    * @return the flush interval of stats sinks.
    */
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
 } // namespace Server
