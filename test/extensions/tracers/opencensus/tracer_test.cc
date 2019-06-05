@@ -233,7 +233,7 @@ TEST(OpenCensusTracerTest, PropagateTraceContext) {
 
 namespace {
 
-// Create a Span using the given oc_config and return how many spans made it to
+// Create a Span using the given config and return how many spans made it to
 // the exporter (either zero or one).
 int SamplerTestHelper(const OpenCensusConfig& oc_config) {
   registerSpanCatcher();
