@@ -20,6 +20,7 @@ struct VerificationOutput {
 
   /**
    * Error message when verification failed.
+   * TODO(crazyxy): switch to absl::StatusOr when available
    */
   std::string error_message_;
 };
@@ -53,7 +54,7 @@ public:
    * @return If the result_ is true, the error_message_ is empty; otherwise,
    * the error_message_ stores the error message
    */
-  static const VerificationOutput verifySignature(const absl::string_view& hash, void* key,
+  static const VerificationOutput verifySignature(const absl::string_view hash, EVP_PKEY* key,
                                                   const std::vector<uint8_t>& signature,
                                                   const std::vector<uint8_t>& text);
 
@@ -65,7 +66,7 @@ public:
   static PublicKeyPtr importPublicKey(const std::vector<uint8_t>& key);
 
 private:
-  static const EVP_MD* getHashFunction(const absl::string_view& name);
+  static const EVP_MD* getHashFunction(const absl::string_view name);
 };
 
 } // namespace Crypto

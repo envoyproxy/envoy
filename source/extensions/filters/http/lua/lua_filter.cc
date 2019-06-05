@@ -447,7 +447,8 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   const std::vector<uint8_t> text_vec(clear_text, clear_text + text_len);
 
   // Step 5: verify signature
-  auto output = Common::Crypto::Utility::verifySignature(hash, ptr, sig_vec, text_vec);
+  auto output = Common::Crypto::Utility::verifySignature(hash, reinterpret_cast<EVP_PKEY*>(ptr),
+                                                         sig_vec, text_vec);
 
   lua_pushboolean(state, output.result_);
   if (output.result_) {
