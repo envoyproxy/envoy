@@ -13,8 +13,6 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/edf_scheduler.h"
 
-#include "absl/types/optional.h"
-
 namespace Envoy {
 namespace Upstream {
 
