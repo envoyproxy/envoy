@@ -291,7 +291,7 @@ message HttpConnectionManager {
   // <config_http_conn_man_headers_x-request-id>` header if passed for a request that is edge
   // (Edge request is the request from external clients to front Envoy) and not reset it, which
   // is the current Envoy behaviour. This defaults to false.
-  google.protobuf.BoolValue edge_accept_request_id = 32;
+  bool edge_accept_request_id = 32;
 
   // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP
   // header.
