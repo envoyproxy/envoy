@@ -10,6 +10,7 @@
 #include "envoy/grpc/status.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/cleanup.h"
 #include "common/common/logger.h"
 #include "common/config/grpc_stream.h"
 #include "common/config/utility.h"
@@ -52,27 +53,32 @@ public:
 private:
   void setRetryTimer();
 
-  struct GrpcMuxWatchImpl : public GrpcMuxWatch {
+  struct GrpcMuxWatchImpl : public GrpcMuxWatch, RaiiListElement<GrpcMuxWatchImpl*> {
     GrpcMuxWatchImpl(const std::set<std::string>& resources, GrpcMuxCallbacks& callbacks,
                      const std::string& type_url, GrpcMuxImpl& parent)
-        : resources_(resources), callbacks_(callbacks), type_url_(type_url), parent_(parent),
-          inserted_(true) {
-      entry_ = parent.api_state_[type_url].watches_.emplace(
-          parent.api_state_[type_url].watches_.begin(), this);
-    }
+        : RaiiListElement<GrpcMuxWatchImpl*>(parent.api_state_[type_url].watches_, this),
+          resources_(resources), callbacks_(callbacks), type_url_(type_url), parent_(parent),
+          inserted_(true) {}
     ~GrpcMuxWatchImpl() override {
       if (inserted_) {
-        parent_.api_state_[type_url_].watches_.erase(entry_);
+        erase();
         if (!resources_.empty()) {
           parent_.sendDiscoveryRequest(type_url_);
         }
       }
     }
+
+    void clear() {
+      inserted_ = false;
+      cancel();
+    }
+
     std::set<std::string> resources_;
     GrpcMuxCallbacks& callbacks_;
     const std::string type_url_;
     GrpcMuxImpl& parent_;
-    std::list<GrpcMuxWatchImpl*>::iterator entry_;
+
+  private:
     bool inserted_;
   };
 

@@ -62,7 +62,7 @@ providers:
 class ExtractorTest : public testing::Test {
 public:
   void SetUp() override {
-    MessageUtil::loadFromYaml(ExampleConfig, config_);
+    TestUtility::loadFromYaml(ExampleConfig, config_);
     extractor_ = Extractor::create(config_);
   }
 

@@ -710,6 +710,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
 
   for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
     if (shouldShowMetric(gauge, used_only, regex)) {
+      ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
       all_stats.emplace(gauge->name(), gauge->value());
     }
   }
@@ -1102,7 +1103,12 @@ Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMa
   }
   std::unordered_map<std::string, std::string> overrides;
   overrides.insert(params.begin(), params.end());
-  server_.runtime().mergeValues(overrides);
+  try {
+    server_.runtime().mergeValues(overrides);
+  } catch (const EnvoyException& e) {
+    response.add(e.what());
+    return Http::Code::ServiceUnavailable;
+  }
   response.add("OK\n");
   return Http::Code::OK;
 }
@@ -1157,6 +1163,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
+      scoped_route_config_provider_(server.timeSource()),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},

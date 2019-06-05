@@ -10,6 +10,7 @@
 #include "test/test_common/simulated_time_system.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -23,7 +24,7 @@ namespace {
 envoy::api::v2::ScopedRouteConfiguration
 parseScopedRouteConfigurationFromYaml(const std::string& yaml) {
   envoy::api::v2::ScopedRouteConfiguration scoped_route_config;
-  MessageUtil::loadFromYaml(yaml, scoped_route_config);
+  TestUtility::loadFromYaml(yaml, scoped_route_config);
   return scoped_route_config;
 }
 
@@ -32,15 +33,12 @@ void parseScopedRouteConfigurationFromYaml(ProtobufWkt::Any& scoped_route_config
   scoped_route_config.PackFrom(parseScopedRouteConfigurationFromYaml(yaml));
 }
 
-std::vector<std::unique_ptr<const Protobuf::Message>>
-protosToMessageVec(std::vector<envoy::api::v2::ScopedRouteConfiguration>&& protos) {
-  std::vector<std::unique_ptr<const Protobuf::Message>> messages;
-  for (const auto& proto : protos) {
-    Protobuf::Message* message = proto.New();
-    message->CopyFrom(proto);
-    messages.push_back(std::unique_ptr<const Protobuf::Message>(message));
-  }
-  return messages;
+envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+parseHttpConnectionManagerFromYaml(const std::string& config_yaml) {
+  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+      http_connection_manager;
+  TestUtility::loadFromYaml(config_yaml, http_connection_manager);
+  return http_connection_manager;
 }
 
 class ScopedRoutesTestBase : public testing::Test {
@@ -57,7 +55,7 @@ api_config_source:
     - foo_rds_cluster
   refresh_delay: { seconds: 1, nanos: 0 }
 )EOF";
-    MessageUtil::loadFromYaml(rds_config_yaml, rds_config_source_);
+    TestUtility::loadFromYaml(rds_config_yaml, rds_config_source_);
   }
 
   ~ScopedRoutesTestBase() override { factory_context_.thread_local_.shutdownThread(); }
@@ -108,7 +106,7 @@ scoped_rds:
       refresh_delay: { seconds: 1, nanos: 0 }
 )EOF";
     envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes scoped_routes_config;
-    MessageUtil::loadFromYaml(config_yaml, scoped_routes_config);
+    TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
     provider_ = config_provider_manager_->createXdsConfigProvider(
         scoped_routes_config.scoped_rds(), factory_context_, "foo.",
         ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.name(),
@@ -231,7 +229,7 @@ scoped_rds:
       refresh_delay: { seconds: 1, nanos: 0 }
 )EOF";
   envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes scoped_routes_config;
-  MessageUtil::loadFromYaml(config_yaml, scoped_routes_config);
+  TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
@@ -273,49 +271,56 @@ TEST_F(ScopedRoutesConfigProviderManagerTest, ConfigDump) {
 
   // No routes at all, no last_updated timestamp
   envoy::admin::v2alpha::ScopedRoutesConfigDump expected_config_dump;
-  MessageUtil::loadFromYaml(R"EOF(
+  TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
 dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
   EXPECT_EQ(expected_config_dump.DebugString(), scoped_routes_config_dump.DebugString());
 
-  const std::string config_yaml = R"EOF(
-name: foo
-route_configuration_name: foo-route-config
-key:
-  fragments: { string_key: "172.10.10.10" }
-)EOF";
-  const std::string config_yaml2 = R"EOF(
-name: foo2
-route_configuration_name: foo-route-config2
-key:
-  fragments: { string_key: "172.10.10.20" }
-)EOF";
-  std::vector<std::unique_ptr<const Protobuf::Message>> config_protos =
-      protosToMessageVec({parseScopedRouteConfigurationFromYaml(config_yaml),
-                          parseScopedRouteConfigurationFromYaml(config_yaml2)});
-
   timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
 
-  envoy::config::filter::network::http_connection_manager::v2 ::ScopedRoutes::ScopeKeyBuilder
-      scope_key_builder;
-  MessageUtil::loadFromYaml(R"EOF(
-fragments:
-  - header_value_extractor: { name: X-Google-VIP }
-)EOF",
-                            scope_key_builder);
+  const std::string hcm_base_config_yaml = R"EOF(
+codec_type: auto
+stat_prefix: foo
+http_filters:
+  - name: http_dynamo_filter
+    config:
+scoped_routes:
+  name: $0
+  scope_key_builder:
+    fragments:
+      - header_value_extractor: { name: X-Google-VIP }
+  rds_config_source:
+    api_config_source:
+      api_type: REST
+      cluster_names:
+        - foo_rds_cluster
+      refresh_delay: { seconds: 1, nanos: 0 }
+$1
+)EOF";
+  const std::string inline_scoped_route_configs_yaml = R"EOF(
+  scoped_route_configurations_list:
+    scoped_route_configurations:
+      - name: foo
+        route_configuration_name: foo-route-config
+        key:
+          fragments: { string_key: "172.10.10.10" }
+      - name: foo2
+        route_configuration_name: foo-route-config2
+        key:
+          fragments: { string_key: "172.10.10.20" }
+)EOF";
   // Only load the inline scopes.
-  Envoy::Config::ConfigProviderPtr inline_config =
-      config_provider_manager_->createStaticConfigProvider(
-          std::move(config_protos), factory_context_,
-          ScopedRoutesConfigProviderManagerOptArg("foo-scoped-routes", rds_config_source_,
-                                                  scope_key_builder));
+  Envoy::Config::ConfigProviderPtr inline_config = ScopedRoutesConfigProviderUtil::create(
+      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_base_config_yaml, "foo-scoped-routes",
+                                                          inline_scoped_route_configs_yaml)),
+      factory_context_, "foo.", *config_provider_manager_);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump2 =
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
-  MessageUtil::loadFromYaml(R"EOF(
+  TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
   - name: foo-scoped-routes
     scoped_route_configs:
@@ -336,21 +341,19 @@ dynamic_scoped_route_configs:
   EXPECT_EQ(expected_config_dump.DebugString(), scoped_routes_config_dump2.DebugString());
 
   setupMockClusterMap();
-  envoy::config::filter::network::http_connection_manager::v2::ScopedRds scoped_rds_config;
-  const std::string config_source_yaml = R"EOF(
-scoped_rds_config_source:
-  api_config_source:
-    api_type: REST
-    cluster_names:
-      - foo_cluster
-    refresh_delay: { seconds: 1, nanos: 0 }
+  const std::string scoped_rds_config_yaml = R"EOF(
+  scoped_rds:
+    scoped_rds_config_source:
+      api_config_source:
+        api_type: REST
+        cluster_names:
+          - foo_cluster
+        refresh_delay: { seconds: 1, nanos: 0 }
 )EOF";
-  MessageUtil::loadFromYaml(config_source_yaml, scoped_rds_config);
-  Envoy::Config::ConfigProviderPtr dynamic_provider =
-      config_provider_manager_->createXdsConfigProvider(
-          scoped_rds_config, factory_context_, "foo.",
-          ScopedRoutesConfigProviderManagerOptArg("foo-dynamic-scoped-routes", rds_config_source_,
-                                                  scope_key_builder));
+  Envoy::Config::ConfigProviderPtr dynamic_provider = ScopedRoutesConfigProviderUtil::create(
+      parseHttpConnectionManagerFromYaml(absl::Substitute(
+          hcm_base_config_yaml, "foo-dynamic-scoped-routes", scoped_rds_config_yaml)),
+      factory_context_, "foo.", *config_provider_manager_);
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   resources.Add()->PackFrom(parseScopedRouteConfigurationFromYaml(R"EOF(
@@ -365,7 +368,7 @@ key:
       dynamic_cast<ScopedRdsConfigProvider&>(*dynamic_provider).subscription();
   subscription.onConfigUpdate(resources, "1");
 
-  MessageUtil::loadFromYaml(R"EOF(
+  TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
   - name: foo-scoped-routes
     scoped_route_configs:
@@ -401,7 +404,7 @@ dynamic_scoped_route_configs:
 
   resources.Clear();
   subscription.onConfigUpdate(resources, "2");
-  MessageUtil::loadFromYaml(R"EOF(
+  TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
   - name: foo-scoped-routes
     scoped_route_configs:

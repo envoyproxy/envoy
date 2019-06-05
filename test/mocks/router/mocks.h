@@ -399,7 +399,7 @@ public:
   MockScopedConfig();
   ~MockScopedConfig();
 
-  MOCK_CONST_METHOD1(getRouterConfig, ConfigConstSharedPtr(const Http::HeaderMap& headers));
+  MOCK_CONST_METHOD1(getRouteConfig, ConfigConstSharedPtr(const Http::HeaderMap& headers));
 };
 
 } // namespace Router
