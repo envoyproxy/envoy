@@ -448,7 +448,7 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
 
 void AdminImpl::writeListenersAsJson(Buffer::Instance& response) {
   envoy::admin::v2alpha::Listeners listeners;
-  for (auto listener : server_.listenerManager().listeners()) {
+  for (const auto& listener : server_.listenerManager().listeners()) {
     envoy::admin::v2alpha::ListenerStatus& listener_status = *listeners.add_listener_statuses();
     listener_status.set_name(listener.get().name());
     Network::Utility::addressToProtobufAddress(*listener.get().socket().localAddress(),
@@ -458,7 +458,7 @@ void AdminImpl::writeListenersAsJson(Buffer::Instance& response) {
 }
 
 void AdminImpl::writeListenersAsText(Buffer::Instance& response) {
-  for (auto listener : server_.listenerManager().listeners()) {
+  for (const auto& listener : server_.listenerManager().listeners()) {
     response.add(fmt::format("{}::{}\n", listener.get().name(),
                              listener.get().socket().localAddress()->asString()));
   }
@@ -974,8 +974,8 @@ Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::HeaderMap&,
 
 Http::Code AdminImpl::handlerListenerInfo(absl::string_view url, Http::HeaderMap& response_headers,
                                           Buffer::Instance& response, AdminStream&) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  auto it = query_params.find("format");
+  const Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  const auto& it = query_params.find("format");
 
   if (it != query_params.end() && it->second == "json") {
     writeListenersAsJson(response);

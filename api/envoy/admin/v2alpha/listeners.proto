@@ -13,7 +13,7 @@ import "envoy/api/v2/core/address.proto";
 // Admin endpoint uses this wrapper for `/listeners` to display listener status information.
 // See :ref:`/listeners <operations_admin_interface_listeners>` for more information.
 message Listeners {
-  // Mapping from listener name to each listener's status.
+  // List of listener statuses.
   repeated ListenerStatus listener_statuses = 1;
 }
 
