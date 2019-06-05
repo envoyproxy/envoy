@@ -671,6 +671,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       "prefix_rewrite" : {"type" : "string"},
       "host_rewrite" : {"type" : "string"},
       "auto_host_rewrite" : {"type" : "boolean"},
+      "auto_host_rewrite_header" : {"type" : "string"},
       "case_sensitive" : {"type" : "boolean"},
       "timeout_ms" : {"type" : "integer"},
       "runtime" : {

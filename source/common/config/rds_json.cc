@@ -275,15 +275,22 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::rou
 
     JSON_UTIL_SET_STRING(json_route, *action, prefix_rewrite);
 
+    int host_rewrite_options = 0;
     if (json_route.hasObject("host_rewrite")) {
       JSON_UTIL_SET_STRING(json_route, *action, host_rewrite);
-      if (json_route.hasObject("auto_host_rewrite")) {
-        throw EnvoyException(
-            "routes cannot have both auto_host_rewrite and host_rewrite options set");
-      }
+      ++host_rewrite_options;
+    }
+    if (json_route.hasObject("auto_host_rewrite_header")) {
+      JSON_UTIL_SET_STRING(json_route, *action, auto_host_rewrite_header);
+      ++host_rewrite_options;
     }
     if (json_route.hasObject("auto_host_rewrite")) {
       JSON_UTIL_SET_BOOL(json_route, *action, auto_host_rewrite);
+      ++host_rewrite_options;
+    }
+    if (host_rewrite_options > 1) {
+      throw EnvoyException("routes cannot have more than one of auto_host_rewrite, "
+                           "auto_host_rewrite_header and host_rewrite options set");
     }
 
     JSON_UTIL_SET_DURATION(json_route, *action, timeout);

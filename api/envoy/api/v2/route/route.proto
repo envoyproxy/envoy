@@ -460,7 +460,7 @@ message CorsPolicy {
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#comment:next free field: 27]
+// [#comment:next free field: 30]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -548,6 +548,16 @@ message RouteAction {
     // type *strict_dns* or *logical_dns*. Setting this to true with other cluster
     // types has no effect.
     google.protobuf.BoolValue auto_host_rewrite = 7;
+
+    // Indicates that during forwarding, the host header will be swapped with the content of given
+    // downstream or :ref:`custom <config_http_conn_man_headers_custom_request_headers>` header.
+    // If header value is empty, host header is left intact.
+    //
+    // .. attention::
+    //
+    //   Pay attention to the potential security implications of using this option. Provided header
+    //   must come from trusted source.
+    string auto_host_rewrite_header = 29;
   }
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
