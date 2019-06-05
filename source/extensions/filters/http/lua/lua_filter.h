@@ -76,7 +76,7 @@ public:
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   /**
-   * @return const const Network::Connection* the current network connection handle.
+   * @return const Network::Connection* the current network connection handle.
    */
   virtual const Network::Connection* connection() const PURE;
 };

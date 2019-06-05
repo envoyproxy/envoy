@@ -27,10 +27,11 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   )EOF";
 
   envoy::config::trace::v2::Tracing configuration;
-  MessageUtil::loadFromYaml(yaml_string, configuration);
+  TestUtility::loadFromYaml(yaml_string, configuration);
 
   ZipkinTracerFactory factory;
-  auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, zipkin_tracer);
 }
@@ -50,10 +51,11 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   )EOF";
 
   envoy::config::trace::v2::Tracing configuration;
-  MessageUtil::loadFromYaml(yaml_string, configuration);
+  TestUtility::loadFromYaml(yaml_string, configuration);
 
   ZipkinTracerFactory factory;
-  auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, zipkin_tracer);
 }

@@ -13,6 +13,19 @@
 namespace Envoy {
 namespace Router {
 
+// Scoped routing configuration utilities.
+namespace ScopedRoutesConfigProviderUtil {
+
+// If enabled in the HttpConnectionManager config, returns a ConfigProvider for scoped routing
+// configuration.
+Envoy::Config::ConfigProviderPtr
+create(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+           config,
+       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+       Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager);
+
+} // namespace ScopedRoutesConfigProviderUtil
+
 class ScopedRoutesConfigProviderManager;
 
 // A ConfigProvider for inline scoped routing configuration.
@@ -82,7 +95,7 @@ public:
   const std::string& name() const { return name_; }
 
   // Envoy::Config::ConfigSubscriptionCommonBase
-  void start() override { subscription_->start({}, *this); }
+  void start() override { subscription_->start({}); }
 
   // Envoy::Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -95,7 +108,9 @@ public:
     ConfigSubscriptionCommonBase::onConfigUpdateFailed();
   }
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource).name();
+    return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource,
+                                                                             validation_visitor_)
+        .name();
   }
   const ScopedConfigManager::ScopedRouteMap& scopedRouteMap() const {
     return scoped_config_manager_.scopedRouteMap();
@@ -107,6 +122,7 @@ private:
   Stats::ScopePtr scope_;
   ScopedRdsStats stats_;
   ScopedConfigManager scoped_config_manager_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubscription>;

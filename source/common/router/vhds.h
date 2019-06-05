@@ -40,8 +40,9 @@ struct VhdsStats {
 
 typedef std::unique_ptr<Envoy::Config::Subscription> (*SubscriptionFactoryFunction)(
     const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&, Event::Dispatcher&,
-    Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&, Stats::Scope&, const std::string&,
-    const std::string&, absl::string_view, Api::Api&);
+    Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&, Stats::Scope&, absl::string_view,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api&,
+    Envoy::Config::SubscriptionCallbacks&);
 
 class VhdsSubscription : Envoy::Config::SubscriptionCallbacks,
                          Logger::Loggable<Logger::Id::router> {
@@ -55,7 +56,6 @@ public:
   ~VhdsSubscription() override { init_target_.ready(); }
 
   // Config::SubscriptionCallbacks
-  // TODO(fredlas) deduplicate
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>&,
                       const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -64,7 +64,9 @@ public:
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
+    return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource,
+                                                                       validation_visitor_)
+        .name();
   }
   void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
 
@@ -74,6 +76,7 @@ public:
   Stats::ScopePtr scope_;
   VhdsStats stats_;
   std::unordered_set<RouteConfigProvider*>& route_config_providers_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;

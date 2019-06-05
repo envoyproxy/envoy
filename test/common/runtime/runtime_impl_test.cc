@@ -1,6 +1,7 @@
 #include <memory>
 #include <string>
 
+#include "common/config/runtime_utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
@@ -65,41 +66,57 @@ TEST(UUID, SanityCheckOfUniqueness) {
   EXPECT_EQ(num_of_uuids, uuids.size());
 }
 
-class DiskBackedLoaderImplTest : public testing::Test {
+class LoaderImplTest : public testing::Test {
 protected:
-  DiskBackedLoaderImplTest() : api_(Api::createApiForTest(store_)) {}
+  LoaderImplTest() : api_(Api::createApiForTest(store_)) {}
 
   static void SetUpTestSuite() {
     TestEnvironment::exec(
         {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
   }
 
-  void setup() {
-    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(InvokeWithoutArgs([this] {
+  static void TearDownTestSuite() {
+    TestEnvironment::removePath(TestEnvironment::temporaryPath("test/common/runtime/test_data"));
+  }
+
+  virtual void setup() {
+    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([this] {
       Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
       EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
-          .WillOnce(Invoke([this](const std::string&, uint32_t,
-                                  Filesystem::Watcher::OnChangedCb cb) { on_changed_cb_ = cb; }));
+          .WillRepeatedly(
+              Invoke([this](const std::string&, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+                on_changed_cbs_.emplace_back(cb);
+              }));
       return mock_watcher;
     }));
   }
 
   void run(const std::string& primary_dir, const std::string& override_dir) {
-    loader_ = std::make_unique<DiskBackedLoaderImpl>(
-        dispatcher_, tls_, base_, TestEnvironment::temporaryPath(primary_dir), "envoy",
-        override_dir, store_, generator_, *api_);
+    envoy::config::bootstrap::v2::Runtime runtime;
+    runtime.mutable_base()->MergeFrom(base_);
+    runtime.set_symlink_root(TestEnvironment::temporaryPath(primary_dir));
+    runtime.set_subdirectory("envoy");
+    runtime.set_override_subdirectory(override_dir);
+
+    envoy::config::bootstrap::v2::LayeredRuntime layered_runtime;
+    Config::translateRuntime(runtime, layered_runtime);
+    loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, "", store_,
+                                           generator_, *api_);
   }
 
   void write(const std::string& path, const std::string& value) {
     TestEnvironment::writeStringToFileForTest(path, value);
   }
 
-  void updateDiskLayer() { on_changed_cb_(Filesystem::Watcher::Events::MovedTo); }
+  void updateDiskLayer(uint32_t layer) {
+    ASSERT_LT(layer, on_changed_cbs_.size());
+    on_changed_cbs_[layer](Filesystem::Watcher::Events::MovedTo);
+  }
 
   Event::MockDispatcher dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
 
-  Filesystem::Watcher::OnChangedCb on_changed_cb_;
+  std::vector<Filesystem::Watcher::OnChangedCb> on_changed_cbs_;
   Stats::IsolatedStoreImpl store_;
   MockRandomGenerator generator_;
   std::unique_ptr<LoaderImpl> loader_;
@@ -107,7 +124,7 @@ protected:
   ProtobufWkt::Struct base_;
 };
 
-TEST_F(DiskBackedLoaderImplTest, All) {
+TEST_F(LoaderImplTest, All) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
 
@@ -198,16 +215,23 @@ TEST_F(DiskBackedLoaderImplTest, All) {
 
   // Overrides from override dir
   EXPECT_EQ("hello override", loader_->snapshot().get("file1"));
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(1, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(17, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
-TEST_F(DiskBackedLoaderImplTest, GetLayers) {
+TEST_F(LoaderImplTest, GetLayers) {
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
     foo: whatevs
   )EOF");
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
   const auto& layers = loader_->snapshot().getLayers();
+  EXPECT_EQ(1, store_.counter("runtime.load_success").value());
   EXPECT_EQ(4, layers.size());
+  EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ("whatevs", layers[0]->values().find("foo")->second.raw_string_value_);
   EXPECT_EQ("hello", layers[1]->values().find("file1")->second.raw_string_value_);
   EXPECT_EQ("hello override", layers[2]->values().find("file1")->second.raw_string_value_);
@@ -219,21 +243,44 @@ TEST_F(DiskBackedLoaderImplTest, GetLayers) {
   // The old snapshot and its layers should have been invalidated. Refetch.
   const auto& new_layers = loader_->snapshot().getLayers();
   EXPECT_EQ("bar", new_layers[3]->values().find("foo")->second.raw_string_value_);
+  EXPECT_EQ(2, store_.counter("runtime.load_success").value());
 }
 
-TEST_F(DiskBackedLoaderImplTest, BadDirectory) {
+TEST_F(LoaderImplTest, BadDirectory) {
   setup();
   run("/baddir", "/baddir");
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(1, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(0, store_.counter("runtime.override_dir_exists").value());
+  EXPECT_EQ(1, store_.counter("runtime.override_dir_not_exists").value());
 }
 
-TEST_F(DiskBackedLoaderImplTest, OverrideFolderDoesNotExist) {
+// Validate that an error in a layer will results in appropriate stats tracking.
+TEST_F(LoaderImplTest, DiskLayerFailure) {
+  setup();
+  // Symlink loopy configuration will result in an error.
+  run("test/common/runtime/test_data", "loop");
+  EXPECT_EQ(1, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(0, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(0, store_.counter("runtime.override_dir_exists").value());
+  EXPECT_EQ(1, store_.counter("runtime.override_dir_not_exists").value());
+}
+
+TEST_F(LoaderImplTest, OverrideFolderDoesNotExist) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override_does_not_exist");
 
   EXPECT_EQ("hello", loader_->snapshot().get("file1"));
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(1, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(0, store_.counter("runtime.override_dir_exists").value());
+  EXPECT_EQ(1, store_.counter("runtime.override_dir_not_exists").value());
 }
 
-TEST_F(DiskBackedLoaderImplTest, PercentHandling) {
+TEST_F(LoaderImplTest, PercentHandling) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
 
@@ -276,65 +323,75 @@ TEST_F(DiskBackedLoaderImplTest, PercentHandling) {
 }
 
 void testNewOverrides(Loader& loader, Stats::Store& store) {
+  Stats::Gauge& admin_overrides_active =
+      store.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport);
+
   // New string
   loader.mergeValues({{"foo", "bar"}});
   EXPECT_EQ("bar", loader.snapshot().get("foo"));
-  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove new string
   loader.mergeValues({{"foo", ""}});
   EXPECT_EQ("", loader.snapshot().get("foo"));
-  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, admin_overrides_active.value());
 
   // New integer
   loader.mergeValues({{"baz", "42"}});
   EXPECT_EQ(42, loader.snapshot().getInteger("baz", 0));
-  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove new integer
   loader.mergeValues({{"baz", ""}});
   EXPECT_EQ(0, loader.snapshot().getInteger("baz", 0));
-  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, admin_overrides_active.value());
 }
 
-TEST_F(DiskBackedLoaderImplTest, MergeValues) {
+TEST_F(LoaderImplTest, MergeValues) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
   testNewOverrides(*loader_, store_);
+  Stats::Gauge& admin_overrides_active =
+      store_.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport);
 
   // Override string
   loader_->mergeValues({{"file2", "new world"}});
   EXPECT_EQ("new world", loader_->snapshot().get("file2"));
-  EXPECT_EQ(1, store_.gauge("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove overridden string
   loader_->mergeValues({{"file2", ""}});
   EXPECT_EQ("world", loader_->snapshot().get("file2"));
-  EXPECT_EQ(0, store_.gauge("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, admin_overrides_active.value());
 
   // Override integer
   loader_->mergeValues({{"file3", "42"}});
   EXPECT_EQ(42, loader_->snapshot().getInteger("file3", 1));
-  EXPECT_EQ(1, store_.gauge("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove overridden integer
   loader_->mergeValues({{"file3", ""}});
   EXPECT_EQ(2, loader_->snapshot().getInteger("file3", 1));
-  EXPECT_EQ(0, store_.gauge("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, admin_overrides_active.value());
 
   // Override override string
   loader_->mergeValues({{"file1", "hello overridden override"}});
   EXPECT_EQ("hello overridden override", loader_->snapshot().get("file1"));
-  EXPECT_EQ(1, store_.gauge("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove overridden override string
   loader_->mergeValues({{"file1", ""}});
   EXPECT_EQ("hello override", loader_->snapshot().get("file1"));
-  EXPECT_EQ(0, store_.gauge("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, admin_overrides_active.value());
+  EXPECT_EQ(0, store_.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+
+  EXPECT_EQ(11, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
 // Validate that admin overrides disk, disk overrides bootstrap.
-TEST_F(DiskBackedLoaderImplTest, LayersOverride) {
+TEST_F(LoaderImplTest, LayersOverride) {
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
     some: thing
     other: thang
@@ -359,23 +416,37 @@ TEST_F(DiskBackedLoaderImplTest, LayersOverride) {
   EXPECT_EQ("Cheese cake", loader_->snapshot().get("file15"));
   write("test/common/runtime/test_data/current/envoy/file14", "Sad cake");
   write("test/common/runtime/test_data/current/envoy/file15", "Happy cake");
-  updateDiskLayer();
+  updateDiskLayer(0);
   EXPECT_EQ("Mega layer cake", loader_->snapshot().get("file14"));
   EXPECT_EQ("Happy cake", loader_->snapshot().get("file15"));
 }
 
-class LoaderImplTest : public testing::Test {
-protected:
-  void setup() { loader_ = std::make_unique<LoaderImpl>(base_, generator_, store_, tls_); }
+// Validate that multiple admin layers leads to a configuration load failure.
+TEST_F(LoaderImplTest, MultipleAdminLayersFail) {
+  setup();
+  envoy::config::bootstrap::v2::LayeredRuntime layered_runtime;
+  layered_runtime.add_layers()->mutable_admin_layer();
+  layered_runtime.add_layers()->mutable_admin_layer();
+  EXPECT_THROW_WITH_MESSAGE(
+      std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, "", store_, generator_,
+                                   *api_),
+      EnvoyException,
+      "Too many admin layers specified in LayeredRuntime, at most one may be specified");
+}
 
-  MockRandomGenerator generator_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::IsolatedStoreImpl store_;
-  std::unique_ptr<LoaderImpl> loader_;
-  ProtobufWkt::Struct base_;
+class DisklessLoaderImplTest : public LoaderImplTest {
+protected:
+  void setup() override {
+    LoaderImplTest::setup();
+    envoy::config::bootstrap::v2::LayeredRuntime layered_runtime;
+    layered_runtime.add_layers()->mutable_static_layer()->MergeFrom(base_);
+    layered_runtime.add_layers()->mutable_admin_layer();
+    loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, "", store_,
+                                           generator_, *api_);
+  }
 };
 
-TEST_F(LoaderImplTest, All) {
+TEST_F(DisklessLoaderImplTest, All) {
   setup();
   EXPECT_EQ("", loader_->snapshot().get("foo"));
   EXPECT_EQ(1UL, loader_->snapshot().getInteger("foo", 1));
@@ -385,7 +456,7 @@ TEST_F(LoaderImplTest, All) {
 }
 
 // Validate proto parsing sanity.
-TEST_F(LoaderImplTest, ProtoParsing) {
+TEST_F(DisklessLoaderImplTest, ProtoParsing) {
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
     file1: hello override
     file2: world
@@ -491,11 +562,25 @@ TEST_F(LoaderImplTest, ProtoParsing) {
   EXPECT_FALSE(loader_->snapshot().featureEnabled("empty", fractional_percent)); // valid data
   EXPECT_CALL(generator_, random()).WillOnce(Return(6));
   EXPECT_FALSE(loader_->snapshot().featureEnabled("empty", fractional_percent)); // valid data
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(1, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(15, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
 class DiskLayerTest : public testing::Test {
 protected:
   DiskLayerTest() : api_(Api::createApiForTest()) {}
+
+  static void SetUpTestSuite() {
+    TestEnvironment::exec(
+        {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
+  }
+
+  static void TearDownTestSuite() {
+    TestEnvironment::removePath(TestEnvironment::temporaryPath("test/common/runtime/test_data"));
+  }
 
   Api::ApiPtr api_;
 };

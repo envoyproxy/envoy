@@ -47,7 +47,7 @@ public:
           common_config->set_log_name("foo");
           setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                          fake_upstreams_.back()->localAddress());
-          MessageUtil::jsonConvert(config, *access_log->mutable_config());
+          TestUtility::jsonConvert(config, *access_log->mutable_config());
         });
 
     HttpIntegrationTest::initialize();
@@ -74,7 +74,7 @@ public:
               access_log_request_->headers().ContentType()->value().getStringView());
 
     envoy::service::accesslog::v2::StreamAccessLogsMessage expected_request_msg;
-    MessageUtil::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
+    TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
 
     // Clear fields which are not deterministic.
     auto* log_entry = request_msg.mutable_http_logs()->mutable_log_entry(0);
