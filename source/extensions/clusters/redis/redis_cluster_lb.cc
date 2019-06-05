@@ -10,23 +10,29 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(
     const std::vector<Envoy::Extensions::Clusters::Redis::ClusterSlot>& slots,
     Envoy::Upstream::HostMap all_hosts) {
 
-  absl::WriterMutexLock lock(&mutex_);
-  bool should_update = !slot_array_;
-  auto slots_array = std::make_shared<SlotArray>();
+  SlotArraySharedPtr current;
+  {
+    absl::ReaderMutexLock lock(&mutex_);
+    current = slot_array_;
+  }
+
+  bool should_update = !current;
+  auto updated_slots = std::make_shared<SlotArray>();
   for (const ClusterSlot& slot : slots) {
     auto host = all_hosts.find(slot.master()->asString());
     ASSERT(host != all_hosts.end(), "we expect all address to be found in the updated_hosts");
     for (auto i = slot.start(); i <= slot.end(); ++i) {
-      slots_array->at(i) = host->second;
-      if (slot_array_ &&
-          slot_array_->at(i)->address()->asString() != host->second->address()->asString()) {
+      updated_slots->at(i) = host->second;
+      if (current &&
+          current->at(i)->address()->asString() != host->second->address()->asString()) {
         should_update = true;
       }
     }
   }
 
   if (should_update) {
-    slot_array_ = slots_array;
+    absl::WriterMutexLock lock(&mutex_);
+    slot_array_ = updated_slots;
   }
   return should_update;
 }

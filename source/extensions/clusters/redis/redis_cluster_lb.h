@@ -26,7 +26,7 @@ static const uint64_t MaxSlot = 16384;
 
 typedef std::array<Upstream::HostSharedPtr, MaxSlot> SlotArray;
 
-typedef std::shared_ptr<SlotArray> SlotArraySharedPtr;
+typedef std::shared_ptr<const SlotArray> SlotArraySharedPtr;
 
 class ClusterSlot {
 public:
@@ -71,7 +71,6 @@ private:
 class RedisClusterLoadBalancer : public Upstream::LoadBalancer {
 public:
   RedisClusterLoadBalancer(SlotArraySharedPtr slot_array) : slot_array_(std::move(slot_array)){};
-  ~RedisClusterLoadBalancer() = default;
 
   // Upstream::LoadBalancerBase
   Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override;
@@ -103,8 +102,6 @@ typedef std::shared_ptr<ClusterSlotUpdateCallBack> ClusterSlotUpdateCallBackShar
 class RedisClusterLoadBalancerFactory : public ClusterSlotUpdateCallBack,
                                         public Upstream::LoadBalancerFactory {
 public:
-  RedisClusterLoadBalancerFactory() = default;
-
   // ClusterSlotUpdateCallBack
   bool onClusterSlotUpdate(const std::vector<ClusterSlot>& slots,
                            Upstream::HostMap all_hosts) override;

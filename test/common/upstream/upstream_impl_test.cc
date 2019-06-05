@@ -1864,7 +1864,7 @@ TEST_F(ClusterInfoImplTest, Metadata) {
   BazFactory baz_factory;
   Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
   auto cluster = makeCluster(yaml);
-  EXPECT_EQ("envoy.cluster.strict_dns", cluster->info()->clusterType().name());
+
   EXPECT_EQ("meh", cluster->info()->typedMetadata().get<Baz>(baz_factory.name())->name);
   EXPECT_EQ(nullptr, cluster->info()->typedMetadata().get<Foo>(baz_factory.name()));
   EXPECT_EQ("test_value",

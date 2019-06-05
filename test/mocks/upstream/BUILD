@@ -19,7 +19,6 @@ envoy_cc_mock(
         "//source/common/network:raw_buffer_socket_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
-        "//source/extensions/clusters:well_known_names",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
     ],

@@ -248,7 +248,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Runtime::RandomGenerator& random_;
   RedisDiscoverySession redis_discovery_session_;
-  ClusterSlotUpdateCallBackSharedPtr lb_factory_;
+  const ClusterSlotUpdateCallBackSharedPtr lb_factory_;
 
   Upstream::HostVector hosts_;
   Upstream::HostMap all_hosts_;
