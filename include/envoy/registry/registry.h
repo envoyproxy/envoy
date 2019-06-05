@@ -9,6 +9,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 
+#include "absl/base/attributes.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -131,7 +132,7 @@ private:
  * Macro used for static registration.
  */
 #define REGISTER_FACTORY(FACTORY, BASE)                                                            \
-  void forceRegister##FACTORY() {}                                                                 \
+  void forceRegister##FACTORY() {} ABSL_ATTRIBUTE_UNUSED                                           \
   static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
                                           FACTORY, BASE>                                           \
       FACTORY##_registered
@@ -143,7 +144,7 @@ private:
  * not run until a function in the compilation unit is invoked. The force function can be invoked
  * from a static library wrapper.
  */
-#define DECLARE_FACTORY(FACTORY) void forceRegister##FACTORY()
+#define DECLARE_FACTORY(FACTORY) void forceRegister##FACTORY() ABSL_ATTRIBUTE_UNUSED
 
 } // namespace Registry
 } // namespace Envoy
