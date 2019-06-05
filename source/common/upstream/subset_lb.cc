@@ -150,16 +150,15 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
     const absl::optional<
         envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy>&
         fallback_policy) {
-  if (fallback_policy ==
-          envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT &&
+  if (fallback_policy == envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT &&
       selector_fallback_subset_any_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer for selector");
     HostPredicate predicate = [](const Host&) -> bool { return true; };
     selector_fallback_subset_any_ = std::make_unique<LbSubsetEntry>();
     selector_fallback_subset_any_->priority_subset_.reset(
         new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
-  } else if (fallback_policy == envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
-                                    DEFAULT_SUBSET &&
+  } else if (fallback_policy ==
+                 envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::DEFAULT_SUBSET &&
              selector_fallback_subset_default_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: creating default subset fallback load balancer for selector");
     HostPredicate predicate = std::bind(&SubsetLoadBalancer::hostMatches, this,
@@ -251,8 +250,7 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
     return nullptr;
   }
   const auto fallback = fallback_policy.value();
-  if (fallback ==
-          envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT &&
+  if (fallback == envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT &&
       selector_fallback_subset_any_ != nullptr) {
     HostConstSharedPtr host =
         selector_fallback_subset_any_->priority_subset_->lb_->chooseHost(context);
@@ -260,8 +258,8 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
       return host;
     }
 
-  } else if (fallback == envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
-                             DEFAULT_SUBSET &&
+  } else if (fallback ==
+                 envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::DEFAULT_SUBSET &&
              selector_fallback_subset_default_ != nullptr) {
     HostConstSharedPtr host =
         selector_fallback_subset_default_->priority_subset_->lb_->chooseHost(context);
