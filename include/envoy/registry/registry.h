@@ -132,7 +132,8 @@ private:
  * Macro used for static registration.
  */
 #define REGISTER_FACTORY(FACTORY, BASE)                                                            \
-  void forceRegister##FACTORY() {} ABSL_ATTRIBUTE_UNUSED                                           \
+  void forceRegister##FACTORY() {}                                                                 \
+  ABSL_ATTRIBUTE_UNUSED                                                                            \
   static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
                                           FACTORY, BASE>                                           \
       FACTORY##_registered
