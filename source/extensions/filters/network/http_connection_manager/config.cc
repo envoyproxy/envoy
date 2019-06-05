@@ -348,7 +348,7 @@ void HttpConnectionManagerConfig::processFilter(
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           string_name);
   Http::FilterFactoryCb callback;
-  if (filter_config->getBoolean("deprecated_v1", false)) {
+  if (Config::Utility::allowDeprecatedV1Config(context_.runtime(), *filter_config)) {
     callback = factory.createFilterFactory(*filter_config->getObject("value", true), stats_prefix_,
                                            context_);
   } else {

@@ -88,8 +88,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       scoped_rds.scoped_rds_config_source(), factory_context.localInfo(),
       factory_context.dispatcher(), factory_context.clusterManager(), factory_context.random(),
-      *scope_, "envoy.api.v2.ScopedRoutesDiscoveryService.FetchScopedRoutes",
-      "envoy.api.v2.ScopedRoutesDiscoveryService.StreamScopedRoutes",
+      *scope_,
       Grpc::Common::typeUrl(
           envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
       validation_visitor_, factory_context.api(), *this);

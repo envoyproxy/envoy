@@ -44,8 +44,7 @@ public:
     factory_function_ = {
         [](const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&,
            Event::Dispatcher&, Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&,
-           Stats::Scope&, const std::string&, const std::string&, absl::string_view,
-           ProtobufMessage::ValidationVisitor&, Api::Api&,
+           Stats::Scope&, absl::string_view, ProtobufMessage::ValidationVisitor&, Api::Api&,
            Envoy::Config::SubscriptionCallbacks&) -> std::unique_ptr<Envoy::Config::Subscription> {
           return std::unique_ptr<Envoy::Config::MockSubscription>();
         }};

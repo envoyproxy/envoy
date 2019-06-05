@@ -4,6 +4,7 @@
 
 #include "test/common/stream_info/test_util.h"
 #include "test/fuzz/common.pb.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
 
@@ -50,7 +51,8 @@ inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
   return fuzz_headers;
 }
 
-inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) {
+inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info,
+                                     const Ssl::MockConnectionInfo* connection_info) {
   TestStreamInfo test_stream_info;
   test_stream_info.metadata_ = stream_info.dynamic_metadata();
   // libc++ clocks don't track at nanosecond on macOS.
@@ -73,6 +75,10 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) 
   test_stream_info.downstream_local_address_ = address;
   test_stream_info.downstream_direct_remote_address_ = address;
   test_stream_info.downstream_remote_address_ = address;
+  test_stream_info.setDownstreamSslConnection(connection_info);
+  ON_CALL(*connection_info, subjectPeerCertificate())
+      .WillByDefault(testing::Return(
+          "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"));
   return test_stream_info;
 }
 
