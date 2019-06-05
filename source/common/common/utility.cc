@@ -532,4 +532,9 @@ double WelfordStandardDeviation::computeStandardDeviation() const {
   return (std::isnan(variance) || variance < 0) ? std::nan("") : sqrt(variance);
 }
 
+InlineString::InlineString(const char* str, size_t size) : size_(size) {
+  RELEASE_ASSERT(size <= 0xffffffff, "size must fit in 32 bits");
+  memcpy(data_, str, size);
+}
+
 } // namespace Envoy

@@ -40,7 +40,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   Stats::IsolatedStoreImpl store;
   Stats::Counter& c = store.counter("hello");
   c.inc();
-  store.gauge("world").set(5);
+  store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
   store.histogram("histogram");
 
   std::list<Stats::SinkPtr> sinks;
@@ -201,6 +201,27 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
+  absl::Notification started;
+
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    initialize("test/server/node_bootstrap.yaml");
+    auto startup_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
+                                                    [&] { started.Notify(); });
+    auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                                                     [&](Event::PostCb) { FAIL(); });
+    shutdown_handle = nullptr; // unregister callback
+    server_->run();
+    startup_handle = nullptr;
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  started.WaitForNotification();
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   bool startup = false, shutdown = false, shutdown_with_completion = false;
   absl::Notification started, shutdown_begin, completion_block, completion_done;
@@ -309,10 +330,30 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
 }
 
-// Validate server runtime is parsed from bootstrap.
+// Validate server runtime is parsed from bootstrap and that we can read from
+// service cluster specified disk-based overrides.
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
+  options_.service_cluster_name_ = "some_service";
   initialize("test/server/runtime_bootstrap.yaml");
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo"));
+  // This should access via the override/some_service overlay.
+  EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz"));
+}
+
+// Validate that a runtime absent an admin layer will fail mutating operations
+// but still support inspection of runtime values.
+TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
+  options_.service_cluster_name_ = "some_service";
+  initialize("test/server/runtime_bootstrap.yaml");
+  Http::TestHeaderMapImpl response_headers;
+  std::string response_body;
+  EXPECT_EQ(Http::Code::OK,
+            server_->admin().request("/runtime", "GET", response_headers, response_body));
+  EXPECT_THAT(response_body, HasSubstr("fozz"));
+  EXPECT_EQ(
+      Http::Code::ServiceUnavailable,
+      server_->admin().request("/runtime_modify?foo=bar", "POST", response_headers, response_body));
+  EXPECT_EQ("No admin layer specified", response_body);
 }
 
 // Validate invalid runtime in bootstrap is rejected.
