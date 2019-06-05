@@ -1209,7 +1209,7 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
 }
 
-// test edge_accept_request_id does not reset the passed requestId if passed
+// test edge_accept_request_id true does not reset the passed requestId if passed
 TEST_F(ConnectionManagerUtilityTest, AcceptEdgeRequestId) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -1225,10 +1225,70 @@ TEST_F(ConnectionManagerUtilityTest, AcceptEdgeRequestId) {
 TEST_F(ConnectionManagerUtilityTest, AcceptEdgeRequestIdNoReqId) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, edgeAcceptRequestId()).WillByDefault(Return(true));
   TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
   EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+}
+
+// test edge_accept_request_id true and no edge_request passing requestId should keep the requestID
+TEST_F(ConnectionManagerUtilityTest, AcceptEdgeRequestIdNoEdgeRequestKeepRequestId) {
+  ON_CALL(config_, edgeAcceptRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-request-id", "myReqId"}};
+  EXPECT_EQ("myReqId", headers.get_(Headers::get().RequestId));
+}
+
+// test edge_accept_request_id true and no edge_request not passing requestId should generate new
+// request id
+TEST_F(ConnectionManagerUtilityTest, AcceptEdgeRequestIdNoEdgeRequestGenerateNewRequestId) {
+  ON_CALL(config_, edgeAcceptRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers;
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+}
+
+// test edge_accept_request_id false edge request generates new request id
+TEST_F(ConnectionManagerUtilityTest, NoAcceptEdgeRequestIdEdgeRequestGenerateRequestId) {
+  ON_CALL(config_, edgeAcceptRequestId()).WillByDefault(Return(false));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  // with request id
+  {
+
+    ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+    TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"},
+                              {"x-request-id", "my-request-id"}};
+    EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+  }
+
+  // with no request id
+  {
+    TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
+    EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+  }
+}
+
+// test edge_accept_request_id false not edge request
+TEST_F(ConnectionManagerUtilityTest, NoAcceptEdgeRequestIdNoEdgeRequest) {
+  ON_CALL(config_, edgeAcceptRequestId()).WillByDefault(Return(false));
+
+  // with no request id
+  {
+    TestHeaderMapImpl headers;
+    callMutateRequestHeaders(headers, Protocol::Http2);
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+  }
+
+  // with request id
+  {
+    TestHeaderMapImpl headers{{"x-request-id", "my-request-id"}};
+    callMutateRequestHeaders(headers, Protocol::Http2);
+    EXPECT_EQ("my-request-id", headers.get_(Headers::get().RequestId));
+  }
 }
 } // namespace Http
 } // namespace Envoy
