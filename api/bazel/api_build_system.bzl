@@ -75,7 +75,7 @@ def api_go_grpc_library(name, proto, deps = []):
     )
 
 # This is api_proto_library plus some logic internal to //envoy/api.
-def api_proto_library_internal(visibility = ["//visibility:private"], **kwargs):
+def api_proto_library_internal(visibility = ["//visibility:public"], **kwargs):
     # //envoy/docs/build.sh needs visibility in order to generate documents.
     if visibility == ["//visibility:private"]:
         visibility = ["//docs"]
@@ -90,7 +90,7 @@ def api_proto_library_internal(visibility = ["//visibility:private"], **kwargs):
 # from api_proto_library.
 def api_proto_library(
         name,
-        visibility = ["//visibility:private"],
+        visibility = ["//visibility:public"],
         srcs = [],
         deps = [],
         external_proto_deps = [],
