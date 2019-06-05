@@ -112,12 +112,6 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "lightstep-tracer-cpp-0.8.0",
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.8.0.tar.gz"],
     ),
-    lightstep_vendored_googleapis = dict(
-        sha256 = "d1ef4f790eeaa805e7b364de05b91f9eed66bd6ae46f1483bbf49c33d86998e5",
-        strip_prefix = "googleapis-d6f78d948c53f3b400bb46996eb3084359914f9b",
-        # From: https://github.com/lightstep/lightstep-tracer-cpp/blob/v0.8.0/lightstep-tracer-common/third_party/googleapis/README.lightstep-tracer-common#L6
-        urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
-    ),
     com_github_datadog_dd_opentracing_cpp = dict(
         sha256 = "a3d1c03e7af570fa64c01df259e6e9bb78637a6bd9c65c6bf7e8703e466dc22f",
         strip_prefix = "dd-opentracing-cpp-0.4.2",
@@ -236,6 +230,16 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "b80297a1b8d38027a86836dbadc22f55dc3ecad56728175381aa6330705ac10f",
         strip_prefix = "subpar-2.0.0",
         urls = ["https://github.com/google/subpar/archive/2.0.0.tar.gz"],
+    ),
+    io_opencensus_cpp = dict(
+        sha256 = "d6d68704c419a9e892bd1f942e09509ebc5a318499a1abcf2c09734e5dc56e19",
+        strip_prefix = "opencensus-cpp-1145dd77ffb7a2845c71c8e6ca188ef55e4ff607",
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/1145dd77ffb7a2845c71c8e6ca188ef55e4ff607.tar.gz"],
+    ),
+    com_github_curl = dict(
+        sha256 = "d483b89062832e211c887d7cf1b65c902d591b48c11fe7d174af781681580b41",
+        strip_prefix = "curl-7.63.0",
+        urls = ["https://github.com/curl/curl/releases/download/curl-7_63_0/curl-7.63.0.tar.gz"],
     ),
     com_googlesource_quiche = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/7bf7c3c358eb954e463bde14ea27444f4bd8ea05.tar.gz
