@@ -30,12 +30,7 @@ public:
   /**
    * Enable a pending timeout. If a timeout is already pending, it will be reset to the new timeout.
    */
-  virtual void enableTimerInUs(const std::chrono::microseconds& d) PURE;
-
-  virtual void enableTimer(const std::chrono::milliseconds& d) {
-    // TODO(#4332): use duration_cast more nicely to clean up this code.
-    enableTimerInUs(std::chrono::duration_cast<std::chrono::microseconds>(d));
-  }
+  virtual void enableTimer(const std::chrono::milliseconds& d) PURE;
 
   /**
    * Return whether the timer is currently armed.

@@ -19,7 +19,7 @@ public:
 
   // Timer
   void disableTimer() override;
-  void enableTimerInUs(const std::chrono::microseconds& d) override;
+  void enableTimer(const std::chrono::milliseconds& d) override;
   bool enabled() override;
 
 private:

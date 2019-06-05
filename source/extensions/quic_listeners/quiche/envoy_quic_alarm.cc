@@ -12,7 +12,8 @@ EnvoyQuicAlarm::EnvoyQuicAlarm(Event::Scheduler& scheduler, quic::QuicClock& clo
 void EnvoyQuicAlarm::CancelImpl() { timer_->disableTimer(); }
 
 void EnvoyQuicAlarm::SetImpl() {
-  timer_->enableTimerInUs(std::chrono::microseconds(getDurationBeforeDeadline().ToMicroseconds()));
+  // TODO switch to use microseconds after issue #7170 is addressed.
+  timer_->enableTimer(std::chrono::milliseconds(getDurationBeforeDeadline().ToMilliseconds()));
 }
 
 void EnvoyQuicAlarm::UpdateImpl() {
