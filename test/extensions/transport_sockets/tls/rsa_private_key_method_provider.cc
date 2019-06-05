@@ -204,10 +204,17 @@ RsaPrivateKeyConnection::RsaPrivateKeyConnection(SSL* ssl, Ssl::PrivateKeyConnec
   SSL_set_ex_data(ssl, RsaPrivateKeyMethodProvider::ssl_rsa_connection_index, this);
 }
 
-Ssl::PrivateKeyConnectionPtr RsaPrivateKeyMethodProvider::getPrivateKeyConnection(
-    SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher) {
-  return std::make_unique<RsaPrivateKeyConnection>(ssl, cb, dispatcher, bssl::UpRef(pkey_),
-                                                   test_options_);
+void RsaPrivateKeyMethodProvider::registerPrivateKeyMethod(SSL* ssl,
+                                                           Ssl::PrivateKeyConnectionCallbacks& cb,
+                                                           Event::Dispatcher& dispatcher) {
+  Thread::LockGuard map_lock(map_lock_);
+  connections_.emplace(
+      ssl, new RsaPrivateKeyConnection(ssl, cb, dispatcher, bssl::UpRef(pkey_), test_options_));
+}
+
+void RsaPrivateKeyMethodProvider::unregisterPrivateKeyMethod(SSL* ssl) {
+  Thread::LockGuard map_lock(map_lock_);
+  connections_.erase(ssl);
 }
 
 RsaPrivateKeyMethodProvider::RsaPrivateKeyMethodProvider(

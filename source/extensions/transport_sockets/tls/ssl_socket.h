@@ -95,7 +95,6 @@ private:
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
   mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
-  std::vector<Envoy::Ssl::PrivateKeyConnectionPtr> pk_connections_;
   bool async_handshake_in_progress_{};
   Thread::ThreadIdPtr run_tid_;
 };

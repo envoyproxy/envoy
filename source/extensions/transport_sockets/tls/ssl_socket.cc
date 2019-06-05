@@ -62,21 +62,8 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
 
   // Associate this SSL connection with all the certificates (with their potentially different
   // private key methods).
-  std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> providers =
-      ctx_->getPrivateKeyMethodProviders();
-
-  for (auto const& provider : providers) {
-    Ssl::PrivateKeyConnectionPtr pk_connection =
-        provider->getPrivateKeyConnection(ssl_.get(), *this, callbacks_->connection().dispatcher());
-    // If a private key method provider has been assigned for this certificate, it's a fatal
-    // error if the connection can't be associated with the method.
-    ASSERT(pk_connection);
-    // We keep track of the private key operations for memory management purposes (the operations
-    // object if destroyed when the SslSocket is destroyed). The operations objects are unique
-    // because they need to associated with the SSL objects so that user data can be passed to the
-    // BoringSSL private key methods.
-    pk_connections_.emplace_back(std::move(pk_connection));
-
+  for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
+    provider->registerPrivateKeyMethod(ssl_.get(), *this, callbacks_->connection().dispatcher());
     if (run_tid_ == nullptr) {
       // Store the dispatcher thread ID. We will check that the caller is the same when the private
       // key method callback is received.
@@ -417,10 +404,15 @@ std::vector<std::string> SslSocket::dnsSansPeerCertificate() const {
 }
 
 void SslSocket::closeSocket(Network::ConnectionEvent) {
+  // Unregister the SSL connection object from private key method providers.
+  for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
+    provider->unregisterPrivateKeyMethod(ssl_.get());
+  }
+
   // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
   // there is no room on the socket. We can extend the state machine to handle this at some point
   // if needed.
-  if (handshake_complete_) {
+  if (handshake_complete_ || async_handshake_in_progress_) {
     shutdownSsl();
   }
 }

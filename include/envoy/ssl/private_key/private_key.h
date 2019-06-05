@@ -22,28 +22,26 @@ namespace Ssl {
 
 typedef std::shared_ptr<SSL_PRIVATE_KEY_METHOD> BoringSslPrivateKeyMethodSharedPtr;
 
-class PrivateKeyConnection {
-public:
-  virtual ~PrivateKeyConnection() {}
-};
-
-typedef std::unique_ptr<PrivateKeyConnection> PrivateKeyConnectionPtr;
-
 class PrivateKeyMethodProvider {
 public:
   virtual ~PrivateKeyMethodProvider() {}
 
   /**
-   * Get a private key operations instance from the provider.
+   * Register an SSL connection to private key operations by the provider.
    * @param ssl a SSL connection object.
    * @param cb a callbacks object, whose "complete" method will be invoked
    * when the asynchronous processing is complete.
    * @param dispatcher supplies the owning thread's dispatcher.
-   * @return the private key operations instance.
    */
-  virtual PrivateKeyConnectionPtr getPrivateKeyConnection(SSL* ssl,
-                                                          PrivateKeyConnectionCallbacks& cb,
-                                                          Event::Dispatcher& dispatcher) PURE;
+  virtual void registerPrivateKeyMethod(SSL* ssl, PrivateKeyConnectionCallbacks& cb,
+                                        Event::Dispatcher& dispatcher) PURE;
+
+  /**
+   * Unregister an SSL connection from private key operations by the provider.
+   * @param ssl a SSL connection object.
+   * @throw EnvoyException if registration fails.
+   */
+  virtual void unregisterPrivateKeyMethod(SSL* ssl) PURE;
 
   /**
    * Check whether the private key method satisfies FIPS requirements.

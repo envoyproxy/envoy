@@ -127,10 +127,17 @@ EcdsaPrivateKeyConnection::EcdsaPrivateKeyConnection(
   SSL_set_ex_data(ssl, EcdsaPrivateKeyMethodProvider::ssl_ecdsa_connection_index, this);
 }
 
-Ssl::PrivateKeyConnectionPtr EcdsaPrivateKeyMethodProvider::getPrivateKeyConnection(
-    SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher) {
-  return std::make_unique<EcdsaPrivateKeyConnection>(ssl, cb, dispatcher, bssl::UpRef(pkey_),
-                                                     test_options_);
+void EcdsaPrivateKeyMethodProvider::registerPrivateKeyMethod(SSL* ssl,
+                                                             Ssl::PrivateKeyConnectionCallbacks& cb,
+                                                             Event::Dispatcher& dispatcher) {
+  Thread::LockGuard map_lock(map_lock_);
+  connections_.emplace(
+      ssl, new EcdsaPrivateKeyConnection(ssl, cb, dispatcher, bssl::UpRef(pkey_), test_options_));
+}
+
+void EcdsaPrivateKeyMethodProvider::unregisterPrivateKeyMethod(SSL* ssl) {
+  Thread::LockGuard map_lock(map_lock_);
+  connections_.erase(ssl);
 }
 
 EcdsaPrivateKeyMethodProvider::EcdsaPrivateKeyMethodProvider(

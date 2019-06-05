@@ -5,6 +5,8 @@
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/private_key/private_key_config.h"
 
+#include "common/common/lock_guard.h"
+#include "common/common/thread.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -17,9 +19,9 @@ struct EcdsaPrivateKeyConnectionTestOptions {
   bool async_method_error_{};
 };
 
-// An example ECDSA private key method provider here for testing the decrypt() and sign()
+// An example ECDSA private key method provider for testing the decrypt() and sign()
 // functionality.
-class EcdsaPrivateKeyConnection : public virtual Ssl::PrivateKeyConnection {
+class EcdsaPrivateKeyConnection {
 public:
   EcdsaPrivateKeyConnection(SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb,
                             Event::Dispatcher& dispatcher, bssl::UniquePtr<EVP_PKEY> pkey,
@@ -46,18 +48,20 @@ public:
       const ProtobufWkt::Struct& config,
       Server::Configuration::TransportSocketFactoryContext& factory_context);
   // Ssl::PrivateKeyMethodProvider
-  Ssl::PrivateKeyConnectionPtr getPrivateKeyConnection(SSL* ssl,
-                                                       Ssl::PrivateKeyConnectionCallbacks& cb,
-                                                       Event::Dispatcher& dispatcher) override;
+  void registerPrivateKeyMethod(SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb,
+                                Event::Dispatcher& dispatcher) override;
+  void unregisterPrivateKeyMethod(SSL* ssl) override;
   bool checkFips() override;
   Ssl::BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() override;
 
   static int ssl_ecdsa_connection_index;
 
 private:
+  Thread::MutexBasicLockable map_lock_{};
   Ssl::BoringSslPrivateKeyMethodSharedPtr method_{};
   bssl::UniquePtr<EVP_PKEY> pkey_;
   EcdsaPrivateKeyConnectionTestOptions test_options_;
+  std::map<SSL*, std::unique_ptr<EcdsaPrivateKeyConnection>> connections_;
 };
 
 class EcdsaPrivateKeyMethodFactory : public Ssl::PrivateKeyMethodProviderInstanceFactory {

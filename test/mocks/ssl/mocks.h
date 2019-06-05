@@ -78,9 +78,9 @@ public:
   MockPrivateKeyMethodProvider();
   ~MockPrivateKeyMethodProvider();
 
-  MOCK_METHOD3(getPrivateKeyConnection,
-               PrivateKeyConnectionPtr(SSL* ssl, PrivateKeyConnectionCallbacks& cb,
-                                       Event::Dispatcher& dispatcher));
+  MOCK_METHOD3(registerPrivateKeyMethod,
+               void(SSL* ssl, PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher));
+  MOCK_METHOD1(unregisterPrivateKeyMethod, void(SSL* ssl));
   MOCK_METHOD0(checkFips, bool());
   MOCK_METHOD0(getBoringSslPrivateKeyMethod, BoringSslPrivateKeyMethodSharedPtr());
 };
