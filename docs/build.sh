@@ -48,7 +48,7 @@ pip install -r "${SCRIPT_DIR}"/requirements.txt
 
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED \
-  --incompatible_depset_union=false --action_env=ENVOY_BLOB_SHA --spawn_strategy=standalone
+  --action_env=ENVOY_BLOB_SHA --spawn_strategy=standalone
 
 # These are the protos we want to put in docs, this list will grow.
 # TODO(htuch): Factor this out of this script.
