@@ -151,9 +151,6 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
 void Span::finishSpan() { span_.End(); }
 
 void Span::injectContext(Http::HeaderMap& request_headers) {
-  if (!span_.context().IsValid()) {
-    return;
-  }
   using OpenCensusConfig = envoy::config::trace::v2::OpenCensusConfig;
   for (const auto& outgoing : oc_config_.outgoing_trace_context()) {
     switch (outgoing) {
