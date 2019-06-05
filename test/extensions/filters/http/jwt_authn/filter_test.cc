@@ -70,6 +70,8 @@ TEST_F(FilterTest, InlineOK) {
 
   auto headers = Http::TestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
 
   Buffer::OwnedImpl data("");

@@ -198,6 +198,8 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   request_headers_.addCopy(Http::Headers::get().RequestId, "requestid");
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,

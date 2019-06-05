@@ -185,6 +185,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap& metadata_map) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Upstream::LoadBalancerContext
@@ -303,6 +304,7 @@ private:
     void encodeHeaders(bool end_stream);
     void encodeData(Buffer::Instance& data, bool end_stream);
     void encodeTrailers(const Http::HeaderMap& trailers);
+    void encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr);
 
     void resetStream();
     void setupPerTryTimeout();
@@ -400,6 +402,7 @@ private:
     // access logging is configured.
     Http::HeaderMapPtr upstream_headers_;
     Http::HeaderMapPtr upstream_trailers_;
+    Http::MetadataMapVector downstream_metadata_map_vector_;
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;
@@ -465,6 +468,7 @@ private:
   // for the remaining upstream requests to return.
   void resetOtherUpstreams(UpstreamRequest& upstream_request);
   void sendNoHealthyUpstreamResponse();
+  // TODO(soya3129): Save metadata for retry, redirect and shadowing case.
   bool setupRetry();
   bool setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upstream_request);
   void updateOutlierDetection(Http::Code code, UpstreamRequest& upstream_request);
