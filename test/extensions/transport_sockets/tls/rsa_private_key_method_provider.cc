@@ -33,10 +33,6 @@ static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* o
       SSL_get_ex_data(ssl, RsaPrivateKeyMethodProvider::ssl_rsa_connection_index));
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int hash_len;
-  uint8_t* msg;
-  size_t msg_len;
-  int prefix_allocated = 0;
-  int padding = RSA_NO_PADDING;
 
   if (!ops) {
     return ssl_private_key_failure;
@@ -68,35 +64,15 @@ static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* o
     return ssl_private_key_failure;
   }
 
-  // Add RSA padding to the the hash.
+  // Perform signing.
   if (SSL_is_signature_algorithm_rsa_pss(signature_algorithm)) {
-    msg_len = RSA_size(rsa);
-    msg = static_cast<uint8_t*>(OPENSSL_malloc(msg_len));
-    if (!msg) {
-      return ssl_private_key_failure;
-    }
-    prefix_allocated = 1;
-    if (!RSA_padding_add_PKCS1_PSS_mgf1(rsa, msg, hash, md, nullptr, -1)) {
-      OPENSSL_free(msg);
-      return ssl_private_key_failure;
-    }
-    padding = RSA_NO_PADDING;
+    RSA_sign_pss_mgf1(rsa, out_len, out, max_out, hash, hash_len, md, nullptr, -1);
   } else {
-    if (!RSA_add_pkcs1_prefix(&msg, &msg_len, &prefix_allocated, EVP_MD_type(md), hash, hash_len)) {
+    unsigned int out_len_unsigned;
+    if (!RSA_sign(EVP_MD_type(md), hash, hash_len, out, &out_len_unsigned, rsa)) {
       return ssl_private_key_failure;
     }
-    padding = RSA_PKCS1_PADDING;
-  }
-
-  if (!RSA_sign_raw(rsa, out_len, out, max_out, msg, msg_len, padding)) {
-    if (prefix_allocated) {
-      OPENSSL_free(msg);
-    }
-    return ssl_private_key_failure;
-  }
-
-  if (prefix_allocated) {
-    OPENSSL_free(msg);
+    *out_len = out_len_unsigned;
   }
 
   if (ops->test_options_.crypto_error_) {
