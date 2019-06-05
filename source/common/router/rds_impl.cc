@@ -140,13 +140,10 @@ void RdsRouteConfigSubscription::onConfigUpdate(
         "Server sent a delta RDS update attempting to remove a resource (name: {}). Ignoring.",
         removed_resources[0]);
   }
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
   if (!added_resources.empty()) {
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
     *unwrapped_resource.Add() = added_resources[0].resource();
     onConfigUpdate(unwrapped_resource, added_resources[0].version());
-  } else {
-    onConfigUpdate({}, "");
-    return;
   }
 }
 
