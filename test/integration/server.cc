@@ -47,10 +47,12 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
 IntegrationTestServerPtr IntegrationTestServer::create(
     const std::string& config_path, const Network::Address::IpVersion version,
     std::function<void()> on_server_init_function, bool deterministic,
-    Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization) {
+    Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
+    absl::optional<std::reference_wrapper<ProcessObject>> process_object) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
-  server->start(version, on_server_init_function, deterministic, defer_listener_finalization);
+  server->start(version, on_server_init_function, deterministic, defer_listener_finalization,
+                process_object);
   return server;
 }
 
@@ -64,13 +66,16 @@ void IntegrationTestServer::waitUntilListenersReady() {
   ENVOY_LOG(info, "listener wait complete");
 }
 
-void IntegrationTestServer::start(const Network::Address::IpVersion version,
-                                  std::function<void()> on_server_init_function, bool deterministic,
-                                  bool defer_listener_finalization) {
+void IntegrationTestServer::start(
+    const Network::Address::IpVersion version, std::function<void()> on_server_init_function,
+    bool deterministic, bool defer_listener_finalization,
+    absl::optional<std::reference_wrapper<ProcessObject>> process_object) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_ = api_.threadFactory().createThread(
-      [version, deterministic, this]() -> void { threadRoutine(version, deterministic); });
+  thread_ =
+      api_.threadFactory().createThread([version, deterministic, process_object, this]() -> void {
+        threadRoutine(version, deterministic, process_object);
+      });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
   // Note that there is no synchronization guaranteeing this happens either
@@ -139,8 +144,9 @@ void IntegrationTestServer::serverReady() {
   server_set_.setReady();
 }
 
-void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
-                                          bool deterministic) {
+void IntegrationTestServer::threadRoutine(
+    const Network::Address::IpVersion version, bool deterministic,
+    absl::optional<std::reference_wrapper<ProcessObject>> process_object) {
   OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version));
   Thread::MutexBasicLockable lock;
 
@@ -151,7 +157,7 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
     random_generator = std::make_unique<Runtime::RandomGeneratorImpl>();
   }
   createAndRunEnvoyServer(options, time_system_, Network::Utility::getLocalAddress(version), *this,
-                          lock, *this, std::move(random_generator));
+                          lock, *this, std::move(random_generator), process_object);
 }
 
 void IntegrationTestServer::onRuntimeCreated() {
@@ -168,17 +174,22 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     OptionsImpl& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
-    Runtime::RandomGeneratorPtr&& random_generator) {
+    Runtime::RandomGeneratorPtr&& random_generator,
+    absl::optional<std::reference_wrapper<ProcessObject>> process_object) {
   {
     Stats::FakeSymbolTableImpl symbol_table;
     Server::HotRestartNopImpl restarter;
     ThreadLocal::InstanceImpl tls;
     Stats::HeapStatDataAllocator stats_allocator(symbol_table);
     Stats::ThreadLocalStoreImpl stat_store(stats_allocator);
+    std::unique_ptr<ProcessContext> process_context;
+    if (process_object.has_value()) {
+      process_context = std::make_unique<ProcessContextImpl>(process_object->get());
+    }
     Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
                                 access_log_lock, component_factory, std::move(random_generator),
                                 tls, Thread::threadFactoryForTest(),
-                                Filesystem::fileSystemForTest(), nullptr);
+                                Filesystem::fileSystemForTest(), std::move(process_context));
     // This is technically thread unsafe (assigning to a shared_ptr accessed
     // across threads), but because we synchronize below through serverReady(), the only
     // consumer on the main test thread in ~IntegrationTestServerImpl will not race.
