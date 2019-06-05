@@ -204,6 +204,11 @@ struct ActiveTestRequest {
 };
 
 /**
+ * Verify that the pool's host is a member of the cluster the pool was constructed with.
+ */
+TEST_F(Http1ConnPoolImplTest, Host) { EXPECT_EQ(cluster_.get(), &conn_pool_.host()->cluster()); }
+
+/**
  * Verify that connections are drained when requested.
  */
 TEST_F(Http1ConnPoolImplTest, DrainConnections) {
