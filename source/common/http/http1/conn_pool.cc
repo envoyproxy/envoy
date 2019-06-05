@@ -273,18 +273,19 @@ ConnPoolImpl::StreamWrapper::~StreamWrapper() {
 void ConnPoolImpl::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
 
 void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
+  // If Connection: close OR
+  //    Http/1.0 and not Connection: keep-alive OR
+  //    Proxy-Connection: close
   if ((headers->Connection() &&
        (absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
                                Headers::get().ConnectionValues.Close))) ||
       (parent_.codec_client_->protocol() == Protocol::Http10 &&
        (!headers->Connection() ||
         !absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
-                                Headers::get().ConnectionValues.KeepAlive)))) {
-    parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
-    close_connection_ = true;
-  } else if (headers->ProxyConnection() &&
-             (absl::EqualsIgnoreCase(headers->ProxyConnection()->value().getStringView(),
-                                     Headers::get().ConnectionValues.Close))) {
+                                Headers::get().ConnectionValues.KeepAlive))) ||
+      (headers->ProxyConnection() &&
+       (absl::EqualsIgnoreCase(headers->ProxyConnection()->value().getStringView(),
+                               Headers::get().ConnectionValues.Close)))) {
     parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
     close_connection_ = true;
   }
