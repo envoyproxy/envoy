@@ -171,14 +171,14 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
     }
     // Once tls_certificate_config_ receives new secret, this callback updates
     // ContextConfigImpl::tls_certificate_config_ with new secret.
-    tc_update_callback_handle_ = tls_certificate_providers_[0]->addUpdateCallback([this,
-                                                                                   callback]() {
-      // This breaks multiple certificate support, but today SDS is only single cert.
-      // TODO(htuch): Fix this when SDS goes multi-cert.
-      tls_certificate_configs_.clear();
-      tls_certificate_configs_.emplace_back(*tls_certificate_providers_[0]->secret(), api_, false);
-      callback();
-    });
+    tc_update_callback_handle_ =
+        tls_certificate_providers_[0]->addUpdateCallback([this, callback]() {
+          // This breaks multiple certificate support, but today SDS is only single cert.
+          // TODO(htuch): Fix this when SDS goes multi-cert.
+          tls_certificate_configs_.clear();
+          tls_certificate_configs_.emplace_back(*tls_certificate_providers_[0]->secret(), api_);
+          callback();
+        });
   }
   if (certificate_validation_context_provider_) {
     if (cvc_update_callback_handle_) {

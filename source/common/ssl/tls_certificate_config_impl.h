@@ -12,8 +12,9 @@ namespace Ssl {
 
 class TlsCertificateConfigImpl : public TlsCertificateConfig {
 public:
-  TlsCertificateConfigImpl(const envoy::api::v2::auth::TlsCertificate& config, Api::Api& api,
-                           bool expect_private_key_method);
+  // SDS uses this constructor.
+  TlsCertificateConfigImpl(const envoy::api::v2::auth::TlsCertificate& config, Api::Api& api);
+  // Regular constructor, works also for private key methods.
   TlsCertificateConfigImpl(const envoy::api::v2::auth::TlsCertificate& config,
                            Server::Configuration::TransportSocketFactoryContext& factory_context,
                            Api::Api& api);
@@ -22,21 +23,20 @@ public:
   const std::string& certificateChainPath() const override { return certificate_chain_path_; }
   const std::string& privateKey() const override { return private_key_; }
   const std::string& privateKeyPath() const override { return private_key_path_; }
+  const std::string& password() const override { return password_; }
+  const std::string& passwordPath() const override { return password_path_; }
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr privateKeyMethod() const override {
     return private_key_method_;
   }
-  const std::string& password() const override { return password_; }
-  const std::string& passwordPath() const override { return password_path_; }
 
 private:
-  TlsCertificateConfigImpl(const envoy::api::v2::auth::TlsCertificate& config, Api::Api& api);
   const std::string certificate_chain_;
   const std::string certificate_chain_path_;
   const std::string private_key_;
   const std::string private_key_path_;
-  Envoy::Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_{};
   const std::string password_;
   const std::string password_path_;
+  Envoy::Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_{};
 };
 
 } // namespace Ssl

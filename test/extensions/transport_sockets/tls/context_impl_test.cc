@@ -1291,6 +1291,15 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {
 
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureBothKeyAndMethod) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  NiceMock<Ssl::MockContextManager> context_manager;
+  NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
+  auto private_key_method_provider_ptr =
+      std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
+  EXPECT_CALL(context_manager, privateKeyMethodManager())
+      .WillOnce(ReturnRef(private_key_method_manager));
+  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _))
+      .WillOnce(Return(private_key_method_provider_ptr));
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
