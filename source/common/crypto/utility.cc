@@ -43,7 +43,7 @@ std::vector<uint8_t> Utility::getSha256Hmac(const std::vector<uint8_t>& key,
   return hmac;
 }
 
-const VerificationOutput Utility::verifySignature(const absl::string_view hash, EVP_PKEY* pubKey,
+const VerificationOutput Utility::verifySignature(absl::string_view hash, EVP_PKEY* pubKey,
                                                   const std::vector<uint8_t>& signature,
                                                   const std::vector<uint8_t>& text) {
   // Step 1: initialize EVP_MD_CTX
@@ -78,7 +78,7 @@ PublicKeyPtr Utility::importPublicKey(const std::vector<uint8_t>& key) {
   return PublicKeyPtr(EVP_parse_public_key(&cbs));
 }
 
-const EVP_MD* Utility::getHashFunction(const absl::string_view name) {
+const EVP_MD* Utility::getHashFunction(absl::string_view name) {
   const std::string hash = absl::AsciiStrToLower(name);
 
   // Hash algorithms set refers
