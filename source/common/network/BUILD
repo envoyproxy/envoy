@@ -19,6 +19,10 @@ envoy_cc_library(
         "address_impl.h",
         "io_socket_handle_impl.h",
     ],
+    copts = select({
+        "//bazel:apple": ["-D__APPLE_USE_RFC_3542"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":io_socket_error_lib",
         "//include/envoy/buffer:buffer_interface",
