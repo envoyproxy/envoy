@@ -1577,7 +1577,7 @@ TEST_F(LuaHttpFilterTest, CheckConnection) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-TEST_F(LuaHttpFilterTest, ImportandReleasePublicKey) {
+TEST_F(LuaHttpFilterTest, ImportPublicKey) {
   const std::string SCRIPT{R"EOF(
     function string.fromhex(str)
       return (str:gsub('..', function (cc)
@@ -1587,14 +1587,13 @@ TEST_F(LuaHttpFilterTest, ImportandReleasePublicKey) {
     function envoy_on_request(request_handle)
       key = "30820122300d06092a864886f70d01010105000382010f003082010a0282010100a7471266d01d160308d73409c06f2e8d35c531c458d3e480e9f3191847d062ec5ccff7bc51e949d5f2c3540c189a4eca1e8633a62cf2d0923101c27e38013e71de9ae91a704849bff7fbe2ce5bf4bd666fd9731102a53193fe5a9a5a50644ff8b1183fa897646598caad22a37f9544510836372b44c58c98586fb7144629cd8c9479592d996d32ff6d395c0b8442ec5aa1ef8051529ea0e375883cefc72c04e360b4ef8f5760650589ca814918f678eee39b884d5af8136a9630a6cc0cde157dc8e00f39540628d5f335b2c36c54c7c8bc3738a6b21acff815405afa28e5183f550dac19abcf1145a7f9ced987db680e4a229cac75dee347ec9ebce1fc3dbbbb0203010001"
       raw = key:fromhex()
-      key = request_handle:importPublicKey(raw, string.len(raw)) 
+      key = request_handle:importPublicKey(raw, string.len(raw)):get()
 
       if key == nil then
         request_handle:logTrace("failed to import public key")
       else
         request_handle:logTrace("succeeded to import public key")
       end
-      request_handle:releasePublicKey(key)
     end
   )EOF"};
 
@@ -1617,14 +1616,13 @@ TEST_F(LuaHttpFilterTest, InvalidPublicKey) {
     function envoy_on_request(request_handle)
       key = "0000"
       raw = key:fromhex()
-      key = request_handle:importPublicKey(raw, string.len(raw)) 
+      key = request_handle:importPublicKey(raw, string.len(raw)):get()
 
       if key == nil then
         request_handle:logTrace("failed to import public key")
       else
         request_handle:logTrace("succeeded to import public key")
       end
-      request_handle:releasePublicKey(key)
     end
   )EOF"};
 
@@ -1651,7 +1649,7 @@ TEST_F(LuaHttpFilterTest, SignatureVerify) {
       data = "hello"
 
       rawkey = key:fromhex()
-      pubkey = request_handle:importPublicKey(rawkey, string.len(rawkey))
+      pubkey = request_handle:importPublicKey(rawkey, string.len(rawkey)):get()
 
       if pubkey == nil then
         request_handle:logTrace("failed to import public key")
@@ -1687,8 +1685,6 @@ TEST_F(LuaHttpFilterTest, SignatureVerify) {
       else
         request_handle:logTrace(error)
       end
-
-      request_handle:releasePublicKey(pubkey)
     end
   )EOF"};
 

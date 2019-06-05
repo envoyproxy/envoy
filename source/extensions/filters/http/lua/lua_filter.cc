@@ -462,21 +462,16 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
   // Get byte array and the length.
   const char* str = luaL_checkstring(state, 2);
   int n = luaL_checknumber(state, 3);
-  std::vector<uint8_t> keyVec(str, str + n);
+  std::vector<uint8_t> key(str, str + n);
 
-  auto key = Common::Crypto::Utility::importPublicKey(keyVec);
-  if (key != nullptr) {
-    lua_pushlightuserdata(state, key);
+  if (public_key_wrapper_.get() != nullptr) {
+    public_key_wrapper_.pushStack();
   } else {
-    lua_pushnil(state);
+    public_key_wrapper_.reset(
+        PublicKeyWrapper::create(state, Common::Crypto::Utility::importPublicKey(key)), true);
   }
 
   return 1;
-}
-
-int StreamHandleWrapper::luaReleasePublicKey(lua_State* state) {
-  Common::Crypto::Utility::releasePublicKey(lua_touserdata(state, 2));
-  return 0;
 }
 
 FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
@@ -493,6 +488,7 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
   lua_state_.registerType<DynamicMetadataMapWrapper>();
   lua_state_.registerType<DynamicMetadataMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
+  lua_state_.registerType<PublicKeyWrapper>();
 
   request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
   if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {

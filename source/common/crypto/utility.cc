@@ -43,9 +43,9 @@ std::vector<uint8_t> Utility::getSha256Hmac(const std::vector<uint8_t>& key,
   return hmac;
 }
 
-VerificationOutput Utility::verifySignature(const absl::string_view& hash, void* ptr,
-                                            const std::vector<uint8_t>& signature,
-                                            const std::vector<uint8_t>& clearText) {
+const VerificationOutput Utility::verifySignature(const absl::string_view& hash, void* ptr,
+                                                  const std::vector<uint8_t>& signature,
+                                                  const std::vector<uint8_t>& text) {
   // Step 1: get public key
   auto pub_key = reinterpret_cast<EVP_PKEY*>(ptr);
 
@@ -66,8 +66,7 @@ VerificationOutput Utility::verifySignature(const absl::string_view& hash, void*
   }
 
   // Step 5: verify signature
-  ok = EVP_DigestVerify(ctx.get(), signature.data(), signature.size(), clearText.data(),
-                        clearText.size());
+  ok = EVP_DigestVerify(ctx.get(), signature.data(), signature.size(), text.data(), text.size());
 
   // Step 6: check result
   if (ok == 1) {
@@ -79,12 +78,10 @@ VerificationOutput Utility::verifySignature(const absl::string_view& hash, void*
   return {false, err_msg};
 }
 
-void* Utility::importPublicKey(const std::vector<uint8_t>& key) {
+const PublicKeyPtr* Utility::importPublicKey(const std::vector<uint8_t>& key) {
   CBS cbs({key.data(), key.size()});
-  return EVP_parse_public_key(&cbs);
+  return new PublicKeyPtr(EVP_parse_public_key(&cbs));
 }
-
-void Utility::releasePublicKey(void* ptr) { EVP_PKEY_free(reinterpret_cast<EVP_PKEY*>(ptr)); }
 
 const EVP_MD* Utility::getHashFunction(const absl::string_view& name) {
   const std::string hash = absl::AsciiStrToLower(name);

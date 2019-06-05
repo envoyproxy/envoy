@@ -24,6 +24,8 @@ struct VerificationOutput {
   std::string error_message_;
 };
 
+typedef bssl::UniquePtr<EVP_PKEY> PublicKeyPtr;
+
 class Utility {
 public:
   /**
@@ -47,26 +49,20 @@ public:
    * @param hash hash function(including SHA1, SHA224, SHA256, SHA384, SHA512)
    * @param key pointer to public key
    * @param signature signature
-   * @param clearText clear text
+   * @param text clear text
    * @return If the result_ is true, the error_message_ is empty; otherwise,
    * the error_message_ stores the error message
    */
-  static VerificationOutput verifySignature(const absl::string_view& hash, void* key,
-                                            const std::vector<uint8_t>& signature,
-                                            const std::vector<uint8_t>& clearText);
+  static const VerificationOutput verifySignature(const absl::string_view& hash, void* key,
+                                                  const std::vector<uint8_t>& signature,
+                                                  const std::vector<uint8_t>& text);
 
   /**
    * Import public key.
    * @param key key string
    * @return pointer to public key
    */
-  static void* importPublicKey(const std::vector<uint8_t>& key);
-
-  /**
-   * Release public key.
-   * @param key pointer to public key
-   */
-  static void releasePublicKey(void* key);
+  static const PublicKeyPtr* importPublicKey(const std::vector<uint8_t>& key);
 
 private:
   static const EVP_MD* getHashFunction(const absl::string_view& name);

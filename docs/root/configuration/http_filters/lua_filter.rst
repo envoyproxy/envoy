@@ -321,21 +321,6 @@ importPublicKey()
 
 Returns public key which is used by :ref:`verifySignature <verify_signature>` to verify digital signature. 
 
-.. attention::
-
-  Remember to call :ref:`releasePublicKey <release_public_key>` when *pubkey* is not needed to avoid memory leak.
-
-.. _release_public_key:
-
-releasePublicKey()
-^^^^^^^^^^^^^^^^^^
-
-.. code-block:: lua
-  
-  handle:releasePublicKey(pubkey)
-
-Free the resource of *pubkey*
-
 .. _verify_signature:
 
 verifySignature()

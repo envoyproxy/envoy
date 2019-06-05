@@ -143,7 +143,6 @@ public:
             {"streamInfo", static_luaStreamInfo},
             {"connection", static_luaConnection},
             {"importPublicKey", static_luaImportPublicKey},
-            {"releasePublicKey", static_luaReleasePublicKey},
             {"verifySignature", static_luaVerifySignature}};
   }
 
@@ -241,12 +240,6 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaImportPublicKey);
 
   /**
-   * Release public key.
-   * @param 1 (void*) pointer to public key
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaReleasePublicKey);
-
-  /**
    * This is the closure/iterator returned by luaBodyChunks() above.
    */
   DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
@@ -263,6 +256,7 @@ private:
     metadata_wrapper_.reset();
     stream_info_wrapper_.reset();
     connection_wrapper_.reset();
+    public_key_wrapper_.reset();
   }
 
   // Http::AsyncClient::Callbacks
@@ -284,6 +278,7 @@ private:
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> stream_info_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::ConnectionWrapper> connection_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<PublicKeyWrapper> public_key_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};

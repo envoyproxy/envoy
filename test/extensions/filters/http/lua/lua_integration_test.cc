@@ -424,7 +424,7 @@ config:
       local keyder = metadata[request_handle:headers():get("keyid")]
 
       local rawkeyder = dec(keyder)
-      local pubkey = request_handle:importPublicKey(rawkeyder, string.len(rawkeyder)) 
+      local pubkey = request_handle:importPublicKey(rawkeyder, string.len(rawkeyder)):get()
 
       if pubkey == nil then
         request_handle:logErr("log test")
