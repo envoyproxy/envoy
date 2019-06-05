@@ -19,7 +19,7 @@ its fallback policy. The default policy is ``NO_FALLBACK``, in which case the re
 the cluster had no hosts. Conversely, the ``ANY_ENDPOINT`` fallback policy load balances across all
 hosts in the cluster, without regard to host metadata. Finally, the ``DEFAULT_SUBSET`` causes
 fallback to load balance among hosts that match a specific set of metadata. Is possible to
-override fallback policy for specific subset selector.***TODO***
+override fallback policy for specific subset selector.
 
 Subsets must be predefined to allow the subset load balancer to efficiently select the correct
 subset of hosts. Each definition is a set of keys, which translates to zero or more
@@ -80,7 +80,7 @@ The cluster may enable subset load balancing like this:
       - stage
     - keys:
       - stage
-      fallback_policy: NO_ENDPOINT
+      fallback_policy: NO_FALLBACK
 
 The following table describes some routes and the result of their application to the
 cluster. Typically the match criteria would be used with routes matching specific aspects of the
@@ -94,7 +94,7 @@ v: 1.2-pre, stage: dev  host4          Subset of hosts selected
 v: 1.0                  host1, host2   Fallback: No subset selector for "v" alone
 other: x                host1, host2   Fallback: No subset selector for "other"
 (none)                  host1, host2   Fallback: No subset requested
-stage: test             no hosts       As fallback policy is overriden per selector with "NO_ENDPOINT" value
+stage: test             empty cluster  As fallback policy is overriden per selector with "NO_FALLBACK" value
 ======================  =============  ======================================================================
 
 Metadata match criteria may also be specified on a route's weighted clusters. Metadata match
