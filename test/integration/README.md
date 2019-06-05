@@ -113,7 +113,7 @@ likely a one-off change, it can be scoped to the existing test file.
 
 # Debugging integration tests
 
-The Envoy integration test fraemwork is generally designed to fast-fail when
+The Envoy integration test framework is generally designed to fast-fail when
 things go wrong, with an explanatory message such as
 "Timed out waiting for new connection."
 but it's not always clear what the underlying cause is. Because there are many
