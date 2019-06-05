@@ -193,7 +193,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
 #if defined(IPV6_PKTINFO)
       if (cmsg->cmsg_type == IPV6_PKTINFO) {
 #else
-      if (cms->cmsg_type == IPV6_RECVPKTINFO) {
+      if (cmsg->cmsg_type == IPV6_RECVPKTINFO) {
 
 #endif
         struct in6_pktinfo* info = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
