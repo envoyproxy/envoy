@@ -180,6 +180,16 @@ public:
   static Address::InstanceConstSharedPtr getIpv6AnyAddress();
 
   /**
+   * @return the IPv4 CIDR catch-all address (0.0.0.0/0).
+   */
+  static const std::string& getIpv4CidrCatchAllAddress();
+
+  /**
+   * @return the IPv6 CIDR catch-all address (::/0).
+   */
+  static const std::string& getIpv6CidrCatchAllAddress();
+
+  /**
    * @param address IP address instance.
    * @param port to update.
    * @return Address::InstanceConstSharedPtr a new address instance with updated port.

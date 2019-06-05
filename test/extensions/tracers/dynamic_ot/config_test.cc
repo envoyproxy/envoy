@@ -34,10 +34,11 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   )EOF",
                                                TestEnvironment::runfilesDirectory());
   envoy::config::trace::v2::Tracing configuration;
-  MessageUtil::loadFromYaml(yaml_string, configuration);
+  TestUtility::loadFromYaml(yaml_string, configuration);
 
   DynamicOpenTracingTracerFactory factory;
-  auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   const Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, tracer);
 }

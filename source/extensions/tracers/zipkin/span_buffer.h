@@ -44,7 +44,7 @@ public:
 
   /**
    * Empties the buffer. This method is supposed to be called when all buffered spans
-   * have been sent to to the Zipkin service.
+   * have been sent to the Zipkin service.
    */
   void clear() { span_buffer_.clear(); }
 
