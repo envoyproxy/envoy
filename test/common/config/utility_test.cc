@@ -187,7 +187,9 @@ TEST(UtilityTest, AllowDeprecatedV1Config) {
       Utility::allowDeprecatedV1Config(runtime, *v1_config), EnvoyException,
       "Using deprecated v1 JSON config load via 'deprecated_v1: true'. This configuration will be "
       "removed from Envoy soon. Please see "
-      "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details.");
+      "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details. The "
+      "`envoy.deprecated_features.v1_filter_json_config` runtime key can be used to temporarily "
+      "enable this feature once the deprecation becomes fail by default.");
 
   // v1 config, runtime allowed.
   EXPECT_CALL(runtime.snapshot_,
@@ -197,7 +199,9 @@ TEST(UtilityTest, AllowDeprecatedV1Config) {
       "warning",
       "Using deprecated v1 JSON config load via 'deprecated_v1: true'. This configuration will be "
       "removed from Envoy soon. Please see "
-      "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details.",
+      "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details. The "
+      "`envoy.deprecated_features.v1_filter_json_config` runtime key can be used to temporarily "
+      "enable this feature once the deprecation becomes fail by default.",
       Utility::allowDeprecatedV1Config(runtime, *v1_config));
 }
 

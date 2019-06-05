@@ -24,6 +24,8 @@ Version 1.11.0 (Pending)
 * Specifying "deprecated_v1: true" in HTTP and network filter configuration to allow loading JSON
   configuration is now deprecated and will be removed in a following release. Update any custom
   filters to use protobuf configuration. A struct can be used for a mostly 1:1 conversion if needed.
+  The `envoy.deprecated_features.v1_filter_json_config` runtime key can be used to temporarily
+  enable this feature once the deprecation becomes fail by default.
 
 Version 1.10.0 (Apr 5, 2019)
 ============================
