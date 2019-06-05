@@ -258,10 +258,6 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
   send_rc = client_socket_->ioHandle().sendto(second_slice, 0, *send_to_addr_);
   ASSERT_EQ(send_rc.rc_, second.length());
 
-  Event::TimerPtr timer = dispatcher_->createTimer([&] { dispatcher_->exit(); });
-
-  timer->enableTimer(std::chrono::milliseconds(2000));
-
   EXPECT_CALL(listener_callbacks_, onData_(_)).Times(0);
 
   EXPECT_CALL(listener_callbacks_, onWriteReady_(_)).Times(0);
