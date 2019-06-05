@@ -47,6 +47,10 @@ ConnPoolImpl::~ConnPoolImpl() {
 }
 
 void ConnPoolImpl::drainConnections() {
+  while (!delayed_clients_.empty()) {
+    delayed_clients_.front()->codec_client_->close();
+  }
+
   while (!ready_clients_.empty()) {
     ready_clients_.front()->codec_client_->close();
   }
@@ -78,6 +82,10 @@ void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& re
 
 void ConnPoolImpl::checkForDrained() {
   if (!drained_callbacks_.empty() && pending_requests_.empty() && busy_clients_.empty()) {
+    while (!delayed_clients_.empty()) {
+      delayed_clients_.front()->codec_client_->close();
+    }
+
     while (!ready_clients_.empty()) {
       ready_clients_.front()->codec_client_->close();
     }

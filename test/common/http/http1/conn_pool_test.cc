@@ -197,18 +197,6 @@ struct ActiveTestRequest {
     }
   }
 
-  void completeKeepAliveResponse(bool with_body) {
-    // Test additional metric writes also.
-    Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{
-        {"connection", "keep-alive"}, {":status", "200"}, {"x-envoy-upstream-canary", "true"}});
-
-    inner_decoder_->decodeHeaders(std::move(response_headers), !with_body);
-    if (with_body) {
-      Buffer::OwnedImpl data;
-      inner_decoder_->decodeData(data, true);
-    }
-  }
-
   void expectNewStream() {
     EXPECT_CALL(*parent_.conn_pool_.test_clients_[client_index_].codec_, newStream(_))
         .WillOnce(DoAll(SaveArgAddress(&inner_decoder_), ReturnRef(request_encoder_)));
@@ -303,7 +291,7 @@ TEST_F(Http1ConnPoolImplTest, MultipleRequestAndResponse) {
   // Request 1 should kick off a new connection.
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   r1.startRequest();
-  r1.completeKeepAliveResponse(false);
+  r1.completeResponse(false);
 
   conn_pool_.expectAndRunUpstreamReadyStillReady();
   conn_pool_.expectAndRunUpstreamReady();
@@ -311,7 +299,7 @@ TEST_F(Http1ConnPoolImplTest, MultipleRequestAndResponse) {
   // Request 2 should not.
   ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Immediate);
   r2.startRequest();
-  r2.completeKeepAliveResponse(true);
+  r2.completeResponse(true);
 
   // Cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
@@ -501,8 +489,7 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
   EXPECT_CALL(callbacks2.pool_ready_, ready());
 
   callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
-  Http::HeaderMapPtr response_headers(
-      new TestHeaderMapImpl{{":status", "200"}, {"connection", "keep-alive"}});
+  Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   conn_pool_.expectAndRunUpstreamReadyStillReady();
@@ -557,8 +544,7 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
   conn_pool_.expectEnableUpstreamReady();
 
   callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
-  Http::HeaderMapPtr response_headers(
-      new TestHeaderMapImpl{{":status", "200"}, {"connection", "keep-alive"}});
+  Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   // Cause the connection to go away.
@@ -709,8 +695,7 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
 
   // Response with 'connection: close' which should cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
-  Http::HeaderMapPtr response_headers(
-      new TestHeaderMapImpl{{":status", "200"}, {"connection", "keep-alive"}});
+  Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 
@@ -734,15 +719,15 @@ TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
   conn_pool_.expectEnableUpstreamReady(2);
   r3.expectNewStream();
 
-  r1.completeKeepAliveResponse(false);
+  r1.completeResponse(false);
   conn_pool_.expectAndRunUpstreamReadyStillReady();
   conn_pool_.expectAndRunUpstreamReady();
   r3.startRequest();
   EXPECT_EQ(3U, cluster_->stats_.upstream_rq_total_.value());
 
   conn_pool_.expectUpstreamReadyEnableTimer(); // The connections will be added to the delay list.
-  r2.completeKeepAliveResponse(false);
-  r3.completeKeepAliveResponse(false);
+  r2.completeResponse(false);
+  r3.completeResponse(false);
 
   // Disconnect both clients.
   EXPECT_CALL(conn_pool_, onClientDestroy()).Times(2);
