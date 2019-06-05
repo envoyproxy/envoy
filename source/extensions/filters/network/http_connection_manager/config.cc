@@ -7,7 +7,6 @@
 
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
-#include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
 
 #include "common/access_log/access_log_impl.h"

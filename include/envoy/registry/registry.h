@@ -46,6 +46,7 @@ public:
 
     return absl::StrJoin(ret, ",");
   }
+
   /**
    * Gets the current map of factory implementations. This is an ordered map for sorting reasons.
    */
@@ -130,9 +131,19 @@ private:
  * Macro used for static registration.
  */
 #define REGISTER_FACTORY(FACTORY, BASE)                                                            \
+  void forceStaticLink##FACTORY() {}                                                               \
   static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
                                           FACTORY, BASE>                                           \
       FACTORY##_registered
+
+/**
+ * Macro used for static registration declaration.
+ * Calling forceRegister...(); can be used to force the static factory initializer to run in a
+ * setting in which Envoy is bundled as a static archive. In this case, the static initializer is
+ * not run until a function in the compilation unit is invoked. The force function can be invoked
+ * from a static library wrapper.
+ */
+#define DECLARE_FACTORY(FACTORY) void forceRegister##FACTORY()
 
 } // namespace Registry
 } // namespace Envoy
