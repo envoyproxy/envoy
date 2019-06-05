@@ -80,7 +80,8 @@ public:
   MOCK_CONST_METHOD0(lbConfig, const envoy::api::v2::Cluster::CommonLbConfig&());
   MOCK_CONST_METHOD0(lbType, LoadBalancerType());
   MOCK_CONST_METHOD0(type, envoy::api::v2::Cluster::DiscoveryType());
-  MOCK_CONST_METHOD0(clusterType, const absl::optional<envoy::api::v2::Cluster::CustomClusterType>&());
+  MOCK_CONST_METHOD0(clusterType,
+                     const absl::optional<envoy::api::v2::Cluster::CustomClusterType>&());
   MOCK_CONST_METHOD0(lbRingHashConfig,
                      const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&());
   MOCK_CONST_METHOD0(lbLeastRequestConfig,

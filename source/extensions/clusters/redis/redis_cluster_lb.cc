@@ -23,8 +23,7 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(
     ASSERT(host != all_hosts.end(), "we expect all address to be found in the updated_hosts");
     for (auto i = slot.start(); i <= slot.end(); ++i) {
       updated_slots->at(i) = host->second;
-      if (current &&
-          current->at(i)->address()->asString() != host->second->address()->asString()) {
+      if (current && current->at(i)->address()->asString() != host->second->address()->asString()) {
         should_update = true;
       }
     }
