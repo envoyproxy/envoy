@@ -495,8 +495,8 @@ void RedisProxyIntegrationTest::simpleRoundtripToUpstream(FakeUpstreamPtr& upstr
 
   roundtripToUpstreamStep(upstream, request, response, redis_client, fake_upstream_connection, "");
 
-  redis_client->close();
   EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
 }
 
 void RedisProxyIntegrationTest::proxyResponseStep(const std::string& request,
@@ -561,9 +561,9 @@ void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
   // The client should receive response unchanged.
   EXPECT_EQ(response, redis_client->data());
 
-  redis_client->close();
   EXPECT_TRUE(fake_upstream_connection_1->close());
   EXPECT_TRUE(fake_upstream_connection_2->close());
+  redis_client->close();
 }
 
 FakeRawConnectionPtr RedisProxyWithMirrorsIntegrationTest::expectUpstreamRequestResponse(
@@ -765,8 +765,8 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, ConnectionFailureBeforeAskingRe
   redis_client->waitForData(error_response.str());
   EXPECT_EQ(error_response.str(), redis_client->data());
 
-  redis_client->close();
   EXPECT_TRUE(fake_upstream_connection_1->close());
+  redis_client->close();
 }
 
 // This test verifies that a ASK redirection error as a response to an "asking" command is ignored.
@@ -866,8 +866,8 @@ TEST_P(RedisProxyWithDownstreamAuthIntegrationTest, ErrorsUntilCorrectPasswordSe
   roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n",
                           redis_client, fake_upstream_connection, "");
 
-  redis_client->close();
   EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
 }
 
 // This test verifies that upstream server connections are transparently authenticated if an
@@ -893,10 +893,10 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsIntegrationTest, TransparentAuthentic
                           "$3\r\nbar\r\n", redis_client, fake_upstream_connection[2],
                           "cluster_2_password");
 
-  redis_client->close();
   EXPECT_TRUE(fake_upstream_connection[0]->close());
   EXPECT_TRUE(fake_upstream_connection[1]->close());
   EXPECT_TRUE(fake_upstream_connection[2]->close());
+  redis_client->close();
 }
 
 TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredCatchAllRequest) {
@@ -921,10 +921,10 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredCatchAllRequest) {
   // response from mirrored requests are ignored.
   EXPECT_EQ(response, redis_client->data());
 
-  redis_client->close();
   EXPECT_TRUE(cluster_0_connection->close());
   EXPECT_TRUE(cluster_1_connection->close());
   EXPECT_TRUE(cluster_2_connection->close());
+  redis_client->close();
 }
 
 TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredWriteOnlyRequest) {
@@ -948,9 +948,9 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredWriteOnlyRequest) {
   redis_client->waitForData(set_response);
   EXPECT_EQ(set_response, redis_client->data());
 
-  redis_client->close();
   EXPECT_TRUE(cluster_0_connection->close());
   EXPECT_TRUE(cluster_1_connection->close());
+  redis_client->close();
 }
 
 TEST_P(RedisProxyWithMirrorsIntegrationTest, ExcludeReadCommands) {
@@ -973,8 +973,8 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, ExcludeReadCommands) {
   redis_client->waitForData(get_response);
   EXPECT_EQ(get_response, redis_client->data());
 
-  redis_client->close();
   EXPECT_TRUE(cluster_0_connection->close());
+  redis_client->close();
 }
 
 TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
@@ -998,9 +998,9 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
   // response from mirrored requests are ignored.
   EXPECT_EQ(response, redis_client->data());
 
-  redis_client->close();
   EXPECT_TRUE(cluster_0_connection->close());
   EXPECT_TRUE(cluster_1_connection->close());
+  redis_client->close();
 }
 
 } // namespace
