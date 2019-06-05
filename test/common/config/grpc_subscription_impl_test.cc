@@ -18,7 +18,7 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   EXPECT_CALL(random_, random());
   EXPECT_CALL(*timer_, enableTimer(_));
-  subscription_->start({"cluster0", "cluster1"}, callbacks_);
+  subscription_->start({"cluster0", "cluster1"});
   verifyStats(2, 0, 0, 1, 0);
   // Ensure this doesn't cause an issue by sending a request, since we don't
   // have a gRPC stream.

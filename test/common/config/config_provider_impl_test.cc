@@ -55,7 +55,6 @@ public:
   void start() override {}
 
   // Envoy::Config::SubscriptionCallbacks
-  // TODO(fredlas) deduplicate
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override {
     auto config = TestUtility::anyConvert<test::common::config::DummyConfig>(resources[0]);

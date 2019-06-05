@@ -112,7 +112,6 @@ envoy_cc_test(
     srcs = ["filter_manager_impl_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:filter_manager_lib",
         "//source/common/stats:stats_lib",
@@ -130,6 +129,7 @@ envoy_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

@@ -47,8 +47,8 @@ public:
     }));
     subscription_ = std::make_unique<HttpSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
-        std::chrono::milliseconds(1000), *method_descriptor_, stats_, init_fetch_timeout,
-        validation_visitor_);
+        std::chrono::milliseconds(1000), *method_descriptor_, callbacks_, stats_,
+        init_fetch_timeout, validation_visitor_);
   }
 
   ~HttpSubscriptionTestHarness() {
@@ -102,7 +102,7 @@ public:
     version_ = "";
     cluster_names_ = cluster_names;
     expectSendMessage(cluster_names, "");
-    subscription_->start(cluster_names, callbacks_);
+    subscription_->start(cluster_names);
   }
 
   void updateResources(const std::set<std::string>& cluster_names) override {

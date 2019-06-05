@@ -17,7 +17,6 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.ratelimit",
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/network/ratelimit:ratelimit_lib",
@@ -36,5 +35,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/network/ratelimit:config",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
