@@ -42,6 +42,12 @@ Prefix::Prefix(
   }
 }
 
+void Prefix::removePrefix(std::string& key) const {
+  if (remove_prefix_) {
+    key.erase(0, prefix_.length());
+  }
+}
+
 PrefixRoutes::PrefixRoutes(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes& config,
     Upstreams&& upstreams, Runtime::Loader& runtime)
@@ -65,7 +71,7 @@ PrefixRoutes::PrefixRoutes(
   }
 }
 
-RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
+RouteSharedPtr PrefixRoutes::upstreamPool(const std::string& key) const {
   PrefixSharedPtr value = nullptr;
   if (case_insensitive_) {
     std::string copy(key);
@@ -76,9 +82,6 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
   }
 
   if (value != nullptr) {
-    if (value->removePrefix()) {
-      key.erase(0, value->prefix().length());
-    }
     return value;
   }
 

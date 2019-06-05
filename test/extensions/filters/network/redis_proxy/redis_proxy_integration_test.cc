@@ -838,7 +838,8 @@ TEST_P(RedisProxyWithRoutesIntegrationTest, SimpleRequestAndResponseRoutedByPref
                             "$3\r\nbar\r\n");
 
   // roundtrip to cluster_2 (prefix "baz:" route)
-  simpleRoundtripToUpstream(fake_upstreams_[4], makeBulkStringArray({"get", "baz:123"}),
+  simpleRoundtripToUpstream(fake_upstreams_[4],
+                            makeBulkStringArray({"eval", "script", "1", "baz:123", "baz:456"}),
                             "$3\r\nbar\r\n");
 }
 

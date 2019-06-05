@@ -41,6 +41,8 @@ typedef std::vector<MirrorPolicyConstSharedPtr> MirrorPolicies;
 
 /**
  * An resolved route that wraps an upstream connection pool and list of mirror policies
+ * Also provides a method to remove prefix from keys for this route, if remove_prefix is set on this
+ * route.
  */
 class Route {
 public:
@@ -49,6 +51,8 @@ public:
   virtual ConnPool::InstanceSharedPtr upstream() const PURE;
 
   virtual const MirrorPolicies& mirrorPolicies() const PURE;
+
+  virtual void removePrefix(std::string& key) const PURE;
 };
 
 typedef std::shared_ptr<Route> RouteSharedPtr;
@@ -62,11 +66,11 @@ public:
 
   /**
    * Returns a connection pool that matches a given route. When no match is found, the catch all
-   * pool is used. When remove prefix is set to true, the prefix will be removed from the key.
-   * @param key mutable reference to the key of the current command.
+   * pool is used.
+   * @param key key of the current command.
    * @return a handle to the connection pool.
    */
-  virtual RouteSharedPtr upstreamPool(std::string& key) PURE;
+  virtual RouteSharedPtr upstreamPool(const std::string& key) const PURE;
 };
 
 typedef std::unique_ptr<Router> RouterPtr;

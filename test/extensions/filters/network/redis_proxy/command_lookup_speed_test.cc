@@ -32,7 +32,7 @@ public:
 };
 
 class NullRouterImpl : public Router {
-  RouteSharedPtr upstreamPool(std::string&) override { return nullptr; }
+  RouteSharedPtr upstreamPool(const std::string&) const override { return nullptr; }
 };
 
 class CommandLookUpSpeedTest {

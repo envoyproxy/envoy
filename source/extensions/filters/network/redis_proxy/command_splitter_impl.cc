@@ -163,6 +163,7 @@ SplitRequestPtr SimpleRequest::create(Router& router,
 
   const auto route = router.upstreamPool(incoming_request->asArray()[1].asString());
   if (route) {
+    route->removePrefix(incoming_request->asArray()[1].asString());
     request_ptr->conn_pool_ = route->upstream();
     request_ptr->handle_ =
         makeRequest(route, incoming_request->asArray()[0].asString(),
@@ -194,6 +195,20 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
 
   const auto route = router.upstreamPool(incoming_request->asArray()[3].asString());
   if (route) {
+    int key_count;
+    try {
+      key_count = std::stoi(incoming_request->asArray()[2].asString());
+    } catch (const std::invalid_argument& e) {
+      throw EnvoyException(e.what());
+    } catch (const std::out_of_range& e) {
+      throw EnvoyException(e.what());
+    }
+    auto keys_start = incoming_request->asArray().cbegin() + 3;
+    auto keys_end = keys_start + key_count;
+    std::vector<Common::Redis::RespValue> keys(keys_start, keys_end + 1);
+    for (auto& key : keys) {
+      route->removePrefix(key.asString());
+    }
     request_ptr->conn_pool_ = route->upstream();
     request_ptr->handle_ =
         makeRequest(route, incoming_request->asArray()[0].asString(),
@@ -261,6 +276,7 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
     ENVOY_LOG(debug, "redis: parallel get: '{}'", single_mget.toString());
     const auto route = router.upstreamPool(incoming_request->asArray()[i].asString());
     if (route) {
+      route->removePrefix(incoming_request->asArray()[i].asString());
       pending_request.conn_pool_ = route->upstream();
       pending_request.handle_ = makeRequest(route, "get", incoming_request->asArray()[i].asString(),
                                             single_mget, pending_request);
@@ -393,6 +409,7 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
     ENVOY_LOG(debug, "redis: parallel set: '{}'", single_mset.toString());
     const auto route = router.upstreamPool(incoming_request->asArray()[i].asString());
     if (route) {
+      route->removePrefix(incoming_request->asArray()[i].asString());
       pending_request.conn_pool_ = route->upstream();
       pending_request.handle_ = makeRequest(route, "set", incoming_request->asArray()[i].asString(),
                                             single_mset, pending_request);
@@ -487,6 +504,7 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
               single_fragment.toString());
     const auto route = router.upstreamPool(incoming_request->asArray()[i].asString());
     if (route) {
+      route->removePrefix(incoming_request->asArray()[i].asString());
       pending_request.conn_pool_ = route->upstream();
       pending_request.handle_ =
           makeRequest(route, single_fragment.asArray()[0].asString(),

@@ -39,7 +39,7 @@ public:
   PassthruRouter(ConnPool::InstanceSharedPtr conn_pool)
       : route_(std::make_shared<testing::NiceMock<MockRoute>>(conn_pool)) {}
 
-  RouteSharedPtr upstreamPool(std::string&) override { return route_; }
+  RouteSharedPtr upstreamPool(const std::string&) const override { return route_; }
 
 private:
   RouteSharedPtr route_;

@@ -127,7 +127,9 @@ TEST(PrefixRoutesTest, RemovePrefix) {
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
   std::string key("abc:bar");
-  EXPECT_EQ(upstream_a, router.upstreamPool(key)->upstream());
+  RouteSharedPtr route = router.upstreamPool(key);
+  EXPECT_EQ(upstream_a, route->upstream());
+  route->removePrefix(key);
   EXPECT_EQ(":bar", key);
 }
 
