@@ -5,6 +5,8 @@
 
 #include "envoy/buffer/buffer.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 
 /**
@@ -51,7 +53,7 @@ public:
    * Note, decoded string may contain '\0' at any position, it should be treated as a sequence of
    * bytes.
    */
-  static std::string decode_without_padding(const std::string& input);
+  static std::string decodeWithoutPadding(absl::string_view input);
 };
 
 /**

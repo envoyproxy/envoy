@@ -92,18 +92,22 @@ TEST(Base64Test, DecodeFailure) {
 }
 
 TEST(Base64Test, DecodeWithoutPadding) {
-  EXPECT_EQ("foo", Base64::decode_without_padding("Zm9v"));
-  EXPECT_EQ("fo", Base64::decode_without_padding("Zm8"));
-  EXPECT_EQ("f", Base64::decode_without_padding("Zg"));
-  EXPECT_EQ("foobar", Base64::decode_without_padding("Zm9vYmFy"));
-  EXPECT_EQ("fooba", Base64::decode_without_padding("Zm9vYmE"));
-  EXPECT_EQ("foob", Base64::decode_without_padding("Zm9vYg"));
+  EXPECT_EQ("foo", Base64::decodeWithoutPadding("Zm9v"));
+  EXPECT_EQ("fo", Base64::decodeWithoutPadding("Zm8"));
+  EXPECT_EQ("f", Base64::decodeWithoutPadding("Zg"));
+  EXPECT_EQ("foobar", Base64::decodeWithoutPadding("Zm9vYmFy"));
+  EXPECT_EQ("fooba", Base64::decodeWithoutPadding("Zm9vYmE"));
+  EXPECT_EQ("foob", Base64::decodeWithoutPadding("Zm9vYg"));
 
-  EXPECT_EQ("", Base64::decode_without_padding(""));
-  EXPECT_EQ("", Base64::decode_without_padding("="));
-  EXPECT_EQ("", Base64::decode_without_padding("=="));
-  EXPECT_EQ("", Base64::decode_without_padding("==="));
-  EXPECT_EQ("", Base64::decode_without_padding("===="));
+  EXPECT_EQ("", Base64::decodeWithoutPadding(""));
+  EXPECT_EQ("", Base64::decodeWithoutPadding("="));
+  EXPECT_EQ("", Base64::decodeWithoutPadding("=="));
+  EXPECT_EQ("", Base64::decodeWithoutPadding("==="));
+  EXPECT_EQ("", Base64::decodeWithoutPadding("===="));
+
+  EXPECT_EQ("f", Base64::decodeWithoutPadding("Zg"));
+  EXPECT_EQ("f", Base64::decodeWithoutPadding("Zg="));
+  EXPECT_EQ("f", Base64::decodeWithoutPadding("Zg=="));
 }
 
 TEST(Base64Test, MultiSlicesBufferEncode) {

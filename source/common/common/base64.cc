@@ -144,10 +144,10 @@ std::string Base64::decode(const std::string& input) {
   if (input.length() % 4) {
     return EMPTY_STRING;
   }
-  return decode_without_padding(input);
+  return decodeWithoutPadding(input);
 }
 
-std::string Base64::decode_without_padding(const std::string& input) {
+std::string Base64::decodeWithoutPadding(absl::string_view input) {
   if (input.empty()) {
     return EMPTY_STRING;
   }
