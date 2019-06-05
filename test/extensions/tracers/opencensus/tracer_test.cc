@@ -1,6 +1,7 @@
 // Usage:
 // bazel run //test/extensions/tracers/opencensus:tracer_test -- -l debug
 
+#include <cstdint>
 #include <iostream>
 #include <vector>
 
@@ -230,33 +231,55 @@ TEST(OpenCensusTracerTest, PropagateTraceContext) {
   helper("x-cloud-trace-context", "404142434445464748494a4b4c4d4e4f/7017280452245743464;o=1");
 }
 
-// Test constant_sampler that's always on.
-TEST(OpenCensusTracerTest, ConstantSamplerAlwaysOn) {
+namespace {
+
+// Create a Span using the given oc_config and return how many spans made it to
+// the exporter (either zero or one).
+int SamplerTestHelper(const OpenCensusConfig& oc_config) {
   registerSpanCatcher();
-  OpenCensusConfig oc_config;
-  oc_config.mutable_trace_config()->mutable_constant_sampler()->set_decision(
-      ::opencensus::proto::trace::v1::ConstantSampler::ALWAYS_ON);
   std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config));
-  auto span = ::opencensus::trace::Span::StartSpan("span_on");
+  auto span = ::opencensus::trace::Span::StartSpan("test_span");
   span.End();
   // Retrieve SpanData from the OpenCensus trace exporter.
   std::vector<SpanData> spans = getSpanCatcher()->catchSpans();
-  ASSERT_EQ(1, spans.size());
-  EXPECT_TRUE(spans[0].context().trace_options().IsSampled());
+  EXPECT_GE(spans.size(), 0);
+  EXPECT_LE(spans.size(), 1);
+  if (!spans.empty()) {
+    EXPECT_TRUE(spans[0].context().trace_options().IsSampled());
+  }
+  return spans.size();
+}
+
+} // namespace
+
+// Test constant_sampler that's always on.
+TEST(OpenCensusTracerTest, ConstantSamplerAlwaysOn) {
+  OpenCensusConfig oc_config;
+  oc_config.mutable_trace_config()->mutable_constant_sampler()->set_decision(
+      ::opencensus::proto::trace::v1::ConstantSampler::ALWAYS_ON);
+  EXPECT_EQ(1, SamplerTestHelper(oc_config));
 }
 
 // Test constant_sampler that's always off.
 TEST(OpenCensusTracerTest, ConstantSamplerAlwaysOff) {
-  registerSpanCatcher();
   OpenCensusConfig oc_config;
   oc_config.mutable_trace_config()->mutable_constant_sampler()->set_decision(
       ::opencensus::proto::trace::v1::ConstantSampler::ALWAYS_OFF);
-  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config));
-  auto span = ::opencensus::trace::Span::StartSpan("span_off");
-  span.End();
-  // Retrieve SpanData from the OpenCensus trace exporter.
-  std::vector<SpanData> spans = getSpanCatcher()->catchSpans();
-  EXPECT_EQ(0, spans.size());
+  EXPECT_EQ(0, SamplerTestHelper(oc_config));
+}
+
+// Test probability_sampler that's always on.
+TEST(OpenCensusTracerTest, ProbabilitySamplerAlwaysOn) {
+  OpenCensusConfig oc_config;
+  oc_config.mutable_trace_config()->mutable_probability_sampler()->set_samplingprobability(1.0);
+  EXPECT_EQ(1, SamplerTestHelper(oc_config));
+}
+
+// Test probability_sampler that's always off.
+TEST(OpenCensusTracerTest, ProbabilitySamplerAlwaysOff) {
+  OpenCensusConfig oc_config;
+  oc_config.mutable_trace_config()->mutable_probability_sampler()->set_samplingprobability(0.0);
+  EXPECT_EQ(0, SamplerTestHelper(oc_config));
 }
 
 } // namespace OpenCensus
