@@ -5,8 +5,6 @@
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/private_key/private_key_config.h"
 
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -23,8 +21,8 @@ struct EcdsaPrivateKeyConnectionTestOptions {
 // functionality.
 class EcdsaPrivateKeyConnection {
 public:
-  EcdsaPrivateKeyConnection(SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb,
-                            Event::Dispatcher& dispatcher, bssl::UniquePtr<EVP_PKEY> pkey,
+  EcdsaPrivateKeyConnection(Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher,
+                            bssl::UniquePtr<EVP_PKEY> pkey,
                             EcdsaPrivateKeyConnectionTestOptions& test_options);
   EC_KEY* getPrivateKey() { return EVP_PKEY_get1_EC_KEY(pkey_.get()); }
   void delayed_op();
@@ -57,11 +55,9 @@ public:
   static int ssl_ecdsa_connection_index;
 
 private:
-  Thread::MutexBasicLockable map_lock_{};
   Ssl::BoringSslPrivateKeyMethodSharedPtr method_{};
   bssl::UniquePtr<EVP_PKEY> pkey_;
   EcdsaPrivateKeyConnectionTestOptions test_options_;
-  std::map<SSL*, std::unique_ptr<EcdsaPrivateKeyConnection>> connections_;
 };
 
 class EcdsaPrivateKeyMethodFactory : public Ssl::PrivateKeyMethodProviderInstanceFactory {

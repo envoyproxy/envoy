@@ -172,25 +172,25 @@ bool RsaPrivateKeyMethodProvider::checkFips() {
   return true;
 }
 
-RsaPrivateKeyConnection::RsaPrivateKeyConnection(SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb,
+RsaPrivateKeyConnection::RsaPrivateKeyConnection(Ssl::PrivateKeyConnectionCallbacks& cb,
                                                  Event::Dispatcher& dispatcher,
                                                  bssl::UniquePtr<EVP_PKEY> pkey,
                                                  RsaPrivateKeyConnectionTestOptions& test_options)
-    : test_options_(test_options), cb_(cb), dispatcher_(dispatcher), pkey_(std::move(pkey)) {
-  SSL_set_ex_data(ssl, RsaPrivateKeyMethodProvider::ssl_rsa_connection_index, this);
-}
+    : test_options_(test_options), cb_(cb), dispatcher_(dispatcher), pkey_(std::move(pkey)) {}
 
 void RsaPrivateKeyMethodProvider::registerPrivateKeyMethod(SSL* ssl,
                                                            Ssl::PrivateKeyConnectionCallbacks& cb,
                                                            Event::Dispatcher& dispatcher) {
-  Thread::LockGuard map_lock(map_lock_);
-  connections_.emplace(
-      ssl, new RsaPrivateKeyConnection(ssl, cb, dispatcher, bssl::UpRef(pkey_), test_options_));
+  RsaPrivateKeyConnection* ops =
+      new RsaPrivateKeyConnection(cb, dispatcher, bssl::UpRef(pkey_), test_options_);
+  SSL_set_ex_data(ssl, RsaPrivateKeyMethodProvider::ssl_rsa_connection_index, ops);
 }
 
 void RsaPrivateKeyMethodProvider::unregisterPrivateKeyMethod(SSL* ssl) {
-  Thread::LockGuard map_lock(map_lock_);
-  connections_.erase(ssl);
+  RsaPrivateKeyConnection* ops = static_cast<RsaPrivateKeyConnection*>(
+      SSL_get_ex_data(ssl, RsaPrivateKeyMethodProvider::ssl_rsa_connection_index));
+  SSL_set_ex_data(ssl, RsaPrivateKeyMethodProvider::ssl_rsa_connection_index, nullptr);
+  delete ops;
 }
 
 RsaPrivateKeyMethodProvider::RsaPrivateKeyMethodProvider(

@@ -121,23 +121,23 @@ bool EcdsaPrivateKeyMethodProvider::checkFips() {
 }
 
 EcdsaPrivateKeyConnection::EcdsaPrivateKeyConnection(
-    SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher,
+    Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher,
     bssl::UniquePtr<EVP_PKEY> pkey, EcdsaPrivateKeyConnectionTestOptions& test_options)
-    : test_options_(test_options), cb_(cb), dispatcher_(dispatcher), pkey_(move(pkey)) {
-  SSL_set_ex_data(ssl, EcdsaPrivateKeyMethodProvider::ssl_ecdsa_connection_index, this);
-}
+    : test_options_(test_options), cb_(cb), dispatcher_(dispatcher), pkey_(move(pkey)) {}
 
 void EcdsaPrivateKeyMethodProvider::registerPrivateKeyMethod(SSL* ssl,
                                                              Ssl::PrivateKeyConnectionCallbacks& cb,
                                                              Event::Dispatcher& dispatcher) {
-  Thread::LockGuard map_lock(map_lock_);
-  connections_.emplace(
-      ssl, new EcdsaPrivateKeyConnection(ssl, cb, dispatcher, bssl::UpRef(pkey_), test_options_));
+  EcdsaPrivateKeyConnection* ops =
+      new EcdsaPrivateKeyConnection(cb, dispatcher, bssl::UpRef(pkey_), test_options_);
+  SSL_set_ex_data(ssl, EcdsaPrivateKeyMethodProvider::ssl_ecdsa_connection_index, ops);
 }
 
 void EcdsaPrivateKeyMethodProvider::unregisterPrivateKeyMethod(SSL* ssl) {
-  Thread::LockGuard map_lock(map_lock_);
-  connections_.erase(ssl);
+  EcdsaPrivateKeyConnection* ops = static_cast<EcdsaPrivateKeyConnection*>(
+      SSL_get_ex_data(ssl, EcdsaPrivateKeyMethodProvider::ssl_ecdsa_connection_index));
+  SSL_set_ex_data(ssl, EcdsaPrivateKeyMethodProvider::ssl_ecdsa_connection_index, nullptr);
+  delete ops;
 }
 
 EcdsaPrivateKeyMethodProvider::EcdsaPrivateKeyMethodProvider(

@@ -5,8 +5,6 @@
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/private_key/private_key_config.h"
 
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -38,8 +36,8 @@ struct RsaPrivateKeyConnectionTestOptions {
 // functionality.
 class RsaPrivateKeyConnection {
 public:
-  RsaPrivateKeyConnection(SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb,
-                          Event::Dispatcher& dispatcher, bssl::UniquePtr<EVP_PKEY> pkey,
+  RsaPrivateKeyConnection(Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher,
+                          bssl::UniquePtr<EVP_PKEY> pkey,
                           RsaPrivateKeyConnectionTestOptions& test_options);
   RSA* getPrivateKey() { return EVP_PKEY_get0_RSA(pkey_.get()); }
   void delayed_op();
@@ -72,11 +70,9 @@ public:
   static int ssl_rsa_connection_index;
 
 private:
-  Thread::MutexBasicLockable map_lock_{};
   Ssl::BoringSslPrivateKeyMethodSharedPtr method_{};
   bssl::UniquePtr<EVP_PKEY> pkey_;
   RsaPrivateKeyConnectionTestOptions test_options_;
-  std::map<SSL*, std::unique_ptr<RsaPrivateKeyConnection>> connections_;
 };
 
 class RsaPrivateKeyMethodFactory : public Ssl::PrivateKeyMethodProviderInstanceFactory {
