@@ -488,7 +488,10 @@ TEST_F(Http1ConnPoolImplTest, Http10MaxConnections) {
 
   conn_pool_.expectAndRunUpstreamReady();
   callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
-  response_headers.reset(new TestHeaderMapImpl{{":status", "200"}, {"connection", "keep-alive"}});
+  // N.B. clang_tidy insists that we use std::make_unique which can not infer std::initialize_list.
+  response_headers = std::make_unique<TestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{{":status", "200"},
+                                                                 {"connection", "keep-alive"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   // Cause the connection to go away.
@@ -551,7 +554,10 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
-  response_headers.reset(new TestHeaderMapImpl{{":status", "200"}, {"connection", "keep-alive"}});
+  // N.B. clang_tidy insists that we use std::make_unique which can not infer std::initialize_list.
+  response_headers = std::make_unique<TestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{{":status", "200"},
+                                                                 {"connection", "keep-alive"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
