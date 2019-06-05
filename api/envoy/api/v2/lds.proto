@@ -30,6 +30,9 @@ option (gogoproto.equal_all) = true;
 // consist of a complete update of all listeners. Existing connections will be
 // allowed to drain from listeners that are no longer present.
 service ListenerDiscoveryService {
+  rpc DeltaListeners(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  }
+
   rpc StreamListeners(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 

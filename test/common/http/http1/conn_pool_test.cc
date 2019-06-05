@@ -74,7 +74,7 @@ public:
   MOCK_METHOD0(createCodecClient_, CodecClient*());
   MOCK_METHOD0(onClientDestroy, void());
 
-  void expectClientCreate() {
+  void expectClientCreate(Protocol protocol = Protocol::Http11) {
     test_clients_.emplace_back();
     TestCodecClient& test_client = test_clients_.back();
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
@@ -99,6 +99,7 @@ public:
         .WillOnce(Return(test_client.connection_));
     EXPECT_CALL(*this, createCodecClient_()).WillOnce(Return(test_client.codec_client_));
     EXPECT_CALL(*test_client.connect_timer_, enableTimer(_));
+    ON_CALL(*test_client.codec_, protocol()).WillByDefault(Return(protocol));
   }
 
   void expectUpstreamReadyEnableTimer(int times = 1) {
@@ -224,6 +225,11 @@ struct ActiveTestRequest {
   Http::StreamDecoder* inner_decoder_{};
   ConnPoolCallbacks callbacks_;
 };
+
+/**
+ * Verify that the pool's host is a member of the cluster the pool was constructed with.
+ */
+TEST_F(Http1ConnPoolImplTest, Host) { EXPECT_EQ(cluster_.get(), &conn_pool_.host()->cluster()); }
 
 /**
  * Verify that connections are drained when requested.
@@ -504,7 +510,9 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
 
   conn_pool_.expectUpstreamReadyEnableTimer(); // The connection will be added to the delay list.
   callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
-  response_headers.reset(new TestHeaderMapImpl{{":status", "200"}, {"connection", "keep-alive"}});
+  // N.B. clang_tidy insists that we use std::make_unique which can not infer std::initialize_list.
+  response_headers = std::make_unique<TestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   // Cause the connection to go away.
@@ -565,7 +573,9 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
-  response_headers.reset(new TestHeaderMapImpl{{":status", "200"}, {"connection", "keep-alive"}});
+  // N.B. clang_tidy insists that we use std::make_unique which can not infer std::initialize_list.
+  response_headers = std::make_unique<TestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
@@ -642,13 +652,13 @@ TEST_F(Http1ConnPoolImplTest, ProxyConnectionCloseHeader) {
 /**
  * Test when upstream is HTTP/1.0 and does not send 'connection: keep-alive'
  */
-TEST_F(Http1ConnPoolImplTest, NoConnectionKeepAlive) {
+TEST_F(Http1ConnPoolImplTest, Http10NoConnectionKeepAlive) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
   NiceMock<Http::MockStreamDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
-  conn_pool_.expectClientCreate();
+  conn_pool_.expectClientCreate(Protocol::Http10);
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
 
   EXPECT_NE(nullptr, handle);

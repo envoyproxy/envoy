@@ -10,6 +10,8 @@
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
+#include "test/test_common/utility.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -20,7 +22,7 @@ public:
   MockSubscriptionCallbacks() {
     ON_CALL(*this, resourceName(testing::_))
         .WillByDefault(testing::Invoke([](const ProtobufWkt::Any& resource) -> std::string {
-          return resourceName_(MessageUtil::anyConvert<ResourceType>(resource));
+          return resourceName_(TestUtility::anyConvert<ResourceType>(resource));
         }));
   }
   ~MockSubscriptionCallbacks() override {}
@@ -29,7 +31,6 @@ public:
   }
   template <class T> static std::string resourceName_(const T& resource) { return resource.name(); }
 
-  // TODO(fredlas) deduplicate
   MOCK_METHOD2_T(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string& version_info));
   MOCK_METHOD3_T(onConfigUpdate,
@@ -42,9 +43,8 @@ public:
 
 class MockSubscription : public Subscription {
 public:
-  MOCK_METHOD2_T(start,
-                 void(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks));
-  MOCK_METHOD1_T(updateResources, void(const std::set<std::string>& update_to_these_names));
+  MOCK_METHOD1(start, void(const std::set<std::string>& resources));
+  MOCK_METHOD1(updateResources, void(const std::set<std::string>& update_to_these_names));
 };
 
 class MockGrpcMuxWatch : public GrpcMuxWatch {

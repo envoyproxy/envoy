@@ -37,6 +37,7 @@ public:
   const LowerCaseString Date{"date"};
   const LowerCaseString EnvoyAttemptCount{"x-envoy-attempt-count"};
   const LowerCaseString EnvoyAuthPartialBody{"x-envoy-auth-partial-body"};
+  const LowerCaseString EnvoyCluster{"x-envoy-cluster"};
   const LowerCaseString EnvoyDegraded{"x-envoy-degraded"};
   const LowerCaseString EnvoyDownstreamServiceCluster{"x-envoy-downstream-service-cluster"};
   const LowerCaseString EnvoyDownstreamServiceNode{"x-envoy-downstream-service-node"};
@@ -48,6 +49,7 @@ public:
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
   const LowerCaseString EnvoyIpTags{"x-envoy-ip-tags"};
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
+  const LowerCaseString EnvoyNotForwarded{"x-envoy-not-forwarded"};
   const LowerCaseString EnvoyOriginalDstHost{"x-envoy-original-dst-host"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
   const LowerCaseString EnvoyOverloaded{"x-envoy-overloaded"};
@@ -57,6 +59,8 @@ public:
   const LowerCaseString EnvoyRetriableStatusCodes{"x-envoy-retriable-status-codes"};
   const LowerCaseString EnvoyUpstreamAltStatName{"x-envoy-upstream-alt-stat-name"};
   const LowerCaseString EnvoyUpstreamCanary{"x-envoy-upstream-canary"};
+  const LowerCaseString EnvoyUpstreamHostAddress{"x-envoy-upstream-host-address"};
+  const LowerCaseString EnvoyUpstreamHostname{"x-envoy-upstream-hostname"};
   const LowerCaseString EnvoyUpstreamRequestTimeoutAltResponse{
       "x-envoy-upstream-rq-timeout-alt-response"};
   const LowerCaseString EnvoyUpstreamRequestTimeoutMs{"x-envoy-upstream-rq-timeout-ms"};

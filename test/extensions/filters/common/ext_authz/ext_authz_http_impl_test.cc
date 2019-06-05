@@ -71,9 +71,9 @@ public:
               - exact: Foo
               - prefix: "x-"
         )EOF";
-      MessageUtil::loadFromYaml(default_yaml, proto_config);
+      TestUtility::loadFromYaml(default_yaml, proto_config);
     } else {
-      MessageUtil::loadFromYaml(yaml, proto_config);
+      TestUtility::loadFromYaml(yaml, proto_config);
     }
 
     return std::make_shared<ClientConfig>(ClientConfig{proto_config, timeout, path_prefix});

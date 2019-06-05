@@ -81,6 +81,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "scoped_rds_test",
     srcs = ["scoped_rds_test.cc"],
+    external_deps = [
+        "abseil_strings",
+    ],
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",
@@ -276,6 +279,8 @@ envoy_cc_test(
         "//source/common/stream_info:filter_state_lib",
         "//test/common/stream_info:test_int_accessor_lib",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
