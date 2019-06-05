@@ -226,8 +226,6 @@ void Driver::applyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& c
       probability = 0.;
       break;
     case ConstantSampler::ALWAYS_ON:
-      probability = 1.;
-      break;
     case ConstantSampler::ALWAYS_PARENT:
       probability = 1.;
       break;
