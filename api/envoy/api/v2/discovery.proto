@@ -169,8 +169,8 @@ message DeltaDiscoveryRequest {
   // A list of Resource names to remove from the list of tracked resources.
   repeated string resource_names_unsubscribe = 4;
 
-  // Informs the server of the versions of the resources the xDS client knows of, to enable an xDS
-  // session to continue in a reconnected gRPC stream.
+  // Informs the server of the versions of the resources the xDS client knows of, to enable the
+  // client to continue the same logical xDS session even in the face of gRPC stream reconnection.
   // It will not be populated:
   // * in the very first stream of a session, since the client will not yet have any resources.
   // * in any message after the first in a stream (for a given type_url), since the server
@@ -196,8 +196,8 @@ message DeltaDiscoveryResponse {
   // The version of the response data (used for debugging).
   string system_version_info = 1;
 
-  // The response resources. The Resource proto's Any field ('resource') should be
-  // of type type_url.
+  // The response resources. These are typed resources, whose types must match
+  // the type_url field.
   repeated Resource resources = 2 [(gogoproto.nullable) = false];
 
   // field id 3 IS available!
@@ -211,7 +211,7 @@ message DeltaDiscoveryResponse {
   repeated string removed_resources = 6;
 
   // The nonce provides a way for DeltaDiscoveryRequests to uniquely
-  // reference a DeltaDiscoveryResponse. The nonce is required.
+  // reference a DeltaDiscoveryResponse when (N)ACKing. The nonce is required.
   string nonce = 5;
 }
 
