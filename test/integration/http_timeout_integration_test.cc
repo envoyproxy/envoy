@@ -61,7 +61,7 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeoutAfterHeadersBeforeBodyResetsUpst
                                           {":authority", "host"},
                                           {"x-forwarded-for", "10.0.0.1"},
                                           {"x-envoy-upstream-rq-timeout-ms", "100"}};
-  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr> encoder_decoder = codec_client_->startRequest(request_headers);
 
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
