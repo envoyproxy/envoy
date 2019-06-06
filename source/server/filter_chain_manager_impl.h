@@ -19,9 +19,6 @@ namespace Server {
 class FilterChainManagerImpl : public Network::FilterChainManager,
                                Logger::Loggable<Logger::Id::config> {
 public:
-  FilterChainManagerImpl();
-  virtual ~FilterChainManagerImpl() {}
-
   // Network::FilterChainManager
   const Network::FilterChain*
   findFilterChain(const Network::ConnectionSocket& socket) const override;
