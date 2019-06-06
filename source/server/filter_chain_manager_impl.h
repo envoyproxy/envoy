@@ -3,19 +3,11 @@
 #include <memory>
 
 #include "envoy/api/v2/listener/listener.pb.h"
-#include "envoy/network/filter.h"
-#include "envoy/server/filter_config.h"
-#include "envoy/server/instance.h"
-#include "envoy/server/transport_socket_config.h"
-#include "envoy/server/worker.h"
-#include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
-#include "common/init/manager_impl.h"
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
-
-#include "server/lds_api.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Server {

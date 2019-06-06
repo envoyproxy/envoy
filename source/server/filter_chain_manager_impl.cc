@@ -1,9 +1,6 @@
 #include "server/filter_chain_manager_impl.h"
 
 #include "common/common/empty_string.h"
-
-#include "server/configuration_impl.h"
-
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
