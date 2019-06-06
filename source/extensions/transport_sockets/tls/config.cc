@@ -2,7 +2,6 @@
 
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/api/v2/auth/cert.pb.validate.h"
-#include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
 

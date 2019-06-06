@@ -257,6 +257,7 @@ envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
 
 void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     const ProtobufWkt::Struct& config,
+                                    ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
   static const std::string& struct_type =
       ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
@@ -277,13 +278,35 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
     } else {
       ProtobufWkt::Struct struct_config;
       typed_config.UnpackTo(&struct_config);
-      MessageUtil::jsonConvert(struct_config, out_proto);
+      MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
     }
   }
 
   if (!config.fields().empty()) {
-    MessageUtil::jsonConvert(config, out_proto);
+    MessageUtil::jsonConvert(config, validation_visitor, out_proto);
   }
+}
+
+bool Utility::allowDeprecatedV1Config(Runtime::Loader& runtime, const Json::Object& config) {
+  if (!config.getBoolean("deprecated_v1", false)) {
+    return false;
+  }
+
+  constexpr char error[] =
+      "Using deprecated v1 JSON config load via 'deprecated_v1: true'. This configuration will "
+      "be removed from Envoy soon. Please see "
+      "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details. The "
+      "`envoy.deprecated_features.v1_filter_json_config` runtime key can be used to temporarily "
+      "enable this feature once the deprecation becomes fail by default.";
+
+  if (!runtime.snapshot().deprecatedFeatureEnabled(
+          "envoy.deprecated_features.v1_filter_json_config")) {
+    throw EnvoyException(error);
+  } else {
+    ENVOY_LOG_MISC(warn, "{}", error);
+  }
+
+  return true;
 }
 
 } // namespace Config

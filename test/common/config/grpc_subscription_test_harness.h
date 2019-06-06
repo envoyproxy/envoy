@@ -44,8 +44,8 @@ public:
     }));
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
-        *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignment, stats_, stats_store_,
-        rate_limit_settings_, init_fetch_timeout);
+        *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
+        stats_store_, rate_limit_settings_, init_fetch_timeout);
   }
 
   ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
@@ -79,7 +79,7 @@ public:
     EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "");
-    subscription_->start(cluster_names, callbacks_);
+    subscription_->start(cluster_names);
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
