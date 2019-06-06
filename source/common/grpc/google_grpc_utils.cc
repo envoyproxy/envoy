@@ -78,7 +78,9 @@ Buffer::InstancePtr GoogleGrpcUtils::makeBufferInstance(const grpc::ByteBuffer& 
   // NB: ByteBuffer::Dump moves the data out of the ByteBuffer so we need to ensure that the
   // lifetime of the Slice(s) exceeds our Buffer::Instance.
   std::vector<grpc::Slice> slices;
-  byte_buffer.Dump(&slices);
+  if (!byte_buffer.Dump(&slices).ok()) {
+    return nullptr;
+  }
   auto* container = new ByteBufferContainer(static_cast<int>(slices.size()));
   std::function<void(const void*, size_t, const Buffer::BufferFragmentImpl*)> releaser =
       [container](const void*, size_t, const Buffer::BufferFragmentImpl*) {
