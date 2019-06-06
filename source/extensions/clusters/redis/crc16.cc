@@ -8,7 +8,8 @@ namespace Clusters {
 namespace Redis {
 
 /**
- * XMODEM CRC16 implementation according to CITT standards.
+ * XMODEM CRC16 implementation according to CITT standards.  Based on
+ * https://github.com/antirez/redis/blob/unstable/src/crc16.c
  * Based on (F).
  * @param key The string to hash.
  * @return The CRC16 hash code.
@@ -37,7 +38,6 @@ static const uint16_t crc16tab[256] = {
     0xef1f, 0xff3e, 0xcf5d, 0xdf7c, 0xaf9b, 0xbfba, 0x8fd9, 0x9ff8, 0x6e17, 0x7e36, 0x4e55, 0x5e74,
     0x2e93, 0x3eb2, 0x0ed1, 0x1ef0};
 
-// (https://github.com/antirez/redis/blob/unstable/src/crc16.c)
 uint16_t Crc16::crc16(absl::string_view key) {
   const char* buf = static_cast<const char*>(key.data());
   uint64_t len = key.size();
