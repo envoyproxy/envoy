@@ -67,8 +67,6 @@ Version history
   that allows ignoring new hosts for the purpose of load balancing calculations until they have
   been health checked for the first time.
 * upstream: added runtime error checking to prevent setting dns type to STRICT_DNS or LOGICAL_DNS when custom resolver name is specified.
-* grpc-json: added support for :ref:`auto mapping
-  <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.auto_mapping>`.
 
 1.10.0 (Apr 5, 2019)
 ====================

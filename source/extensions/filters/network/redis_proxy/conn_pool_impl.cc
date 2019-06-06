@@ -156,10 +156,10 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
   }
 
   Upstream::ClusterInfoConstSharedPtr info = cluster_->info();
-  const auto& clusterType = info->clusterType();
+  const auto& cluster_type = info->clusterType();
   const bool use_crc16 = info->lbType() == Upstream::LoadBalancerType::ClusterProvided &&
-                         clusterType.has_value() &&
-                         clusterType->name() == Extensions::Clusters::ClusterTypes::get().Redis;
+                         cluster_type.has_value() &&
+                         cluster_type->name() == Extensions::Clusters::ClusterTypes::get().Redis;
   Clusters::Redis::RedisLoadBalancerContext lb_context(key, parent_.config_.enableHashtagging(),
                                                        use_crc16);
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);

@@ -725,8 +725,7 @@ public:
   virtual envoy::api::v2::Cluster::DiscoveryType type() const PURE;
 
   /**
-   * @return the type of cluster, this includes custom discovery type in addition to the build-in
-   * discovery types.
+   * @return the type of cluster, only used for custom discovery types.
    */
   virtual const absl::optional<envoy::api::v2::Cluster::CustomClusterType>&
   clusterType() const PURE;
