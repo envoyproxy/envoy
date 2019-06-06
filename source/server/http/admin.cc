@@ -668,8 +668,8 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
   server_info.set_state(serverState());
 
   const uint64_t current_uptime = std::chrono::duration_cast<std::chrono::seconds>(
-                                  current_time - server_.startTimeCurrentEpoch())
-                                  .count();
+                                      current_time - server_.startTimeCurrentEpoch())
+                                      .count();
   const uint64_t total_uptime =
       std::chrono::duration_cast<std::chrono::seconds>(current_time - server_.startTimeFirstEpoch())
           .count();

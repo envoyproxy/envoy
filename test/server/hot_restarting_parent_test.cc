@@ -18,7 +18,8 @@ namespace {
 using HotRestartMessage = envoy::HotRestartMessage;
 
 int64_t timeToSeconds(MonotonicTime monotonic_time) {
-  return std::chrono::duration_cast<std::chrono::seconds>(monotonic_time.time_since_epoch()).count();
+  return std::chrono::duration_cast<std::chrono::seconds>(monotonic_time.time_since_epoch())
+      .count();
 }
 
 class HotRestartingParentTest : public testing::Test {

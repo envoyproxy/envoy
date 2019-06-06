@@ -175,9 +175,9 @@ void InstanceImpl::flushStats() {
     // mergeParentStatsIfAny() does nothing and returns a struct of 0s if there is no parent.
     HotRestart::ServerStatsFromParent parent_stats = restarter_.mergeParentStatsIfAny(stats_store_);
 
-    const uint64_t uptime = std::chrono::duration_cast<std::chrono::seconds>(time_source_.monotonicTime() -
-                                                                         original_start_time_)
-                            .count();
+    const uint64_t uptime = std::chrono::duration_cast<std::chrono::seconds>(
+                                time_source_.monotonicTime() - original_start_time_)
+                                .count();
     server_stats_->uptime_.set(uptime);
     server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
                                          parent_stats.parent_memory_allocated_);
