@@ -74,6 +74,12 @@ public:
   MOCK_METHOD2(updateResources,
                void(const std::set<std::string>& resources, const std::string& type_url));
 
+  MOCK_METHOD4(addWatch, uint64_t(const std::string&, const std::set<std::string>&,
+                                  SubscriptionCallbacks&, std::chrono::milliseconds));
+  MOCK_METHOD2(removeWatch, void(const std::string&, /*WatchMap::Token*/ uint64_t));
+  MOCK_METHOD3(updateWatch, void(const std::string&, /*WatchMap::Token*/ uint64_t,
+                                 const std::set<std::string>&));
+
   MOCK_METHOD1(removeSubscription, void(const std::string& type_url));
 };
 

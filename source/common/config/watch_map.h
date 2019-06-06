@@ -97,12 +97,13 @@ private:
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
       const std::string& system_version_info);
 
-  // Does a lookup in watch_interest_, returning empty set if not found.
-  const absl::flat_hash_set<Token>& tokensInterestedIn(const std::string& resource_name);
-  // A little hack to allow tokensInterestedIn() to return a ref, rather than a copy.
-  const absl::flat_hash_set<WatchMap::Token> empty_token_set_{};
+  // Returns the union of watch_interest_[resource_name] and wildcard_watches_.
+  absl::flat_hash_set<Token> tokensInterestedIn(const std::string& resource_name);
 
   absl::flat_hash_map<Token, Watch> watches_;
+
+  // Watches whose interest set is currently empty, which is interpreted as "everything".
+  absl::flat_hash_set<Token> wildcard_watches_;
 
   // Maps a resource name to the set of watches interested in that resource. Has two purposes:
   // 1) Acts as a reference count; no watches care anymore ==> the resource can be removed.

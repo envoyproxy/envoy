@@ -227,6 +227,7 @@ ClusterManagerImpl::ClusterManagerImpl(
           bootstrap.dynamic_resources().has_ads_config()
               ? bootstrap.dynamic_resources().ads_config()
               : bootstrap.dynamic_resources().cds_config().api_config_source();
+      std::cerr << "MAKING DELTA ADS" << std::endl;
       ads_mux_ = std::make_shared<Config::GrpcDeltaXdsContext>(
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, api_config_source,
                                                          stats)
@@ -239,6 +240,7 @@ ClusterManagerImpl::ClusterManagerImpl(
               bootstrap.dynamic_resources().ads_config()),
           local_info);
     } else {
+      std::cerr << "MAKING SOTW ADS" << std::endl;
       ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info,
           Config::Utility::factoryForGrpcApiConfigSource(
@@ -252,6 +254,7 @@ ClusterManagerImpl::ClusterManagerImpl(
               bootstrap.dynamic_resources().ads_config()));
     }
   } else {
+    std::cerr << "MAKING NULLLLLLLLLL ADS" << std::endl;
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
   }
 

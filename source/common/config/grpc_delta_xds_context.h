@@ -50,7 +50,9 @@ public:
                       const LocalInfo::LocalInfo& local_info)
       : dispatcher_(dispatcher), local_info_(local_info),
         grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                     rate_limit_settings) {}
+                     rate_limit_settings) {
+    std::cerr << "making a GrpcDeltaXdsContext" << std::endl;
+  }
 
   WatchMap::Token addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
@@ -103,21 +105,16 @@ public:
   }
 
   void pause(const std::string& type_url) override {
-    auto sub = subscriptions_.find(type_url);
-    if (sub == subscriptions_.end()) {
-      ENVOY_LOG(warn, "Not pausing non-existent subscription {}.", type_url);
-      return;
-    }
-    sub->second->sub_state_.pause();
+    // It's ok to pause a subscription that doesn't exist yet.
+    auto& pause_entry = paused_[type_url];
+    ASSERT(!pause_entry);
+    pause_entry = true;
   }
 
   void resume(const std::string& type_url) override {
-    auto sub = subscriptions_.find(type_url);
-    if (sub == subscriptions_.end()) {
-      ENVOY_LOG(warn, "Not resuming non-existent subscription {}.", type_url);
-      return;
-    }
-    sub->second->sub_state_.resume();
+    auto& pause_entry = paused_[type_url];
+    ASSERT(pause_entry);
+    pause_entry = false;
     trySendDiscoveryRequests();
   }
 
@@ -164,6 +161,9 @@ public:
     //   callbacks));
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+  // TODO TODO needs to be idempotent. GrpcSubscription is special-purposed to non-ADS, and so knows
+  // that it needs to call start. My DeltaSubscriptionImpl can be either ADS or not, and so needs to
+  // (safely) call start regardless.
   void start() override { grpc_stream_.establishNewStream(); }
 
 private:
@@ -212,7 +212,7 @@ private:
         continue;
       }
       // Try again later if paused/rate limited/stream down.
-      if (!canSendDiscoveryRequest(next_request_type_url, sub->second->sub_state_)) {
+      if (!canSendDiscoveryRequest(next_request_type_url)) {
         std::cerr << "not available to send\n====================================" << std::endl;
         break;
       }
@@ -233,8 +233,8 @@ private:
 
   // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
   // whether we *want* to send a DeltaDiscoveryRequest).
-  bool canSendDiscoveryRequest(absl::string_view type_url, DeltaSubscriptionState& sub) {
-    if (sub.paused()) {
+  bool canSendDiscoveryRequest(absl::string_view type_url) {
+    if (paused_[type_url]) {
       ENVOY_LOG(trace, "API {} paused; discovery request on hold for now.", type_url);
       return false;
     } else if (!grpc_stream_.grpcStreamAvailable()) {
@@ -296,6 +296,10 @@ private:
   };
   // Map key is type_url.
   absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionStuff>> subscriptions_;
+
+  // It's ok for non-existent subs to be paused/resumed. The cleanest way to support that is to give
+  // the pause state its own map. (Map key is type_url.)
+  absl::flat_hash_map<std::string, bool> paused_;
 
   // Determines the order of initial discovery requests. (Assumes that subscriptions are added in
   // the order of Envoy's dependency ordering).

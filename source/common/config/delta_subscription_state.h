@@ -33,10 +33,6 @@ public:
 
   void setInitFetchTimeout(Event::Dispatcher& dispatcher);
 
-  void pause();
-  void resume();
-  bool paused() const { return paused_; }
-
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const std::set<std::string>& cur_added,
                                   const std::set<std::string>& cur_removed);
@@ -98,7 +94,6 @@ private:
   std::chrono::milliseconds init_fetch_timeout_;
   Event::TimerPtr init_fetch_timeout_timer_;
 
-  bool paused_{};
   bool any_request_sent_yet_in_current_stream_{};
 
   // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.

@@ -26,18 +26,6 @@ void DeltaSubscriptionState::setInitFetchTimeout(Event::Dispatcher& dispatcher) 
   }
 }
 
-void DeltaSubscriptionState::pause() {
-  ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url_);
-  ASSERT(!paused_);
-  paused_ = true;
-}
-
-void DeltaSubscriptionState::resume() {
-  ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url_);
-  ASSERT(paused_);
-  paused_ = false;
-}
-
 void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
                                                         const std::set<std::string>& cur_removed) {
   for (const auto& a : cur_added) {
@@ -96,7 +84,7 @@ void DeltaSubscriptionState::handleGoodResponse(
           fmt::format("duplicate name {} found in the union of added+removed resources", name));
     }
   }
-
+  std::cerr << "handleGoodResponse now callbacks_.onConfigUpdate()" << std::endl;
   callbacks_.onConfigUpdate(message.resources(), message.removed_resources(),
                             message.system_version_info());
   for (const auto& resource : message.resources()) {

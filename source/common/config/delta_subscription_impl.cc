@@ -19,6 +19,11 @@ void DeltaSubscriptionImpl::resume() { context_->resume(type_url_); }
 
 // Config::DeltaSubscription
 void DeltaSubscriptionImpl::start(const std::set<std::string>& resources) {
+  // TODO TODO needs to be idempotent. GrpcSubscription is special-purposed to non-ADS, and so knows
+  // that it needs to call start. My DeltaSubscriptionImpl can be either ADS or not, and so needs to
+  // (safely) call start regardless.
+  context_->start();
+
   watch_token_ = context_->addWatch(type_url_, resources, *this, init_fetch_timeout_);
   stats_.update_attempt_.inc();
 }
