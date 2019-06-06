@@ -2,6 +2,8 @@
 
 #include "envoy/event/timer.h"
 
+#include "common/common/assert.h"
+
 #include "quiche/quic/core/quic_alarm.h"
 #include "quiche/quic/core/quic_time.h"
 #include "quiche/quic/platform/api/quic_clock.h"
@@ -17,7 +19,7 @@ public:
   EnvoyQuicAlarm(Event::Scheduler& scheduler, quic::QuicClock& clock,
                  quic::QuicArenaScopedPtr<quic::QuicAlarm::Delegate> delegate);
 
-  ~EnvoyQuicAlarm() override{};
+  ~EnvoyQuicAlarm() override { ASSERT(!IsSet()); };
 
   // quic::QuicAlarm
   void CancelImpl() override;

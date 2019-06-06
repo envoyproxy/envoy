@@ -104,6 +104,9 @@ TEST_F(EnvoyQuicAlarmTest, CreateAlarmAndReset) {
   advanceMsAndLoop(9);
   EXPECT_TRUE(unowned_delegate1->fired());
   EXPECT_FALSE(unowned_delegate2->fired());
+
+  advanceMsAndLoop(1);
+  EXPECT_TRUE(unowned_delegate2->fired());
 }
 
 TEST_F(EnvoyQuicAlarmTest, CreateAlarmAndUpdate) {
@@ -122,6 +125,9 @@ TEST_F(EnvoyQuicAlarmTest, CreateAlarmAndUpdate) {
   advanceMsAndLoop(9);
   EXPECT_TRUE(unowned_delegate1->fired());
   EXPECT_FALSE(unowned_delegate2->fired());
+
+  advanceMsAndLoop(1);
+  EXPECT_TRUE(unowned_delegate2->fired());
 }
 
 TEST_F(EnvoyQuicAlarmTest, PostponeDeadline) {
