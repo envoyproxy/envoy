@@ -8,7 +8,7 @@ namespace Clusters {
 namespace Redis {
 
 /**
- * XMODEM CRC16 implementation according to CITT standards.  Based on
+ * XMODEM CRC16 implementation according to CITT standards. Based on
  * https://github.com/antirez/redis/blob/unstable/src/crc16.c
  * Based on (F).
  * @param key The string to hash.
