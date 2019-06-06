@@ -146,8 +146,15 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
 void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-
     ENVOY_CONN_LOG(debug, "client disconnected", *client.client_);
+
+    if (event == Network::ConnectionEvent::RemoteClose) {
+      host_->cluster().stats().upstream_cx_destroy_remote_.inc();
+    } else {
+      host_->cluster().stats().upstream_cx_destroy_local_.inc();
+    }
+    host_->cluster().stats().upstream_cx_destroy_.inc();
+    
     if (client.closed_with_active_rq_) {
       host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
       if (event == Network::ConnectionEvent::RemoteClose) {

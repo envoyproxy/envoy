@@ -127,15 +127,22 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
     // The client died.
     ENVOY_CONN_LOG(debug, "client disconnected, failure reason: {}", *client.codec_client_,
                    client.codec_client_->connectionFailureReason());
+
+    if (event == Network::ConnectionEvent::RemoteClose) {
+      host_->cluster().stats().upstream_cx_destroy_remote_.inc();
+    } else {
+      host_->cluster().stats().upstream_cx_destroy_local_.inc();
+    }
+    host_->cluster().stats().upstream_cx_destroy_.inc();
+  
     ActiveClientPtr removed;
     bool check_for_drained = true;
     if (client.stream_wrapper_) {
       if (!client.stream_wrapper_->decode_complete_) {
-        if (event == Network::ConnectionEvent::LocalClose) {
-          host_->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
-        }
         if (event == Network::ConnectionEvent::RemoteClose) {
           host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
+        } else {
+          host_->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
         }
         host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
       }
