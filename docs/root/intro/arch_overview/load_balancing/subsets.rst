@@ -15,7 +15,7 @@ condition described above.
 
 If subsets are :ref:`configured <envoy_api_field_Cluster.lb_subset_config>` and a route
 specifies no metadata or no subset matching the metadata exists, the subset load balancer initiates
-its fallback policy. The default policy is ``NO_ENDPOINT``, in which case the request fails as if
+its fallback policy. The default policy is ``NO_FALLBACK``, in which case the request fails as if
 the cluster had no hosts. Conversely, the ``ANY_ENDPOINT`` fallback policy load balances across all
 hosts in the cluster, without regard to host metadata. Finally, the ``DEFAULT_SUBSET`` causes
 fallback to load balance among hosts that match a specific set of metadata.

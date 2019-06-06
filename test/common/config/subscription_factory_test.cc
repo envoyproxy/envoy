@@ -37,8 +37,6 @@ public:
   subscriptionFromConfigSource(const envoy::api::v2::core::ConfigSource& config) {
     return SubscriptionFactory::subscriptionFromConfigSource(
         config, local_info_, dispatcher_, cm_, random_, stats_store_,
-        "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-        "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints",
         Config::TypeUrl::get().ClusterLoadAssignment, validation_visitor_, *api_, callbacks_);
   }
 
