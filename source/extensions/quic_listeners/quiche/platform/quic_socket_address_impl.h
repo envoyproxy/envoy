@@ -23,7 +23,7 @@ namespace quic {
 class QuicSocketAddressImpl {
 public:
   QuicSocketAddressImpl() = default;
-  QuicSocketAddressImpl(QuicIpAddressImpl, uint16_t) {}
+  QuicSocketAddressImpl(QuicIpAddress, uint16_t) {}
   explicit QuicSocketAddressImpl(const struct sockaddr_storage&) {}
   explicit QuicSocketAddressImpl(const struct sockaddr&) {}
   QuicSocketAddressImpl(const QuicSocketAddressImpl&) = default;

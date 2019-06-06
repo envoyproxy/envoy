@@ -26,6 +26,7 @@ public:
    * @param buffer has to outlive the life time of this class.
    */
   explicit QuicMemSliceSpanImpl(Envoy::Buffer::Instance& buffer) : buffer_(&buffer) {}
+  explicit QuicMemSliceSpanImpl(QuicMemSliceImpl* slice) : buffer_(&slice->single_slice_buffer()) {}
 
   QuicMemSliceSpanImpl(const QuicMemSliceSpanImpl& other) = default;
   QuicMemSliceSpanImpl& operator=(const QuicMemSliceSpanImpl& other) = default;

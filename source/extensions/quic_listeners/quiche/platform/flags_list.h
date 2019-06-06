@@ -292,8 +292,15 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_validate_packet_number_post_decrypti
             "If true, a QUIC endpoint will valid a received packet number after "
             "successfully decrypting the packet.")
 
-QUICHE_FLAG(bool, quic_reloadable_flag_quic_v44_disable_trial_decryption, false,
-            "Disables trial decryption in QUIC v44 and above.")
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_send_version_negotiation_fixed_bit, false,
+            "When true, version negotiation packets sent by the server will set the fixed bit.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_eliminate_static_stream_map_3, false,
+            "If true, static streams in a QuicSession will be stored inside dynamic stream map. "
+            "static_stream_map will no longer be used.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_simplify_stop_waiting, false,
+            "Do not send STOP_WAITING if no_stop_waiting_frame_ is true.")
 
 QUICHE_FLAG(bool, quic_restart_flag_quic_allow_loas_multipacket_chlo, false,
             "If true, inspects QUIC CHLOs for kLOAS and early creates sessions "
@@ -344,6 +351,21 @@ QUICHE_FLAG(bool, quic_restart_flag_quic_use_leto_for_quic_configs, false,
 QUICHE_FLAG(bool, quic_restart_flag_quic_use_pigeon_socket_to_backend, false,
             "If true, create a shared pigeon socket for all quic to backend "
             "connections and switch to use it after successful handshake.")
+
+QUICHE_FLAG(bool, quic_restart_flag_quic_do_not_override_connection_id, false,
+            " When true, QuicFramer will not override connection IDs in headers and will instead "
+            "respect the source/destination direction as expected by IETF QUIC.")
+
+QUICHE_FLAG(bool, quic_restart_flag_quic_server_drop_version_negotiation, false,
+            "When true, QUIC server will drop IETF QUIC Version Negotiation packets.")
+
+QUICHE_FLAG(
+    bool, quic_restart_flag_quic_allow_variable_length_connection_id_for_negotiation, false,
+    "When true, allow variable length QUIC connection IDs for unsupported versions. This allows "
+    "performing version negotiation when the client-chosen server connection ID length is not 8")
+
+QUICHE_FLAG(bool, quic_restart_flag_quic_no_framer_object_in_dispatcher, false,
+            "If true, make QuicDispatcher no longer have an instance of QuicFramer.")
 
 QUICHE_FLAG(bool, quic_allow_chlo_buffering, true,
             "If true, allows packets to be buffered in anticipation of a "

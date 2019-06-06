@@ -47,7 +47,10 @@ cat <<EOF >sed_commands
 
 # Rewrite third_party includes.
 /^#include/ s!third_party/boringssl/src/include/!!
+/^#include/ s!third_party/zlib/zlib!zlib!
 
+/^import/ s!cached_network_parameters!quiche/quic/core/proto/cached_network_parameters!
+/^syntax\s=\s"proto2";/a option cc_generic_services = true;
 EOF
 
 for src_file in $(SRCS); do
