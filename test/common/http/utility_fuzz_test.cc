@@ -2,6 +2,7 @@
 
 #include "test/common/http/utility_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/fuzz/utility.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -18,18 +19,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
     const auto& parse_cookie_value = input.parse_cookie_value();
     Http::TestHeaderMapImpl headers;
     for (const std::string& cookie : parse_cookie_value.cookies()) {
-      headers.addCopy("cookie", cookie);
+      headers.addCopy("cookie", replaceInvalidCharacters(cookie));
     }
     Http::Utility::parseCookieValue(headers, parse_cookie_value.key());
-    break;
-  }
-  case test::common::http::UtilityTestCase::kHasSetCookie: {
-    const auto& has_set_cookie = input.has_set_cookie();
-    Http::TestHeaderMapImpl headers;
-    for (const std::string& cookie : has_set_cookie.cookies()) {
-      headers.addCopy("set-cookie", cookie);
-    }
-    Http::Utility::hasSetCookie(headers, has_set_cookie.key());
     break;
   }
   case test::common::http::UtilityTestCase::kGetLastAddressFromXff: {

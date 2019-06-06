@@ -34,7 +34,7 @@ public:
     subscription_ = std::make_unique<DeltaSubscriptionImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignment, random_, stats_store_,
-        rate_limit_settings_, stats_, init_fetch_timeout);
+        rate_limit_settings_, callbacks_, stats_, init_fetch_timeout);
   }
 
   ~DeltaSubscriptionTestHarness() {
@@ -51,7 +51,7 @@ public:
     EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "");
-    subscription_->start(cluster_names, callbacks_);
+    subscription_->start(cluster_names);
   }
 
   void expectSendMessage(const std::set<std::string>& cluster_names,

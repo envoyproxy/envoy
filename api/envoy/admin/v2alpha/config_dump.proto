@@ -9,6 +9,7 @@ option java_package = "io.envoyproxy.envoy.admin.v2alpha";
 import "envoy/api/v2/cds.proto";
 import "envoy/api/v2/lds.proto";
 import "envoy/api/v2/rds.proto";
+import "envoy/api/v2/srds.proto";
 import "envoy/config/bootstrap/v2/bootstrap.proto";
 
 import "google/protobuf/any.proto";
@@ -177,4 +178,44 @@ message RoutesConfigDump {
 
   // The dynamically loaded route configs.
   repeated DynamicRouteConfig dynamic_route_configs = 3 [(gogoproto.nullable) = false];
+}
+
+// Envoy's scoped RDS implementation fills this message with all currently loaded route
+// configuration scopes (defined via ScopedRouteConfigurationsSet protos). This message lists both
+// the scopes defined inline with the higher order object (i.e., the HttpConnectionManager) and the
+// dynamically obtained scopes via the SRDS API.
+message ScopedRoutesConfigDump {
+  message InlineScopedRouteConfigs {
+    // The name assigned to the scoped route configurations.
+    string name = 1;
+
+    // The scoped route configurations.
+    repeated envoy.api.v2.ScopedRouteConfiguration scoped_route_configs = 2;
+
+    // The timestamp when the scoped route config set was last updated.
+    google.protobuf.Timestamp last_updated = 3;
+  }
+
+  message DynamicScopedRouteConfigs {
+    // The name assigned to the scoped route configurations.
+    string name = 1;
+
+    // This is the per-resource version information. This version is currently taken from the
+    // :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` field at the time that
+    // the scoped routes configuration was loaded.
+    string version_info = 2;
+
+    // The scoped route configurations.
+    repeated envoy.api.v2.ScopedRouteConfiguration scoped_route_configs = 3;
+
+    // The timestamp when the scoped route config set was last updated.
+    google.protobuf.Timestamp last_updated = 4;
+  }
+
+  // The statically loaded scoped route configs.
+  repeated InlineScopedRouteConfigs inline_scoped_route_configs = 1 [(gogoproto.nullable) = false];
+
+  // The dynamically loaded scoped route configs.
+  repeated DynamicScopedRouteConfigs dynamic_scoped_route_configs = 2
+      [(gogoproto.nullable) = false];
 }

@@ -43,6 +43,7 @@ public:
   bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
+  Upstream::HostDescriptionConstSharedPtr host() const override { return host_; };
 
   // ConnPoolImplBase
   void checkForDrained() override;
@@ -73,7 +74,7 @@ protected:
 
     ActiveClient& parent_;
     bool encode_complete_{};
-    bool saw_close_header_{};
+    bool close_connection_{};
     bool decode_complete_{};
   };
 

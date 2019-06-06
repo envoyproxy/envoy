@@ -105,6 +105,15 @@ config_setting(
     values = {"define": "hot_restart=disabled"},
 )
 
+# Used to avoid conflicting selects https://github.com/bazelbuild/bazel/issues/8323
+alias(
+    name = "disable_hot_restart_or_apple",
+    actual = select({
+        ":apple": ":apple",
+        "//conditions:default": ":disable_hot_restart",
+    }),
+)
+
 config_setting(
     name = "disable_google_grpc",
     values = {"define": "google_grpc=disabled"},
@@ -245,8 +254,22 @@ alias(
             ":ios_i386": ":ios_i386",
             ":ios_x86_64": ":ios_x86_64",
             # If we're not on an apple platform return a value that will never match in the select() statement calling this
-            # since it would have already been matched above
+            # since it would have already been matched above.
             "//conditions:default": ":darwin",
+        },
+    ),
+)
+
+alias(
+    name = "linux",
+    actual = select(
+        {
+            ":linux_x86_64": ":linux_x86_64",
+            ":linux_aarch64": ":linux_aarch64",
+            ":linux_ppc": ":linux_ppc",
+            # If we're not on an linux platform return a value that will never match in the select() statement calling this
+            # since it would have already been matched above.
+            "//conditions:default": ":linux_x86_64",
         },
     ),
 )

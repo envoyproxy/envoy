@@ -27,6 +27,7 @@
 #include "common/http/default_server_string.h"
 #include "common/http/utility.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/router/scoped_config_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "server/http/config_tracker_impl.h"
@@ -81,6 +82,10 @@ public:
   createNetworkFilterChain(Network::Connection& connection,
                            const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager&) override { return true; }
+  bool createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
+                                    Network::UdpReadFilterCallbacks&) override {
+    return true;
+  }
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -103,7 +108,10 @@ public:
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
   std::chrono::milliseconds requestTimeout() const override { return {}; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
-  Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
+  Router::RouteConfigProvider* routeConfigProvider() override { return &route_config_provider_; }
+  Config::ConfigProvider* scopedRouteConfigProvider() override {
+    return &scoped_route_config_provider_;
+  }
   const std::string& serverName() override { return Http::DefaultServerString::get(); }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
@@ -154,8 +162,31 @@ private:
     Router::ConfigConstSharedPtr config() override { return config_; }
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
+    void onConfigUpdate() override {}
 
     Router::ConfigConstSharedPtr config_;
+    TimeSource& time_source_;
+  };
+
+  /**
+   * Implementation of ScopedRouteConfigProvider that returns a null scoped route config.
+   */
+  struct NullScopedRouteConfigProvider : public Config::ConfigProvider {
+    NullScopedRouteConfigProvider(TimeSource& time_source)
+        : config_(std::make_shared<const Router::NullScopedConfigImpl>()),
+          time_source_(time_source) {}
+
+    ~NullScopedRouteConfigProvider() override = default;
+
+    // Config::ConfigProvider
+    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
+    const Protobuf::Message* getConfigProto() const override { return nullptr; }
+    std::string getConfigVersion() const override { return ""; }
+    ConfigConstSharedPtr getConfig() const override { return config_; }
+    ApiType apiType() const override { return ApiType::Full; }
+    ConfigProtoVector getConfigProtos() const override { return {}; }
+
+    Router::ScopedConfigConstSharedPtr config_;
     TimeSource& time_source_;
   };
 
@@ -194,7 +225,7 @@ private:
   std::vector<const UrlHandler*> sortedHandlers() const;
   static const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>
   sortedRuntime(const std::unordered_map<std::string, const Runtime::Snapshot::Entry>& entries);
-
+  envoy::admin::v2alpha::ServerInfo::State serverState();
   /**
    * URL handlers.
    */
@@ -240,6 +271,8 @@ private:
                                   AdminStream&);
   Http::Code handlerServerInfo(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
+  Http::Code handlerReady(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                          Buffer::Instance& response, AdminStream&);
   Http::Code handlerStats(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response, AdminStream&);
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
@@ -250,6 +283,7 @@ private:
   Http::Code handlerRuntimeModify(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
                                   AdminStream&);
+  bool isFormUrlEncoded(const Http::HeaderEntry* content_type) const;
 
   class AdminListener : public Network::ListenerConfig {
   public:
@@ -306,6 +340,7 @@ private:
   Stats::IsolatedStoreImpl no_op_store_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
+  NullScopedRouteConfigProvider scoped_route_config_provider_;
   std::list<UrlHandler> handlers_;
   const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   absl::optional<std::chrono::milliseconds> idle_timeout_;

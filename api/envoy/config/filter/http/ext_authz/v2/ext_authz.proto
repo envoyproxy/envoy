@@ -11,6 +11,7 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/grpc_service.proto";
 import "envoy/api/v2/core/http_uri.proto";
 
+import "envoy/type/http_status.proto";
 import "envoy/type/matcher/string.proto";
 
 import "validate/validate.proto";
@@ -67,6 +68,10 @@ message ExtAuthz {
   // altering another client request header.
   //
   bool clear_route_cache = 6;
+
+  // Sets the HTTP status that is returned to the client when there is a network error between the
+  // filter and the authorization server. The default status is HTTP 403 Forbidden.
+  envoy.type.HttpStatus status_on_error = 7;
 }
 
 // Configuration for buffering the request data.

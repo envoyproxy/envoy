@@ -30,7 +30,7 @@ namespace {
 
 envoy::api::v2::route::RateLimit parseRateLimitFromV2Yaml(const std::string& yaml_string) {
   envoy::api::v2::route::RateLimit rate_limit;
-  MessageUtil::loadFromYaml(yaml_string, rate_limit);
+  TestUtility::loadFromYaml(yaml_string, rate_limit);
   MessageUtil::validate(rate_limit);
   return rate_limit;
 }
@@ -38,16 +38,6 @@ envoy::api::v2::route::RateLimit parseRateLimitFromV2Yaml(const std::string& yam
 TEST(BadRateLimitConfiguration, MissingActions) {
   EXPECT_THROW_WITH_REGEX(parseRateLimitFromV2Yaml("{}"), EnvoyException,
                           "value must contain at least");
-}
-
-TEST(BadRateLimitConfiguration, BadType) {
-  const std::string yaml = R"EOF(
-actions:
-- bad_type: {}
-  )EOF";
-
-  EXPECT_THROW_WITH_REGEX(parseRateLimitFromV2Yaml(yaml), EnvoyException,
-                          "bad_type: Cannot find field");
 }
 
 TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
@@ -88,12 +78,12 @@ class RateLimitConfiguration : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
     envoy::api::v2::RouteConfiguration route_config;
-    MessageUtil::loadFromYaml(yaml, route_config);
+    TestUtility::loadFromYaml(yaml, route_config);
     config_ = std::make_unique<ConfigImpl>(route_config, factory_context_, true);
   }
 
-  std::unique_ptr<ConfigImpl> config_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  std::unique_ptr<ConfigImpl> config_;
   Http::TestHeaderMapImpl header_;
   const RouteEntry* route_;
   Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};

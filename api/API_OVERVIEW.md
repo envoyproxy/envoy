@@ -95,7 +95,7 @@ services:
 * [Aggregated Discovery Service (ADS)](envoy/api/v2/discovery.proto). See
   the [ADS overview](https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/v2_overview#aggregated-discovery-service).
 
-A protocol description for the xDS APIs is provided [here](XDS_PROTOCOL.md).
+A protocol description for the xDS APIs is provided [here](https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol).
 
 ## Terminology
 
