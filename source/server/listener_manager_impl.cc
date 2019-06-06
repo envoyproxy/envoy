@@ -202,8 +202,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
-          PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
-      filter_chain_manager_(std::make_unique<FilterChainManagerImpl>()) {
+          PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)) {
   if (config.has_transparent()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
@@ -345,7 +344,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         parent_.server_.threadLocal(), parent_.server_.messageValidationVisitor(),
         parent_.server_.api());
     factory_context.setInitManager(initManager());
-    filter_chain_manager_->addFilterChain(
+    filter_chain_manager_.addFilterChain(
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
         server_names, filter_chain_match.transport_protocol(), application_protocols,
         filter_chain_match.source_type(), source_ips, filter_chain_match.source_ports(),
@@ -358,7 +357,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   }
 
   // Convert both destination and source IP CIDRs to tries for faster lookups.
-  filter_chain_manager_->finishFilterChain();
+  filter_chain_manager_.finishFilterChain();
 
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
   if (need_tls_inspector) {

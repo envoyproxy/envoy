@@ -252,7 +252,7 @@ public:
   const std::string& versionInfo() { return version_info_; }
 
   // Network::ListenerConfig
-  Network::FilterChainManager& filterChainManager() override { return *filter_chain_manager_; }
+  Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::Socket& socket() override { return *socket_; }
   const Network::Socket& socket() const override { return *socket_; }
@@ -331,6 +331,7 @@ public:
 
 private:
   ListenerManagerImpl& parent_;
+  FilterChainManagerImpl filter_chain_manager_;
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::SocketType socket_type_;
   Network::SocketSharedPtr socket_;
@@ -360,7 +361,6 @@ private:
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
-  std::unique_ptr<FilterChainManagerImpl> filter_chain_manager_;
 };
 
 } // namespace Server
