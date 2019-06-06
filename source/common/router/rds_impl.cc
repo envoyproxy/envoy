@@ -12,7 +12,6 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/rds_json.h"
-#include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
@@ -53,29 +52,29 @@ StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
 }
 
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
-// initialization needs to be fixed.
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
     const std::string& stat_prefix,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
-    : route_config_name_(rds.route_config_name()),
+    : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
       init_target_(fmt::format("RdsRouteConfigSubscription {}", route_config_name_),
-                   [this]() { subscription_->start({route_config_name_}, *this); }),
+                   [this]() { subscription_->start({route_config_name_}); }),
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
-      stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
+      stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
-      manager_identifier_(manager_identifier), time_source_(factory_context.timeSource()),
-      last_updated_(factory_context.timeSource().systemTime()) {
+      manager_identifier_(manager_identifier),
+      validation_visitor_(factory_context_.messageValidationVisitor()) {
   Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
 
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       rds.config_source(), factory_context.localInfo(), factory_context.dispatcher(),
       factory_context.clusterManager(), factory_context.random(), *scope_,
-      "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
-      "envoy.api.v2.RouteDiscoveryService.StreamRoutes",
       Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
-      factory_context.api());
+      factory_context.messageValidationVisitor(), factory_context.api(), *this);
+
+  config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(
+      factory_context.timeSource(), factory_context.messageValidationVisitor());
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -92,38 +91,62 @@ RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
 void RdsRouteConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
-  last_updated_ = time_source_.systemTime();
-
-  if (resources.empty()) {
-    ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
-    stats_.update_empty_.inc();
-    init_target_.ready();
+  if (!validateUpdateSize(resources.size())) {
     return;
   }
-  if (resources.size() != 1) {
-    throw EnvoyException(fmt::format("Unexpected RDS resource length: {}", resources.size()));
-  }
-  auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resources[0]);
+  auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(
+      resources[0], validation_visitor_);
   MessageUtil::validate(route_config);
-  // TODO(PiotrSikora): Remove this hack once fixed internally.
-  if (!(route_config.name() == route_config_name_)) {
+  if (route_config.name() != route_config_name_) {
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
                                      route_config_name_, route_config.name()));
   }
 
-  const uint64_t new_hash = MessageUtil::hash(route_config);
-  if (!config_info_ || new_hash != config_info_.value().last_config_hash_) {
-    config_info_ = {new_hash, version_info};
-    route_config_proto_ = route_config;
+  if (config_update_info_->onRdsUpdate(route_config, version_info)) {
     stats_.config_reload_.inc();
-    ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
-              new_hash);
-    for (auto* provider : route_config_providers_) {
-      provider->onConfigUpdate();
+
+    if (config_update_info_->routeConfiguration().has_vhds()) {
+      ENVOY_LOG(debug, "rds: vhds configuration present, starting vhds: config_name={} hash={}",
+                route_config_name_, config_update_info_->configHash());
+      // TODO(dmitri-d): It's unsafe to depend directly on factory context here,
+      // the listener might have been torn down, need to remove this.
+      vhds_subscription_ = std::make_unique<VhdsSubscription>(
+          config_update_info_, factory_context_, stat_prefix_, route_config_providers_);
+      vhds_subscription_->registerInitTargetWithInitManager(factory_context_.initManager());
+    } else {
+      ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
+                config_update_info_->configHash());
+
+      for (auto* provider : route_config_providers_) {
+        provider->onConfigUpdate();
+      }
+      vhds_subscription_.release();
     }
   }
 
   init_target_.ready();
+}
+
+void RdsRouteConfigSubscription::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+    const std::string& system_version_info) {
+  if (!removed_resources.empty()) {
+    // TODO(#2500) when on-demand resource loading is supported, an RDS removal may make sense (see
+    // discussion in #6879), and so we should do something other than ignoring here.
+    ENVOY_LOG(
+        error,
+        "Server sent a delta RDS update attempting to remove a resource (name: {}). Ignoring.",
+        removed_resources[0]);
+  }
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
+  if (!added_resources.empty()) {
+    *unwrapped_resource.Add() = added_resources[0].resource();
+    onConfigUpdate(unwrapped_resource, added_resources[0].version());
+  } else {
+    onConfigUpdate({}, system_version_info);
+    return;
+  }
 }
 
 void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
@@ -132,44 +155,50 @@ void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
   init_target_.ready();
 }
 
+bool RdsRouteConfigSubscription::validateUpdateSize(int num_resources) {
+  if (num_resources == 0) {
+    ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
+    stats_.update_empty_.inc();
+    init_target_.ready();
+    return false;
+  }
+  if (num_resources != 1) {
+    throw EnvoyException(fmt::format("Unexpected RDS resource length: {}", num_resources));
+    // (would be a return false here)
+  }
+  return true;
+}
+
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RdsRouteConfigSubscriptionSharedPtr&& subscription,
     Server::Configuration::FactoryContext& factory_context)
-    : subscription_(std::move(subscription)), factory_context_(factory_context),
+    : subscription_(std::move(subscription)),
+      config_update_info_(subscription_->routeConfigUpdate()), factory_context_(factory_context),
       tls_(factory_context.threadLocal().allocateSlot()) {
   ConfigConstSharedPtr initial_config;
-  if (subscription_->config_info_.has_value()) {
-    initial_config =
-        std::make_shared<ConfigImpl>(subscription_->route_config_proto_, factory_context_, false);
+  if (config_update_info_->configInfo().has_value()) {
+    initial_config = std::make_shared<ConfigImpl>(config_update_info_->routeConfiguration(),
+                                                  factory_context_, false);
   } else {
     initial_config = std::make_shared<NullConfigImpl>();
   }
   tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalConfig>(initial_config);
   });
-  subscription_->route_config_providers_.insert(this);
+  subscription_->routeConfigProviders().insert(this);
 }
 
 RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
-  subscription_->route_config_providers_.erase(this);
+  subscription_->routeConfigProviders().erase(this);
 }
 
 Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
   return tls_->getTyped<ThreadLocalConfig>().config_;
 }
 
-absl::optional<RouteConfigProvider::ConfigInfo> RdsRouteConfigProviderImpl::configInfo() const {
-  if (!subscription_->config_info_) {
-    return {};
-  } else {
-    return ConfigInfo{subscription_->route_config_proto_,
-                      subscription_->config_info_.value().last_config_version_};
-  }
-}
-
 void RdsRouteConfigProviderImpl::onConfigUpdate() {
   ConfigConstSharedPtr new_config(
-      new ConfigImpl(subscription_->route_config_proto_, factory_context_, false));
+      new ConfigImpl(config_update_info_->routeConfiguration(), factory_context_, false));
   tls_->runOnAllThreads(
       [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
 }
@@ -219,7 +248,7 @@ RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigPr
     const envoy::api::v2::RouteConfiguration& route_config,
     Server::Configuration::FactoryContext& factory_context) {
   auto provider =
-      absl::make_unique<StaticRouteConfigProviderImpl>(route_config, factory_context, *this);
+      std::make_unique<StaticRouteConfigProviderImpl>(route_config, factory_context, *this);
   static_route_config_providers_.insert(provider.get());
   return provider;
 }
@@ -236,11 +265,12 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
     ASSERT(subscription);
     ASSERT(!subscription->route_config_providers_.empty());
 
-    if (subscription->config_info_) {
+    if (subscription->routeConfigUpdate()->configInfo()) {
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
-      dynamic_config->set_version_info(subscription->config_info_.value().last_config_version_);
-      dynamic_config->mutable_route_config()->MergeFrom(subscription->route_config_proto_);
-      TimestampUtil::systemClockToTimestamp(subscription->last_updated_,
+      dynamic_config->set_version_info(subscription->routeConfigUpdate()->configVersion());
+      dynamic_config->mutable_route_config()->MergeFrom(
+          subscription->routeConfigUpdate()->routeConfiguration());
+      TimestampUtil::systemClockToTimestamp(subscription->routeConfigUpdate()->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
     }
   }

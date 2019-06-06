@@ -11,6 +11,7 @@
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/process_context.h"
 #include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
@@ -18,11 +19,13 @@
 
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/common/assert.h"
+#include "common/common/cleanup.h"
 #include "common/common/logger_delegates.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/context_impl.h"
 #include "common/init/manager_impl.h"
 #include "common/memory/heap_shrinker.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
@@ -45,20 +48,18 @@ namespace Server {
 /**
  * All server wide stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_SERVER_STATS(COUNTER, GAUGE)                                                           \
-  GAUGE(uptime)                                                                                    \
-  GAUGE(concurrency)                                                                               \
-  GAUGE(memory_allocated)                                                                          \
-  GAUGE(memory_heap_size)                                                                          \
-  GAUGE(live)                                                                                      \
-  GAUGE(parent_connections)                                                                        \
-  GAUGE(total_connections)                                                                         \
-  GAUGE(version)                                                                                   \
-  GAUGE(days_until_first_cert_expiring)                                                            \
-  GAUGE(hot_restart_epoch)                                                                         \
-  COUNTER(debug_assertion_failures)
-// clang-format on
+  COUNTER(debug_assertion_failures)                                                                \
+  GAUGE(concurrency, NeverImport)                                                                  \
+  GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
+  GAUGE(hot_restart_epoch, NeverImport)                                                            \
+  GAUGE(live, NeverImport)                                                                         \
+  GAUGE(memory_allocated, Accumulate)                                                              \
+  GAUGE(memory_heap_size, Accumulate)                                                              \
+  GAUGE(parent_connections, Accumulate)                                                            \
+  GAUGE(total_connections, Accumulate)                                                             \
+  GAUGE(uptime, Accumulate)                                                                        \
+  GAUGE(version, NeverImport)
 
 struct ServerStats {
   ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
@@ -97,11 +98,11 @@ public:
 
   /**
    * Helper for flushing counters, gauges and histograms to sinks. This takes care of calling
-   * flush() on each sink and clearing the cache afterward.
+   * flush() on each sink.
    * @param sinks supplies the list of sinks.
-   * @param source provides the metrics being flushed.
+   * @param store provides the store being flushed.
    */
-  static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Source& source);
+  static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store);
 
   /**
    * Load a bootstrap config from either v1 or v2 and perform validation.
@@ -109,10 +110,12 @@ public:
    * @param config_path supplies the config path.
    * @param v2_only supplies whether to attempt v1 fallback.
    * @param api reference to the Api object
+   * @param validation_visitor message validation visitor instance.
    * @return BootstrapVersion to indicate which version of the API was parsed.
    */
-  static BootstrapVersion loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                              const Options& options, Api::Api& api);
+  static BootstrapVersion
+  loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,
+                      ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 };
 
 /**
@@ -149,7 +152,8 @@ public:
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
-               Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
+               Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
+               std::unique_ptr<ProcessContext> process_context);
 
   ~InstanceImpl() override;
 
@@ -185,6 +189,7 @@ public:
   time_t startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
   Http::Context& httpContext() override { return http_context_; }
+  ProcessContext& processContext() override { return *process_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
@@ -193,9 +198,15 @@ public:
     return config_.statsFlushInterval();
   }
 
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return options_.allowUnknownFields() ? ProtobufMessage::getStrictValidationVisitor()
+                                         : ProtobufMessage::getNullValidationVisitor();
+  }
+
   // ServerLifecycleNotifier
-  void registerCallback(Stage stage, StageCallback callback) override;
-  void registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
+  ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
+  ServerLifecycleNotifier::HandlePtr
+  registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
 
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
@@ -258,10 +269,51 @@ private:
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
   Envoy::MutexTracer* mutex_tracer_;
   Http::ContextImpl http_context_;
+  std::unique_ptr<ProcessContext> process_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   const std::thread::id main_thread_id_;
-  absl::flat_hash_map<Stage, std::vector<StageCallback>> stage_callbacks_;
-  absl::flat_hash_map<Stage, std::vector<StageCallbackWithCompletion>> stage_completable_callbacks_;
+
+  using LifecycleNotifierCallbacks = std::list<StageCallback>;
+  using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
+
+  template <class T>
+  class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {
+  public:
+    LifecycleCallbackHandle(std::list<T>& callbacks, T& callback)
+        : RaiiListElement<T>(callbacks, callback) {}
+  };
+
+  absl::flat_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
+  absl::flat_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
+};
+
+// Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could
+// potentially have a single class instance held in a static and have a clear() method to avoid some
+// vector constructions and reservations, but I'm not sure it's worth the extra complexity until it
+// shows up in perf traces.
+// TODO(mattklein123): One thing we probably want to do is switch from returning vectors of metrics
+//                     to a lambda based callback iteration API. This would require less vector
+//                     copying and probably be a cleaner API in general.
+class MetricSnapshotImpl : public Stats::MetricSnapshot {
+public:
+  explicit MetricSnapshotImpl(Stats::Store& store);
+
+  // Stats::MetricSnapshot
+  const std::vector<CounterSnapshot>& counters() override { return counters_; }
+  const std::vector<std::reference_wrapper<const Stats::Gauge>>& gauges() override {
+    return gauges_;
+  };
+  const std::vector<std::reference_wrapper<const Stats::ParentHistogram>>& histograms() override {
+    return histograms_;
+  }
+
+private:
+  std::vector<Stats::CounterSharedPtr> snapped_counters_;
+  std::vector<CounterSnapshot> counters_;
+  std::vector<Stats::GaugeSharedPtr> snapped_gauges_;
+  std::vector<std::reference_wrapper<const Stats::Gauge>> gauges_;
+  std::vector<Stats::ParentHistogramSharedPtr> snapped_histograms_;
+  std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
 };
 
 } // namespace Server

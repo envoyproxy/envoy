@@ -41,7 +41,7 @@ tls_certificate:
   private_key:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
 )EOF";
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
   secret_manager->addStaticSecret(secret_config);
 
@@ -74,7 +74,7 @@ TEST_F(SecretManagerImplTest, DuplicateStaticTlsCertificateSecret) {
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
     )EOF";
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
   secret_manager->addStaticSecret(secret_config);
 
@@ -93,7 +93,7 @@ TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
         trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
         allow_expired_certificate: true
       )EOF";
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
   secret_manager->addStaticSecret(secret_config);
 
@@ -118,7 +118,7 @@ TEST_F(SecretManagerImplTest, DuplicateStaticCertificateValidationContextSecret)
       trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
       allow_expired_certificate: true
     )EOF";
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
   secret_manager->addStaticSecret(secret_config);
 
@@ -140,7 +140,7 @@ session_ticket_keys:
     - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
 )EOF";
 
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
 
@@ -180,7 +180,7 @@ tls_certificate:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
 )EOF";
   envoy::api::v2::auth::Secret typed_secret;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
   secret_resources.Add()->PackFrom(typed_secret);
   dynamic_cast<TlsCertificateSdsApi&>(*secret_provider).onConfigUpdate(secret_resources, "");

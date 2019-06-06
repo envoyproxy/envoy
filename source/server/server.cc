@@ -25,7 +25,6 @@
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/config/bootstrap_json.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/http/codes.h"
@@ -54,7 +53,8 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
                            ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-                           Filesystem::Instance& file_system)
+                           Filesystem::Instance& file_system,
+                           std::unique_ptr<ProcessContext> process_context)
     : secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), shutdown_(false),
       options_(options), time_source_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
@@ -70,6 +70,7 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
       terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
+      http_context_(store.symbolTable()), process_context_(std::move(process_context)),
       main_thread_id_(std::this_thread::get_id()) {
   try {
     if (!options.logPath().empty()) {
@@ -128,19 +129,39 @@ void InstanceImpl::drainListeners() {
   drain_manager_->startDrainSequence(nullptr);
 }
 
-void InstanceImpl::failHealthcheck(bool fail) {
-  // We keep liveness state in shared memory so the parent process sees the same state.
-  server_stats_->live_.set(!fail);
+void InstanceImpl::failHealthcheck(bool fail) { server_stats_->live_.set(!fail); }
+
+MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
+  snapped_counters_ = store.counters();
+  counters_.reserve(snapped_counters_.size());
+  for (const auto& counter : snapped_counters_) {
+    counters_.push_back({counter->latch(), *counter});
+  }
+
+  snapped_gauges_ = store.gauges();
+  gauges_.reserve(snapped_gauges_.size());
+  for (const auto& gauge : snapped_gauges_) {
+    ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
+    gauges_.push_back(*gauge);
+  }
+
+  snapped_histograms_ = store.histograms();
+  histograms_.reserve(snapped_histograms_.size());
+  for (const auto& histogram : snapped_histograms_) {
+    histograms_.push_back(*histogram);
+  }
 }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                       Stats::Source& source) {
+                                       Stats::Store& store) {
+  // Create a snapshot and flush to all sinks.
+  // NOTE: Even if there are no sinks, creating the snapshot has the important property that it
+  //       latches all counters on a periodic basis. The hot restart code assumes this is being
+  //       done so this should not be removed.
+  MetricSnapshotImpl snapshot(store);
   for (const auto& sink : sinks) {
-    sink->flush(source);
+    sink->flush(snapshot);
   }
-  // TODO(mrice32): this reset should be called by the StoreRoot on stat construction/destruction so
-  // that it doesn't need to be reset when the set of stats isn't changing.
-  source.clearCache();
 }
 
 void InstanceImpl::flushStats() {
@@ -160,7 +181,7 @@ void InstanceImpl::flushStats() {
                                           parent_stats.parent_connections_);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
-    InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_.source());
+    InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
     if (stat_flush_timer_ != nullptr) {
       stat_flush_timer_->enableTimer(config_.statsFlushInterval());
@@ -170,9 +191,9 @@ void InstanceImpl::flushStats() {
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
 
-InstanceUtil::BootstrapVersion
-InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                  const Options& options, Api::Api& api) {
+InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
+    envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
 
@@ -184,11 +205,11 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, api);
+    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
-    MessageUtil::loadFromYaml(config_yaml, bootstrap_override);
+    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     bootstrap.MergeFrom(bootstrap_override);
   }
   MessageUtil::validate(bootstrap);
@@ -231,7 +252,7 @@ void InstanceImpl::initialize(const Options& options,
             Buffer::OwnedImpl().usesOldImpl() ? "old (libevent)" : "new");
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options, *api_);
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options, messageValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
@@ -290,7 +311,8 @@ void InstanceImpl::initialize(const Options& options,
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(), *api_);
+      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
+      messageValidationVisitor(), *api_);
 
   heap_shrinker_ =
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
@@ -323,8 +345,8 @@ void InstanceImpl::initialize(const Options& options,
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
-      dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_, *api_,
-      http_context_, access_log_manager_, *singleton_manager_);
+      dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
+      messageValidationVisitor(), *api_, http_context_, access_log_manager_, *singleton_manager_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -350,7 +372,8 @@ void InstanceImpl::initialize(const Options& options,
             ->create(),
         *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
         *random_generator_, info_factory_, access_log_manager_, *config_.clusterManager(),
-        *local_info_, *admin_, *singleton_manager_, thread_local_, *api_);
+        *local_info_, *admin_, *singleton_manager_, thread_local_, messageValidationVisitor(),
+        *api_);
   }
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
@@ -378,25 +401,10 @@ void InstanceImpl::startWorkers() {
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
-  if (!config.baseRuntime().fields().empty()) {
-    ENVOY_LOG(info, "non-empty base runtime layer specified in bootstrap");
-  }
-  if (config.diskRuntime()) {
-    ENVOY_LOG(info, "disk runtime symlink: {}", config.diskRuntime()->symlinkRoot());
-    ENVOY_LOG(info, "disk runtime subdirectory: {}", config.diskRuntime()->subdirectory());
-
-    std::string override_subdirectory =
-        config.diskRuntime()->overrideSubdirectory() + "/" + server.localInfo().clusterName();
-    ENVOY_LOG(info, "disk runtime override subdirectory: {}", override_subdirectory);
-
-    return std::make_unique<Runtime::DiskBackedLoaderImpl>(
-        server.dispatcher(), server.threadLocal(), config.baseRuntime(),
-        config.diskRuntime()->symlinkRoot(), config.diskRuntime()->subdirectory(),
-        override_subdirectory, server.stats(), server.random(), server.api());
-  } else {
-    return std::make_unique<Runtime::LoaderImpl>(config.baseRuntime(), server.random(),
-                                                 server.stats(), server.threadLocal());
-  }
+  ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
+  return std::make_unique<Runtime::LoaderImpl>(server.dispatcher(), server.threadLocal(),
+                                               config.runtime(), server.localInfo().clusterName(),
+                                               server.stats(), server.random(), server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {
@@ -535,9 +543,6 @@ void InstanceImpl::shutdown() {
 
 void InstanceImpl::shutdownAdmin() {
   ENVOY_LOG(warn, "shutting down admin due to child startup");
-  // TODO(mattklein123): Since histograms are not shared between processes, this will also stop
-  //                     histogram flushing. In the future we can consider whether we want to
-  //                     somehow keep flushing histograms from the old process.
   stat_flush_timer_.reset();
   handler_->stopListeners();
   admin_->closeSocket();
@@ -547,13 +552,18 @@ void InstanceImpl::shutdownAdmin() {
   restarter_.sendParentTerminateRequest();
 }
 
-void InstanceImpl::registerCallback(Stage stage, StageCallback callback) {
-  stage_callbacks_[stage].push_back(callback);
+ServerLifecycleNotifier::HandlePtr InstanceImpl::registerCallback(Stage stage,
+                                                                  StageCallback callback) {
+  auto& callbacks = stage_callbacks_[stage];
+  return std::make_unique<LifecycleCallbackHandle<StageCallback>>(callbacks, callback);
 }
 
-void InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
+ServerLifecycleNotifier::HandlePtr
+InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
   ASSERT(stage == Stage::ShutdownExit);
-  stage_completable_callbacks_[stage].push_back(callback);
+  auto& callbacks = stage_completable_callbacks_[stage];
+  return std::make_unique<LifecycleCallbackHandle<StageCallbackWithCompletion>>(callbacks,
+                                                                                callback);
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
@@ -565,23 +575,21 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
     }
   }
 
+  // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
+  // have finished their work.
+  std::shared_ptr<Event::PostCb> cb_guard(new Event::PostCb([] {}),
+                                          [this, completion_cb](Event::PostCb* cb) {
+                                            ASSERT(std::this_thread::get_id() == main_thread_id_);
+                                            completion_cb();
+                                            delete cb;
+                                          });
+
   auto it2 = stage_completable_callbacks_.find(stage);
   if (it2 != stage_completable_callbacks_.end()) {
-    ASSERT(!it2->second.empty());
-    // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
-    // have finished their work.
-    auto completion_cb_count = std::make_shared<int>(it2->second.size());
-    Event::PostCb wrapped_cb = [this, completion_cb, completion_cb_count] {
-      ASSERT(std::this_thread::get_id() == main_thread_id_);
-      if (--*completion_cb_count == 0) {
-        completion_cb();
-      }
-    };
+    ENVOY_LOG(info, "Notifying {} callback(s) with completion.", it2->second.size());
     for (const StageCallbackWithCompletion& callback : it2->second) {
-      callback(wrapped_cb);
+      callback([cb_guard] { (*cb_guard)(); });
     }
-  } else {
-    completion_cb();
   }
 }
 

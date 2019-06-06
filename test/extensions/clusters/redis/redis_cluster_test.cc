@@ -16,6 +16,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 
@@ -71,17 +72,18 @@ protected:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
-        singleton_manager_, tls_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_);
 
     envoy::config::cluster::redis::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(), config);
+                                           ProtobufWkt::Struct::default_instance(),
+                                           ProtobufMessage::getStrictValidationVisitor(), config);
 
     cluster_.reset(new RedisCluster(
         cluster_config,
         MessageUtil::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
             config),
-        *this, cm, runtime_, dns_resolver_, factory_context, std::move(scope), false));
+        *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false));
     // This allows us to create expectation on cluster slot response without waiting for
     // makeRequest.
     pool_callbacks_ = &cluster_->redis_discovery_session_;
@@ -99,11 +101,12 @@ protected:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
-        singleton_manager_, tls_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_);
 
     envoy::config::cluster::redis::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(), config);
+                                           ProtobufWkt::Struct::default_instance(),
+                                           validation_visitor_, config);
 
     NiceMock<AccessLog::MockAccessLogManager> log_manager;
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
@@ -111,7 +114,7 @@ protected:
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
         cm, stats_store_, tls_, std::move(dns_resolver_), ssl_context_manager_, runtime_, random_,
         dispatcher_, log_manager, local_info_, admin_, singleton_manager_,
-        std::move(outlier_event_logger), false, api);
+        std::move(outlier_event_logger), false, validation_visitor_, api);
 
     RedisClusterFactory factory = RedisClusterFactory();
     factory.createClusterWithConfig(cluster_config, config, cluster_factory_context,
@@ -370,6 +373,22 @@ protected:
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
   }
 
+  void exerciseStubs() {
+    EXPECT_CALL(dispatcher_, createTimer_(_));
+    RedisCluster::RedisDiscoverySession discovery_session(*cluster_, *this);
+    EXPECT_FALSE(discovery_session.enableHashtagging());
+    EXPECT_EQ(discovery_session.bufferFlushTimeoutInMs(), std::chrono::milliseconds(0));
+
+    NetworkFilters::Common::Redis::RespValue dummy_value;
+    dummy_value.type(NetworkFilters::Common::Redis::RespType::Error);
+    dummy_value.asString() = "dummy text";
+    EXPECT_TRUE(discovery_session.onRedirection(dummy_value));
+
+    RedisCluster::RedisDiscoveryClient discovery_client(discovery_session);
+    EXPECT_NO_THROW(discovery_client.onAboveWriteBufferHighWatermark());
+    EXPECT_NO_THROW(discovery_client.onBelowWriteBufferLowWatermark());
+  }
+
   Stats::IsolatedStoreImpl stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
@@ -384,6 +403,7 @@ protected:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   std::shared_ptr<Upstream::MockClusterMockPrioritySet> hosts_;
   Upstream::MockHealthCheckEventLogger* event_logger_{};
@@ -522,6 +542,9 @@ TEST_F(RedisClusterTest, Basic) {
 
   testBasicSetup(basic_yaml_hosts, "foo.bar.com");
   testBasicSetup(basic_yaml_load_assignment, "foo.bar.com");
+
+  // Exercise stubbed out interfaces for coverage.
+  exerciseStubs();
 }
 
 TEST_F(RedisClusterTest, RedisResolveFailure) {

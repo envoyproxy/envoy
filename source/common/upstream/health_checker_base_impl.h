@@ -15,17 +15,15 @@ namespace Upstream {
 /**
  * All health checker stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_HEALTH_CHECKER_STATS(COUNTER, GAUGE)                                                   \
   COUNTER(attempt)                                                                                 \
-  COUNTER(success)                                                                                 \
   COUNTER(failure)                                                                                 \
-  COUNTER(passive_failure)                                                                         \
   COUNTER(network_failure)                                                                         \
+  COUNTER(passive_failure)                                                                         \
+  COUNTER(success)                                                                                 \
   COUNTER(verify_cluster)                                                                          \
-  GAUGE  (healthy)                                                                                 \
-  GAUGE  (degraded)
-// clang-format on
+  GAUGE(degraded, Accumulate)                                                                      \
+  GAUGE(healthy, Accumulate)
 
 /**
  * Definition of all health checker stats. @see stats_macros.h
@@ -50,8 +48,8 @@ protected:
   public:
     virtual ~ActiveHealthCheckSession();
     HealthTransition setUnhealthy(envoy::data::core::v2alpha::HealthCheckFailureType type);
-    void start() { onIntervalBase(); }
     void onDeferredDeleteBase();
+    void start() { onInitialInterval(); }
 
   protected:
     ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
@@ -72,6 +70,7 @@ protected:
     virtual void onTimeout() PURE;
     void onTimeoutBase();
     virtual void onDeferredDelete() PURE;
+    void onInitialInterval();
 
     HealthCheckerImplBase& parent_;
     Event::TimerPtr interval_timer_;
@@ -123,6 +122,8 @@ private:
   void incHealthy();
   void incDegraded();
   std::chrono::milliseconds interval(HealthState state, HealthTransition changed_state) const;
+  std::chrono::milliseconds intervalWithJitter(uint64_t base_time_ms,
+                                               std::chrono::milliseconds interval_jitter) const;
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
   void refreshHealthyStat();
   void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
@@ -133,6 +134,7 @@ private:
   std::list<HostStatusCb> callbacks_;
   const std::chrono::milliseconds interval_;
   const std::chrono::milliseconds no_traffic_interval_;
+  const std::chrono::milliseconds initial_jitter_;
   const std::chrono::milliseconds interval_jitter_;
   const uint32_t interval_jitter_percent_;
   const std::chrono::milliseconds unhealthy_interval_;

@@ -418,6 +418,11 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
 
 bool FakeUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { return true; }
 
+bool FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
+                                                Network::UdpReadFilterCallbacks&) {
+  return true;
+}
+
 void FakeUpstream::threadRoutine() {
   handler_->addListener(listener_);
   server_initialized_.setReady();

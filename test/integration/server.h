@@ -13,7 +13,6 @@
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
-#include "common/stats/source_impl.h"
 
 #include "server/listener_hooks.h"
 #include "server/options_impl.h"
@@ -23,6 +22,8 @@
 #include "test/integration/tcp_dump.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
+
+#include "absl/synchronization/notification.h"
 
 namespace Envoy {
 namespace Server {
@@ -80,9 +81,9 @@ public:
     return wrapped_scope_->counterFromStatName(name);
   }
 
-  Gauge& gaugeFromStatName(StatName name) override {
+  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->gaugeFromStatName(name);
+    return wrapped_scope_->gaugeFromStatName(name, import_mode);
   }
 
   Histogram& histogramFromStatName(StatName name) override {
@@ -97,16 +98,32 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return counterFromStatName(storage.statName());
   }
-  Gauge& gauge(const std::string& name) override {
+  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return gaugeFromStatName(storage.statName());
+    return gaugeFromStatName(storage.statName(), import_mode);
   }
   Histogram& histogram(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
     return histogramFromStatName(storage.statName());
   }
 
-  const SymbolTable& symbolTable() const override { return wrapped_scope_->symbolTable(); }
+  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->findCounter(name);
+  }
+  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->findGauge(name);
+  }
+  absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->findHistogram(name);
+  }
+
+  const SymbolTable& constSymbolTable() const override {
+    return wrapped_scope_->constSymbolTable();
+  }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
 
 private:
@@ -120,7 +137,6 @@ private:
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
-  TestIsolatedStoreImpl() : source_(*this) {}
   // Stats::Scope
   Counter& counterFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
@@ -135,13 +151,13 @@ public:
     return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugeFromStatName(StatName name) override {
+  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return store_.gaugeFromStatName(name);
+    return store_.gaugeFromStatName(name, import_mode);
   }
-  Gauge& gauge(const std::string& name) override {
+  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return store_.gauge(name);
+    return store_.gauge(name, import_mode);
   }
   Histogram& histogramFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
@@ -152,7 +168,20 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
   }
-  const SymbolTable& symbolTable() const override { return store_.symbolTable(); }
+  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return store_.findCounter(name);
+  }
+  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return store_.findGauge(name);
+  }
+  absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return store_.findHistogram(name);
+  }
+  const SymbolTable& constSymbolTable() const override { return store_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
 
   // Stats::Store
@@ -177,12 +206,10 @@ public:
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
   void mergeHistograms(PostMergeCb) override {}
-  Source& source() override { return source_; }
 
 private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
-  SourceImpl source_;
 };
 
 } // namespace Stats
@@ -355,6 +382,7 @@ private:
   Server::Instance* server_{};
   Stats::Store* stat_store_{};
   Network::Address::InstanceConstSharedPtr admin_address_;
+  absl::Notification server_gone_;
 };
 
 } // namespace Envoy

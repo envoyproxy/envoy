@@ -5,10 +5,10 @@ REPOSITORY_LOCATIONS = dict(
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        sha256 = "4825306f702fa5cb76fd86c987a88c9bbb241e75f4d86dbb3714530ca73c1fb1",
-        strip_prefix = "boringssl-8cb07520451f0dc454654f2da5cdecf0b806f823",
-        # chromium-74.0.3729.131
-        urls = ["https://github.com/google/boringssl/archive/8cb07520451f0dc454654f2da5cdecf0b806f823.tar.gz"],
+        sha256 = "448773376d063b1e9a19e4fd41002d1a31a968a13be20b3b66ecd4aab9cf14a8",
+        strip_prefix = "boringssl-e534d74f5732e1aeebd514f05271d089c530c2f9",
+        # chromium-75.0.3770.80
+        urls = ["https://github.com/google/boringssl/archive/e534d74f5732e1aeebd514f05271d089c530c2f9.tar.gz"],
     ),
     boringssl_fips = dict(
         sha256 = "b12ad676ee533824f698741bd127f6fbc82c46344398a6d78d25e62c6c418c73",
@@ -82,9 +82,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gperftools/gperftools/archive/fc00474ddc21fff618fc3f009b46590e241e425e.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
-        sha256 = "ba8b08a697b66e14af35da07753583cf32ff3d14dcd768f91b1bbe2e6c07c349",
-        strip_prefix = "grpc-1.20.1",
-        urls = ["https://github.com/grpc/grpc/archive/v1.20.1.tar.gz"],
+        sha256 = "bcb01ac7029a7fb5219ad2cbbc4f0a2df3ef32db42e236ce7814597f4b04b541",
+        strip_prefix = "grpc-79a8b5289e3122d2cea2da3be7151d37313d6f46",
+        # Commit from 2019-05-30
+        urls = ["https://github.com/grpc/grpc/archive/79a8b5289e3122d2cea2da3be7151d37313d6f46.tar.gz"],
     ),
     com_github_luajit_luajit = dict(
         sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",
@@ -111,33 +112,31 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "lightstep-tracer-cpp-0.8.0",
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.8.0.tar.gz"],
     ),
-    lightstep_vendored_googleapis = dict(
-        sha256 = "d1ef4f790eeaa805e7b364de05b91f9eed66bd6ae46f1483bbf49c33d86998e5",
-        strip_prefix = "googleapis-d6f78d948c53f3b400bb46996eb3084359914f9b",
-        # From: https://github.com/lightstep/lightstep-tracer-cpp/blob/v0.8.0/lightstep-tracer-common/third_party/googleapis/README.lightstep-tracer-common#L6
-        urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
-    ),
     com_github_datadog_dd_opentracing_cpp = dict(
         sha256 = "a3d1c03e7af570fa64c01df259e6e9bb78637a6bd9c65c6bf7e8703e466dc22f",
         strip_prefix = "dd-opentracing-cpp-0.4.2",
         urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.4.2.tar.gz"],
     ),
     com_github_google_benchmark = dict(
-        # TODO (moderation) change back to tarball method on next benchmark release
-        sha256 = "0de43b6eaddd356f1d6cd164f73f37faf2f6c96fd684e1f7ea543ce49c1d144e",
-        strip_prefix = "benchmark-505be96ab23056580a3a2315abba048f4428b04e",
-        urls = ["https://github.com/google/benchmark/archive/505be96ab23056580a3a2315abba048f4428b04e.tar.gz"],
+        sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
+        strip_prefix = "benchmark-1.5.0",
+        urls = ["https://github.com/google/benchmark/archive/v1.5.0.tar.gz"],
     ),
     com_github_libevent_libevent = dict(
-        sha256 = "ab3af422b7e4c6d9276b3637d87edb6cf628fd91c9206260b759778c3a28b330",
+        sha256 = "6f799dd920aab9487cb04cd40627a5d4104fbbd246ebb5c8fd5e520055af2ef5",
         # This SHA includes the new "prepare" and "check" watchers, used for event loop performance
         # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
         # in the watchers (see https://github.com/libevent/libevent/pull/802).
+        # This also includes the fix for https://github.com/libevent/libevent/issues/806
         # TODO(mergeconflict): Update to v2.2 when it is released.
-        strip_prefix = "libevent-1cd8830de27c30c5324c75bfb6012c969c09ca2c",
-        urls = ["https://github.com/libevent/libevent/archive/1cd8830de27c30c5324c75bfb6012c969c09ca2c.tar.gz"],
+        strip_prefix = "libevent-3b1864b625ec37c3051512845982f347f4cc5621",
+        # 2019-05-16
+        urls = ["https://github.com/libevent/libevent/archive/3b1864b625ec37c3051512845982f347f4cc5621.tar.gz"],
     ),
-    com_github_madler_zlib = dict(
+    net_zlib = dict(
+        # TODO(moderation): revert to com_github_madler_zlib name pending resolution of workaround
+        # in rules_go https://github.com/bazelbuild/rules_go/blob/master/go/private/repositories.bzl#L87-L101
+        # for issue in protocolbuffers/protobuf https://github.com/protocolbuffers/protobuf/issues/5472
         sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
         strip_prefix = "zlib-1.2.11",
         urls = ["https://github.com/madler/zlib/archive/v1.2.11.tar.gz"],
@@ -211,22 +210,15 @@ REPOSITORY_LOCATIONS = dict(
         # 2018-12-19
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/64d6ac985360b624d8e95105701b64a3814794cd.tar.gz"],
     ),
-    com_github_golang_protobuf = dict(
-        # TODO(sesmith177): Remove this dependency when:
-        #   1. There's a release of rules_go that includes golang/protobuf v1.3.1
-        sha256 = "3f3a6123054a9847093c119895f1660612f301fe95358f3a6a1a33fd0933e6cf",
-        strip_prefix = "protobuf-1.3.1",
-        urls = ["https://github.com/golang/protobuf/archive/v1.3.1.tar.gz"],
-    ),
     io_bazel_rules_go = dict(
-        sha256 = "91b79f4758fd16f2c6426279ce00c1d2d8577d61c519db39675ed84657e1a95e",
-        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.17.4/rules_go-0.17.4.tar.gz"],
+        sha256 = "a82a352bffae6bee4e95f68a8d80a70e87f42c4741e6a448bec11998fcc82329",
+        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.18.5/rules_go-0.18.5.tar.gz"],
     ),
     rules_foreign_cc = dict(
-        sha256 = "136470a38dcd00c7890230402b43004dc947bf1e3dd0289dd1bd2bfb1e0a3484",
-        strip_prefix = "rules_foreign_cc-e3f4b5e0bc9dac9cf036616c13de25e6cd5051a2",
-        # 2019-04-04
-        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/e3f4b5e0bc9dac9cf036616c13de25e6cd5051a2.tar.gz"],
+        sha256 = "980c1b74f5c18ea099889b0fb0479ee34b8a02845d3d302ecb16b15d73d624c8",
+        strip_prefix = "rules_foreign_cc-a0dc109915cea85909bef586e2b2a9bbdc6c8ff5",
+        # 2019-06-04
+        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/a0dc109915cea85909bef586e2b2a9bbdc6c8ff5.tar.gz"],
     ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
@@ -235,9 +227,19 @@ REPOSITORY_LOCATIONS = dict(
     # I'd love to name this `com_github_google_subpar`, but something in the Subpar
     # code assumes its repository name is just `subpar`.
     subpar = dict(
-        sha256 = "eddbfc920e9cd565500370114316757848b672deba06dc2336acfa81b4ac0e6d",
-        strip_prefix = "subpar-1.3.0",
-        urls = ["https://github.com/google/subpar/archive/1.3.0.tar.gz"],
+        sha256 = "b80297a1b8d38027a86836dbadc22f55dc3ecad56728175381aa6330705ac10f",
+        strip_prefix = "subpar-2.0.0",
+        urls = ["https://github.com/google/subpar/archive/2.0.0.tar.gz"],
+    ),
+    io_opencensus_cpp = dict(
+        sha256 = "d6d68704c419a9e892bd1f942e09509ebc5a318499a1abcf2c09734e5dc56e19",
+        strip_prefix = "opencensus-cpp-1145dd77ffb7a2845c71c8e6ca188ef55e4ff607",
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/1145dd77ffb7a2845c71c8e6ca188ef55e4ff607.tar.gz"],
+    ),
+    com_github_curl = dict(
+        sha256 = "d483b89062832e211c887d7cf1b65c902d591b48c11fe7d174af781681580b41",
+        strip_prefix = "curl-7.63.0",
+        urls = ["https://github.com/curl/curl/releases/download/curl-7_63_0/curl-7.63.0.tar.gz"],
     ),
     com_googlesource_quiche = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/7bf7c3c358eb954e463bde14ea27444f4bd8ea05.tar.gz

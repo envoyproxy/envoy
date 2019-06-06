@@ -9,6 +9,7 @@ api_proto_library_internal(
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/core:grpc_service",
         "//envoy/api/v2/core:http_uri",
+        "//envoy/type:http_status",
         "//envoy/type/matcher:string",
     ],
 )

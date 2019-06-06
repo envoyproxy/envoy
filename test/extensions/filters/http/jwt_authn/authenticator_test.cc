@@ -32,7 +32,7 @@ namespace {
 class AuthenticatorTest : public testing::Test {
 public:
   void SetUp() override {
-    MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
+    TestUtility::loadFromYaml(ExampleConfig, proto_config_);
     CreateAuthenticator();
   }
 
@@ -138,7 +138,7 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
   EXPECT_EQ(out_name_, "my_payload");
 
   ProtobufWkt::Struct expected_payload;
-  MessageUtil::loadFromJson(ExpectedPayloadJSON, expected_payload);
+  TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
   EXPECT_TRUE(TestUtility::protoEqual(out_payload_, expected_payload));
 }
 

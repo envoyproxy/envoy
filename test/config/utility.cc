@@ -27,6 +27,9 @@ admin:
     socket_address:
       address: 127.0.0.1
       port_value: 0
+dynamic_resources:
+  lds_config:
+    path: /dev/null
 static_resources:
   clusters:
     name: cluster_0
@@ -40,6 +43,29 @@ static_resources:
       socket_address:
         address: 127.0.0.1
         port_value: 0
+)EOF";
+
+const std::string ConfigHelper::BASE_UDP_LISTENER_CONFIG = R"EOF(
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+static_resources:
+  clusters:
+    name: cluster_0
+    hosts:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+  listeners:
+    name: listener_0
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+        protocol: udp
 )EOF";
 
 const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
@@ -203,7 +229,7 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
                            const std::string& config) {
   RELEASE_ASSERT(!finalized_, "");
   std::string filename = TestEnvironment::writeStringToFileForTest("basic_config.yaml", config);
-  MessageUtil::loadFromFile(filename, bootstrap_, api);
+  TestUtility::loadFromFile(filename, bootstrap_, api);
 
   // Fix up all the socket addresses with the correct version.
   auto* admin = bootstrap_.mutable_admin();
@@ -240,15 +266,22 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   }
 }
 
-void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
-  RELEASE_ASSERT(!finalized_, "");
+void ConfigHelper::applyConfigModifiers() {
   for (auto config_modifier : config_modifiers_) {
     config_modifier(bootstrap_);
   }
+  config_modifiers_.clear();
+}
+
+void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
+  RELEASE_ASSERT(!finalized_, "");
+
+  applyConfigModifiers();
 
   uint32_t port_idx = 0;
   bool eds_hosts = false;
   bool custom_cluster = false;
+  bool original_dst_cluster = false;
   auto* static_resources = bootstrap_.mutable_static_resources();
   const auto tap_path = TestEnvironment::getOptionalEnvVar("TAP_PATH");
   if (tap_path) {
@@ -265,7 +298,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
         absl::optional<ProtobufWkt::Struct> tls_config;
         if (has_tls) {
           tls_config = ProtobufWkt::Struct();
-          MessageUtil::jsonConvert(filter_chain->tls_context(), tls_config.value());
+          TestUtility::jsonConvert(filter_chain->tls_context(), tls_config.value());
           filter_chain->clear_tls_context();
         }
         setTapTransportSocket(tap_path.value(), fmt::format("listener_{}_{}", i, j),
@@ -277,6 +310,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
     auto* cluster = static_resources->mutable_clusters(i);
     if (cluster->type() == envoy::api::v2::Cluster::EDS) {
       eds_hosts = true;
+    } else if (cluster->type() == envoy::api::v2::Cluster::ORIGINAL_DST) {
+      original_dst_cluster = true;
     } else if (cluster->has_cluster_type()) {
       custom_cluster = true;
     } else {
@@ -309,14 +344,15 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
       absl::optional<ProtobufWkt::Struct> tls_config;
       if (has_tls) {
         tls_config = ProtobufWkt::Struct();
-        MessageUtil::jsonConvert(cluster->tls_context(), tls_config.value());
+        TestUtility::jsonConvert(cluster->tls_context(), tls_config.value());
         cluster->clear_tls_context();
       }
       setTapTransportSocket(tap_path.value(), fmt::format("cluster_{}", i),
                             *cluster->mutable_transport_socket(), tls_config);
     }
   }
-  ASSERT(port_idx == ports.size() || eds_hosts || custom_cluster);
+  ASSERT(port_idx == ports.size() || eds_hosts || original_dst_cluster || custom_cluster ||
+         bootstrap_.dynamic_resources().has_cds_config());
 
   if (!connect_timeout_set_) {
 #ifdef __APPLE__
@@ -465,7 +501,7 @@ void ConfigHelper::addFilter(const std::string& config) {
 
   auto* filter_list_back = hcm_config.add_http_filters();
   const std::string json = Json::Factory::loadFromYamlString(config)->asJsonString();
-  MessageUtil::loadFromJson(json, *filter_list_back);
+  TestUtility::loadFromJson(json, *filter_list_back);
 
   // Now move it to the front.
   for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
@@ -502,7 +538,7 @@ bool ConfigHelper::setAccessLog(const std::string& filename) {
   loadHttpConnectionManager(hcm_config);
   envoy::config::accesslog::v2::FileAccessLog access_log_config;
   access_log_config.set_path(filename);
-  MessageUtil::jsonConvert(access_log_config, *hcm_config.mutable_access_log(0)->mutable_config());
+  TestUtility::jsonConvert(access_log_config, *hcm_config.mutable_access_log(0)->mutable_config());
   storeHttpConnectionManager(hcm_config);
   return true;
 }
@@ -569,7 +605,7 @@ bool ConfigHelper::loadHttpConnectionManager(
   RELEASE_ASSERT(!finalized_, "");
   auto* hcm_filter = getFilterFromListener("envoy.http_connection_manager");
   if (hcm_filter) {
-    MessageUtil::jsonConvert(*hcm_filter->mutable_config(), hcm);
+    TestUtility::jsonConvert(*hcm_filter->mutable_config(), hcm);
     return true;
   }
   return false;
@@ -581,7 +617,7 @@ void ConfigHelper::storeHttpConnectionManager(
   auto* hcm_config_struct =
       getFilterFromListener("envoy.http_connection_manager")->mutable_config();
 
-  MessageUtil::jsonConvert(hcm, *hcm_config_struct);
+  TestUtility::jsonConvert(hcm, *hcm_config_struct);
 }
 
 void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {
@@ -598,6 +634,39 @@ void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
   });
 }
 
+void ConfigHelper::setLds(absl::string_view version_info) {
+  applyConfigModifiers();
+
+  envoy::api::v2::DiscoveryResponse lds;
+  lds.set_version_info(std::string(version_info));
+  for (auto& listener : bootstrap_.static_resources().listeners()) {
+    ProtobufWkt::Any* resource = lds.add_resources();
+    resource->PackFrom(listener);
+  }
+
+  const std::string lds_filename = bootstrap().dynamic_resources().lds_config().path();
+  std::string file = TestEnvironment::writeStringToFileForTest(
+      "new_lds_file", MessageUtil::getJsonStringFromMessage(lds));
+  TestUtility::renameFile(file, lds_filename);
+}
+
+CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {}
+
+void CdsHelper::setCds(const std::vector<envoy::api::v2::Cluster>& clusters) {
+  // Write to file the DiscoveryResponse and trigger inotify watch.
+  envoy::api::v2::DiscoveryResponse cds_response;
+  cds_response.set_version_info(std::to_string(cds_version_++));
+  cds_response.set_type_url(Config::TypeUrl::get().Cluster);
+  for (const auto& cluster : clusters) {
+    cds_response.add_resources()->PackFrom(cluster);
+  }
+  // Past the initial write, need move semantics to trigger inotify move event that the
+  // FilesystemSubscriptionImpl is subscribed to.
+  std::string path =
+      TestEnvironment::writeStringToFileForTest("cds.update.pb_text", cds_response.DebugString());
+  TestUtility::renameFile(path, cds_path_);
+}
+
 EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("eds.pb_text", "")) {
   // cluster.cluster_0.update_success will be incremented on the initial
   // load when Envoy comes up.
@@ -605,8 +674,7 @@ EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("ed
 }
 
 void EdsHelper::setEds(
-    const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
-    IntegrationTestServerStats& server_stats) {
+    const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments) {
   // Write to file the DiscoveryResponse and trigger inotify watch.
   envoy::api::v2::DiscoveryResponse eds_response;
   eds_response.set_version_info(std::to_string(eds_version_++));
@@ -619,10 +687,16 @@ void EdsHelper::setEds(
   std::string path =
       TestEnvironment::writeStringToFileForTest("eds.update.pb_text", eds_response.DebugString());
   TestUtility::renameFile(path, eds_path_);
+}
+
+void EdsHelper::setEdsAndWait(
+    const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
+    IntegrationTestServerStats& server_stats) {
+  setEds(cluster_load_assignments);
   // Make sure Envoy has consumed the update now that it is running.
-  server_stats.waitForCounterGe("cluster.cluster_0.update_success", ++update_successes_);
+  ++update_successes_;
+  server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
   RELEASE_ASSERT(
       update_successes_ == server_stats.counter("cluster.cluster_0.update_success")->value(), "");
 }
-
 } // namespace Envoy
