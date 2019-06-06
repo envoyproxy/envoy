@@ -3,6 +3,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "common/crypto/utility.h"
+
 #include "extensions/filters/common/lua/lua.h"
 
 namespace Envoy {
@@ -199,6 +201,24 @@ private:
   Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapWrapper> dynamic_metadata_wrapper_;
 
   friend class DynamicMetadataMapWrapper;
+};
+
+/**
+ * Lua wrapper for EVP_PKEY.
+ */
+class PublicKeyWrapper : public Filters::Common::Lua::BaseLuaObject<PublicKeyWrapper> {
+public:
+  PublicKeyWrapper(Envoy::Common::Crypto::PublicKeyPtr key) : public_key_(std::move(key)) {}
+  static ExportedFunctions exportedFunctions() { return {{"get", static_luaGet}}; }
+
+private:
+  /**
+   * Get a pointer to public key.
+   * @return pointer to public key.
+   */
+  DECLARE_LUA_FUNCTION(PublicKeyWrapper, luaGet);
+
+  Envoy::Common::Crypto::PublicKeyPtr public_key_;
 };
 
 } // namespace Lua
