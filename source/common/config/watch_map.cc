@@ -6,11 +6,13 @@ namespace Config {
 WatchMap::Token WatchMap::addWatch(SubscriptionCallbacks& callbacks) {
   WatchMap::Token next_watch = next_watch_++;
   watches_.emplace(next_watch, WatchMap::Watch(callbacks));
+  wildcard_watches_.insert(next_watch);
   return next_watch;
 }
 
 bool WatchMap::removeWatch(WatchMap::Token token) {
   watches_.erase(token);
+  wildcard_watches_.erase(token); // may or may not be in there, but we want it gone.
   return watches_.empty();
 }
 
@@ -22,6 +24,12 @@ WatchMap::updateWatchInterest(WatchMap::Token token,
     ENVOY_LOG(error, "updateWatchInterest() called on nonexistent token!");
     return std::make_pair(std::set<std::string>(), std::set<std::string>());
   }
+  if (update_to_these_names.empty()) {
+    wildcard_watches_.insert(token);
+  } else {
+    wildcard_watches_.erase(token);
+  }
+
   auto& watch = watches_entry->second;
 
   std::vector<std::string> newly_added_to_watch;
@@ -40,13 +48,17 @@ WatchMap::updateWatchInterest(WatchMap::Token token,
                         findRemovals(newly_removed_from_watch, token));
 }
 
-const absl::flat_hash_set<WatchMap::Token>&
+absl::flat_hash_set<WatchMap::Token>
 WatchMap::tokensInterestedIn(const std::string& resource_name) {
-  auto entry = watch_interest_.find(resource_name);
-  if (entry == watch_interest_.end()) {
-    return empty_token_set_;
+  // Note that std::set_union needs sorted sets. Better to do it ourselves with insert().
+  absl::flat_hash_set<WatchMap::Token> ret = wildcard_watches_;
+  auto watches_interested = watch_interest_.find(resource_name);
+  if (watches_interested != watch_interest_.end()) {
+    for (const auto& watch : watches_interested->second) {
+      ret.insert(watch);
+    }
   }
-  return entry->second;
+  return ret;
 }
 
 void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

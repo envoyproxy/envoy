@@ -84,7 +84,6 @@ wrapInResource(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& anys,
     envoy::api::v2::ClusterLoadAssignment cur_endpoint;
     a.UnpackTo(&cur_endpoint);
     auto* cur_resource = ret.Add();
-    std::cerr << "wrapping " << cur_endpoint.cluster_name() << std::endl;
     cur_resource->set_name(cur_endpoint.cluster_name());
     cur_resource->mutable_resource()->CopyFrom(a);
     cur_resource->set_version(version);
@@ -104,10 +103,6 @@ void doDeltaAndSotwUpdate(WatchMap& watch_map,
   Protobuf::RepeatedPtrField<std::string> removed_names_proto;
   for (auto n : removed_names) {
     *removed_names_proto.Add() = n;
-  }
-  std::cerr << "removed names:" << std::endl;
-  for (auto n : removed_names_proto) {
-    std::cerr << n << std::endl;
   }
   watch_map.onConfigUpdate(delta_resources, removed_names_proto, "version1");
 }
@@ -144,7 +139,6 @@ TEST(WatchMapTest, Basic) {
     expectDeltaAndSotwUpdate(callbacks, expected_resources, {}, "version1");
     doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version1");
   }
-
   {
     // The watch is now interested in Bob, Carol, Dave, Eve...
     std::set<std::string> update_to({"bob", "carol", "dave", "eve"});
@@ -173,11 +167,6 @@ TEST(WatchMapTest, Basic) {
     expectDeltaAndSotwUpdate(callbacks, expected_resources, {"bob"}, "version2");
     doDeltaAndSotwUpdate(watch_map, updated_resources, {"bob"}, "version2");
   }
-
-  // Clean removal of the watch: first update to "interested in nothing", then remove.
-  std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-      watch_map.updateWatchInterest(token, {});
-  EXPECT_EQ(std::set<std::string>({"bob", "carol", "dave", "eve"}), added_removed.second);
   EXPECT_TRUE(watch_map.removeWatch(token));
 }
 
@@ -186,6 +175,8 @@ TEST(WatchMapTest, Basic) {
 // Second watch on that name ==> updateWatchInterest() returns nothing about that name
 // Original watch loses interest ==> nothing
 // Second watch also loses interest ==> "remove it from subscription"
+// NOTE: we need the resource name "dummy" to keep either watch from ever having no names watched,
+// which is treated as interest in all names.
 TEST(WatchMapTest, Overlap) {
   NamedMockSubscriptionCallbacks callbacks1;
   NamedMockSubscriptionCallbacks callbacks2;
@@ -200,11 +191,12 @@ TEST(WatchMapTest, Overlap) {
 
   // First watch becomes interested.
   {
-    std::set<std::string> update_to({"alice"});
+    std::set<std::string> update_to({"alice", "dummy"});
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
         watch_map.updateWatchInterest(token1, update_to);
     EXPECT_EQ(update_to, added_removed.first); // add to subscription
     EXPECT_TRUE(added_removed.second.empty());
+    watch_map.updateWatchInterest(token2, {"dummy"});
 
     // First watch receives update.
     expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version1");
@@ -213,7 +205,7 @@ TEST(WatchMapTest, Overlap) {
   }
   // Second watch becomes interested.
   {
-    std::set<std::string> update_to({"alice"});
+    std::set<std::string> update_to({"alice", "dummy"});
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
         watch_map.updateWatchInterest(token2, update_to);
     EXPECT_TRUE(added_removed.first.empty()); // nothing happens
@@ -227,7 +219,7 @@ TEST(WatchMapTest, Overlap) {
   // First watch loses interest.
   {
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(token1, {});
+        watch_map.updateWatchInterest(token1, {"dummy"});
     EXPECT_TRUE(added_removed.first.empty()); // nothing happens
     EXPECT_TRUE(added_removed.second.empty());
 
@@ -239,7 +231,7 @@ TEST(WatchMapTest, Overlap) {
   // Second watch loses interest.
   {
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(token2, {});
+        watch_map.updateWatchInterest(token2, {"dummy"});
     EXPECT_TRUE(added_removed.first.empty());
     EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.second); // remove from subscription
   }
@@ -249,6 +241,8 @@ TEST(WatchMapTest, Overlap) {
 // First watch on a resource name ==> updateWatchInterest() returns "add it to subscription"
 // Watch loses interest ==> "remove it from subscription"
 // Second watch on that name ==> "add it to subscription"
+// NOTE: we need the resource name "dummy" to keep either watch from ever having no names watched,
+// which is treated as interest in all names.
 TEST(WatchMapTest, AddRemoveAdd) {
   NamedMockSubscriptionCallbacks callbacks1;
   NamedMockSubscriptionCallbacks callbacks2;
@@ -263,11 +257,12 @@ TEST(WatchMapTest, AddRemoveAdd) {
 
   // First watch becomes interested.
   {
-    std::set<std::string> update_to({"alice"});
+    std::set<std::string> update_to({"alice", "dummy"});
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
         watch_map.updateWatchInterest(token1, update_to);
     EXPECT_EQ(update_to, added_removed.first); // add to subscription
     EXPECT_TRUE(added_removed.second.empty());
+    watch_map.updateWatchInterest(token2, {"dummy"});
 
     // First watch receives update.
     expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version1");
@@ -277,7 +272,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
   // First watch loses interest.
   {
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(token1, {});
+        watch_map.updateWatchInterest(token1, {"dummy"});
     EXPECT_TRUE(added_removed.first.empty());
     EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.second); // remove from subscription
 
@@ -286,10 +281,10 @@ TEST(WatchMapTest, AddRemoveAdd) {
   }
   // Second watch becomes interested.
   {
-    std::set<std::string> update_to({"alice"});
+    std::set<std::string> update_to({"alice", "dummy"});
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
         watch_map.updateWatchInterest(token2, update_to);
-    EXPECT_EQ(update_to, added_removed.first); // add to subscription
+    EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.first); // add to subscription
     EXPECT_TRUE(added_removed.second.empty());
 
     // *Only* second watch receives update.
@@ -328,6 +323,36 @@ TEST(WatchMapTest, UninterestingUpdate) {
   // Clean removal of the watch: first update to "interested in nothing", then remove.
   watch_map.updateWatchInterest(token, {});
   EXPECT_TRUE(watch_map.removeWatch(token));
+}
+
+// Tests that a watch that specifies no particular resource interest is treated as interested in
+// everything.
+TEST(WatchMapTest, WatchingEverything) {
+  NamedMockSubscriptionCallbacks callbacks1;
+  NamedMockSubscriptionCallbacks callbacks2;
+  WatchMap watch_map;
+  watch_map.addWatch(callbacks1);
+  WatchMap::Token token2 = watch_map.addWatch(callbacks2);
+  // token1 never specifies any names, and so is treated as interested in everything.
+  watch_map.updateWatchInterest(token2, {"alice"});
+
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
+  envoy::api::v2::ClusterLoadAssignment alice;
+  alice.set_cluster_name("alice");
+  updated_resources.Add()->PackFrom(alice);
+  envoy::api::v2::ClusterLoadAssignment bob;
+  bob.set_cluster_name("bob");
+  updated_resources.Add()->PackFrom(bob);
+
+  std::vector<envoy::api::v2::ClusterLoadAssignment> expected_resources1;
+  expected_resources1.push_back(alice);
+  expected_resources1.push_back(bob);
+  std::vector<envoy::api::v2::ClusterLoadAssignment> expected_resources2;
+  expected_resources2.push_back(alice);
+
+  expectDeltaAndSotwUpdate(callbacks1, expected_resources1, {}, "version1");
+  expectDeltaAndSotwUpdate(callbacks2, expected_resources2, {}, "version1");
+  doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version1");
 }
 
 // Delta onConfigUpdate has some slightly subtle details with how it handles the three cases where a
