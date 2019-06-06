@@ -16,6 +16,7 @@ jobs:
     displayName: 'Run Mac CI'
     env:
       BAZEL_REMOTE_CACHE: remotebuildexecution.googleapis.com
+      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
 
   - task: PublishTestResults@2
