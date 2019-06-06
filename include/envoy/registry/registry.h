@@ -132,8 +132,7 @@ private:
  * Macro used for static registration.
  */
 #define REGISTER_FACTORY(FACTORY, BASE)                                                            \
-  void forceRegister##FACTORY() {}                                                                 \
-  ABSL_ATTRIBUTE_UNUSED                                                                            \
+  ABSL_ATTRIBUTE_UNUSED void forceRegister##FACTORY() {}                                           \
   static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
                                           FACTORY, BASE>                                           \
       FACTORY##_registered
@@ -145,7 +144,7 @@ private:
  * not run until a function in the compilation unit is invoked. The force function can be invoked
  * from a static library wrapper.
  */
-#define DECLARE_FACTORY(FACTORY) void forceRegister##FACTORY() ABSL_ATTRIBUTE_UNUSED
+#define DECLARE_FACTORY(FACTORY) ABSL_ATTRIBUTE_UNUSED void forceRegister##FACTORY()
 
 } // namespace Registry
 } // namespace Envoy
