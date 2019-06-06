@@ -50,8 +50,7 @@ test: a
   )EOF";
 
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
-  EXPECT_THROW(TestUtility::loadFromYaml(yaml, proto_config),
-               EnvoyException);
+  EXPECT_THROW(TestUtility::loadFromYaml(yaml, proto_config), EnvoyException);
 }
 
 class ClientSslAuthFilterTest : public testing::Test {
