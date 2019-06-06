@@ -23,7 +23,7 @@ class NamedMockSubscriptionCallbacks
     : public MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> {
 public:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+    return TestUtility::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
   }
 };
 
