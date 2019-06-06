@@ -261,7 +261,6 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   }
 
   for (const auto& formatter : headers_to_add_) {
-    // Remove any invalid characters the formatter may have introduced.
     const std::string value = formatter.second->format(stream_info);
     if (!value.empty()) {
       if (formatter.second->append()) {
