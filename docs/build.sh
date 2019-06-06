@@ -100,6 +100,7 @@ PROTO_RST="
   /envoy/config/filter/http/health_check/v2/health_check/envoy/config/filter/http/health_check/v2/health_check.proto.rst
   /envoy/config/filter/http/header_to_metadata/v2/header_to_metadata/envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.proto.rst
   /envoy/config/filter/http/ip_tagging/v2/ip_tagging/envoy/config/filter/http/ip_tagging/v2/ip_tagging.proto.rst
+  /envoy/config/filter/http/cache/v2alpha/cache/envoy/config/filter/http/cache/v2alpha/cache.proto.rst
   /envoy/config/filter/http/jwt_authn/v2alpha/jwt_authn/envoy/config/filter/http/jwt_authn/v2alpha/config.proto.rst
   /envoy/config/filter/http/lua/v2/lua/envoy/config/filter/http/lua/v2/lua.proto.rst
   /envoy/config/filter/http/original_src/v2alpha1/original_src/envoy/config/filter/http/original_src/v2alpha1/original_src.proto.rst

@@ -29,6 +29,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
+    "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
     "envoy.filters.http.dynamo":                        "//source/extensions/filters/http/dynamo:config",

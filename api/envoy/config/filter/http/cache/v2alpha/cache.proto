@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.cache.v2alpha;
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.cache.v2alpha";
+option java_outer_classname = "CacheProto";
+option java_multiple_files = true;
+// [#protodoc-title: HTTP Cache Filter]
+// `Design<https://docs.google.com/document/d/1WPuim_GzhfdsnIj_tf-fIeutK0jO4aVQfVrLJFoLN3g/view>`_
+// [#proto-status: experimental]
+
+message Cache {
+
+  // Name of cache implementation to use.
+  string name = 1;
+
+  // List of allowed Vary headers. These headers will be provided to caches in lookups, and the
+  // cache filter will only insert responses whose Vary headers (if any) are all in this list. For
+  // example, if an origin supplies "vary:user-agent" in a response, the response will only be
+  // inserted if "user-agent" is in this list.
+  repeated string allowed_vary_headers = 2;
+
+  message KeyCreatorParams {
+    // If true, exclude the URL scheme from the cache key.
+    bool exclude_scheme = 1;
+
+    // If true, exclude the host from the cache key.
+    bool exclude_host = 2;
+
+    // If true, treat query_string_keys as a whitelist.
+    // If false, treat query_string_keys as a blacklist.
+    bool query_string_keys_whitelist = 3;
+
+    // The list of query string keys, to be treated as a whitelist/blacklist
+    // depending on the value of query_string_keys_whitelist.
+    // If your origins ignore all but a few query params, list them here and set
+    // query_string_keys_whitelist to true.
+    // If your origins only pay attention to a few params, list them here and
+    // leave query_string_keys_whitelist as false.
+    // If your origins ignore the query string entirely, leave this empty and
+    // set query_string_keys_whitelist to true.
+    // If you don't know what query params your origins may pay attention to,
+    // leave both query_string fields at their false/empty defaults.
+    repeated string query_string_keys = 4;
+  }
+  KeyCreatorParams key_creator_params = 3;
+}
