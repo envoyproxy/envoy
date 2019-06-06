@@ -79,6 +79,11 @@ public:
   uint64_t id() { return connection_->id(); }
 
   /**
+   * @return the underlying codec protocol.
+   */
+  Protocol protocol() { return codec_->protocol(); }
+
+  /**
    * @return the underlying connection error.
    */
   absl::string_view connectionFailureReason() { return connection_->transportFailureReason(); }

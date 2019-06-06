@@ -4,8 +4,8 @@ BAZEL_SKYLIB_SHA256 = "2ef429f5d7ce7111263289644d233707dba35e39696377ebab8b0bc70
 GOGOPROTO_RELEASE = "1.2.1"
 GOGOPROTO_SHA256 = "99e423905ba8921e86817607a5294ffeedb66fdd4a85efce5eb2848f715fdb3a"
 
-OPENCENSUS_RELEASE = "0.1.0"
-OPENCENSUS_SHA256 = "4fd21cc6de63d7cb979fd749d8101ff425905aa0826fed26019d1c311fcf19a7"
+OPENCENSUS_PROTO_GIT_SHA = "d5d80953a8c2ff4633087af6933cd152678434bb"  # Mar 18, 2019
+OPENCENSUS_PROTO_SHA256 = "a4e87a1da21d1b3a16674332c3ee6e2689d52f3532e2ff8cb4a626c8bcdabcfc"
 
 PGV_GIT_SHA = "26db5cb7c01a67c6a2e21a832106406185530b2f"
 PGV_SHA256 = "6510cbcf69d99059c652ae2376f6240bc761d0b019cd962225f4f609be361e26"
@@ -44,10 +44,10 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "client_model-" + PROMETHEUS_GIT_SHA,
         urls = ["https://github.com/prometheus/client_model/archive/" + PROMETHEUS_GIT_SHA + ".tar.gz"],
     ),
-    io_opencensus_trace = dict(
-        sha256 = OPENCENSUS_SHA256,
-        strip_prefix = "opencensus-proto-" + OPENCENSUS_RELEASE + "/src/opencensus/proto/trace/v1",
-        urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/v" + OPENCENSUS_RELEASE + ".tar.gz"],
+    opencensus_proto = dict(
+        sha256 = OPENCENSUS_PROTO_SHA256,
+        strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_GIT_SHA + "/src",
+        urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_PROTO_GIT_SHA + ".tar.gz"],
     ),
     kafka_source = dict(
         sha256 = KAFKA_SOURCE_SHA,
