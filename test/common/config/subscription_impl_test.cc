@@ -151,7 +151,7 @@ TEST_P(SubscriptionImplInitFetchTimeoutTest, InitialFetchTimeout) {
   verifyStats(1, 0, 0, 0, 0);
   expectConfigUpdateFailed();
   callInitFetchTimeoutCb();
-  verifyStats(1, 0, 0, 0, 0);
+  verifyStats(1, 0, 0, 1, 0);
 }
 
 // Validate that initial fetch timer is disabled on config update

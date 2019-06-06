@@ -94,7 +94,8 @@ public:
   }
 
   void expectConfigUpdateFailed() override {
-    // initial_fetch_timeout not implemented
+    // initial_fetch_timeout not implemented. Match the stat behavior of the others.
+    stats_.update_failure_.inc();
   }
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {

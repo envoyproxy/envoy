@@ -132,7 +132,8 @@ public:
   }
 
   void expectConfigUpdateFailed() override {
-    EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr));
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr))
+        .WillOnce(Invoke([this](const EnvoyException*) { stats_.update_failure_.inc(); }));
   }
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {

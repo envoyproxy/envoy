@@ -66,8 +66,8 @@ public:
   void startSubscription(const std::set<std::string>& cluster_names) override {
     subscription_started_ = true;
     last_cluster_names_ = cluster_names;
-    expectSendMessage(last_cluster_names_, "");
     EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+    expectSendMessage(last_cluster_names_, "");
     subscription_->start(cluster_names);
     xds_context_->start();
   }
