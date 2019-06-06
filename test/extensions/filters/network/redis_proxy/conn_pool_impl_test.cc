@@ -492,8 +492,9 @@ TEST_F(RedisConnPoolImplTest, makeRequestToHostWithAuthPassword) {
 
 TEST_F(RedisConnPoolImplTest, MakeRequestToRedisCluster) {
 
-  envoy::api::v2::Cluster::CustomClusterType cluster_type;
-  cluster_type.set_name("envoy.clusters.redis");
+  absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type;
+  cluster_type.emplace();
+  cluster_type->set_name("envoy.clusters.redis");
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
       .Times(2)
       .WillRepeatedly(ReturnRef(cluster_type));
@@ -513,8 +514,9 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToRedisCluster) {
 
 TEST_F(RedisConnPoolImplTest, MakeRequestToRedisClusterHashtag) {
 
-  envoy::api::v2::Cluster::CustomClusterType cluster_type;
-  cluster_type.set_name("envoy.clusters.redis");
+  absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type;
+  cluster_type.emplace();
+  cluster_type->set_name("envoy.clusters.redis");
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
       .Times(2)
       .WillRepeatedly(ReturnRef(cluster_type));
