@@ -1424,13 +1424,13 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   EXPECT_EQ(subset_info.defaultSubset().fields().at("key").string_value(),
             std::string("the value"));
   EXPECT_EQ(subset_info.subsetSelectors().size(), 2);
-  EXPECT_EQ(subset_info.subsetSelectors()[0]->selector_keys,
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->selector_keys_,
             std::set<std::string>({"selector_key1"}));
-  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallback_policy,
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallback_policy_,
             envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED);
-  EXPECT_EQ(subset_info.subsetSelectors()[1]->selector_keys,
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->selector_keys_,
             std::set<std::string>({"selector_key2"}));
-  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallback_policy,
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallback_policy_,
             envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
 }
 

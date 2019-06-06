@@ -26,12 +26,12 @@ enum class LoadBalancerType {
 };
 
 struct SubsetSelector {
-  std::set<std::string> selector_keys;
+  std::set<std::string> selector_keys_;
   envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
-      fallback_policy;
+      fallback_policy_;
 };
 
-typedef std::shared_ptr<SubsetSelector> SubsetSelectorPtr;
+using SubsetSelectorPtr = std::shared_ptr<SubsetSelector>;
 
 /**
  * Load Balancer subset configuration.

@@ -116,28 +116,28 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
   selectors_ = std::make_shared<SubsetSelectorMap>();
   SubsetSelectorMapPtr selectors;
   for (const auto& subset_selector : subset_selectors_) {
-    const auto& selector_keys = subset_selector->selector_keys;
-    unsigned long pos = 0;
+    const auto& selector_keys = subset_selector->selector_keys_;
+    uint32_t pos = 0;
     selectors = selectors_;
     for (const auto& key : selector_keys) {
       const auto& selector_it = selectors->subset_keys.find(key);
       pos++;
       if (selector_it == selectors->subset_keys.end()) {
         selectors->subset_keys.emplace(std::make_pair(key, std::make_shared<SubsetSelectorMap>()));
-        const auto& childSelector = selectors->subset_keys.find(key);
+        const auto& child_selector = selectors->subset_keys.find(key);
         // if this is last key for given selector, check if it has fallback specified
         if (pos == selector_keys.size()) {
           const auto& selector_fallback_policy =
-              (subset_selector->fallback_policy ==
+              (subset_selector->fallback_policy_ ==
                envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)
                   ? absl::nullopt
                   : absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
                                        LbSubsetSelectorFallbackPolicy>{
-                        subset_selector->fallback_policy};
-          childSelector->second->fallback_policy = selector_fallback_policy;
+                        subset_selector->fallback_policy_};
+          child_selector->second->fallback_policy = selector_fallback_policy;
           initSelectorFallbackSubset(selector_fallback_policy);
         }
-        selectors = childSelector->second;
+        selectors = child_selector->second;
       } else {
         selectors = selector_it->second;
       }
@@ -376,7 +376,7 @@ void SubsetLoadBalancer::processSubsets(
     const bool adding_hosts = step.second;
     for (const auto& host : hosts) {
       for (const auto& subset_selector : subset_selectors_) {
-        const auto& keys = subset_selector->selector_keys;
+        const auto& keys = subset_selector->selector_keys_;
         // For each host, for each subset key, attempt to extract the metadata corresponding to the
         // key from the host.
         SubsetMetadata kvs = extractSubsetMetadata(keys, *host);
