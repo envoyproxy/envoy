@@ -317,7 +317,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
   }
   case GoogleAsyncTag::Operation::Read: {
     ASSERT(ok);
-    auto buffer = (GoogleGrpcUtils::makeBufferInstance(read_buf_));
+    auto buffer = GoogleGrpcUtils::makeBufferInstance(read_buf_);
     if (!buffer || !callbacks_.onReceiveMessageRaw(std::move(buffer))) {
       // This is basically streamError in Grpc::AsyncClientImpl.
       notifyRemoteClose(Status::GrpcStatus::Internal, nullptr, EMPTY_STRING);
