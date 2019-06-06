@@ -134,7 +134,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       host_->cluster().stats().upstream_cx_destroy_local_.inc();
     }
     host_->cluster().stats().upstream_cx_destroy_.inc();
-  
+
     ActiveClientPtr removed;
     bool check_for_drained = true;
     if (client.stream_wrapper_) {

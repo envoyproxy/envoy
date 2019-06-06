@@ -154,7 +154,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       host_->cluster().stats().upstream_cx_destroy_local_.inc();
     }
     host_->cluster().stats().upstream_cx_destroy_.inc();
-    
+
     if (client.closed_with_active_rq_) {
       host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
       if (event == Network::ConnectionEvent::RemoteClose) {

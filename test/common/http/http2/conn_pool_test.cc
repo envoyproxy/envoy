@@ -378,7 +378,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsMaxPendingCircuitBreaker) {
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
-  
+
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_remote_.value());
 }
