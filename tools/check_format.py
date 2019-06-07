@@ -687,6 +687,7 @@ if __name__ == "__main__":
       "--namespace_check_excluded_paths",
       type=str,
       nargs="+",
+      default=[],
       help="exclude paths from the namespace_check.")
   parser.add_argument(
       "--include_dir_order",
