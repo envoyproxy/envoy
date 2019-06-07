@@ -25,8 +25,9 @@ local_repository(
 
 git_repository(
     name = "build_bazel_rules_apple",
-    commit = "2f20f88d85c0fe217cf9a9eadfb8015b3a384dea",
+    commit = "ff6a37b24fcbbd525a5bf61692a12c810d0ee3c1",
     remote = "https://github.com/bazelbuild/rules_apple.git",
+    shallow_since = "1559833568 -0700",
 )
 
 load("@envoy//bazel:api_repositories.bzl", "envoy_api_dependencies")
@@ -52,16 +53,16 @@ go_register_toolchains(go_version = GO_VERSION)
 
 git_repository(
     name = "build_bazel_apple_support",
-    commit = "dabf718975760b4d45bd7db3e18bc12e7b4ef485",
+    commit = "bdcef226ad626bd8b9a4a377347a2f8c1726f3bb",
     remote = "https://github.com/bazelbuild/apple_support.git",
-    shallow_since = "1551297696 -0500",
+    shallow_since = "1554146182 -0700",
 )
 
 git_repository(
     name = "build_bazel_rules_swift",
-    commit = "e517571f92fe7739635c6e25b2be1f4f185fce33",
+    commit = "c935de3d04a8d24feb09a57df3b33a328be5d863",
     remote = "https://github.com/bazelbuild/rules_swift.git",
-    shallow_since = "1551797865 -0800",
+    shallow_since = "1559570694 -0700",
 )
 
 load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependencies")
