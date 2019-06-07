@@ -1,0 +1,10 @@
+--- tools/build_defs/cmake_script.bzl
++++ tools/build_defs/cmake_script.bzl
+@@ -91,6 +91,7 @@ _CMAKE_ENV_VARS_FOR_CROSSTOOL = {
+ _CMAKE_CACHE_ENTRIES_CROSSTOOL = {
+     "CMAKE_SYSTEM_NAME": struct(value = "CMAKE_SYSTEM_NAME", replace = True),
+     "CMAKE_AR": struct(value = "CMAKE_AR", replace = True),
++    "CMAKE_RANLIB": struct(value = "CMAKE_RANLIB", replace = True),
+     "CMAKE_CXX_LINK_EXECUTABLE": struct(value = "CMAKE_CXX_LINK_EXECUTABLE", replace = True),
+     "CMAKE_C_FLAGS": struct(value = "CMAKE_C_FLAGS_INIT", replace = False),
+     "CMAKE_CXX_FLAGS": struct(value = "CMAKE_CXX_FLAGS_INIT", replace = False),

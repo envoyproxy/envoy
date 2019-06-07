@@ -1,0 +1,5 @@
+<resources>
+    <!-- These are for the demo app -->
+    <string name="title_string">Response: %s</string>
+    <string name="header_string">\'Server\' header: %s</string>
+</resources>
