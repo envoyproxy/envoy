@@ -113,13 +113,13 @@ void doDeltaAndSotwUpdate(WatchMap& watch_map,
 TEST(WatchMapTest, Basic) {
   NamedMockSubscriptionCallbacks callbacks;
   WatchMap watch_map;
-  WatchMap::Token token = watch_map.addWatch(callbacks);
+  WatchPtr watch = watch_map.addWatch(callbacks);
 
   {
     // The watch is interested in Alice and Bob...
     std::set<std::string> update_to({"alice", "bob"});
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(token, update_to);
+        watch_map.updateWatchInterest(watch.get(), update_to);
     EXPECT_EQ(update_to, added_removed.first);
     EXPECT_TRUE(added_removed.second.empty());
 
@@ -143,7 +143,7 @@ TEST(WatchMapTest, Basic) {
     // The watch is now interested in Bob, Carol, Dave, Eve...
     std::set<std::string> update_to({"bob", "carol", "dave", "eve"});
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(token, update_to);
+        watch_map.updateWatchInterest(watch.get(), update_to);
     EXPECT_EQ(std::set<std::string>({"carol", "dave", "eve"}), added_removed.first);
     EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.second);
 
@@ -167,7 +167,7 @@ TEST(WatchMapTest, Basic) {
     expectDeltaAndSotwUpdate(callbacks, expected_resources, {"bob"}, "version2");
     doDeltaAndSotwUpdate(watch_map, updated_resources, {"bob"}, "version2");
   }
-  EXPECT_TRUE(watch_map.removeWatch(token));
+  watch.reset();
 }
 
 // Checks the following:
@@ -181,8 +181,8 @@ TEST(WatchMapTest, Overlap) {
   NamedMockSubscriptionCallbacks callbacks1;
   NamedMockSubscriptionCallbacks callbacks2;
   WatchMap watch_map;
-  WatchMap::Token token1 = watch_map.addWatch(callbacks1);
-  WatchMap::Token token2 = watch_map.addWatch(callbacks2);
+  WatchPtr watch1 = watch_map.addWatch(callbacks1);
+  WatchPtr watch2 = watch_map.addWatch(callbacks2);
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
   envoy::api::v2::ClusterLoadAssignment alice;
@@ -193,10 +193,10 @@ TEST(WatchMapTest, Overlap) {
   {
     std::set<std::string> update_to({"alice", "dummy"});
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(token1, update_to);
+        watch_map.updateWatchInterest(watch1.get(), update_to);
     EXPECT_EQ(update_to, added_removed.first); // add to subscription
     EXPECT_TRUE(added_removed.second.empty());
-    watch_map.updateWatchInterest(token2, {"dummy"});
+    watch_map.updateWatchInterest(watch2.get(), {"dummy"});
 
     // First watch receives update.
     expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version1");
@@ -207,7 +207,7 @@ TEST(WatchMapTest, Overlap) {
   {
     std::set<std::string> update_to({"alice", "dummy"});
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(token2, update_to);
+        watch_map.updateWatchInterest(watch2.get(), update_to);
     EXPECT_TRUE(added_removed.first.empty()); // nothing happens
     EXPECT_TRUE(added_removed.second.empty());
 
@@ -219,7 +219,7 @@ TEST(WatchMapTest, Overlap) {
   // First watch loses interest.
   {
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(token1, {"dummy"});
+        watch_map.updateWatchInterest(watch1.get(), {"dummy"});
     EXPECT_TRUE(added_removed.first.empty()); // nothing happens
     EXPECT_TRUE(added_removed.second.empty());
 
@@ -231,7 +231,7 @@ TEST(WatchMapTest, Overlap) {
   // Second watch loses interest.
   {
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(token2, {"dummy"});
+        watch_map.updateWatchInterest(watch2.get(), {"dummy"});
     EXPECT_TRUE(added_removed.first.empty());
     EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.second); // remove from subscription
   }
@@ -247,8 +247,8 @@ TEST(WatchMapTest, AddRemoveAdd) {
   NamedMockSubscriptionCallbacks callbacks1;
   NamedMockSubscriptionCallbacks callbacks2;
   WatchMap watch_map;
-  WatchMap::Token token1 = watch_map.addWatch(callbacks1);
-  WatchMap::Token token2 = watch_map.addWatch(callbacks2);
+  WatchPtr watch1 = watch_map.addWatch(callbacks1);
+  WatchPtr watch2 = watch_map.addWatch(callbacks2);
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
   envoy::api::v2::ClusterLoadAssignment alice;
@@ -259,10 +259,10 @@ TEST(WatchMapTest, AddRemoveAdd) {
   {
     std::set<std::string> update_to({"alice", "dummy"});
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(token1, update_to);
+        watch_map.updateWatchInterest(watch1.get(), update_to);
     EXPECT_EQ(update_to, added_removed.first); // add to subscription
     EXPECT_TRUE(added_removed.second.empty());
-    watch_map.updateWatchInterest(token2, {"dummy"});
+    watch_map.updateWatchInterest(watch2.get(), {"dummy"});
 
     // First watch receives update.
     expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version1");
@@ -272,7 +272,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
   // First watch loses interest.
   {
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(token1, {"dummy"});
+        watch_map.updateWatchInterest(watch1.get(), {"dummy"});
     EXPECT_TRUE(added_removed.first.empty());
     EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.second); // remove from subscription
 
@@ -283,7 +283,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
   {
     std::set<std::string> update_to({"alice", "dummy"});
     std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(token2, update_to);
+        watch_map.updateWatchInterest(watch2.get(), update_to);
     EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.first); // add to subscription
     EXPECT_TRUE(added_removed.second.empty());
 
@@ -298,8 +298,8 @@ TEST(WatchMapTest, AddRemoveAdd) {
 TEST(WatchMapTest, UninterestingUpdate) {
   NamedMockSubscriptionCallbacks callbacks;
   WatchMap watch_map;
-  WatchMap::Token token = watch_map.addWatch(callbacks);
-  watch_map.updateWatchInterest(token, {"alice"});
+  WatchPtr watch = watch_map.addWatch(callbacks);
+  watch_map.updateWatchInterest(watch.get(), {"alice"});
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> alice_update;
   envoy::api::v2::ClusterLoadAssignment alice;
@@ -321,8 +321,8 @@ TEST(WatchMapTest, UninterestingUpdate) {
   doDeltaAndSotwUpdate(watch_map, bob_update, {}, "version3");
 
   // Clean removal of the watch: first update to "interested in nothing", then remove.
-  watch_map.updateWatchInterest(token, {});
-  EXPECT_TRUE(watch_map.removeWatch(token));
+  watch_map.updateWatchInterest(watch.get(), {});
+  watch.reset();
 }
 
 // Tests that a watch that specifies no particular resource interest is treated as interested in
@@ -331,10 +331,10 @@ TEST(WatchMapTest, WatchingEverything) {
   NamedMockSubscriptionCallbacks callbacks1;
   NamedMockSubscriptionCallbacks callbacks2;
   WatchMap watch_map;
-  watch_map.addWatch(callbacks1);
-  WatchMap::Token token2 = watch_map.addWatch(callbacks2);
-  // token1 never specifies any names, and so is treated as interested in everything.
-  watch_map.updateWatchInterest(token2, {"alice"});
+  WatchPtr watch1 = watch_map.addWatch(callbacks1);
+  WatchPtr watch2 = watch_map.addWatch(callbacks2);
+  // watch1 never specifies any names, and so is treated as interested in everything.
+  watch_map.updateWatchInterest(watch2.get(), {"alice"});
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
   envoy::api::v2::ClusterLoadAssignment alice;
@@ -365,12 +365,12 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
   NamedMockSubscriptionCallbacks callbacks2;
   NamedMockSubscriptionCallbacks callbacks3;
   WatchMap watch_map;
-  WatchMap::Token token1 = watch_map.addWatch(callbacks1);
-  WatchMap::Token token2 = watch_map.addWatch(callbacks2);
-  WatchMap::Token token3 = watch_map.addWatch(callbacks3);
-  watch_map.updateWatchInterest(token1, {"updated"});
-  watch_map.updateWatchInterest(token2, {"updated", "removed"});
-  watch_map.updateWatchInterest(token3, {"removed"});
+  WatchPtr watch1 = watch_map.addWatch(callbacks1);
+  WatchPtr watch2 = watch_map.addWatch(callbacks2);
+  WatchPtr watch3 = watch_map.addWatch(callbacks3);
+  watch_map.updateWatchInterest(watch1.get(), {"updated"});
+  watch_map.updateWatchInterest(watch2.get(), {"updated", "removed"});
+  watch_map.updateWatchInterest(watch3.get(), {"removed"});
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
   envoy::api::v2::ClusterLoadAssignment updated;
