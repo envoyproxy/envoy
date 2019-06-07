@@ -1,7 +1,5 @@
 #include "test/common/stats/stat_test_utility.h"
 
-#include <string>
-
 #include "common/memory/stats.h"
 
 namespace Envoy {
