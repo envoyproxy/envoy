@@ -189,12 +189,10 @@ private:
   }
 
   void trySendDiscoveryRequests() {
-    std::cerr << "====================================\ntrySendDiscoveryRequests....." << std::endl;
     while (true) {
       // Do any of our subscriptions even want to send a request?
       absl::optional<std::string> maybe_request_type = whoWantsToSendDiscoveryRequest();
       if (!maybe_request_type.has_value()) {
-        std::cerr << "nobody wants to send.\n====================================" << std::endl;
         break;
       }
       // If so, which one (by type_url)?
@@ -202,7 +200,6 @@ private:
       // If we don't have a subscription object for this request's type_url, drop the request.
       auto sub = subscriptions_.find(next_request_type_url);
       if (sub == subscriptions_.end()) {
-        std::cerr << "NONEXISTENT!!!!!!!!!!! SKIPPING!!!!!!!!!!!!" << std::endl;
         ENVOY_LOG(warn, "Not sending discovery request for non-existent subscription {}.",
                   next_request_type_url);
         // It's safe to assume the front of the ACK queue is of this type, because that's the only
@@ -213,18 +210,15 @@ private:
       }
       // Try again later if paused/rate limited/stream down.
       if (!canSendDiscoveryRequest(next_request_type_url)) {
-        std::cerr << "not available to send\n====================================" << std::endl;
         break;
       }
       // Get our subscription state to generate the appropriate DeltaDiscoveryRequest, and send.
       if (!ack_queue_.empty()) {
         // Because ACKs take precedence over plain requests, if there is anything in the queue, it's
         // safe to assume it's what we want to send here.
-        std::cerr << "sending " << next_request_type_url << " with ACK" << std::endl;
         grpc_stream_.sendMessage(sub->second->sub_state_.getNextRequestWithAck(ack_queue_.front()));
         ack_queue_.pop();
       } else {
-        std::cerr << "sending " << next_request_type_url << " without ACK" << std::endl;
         grpc_stream_.sendMessage(sub->second->sub_state_.getNextRequestAckless());
       }
     }

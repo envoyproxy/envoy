@@ -15,6 +15,16 @@
 namespace Envoy {
 namespace Config {
 
+struct Watch;
+using WatchPtr = std::unique_ptr<Watch>;
+
+struct AddedRemoved {
+  AddedRemoved(std::set<std::string> added, std::set<std::string> removed)
+      : added_(added), removed_(removed) {}
+  std::set<std::string> added_;
+  std::set<std::string> removed_;
+};
+
 // Manages "watches" of xDS resources. Several xDS callers might ask for a subscription to the same
 // resource name "X". The xDS machinery must return to each their very own subscription to X.
 // The xDS machinery's "watch" concept accomplishes that, while avoiding parallel redundant xDS
@@ -38,27 +48,18 @@ class WatchMap : public SubscriptionCallbacks, public Logger::Loggable<Logger::I
 public:
   WatchMap() {}
 
-  // An opaque token given out to users of WatchMap, to identify a given watch.
-  using Token = uint64_t;
-  static constexpr Token InvalidToken = std::numeric_limits<uint64_t>::max();
-
   // Adds 'callbacks' to the WatchMap, with no resource names being watched.
   // (Use updateWatchInterest() to add some names).
-  // Returns a new token identifying the newly added watch.
-  Token addWatch(SubscriptionCallbacks& callbacks);
-
-  // Returns true if this was the very last watch in the map.
-  // Expects that the watch to be removed has already had all of its resource names removed via
-  // updateWatchInterest().
-  bool removeWatch(Token token);
+  // Returns the newly added watch, to be used for updateWatchInterest. Destroy to remove from map.
+  WatchPtr addWatch(SubscriptionCallbacks& callbacks);
 
   // Updates the set of resource names that the given watch should watch.
   // Returns any resource name additions/removals that are unique across all watches. That is:
-  // 1) if 'resources' contains X and no other watch cares about X, X will be in pair.first.
+  // 1) if 'resources' contains X and no other watch cares about X, X will be in added_.
   // 2) if 'resources' does not contain Y, and this watch was the only one that cared about Y,
-  //    Y will be in pair.second.
-  std::pair<std::set<std::string>, std::set<std::string>>
-  updateWatchInterest(Token token, const std::set<std::string>& update_to_these_names);
+  //    Y will be in removed_.
+  AddedRemoved updateWatchInterest(Watch* watch,
+                                   const std::set<std::string>& update_to_these_names);
 
   // SubscriptionCallbacks
   virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -75,45 +76,45 @@ public:
   }
 
 private:
-  struct Watch {
-    Watch(SubscriptionCallbacks& callbacks) : callbacks_(callbacks) {}
-    std::set<std::string> resource_names_; // must be sorted set, for set_difference.
-    SubscriptionCallbacks& callbacks_;
-  };
+  friend struct Watch;
+  // Expects that the watch to be removed has already had all of its resource names removed via
+  // updateWatchInterest().
+  void removeWatch(Watch* watch);
 
   // Given a list of names that are new to an individual watch, returns those names that are in fact
   // new to the entire subscription.
   std::set<std::string> findAdditions(const std::vector<std::string>& newly_added_to_watch,
-                                      Token token);
+                                      Watch* watch);
 
   // Given a list of names that an individual watch no longer cares about, returns those names that
   // in fact the entire subscription no longer cares about.
   std::set<std::string> findRemovals(const std::vector<std::string>& newly_removed_from_watch,
-                                     Token token);
-
-  // Calls watches_[token].callbacks_.onConfigUpdate(), or logs an error if token isn't in watches_.
-  void tryDeliverConfigUpdate(
-      Token token, const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& system_version_info);
+                                     Watch* watch);
 
   // Returns the union of watch_interest_[resource_name] and wildcard_watches_.
-  absl::flat_hash_set<Token> tokensInterestedIn(const std::string& resource_name);
+  absl::flat_hash_set<Watch*> watchesInterestedIn(const std::string& resource_name);
 
-  absl::flat_hash_map<Token, Watch> watches_;
+  absl::flat_hash_set<Watch*> watches_;
 
   // Watches whose interest set is currently empty, which is interpreted as "everything".
-  absl::flat_hash_set<Token> wildcard_watches_;
+  absl::flat_hash_set<Watch*> wildcard_watches_;
 
   // Maps a resource name to the set of watches interested in that resource. Has two purposes:
   // 1) Acts as a reference count; no watches care anymore ==> the resource can be removed.
   // 2) Enables efficient lookup of all interested watches when a resource has been updated.
-  absl::flat_hash_map<std::string, absl::flat_hash_set<Token>> watch_interest_;
-
-  Token next_watch_{0};
+  absl::flat_hash_map<std::string, absl::flat_hash_set<Watch*>> watch_interest_;
 
   WatchMap(const WatchMap&) = delete;
   WatchMap& operator=(const WatchMap&) = delete;
+};
+
+struct Watch {
+  Watch(WatchMap& owning_map, SubscriptionCallbacks& callbacks)
+      : owning_map_(owning_map), callbacks_(callbacks) {}
+  ~Watch() { owning_map_.removeWatch(this); }
+  WatchMap& owning_map_;
+  SubscriptionCallbacks& callbacks_;
+  std::set<std::string> resource_names_; // must be sorted set, for set_difference.
 };
 
 } // namespace Config

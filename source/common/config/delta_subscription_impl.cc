@@ -11,7 +11,16 @@ DeltaSubscriptionImpl::DeltaSubscriptionImpl(std::shared_ptr<GrpcMux> context,
     : context_(context), type_url_(type_url), callbacks_(callbacks), stats_(stats),
       init_fetch_timeout_(init_fetch_timeout) {}
 
-DeltaSubscriptionImpl::~DeltaSubscriptionImpl() { context_->removeWatch(type_url_, watch_token_); }
+DeltaSubscriptionImpl::~DeltaSubscriptionImpl() {
+  // The Watch destruction process assumes all resource interest has already been removed. Doing
+  // that cleanly needs the context's involvement. So, do that now, just before destroying the
+  // watch.
+  context_->updateWatch(type_url_, watch_.get(), {});
+  // A Watch must not outlive its owning WatchMap. Since DeltaSubscriptionImpl holds a shared_ptr to
+  // the context, which owns the WatchMap, the watch must be destroyed first in case this
+  // subscription holds the last shared_ptr.
+  watch_.reset();
+}
 
 void DeltaSubscriptionImpl::pause() { context_->pause(type_url_); }
 
@@ -24,12 +33,12 @@ void DeltaSubscriptionImpl::start(const std::set<std::string>& resources) {
   // (safely) call start regardless.
   context_->start();
 
-  watch_token_ = context_->addWatch(type_url_, resources, *this, init_fetch_timeout_);
+  watch_ = context_->addWatch(type_url_, resources, *this, init_fetch_timeout_);
   stats_.update_attempt_.inc();
 }
 
 void DeltaSubscriptionImpl::updateResources(const std::set<std::string>& update_to_these_names) {
-  context_->updateWatch(type_url_, watch_token_, update_to_these_names);
+  context_->updateWatch(type_url_, watch_.get(), update_to_these_names);
   stats_.update_attempt_.inc();
 }
 
