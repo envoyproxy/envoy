@@ -104,7 +104,7 @@ TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
                            dispatcherImpl().timeSource());
 
 #ifdef SO_RXQ_OVFL
-  // Verify that overflow detectation is enabled.
+  // Verify that overflow detection is enabled.
   int get_overflow = 0;
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   socklen_t int_size = static_cast<socklen_t>(sizeof(get_overflow));
