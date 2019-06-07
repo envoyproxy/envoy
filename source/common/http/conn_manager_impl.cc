@@ -180,10 +180,12 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // explicitly nulls out response_encoder to avoid the downstream being notified of the
   // Envoy-internal stream instance being ended.
   if (stream.response_encoder_ != nullptr &&
-      (!stream.state_.remote_complete_ || !stream.state_.local_complete_)) {
+      (!stream.state_.remote_complete_ || !stream.state_.local_complete_to_codec_)) {
     // Indicate local is complete at this point so that if we reset during a continuation, we don't
     // raise further data or trailers.
+    ENVOY_STREAM_LOG(debug, "doEndStream() resetting stream", stream);
     stream.state_.local_complete_ = true;
+    stream.state_.local_complete_to_codec_ = true;
     stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
     reset_stream = true;
   }
@@ -311,8 +313,8 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
 
 void ConnectionManagerImpl::resetAllStreams() {
   while (!streams_.empty()) {
-    // Mimic a downstream reset in this case.
-    streams_.front()->onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
+    streams_.front()->response_encoder_->getStream().resetStream(
+        StreamResetReason::ConnectionTermination);
   }
 }
 
@@ -1524,6 +1526,8 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
 
 void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
   if (end_stream) {
+    ASSERT(!state_.local_complete_to_codec_);
+    state_.local_complete_to_codec_ = true;
     stream_info_.onLastDownstreamTxByteSent();
     request_response_timespan_->complete();
     connection_manager_.doEndStream(*this);
@@ -1549,6 +1553,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl:
   //       2) The codec TX a codec level reset
   //       3) The codec RX a reset
   //       If we need to differentiate we need to do it inside the codec. Can start with this.
+  ENVOY_STREAM_LOG(debug, "stream reset", *this);
   connection_manager_.stats_.named_.downstream_rq_rx_reset_.inc();
   connection_manager_.doDeferredStreamDestroy(*this);
 }
