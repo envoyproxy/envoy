@@ -127,6 +127,7 @@ envoy_cc_library(
         "//source/common/common:backoff_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:token_bucket_impl_lib",
+        "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",
     ],
 )
@@ -262,6 +263,7 @@ envoy_cc_library(
     deps = [
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
         "@envoy_api//envoy/service/discovery/v2:sds_cc",
+        "@envoy_api//envoy/service/discovery/v2:tds_cc",
         "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )

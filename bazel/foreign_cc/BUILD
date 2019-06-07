@@ -67,6 +67,26 @@ envoy_cmake_external(
 )
 
 envoy_cmake_external(
+    name = "curl",
+    cache_entries = {
+        "BUILD_CURL_EXE": "off",
+        "BUILD_SHARED_LIBS": "off",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "HTTP_ONLY": "on",
+        "BUILD_TESTING": "off",
+        "CMAKE_USE_OPENSSL": "off",
+        "CURL_CA_PATH": "none",
+        "CURL_HIDDEN_SYMBOLS": "off",
+        "CMAKE_USE_LIBSSH2": "off",
+    },
+    lib_source = "@com_github_curl//:all",
+    static_libraries = select({
+        "//bazel:windows_x86_64": ["curl.lib"],
+        "//conditions:default": ["libcurl.a"],
+    }),
+)
+
+envoy_cmake_external(
     name = "event",
     cache_entries = {
         "EVENT__DISABLE_OPENSSL": "on",

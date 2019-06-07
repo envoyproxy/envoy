@@ -10,12 +10,26 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "typed_async_client_lib",
+    srcs = ["typed_async_client.cc"],
+    hdrs = ["typed_async_client.h"],
+    deps = [
+        ":codec_lib",
+        ":common_lib",
+        "//include/envoy/grpc:async_client_interface",
+        "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/http:async_client_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "async_client_lib",
     srcs = ["async_client_impl.cc"],
     hdrs = ["async_client_impl.h"],
     deps = [
         ":codec_lib",
         ":common_lib",
+        ":typed_async_client_lib",
         "//include/envoy/grpc:async_client_interface",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/http:async_client_lib",
@@ -70,6 +84,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
@@ -113,6 +128,8 @@ envoy_cc_library(
     deps = [
         ":common_lib",
         ":google_grpc_creds_lib",
+        ":google_grpc_utils_lib",
+        ":typed_async_client_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/thread:thread_interface",

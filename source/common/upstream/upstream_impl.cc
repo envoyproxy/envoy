@@ -574,7 +574,11 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       cluster_socket_options_(parseClusterSocketOptions(config, bind_config)),
       drain_connections_on_host_removal_(config.drain_connections_on_host_removal()),
       warm_hosts_(!config.health_checks().empty() &&
-                  common_lb_config_.ignore_new_hosts_until_first_hc()) {
+                  common_lb_config_.ignore_new_hosts_until_first_hc()),
+      cluster_type_(config.has_cluster_type()
+                        ? absl::make_optional<envoy::api::v2::Cluster::CustomClusterType>(
+                              config.cluster_type())
+                        : absl::nullopt) {
   switch (config.lb_policy()) {
   case envoy::api::v2::Cluster::ROUND_ROBIN:
     lb_type_ = LoadBalancerType::RoundRobin;

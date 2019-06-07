@@ -312,6 +312,32 @@ Returns the current request's underlying :repo:`connection <include/envoy/networ
 
 Returns a :ref:`connection object <config_http_filters_lua_connection_wrapper>`.
 
+importPublicKey()
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+  
+  pubkey = handle:importPublicKey(keyder, keyderLength)
+
+Returns public key which is used by :ref:`verifySignature <verify_signature>` to verify digital signature. 
+
+.. _verify_signature:
+
+verifySignature()
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  ok, error = verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
+
+Verify signature using provided parameters. *hashFunction* is the variable for hash function which be used 
+for verifying signature. *SHA1*, *SHA224*, *SHA256*, *SHA384* and *SHA512* are supported. 
+*pubkey* is the public key. *signature* is the signature to be verified. *signatureLength* is 
+the length of the signature. *data* is the content which will be hashed. *dataLength* is the length of data.
+
+The function returns a pair. If the first element is *true*, the second element will be empty
+which means signature is verified; otherwise, the second element will store the error message. 
+
 .. _config_http_filters_lua_header_wrapper:
 
 Header object API

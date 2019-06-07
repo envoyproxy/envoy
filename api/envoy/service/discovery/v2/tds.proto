@@ -12,6 +12,11 @@ import "envoy/api/v2/discovery.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
 
+// [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing
+// services: https://github.com/google/protobuf/issues/4221
+message TdsDummy {
+}
+
 // Discovery service for Runtime resources.
 // [#not-implemented-hide:]
 service RuntimeDiscoveryService {
