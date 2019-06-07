@@ -148,20 +148,9 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       event == Network::ConnectionEvent::LocalClose) {
     ENVOY_CONN_LOG(debug, "client disconnected", *client.client_);
 
-    if (event == Network::ConnectionEvent::RemoteClose) {
-      host_->cluster().stats().upstream_cx_destroy_remote_.inc();
-    } else {
-      host_->cluster().stats().upstream_cx_destroy_local_.inc();
-    }
-    host_->cluster().stats().upstream_cx_destroy_.inc();
-
+    Envoy::Upstream::reportUpstreamCxDestroy(host_, event);
     if (client.closed_with_active_rq_) {
-      host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
-      if (event == Network::ConnectionEvent::RemoteClose) {
-        host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
-      } else {
-        host_->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
-      }
+     Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
     }
 
     if (client.connect_timer_) {
