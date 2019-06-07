@@ -19,9 +19,10 @@ class TestDelegate : public quic::QuicAlarm::Delegate {
 public:
   TestDelegate() : fired_(false) {}
 
+  // quic::QuicAlarm::Delegate
   void OnAlarm() override { fired_ = true; }
-  bool fired() const { return fired_; }
 
+  bool fired() const { return fired_; }
   void set_fired(bool fired) { fired_ = fired; }
 
 private:

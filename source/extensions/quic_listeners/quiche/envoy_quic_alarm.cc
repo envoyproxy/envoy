@@ -5,14 +5,13 @@ namespace Quic {
 
 EnvoyQuicAlarm::EnvoyQuicAlarm(Event::Scheduler& scheduler, quic::QuicClock& clock,
                                quic::QuicArenaScopedPtr<quic::QuicAlarm::Delegate> delegate)
-    : QuicAlarm(std::move(delegate)), scheduler_(scheduler), clock_(clock) {
-  timer_ = scheduler_.createTimer([this]() { Fire(); });
-}
+    : QuicAlarm(std::move(delegate)), scheduler_(scheduler),
+      timer_(scheduler_.createTimer([this]() { Fire(); })), clock_(clock) {}
 
 void EnvoyQuicAlarm::CancelImpl() { timer_->disableTimer(); }
 
 void EnvoyQuicAlarm::SetImpl() {
-  // TODO switch to use microseconds after issue #7170 is addressed.
+  // TODO(#7170) switch to use microseconds if it is supported.
   timer_->enableTimer(std::chrono::milliseconds(getDurationBeforeDeadline().ToMilliseconds()));
 }
 
