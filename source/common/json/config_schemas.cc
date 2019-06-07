@@ -353,7 +353,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
           }
       },
       "generate_request_id" : {"type" : "boolean"},
-      "edge_accept_request_id" : {"type" : "boolean"}
+      "preserve_external_request_id" : {"type" : "boolean"}
     },
     "required" : ["codec_type", "stat_prefix", "filters"],
     "additionalProperties" : false
