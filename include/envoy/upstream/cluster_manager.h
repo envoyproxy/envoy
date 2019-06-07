@@ -30,11 +30,6 @@
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
-
-namespace Config {
-class SubscriptionFactory;
-}
-
 namespace Upstream {
 
 /**

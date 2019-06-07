@@ -14,7 +14,6 @@ envoy_cc_library(
     srcs = ["cds_api_impl.cc"],
     hdrs = ["cds_api_impl.h"],
     deps = [
-        "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/local_info:local_info_interface",

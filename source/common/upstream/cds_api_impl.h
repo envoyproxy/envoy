@@ -5,7 +5,6 @@
 #include "envoy/api/api.h"
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/config/subscription.h"
-#include "envoy/config/subscription_factory.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/stats/scope.h"
