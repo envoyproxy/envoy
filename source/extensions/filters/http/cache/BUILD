@@ -27,6 +27,20 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "config_lib",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        ":cache_filter_lib",
+        ":key_cc",
+        "//include/envoy/common:time_interface",
+        "//include/envoy/registry",
+        "//include/envoy/stats:stats_interface",
+        "//source/extensions/filters/http/common:factory_base_lib",
+    ],
+)
+
 envoy_proto_library(
     name = "key",
     srcs = ["key.proto"],
