@@ -1273,7 +1273,7 @@ Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Clu
   }
 }
 
-void reportUpstreamCxDestroy(Upstream::HostDescriptionConstSharedPtr host,
+void reportUpstreamCxDestroy(const Upstream::HostDescriptionConstSharedPtr& host,
                              Network::ConnectionEvent event) {
   host->cluster().stats().upstream_cx_destroy_.inc();
   if (event == Network::ConnectionEvent::RemoteClose) {
@@ -1283,7 +1283,7 @@ void reportUpstreamCxDestroy(Upstream::HostDescriptionConstSharedPtr host,
   }
 }
 
-void reportUpstreamCxDestroyActiveRequest(Upstream::HostDescriptionConstSharedPtr host,
+void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSharedPtr& host,
                                           Network::ConnectionEvent event) {
   host->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
   if (event == Network::ConnectionEvent::RemoteClose) {

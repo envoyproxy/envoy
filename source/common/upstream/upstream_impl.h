@@ -825,13 +825,13 @@ Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Clu
 /**
  * Utility function to report upstream cx destroy metrics
  */
-void reportUpstreamCxDestroy(Upstream::HostDescriptionConstSharedPtr host,
+void reportUpstreamCxDestroy(const Upstream::HostDescriptionConstSharedPtr& host,
                              Network::ConnectionEvent event);
 
 /**
  * Utility function to report upstream cx destroy active request metrics
  */
-void reportUpstreamCxDestroyActiveRequest(Upstream::HostDescriptionConstSharedPtr host,
+void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSharedPtr& host,
                                           Network::ConnectionEvent event);
 
 } // namespace Upstream
