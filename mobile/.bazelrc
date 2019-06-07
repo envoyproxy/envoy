@@ -1,0 +1,19 @@
+startup --host_jvm_args=-Xmx512m
+
+build \
+  --define=google_grpc=disabled \
+  --define=hot_restart=disabled \
+  --define=signal_trace=disabled \
+  --define=tcmalloc=disabled \
+  --ios_minimum_os=10.0 \
+  --ios_simulator_device="iPhone X" \
+  --ios_simulator_version=12.2 \
+  --spawn_strategy=standalone \
+  --verbose_failures \
+  --workspace_status_command=envoy/bazel/get_workspace_status \
+  --xcode_version=10.2.1 \
+  --incompatible_bzl_disallow_load_after_statement=false
+
+build:ios --define=manual_stamp=manual_stamp
+
+build:android --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
