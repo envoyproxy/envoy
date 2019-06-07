@@ -1,4 +1,4 @@
- # Envoy Mobile
+# Envoy Mobile
 
 Mobile client networking libraries based on the [Envoy](https://www.envoyproxy.io/) project.
 
@@ -37,7 +37,7 @@ Envoy proxy project.
 ### Requirements
 
 - Xcode 10.2.1
-- Bazel 0.25.3 (can't use 0.26.0 because of [this issue](https://github.com/bazelbuild/tulsi/issues/86))
+- Bazel 0.26.0
 
 ### iOS
 
