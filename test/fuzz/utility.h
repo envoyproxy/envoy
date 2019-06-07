@@ -62,7 +62,8 @@ inline Http::TestHeaderMapImpl fromHeaders(
     // into the fuzz tests and replace these invalid characters with spaces.
     // When we are injecting headers, we don't allow the key to ever be empty, since calling code is
     // not supposed to do this.
-    const std::string key = header.key().empty() ? "not-empty" : replaceInvalidCharacters(header.key());
+    const std::string key =
+        header.key().empty() ? "not-empty" : replaceInvalidCharacters(header.key());
     if (ignore_headers.find(StringUtil::toLower(key)) != ignore_headers.end()) {
       header_map.addCopy(key, replaceInvalidCharacters(header.value()));
     }
@@ -114,7 +115,6 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info,
           "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"));
   return test_stream_info;
 }
-
 
 } // namespace Fuzz
 } // namespace Envoy
