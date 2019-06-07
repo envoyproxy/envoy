@@ -159,7 +159,7 @@ public:
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);
 
-  // Names a stat name from a string, if we don't already have one for it.
+  // Makes a stat name from a string, if we don't already have one for it.
   // This always takes a lock on mutex_, and if we haven't seen the name
   // before, it also takes a lock on the symbol table.
   //

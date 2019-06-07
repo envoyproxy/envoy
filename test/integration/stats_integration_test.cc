@@ -214,7 +214,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/04/27  6733     50213               Use SymbolTable API for HTTP codes
   // 2019/05/31  6866     50157               libstdc++ upgrade in CI
 
-  EXPECT_EQ(m_per_cluster, 50157);
+  EXPECT_EQ(m_per_cluster, 50213);
 }
 
 } // namespace

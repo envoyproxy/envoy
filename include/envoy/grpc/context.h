@@ -26,7 +26,7 @@ public:
    * hidden in the implementation since it references StatName, which is defined
    * only in the stats implementation.
    *
-   * @parram path the request path.
+   * @param path the request path.
    * @return the request names, expressed as StatName.
    */
   virtual absl::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path) PURE;
@@ -60,7 +60,6 @@ public:
    */
   virtual void chargeStat(const Upstream::ClusterInfo& cluster, const RequestNames& request_names,
                           bool success) PURE;
-  ;
 };
 
 using ContextPtr = std::unique_ptr<Context>;

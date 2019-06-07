@@ -32,6 +32,12 @@ Common::Common(Stats::SymbolTable& symbol_table)
       success_(stat_name_pool_.add("success")), failure_(stat_name_pool_.add("failure")),
       total_(stat_name_pool_.add("total")), zero_(stat_name_pool_.add("0")) {}
 
+// Makes a stat name from a string, if we don't already have one for it.
+// This always takes a lock on mutex_, and if we haven't seen the name
+// before, it also takes a lock on the symbol table.
+//
+// TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/7008 for
+// a lock-free approach to creating dynamic stat-names based on requests.
 Stats::StatName Common::makeDynamicStatName(absl::string_view name) {
   Thread::LockGuard lock(mutex_);
   auto iter = stat_name_map_.find(name);
