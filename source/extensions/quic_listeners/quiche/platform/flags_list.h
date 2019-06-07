@@ -302,6 +302,11 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_eliminate_static_stream_map_3, false
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_simplify_stop_waiting, false,
             "Do not send STOP_WAITING if no_stop_waiting_frame_ is true.")
 
+QUICHE_FLAG(bool, quic_reloadable_flag_send_quic_fallback_server_config_on_leto_error, false,
+            "If true and using Leto for QUIC shared-key calculations, GFE will react to a failure "
+            "to contact Leto by sending a REJ containing a fallback ServerConfig, allowing the "
+            "client to continue the handshake.")
+
 QUICHE_FLAG(bool, quic_restart_flag_quic_allow_loas_multipacket_chlo, false,
             "If true, inspects QUIC CHLOs for kLOAS and early creates sessions "
             "to allow multi-packet CHLOs")
@@ -366,6 +371,10 @@ QUICHE_FLAG(
 
 QUICHE_FLAG(bool, quic_restart_flag_quic_no_framer_object_in_dispatcher, false,
             "If true, make QuicDispatcher no longer have an instance of QuicFramer.")
+
+QUICHE_FLAG(
+    bool, quic_restart_flag_dont_fetch_quic_private_keys_from_leto, false,
+    "If true, GFE will not request private keys when fetching QUIC ServerConfigs from Leto.")
 
 QUICHE_FLAG(bool, quic_allow_chlo_buffering, true,
             "If true, allows packets to be buffered in anticipation of a "

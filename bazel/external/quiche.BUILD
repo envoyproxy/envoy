@@ -287,6 +287,30 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
 )
 
+envoy_cc_library(
+    name = "quic_platform_ip_address",
+    srcs = ["quiche/quic/platform/api/quic_ip_address.cc"],
+    hdrs = ["quiche/quic/platform/api/quic_ip_address.h"],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_export",
+        ":quic_platform_ip_address_family",
+        ":quic_platform_logging",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_platform_logging",
+    hdrs = [
+        "quiche/quic/platform/api/quic_bug_tracker.h",
+        "quiche/quic/platform/api/quic_logging.h",
+    ],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_logging_impl_lib"],
+)
+
 envoy_cc_test_library(
     name = "quic_platform_mock_log",
     hdrs = ["quiche/quic/platform/api/quic_mock_log.h"],
@@ -339,13 +363,11 @@ envoy_cc_test_library(
 envoy_cc_library(
     name = "quic_platform_base",
     srcs = [
-        "quiche/quic/platform/api/quic_ip_address.cc",
         "quiche/quic/platform/api/quic_socket_address.cc",
     ],
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",
         "quiche/quic/platform/api/quic_arraysize.h",
-        "quiche/quic/platform/api/quic_bug_tracker.h",
         "quiche/quic/platform/api/quic_client_stats.h",
         "quiche/quic/platform/api/quic_containers.h",
         "quiche/quic/platform/api/quic_endian.h",
@@ -355,8 +377,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_flags.h",
         "quiche/quic/platform/api/quic_iovec.h",
-        "quiche/quic/platform/api/quic_ip_address.h",
-        "quiche/quic/platform/api/quic_logging.h",
         "quiche/quic/platform/api/quic_map_util.h",
         "quiche/quic/platform/api/quic_mem_slice.h",
         "quiche/quic/platform/api/quic_prefetch.h",
@@ -379,9 +399,10 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_export",
+        ":quic_platform_ip_address",
+        ":quic_platform_logging",
         ":quiche_common_lib",
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
-        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_logging_impl_lib",
     ],
 )
 
