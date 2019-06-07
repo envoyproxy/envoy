@@ -3707,8 +3707,10 @@ TEST_P(SslSocketTest, OverrideRequestedServerNameWithoutSniInUpstreamTlsContext)
 // NotReadySslSocket object to handle downstream connection.
 TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   Stats::IsolatedStoreImpl stats_store;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   NiceMock<Init::MockManager> init_manager;
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
   EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
 
@@ -3739,8 +3741,10 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
 // NotReadySslSocket object to handle upstream connection.
 TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   Stats::IsolatedStoreImpl stats_store;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   NiceMock<Init::MockManager> init_manager;
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
   EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
 
