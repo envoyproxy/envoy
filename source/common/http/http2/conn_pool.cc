@@ -150,7 +150,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
 
     Envoy::Upstream::reportUpstreamCxDestroy(host_, event);
     if (client.closed_with_active_rq_) {
-     Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
+      Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
     }
 
     if (client.connect_timer_) {

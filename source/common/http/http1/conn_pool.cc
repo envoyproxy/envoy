@@ -127,7 +127,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
     // The client died.
     ENVOY_CONN_LOG(debug, "client disconnected, failure reason: {}", *client.codec_client_,
                    client.codec_client_->connectionFailureReason());
-                   
+
     Envoy::Upstream::reportUpstreamCxDestroy(host_, event);
     ActiveClientPtr removed;
     bool check_for_drained = true;
