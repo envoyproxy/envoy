@@ -585,7 +585,7 @@ TEST(SymbolTableTest, Memory) {
     //
     // string_mem_used:        6710912 (libc++), 7759488 (libstdc++).
     // symbol_table_mem_used:  1726056 (3.9x) -- does not seem to depend on STL sizes.
-    EXPECT_EQ(string_mem_used, 6710912);
+    EXPECT_LE(string_mem_used, 7759488);
     EXPECT_LT(symbol_table_mem_used, string_mem_used / 3);
     EXPECT_EQ(symbol_table_mem_used, 1726056);
   }
