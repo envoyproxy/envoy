@@ -140,7 +140,7 @@ public:
   // Prereq: request_headers's Path(), Scheme(), and Host() are nonnull.
   LookupRequest(const Http::HeaderMap& request_headers, SystemTime timestamp);
 
-  // Caches may modify the key accoring to local needs, though care must be
+  // Caches may modify the key according to local needs, though care must be
   // taken to ensure that meaningfully distinct responses have distinct keys.
   const Key& key() const { return key_; }
   Key& key() { return key_; }
@@ -161,7 +161,7 @@ public:
   // validation logic.
   // - LookupResult::headers takes ownership of response_headers.
   // - LookupResult::content_length == content_length.
-  // - LookupResult::response_ranges entries are satisifiable (as documented
+  // - LookupResult::response_ranges entries are satisfiable (as documented
   // there).
   LookupResult makeLookupResult(Http::HeaderMapPtr&& response_headers,
                                 uint64_t content_length) const;

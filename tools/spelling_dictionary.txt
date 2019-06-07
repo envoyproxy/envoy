@@ -284,7 +284,11 @@ WS
 Welford's
 Werror
 XDS
+dechunk
+dechunked
+satisfiable
 sendto
+unsatisfiable
 vip
 xDSes
 XFCC
