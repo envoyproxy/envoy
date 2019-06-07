@@ -1,10 +1,14 @@
 #include "extensions/filters/network/redis_proxy/config.h"
 
+#include "envoy/registry/registry.h"
+#include "envoy/singleton/manager.h"
+
 #include "common/config/filter_json.h"
 
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "extensions/filters/network/redis_proxy/proxy_filter.h"
+#include "extensions/filters/network/redis_proxy/redirection_mgr_impl.h"
 #include "extensions/filters/network/redis_proxy/router_impl.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -13,6 +17,15 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
+
+// This is a slightly unique way of registering for the singleton manager, as the Redis redirection
+// manager is used by the RedisCluster extension (in another file) and connection pools in the
+// filter factory code below. The RedisCluster code uses the global string,
+// global_redis_redirection_manager_singleton_name, in getting its shared pointer to the redirection
+// manager singleton. This ensures that the static registration in this file has already been
+// initialized.
+SINGLETON_MANAGER_REGISTRATION(redis_redirection_manager);
+std::string global_redis_redirection_manager_singleton_name = "redis_redirection_manager_singleton";
 
 namespace {
 inline void addUniqueClusters(
@@ -31,6 +44,13 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   ASSERT(!proto_config.stat_prefix().empty());
   ASSERT(proto_config.has_settings());
+
+  RedirectionManagerSharedPtr redirection_manager =
+      context.singletonManager().getTyped<RedirectionManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(redis_redirection_manager), [&context] {
+            return std::make_shared<RedirectionManagerImpl>(
+                context.dispatcher(), context.clusterManager(), context.timeSource());
+          });
 
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
       proto_config, context.scope(), context.drainDecision(), context.runtime(), context.api()));
@@ -65,7 +85,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
                                    cluster, context.clusterManager(),
                                    Common::Redis::Client::ClientFactoryImpl::instance_,
                                    context.threadLocal(), proto_config.settings(), context.api(),
-                                   std::move(stats_scope)));
+                                   std::move(stats_scope), redirection_manager));
   }
 
   auto router =

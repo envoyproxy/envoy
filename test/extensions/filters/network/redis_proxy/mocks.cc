@@ -19,6 +19,9 @@ MockRoute::MockRoute(ConnPool::InstanceSharedPtr conn_pool) : conn_pool_(std::mo
 }
 MockRoute::~MockRoute() {}
 
+MockRedirectionManager::MockRedirectionManager() {}
+MockRedirectionManager::~MockRedirectionManager() {}
+
 namespace ConnPool {
 
 MockInstance::MockInstance() {}

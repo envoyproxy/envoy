@@ -24,6 +24,11 @@ import "gogoproto/gogo.proto";
 // command <https://redis.io/commands/cluster-slots>`_. This result is then stored locally, and
 // updated at user-configured intervals.
 //
+// Additionally, if
+// :ref:`enable_redirection<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.enable_redirection>`
+// is true, then moved and ask redirection errors from upstream servers will trigger a topology
+// refresh when they exceed a user-configured error rate threshold.
+//
 // Example:
 //
 // .. code-block:: yaml
@@ -42,6 +47,8 @@ import "gogoproto/gogo.proto";
 //       value:
 //         cluster_refresh_rate: 30s
 //         cluster_refresh_timeout: 0.5s
+//         redirect_refresh_interval: 10s
+//         redirect_per_minute_refresh_threshold: 10
 
 message RedisClusterConfig {
   // Interval between successive topology refresh requests. If not set, this defaults to 5s.
@@ -51,4 +58,17 @@ message RedisClusterConfig {
   // Timeout for topology refresh request. If not set, this defaults to 3s.
   google.protobuf.Duration cluster_refresh_timeout = 2
       [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+
+  // The minimum interval that must pass after triggering a topology refresh request before a new
+  // request can possibly be triggered again, no matter how many redirection errors are received
+  // from upstream servers during this interval. If not set, this defaults to 5s.
+  google.protobuf.Duration redirect_refresh_interval = 3 [(gogoproto.stdduration) = true];
+
+  // The number of redirection errors received in the last minute that must be reached before
+  // triggering a topology refresh request. If not set, this defaults to 0. In this case every
+  // redirection error will trigger a topology refresh, limited only by when the last error was
+  // received and the
+  // :ref:`redirect_refresh_interval<envoy_api_field_config.cluster.redis.RedisClusterConfig.redirect_refresh_interval>`
+  // setting.
+  uint32 redirect_per_minute_refresh_threshold = 4;
 }

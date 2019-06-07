@@ -24,10 +24,13 @@ InstanceImpl::InstanceImpl(
     const std::string& cluster_name, Upstream::ClusterManager& cm,
     Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
-    Api::Api& api, Stats::ScopePtr&& stats_scope)
-    : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config),
-      api_(api), stats_scope_(std::move(stats_scope)), redis_cluster_stats_{REDIS_CLUSTER_STATS(
-                                                           POOL_COUNTER(*stats_scope_))} {
+    Api::Api& api, Stats::ScopePtr&& stats_scope,
+    RedisProxy::RedirectionManagerSharedPtr redirection_manager)
+    : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
+      tls_(tls.allocateSlot()), config_(config), api_(api),
+      stats_scope_(std::move(stats_scope)), redis_cluster_stats_{REDIS_CLUSTER_STATS(
+                                                POOL_COUNTER(*stats_scope_))},
+      redirection_manager_(redirection_manager) {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);

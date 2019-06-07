@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
@@ -14,6 +15,8 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
+
+extern std::string global_redis_redirection_manager_singleton_name;
 
 class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
 public:

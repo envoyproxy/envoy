@@ -42,6 +42,13 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "redirection_mgr_interface",
+    hdrs = ["redirection_mgr.h"],
+    deps = [
+    ],
+)
+
+envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
     deps = [
@@ -75,6 +82,7 @@ envoy_cc_library(
     deps = [
         ":config_interface",
         ":conn_pool_interface",
+        ":redirection_mgr_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -116,6 +124,7 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         "//include/envoy/registry",
+        "//include/envoy/singleton:manager_interface",
         "//source/common/config:filter_json_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
@@ -123,7 +132,20 @@ envoy_cc_library(
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "//source/extensions/filters/network/redis_proxy:proxy_filter_lib",
+        "//source/extensions/filters/network/redis_proxy:redirection_mgr_lib",
         "//source/extensions/filters/network/redis_proxy:router_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "redirection_mgr_lib",
+    srcs = ["redirection_mgr_impl.cc"],
+    hdrs = ["redirection_mgr_impl.h"],
+    deps = [
+        ":redirection_mgr_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/singleton:instance_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
     ],
 )
 

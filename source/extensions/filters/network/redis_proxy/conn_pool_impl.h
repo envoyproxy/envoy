@@ -27,6 +27,7 @@
 #include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/common/redis/utility.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
+#include "extensions/filters/network/redis_proxy/redirection_mgr.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -51,7 +52,8 @@ public:
       const std::string& cluster_name, Upstream::ClusterManager& cm,
       Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
       const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
-      Api::Api& api, Stats::ScopePtr&& stats_scope);
+      Api::Api& api, Stats::ScopePtr&& stats_scope,
+      RedisProxy::RedirectionManagerSharedPtr redirection_manager);
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
   makeRequest(const std::string& key, const Common::Redis::RespValue& request,
@@ -59,6 +61,7 @@ public:
   Common::Redis::Client::PoolRequest*
   makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                     Common::Redis::Client::PoolCallbacks& callbacks) override;
+  bool onRedirection() override { return redirection_manager_->onRedirection(cluster_name_); }
 
   // Allow the unit test to have access to private members.
   friend class RedisConnPoolImplTest;
@@ -125,6 +128,7 @@ private:
     bool is_redis_cluster_;
   };
 
+  const std::string cluster_name_;
   Upstream::ClusterManager& cm_;
   Common::Redis::Client::ClientFactory& client_factory_;
   ThreadLocal::SlotPtr tls_;
@@ -132,6 +136,7 @@ private:
   Api::Api& api_;
   Stats::ScopePtr stats_scope_;
   RedisClusterStats redis_cluster_stats_;
+  RedisProxy::RedirectionManagerSharedPtr redirection_manager_;
 };
 
 } // namespace ConnPool

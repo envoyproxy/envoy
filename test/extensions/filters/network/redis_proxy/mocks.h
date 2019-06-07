@@ -8,6 +8,7 @@
 #include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
+#include "extensions/filters/network/redis_proxy/redirection_mgr.h"
 #include "extensions/filters/network/redis_proxy/router.h"
 
 #include "test/test_common/printers.h"
@@ -40,6 +41,19 @@ private:
   const MirrorPolicies policies_;
 };
 
+class MockRedirectionManager : public RedirectionManager {
+public:
+  MockRedirectionManager();
+  ~MockRedirectionManager();
+
+  MOCK_METHOD1(onRedirection, bool(const std::string& cluster_name));
+  MOCK_METHOD4(registerCluster,
+               HandlePtr(const std::string& cluster_name,
+                         const std::chrono::milliseconds min_time_between_triggering,
+                         const uint32_t redirects_per_minute_threshold, const RedirectCB cb));
+  MOCK_METHOD1(unregisterCluster, void(const std::string& cluster_name));
+};
+
 namespace ConnPool {
 
 class MockInstance : public Instance {
@@ -55,6 +69,7 @@ public:
                Common::Redis::Client::PoolRequest*(
                    const std::string& host_address, const Common::Redis::RespValue& request,
                    Common::Redis::Client::PoolCallbacks& callbacks));
+  MOCK_METHOD0(onRedirection, bool());
 };
 
 } // namespace ConnPool
