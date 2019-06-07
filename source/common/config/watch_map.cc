@@ -15,8 +15,8 @@ void WatchMap::removeWatch(Watch* watch) {
   watches_.erase(watch);
 }
 
-std::pair<std::set<std::string>, std::set<std::string>>
-WatchMap::updateWatchInterest(Watch* watch, const std::set<std::string>& update_to_these_names) {
+AddedRemoved WatchMap::updateWatchInterest(Watch* watch,
+                                           const std::set<std::string>& update_to_these_names) {
   if (update_to_these_names.empty()) {
     wildcard_watches_.insert(watch);
   } else {
@@ -35,8 +35,8 @@ WatchMap::updateWatchInterest(Watch* watch, const std::set<std::string>& update_
 
   watch->resource_names_ = update_to_these_names;
 
-  return std::make_pair(findAdditions(newly_added_to_watch, watch),
-                        findRemovals(newly_removed_from_watch, watch));
+  return AddedRemoved(findAdditions(newly_added_to_watch, watch),
+                      findRemovals(newly_removed_from_watch, watch));
 }
 
 absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {

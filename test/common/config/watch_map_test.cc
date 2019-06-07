@@ -118,10 +118,9 @@ TEST(WatchMapTest, Basic) {
   {
     // The watch is interested in Alice and Bob...
     std::set<std::string> update_to({"alice", "bob"});
-    std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(watch.get(), update_to);
-    EXPECT_EQ(update_to, added_removed.first);
-    EXPECT_TRUE(added_removed.second.empty());
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch.get(), update_to);
+    EXPECT_EQ(update_to, added_removed.added_);
+    EXPECT_TRUE(added_removed.removed_.empty());
 
     // ...the update is going to contain Bob and Carol...
     Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
@@ -142,10 +141,9 @@ TEST(WatchMapTest, Basic) {
   {
     // The watch is now interested in Bob, Carol, Dave, Eve...
     std::set<std::string> update_to({"bob", "carol", "dave", "eve"});
-    std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(watch.get(), update_to);
-    EXPECT_EQ(std::set<std::string>({"carol", "dave", "eve"}), added_removed.first);
-    EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.second);
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch.get(), update_to);
+    EXPECT_EQ(std::set<std::string>({"carol", "dave", "eve"}), added_removed.added_);
+    EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.removed_);
 
     // ...the update is going to contain Alice, Carol, Dave...
     Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
@@ -192,10 +190,9 @@ TEST(WatchMapTest, Overlap) {
   // First watch becomes interested.
   {
     std::set<std::string> update_to({"alice", "dummy"});
-    std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(watch1.get(), update_to);
-    EXPECT_EQ(update_to, added_removed.first); // add to subscription
-    EXPECT_TRUE(added_removed.second.empty());
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch1.get(), update_to);
+    EXPECT_EQ(update_to, added_removed.added_); // add to subscription
+    EXPECT_TRUE(added_removed.removed_.empty());
     watch_map.updateWatchInterest(watch2.get(), {"dummy"});
 
     // First watch receives update.
@@ -206,10 +203,9 @@ TEST(WatchMapTest, Overlap) {
   // Second watch becomes interested.
   {
     std::set<std::string> update_to({"alice", "dummy"});
-    std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(watch2.get(), update_to);
-    EXPECT_TRUE(added_removed.first.empty()); // nothing happens
-    EXPECT_TRUE(added_removed.second.empty());
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch2.get(), update_to);
+    EXPECT_TRUE(added_removed.added_.empty()); // nothing happens
+    EXPECT_TRUE(added_removed.removed_.empty());
 
     // Both watches receive update.
     expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version2");
@@ -218,10 +214,9 @@ TEST(WatchMapTest, Overlap) {
   }
   // First watch loses interest.
   {
-    std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(watch1.get(), {"dummy"});
-    EXPECT_TRUE(added_removed.first.empty()); // nothing happens
-    EXPECT_TRUE(added_removed.second.empty());
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch1.get(), {"dummy"});
+    EXPECT_TRUE(added_removed.added_.empty()); // nothing happens
+    EXPECT_TRUE(added_removed.removed_.empty());
 
     // *Only* second watch receives update.
     expectNoDeltaUpdate(callbacks1, "version3");
@@ -230,10 +225,9 @@ TEST(WatchMapTest, Overlap) {
   }
   // Second watch loses interest.
   {
-    std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(watch2.get(), {"dummy"});
-    EXPECT_TRUE(added_removed.first.empty());
-    EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.second); // remove from subscription
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch2.get(), {"dummy"});
+    EXPECT_TRUE(added_removed.added_.empty());
+    EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.removed_); // remove from subscription
   }
 }
 
@@ -258,10 +252,9 @@ TEST(WatchMapTest, AddRemoveAdd) {
   // First watch becomes interested.
   {
     std::set<std::string> update_to({"alice", "dummy"});
-    std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(watch1.get(), update_to);
-    EXPECT_EQ(update_to, added_removed.first); // add to subscription
-    EXPECT_TRUE(added_removed.second.empty());
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch1.get(), update_to);
+    EXPECT_EQ(update_to, added_removed.added_); // add to subscription
+    EXPECT_TRUE(added_removed.removed_.empty());
     watch_map.updateWatchInterest(watch2.get(), {"dummy"});
 
     // First watch receives update.
@@ -271,10 +264,9 @@ TEST(WatchMapTest, AddRemoveAdd) {
   }
   // First watch loses interest.
   {
-    std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(watch1.get(), {"dummy"});
-    EXPECT_TRUE(added_removed.first.empty());
-    EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.second); // remove from subscription
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch1.get(), {"dummy"});
+    EXPECT_TRUE(added_removed.added_.empty());
+    EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.removed_); // remove from subscription
 
     // (The xDS client should have responded to updateWatchInterest()'s return value by removing
     // Alice from the subscription, so onConfigUpdate() calls should be impossible right now.)
@@ -282,10 +274,9 @@ TEST(WatchMapTest, AddRemoveAdd) {
   // Second watch becomes interested.
   {
     std::set<std::string> update_to({"alice", "dummy"});
-    std::pair<std::set<std::string>, std::set<std::string>> added_removed =
-        watch_map.updateWatchInterest(watch2.get(), update_to);
-    EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.first); // add to subscription
-    EXPECT_TRUE(added_removed.second.empty());
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch2.get(), update_to);
+    EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.added_); // add to subscription
+    EXPECT_TRUE(added_removed.removed_.empty());
 
     // *Only* second watch receives update.
     expectNoDeltaUpdate(callbacks1, "version2");

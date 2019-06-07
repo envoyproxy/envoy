@@ -18,6 +18,13 @@ namespace Config {
 struct Watch;
 using WatchPtr = std::unique_ptr<Watch>;
 
+struct AddedRemoved {
+  AddedRemoved(std::set<std::string> added, std::set<std::string> removed)
+      : added_(added), removed_(removed) {}
+  std::set<std::string> added_;
+  std::set<std::string> removed_;
+};
+
 // Manages "watches" of xDS resources. Several xDS callers might ask for a subscription to the same
 // resource name "X". The xDS machinery must return to each their very own subscription to X.
 // The xDS machinery's "watch" concept accomplishes that, while avoiding parallel redundant xDS
@@ -48,11 +55,11 @@ public:
 
   // Updates the set of resource names that the given watch should watch.
   // Returns any resource name additions/removals that are unique across all watches. That is:
-  // 1) if 'resources' contains X and no other watch cares about X, X will be in pair.first.
+  // 1) if 'resources' contains X and no other watch cares about X, X will be in added_.
   // 2) if 'resources' does not contain Y, and this watch was the only one that cared about Y,
-  //    Y will be in pair.second.
-  std::pair<std::set<std::string>, std::set<std::string>>
-  updateWatchInterest(Watch* watch, const std::set<std::string>& update_to_these_names);
+  //    Y will be in removed_.
+  AddedRemoved updateWatchInterest(Watch* watch,
+                                   const std::set<std::string>& update_to_these_names);
 
   // SubscriptionCallbacks
   virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
