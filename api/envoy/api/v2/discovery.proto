@@ -120,11 +120,10 @@ message DiscoveryResponse {
 // debugging purposes only.
 //
 // DeltaDiscoveryRequest plays two independent roles. Any DeltaDiscoveryRequest
-// can be either or both of:
-// [1] informing the server of what resources the client has gained/lost interest in,
-// (using resource_names_subscribe and resource_names_unsubscribe), or
-// [2] (N)ACKing an earlier resource update from the server
-// (using response_nonce, with presence of error_detail making it a NACK).
+// can be either or both of: [1] informing the server of what resources the
+// client has gained/lost interest in (using resource_names_subscribe and
+// resource_names_unsubscribe), or [2] (N)ACKing an earlier resource update from
+// the server (using response_nonce, with presence of error_detail making it a NACK).
 // Additionally, the first message (for a given type_url) of a reconnected gRPC stream
 // has a third role: informing the server of the resources (and their versions)
 // that the client already possesses, using the initial_resource_versions field.
@@ -171,13 +170,10 @@ message DeltaDiscoveryRequest {
 
   // Informs the server of the versions of the resources the xDS client knows of, to enable the
   // client to continue the same logical xDS session even in the face of gRPC stream reconnection.
-  // It will not be populated:
-
-  // [1] in the very first stream of a session, since the client will not yet have any resources.
-  // [2] in any message after the first in a stream (for a given type_url), since the server will
-  //     already be correctly tracking the client's state.
-  //     (In ADS, the first message *of each type_url* of a reconnected stream populates this map.)
-
+  // It will not be populated: [1] in the very first stream of a session, since the client will
+  // not yet have any resources,  [2] in any message after the first in a stream (for a given
+  // type_url), since the server will already be correctly tracking the client's state.
+  // (In ADS, the first message *of each type_url* of a reconnected stream populates this map.)
   // The map's keys are names of xDS resources known to the xDS client.
   // The map's values are opaque resource versions.
   map<string, string> initial_resource_versions = 5;
