@@ -168,6 +168,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
       }));
   EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, localInfo()).WillOnce(ReturnRef(local_info));
 
   auto secret_provider =
       secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
