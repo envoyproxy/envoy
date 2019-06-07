@@ -1,4 +1,6 @@
 #import <UIKit/UIKit.h>
 
-@interface ViewController: UITableViewController
+// NOLINT(namespace-envoy)
+
+@interface ViewController : UITableViewController
 @end
