@@ -8,6 +8,7 @@
 #include <string>
 
 #include "common/buffer/buffer_impl.h"
+#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -292,6 +293,11 @@ void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
   const uint32_t nsize = htonl(buffer.length());
   std::memcpy(&header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
   buffer.prepend(absl::string_view(&header[0], 5));
+}
+
+bool Common::parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message& proto) {
+  Buffer::ZeroCopyInputStreamImpl stream(std::move(buffer));
+  return proto.ParseFromZeroCopyStream(&stream);
 }
 
 } // namespace Grpc

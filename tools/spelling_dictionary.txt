@@ -828,3 +828,5 @@ zag
 zig
 zlib
 zxid
+xmodem
+citt

@@ -127,6 +127,7 @@ envoy_cc_library(
         "//source/common/common:backoff_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:token_bucket_impl_lib",
+        "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",
     ],
 )
