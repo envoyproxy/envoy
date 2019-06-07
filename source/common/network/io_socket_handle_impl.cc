@@ -2,12 +2,16 @@
 
 #include <errno.h>
 
+#include <cstdint>
+
 #include "envoy/buffer/buffer.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/stack_array.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
+
+#include "absl/types/optional.h"
 
 using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
@@ -133,6 +137,48 @@ IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& re
            : Api::IoErrorPtr(new IoSocketError(result.errno_), IoSocketError::deleteIoError)));
 }
 
+Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cmsg,
+                                                             uint32_t self_port, bool v6only) {
+  if (cmsg->cmsg_type == IPV6_PKTINFO) {
+    struct in6_pktinfo* info = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
+    sockaddr_in6 ipv6_addr;
+    memset(&ipv6_addr, 0, sizeof(sockaddr_in6));
+    ipv6_addr.sin6_family = AF_INET6;
+    ipv6_addr.sin6_addr = info->ipi6_addr;
+    ipv6_addr.sin6_port = htons(self_port);
+    return Address::addressFromSockAddr(reinterpret_cast<sockaddr_storage&>(ipv6_addr),
+                                        sizeof(sockaddr_in6), v6only);
+  }
+#if defined(IP_PKTINFO)
+  if (cmsg->cmsg_type == IP_PKTINFO) {
+    struct in_pktinfo* info = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
+#else
+  if (cmsgptr->cmsg_type == IP_RECVDSTADDR) {
+    struct in_addr* addr = reinterpret_cast<in_addr*>(CMSG_DATA(cmsg));
+#endif
+    sockaddr_in ipv4_addr;
+    memset(&ipv4_addr, 0, sizeof(sockaddr_in));
+    ipv4_addr.sin_family = AF_INET;
+    ipv4_addr.sin_addr =
+#if defined(IP_PKTINFO)
+        info->ipi_addr;
+#else
+        ipv4_addr.sin_addr = addr;
+#endif
+    ipv4_addr.sin_port = htons(self_port);
+    return Address::addressFromSockAddr(reinterpret_cast<sockaddr_storage&>(ipv4_addr),
+                                        sizeof(sockaddr_in), v6only);
+  }
+  return nullptr;
+}
+
+absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(struct cmsghdr* cmsg) {
+  if (cmsg->cmsg_type == SO_RXQ_OVFL) {
+    return *reinterpret_cast<uint32_t*>(CMSG_DATA(cmsg));
+  }
+  return absl::nullopt;
+}
+
 Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
                                                     bool v6only, uint32_t* dropped_packets,
@@ -142,7 +188,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   // The minimum cmsg buffer size to filled in destination address and packets dropped when
   // receiving a packet. It is possible for a received packet to contain both IPv4 and IPv6
   // addresses.
-  const int cmsg_space =
+  constexpr int cmsg_space =
       CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(in_pktinfo)) + CMSG_SPACE(sizeof(in6_pktinfo));
   char cbuf[cmsg_space];
 
@@ -190,38 +236,17 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   if (hdr.msg_controllen > 0) {
     struct cmsghdr* cmsg;
     for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-      if (cmsg->cmsg_type == IPV6_PKTINFO) {
-        struct in6_pktinfo* info = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
-        sockaddr_in6 ipv6_addr;
-        memset(&ipv6_addr, 0, sizeof(sockaddr_in6));
-        ipv6_addr.sin6_family = AF_INET6;
-        ipv6_addr.sin6_addr = info->ipi6_addr;
-        ipv6_addr.sin6_port = htons(self_port);
-        local_address = Address::addressFromSockAddr(reinterpret_cast<sockaddr_storage&>(ipv6_addr),
-                                                     sizeof(sockaddr_in6), v6only);
+      Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(cmsg, self_port, v6only);
+      if (addr != nullptr) {
+        // This is a IP packet info message.
+        local_address = std::move(addr);
+        continue;
       }
-#if defined(IP_PKTINFO)
-      if (cmsg->cmsg_type == IP_PKTINFO) {
-        struct in_pktinfo* info = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
-#else
-      if (cmsgptr->cmsg_type == IP_RECVDSTADDR) {
-        struct in_addr* addr = reinterpret_cast<in_addr*>(CMSG_DATA(cmsg));
-#endif
-        sockaddr_in ipv4_addr;
-        memset(&ipv4_addr, 0, sizeof(sockaddr_in));
-        ipv4_addr.sin_family = AF_INET;
-        ipv4_addr.sin_addr =
-#if defined(IP_PKTINFO)
-            info->ipi_addr;
-#else
-            ipv4_addr.sin_addr = addr;
-#endif
-        ipv4_addr.sin_port = htons(self_port);
-        local_address = Address::addressFromSockAddr(reinterpret_cast<sockaddr_storage&>(ipv4_addr),
-                                                     sizeof(sockaddr_in), v6only);
-      }
-      if (dropped_packets != nullptr && cmsg->cmsg_type == SO_RXQ_OVFL) {
-        *dropped_packets = *(reinterpret_cast<uint32_t*> CMSG_DATA(cmsg));
+      if (dropped_packets != nullptr) {
+        absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(cmsg);
+        if (maybe_dropped) {
+          *dropped_packets = *maybe_dropped;
+        }
       }
     }
   }

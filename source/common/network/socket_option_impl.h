@@ -100,10 +100,11 @@ namespace Network {
 #define ENVOY_RECV_IPV6_PKT_INFO Network::SocketOptionName()
 #endif
 
-#ifndef SO_RXQ_OVFL
-#define SO_RXQ_OVFL 40
-#endif
+#ifdef SO_RXQ_OVFL
 #define ENVOY_RXQ_OVFL Network::SocketOptionName(std::make_pair(SOL_SOCKET, SO_RXQ_OVFL))
+#else
+#define ENVOY_RXQ_OVFL Network::SocketOptionName()
+#endif
 
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:

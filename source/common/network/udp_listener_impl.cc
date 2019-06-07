@@ -69,13 +69,13 @@ void UdpListenerImpl::onSocketEvent(short flags) {
 void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
   // Max UDP payload.
-  constexpr uint64_t const read_length = 1500;
+  constexpr uint64_t const read_buffer_length = 1500;
   do {
     Address::InstanceConstSharedPtr peer_address;
     Address::InstanceConstSharedPtr local_address;
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     Buffer::RawSlice slice;
-    const uint64_t num_slices = buffer->reserve(read_length, &slice, 1);
+    const uint64_t num_slices = buffer->reserve(read_buffer_length, &slice, 1);
     ASSERT(num_slices == 1);
 
     uint32_t old_packets_dropped = packets_dropped_;
