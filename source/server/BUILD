@@ -253,6 +253,7 @@ envoy_cc_library(
     deps = [
         ":configuration_lib",
         ":drain_manager_lib",
+        ":filter_chain_manager_lib",
         ":lds_api_lib",
         ":transport_socket_config_lib",
         "//include/envoy/server:filter_config_interface",
@@ -260,11 +261,8 @@ envoy_cc_library(
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/server:worker_interface",
         "//source/common/api:os_sys_calls_lib",
-        "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
         "//source/common/init:manager_lib",
-        "//source/common/network:cidr_range_lib",
-        "//source/common/network:lc_trie_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:socket_option_factory_lib",
@@ -277,6 +275,18 @@ envoy_cc_library(
         "//source/extensions/transport_sockets/tls:context_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2:lds_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_chain_manager_lib",
+    srcs = ["filter_chain_manager_impl.cc"],
+    hdrs = ["filter_chain_manager_impl.h"],
+    deps = [
+        "//include/envoy/server:listener_manager_interface",
+        "//source/common/common:empty_string",
+        "//source/common/network:cidr_range_lib",
+        "//source/common/network:lc_trie_lib",
     ],
 )
 
