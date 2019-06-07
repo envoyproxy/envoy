@@ -36,14 +36,13 @@ enum CacheEntryStatus {
 // Byte range from an HTTP request.
 class RawByteRange {
 public:
- // - If first==UINT64_MAX, construct a RawByteRange requesting the final last
- // body bytes.
- // - Otherwise, construct a RawByteRange requesting the [first,last] body
- // bytes. Prereq: first == UINT64_MAX || first <= last Invariant: isSuffix() ||
- // firstBytePos() <= lastBytePos
- RawByteRange(uint64_t first, uint64_t last)
-     : first_byte_pos_(first), last_byte_pos_(last) {
-   RELEASE_ASSERT(isSuffix() || first <= last, "Illegal byte range.");
+  // - If first==UINT64_MAX, construct a RawByteRange requesting the final last
+  // body bytes.
+  // - Otherwise, construct a RawByteRange requesting the [first,last] body
+  // bytes. Prereq: first == UINT64_MAX || first <= last Invariant: isSuffix() ||
+  // firstBytePos() <= lastBytePos
+  RawByteRange(uint64_t first, uint64_t last) : first_byte_pos_(first), last_byte_pos_(last) {
+    RELEASE_ASSERT(isSuffix() || first <= last, "Illegal byte range.");
   }
   bool isSuffix() const { return first_byte_pos_ == UINT64_MAX; }
   uint64_t firstBytePos() const {
@@ -67,12 +66,11 @@ private:
 // Byte range from an HTTP request, adjusted for a known response body size.
 class AdjustedByteRange {
 public:
- // Construct an AdjustedByteRange representing the [first,last] bytes in the
- // response body. Prereq: first <= last Invariant: firstBytePos() <=
- // lastBytePos()
- AdjustedByteRange(uint64_t first, uint64_t last)
-     : first_byte_pos_(first), last_byte_pos_(last) {
-   ASSERT(first <= last);
+  // Construct an AdjustedByteRange representing the [first,last] bytes in the
+  // response body. Prereq: first <= last Invariant: firstBytePos() <=
+  // lastBytePos()
+  AdjustedByteRange(uint64_t first, uint64_t last) : first_byte_pos_(first), last_byte_pos_(last) {
+    ASSERT(first <= last);
   }
   uint64_t firstBytePos() const { return first_byte_pos_; }
   uint64_t lastBytePos() const { return last_byte_pos_; }
@@ -244,7 +242,7 @@ public:
   // getBody requests bytes 20-23 .......... callback with bytes 20-23
   virtual void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) = 0;
 
-  // Get the trailers from the cache.  Only called if LookupResult::has_trailers
+  // Get the trailers from the cache. Only called if LookupResult::has_trailers
   // == true.
   virtual void getTrailers(LookupTrailersCallback&& cb) = 0;
 };
@@ -254,31 +252,30 @@ using LookupContextPtr = std::unique_ptr<LookupContext>;
 // CacheFilter.
 class HttpCache {
 public:
- // Returns a LookupContextPtr to manage the state of a cache lookup. On a cache
- // miss, the returned LookupContext will be given to the insert call (if any).
- virtual LookupContextPtr makeLookupContext(LookupRequest&& request) = 0;
+  // Returns a LookupContextPtr to manage the state of a cache lookup. On a cache
+  // miss, the returned LookupContext will be given to the insert call (if any).
+  virtual LookupContextPtr makeLookupContext(LookupRequest&& request) = 0;
 
- // Returns an InsertContextPtr to manage the state of a cache insertion.
- // Responses with a chunked transfer-encoding must be dechunked before
- // insertion.
- virtual InsertContextPtr makeInsertContext(
-     LookupContextPtr&& lookup_context) = 0;
+  // Returns an InsertContextPtr to manage the state of a cache insertion.
+  // Responses with a chunked transfer-encoding must be dechunked before
+  // insertion.
+  virtual InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) = 0;
 
- // Precondition: lookup_context represents a prior cache lookup that required
- // validation.
- //
- // Update the headers of that cache entry to match response_headers. The cache
- // entry's body and trailers (if any) will not be modified.
- //
- // This is called when an expired cache entry is successfully validated, to
- // update the cache entry.
- virtual void updateHeaders(LookupContextPtr&& lookup_context,
-                            Http::HeaderMapPtr&& response_headers) = 0;
+  // Precondition: lookup_context represents a prior cache lookup that required
+  // validation.
+  //
+  // Update the headers of that cache entry to match response_headers. The cache
+  // entry's body and trailers (if any) will not be modified.
+  //
+  // This is called when an expired cache entry is successfully validated, to
+  // update the cache entry.
+  virtual void updateHeaders(LookupContextPtr&& lookup_context,
+                             Http::HeaderMapPtr&& response_headers) = 0;
 
- // Returns statically known information about a cache.
- virtual CacheInfo cacheInfo() const = 0;
+  // Returns statically known information about a cache.
+  virtual CacheInfo cacheInfo() const = 0;
 
- virtual ~HttpCache() = default;
+  virtual ~HttpCache() = default;
 };
 
 // Factory interface for cache implementations to implement and register.

@@ -21,8 +21,8 @@ using std::make_shared;
 using std::string;
 
 Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::cache::v2alpha::Cache& config,
-    const string& stats_prefix, FactoryContext& context) {
+    const envoy::config::filter::http::cache::v2alpha::Cache& config, const string& stats_prefix,
+    FactoryContext& context) {
   return [config, stats_prefix, &context](FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
         make_shared<CacheFilter>(config, stats_prefix, context.scope(), context.timeSource()));

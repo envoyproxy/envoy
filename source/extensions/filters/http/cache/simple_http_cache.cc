@@ -80,7 +80,7 @@ public:
   }
 
   void insertTrailers(const HeaderMap&) override {
-    ASSERT(false);  // TODO(toddmgreer) support trailers
+    ASSERT(false); // TODO(toddmgreer) support trailers
   }
 
 private:

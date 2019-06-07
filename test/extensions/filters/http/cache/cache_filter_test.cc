@@ -33,7 +33,7 @@ protected:
     MessageUtil::loadFromJson(json, cache_options);
     config_ =
         std::make_shared<CacheFilterConfig>(cache_options, "test.", stats_, runtime_, time_system_);
-    filter_ = absl::make_unique<CacheFilter>(config_);
+    filter_ = std::make_unique<CacheFilter>(config_);
   }
 
   void feedBuffer(uint64_t size) {
