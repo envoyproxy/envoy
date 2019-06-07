@@ -16,10 +16,6 @@
 using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
 
-#ifndef SO_RXQ_OVFL
-#define SO_RXQ_OVFL 40
-#endif
-
 namespace Envoy {
 namespace Network {
 
@@ -173,9 +169,11 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cms
 }
 
 absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(struct cmsghdr* cmsg) {
+#ifdef SO_RXQ_OVFL
   if (cmsg->cmsg_type == SO_RXQ_OVFL) {
     return *reinterpret_cast<uint32_t*>(CMSG_DATA(cmsg));
   }
+#endif
   return absl::nullopt;
 }
 
