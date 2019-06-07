@@ -1233,15 +1233,16 @@ TEST_F(ConnectionManagerUtilityTest, PreseverExternalRequestIdNoReqId) {
   EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
 }
 
-// test preserve_external_request_id true and no edge_request passing requestId should keep the requestID
+// test preserve_external_request_id true and no edge_request passing requestId should keep the
+// requestID
 TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestKeepRequestId) {
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
   TestHeaderMapImpl headers{{"x-request-id", "myReqId"}};
   EXPECT_EQ("myReqId", headers.get_(Headers::get().RequestId));
 }
 
-// test preserve_external_request_id true and no edge_request not passing requestId should generate new
-// request id
+// test preserve_external_request_id true and no edge_request not passing requestId should generate
+// new request id
 TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestGenerateNewRequestId) {
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
   TestHeaderMapImpl headers;
