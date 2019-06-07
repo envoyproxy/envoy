@@ -85,8 +85,7 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeoutAfterHeadersBeforeBodyResetsUpst
   // Trigger global timeout.
   timeSystem().sleep(std::chrono::milliseconds(200));
 
-  // Respond with body.
-  upstream_request_->encodeData(100, true);
+  ASSERT_TRUE(upstream_request_->waitForReset(std::chrono::seconds(15)));
 
   response->waitForReset();
 
