@@ -148,6 +148,14 @@ public:
     return protocol == Context::Protocol::Grpc ? grpc_ : grpc_web_;
   }
 
+  /**
+   * Parse a Buffer::Instance into a Protobuf::Message.
+   * @param buffer containing the data to be parsed.
+   * @param proto the parsed proto.
+   * @return bool true if the parse was successful.
+   */
+  static bool parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message& proto);
+
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);
 

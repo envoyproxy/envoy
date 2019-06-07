@@ -144,6 +144,22 @@ TEST_P(GrpcClientIntegrationTest, BadReplyProtobuf) {
   dispatcher_helper_.runDispatcher();
 }
 
+// Validate that a reply with bad protobuf is handled as an INTERNAL gRPC error.
+TEST_P(GrpcClientIntegrationTest, BadRequestReplyProtobuf) {
+  initialize();
+  auto request = createRequest(empty_metadata_);
+  request->fake_stream_->startGrpcStream();
+  EXPECT_CALL(*request->child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("0")));
+  EXPECT_CALL(*request, onFailure(Status::Internal, "", _)).WillExitIfNeeded();
+  EXPECT_CALL(*request->child_span_, finishSpan());
+  dispatcher_helper_.setStreamEventPending();
+  Buffer::OwnedImpl reply_buffer("\x00\x00\x00\x00\x02\xff\xff", 7);
+  Common::prependGrpcFrameHeader(reply_buffer);
+  request->fake_stream_->encodeData(reply_buffer, false);
+  request->fake_stream_->finishGrpcStream(Grpc::Status::Ok);
+  dispatcher_helper_.runDispatcher();
+}
+
 // Validate that an out-of-range gRPC status is handled as an INVALID_CODE gRPC
 // error.
 TEST_P(GrpcClientIntegrationTest, OutOfRangeGrpcStatus) {

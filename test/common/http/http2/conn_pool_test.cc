@@ -199,6 +199,11 @@ void Http2ConnPoolImplTest::completeRequestCloseUpstream(size_t index, ActiveTes
 }
 
 /**
+ * Verify that the pool retains and returns the host it was constructed with.
+ */
+TEST_F(Http2ConnPoolImplTest, Host) { EXPECT_EQ(host_, pool_.host()); }
+
+/**
  * Verify that connections are drained when requested.
  */
 TEST_F(Http2ConnPoolImplTest, DrainConnections) {

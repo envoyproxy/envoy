@@ -203,8 +203,8 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
   if (!client.stream_wrapper_->encode_complete_) {
     ENVOY_CONN_LOG(debug, "response before request complete", *client.codec_client_);
     onDownstreamReset(client);
-  } else if (client.stream_wrapper_->saw_close_header_ || client.codec_client_->remoteClosed()) {
-    ENVOY_CONN_LOG(debug, "saw upstream connection: close", *client.codec_client_);
+  } else if (client.stream_wrapper_->close_connection_ || client.codec_client_->remoteClosed()) {
+    ENVOY_CONN_LOG(debug, "saw upstream close connection", *client.codec_client_);
     onDownstreamReset(client);
   } else if (client.remaining_requests_ > 0 && --client.remaining_requests_ == 0) {
     ENVOY_CONN_LOG(debug, "maximum requests per connection", *client.codec_client_);
@@ -273,17 +273,21 @@ ConnPoolImpl::StreamWrapper::~StreamWrapper() {
 void ConnPoolImpl::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
 
 void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
-  if (headers->Connection() &&
-      absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
-                             Headers::get().ConnectionValues.Close)) {
-    saw_close_header_ = true;
+  // If Connection: close OR
+  //    Http/1.0 and not Connection: keep-alive OR
+  //    Proxy-Connection: close
+  if ((headers->Connection() &&
+       (absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
+                               Headers::get().ConnectionValues.Close))) ||
+      (parent_.codec_client_->protocol() == Protocol::Http10 &&
+       (!headers->Connection() ||
+        !absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
+                                Headers::get().ConnectionValues.KeepAlive))) ||
+      (headers->ProxyConnection() &&
+       (absl::EqualsIgnoreCase(headers->ProxyConnection()->value().getStringView(),
+                               Headers::get().ConnectionValues.Close)))) {
     parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
-  }
-  if (!saw_close_header_ && headers->ProxyConnection() &&
-      absl::EqualsIgnoreCase(headers->ProxyConnection()->value().getStringView(),
-                             Headers::get().ConnectionValues.Close)) {
-    saw_close_header_ = true;
-    parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
+    close_connection_ = true;
   }
 
   StreamDecoderWrapper::decodeHeaders(std::move(headers), end_stream);

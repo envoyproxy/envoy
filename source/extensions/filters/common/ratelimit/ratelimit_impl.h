@@ -16,6 +16,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
+#include "common/grpc/typed_async_client.h"
 #include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit.h"
@@ -26,7 +27,7 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::ratelimit::v2::RateLimitResponse>
+typedef Grpc::AsyncRequestCallbacks<envoy::service::ratelimit::v2::RateLimitResponse>
     RateLimitAsyncCallbacks;
 
 struct ConstantValues {
@@ -44,7 +45,7 @@ class GrpcClientImpl : public Client,
                        public RateLimitAsyncCallbacks,
                        public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
+  GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl();
 
@@ -67,7 +68,9 @@ public:
 
 private:
   const Protobuf::MethodDescriptor& service_method_;
-  Grpc::AsyncClientPtr async_client_;
+  Grpc::AsyncClient<envoy::service::ratelimit::v2::RateLimitRequest,
+                    envoy::service::ratelimit::v2::RateLimitResponse>
+      async_client_;
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};

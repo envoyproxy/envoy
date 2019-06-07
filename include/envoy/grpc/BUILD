@@ -14,8 +14,10 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":status",
+        "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/tracing:http_tracer_interface",
+        "//source/common/common:assert_lib",
         "//source/common/protobuf",
     ],
 )
