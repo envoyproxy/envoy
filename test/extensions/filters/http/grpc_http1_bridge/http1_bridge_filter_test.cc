@@ -1,5 +1,5 @@
 #include "common/buffer/buffer_impl.h"
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/stats/fake_symbol_table_impl.h"
 

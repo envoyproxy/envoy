@@ -3,7 +3,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 
 namespace Envoy {
 namespace Extensions {

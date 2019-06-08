@@ -2,7 +2,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/grpc/codec.h"
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 #include "common/grpc/status.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"

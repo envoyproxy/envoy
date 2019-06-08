@@ -23,7 +23,7 @@
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/grpc/codec.h"
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/stats/isolated_store_impl.h"

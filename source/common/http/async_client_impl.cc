@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 #include "common/http/utility.h"
 
 namespace Envoy {

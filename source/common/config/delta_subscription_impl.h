@@ -11,7 +11,7 @@
 #include "common/common/logger.h"
 #include "common/config/delta_subscription_state.h"
 #include "common/config/grpc_stream.h"
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 
 namespace Envoy {
 namespace Config {

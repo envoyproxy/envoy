@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common/config/delta_subscription_impl.h"
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"

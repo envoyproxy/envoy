@@ -6,7 +6,7 @@
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/srds.pb.h"
 
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 
 namespace Envoy {
 namespace Config {

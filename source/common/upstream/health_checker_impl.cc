@@ -8,7 +8,7 @@
 #include "common/common/macros.h"
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
 #include "common/router/router.h"

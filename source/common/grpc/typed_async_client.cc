@@ -2,7 +2,7 @@
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/utility.h"
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 #include "common/http/utility.h"
 
 namespace Envoy {

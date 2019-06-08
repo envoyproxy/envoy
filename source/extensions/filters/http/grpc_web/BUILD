@@ -22,7 +22,7 @@ envoy_cc_library(
         "//source/common/common:base64_lib",
         "//source/common/common:utility_lib",
         "//source/common/grpc:codec_lib",
-        "//source/common/grpc:common_lib",
+        "//source/common/grpc:context_lib",
         "//source/common/http:headers_lib",
     ],
 )

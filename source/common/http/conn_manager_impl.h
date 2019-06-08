@@ -28,7 +28,7 @@
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 #include "common/http/conn_manager_config.h"
 #include "common/http/user_agent.h"
 #include "common/http/utility.h"

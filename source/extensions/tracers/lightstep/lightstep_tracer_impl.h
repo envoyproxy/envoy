@@ -9,7 +9,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"

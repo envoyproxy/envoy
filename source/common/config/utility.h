@@ -18,7 +18,7 @@
 #include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
