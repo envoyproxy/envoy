@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
@@ -38,6 +39,10 @@ public:
                                Server::Configuration::TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) override;
 };
+
+DECLARE_FACTORY(UpstreamRawBufferSocketFactory);
+
+DECLARE_FACTORY(DownstreamRawBufferSocketFactory);
 
 } // namespace RawBuffer
 } // namespace TransportSockets

@@ -40,9 +40,9 @@ struct VhdsStats {
 
 typedef std::unique_ptr<Envoy::Config::Subscription> (*SubscriptionFactoryFunction)(
     const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&, Event::Dispatcher&,
-    Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&, Stats::Scope&, const std::string&,
-    const std::string&, absl::string_view, ProtobufMessage::ValidationVisitor& validation_visitor,
-    Api::Api&, Envoy::Config::SubscriptionCallbacks&);
+    Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&, Stats::Scope&, absl::string_view,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api&,
+    Envoy::Config::SubscriptionCallbacks&);
 
 class VhdsSubscription : Envoy::Config::SubscriptionCallbacks,
                          Logger::Loggable<Logger::Id::router> {
@@ -56,7 +56,6 @@ public:
   ~VhdsSubscription() override { init_target_.ready(); }
 
   // Config::SubscriptionCallbacks
-  // TODO(fredlas) deduplicate
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>&,
                       const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;

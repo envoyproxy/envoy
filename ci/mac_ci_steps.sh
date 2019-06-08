@@ -11,7 +11,7 @@ trap finish EXIT
 echo "disk space at beginning of build:"
 df -h
 
-. "$(dirname "$0")"/setup_gcs_cache.sh
+. "$(dirname "$0")"/setup_cache.sh
 
 BAZEL_BUILD_OPTIONS="--curses=no --show_task_finish --verbose_failures ${BAZEL_BUILD_EXTRA_OPTIONS} \
   --action_env=PATH=/usr/local/bin:/opt/local/bin:/usr/bin:/bin"

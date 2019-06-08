@@ -43,7 +43,7 @@ AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
 #endif
 }
 
-AsyncClientPtr AsyncClientFactoryImpl::create() {
+RawAsyncClientPtr AsyncClientFactoryImpl::create() {
   return std::make_unique<AsyncClientImpl>(cm_, config_, time_source_);
 }
 
@@ -66,7 +66,7 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
 #endif
 }
 
-AsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
+RawAsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
 #ifdef ENVOY_GOOGLE_GRPC
   GoogleGenericStubFactory stub_factory;
   return std::make_unique<GoogleAsyncClientImpl>(
