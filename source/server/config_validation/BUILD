@@ -97,6 +97,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/common:version_lib",
         "//source/common/config:utility_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:rds_lib",
