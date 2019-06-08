@@ -2,7 +2,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
-#include "common/grpc/context_impl.h"
+#include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 

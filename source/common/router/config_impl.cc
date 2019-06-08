@@ -488,7 +488,7 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
   }
 
   if (match_grpc_) {
-    matches &= Grpc::ContextImpl::hasGrpcContentType(headers);
+    matches &= Grpc::Common::hasGrpcContentType(headers);
   }
 
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);

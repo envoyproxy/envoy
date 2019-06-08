@@ -154,7 +154,7 @@ TEST_P(GrpcClientIntegrationTest, BadRequestReplyProtobuf) {
   EXPECT_CALL(*request->child_span_, finishSpan());
   dispatcher_helper_.setStreamEventPending();
   Buffer::OwnedImpl reply_buffer("\x00\x00\x00\x00\x02\xff\xff", 7);
-  ContextImpl::prependGrpcFrameHeader(reply_buffer);
+  Common::prependGrpcFrameHeader(reply_buffer);
   request->fake_stream_->encodeData(reply_buffer, false);
   request->fake_stream_->finishGrpcStream(Grpc::Status::Ok);
   dispatcher_helper_.runDispatcher();
@@ -206,7 +206,7 @@ TEST_P(GrpcClientIntegrationTest, ReplyNoTrailers) {
   dispatcher_helper_.setStreamEventPending();
   stream->expectTrailingMetadata(empty_metadata_);
   stream->expectGrpcStatus(Status::GrpcStatus::InvalidCode);
-  auto serialized_response = Grpc::ContextImpl::serializeToGrpcFrame(reply);
+  auto serialized_response = Grpc::Common::serializeToGrpcFrame(reply);
   stream->fake_stream_->encodeData(*serialized_response, true);
   stream->fake_stream_->encodeResetStream();
   dispatcher_helper_.runDispatcher();

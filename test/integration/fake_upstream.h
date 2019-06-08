@@ -23,7 +23,7 @@
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/grpc/codec.h"
-#include "common/grpc/context_impl.h"
+#include "common/grpc/common.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/stats/isolated_store_impl.h"
@@ -90,7 +90,7 @@ public:
   void startGrpcStream();
   void finishGrpcStream(Grpc::Status::GrpcStatus status);
   template <class T> void sendGrpcMessage(const T& message) {
-    auto serialized_response = Grpc::ContextImpl::serializeToGrpcFrame(message);
+    auto serialized_response = Grpc::Common::serializeToGrpcFrame(message);
     encodeData(*serialized_response, false);
     ENVOY_LOG(debug, "Sent gRPC message: {}", message.DebugString());
   }

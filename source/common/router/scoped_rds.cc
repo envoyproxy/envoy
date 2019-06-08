@@ -89,7 +89,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       scoped_rds.scoped_rds_config_source(), factory_context.localInfo(),
       factory_context.dispatcher(), factory_context.clusterManager(), factory_context.random(),
       *scope_,
-      Grpc::ContextImpl::typeUrl(
+      Grpc::Common::typeUrl(
           envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
       validation_visitor_, factory_context.api(), *this);
 }

@@ -1,6 +1,6 @@
 #include "envoy/api/v2/core/base.pb.h"
 
-#include "common/grpc/context_impl.h"
+#include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/protobuf/protobuf.h"
 

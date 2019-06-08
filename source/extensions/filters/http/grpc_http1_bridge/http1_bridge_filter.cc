@@ -8,6 +8,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/grpc/context_impl.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
@@ -18,12 +19,12 @@ namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
 void Http1BridgeFilter::chargeStat(const Http::HeaderMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::ContextImpl::Protocol::Grpc, *request_names_,
+  context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_names_,
                       headers.GrpcStatus());
 }
 
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
-  const bool grpc_request = Grpc::ContextImpl::hasGrpcContentType(headers);
+  const bool grpc_request = Grpc::Common::hasGrpcContentType(headers);
   if (grpc_request) {
     setupStatTracking(headers);
   }

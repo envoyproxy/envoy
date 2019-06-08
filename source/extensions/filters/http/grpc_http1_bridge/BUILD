@@ -22,6 +22,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/grpc:context_lib",
         "//source/common/http:headers_lib",
         "//source/common/http/http1:codec_lib",

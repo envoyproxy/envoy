@@ -47,16 +47,26 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "common_impl_test",
+    srcs = ["context_impl_test.cc"],
+    deps = [
+        "//source/common/grpc:common_lib",
+        "//source/common/http:headers_lib",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/proto:helloworld_proto_cc",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "context_impl_test",
     srcs = ["context_impl_test.cc"],
     deps = [
-        "//source/common/grpc:context_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
         "//source/common/stats:fake_symbol_table_lib",
         "//test/mocks/upstream:upstream_mocks",
-        "//test/proto:helloworld_proto_cc",
         "//test/test_common:global_lib",
-        "//test/test_common:utility_lib",
     ],
 )
 
@@ -64,7 +74,7 @@ envoy_cc_test(
     name = "google_grpc_utils_test",
     srcs = envoy_select_google_grpc(["google_grpc_utils_test.cc"]),
     deps = [
-        "//source/common/grpc:context_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
         "//test/mocks/upstream:upstream_mocks",
         "//test/proto:helloworld_proto_cc",

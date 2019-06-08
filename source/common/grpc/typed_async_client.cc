@@ -2,7 +2,7 @@
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/utility.h"
-#include "common/grpc/context_impl.h"
+#include "common/grpc/common.h"
 #include "common/http/utility.h"
 
 namespace Envoy {
@@ -10,7 +10,7 @@ namespace Grpc {
 namespace Internal {
 
 void sendMessageUntyped(RawAsyncStream* stream, const Protobuf::Message& request, bool end_stream) {
-  stream->sendMessageRaw(ContextImpl::serializeMessage(request), end_stream);
+  stream->sendMessageRaw(Common::serializeMessage(request), end_stream);
 }
 
 ProtobufTypes::MessagePtr parseMessageUntyped(ProtobufTypes::MessagePtr&& message,
@@ -36,7 +36,7 @@ AsyncRequest* sendUntyped(RawAsyncClient* client, const Protobuf::MethodDescript
                           Tracing::Span& parent_span,
                           const absl::optional<std::chrono::milliseconds>& timeout) {
   return client->sendRaw(service_method.service()->full_name(), service_method.name(),
-                         ContextImpl::serializeMessage(request), callbacks, parent_span, timeout);
+                         Common::serializeMessage(request), callbacks, parent_span, timeout);
 }
 
 } // namespace Internal

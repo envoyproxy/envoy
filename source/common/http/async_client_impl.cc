@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "common/grpc/context_impl.h"
+#include "common/grpc/common.h"
 #include "common/http/utility.h"
 
 namespace Envoy {
@@ -114,7 +114,7 @@ void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
     is_head_request_ = true;
   }
 
-  is_grpc_request_ = Grpc::ContextImpl::hasGrpcContentType(headers);
+  is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
   headers.insertEnvoyInternalRequest().value().setReference(
       Headers::get().EnvoyInternalRequestValues.True);
   if (send_xff_) {

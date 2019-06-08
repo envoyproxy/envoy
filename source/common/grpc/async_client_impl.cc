@@ -3,7 +3,7 @@
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
-#include "common/grpc/context_impl.h"
+#include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/utility.h"
 
@@ -84,7 +84,7 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
   // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
   headers_message_ =
-      ContextImpl::prepareHeaders(parent_.remote_cluster_name_, service_full_name_, method_name_,
+      Common::prepareHeaders(parent_.remote_cluster_name_, service_full_name_, method_name_,
                                   absl::optional<std::chrono::milliseconds>(timeout_));
   // Fill service-wide initial metadata.
   for (const auto& header_value : parent_.initial_metadata_) {
@@ -99,7 +99,7 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
 void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   const auto http_response_status = Http::Utility::getResponseStatus(*headers);
-  const auto grpc_status = ContextImpl::getGrpcStatus(*headers);
+  const auto grpc_status = Common::getGrpcStatus(*headers);
   callbacks_.onReceiveInitialMetadata(end_stream ? std::make_unique<Http::HeaderMapImpl>()
                                                  : std::move(headers));
   if (http_response_status != enumToInt(Http::Code::OK)) {
@@ -150,8 +150,8 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
 // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
 // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
 void AsyncStreamImpl::onTrailers(Http::HeaderMapPtr&& trailers) {
-  auto grpc_status = ContextImpl::getGrpcStatus(*trailers);
-  const std::string grpc_message = ContextImpl::getGrpcMessage(*trailers);
+  auto grpc_status = Common::getGrpcStatus(*trailers);
+  const std::string grpc_message = Common::getGrpcMessage(*trailers);
   callbacks_.onReceiveTrailingMetadata(std::move(trailers));
   if (!grpc_status) {
     grpc_status = Status::GrpcStatus::Unknown;
@@ -176,11 +176,11 @@ void AsyncStreamImpl::onReset() {
 }
 
 void AsyncStreamImpl::sendMessage(const Protobuf::Message& request, bool end_stream) {
-  stream_->sendData(*ContextImpl::serializeToGrpcFrame(request), end_stream);
+  stream_->sendData(*Common::serializeToGrpcFrame(request), end_stream);
 }
 
 void AsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& buffer, bool end_stream) {
-  ContextImpl::prependGrpcFrameHeader(*buffer);
+  Common::prependGrpcFrameHeader(*buffer);
   stream_->sendData(*buffer, end_stream);
 }
 

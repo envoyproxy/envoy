@@ -1,5 +1,5 @@
 #include "common/grpc/codec.h"
-#include "common/grpc/context_impl.h"
+#include "common/grpc/common.h"
 #include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
 
@@ -109,7 +109,7 @@ protected:
         for (const auto& response_message_str : grpc_response_messages) {
           ResponseType response_message;
           EXPECT_TRUE(TextFormat::ParseFromString(response_message_str, &response_message));
-          auto buffer = Grpc::ContextImpl::serializeToGrpcFrame(response_message);
+          auto buffer = Grpc::Common::serializeToGrpcFrame(response_message);
           upstream_request_->encodeData(*buffer, false);
         }
         Http::TestHeaderMapImpl response_trailers;

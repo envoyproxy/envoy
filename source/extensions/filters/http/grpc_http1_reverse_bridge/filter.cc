@@ -2,7 +2,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/grpc/codec.h"
-#include "common/grpc/context_impl.h"
+#include "common/grpc/common.h"
 #include "common/grpc/status.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -60,7 +60,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // If this is a gRPC request we:
   //  - mark this request as being gRPC
   //  - change the content-type to application/x-protobuf
-  if (Envoy::Grpc::ContextImpl::hasGrpcContentType(headers)) {
+  if (Envoy::Grpc::Common::hasGrpcContentType(headers)) {
     enabled_ = true;
 
     // We keep track of the original content-type to ensure that we handle

@@ -4,7 +4,7 @@
 #include <string>
 
 #include "common/common/base64.h"
-#include "common/grpc/context_impl.h"
+#include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
@@ -209,7 +209,7 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
   std::unique_ptr<Protobuf::Message> collector_response =
       lightstep::Transporter::MakeCollectorResponse();
   EXPECT_NE(collector_response, nullptr);
-  msg->body() = Grpc::ContextImpl::serializeToGrpcFrame(*collector_response);
+  msg->body() = Grpc::Common::serializeToGrpcFrame(*collector_response);
 
   callback->onSuccess(std::move(msg));
 

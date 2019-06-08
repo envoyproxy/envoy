@@ -19,7 +19,7 @@ envoy_cc_library(
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/registry",
         "//source/common/config:utility_lib",
-        "//source/common/grpc:context_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/grpc:google_grpc_creds_lib",
         "//source/extensions/grpc_credentials:well_known_names",
         "@envoy_api//envoy/config/grpc_credential/v2alpha:file_based_metadata_cc",

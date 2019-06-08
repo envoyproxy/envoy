@@ -496,7 +496,7 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   } else {
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
     sendLocalReply(request_headers_ != nullptr &&
-                       Grpc::ContextImpl::hasGrpcContentType(*request_headers_),
+                       Grpc::Common::hasGrpcContentType(*request_headers_),
                    Http::Code::RequestTimeout, "stream timeout", nullptr, is_head_request_,
                    absl::nullopt, StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
   }
@@ -505,7 +505,7 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
   sendLocalReply(request_headers_ != nullptr &&
-                     Grpc::ContextImpl::hasGrpcContentType(*request_headers_),
+                     Grpc::Common::hasGrpcContentType(*request_headers_),
                  Http::Code::RequestTimeout, "request timeout", nullptr, is_head_request_,
                  absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
@@ -595,7 +595,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     // overload it is more important to avoid unnecessary allocation than to create the filters.
     state_.created_filter_chain_ = true;
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
-    sendLocalReply(Grpc::ContextImpl::hasGrpcContentType(*request_headers_),
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
                    Http::Code::ServiceUnavailable, "envoy overloaded", nullptr, is_head_request_,
                    absl::nullopt, StreamInfo::ResponseCodeDetails::get().Overload);
     return;
@@ -648,7 +648,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
           connection_manager_.config_.http1Settings().default_host_for_http_10_);
     } else {
       // Require host header. For HTTP/1.1 Host has already been translated to :authority.
-      sendLocalReply(Grpc::ContextImpl::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
+      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
                      nullptr, is_head_request_, absl::nullopt,
                      StreamInfo::ResponseCodeDetails::get().MissingHost);
       return;
@@ -657,7 +657,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   ASSERT(connection_manager_.config_.maxRequestHeadersKb() > 0);
   if (request_headers_->byteSize() > (connection_manager_.config_.maxRequestHeadersKb() * 1024)) {
-    sendLocalReply(Grpc::ContextImpl::hasGrpcContentType(*request_headers_),
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
                    Code::RequestHeaderFieldsTooLarge, "", nullptr, is_head_request_, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
     return;
@@ -673,7 +673,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     const bool has_path =
         request_headers_->Path() && !request_headers_->Path()->value().getStringView().empty();
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
-    sendLocalReply(Grpc::ContextImpl::hasGrpcContentType(*request_headers_), Code::NotFound, "",
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "",
                    nullptr, is_head_request_, absl::nullopt,
                    has_path ? StreamInfo::ResponseCodeDetails::get().AbsolutePath
                             : StreamInfo::ResponseCodeDetails::get().MissingPath);
@@ -683,7 +683,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // Path sanitization should happen before any path access other than the above sanity check.
   if (!ConnectionManagerUtility::maybeNormalizePath(*request_headers_,
                                                     connection_manager_.config_)) {
-    sendLocalReply(Grpc::ContextImpl::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
                    nullptr, is_head_request_, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
@@ -730,7 +730,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     if (upgrade_rejected) {
       // Do not allow upgrades if the route does not support it.
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
-      sendLocalReply(Grpc::ContextImpl::hasGrpcContentType(*request_headers_), Code::Forbidden, "",
+      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::Forbidden, "",
                      nullptr, is_head_request_, absl::nullopt,
                      StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
       return;
@@ -2018,7 +2018,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
       parent_.stream_info_.setResponseCodeDetails(
           StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
       Http::Utility::sendLocalReply(
-          Grpc::ContextImpl::hasGrpcContentType(*parent_.request_headers_),
+          Grpc::Common::hasGrpcContentType(*parent_.request_headers_),
           [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
             parent_.chargeStats(*response_headers);
             parent_.response_headers_ = std::move(response_headers);

@@ -73,12 +73,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "context_lib",
-    srcs = ["context_impl.cc"],
-    hdrs = ["context_impl.h"],
+    name = "common_lib",
+    srcs = ["common.cc"],
+    hdrs = ["common.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/grpc:context_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",
         "//include/envoy/stats:stats_interface",
@@ -97,6 +96,19 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "context_lib",
+    srcs = ["context_impl.cc"],
+    hdrs = ["context_impl.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//include/envoy/grpc:context_interface",
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/common:hash_lib",
         "//source/common/stats:symbol_table_lib",
     ],
 )

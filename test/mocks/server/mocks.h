@@ -20,6 +20,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread/thread.h"
 
+#include "common/grpc/context_impl.h"
 #include "common/http/context_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/stats/fake_symbol_table_impl.h"

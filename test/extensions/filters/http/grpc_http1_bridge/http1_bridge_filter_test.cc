@@ -1,5 +1,5 @@
 #include "common/buffer/buffer_impl.h"
-#include "common/grpc/context_impl.h"
+#include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
 #include "common/stats/fake_symbol_table_impl.h"
 
@@ -28,7 +28,7 @@ namespace {
 
 class GrpcHttp1BridgeFilterTest : public testing::Test {
 public:
-  GrpcHttp1BridgeFilterTest() : common_(*symbol_table_), filter_(common_) {
+  GrpcHttp1BridgeFilterTest() : common_(*symbol_table_), filter_(context_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
     ON_CALL(decoder_callbacks_.stream_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
@@ -37,7 +37,7 @@ public:
   ~GrpcHttp1BridgeFilterTest() { filter_.onDestroy(); }
 
   Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
-  Grpc::ContextImpl common_;
+  Grpc::ContextImpl context_;
   Http1BridgeFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;

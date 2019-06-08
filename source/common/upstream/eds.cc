@@ -27,7 +27,7 @@ EdsClusterImpl::EdsClusterImpl(
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
       eds_config, local_info_, dispatcher, cm, random, info_->statsScope(),
-      Grpc::ContextImpl::typeUrl(
+      Grpc::Common::typeUrl(
           envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
       factory_context.messageValidationVisitor(), factory_context.api(), *this);
 }

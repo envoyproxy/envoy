@@ -26,7 +26,7 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
       validation_visitor_(validation_visitor) {
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       lds_config, local_info, dispatcher, cm, random, *scope_,
-      Grpc::ContextImpl::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()),
+      Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()),
       validation_visitor_, api, *this);
   Config::Utility::checkLocalInfo("lds", local_info);
   init_manager.add(init_target_);

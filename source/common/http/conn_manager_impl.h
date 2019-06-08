@@ -28,7 +28,7 @@
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
-#include "common/grpc/context_impl.h"
+#include "common/grpc/common.h"
 #include "common/http/conn_manager_config.h"
 #include "common/http/user_agent.h"
 #include "common/http/utility.h"
@@ -255,7 +255,7 @@ private:
     // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
     // called here may change the content type, so we must check it before the call.
     FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) {
-      is_grpc_request_ = Grpc::ContextImpl::hasGrpcContentType(headers);
+      is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
       FilterHeadersStatus status = handle_->decodeHeaders(headers, end_stream);
       if (end_stream) {
         handle_->decodeComplete();
