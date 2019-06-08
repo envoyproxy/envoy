@@ -10,6 +10,7 @@
 
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/common/assert.h"
+#include "common/grpc/common.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
@@ -93,6 +94,7 @@ public:
   time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Stats::Store& stats() override { return stats_store_; }
+  Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
   ProcessContext& processContext() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
@@ -190,6 +192,7 @@ private:
   std::unique_ptr<ListenerManagerImpl> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
   MutexTracer* mutex_tracer_;
+  Grpc::Common grpc_context_;
   Http::ContextImpl http_context_;
   Event::TimeSystem& time_system_;
 };
