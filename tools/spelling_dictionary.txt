@@ -53,6 +53,7 @@ DGRAM
 DHE
 DLOG
 DNS
+DQUOTE
 DRYs
 DS
 DST
@@ -109,6 +110,7 @@ HCM
 HDS
 HMAC
 HPACK
+HTAB
 HTML
 HTTP
 HTTPS
@@ -126,6 +128,7 @@ IPV
 IPs
 IPv
 ITOA
+InifinitePast
 Isode
 JSON
 JSONs
@@ -275,6 +278,7 @@ UTF
 UUID
 UUIDs
 VC
+VCHAR
 VH
 VHDS
 VLOG
@@ -284,10 +288,13 @@ WS
 Welford's
 Werror
 XDS
+asctime
 dechunk
 dechunked
+qdtext
 satisfiable
 sendto
+tchar
 unsatisfiable
 vip
 xDSes
