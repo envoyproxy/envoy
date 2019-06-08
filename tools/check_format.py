@@ -146,6 +146,10 @@ def checkTools():
 
 
 def checkNamespace(file_path):
+  for excluded_path in namespace_check_excluded_paths:
+    if file_path.startswith(excluded_path):
+      return []
+
   nolint = "NOLINT(namespace-%s)" % namespace_check.lower()
   with open(file_path) as f:
     text = f.read()
@@ -668,28 +672,35 @@ if __name__ == "__main__":
       type=int,
       default=multiprocessing.cpu_count(),
       help="number of worker processes to use; defaults to one per core.")
-  parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree")
+  parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
   parser.add_argument(
       "--skip_envoy_build_rule_check",
       action="store_true",
-      help="Skip checking for '@envoy//' prefix in build rules.")
+      help="skip checking for '@envoy//' prefix in build rules.")
   parser.add_argument(
       "--namespace_check",
       type=str,
       nargs="?",
       default="Envoy",
-      help="Specify namespace check string. Default 'Envoy'.")
+      help="specify namespace check string. Default 'Envoy'.")
+  parser.add_argument(
+      "--namespace_check_excluded_paths",
+      type=str,
+      nargs="+",
+      default=[],
+      help="exclude paths from the namespace_check.")
   parser.add_argument(
       "--include_dir_order",
       type=str,
       default=",".join(common.includeDirOrder()),
-      help="specify the header block include directory order")
+      help="specify the header block include directory order.")
   args = parser.parse_args()
 
   operation_type = args.operation_type
   target_path = args.target_path
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
   namespace_check = args.namespace_check
+  namespace_check_excluded_paths = args.namespace_check_excluded_paths
   include_dir_order = args.include_dir_order
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
