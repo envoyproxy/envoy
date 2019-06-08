@@ -232,8 +232,8 @@ bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
   //
   // If none of those options exist, it will default to Grpc::Status::GrpcStatus::Unknown.
   const std::array<absl::optional<Grpc::Status::GrpcStatus>, 3> optional_statuses = {{
-      {Grpc::Common::getGrpcStatus(response_trailers)},
-      {Grpc::Common::getGrpcStatus(response_headers)},
+      {Grpc::ContextImpl::getGrpcStatus(response_trailers)},
+      {Grpc::ContextImpl::getGrpcStatus(response_headers)},
       {info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
                                  Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
                            : absl::nullopt},

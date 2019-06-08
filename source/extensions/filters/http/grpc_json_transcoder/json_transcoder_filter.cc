@@ -151,7 +151,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   path_matcher_ = pmb.Build();
 
   type_helper_ = std::make_unique<google::grpc::transcoding::TypeHelper>(
-      Protobuf::util::NewTypeResolverForDescriptorPool(Grpc::Common::typeUrlPrefix(),
+      Protobuf::util::NewTypeResolverForDescriptorPool(Grpc::ContextImpl::typeUrlPrefix(),
                                                        &descriptor_pool_));
 
   const auto print_config = proto_config.print_options();
@@ -171,7 +171,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     const Http::HeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input,
     std::unique_ptr<Transcoder>& transcoder, const Protobuf::MethodDescriptor*& method_descriptor) {
-  if (Grpc::Common::hasGrpcContentType(headers)) {
+  if (Grpc::ContextImpl::hasGrpcContentType(headers)) {
     return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
                                 "Request headers has application/grpc content-type");
   }
@@ -216,7 +216,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
                                 method_descriptor->client_streaming(), true)};
 
   const auto response_type_url =
-      Grpc::Common::typeUrl(method_descriptor->output_type()->full_name());
+      Grpc::ContextImpl::typeUrl(method_descriptor->output_type()->full_name());
   std::unique_ptr<ResponseToJsonTranslator> response_translator{new ResponseToJsonTranslator(
       type_helper_->Resolver(), response_type_url, method_descriptor->server_streaming(),
       &response_input, print_options_)};
@@ -229,7 +229,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
 ProtobufUtil::Status
 JsonTranscoderConfig::methodToRequestInfo(const Protobuf::MethodDescriptor* method,
                                           google::grpc::transcoding::RequestInfo* info) {
-  auto request_type_url = Grpc::Common::typeUrl(method->input_type()->full_name());
+  auto request_type_url = Grpc::ContextImpl::typeUrl(method->input_type()->full_name());
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
   if (info->message_type == nullptr) {
     ENVOY_LOG(debug, "Cannot resolve input-type: {}", method->input_type()->full_name());
@@ -351,7 +351,7 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& headers,
                                                               bool end_stream) {
-  if (!Grpc::Common::isGrpcResponseHeader(headers, end_stream)) {
+  if (!Grpc::ContextImpl::isGrpcResponseHeader(headers, end_stream)) {
     error_ = true;
   }
 
@@ -424,7 +424,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   }
 
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
-      Grpc::Common::getGrpcStatus(trailers);
+      Grpc::ContextImpl::getGrpcStatus(trailers);
   if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
     response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
   } else {

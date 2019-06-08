@@ -234,7 +234,7 @@ void GrpcWebFilter::setupStatTracking(const Http::HeaderMap& headers) {
 }
 
 void GrpcWebFilter::chargeStat(const Http::HeaderMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::Common::Protocol::GrpcWeb, *request_names_,
+  context_.chargeStat(*cluster_, Grpc::ContextImpl::Protocol::GrpcWeb, *request_names_,
                       headers.GrpcStatus());
 }
 

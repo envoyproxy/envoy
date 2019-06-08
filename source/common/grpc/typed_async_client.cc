@@ -10,7 +10,7 @@ namespace Grpc {
 namespace Internal {
 
 void sendMessageUntyped(RawAsyncStream* stream, const Protobuf::Message& request, bool end_stream) {
-  stream->sendMessageRaw(Common::serializeMessage(request), end_stream);
+  stream->sendMessageRaw(ContextImpl::serializeMessage(request), end_stream);
 }
 
 ProtobufTypes::MessagePtr parseMessageUntyped(ProtobufTypes::MessagePtr&& message,
@@ -36,7 +36,7 @@ AsyncRequest* sendUntyped(RawAsyncClient* client, const Protobuf::MethodDescript
                           Tracing::Span& parent_span,
                           const absl::optional<std::chrono::milliseconds>& timeout) {
   return client->sendRaw(service_method.service()->full_name(), service_method.name(),
-                         Common::serializeMessage(request), callbacks, parent_span, timeout);
+                         ContextImpl::serializeMessage(request), callbacks, parent_span, timeout);
 }
 
 } // namespace Internal

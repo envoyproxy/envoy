@@ -33,10 +33,9 @@ struct Context::RequestNames {
   Stats::StatName method_;  // supplies the method name.
 };
 
-// TODO(jmarantz): Rename 'Common' to 'ContextImpl'.
-class Common : public Context {
+class ContextImpl : public Context {
 public:
-  explicit Common(Stats::SymbolTable& symbol_table);
+  explicit ContextImpl(Stats::SymbolTable& symbol_table);
 
   /**
    * @param headers the headers to parse.

@@ -93,7 +93,7 @@ public:
                     Grpc::ProtoBufferEqIgnoringField(expected_request, "response_nonce"), false))
         .WillOnce([this](Buffer::InstancePtr& buffer, bool) {
           envoy::api::v2::DeltaDiscoveryRequest message;
-          EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
+          EXPECT_TRUE(Grpc::ContextImpl::parseBufferInstance(std::move(buffer), message));
           const std::string nonce = message.response_nonce();
           if (!nonce.empty()) {
             nonce_acks_sent_.push(nonce);

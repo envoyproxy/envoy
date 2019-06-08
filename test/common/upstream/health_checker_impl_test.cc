@@ -2890,7 +2890,7 @@ public:
     serializeResponse(grpc::health::v1::HealthCheckResponse::ServingStatus status) {
       grpc::health::v1::HealthCheckResponse response;
       response.set_status(status);
-      const auto data = Grpc::Common::serializeToGrpcFrame(response);
+      const auto data = Grpc::ContextImpl::serializeToGrpcFrame(response);
       auto ret = std::vector<uint8_t>(data->length(), 0);
       data->copyOut(0, data->length(), &ret[0]);
       return ret;
@@ -3209,7 +3209,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessResponseSplitBetweenChunks) {
 
   grpc::health::v1::HealthCheckResponse response;
   response.set_status(grpc::health::v1::HealthCheckResponse::SERVING);
-  auto data = Grpc::Common::serializeToGrpcFrame(response);
+  auto data = Grpc::ContextImpl::serializeToGrpcFrame(response);
 
   const char* raw_data = static_cast<char*>(data->linearize(data->length()));
   const uint64_t chunk_size = data->length() / 5;

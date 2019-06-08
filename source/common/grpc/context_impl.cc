@@ -26,7 +26,7 @@
 namespace Envoy {
 namespace Grpc {
 
-Common::Common(Stats::SymbolTable& symbol_table)
+ContextImpl::ContextImpl(Stats::SymbolTable& symbol_table)
     : symbol_table_(symbol_table), stat_name_pool_(symbol_table),
       grpc_(stat_name_pool_.add("grpc")), grpc_web_(stat_name_pool_.add("grpc-web")),
       success_(stat_name_pool_.add("success")), failure_(stat_name_pool_.add("failure")),
@@ -38,7 +38,7 @@ Common::Common(Stats::SymbolTable& symbol_table)
 //
 // TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/7008 for
 // a lock-free approach to creating dynamic stat-names based on requests.
-Stats::StatName Common::makeDynamicStatName(absl::string_view name) {
+Stats::StatName ContextImpl::makeDynamicStatName(absl::string_view name) {
   Thread::LockGuard lock(mutex_);
   auto iter = stat_name_map_.find(name);
   if (iter != stat_name_map_.end()) {
@@ -49,7 +49,7 @@ Stats::StatName Common::makeDynamicStatName(absl::string_view name) {
   return stat_name;
 }
 
-bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
+bool ContextImpl::hasGrpcContentType(const Http::HeaderMap& headers) {
   const Http::HeaderEntry* content_type = headers.ContentType();
   // Content type is gRPC if it is exactly "application/grpc" or starts with
   // "application/grpc+". Specifically, something like application/grpc-web is not gRPC.
@@ -61,7 +61,7 @@ bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
                   .getStringView()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }
 
-bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_stream) {
+bool ContextImpl::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_stream) {
   if (end_stream) {
     // Trailers-only response, only grpc-status is required.
     return headers.GrpcStatus() != nullptr;
@@ -72,8 +72,9 @@ bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_strea
   return hasGrpcContentType(headers);
 }
 
-void Common::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                        const RequestNames& request_names, const Http::HeaderEntry* grpc_status) {
+void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
+                             const RequestNames& request_names,
+                             const Http::HeaderEntry* grpc_status) {
   if (!grpc_status) {
     return;
   }
@@ -93,8 +94,8 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
   chargeStat(cluster, protocol, request_names, success);
 }
 
-void Common::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                        const RequestNames& request_names, bool success) {
+void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
+                             const RequestNames& request_names, bool success) {
   const Stats::SymbolTable::StoragePtr prefix_storage = symbol_table_.join(
       {protocolStatName(protocol), request_names.service_, request_names.method_});
   const Stats::StatName prefix(prefix_storage.get());
@@ -106,12 +107,12 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
   cluster.statsScope().counterFromStatName(Stats::StatName(total.get())).inc();
 }
 
-void Common::chargeStat(const Upstream::ClusterInfo& cluster, const RequestNames& request_names,
-                        bool success) {
+void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster,
+                             const RequestNames& request_names, bool success) {
   chargeStat(cluster, Protocol::Grpc, request_names, success);
 }
 
-absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers) {
+absl::optional<Status::GrpcStatus> ContextImpl::getGrpcStatus(const Http::HeaderMap& trailers) {
   const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
 
   uint64_t grpc_status_code;
@@ -125,13 +126,13 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
   return absl::optional<Status::GrpcStatus>(static_cast<Status::GrpcStatus>(grpc_status_code));
 }
 
-std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {
+std::string ContextImpl::getGrpcMessage(const Http::HeaderMap& trailers) {
   const auto entry = trailers.GrpcMessage();
   return entry ? std::string(entry->value().getStringView()) : EMPTY_STRING;
 }
 
-absl::optional<Common::RequestNames>
-Common::resolveServiceAndMethod(const Http::HeaderEntry* path) {
+absl::optional<ContextImpl::RequestNames>
+ContextImpl::resolveServiceAndMethod(const Http::HeaderEntry* path) {
   absl::optional<RequestNames> request_names;
   if (path == nullptr) {
     return request_names;
@@ -146,7 +147,7 @@ Common::resolveServiceAndMethod(const Http::HeaderEntry* path) {
   return request_names;
 }
 
-Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& message) {
+Buffer::InstancePtr ContextImpl::serializeToGrpcFrame(const Protobuf::Message& message) {
   // http://www.grpc.io/docs/guides/wire.html
   // Reserve enough space for the entire message and the 5 byte header.
   // NB: we do not use prependGrpcFrameHeader because that would add another BufferFragment and this
@@ -170,7 +171,7 @@ Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& messag
   return body;
 }
 
-Buffer::InstancePtr Common::serializeMessage(const Protobuf::Message& message) {
+Buffer::InstancePtr ContextImpl::serializeMessage(const Protobuf::Message& message) {
   auto body = std::make_unique<Buffer::OwnedImpl>();
   const uint32_t size = message.ByteSize();
   Buffer::RawSlice iovec;
@@ -185,7 +186,7 @@ Buffer::InstancePtr Common::serializeMessage(const Protobuf::Message& message) {
   return body;
 }
 
-std::chrono::milliseconds Common::getGrpcTimeout(Http::HeaderMap& request_headers) {
+std::chrono::milliseconds ContextImpl::getGrpcTimeout(Http::HeaderMap& request_headers) {
   std::chrono::milliseconds timeout(0);
   Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
   if (header_grpc_timeout_entry) {
@@ -227,7 +228,8 @@ std::chrono::milliseconds Common::getGrpcTimeout(Http::HeaderMap& request_header
   return timeout;
 }
 
-void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::HeaderString& value) {
+void ContextImpl::toGrpcTimeout(const std::chrono::milliseconds& timeout,
+                                Http::HeaderString& value) {
   uint64_t time = timeout.count();
   static const char units[] = "mSMH";
   const char* unit = units; // start with milliseconds
@@ -248,10 +250,10 @@ void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::Heade
   value.append(unit, 1);
 }
 
-Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
-                                        const std::string& service_full_name,
-                                        const std::string& method_name,
-                                        const absl::optional<std::chrono::milliseconds>& timeout) {
+Http::MessagePtr
+ContextImpl::prepareHeaders(const std::string& upstream_cluster,
+                            const std::string& service_full_name, const std::string& method_name,
+                            const absl::optional<std::chrono::milliseconds>& timeout) {
   Http::MessagePtr message(new Http::RequestMessageImpl());
   message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
   message->headers().insertPath().value().append("/", 1);
@@ -272,10 +274,10 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
   return message;
 }
 
-void Common::checkForHeaderOnlyError(Http::Message& http_response) {
+void ContextImpl::checkForHeaderOnlyError(Http::Message& http_response) {
   // First check for grpc-status in headers. If it is here, we have an error.
   absl::optional<Status::GrpcStatus> grpc_status_code =
-      Common::getGrpcStatus(http_response.headers());
+      ContextImpl::getGrpcStatus(http_response.headers());
   if (!grpc_status_code) {
     return;
   }
@@ -284,10 +286,10 @@ void Common::checkForHeaderOnlyError(Http::Message& http_response) {
     throw Exception(absl::optional<uint64_t>(), "bad grpc-status header");
   }
 
-  throw Exception(grpc_status_code.value(), Common::getGrpcMessage(http_response.headers()));
+  throw Exception(grpc_status_code.value(), ContextImpl::getGrpcMessage(http_response.headers()));
 }
 
-void Common::validateResponse(Http::Message& http_response) {
+void ContextImpl::validateResponse(Http::Message& http_response) {
   if (Http::Utility::getResponseStatus(http_response.headers()) != enumToInt(Http::Code::OK)) {
     throw Exception(absl::optional<uint64_t>(), "non-200 response code");
   }
@@ -300,25 +302,26 @@ void Common::validateResponse(Http::Message& http_response) {
   }
 
   absl::optional<Status::GrpcStatus> grpc_status_code =
-      Common::getGrpcStatus(*http_response.trailers());
+      ContextImpl::getGrpcStatus(*http_response.trailers());
   if (!grpc_status_code || grpc_status_code.value() < 0) {
     throw Exception(absl::optional<uint64_t>(), "bad grpc-status trailer");
   }
 
   if (grpc_status_code.value() != 0) {
-    throw Exception(grpc_status_code.value(), Common::getGrpcMessage(*http_response.trailers()));
+    throw Exception(grpc_status_code.value(),
+                    ContextImpl::getGrpcMessage(*http_response.trailers()));
   }
 }
 
-const std::string& Common::typeUrlPrefix() {
+const std::string& ContextImpl::typeUrlPrefix() {
   CONSTRUCT_ON_FIRST_USE(std::string, "type.googleapis.com");
 }
 
-std::string Common::typeUrl(const std::string& qualified_name) {
+std::string ContextImpl::typeUrl(const std::string& qualified_name) {
   return typeUrlPrefix() + "/" + qualified_name;
 }
 
-void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
+void ContextImpl::prependGrpcFrameHeader(Buffer::Instance& buffer) {
   std::array<char, 5> header;
   header[0] = 0; // flags
   const uint32_t nsize = htonl(buffer.length());
@@ -326,7 +329,7 @@ void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
   buffer.prepend(absl::string_view(&header[0], 5));
 }
 
-bool Common::parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message& proto) {
+bool ContextImpl::parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message& proto) {
   Buffer::ZeroCopyInputStreamImpl stream(std::move(buffer));
   return proto.ParseFromZeroCopyStream(&stream);
 }

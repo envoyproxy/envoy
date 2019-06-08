@@ -18,12 +18,12 @@ namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
 void Http1BridgeFilter::chargeStat(const Http::HeaderMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::Common::Protocol::Grpc, *request_names_,
+  context_.chargeStat(*cluster_, Grpc::ContextImpl::Protocol::Grpc, *request_names_,
                       headers.GrpcStatus());
 }
 
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
-  const bool grpc_request = Grpc::Common::hasGrpcContentType(headers);
+  const bool grpc_request = Grpc::ContextImpl::hasGrpcContentType(headers);
   if (grpc_request) {
     setupStatTracking(headers);
   }

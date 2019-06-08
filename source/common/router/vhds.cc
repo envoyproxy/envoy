@@ -45,7 +45,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
       config_update_info_->routeConfiguration().vhds().config_source(), factory_context.localInfo(),
       factory_context.dispatcher(), factory_context.clusterManager(), factory_context.random(),
       *scope_,
-      Grpc::Common::typeUrl(envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()),
+      Grpc::ContextImpl::typeUrl(envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()),
       factory_context.messageValidationVisitor(), factory_context.api(), *this);
 }
 

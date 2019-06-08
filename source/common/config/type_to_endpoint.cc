@@ -14,7 +14,7 @@ namespace Config {
 const char UnknownMethod[] = "could_not_lookup_method_due_to_unknown_type_url";
 
 #define TYPE_URL_IS(x)                                                                             \
-  (type_url == Grpc::Common::typeUrl(envoy::api::v2::x().GetDescriptor()->full_name()))
+  (type_url == Grpc::ContextImpl::typeUrl(envoy::api::v2::x().GetDescriptor()->full_name()))
 const Protobuf::MethodDescriptor& deltaGrpcMethod(absl::string_view type_url) {
   std::string method_name = UnknownMethod;
   if (TYPE_URL_IS(RouteConfiguration)) {

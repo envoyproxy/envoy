@@ -70,7 +70,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       rds.config_source(), factory_context.localInfo(), factory_context.dispatcher(),
       factory_context.clusterManager(), factory_context.random(), *scope_,
-      Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
+      Grpc::ContextImpl::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
       factory_context.messageValidationVisitor(), factory_context.api(), *this);
 
   config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(

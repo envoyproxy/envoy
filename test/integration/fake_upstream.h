@@ -90,7 +90,7 @@ public:
   void startGrpcStream();
   void finishGrpcStream(Grpc::Status::GrpcStatus status);
   template <class T> void sendGrpcMessage(const T& message) {
-    auto serialized_response = Grpc::Common::serializeToGrpcFrame(message);
+    auto serialized_response = Grpc::ContextImpl::serializeToGrpcFrame(message);
     encodeData(*serialized_response, false);
     ENVOY_LOG(debug, "Sent gRPC message: {}", message.DebugString());
   }

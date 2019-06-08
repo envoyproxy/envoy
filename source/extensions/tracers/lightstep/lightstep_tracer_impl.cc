@@ -61,10 +61,10 @@ void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& reques
 
   const uint64_t timeout =
       driver_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
-  Http::MessagePtr message = Grpc::Common::prepareHeaders(
+  Http::MessagePtr message = Grpc::ContextImpl::prepareHeaders(
       driver_.cluster()->name(), lightstep::CollectorServiceFullName(),
       lightstep::CollectorMethodName(), absl::optional<std::chrono::milliseconds>(timeout));
-  message->body() = Grpc::Common::serializeToGrpcFrame(request);
+  message->body() = Grpc::ContextImpl::serializeToGrpcFrame(request);
 
   active_request_ =
       driver_.clusterManager()
@@ -76,7 +76,7 @@ void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& reques
 void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& response) {
   try {
     active_request_ = nullptr;
-    Grpc::Common::validateResponse(*response);
+    Grpc::ContextImpl::validateResponse(*response);
 
     // http://www.grpc.io/docs/guides/wire.html
     // First 5 bytes contain the message header.
