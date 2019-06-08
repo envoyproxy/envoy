@@ -47,8 +47,8 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "common_impl_test",
-    srcs = ["context_impl_test.cc"],
+    name = "common_test",
+    srcs = ["common_test.cc"],
     deps = [
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",

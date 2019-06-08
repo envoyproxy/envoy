@@ -34,7 +34,7 @@ public:
     ON_CALL(decoder_callbacks_.stream_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
   }
 
-  ~GrpcHttp1BridgeFilterTest() { filter_.onDestroy(); }
+  ~GrpcHttp1BridgeFilterTest() override { filter_.onDestroy(); }
 
   Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   Grpc::ContextImpl context_;
