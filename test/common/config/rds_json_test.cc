@@ -72,6 +72,50 @@ TEST(RdsJsonTest, TestWeightedClusterTranslation) {
   EXPECT_EQ(20, route.route().weighted_clusters().clusters(1).weight().value());
 }
 
+TEST(RdsJsonTest, TestVirtualClusterTranslation) {
+  const std::string json_string = R"EOF(
+  {
+    "name": "some-name",
+    "method": "GET",
+    "pattern": "/rides/d+"
+  }
+  )EOF";
+  envoy::api::v2::route::VirtualCluster virtual_cluster;
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Envoy::Config::RdsJson::translateVirtualCluster(*json_object_ptr, virtual_cluster);
+
+  EXPECT_EQ(envoy::api::v2::core::GET, virtual_cluster.method());
+  EXPECT_EQ("some-name", virtual_cluster.name());
+  EXPECT_EQ("/rides/d+", virtual_cluster.pattern());
+}
+
+TEST(RdsJsonTest, TestCorsTranslation) {
+  const std::string json_string = R"EOF(
+  {
+    "allow_origin": ["www", "shop"],
+    "allow_methods": "PUT",
+    "allow_headers": "Content-Type",
+    "expose_headers": "Content-Length",
+    "max_age": "600",
+    "allow_credentials": true,
+    "enabled": true
+  }
+  )EOF";
+
+  envoy::api::v2::route::CorsPolicy cors_policy;
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Envoy::Config::RdsJson::translateCors(*json_object_ptr, cors_policy);
+
+  EXPECT_EQ("www", cors_policy.allow_origin().Get(0));
+  EXPECT_EQ("shop", cors_policy.allow_origin().Get(1));
+  EXPECT_EQ("PUT", cors_policy.allow_methods());
+  EXPECT_EQ("Content-Type", cors_policy.allow_headers());
+  EXPECT_EQ("Content-Length", cors_policy.expose_headers());
+  EXPECT_EQ("600", cors_policy.max_age());
+  EXPECT_EQ(true, cors_policy.allow_credentials().value());
+  EXPECT_EQ(true, cors_policy.enabled().value());
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy
