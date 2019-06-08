@@ -277,6 +277,7 @@ public:
   Upstream::ClusterManager& clusterManager() override { return parent_.server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return parent_.server_.dispatcher(); }
   Network::DrainDecision& drainDecision() override { return *this; }
+  Grpc::Context& grpcContext() override { return parent_.server_.grpcContext(); }
   bool healthCheckFailed() override { return parent_.server_.healthCheckFailed(); }
   Tracing::HttpTracer& httpTracer() override { return httpContext().tracer(); }
   Http::Context& httpContext() override { return parent_.server_.httpContext(); }

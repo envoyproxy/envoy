@@ -78,6 +78,7 @@ envoy_cc_library(
     hdrs = ["common.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        "//include/envoy/grpc:context_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",
         "//include/envoy/stats:stats_interface",
@@ -88,6 +89,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
+        "//source/common/common:hash_lib",
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "//source/common/grpc:status_lib",
@@ -95,6 +97,7 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
+        "//source/common/stats:symbol_table_lib",
     ],
 )
 

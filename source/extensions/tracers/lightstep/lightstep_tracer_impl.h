@@ -9,6 +9,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
@@ -54,7 +55,7 @@ public:
                   Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
                   ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                   std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
-                  PropagationMode propagation_mode);
+                  PropagationMode propagation_mode, Grpc::Context& grpc_context);
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
   Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
@@ -121,6 +122,9 @@ private:
   Runtime::Loader& runtime_;
   std::unique_ptr<lightstep::LightStepTracerOptions> options_;
   const PropagationMode propagation_mode_;
+  Grpc::Context& grpc_context_;
+  Stats::StatNamePool pool_;
+  const Grpc::Context::RequestNames request_names_;
 };
 } // namespace Lightstep
 } // namespace Tracers

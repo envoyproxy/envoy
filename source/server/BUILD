@@ -361,6 +361,7 @@ envoy_cc_library(
         "//source/common/common:version_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:async_client_manager_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:context_lib",
         "//source/common/init:manager_lib",
