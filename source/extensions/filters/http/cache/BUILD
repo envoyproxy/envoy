@@ -28,7 +28,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "config_lib",
+    name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
