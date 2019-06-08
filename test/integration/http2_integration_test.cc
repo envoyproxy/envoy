@@ -430,7 +430,7 @@ TEST_P(Http2IntegrationTest, GrpcRouterNotFound) {
 
 TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
-// fixfix
+// Verify the case where there is an HTTP/2 codec/protocol error with an active stream.
 TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
