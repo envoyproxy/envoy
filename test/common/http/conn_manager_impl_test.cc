@@ -2297,7 +2297,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamProtocolError) {
     throw CodecProtocolException("protocol error");
   }));
 
-  EXPECT_CALL(response_encoder_.stream_, resetStream(StreamResetReason::ConnectionTermination));
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_));
   EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
 
   // A protocol exception should result in reset of the streams followed by a remote or local close

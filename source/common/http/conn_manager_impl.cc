@@ -313,8 +313,17 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
 
 void ConnectionManagerImpl::resetAllStreams() {
   while (!streams_.empty()) {
-    streams_.front()->response_encoder_->getStream().resetStream(
-        StreamResetReason::ConnectionTermination);
+    // Mimic a downstream reset in this case. We must also remove callbacks here. Though we are
+    // about to close the connection and will disable further reads, it is possible that flushing
+    // data out can cause stream callbacks to fire (e.g., low watermark callbacks).
+    //
+    // TODO(mattklein123): I tried to actually reset through the codec here, but ran into issues
+    // with nghttp2 state and being unhappy about sending reset frames after the connection had
+    // been terminated via GOAWAY. It might be possible to do something better here inside the h2
+    // codec but there are no easy answers and this seems simpler.
+    auto& stream = *streams_.front();
+    stream.response_encoder_->getStream().removeCallbacks(stream);
+    stream.onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
   }
 }
 
