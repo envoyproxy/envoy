@@ -190,7 +190,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   // If the expected timeout is 0 set no timeout, as Envoy treats 0 as infinite timeout.
   if (grpc_request && route.maxGrpcTimeout() && expected_timeout != 0) {
     Grpc::Common::toGrpcTimeout(std::chrono::milliseconds(expected_timeout),
-                                     request_headers.insertGrpcTimeout().value());
+                                request_headers.insertGrpcTimeout().value());
   }
 
   return timeout;
@@ -882,8 +882,7 @@ void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers,
   // the trailers.
   if (grpc_request_) {
     if (end_stream) {
-      absl::optional<Grpc::Status::GrpcStatus> grpc_status =
-          Grpc::Common::getGrpcStatus(headers);
+      absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
       if (grpc_status &&
           !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
         upstream_request.upstream_host_->stats().rq_success_.inc();
@@ -1082,8 +1081,7 @@ void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers, UpstreamRequest& 
   ASSERT(upstream_requests_.size() == 1);
 
   if (upstream_request.grpc_rq_success_deferred_) {
-    absl::optional<Grpc::Status::GrpcStatus> grpc_status =
-        Grpc::Common::getGrpcStatus(*trailers);
+    absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*trailers);
     if (grpc_status &&
         !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
       upstream_request.upstream_host_->stats().rq_success_.inc();

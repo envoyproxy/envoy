@@ -85,7 +85,7 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
   headers_message_ =
       Common::prepareHeaders(parent_.remote_cluster_name_, service_full_name_, method_name_,
-                                  absl::optional<std::chrono::milliseconds>(timeout_));
+                             absl::optional<std::chrono::milliseconds>(timeout_));
   // Fill service-wide initial metadata.
   for (const auto& header_value : parent_.initial_metadata_) {
     headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),

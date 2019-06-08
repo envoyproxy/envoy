@@ -606,7 +606,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
                                      : parent_.cluster_.info()->name();
   auto headers_message =
       Grpc::Common::prepareHeaders(authority, parent_.service_method_.service()->full_name(),
-                                        parent_.service_method_.name(), absl::nullopt);
+                                   parent_.service_method_.name(), absl::nullopt);
   headers_message->headers().insertUserAgent().value().setReference(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
   Router::FilterUtility::setUpstreamScheme(headers_message->headers(), *parent_.cluster_.info());

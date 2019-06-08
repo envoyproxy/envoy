@@ -504,8 +504,7 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
-  sendLocalReply(request_headers_ != nullptr &&
-                     Grpc::Common::hasGrpcContentType(*request_headers_),
+  sendLocalReply(request_headers_ != nullptr && Grpc::Common::hasGrpcContentType(*request_headers_),
                  Http::Code::RequestTimeout, "request timeout", nullptr, is_head_request_,
                  absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
@@ -673,8 +672,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     const bool has_path =
         request_headers_->Path() && !request_headers_->Path()->value().getStringView().empty();
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "",
-                   nullptr, is_head_request_, absl::nullopt,
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
+                   is_head_request_, absl::nullopt,
                    has_path ? StreamInfo::ResponseCodeDetails::get().AbsolutePath
                             : StreamInfo::ResponseCodeDetails::get().MissingPath);
     return;
