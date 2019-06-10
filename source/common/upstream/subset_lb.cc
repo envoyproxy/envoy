@@ -244,7 +244,7 @@ void SubsetLoadBalancer::processSubsets(
         if (!kvs.empty()) {
           // The host has metadata for each key, find or create its subset.
           std::vector<LbSubsetEntryPtr> entries;
-          findOrCreateSubset(subsets_, kvs, 0, entries);
+          findOrCreateSubsets(subsets_, kvs, 0, entries);
           for (const auto& entry : entries) {
             if (subsets_modified.find(entry) != subsets_modified.end()) {
               // We've already invoked the callback for this entry.
@@ -435,7 +435,7 @@ SubsetLoadBalancer::getOrCreateSubset(LbSubsetMap& subsets, const std::string& n
 
 // Given a vector of key-values (from extractSubsetMetadata), recursively finds the matching
 // LbSubsetEntryPtr.
-void SubsetLoadBalancer::findOrCreateSubset(
+void SubsetLoadBalancer::findOrCreateSubsets(
     LbSubsetMap& subsets, const SubsetMetadata& kvs, uint32_t idx,
     std::vector<SubsetLoadBalancer::LbSubsetEntryPtr>& entries) {
   ASSERT(idx < kvs.size());
@@ -455,7 +455,7 @@ void SubsetLoadBalancer::findOrCreateSubset(
         entries.emplace_back(entry);
       } else {
         // Keep recursing down to match the new
-        findOrCreateSubset(entry->children_, kvs, idx, entries);
+        findOrCreateSubsets(entry->children_, kvs, idx, entries);
       }
     }
   } else {
@@ -469,7 +469,7 @@ void SubsetLoadBalancer::findOrCreateSubset(
     }
 
     // Keep recursing down to match the new
-    findOrCreateSubset(entry->children_, kvs, idx, entries);
+    findOrCreateSubsets(entry->children_, kvs, idx, entries);
   }
 }
 // Invokes cb for each LbSubsetEntryPtr in subsets.
