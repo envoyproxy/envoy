@@ -18,7 +18,7 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
+GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout)
     : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit")),

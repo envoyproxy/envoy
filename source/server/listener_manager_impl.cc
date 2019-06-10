@@ -63,7 +63,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
         Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
             string_name);
     Network::FilterFactoryCb callback;
-    if (filter_config->getBoolean("deprecated_v1", false)) {
+    if (Config::Utility::allowDeprecatedV1Config(context.runtime(), *filter_config)) {
       callback = factory.createFilterFactory(*filter_config->getObject("value", true), context);
     } else {
       auto message = Config::Utility::translateToFactoryConfig(

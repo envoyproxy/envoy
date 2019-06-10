@@ -39,7 +39,7 @@
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
-#include "absl/container/flat_hash_map.h"
+#include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -283,8 +283,8 @@ private:
         : RaiiListElement<T>(callbacks, callback) {}
   };
 
-  absl::flat_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
-  absl::flat_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
+  absl::node_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
+  absl::node_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
 };
 
 // Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could

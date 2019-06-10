@@ -29,9 +29,11 @@ Version history
 * listener: added :ref:`source IP <envoy_api_field_listener.FilterChainMatch.source_prefix_ranges>`
   and :ref:`source port <envoy_api_field_listener.FilterChainMatch.source_ports>` filter
   chain matching.
+* lua: exposed functions to Lua to verify digital signature.
 * original_src filter: added the :ref:`filter<config_http_filters_original_src>`.
 * rbac: migrated from v2alpha to v2.
 * redis: add support for Redis cluster custom cluster type.
+* redis: automatically route commands using cluster slots for Redis cluster.
 * redis: added :ref:`prefix routing <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.prefix_routes>` to enable routing commands based on their key's prefix to different upstream.
 * redis: added :ref:`request mirror policy <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.Route.request_mirror_policy>` to enable shadow traffic and/or dual writes.
 * redis: add support for zpopmax and zpopmin commands.

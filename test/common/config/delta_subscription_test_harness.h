@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/config/delta_subscription_impl.h"
+#include "common/grpc/common.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
@@ -34,7 +35,7 @@ public:
     subscription_ = std::make_unique<DeltaSubscriptionImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignment, random_, stats_store_,
-        rate_limit_settings_, stats_, init_fetch_timeout);
+        rate_limit_settings_, callbacks_, stats_, init_fetch_timeout);
   }
 
   ~DeltaSubscriptionTestHarness() {
@@ -48,10 +49,10 @@ public:
   }
 
   void startSubscription(const std::set<std::string>& cluster_names) override {
-    EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "");
-    subscription_->start(cluster_names, callbacks_);
+    subscription_->start(cluster_names);
   }
 
   void expectSendMessage(const std::set<std::string>& cluster_names,
@@ -88,10 +89,12 @@ public:
       error_detail->set_message(error_message);
     }
     EXPECT_CALL(async_stream_,
-                sendMessage(ProtoEqIgnoringField(expected_request, "response_nonce"), false))
-        .WillOnce([this](const Protobuf::Message& message, bool) {
-          const std::string nonce =
-              static_cast<const envoy::api::v2::DeltaDiscoveryRequest&>(message).response_nonce();
+                sendMessageRaw_(
+                    Grpc::ProtoBufferEqIgnoringField(expected_request, "response_nonce"), false))
+        .WillOnce([this](Buffer::InstancePtr& buffer, bool) {
+          envoy::api::v2::DeltaDiscoveryRequest message;
+          EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
+          const std::string nonce = message.response_nonce();
           if (!nonce.empty()) {
             nonce_acks_sent_.push(nonce);
           }
