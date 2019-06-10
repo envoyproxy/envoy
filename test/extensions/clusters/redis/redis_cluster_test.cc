@@ -38,6 +38,25 @@ namespace Extensions {
 namespace Clusters {
 namespace Redis {
 
+namespace {
+const std::string BasicConfig = R"EOF(
+  name: name
+  connect_timeout: 0.25s
+  dns_lookup_family: V4_ONLY
+  hosts:
+  - socket_address:
+      address: foo.bar.com
+      port_value: 22120
+  cluster_type:
+    name: envoy.clusters.redis
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        cluster_refresh_rate: 4s
+        cluster_refresh_timeout: 0.25s
+  )EOF";
+}
+
 class RedisClusterTest : public testing::Test,
                          public Extensions::NetworkFilters::Common::Redis::Client::ClientFactory {
 public:
@@ -395,6 +414,34 @@ protected:
     EXPECT_NO_THROW(discovery_client.onBelowWriteBufferLowWatermark());
   }
 
+  void testDnsResolve(const char* const address, const int port) {
+    RedisCluster::DnsDiscoveryResolveTarget resolver_target(*cluster_, address, port);
+    EXPECT_CALL(*dns_resolver_, resolve(address, Network::DnsLookupFamily::V4Only, _))
+        .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                             Network::DnsResolver::ResolveCb) -> Network::ActiveDnsQuery* {
+          return &active_dns_query_;
+        }));
+    ;
+    resolver_target.startResolve();
+
+    EXPECT_CALL(active_dns_query_, cancel());
+  }
+
+  void testRedisResolve() {
+    EXPECT_CALL(dispatcher_, createTimer_(_));
+    RedisCluster::RedisDiscoverySession discovery_session(*cluster_, *this);
+    discovery_session.registerDiscoveryAddress(
+        TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"})), 22120);
+    expectRedisResolve(true);
+    discovery_session.startResolve();
+
+    // 2nd startResolve() call will be a no-opt until the first startResolve is done.
+    discovery_session.startResolve();
+
+    // Make sure cancel is called.
+    EXPECT_CALL(pool_request_, cancel());
+  }
+
   Stats::IsolatedStoreImpl stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
@@ -419,6 +466,7 @@ protected:
   Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks* pool_callbacks_{};
   std::shared_ptr<RedisCluster> cluster_;
   std::shared_ptr<NiceMock<MockClusterSlotUpdateCallBack>> cluster_callback_;
+  Network::MockActiveDnsQuery active_dns_query_;
 };
 
 typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>,
@@ -506,23 +554,6 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
 }
 
 TEST_F(RedisClusterTest, Basic) {
-  const std::string basic_yaml_hosts = R"EOF(
-  name: name
-  connect_timeout: 0.25s
-  dns_lookup_family: V4_ONLY
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 22120
-  cluster_type:
-    name: envoy.clusters.redis
-    typed_config:
-      "@type": type.googleapis.com/google.protobuf.Struct
-      value:
-        cluster_refresh_rate: 4s
-        cluster_refresh_timeout: 0.25s
-  )EOF";
-
   // Using load assignment.
   const std::string basic_yaml_load_assignment = R"EOF(
   name: name
@@ -548,7 +579,7 @@ TEST_F(RedisClusterTest, Basic) {
         cluster_refresh_timeout: 0.25s
   )EOF";
 
-  testBasicSetup(basic_yaml_hosts, "foo.bar.com");
+  testBasicSetup(BasicConfig, "foo.bar.com");
   testBasicSetup(basic_yaml_load_assignment, "foo.bar.com");
 
   // Exercise stubbed out interfaces for coverage.
@@ -556,23 +587,7 @@ TEST_F(RedisClusterTest, Basic) {
 }
 
 TEST_F(RedisClusterTest, RedisResolveFailure) {
-  const std::string basic_yaml_hosts = R"EOF(
-  name: name
-  connect_timeout: 0.25s
-  dns_lookup_family: V4_ONLY
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 22120
-  cluster_type:
-    name: envoy.clusters.redis
-    typed_config:
-      "@type": type.googleapis.com/google.protobuf.Struct
-      value:
-        cluster_refresh_rate: 4s
-        cluster_refresh_timeout: 0.25s
-  )EOF";
-  setupFromV2Yaml(basic_yaml_hosts);
+  setupFromV2Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
   expectRedisResolve(true);
@@ -624,43 +639,11 @@ TEST_F(RedisClusterTest, FactoryInitNotRedisClusterTypeFailure) {
 }
 
 TEST_F(RedisClusterTest, FactoryInitRedisClusterTypeSuccess) {
-  const std::string basic_yaml_hosts = R"EOF(
-  name: name
-  connect_timeout: 0.25s
-  dns_lookup_family: V4_ONLY
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 22120
-  cluster_type:
-    name: envoy.clusters.redis
-    typed_config:
-      "@type": type.googleapis.com/google.protobuf.Struct
-      value:
-        cluster_refresh_rate: 4s
-        cluster_refresh_timeout: 0.25s
-  )EOF";
-  setupFactoryFromV2Yaml(basic_yaml_hosts);
+  setupFactoryFromV2Yaml(BasicConfig);
 }
 
 TEST_F(RedisClusterTest, RedisErrorResponse) {
-  const std::string basic_yaml_hosts = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    dns_lookup_family: V4_ONLY
-    hosts:
-    - socket_address:
-        address: foo.bar.com
-        port_value: 22120
-    cluster_type:
-      name: envoy.clusters.redis
-      typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
-        value:
-          cluster_refresh_rate: 4s
-          cluster_refresh_timeout: 0.25s
-    )EOF";
-  setupFromV2Yaml(basic_yaml_hosts);
+  setupFromV2Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
   expectRedisResolve(true);
@@ -710,6 +693,16 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
       EXPECT_EQ(++update_failure, cluster_->info()->stats().update_failure_.value());
     }
   }
+}
+
+TEST_F(RedisClusterTest, DnsDiscoveryResolverBasic) {
+  setupFromV2Yaml(BasicConfig);
+  testDnsResolve("foo.bar.com", 22120);
+}
+
+TEST_F(RedisClusterTest, RedisDiscoveryResolverBasic) {
+  setupFromV2Yaml(BasicConfig);
+  testRedisResolve();
 }
 
 } // namespace Redis

@@ -155,10 +155,8 @@ private:
 
   // Resolves the discovery endpoint.
   struct DnsDiscoveryResolveTarget {
-    DnsDiscoveryResolveTarget(
-        RedisCluster& parent, const std::string& dns_address, const uint32_t port,
-        const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-        const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
+    DnsDiscoveryResolveTarget(RedisCluster& parent, const std::string& dns_address,
+                              const uint32_t port);
 
     ~DnsDiscoveryResolveTarget();
 
@@ -168,8 +166,6 @@ private:
     Network::ActiveDnsQuery* active_query_{};
     const std::string dns_address_;
     const uint32_t port_;
-    const envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
-    const envoy::api::v2::endpoint::LbEndpoint lb_endpoint_;
   };
 
   typedef std::unique_ptr<DnsDiscoveryResolveTarget> DnsDiscoveryResolveTargetPtr;
