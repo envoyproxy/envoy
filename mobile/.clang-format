@@ -8,6 +8,16 @@ SortIncludes: false
 ...
 
 ---
+Language: Java
+AccessModifierOffset: -2
+ColumnLimit: 100
+DerivePointerAlignment: false
+IndentWidth: 2
+PointerAlignment: Left
+SortIncludes: false
+...
+
+---
 Language: ObjC
 AccessModifierOffset: -2
 ColumnLimit: 100

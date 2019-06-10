@@ -8,24 +8,22 @@ import java.io.*;
 
 public class Envoy {
 
-    public void load() {
-        System.loadLibrary("envoy_jni");
-    }
+  public void load() { System.loadLibrary("envoy_jni"); }
 
-    public void run(Context context, String config) {
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                initialize((ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE));
-                runEnvoy(config.trim());
-            }
-        });
-        thread.start();
-    }
+  public void run(Context context, String config) {
+    Thread thread = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        initialize((ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE));
+        runEnvoy(config.trim());
+      }
+    });
+    thread.start();
+  }
 
-    private native int initialize(ConnectivityManager connectivityManager);
+  private native int initialize(ConnectivityManager connectivityManager);
 
-    private native boolean isAresInitialized();
+  private native boolean isAresInitialized();
 
-    private native int runEnvoy(String config);
+  private native int runEnvoy(String config);
 }
