@@ -285,7 +285,7 @@ Example 5: Envoy as an internal proxy, receiving a request from an internal clie
     Result:
       | Trusted client address = 10.20.30.40
       | X-Envoy-External-Address remains unset
-      | X-Envoy-Internal is set to "true"
+      | X-Envoy-Internal is set to "false"
 
 Example 6: The internal Envoy from Example 5, receiving a request proxied by another Envoy
     Settings:

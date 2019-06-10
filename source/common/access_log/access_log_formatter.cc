@@ -23,6 +23,9 @@ static const std::string UnspecifiedValueString = "-";
 
 namespace {
 
+// Matches newline pattern in a StartTimeFormatter format string.
+const std::regex& getNewlinePattern(){CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n")};
+
 // Helper that handles the case when the ConnectionInfo is missing or if the desired value is
 // empty.
 StreamInfoFormatter::FieldExtractor sslConnectionInfoStringExtractor(
@@ -275,6 +278,11 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
         const std::string args = token[StartTimeParamStart - 1] == '('
                                      ? token.substr(StartTimeParamStart, parameters_end)
                                      : "";
+        // Validate the input specifier here. The formatted string may be destined for a header, and
+        // should not contain invalid characters {NUL, LR, CF}.
+        if (std::regex_search(args, getNewlinePattern())) {
+          throw EnvoyException("Invalid header configuration. Format string contains newline.");
+        }
         formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(args)});
       } else {
         formatters.emplace_back(FormatterProviderPtr{new StreamInfoFormatter(token)});

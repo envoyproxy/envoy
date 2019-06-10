@@ -33,6 +33,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "context_interface",
+    hdrs = ["context.h"],
+    deps = [
+        "//include/envoy/http:context_interface",
+        "//include/envoy/upstream:upstream_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "google_grpc_creds_interface",
     hdrs = ["google_grpc_creds.h"],
     external_deps = [
