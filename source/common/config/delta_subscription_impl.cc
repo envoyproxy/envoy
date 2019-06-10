@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Config {
 
 DeltaSubscriptionImpl::DeltaSubscriptionImpl(
-    const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
+    const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
     Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
     absl::string_view type_url, Runtime::RandomGenerator& random, Stats::Scope& scope,
     const RateLimitSettings& rate_limit_settings, SubscriptionCallbacks& callbacks,

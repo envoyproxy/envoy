@@ -7,6 +7,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/crypto/utility.h"
 #include "common/http/message_impl.h"
 
 namespace Envoy {
@@ -428,6 +429,52 @@ int StreamHandleWrapper::luaLogCritical(lua_State* state) {
   return 0;
 }
 
+int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
+  // Step 1: get hash function
+  absl::string_view hash = luaL_checkstring(state, 2);
+
+  // Step 2: get key pointer
+  auto ptr = lua_touserdata(state, 3);
+
+  // Step 3: get signature
+  const char* signature = luaL_checkstring(state, 4);
+  int sig_len = luaL_checknumber(state, 5);
+  const std::vector<uint8_t> sig_vec(signature, signature + sig_len);
+
+  // Step 4: get clear text
+  const char* clear_text = luaL_checkstring(state, 6);
+  int text_len = luaL_checknumber(state, 7);
+  const std::vector<uint8_t> text_vec(clear_text, clear_text + text_len);
+
+  // Step 5: verify signature
+  auto output = Common::Crypto::Utility::verifySignature(hash, reinterpret_cast<EVP_PKEY*>(ptr),
+                                                         sig_vec, text_vec);
+
+  lua_pushboolean(state, output.result_);
+  if (output.result_) {
+    lua_pushnil(state);
+  } else {
+    lua_pushlstring(state, output.error_message_.data(), output.error_message_.length());
+  }
+  return 2;
+}
+
+int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
+  // Get byte array and the length.
+  const char* str = luaL_checkstring(state, 2);
+  int n = luaL_checknumber(state, 3);
+  std::vector<uint8_t> key(str, str + n);
+
+  if (public_key_wrapper_.get() != nullptr) {
+    public_key_wrapper_.pushStack();
+  } else {
+    public_key_wrapper_.reset(
+        PublicKeyWrapper::create(state, Common::Crypto::Utility::importPublicKey(key)), true);
+  }
+
+  return 1;
+}
+
 FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
                            Upstream::ClusterManager& cluster_manager)
     : cluster_manager_(cluster_manager), lua_state_(lua_code, tls) {
@@ -442,6 +489,7 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
   lua_state_.registerType<DynamicMetadataMapWrapper>();
   lua_state_.registerType<DynamicMetadataMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
+  lua_state_.registerType<PublicKeyWrapper>();
 
   request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
   if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {
