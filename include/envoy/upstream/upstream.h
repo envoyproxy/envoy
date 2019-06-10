@@ -725,6 +725,12 @@ public:
   virtual envoy::api::v2::Cluster::DiscoveryType type() const PURE;
 
   /**
+   * @return the type of cluster, only used for custom discovery types.
+   */
+  virtual const absl::optional<envoy::api::v2::Cluster::CustomClusterType>&
+  clusterType() const PURE;
+
+  /**
    * @return configuration for least request load balancing, only used if LB type is least request.
    */
   virtual const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>&

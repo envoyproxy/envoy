@@ -10,6 +10,7 @@
 #include "common/http/message_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/lightstep/lightstep_tracer_impl.h"
@@ -21,6 +22,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -42,6 +44,8 @@ namespace {
 
 class LightStepDriverTest : public testing::Test {
 public:
+  LightStepDriverTest() : grpc_context_(*symbol_table_) {}
+
   void setup(envoy::config::trace::v2::LightstepConfig& lightstep_config, bool init_timer,
              Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
                  Common::Ot::OpenTracingDriver::PropagationMode::TracerNative) {
@@ -59,7 +63,7 @@ public:
     }
 
     driver_ = std::make_unique<LightStepDriver>(lightstep_config, cm_, stats_, tls_, runtime_,
-                                                std::move(opts), propagation_mode);
+                                                std::move(opts), propagation_mode, grpc_context_);
   }
 
   void setupValidDriver(Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
@@ -84,10 +88,12 @@ public:
   SystemTime start_time_;
   StreamInfo::MockStreamInfo stream_info_;
 
+  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Grpc::Common grpc_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::IsolatedStoreImpl stats_;
   std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
-  Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
