@@ -1,4 +1,4 @@
 struct Response {
-    let body: String
-    let serverHeader: String
+  let body: String
+  let serverHeader: String
 }

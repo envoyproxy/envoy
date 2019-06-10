@@ -1,0 +1,159 @@
+excluded:
+  - envoy
+whitelist_rules:
+  - anyobject_protocol
+  - array_init
+  - attributes
+  - block_based_kvo
+  - class_delegate_protocol
+  - closing_brace
+  - closure_end_indentation
+  - closure_parameter_position
+  - closure_spacing
+  - collection_alignment
+  - colon
+  - comma
+  - conditional_returns_on_newline
+  - contains_over_first_not_nil
+  - control_statement
+  - custom_rules
+  - cyclomatic_complexity
+  - deployment_target
+  - discarded_notification_center_observer
+  - discouraged_direct_init
+  - discouraged_object_literal
+  - duplicate_enum_cases
+  - duplicate_imports
+  - dynamic_inline
+  - empty_enum_arguments
+  - empty_parameters
+  - empty_parentheses_with_trailing_closure
+  - empty_string
+  - explicit_init
+  - fallthrough
+  - fatal_error_message
+  - file_header
+  - file_length
+  - first_where
+  - for_where
+  - force_unwrapping
+  - generic_type_name
+  - identical_operands
+  - identifier_name
+  - implicit_getter
+  - inert_defer
+  - is_disjoint
+  - leading_whitespace
+  - legacy_cggeometry_functions
+  - legacy_constant
+  - legacy_constructor
+  - legacy_multiple
+  - legacy_nsgeometry_functions
+  - legacy_random
+  - line_length
+  - literal_expression_end_indentation
+  - lower_acl_than_parent
+  - mark
+  - modifier_order
+  - no_fallthrough_only
+  - nsobject_prefer_isequal
+  - operator_usage_whitespace
+  - operator_whitespace
+  - overridden_super_call
+  - prefixed_toplevel_constant
+  - private_outlet
+  - private_over_fileprivate
+  - private_unit_test
+  - prohibited_super_call
+  - protocol_property_accessors_order
+  - reduce_boolean
+  - redundant_discardable_let
+  - redundant_nil_coalescing
+  - redundant_objc_attribute
+  - redundant_optional_initialization
+  - redundant_set_access_control
+  - redundant_void_return
+  - return_arrow_whitespace
+  - shorthand_operator
+  - single_test_class
+  - sorted_imports
+  - statement_position
+  - superfluous_disable_command
+  - switch_case_alignment
+  - switch_case_on_newline
+  - syntactic_sugar
+  - todo
+  - toggle_bool
+  - trailing_comma
+  - trailing_newline
+  - trailing_semicolon
+  - trailing_whitespace
+  - type_body_length
+  - unavailable_function
+  - unneeded_break_in_switch
+  - unneeded_parentheses_in_closure_argument
+  - unused_capture_list
+  - unused_closure_parameter
+  - unused_control_flow_label
+  - unused_enumerated
+  - unused_optional_binding
+  - valid_ibinspectable
+  - vertical_parameter_alignment
+  - vertical_parameter_alignment_on_call
+  - vertical_whitespace
+  - void_return
+  - weak_delegate
+  - xctfail_message
+  - yoda_condition
+trailing_whitespace:
+  ignores_comments: false
+  ignores_empty_lines: false
+trailing_comma:
+  mandatory_comma: true
+line_length:
+  - 100
+file_length:
+  warning: 300
+  ignore_comment_only_lines: true
+private_over_fileprivate:
+  validate_extensions: true
+cyclomatic_complexity:
+  ignores_case_statements: true
+prefixed_toplevel_constant:
+  only_private: true
+attributes:
+  always_on_line_above:
+    - "@discardableResult"
+    - "@IBDesignable"
+    - "@nonobjc"
+    - "@NSManaged"
+    - "@objc"
+modifier_order:
+  preferred_modifier_order:
+    - acl
+    - setterACL
+    - final
+    - override
+    - required
+    - typeMethods
+    - mutators
+    - owned
+    - lazy
+    - dynamic
+    - convenience
+deployment_target:
+  iOS_deployment_target: 10.0
+
+custom_rules:
+  newline_after_brace:
+    name: "Opening braces shouldn't have empty lines under them"
+    regex: '\{\n\n'
+  newline_before_brace:
+    name: "Closing braces shouldn't have empty lines before them"
+    regex: '\n\n\}'
+  space_before_comma:
+    name: "Commas should never have a space before them"
+    regex: '\s+,'
+  spaces_over_tabs:
+    name: "Use (2) spaces instead of tabs"
+    regex: '\t'
