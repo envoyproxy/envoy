@@ -65,7 +65,7 @@ public class MainActivity extends Activity {
                     Log.d("MainActivity", "exception making request.", e);
                 }
                 // Make a call again
-                handler.postDelayed(this, TimeUnit.SECONDS.toMillis(10));
+                handler.postDelayed(this, TimeUnit.SECONDS.toMillis(1));
             }
         }, 0);
     }
