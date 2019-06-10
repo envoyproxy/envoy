@@ -687,7 +687,7 @@ TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabledMultipleLists) {
     EXPECT_TRUE(host_set_.hosts()[2] == lb_->chooseHost(&context));
   }
   {
-    // This should LB between both hosts mared with version 1.2.
+    // This should LB between both hosts marked with version 1.2.
     TestLoadBalancerContext context({{"version", "1.2"}});
     EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
     EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
