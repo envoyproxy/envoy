@@ -180,12 +180,12 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // explicitly nulls out response_encoder to avoid the downstream being notified of the
   // Envoy-internal stream instance being ended.
   if (stream.response_encoder_ != nullptr &&
-      (!stream.state_.remote_complete_ || !stream.state_.local_complete_to_codec_)) {
+      (!stream.state_.remote_complete_ || !stream.state_.codec_saw_local_complete_)) {
     // Indicate local is complete at this point so that if we reset during a continuation, we don't
     // raise further data or trailers.
     ENVOY_STREAM_LOG(debug, "doEndStream() resetting stream", stream);
     stream.state_.local_complete_ = true;
-    stream.state_.local_complete_to_codec_ = true;
+    stream.state_.codec_saw_local_complete_ = true;
     stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
     reset_stream = true;
   }
@@ -1535,8 +1535,8 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
 
 void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
   if (end_stream) {
-    ASSERT(!state_.local_complete_to_codec_);
-    state_.local_complete_to_codec_ = true;
+    ASSERT(!state_.codec_saw_local_complete_);
+    state_.codec_saw_local_complete_ = true;
     stream_info_.onLastDownstreamTxByteSent();
     request_response_timespan_->complete();
     connection_manager_.doEndStream(*this);

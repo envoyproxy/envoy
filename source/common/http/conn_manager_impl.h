@@ -451,7 +451,7 @@ private:
     // All state for the stream. Put here for readability.
     struct State {
       State()
-          : remote_complete_(false), local_complete_(false), local_complete_to_codec_(false),
+          : remote_complete_(false), local_complete_(false), codec_saw_local_complete_(false),
             saw_connection_close_(false), successful_upgrade_(false), created_filter_chain_(false),
             is_internally_created_(false) {}
 
@@ -466,7 +466,7 @@ private:
       bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
                                 // A filter can still stop the stream from being complete as seen
                                 // by the codec.
-      bool local_complete_to_codec_ : 1; // This indicates that local is complete as written all
+      bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written all
                                          // the way through to the codec.
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
