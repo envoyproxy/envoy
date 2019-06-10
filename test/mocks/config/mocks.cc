@@ -23,16 +23,16 @@ MockSubscriptionFactory::MockSubscriptionFactory() {
       .WillByDefault(testing::ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }
 
-MockSubscriptionFactory::~MockSubscriptionFactory() {}
+MockSubscriptionFactory::~MockSubscriptionFactory() = default;
 
-MockGrpcMuxWatch::MockGrpcMuxWatch() {}
+MockGrpcMuxWatch::MockGrpcMuxWatch() = default;
 MockGrpcMuxWatch::~MockGrpcMuxWatch() { cancel(); }
 
-MockGrpcMux::MockGrpcMux() {}
-MockGrpcMux::~MockGrpcMux() {}
+MockGrpcMux::MockGrpcMux() = default;
+MockGrpcMux::~MockGrpcMux() = default;
 
-MockGrpcStreamCallbacks::MockGrpcStreamCallbacks() {}
-MockGrpcStreamCallbacks::~MockGrpcStreamCallbacks() {}
+MockGrpcStreamCallbacks::MockGrpcStreamCallbacks() = default;
+MockGrpcStreamCallbacks::~MockGrpcStreamCallbacks() = default;
 
 GrpcMuxWatchPtr MockGrpcMux::subscribe(const std::string& type_url,
                                        const std::set<std::string>& resources,
@@ -45,7 +45,7 @@ MockGrpcMuxCallbacks::MockGrpcMuxCallbacks() {
       .WillByDefault(testing::Invoke(TestUtility::xdsResourceName));
 }
 
-MockGrpcMuxCallbacks::~MockGrpcMuxCallbacks() {}
+MockGrpcMuxCallbacks::~MockGrpcMuxCallbacks() = default;
 
 MockMutableConfigProviderBase::MockMutableConfigProviderBase(
     std::shared_ptr<ConfigSubscriptionInstance>&& subscription,

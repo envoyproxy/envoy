@@ -50,7 +50,7 @@ public:
 class MockSubscriptionFactory : public SubscriptionFactory {
 public:
   MockSubscriptionFactory();
-  ~MockSubscriptionFactory();
+  ~MockSubscriptionFactory() override;
 
   MOCK_METHOD4(subscriptionFromConfigSource,
                SubscriptionPtr(const envoy::api::v2::core::ConfigSource& config,

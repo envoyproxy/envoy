@@ -10,7 +10,7 @@ namespace Config {
 
 class SubscriptionFactory {
 public:
-  virtual ~SubscriptionFactory() {}
+  virtual ~SubscriptionFactory() = default;
 
   /**
    * Subscription factory interface.

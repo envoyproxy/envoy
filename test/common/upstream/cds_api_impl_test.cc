@@ -52,9 +52,9 @@ protected:
     });
   }
 
-  ClusterManager::ClusterInfoMap makeClusterMap(std::vector<std::string> clusters) {
+  ClusterManager::ClusterInfoMap makeClusterMap(std::vector<std::string>& clusters) {
     ClusterManager::ClusterInfoMap map;
-    for (auto cluster : clusters) {
+    for (const auto cluster& : clusters) {
       map.emplace(cluster, cm_.thread_local_cluster_.cluster_);
     }
     return map;

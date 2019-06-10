@@ -656,7 +656,7 @@ void ClusterManagerImpl::updateGauges() {
 }
 
 ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  auto& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry != cluster_manager.thread_local_clusters_.end()) {
