@@ -173,7 +173,17 @@ envoy_directory_genrule(
 filegroup(
     name = "route_corpus",
     testonly = 1,
-    srcs = [":corpus_from_config_impl"] + glob(["route_corpus/**"]),
+    srcs = select({
+        "ppc_build": [],
+        "//conditions:default": [":corpus_from_config_impl"],
+    }) + glob([
+        "route_corpus/**",
+    ]),
+)
+
+config_setting(
+    name = "ppc_build",
+    values = {"cpu": "ppc"},
 )
 
 envoy_cc_fuzz_test(
