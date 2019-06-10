@@ -120,11 +120,10 @@ message DiscoveryResponse {
 // debugging purposes only.
 //
 // DeltaDiscoveryRequest plays two independent roles. Any DeltaDiscoveryRequest
-// can be either or both of:
-//   1. informing the server of what resources the client has gained/lost interest in,
-//      (resource_names_subscribe and resource_names_unsubscribe)
-//   2. (N)ACKing an earlier resource update from the server
-//      (response_nonce, with presence of error_detail making it a NACK).
+// can be either or both of: [1] informing the server of what resources the
+// client has gained/lost interest in (using resource_names_subscribe and
+// resource_names_unsubscribe), or [2] (N)ACKing an earlier resource update from
+// the server (using response_nonce, with presence of error_detail making it a NACK).
 // Additionally, the first message (for a given type_url) of a reconnected gRPC stream
 // has a third role: informing the server of the resources (and their versions)
 // that the client already possesses, using the initial_resource_versions field.
@@ -169,13 +168,12 @@ message DeltaDiscoveryRequest {
   // A list of Resource names to remove from the list of tracked resources.
   repeated string resource_names_unsubscribe = 4;
 
-  // Informs the server of the versions of the resources the xDS client knows of, to enable an xDS
-  // session to continue in a reconnected gRPC stream.
-  // It will not be populated:
-  // * in the very first stream of a session, since the client will not yet have any resources.
-  // * in any message after the first in a stream (for a given type_url), since the server
-  //   will already be correctly tracking the client's state.
-  //   (In ADS, the first message *of each type_url* of a reconnected stream populates this map.)
+  // Informs the server of the versions of the resources the xDS client knows of, to enable the
+  // client to continue the same logical xDS session even in the face of gRPC stream reconnection.
+  // It will not be populated: [1] in the very first stream of a session, since the client will
+  // not yet have any resources,  [2] in any message after the first in a stream (for a given
+  // type_url), since the server will already be correctly tracking the client's state.
+  // (In ADS, the first message *of each type_url* of a reconnected stream populates this map.)
   // The map's keys are names of xDS resources known to the xDS client.
   // The map's values are opaque resource versions.
   map<string, string> initial_resource_versions = 5;
@@ -196,8 +194,8 @@ message DeltaDiscoveryResponse {
   // The version of the response data (used for debugging).
   string system_version_info = 1;
 
-  // The response resources. The Resource proto's Any field ('resource') should be
-  // of type type_url.
+  // The response resources. These are typed resources, whose types must match
+  // the type_url field.
   repeated Resource resources = 2 [(gogoproto.nullable) = false];
 
   // field id 3 IS available!
@@ -211,7 +209,7 @@ message DeltaDiscoveryResponse {
   repeated string removed_resources = 6;
 
   // The nonce provides a way for DeltaDiscoveryRequests to uniquely
-  // reference a DeltaDiscoveryResponse. The nonce is required.
+  // reference a DeltaDiscoveryResponse when (N)ACKing. The nonce is required.
   string nonce = 5;
 }
 
