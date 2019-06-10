@@ -31,7 +31,6 @@ public:
   }
   template <class T> static std::string resourceName_(const T& resource) { return resource.name(); }
 
-  // TODO(fredlas) deduplicate
   MOCK_METHOD2_T(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string& version_info));
   MOCK_METHOD3_T(onConfigUpdate,

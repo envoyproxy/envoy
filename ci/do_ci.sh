@@ -11,7 +11,7 @@ if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositor
   build_setup_args="-nofetch"
 fi
 
-. "$(dirname "$0")"/setup_gcs_cache.sh
+. "$(dirname "$0")"/setup_cache.sh
 . "$(dirname "$0")"/build_setup.sh $build_setup_args
 cd "${ENVOY_SRCDIR}"
 

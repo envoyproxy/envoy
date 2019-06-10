@@ -51,6 +51,7 @@ envoy_cc_test_library(
         ":common_proto_cc",
         "//source/common/network:utility_lib",
         "//test/common/stream_info:test_util",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],

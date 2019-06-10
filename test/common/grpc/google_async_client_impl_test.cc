@@ -68,7 +68,7 @@ public:
   std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
   MockStubFactory stub_factory_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  std::unique_ptr<GoogleAsyncClientImpl> grpc_client_;
+  AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
 };
 
 // Validate that a failure in gRPC stub call creation returns immediately with
@@ -79,8 +79,8 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, StreamHttpStartFail) {
   EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
   EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Unavailable, ""));
-  auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
-  EXPECT_EQ(grpc_stream, nullptr);
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
+  EXPECT_TRUE(grpc_stream == nullptr);
 }
 
 // Validate that a failure in gRPC stub call creation returns immediately with
@@ -106,7 +106,7 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, RequestHttpStartFail) {
 
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
                                           active_span, absl::optional<std::chrono::milliseconds>());
-  EXPECT_EQ(grpc_request, nullptr);
+  EXPECT_TRUE(grpc_request == nullptr);
 }
 
 } // namespace

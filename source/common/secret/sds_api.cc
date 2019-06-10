@@ -80,8 +80,6 @@ void SdsApi::validateUpdateSize(int num_resources) {
 void SdsApi::initialize() {
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       sds_config_, local_info_, dispatcher_, cluster_manager_, random_, stats_,
-      "envoy.service.discovery.v2.SecretDiscoveryService.FetchSecrets",
-      "envoy.service.discovery.v2.SecretDiscoveryService.StreamSecrets",
       Grpc::Common::typeUrl(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()),
       validation_visitor_, api_, *this);
   subscription_->start({sds_config_name_});

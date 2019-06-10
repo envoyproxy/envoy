@@ -45,7 +45,7 @@ TEST(GoogleGrpcUtilsTest, MakeByteBuffer1) {
   buffer->add("test", 4);
   auto byte_buffer = GoogleGrpcUtils::makeByteBuffer(std::move(buffer));
   std::vector<grpc::Slice> slices;
-  byte_buffer.Dump(&slices);
+  RELEASE_ASSERT(byte_buffer.Dump(&slices).ok(), "");
   std::string str;
   for (auto& s : slices) {
     str.append(std::string(reinterpret_cast<const char*>(s.begin()), s.size()));
@@ -64,7 +64,7 @@ TEST(GoogleGrpcUtilsTest, MakeByteBuffer3) {
   buffer->addBufferFragment(f3);
   auto byte_buffer = GoogleGrpcUtils::makeByteBuffer(std::move(buffer));
   std::vector<grpc::Slice> slices;
-  byte_buffer.Dump(&slices);
+  RELEASE_ASSERT(byte_buffer.Dump(&slices).ok(), "");
   std::string str;
   for (auto& s : slices) {
     str.append(std::string(reinterpret_cast<const char*>(s.begin()), s.size()));
