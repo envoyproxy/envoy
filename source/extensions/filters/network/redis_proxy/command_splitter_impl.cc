@@ -71,19 +71,28 @@ bool redirectionArgsInvalid(const Common::Redis::RespValue* original_request,
 }
 
 /**
- * Mirror the request based on the mirror policies of the route.
+ * Make request and maybe mirror the request based on the mirror policies of the route.
  * @param route supplies the route matched with the request.
  * @param command supplies the command of the request.
  * @param key supplies the key of the request.
  * @param incoming_request supplies the request.
+ * @param callbacks supplies the request completion callbacks.
+ * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
+ *         for some reason.
  */
-void mirrorRequest(const RouteSharedPtr& route, const std::string& command, const std::string& key,
-                   const Common::Redis::RespValue& incoming_request) {
-  for (auto& mirror_policy : route->mirrorPolicies()) {
-    if (mirror_policy->shouldMirror(command)) {
-      mirror_policy->upstream()->makeRequest(key, incoming_request, null_pool_callbacks);
+Common::Redis::Client::PoolRequest* makeRequest(const RouteSharedPtr& route,
+                                                const std::string& command, const std::string& key,
+                                                const Common::Redis::RespValue& incoming_request,
+                                                Common::Redis::Client::PoolCallbacks& callbacks) {
+  auto handler = route->upstream()->makeRequest(key, incoming_request, callbacks);
+  if (handler) {
+    for (auto& mirror_policy : route->mirrorPolicies()) {
+      if (mirror_policy->shouldMirror(command)) {
+        mirror_policy->upstream()->makeRequest(key, incoming_request, null_pool_callbacks);
+      }
     }
   }
+  return handler;
 }
 } // namespace
 
@@ -153,10 +162,11 @@ SplitRequestPtr SimpleRequest::create(Router& router,
       new SimpleRequest(callbacks, command_stats, time_source, latency_in_micros)};
 
   std::string& key = incoming_request->asArray()[1].asString();
-  auto route = router.upstreamPool(key);
+  const auto route = router.upstreamPool(key);
   if (route) {
     request_ptr->conn_pool_ = route->upstream();
-    request_ptr->handle_ = route->upstream()->makeRequest(key, *incoming_request, *request_ptr);
+    request_ptr->handle_ = makeRequest(route, incoming_request->asArray()[0].asString(), key,
+                                       *incoming_request, *request_ptr);
   }
 
   if (!request_ptr->handle_) {
@@ -164,7 +174,6 @@ SplitRequestPtr SimpleRequest::create(Router& router,
     return nullptr;
   }
 
-  mirrorRequest(route, incoming_request->asArray()[0].asString(), key, *incoming_request);
   request_ptr->incoming_request_ = std::move(incoming_request);
   return request_ptr;
 }
@@ -184,10 +193,11 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
       new EvalRequest(callbacks, command_stats, time_source, latency_in_micros)};
 
   std::string& key = incoming_request->asArray()[3].asString();
-  auto route = router.upstreamPool(key);
+  const auto route = router.upstreamPool(key);
   if (route) {
     request_ptr->conn_pool_ = route->upstream();
-    request_ptr->handle_ = route->upstream()->makeRequest(key, *incoming_request, *request_ptr);
+    request_ptr->handle_ = makeRequest(route, incoming_request->asArray()[0].asString(), key,
+                                       *incoming_request, *request_ptr);
   }
 
   if (!request_ptr->handle_) {
@@ -196,7 +206,6 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
     return nullptr;
   }
 
-  mirrorRequest(route, incoming_request->asArray()[0].asString(), key, *incoming_request);
   request_ptr->incoming_request_ = std::move(incoming_request);
   return request_ptr;
 }
@@ -251,13 +260,10 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
     std::string& key = incoming_request->asArray()[i].asString();
     single_mget.asArray()[1].asString() = key;
     ENVOY_LOG(debug, "redis: parallel get: '{}'", single_mget.toString());
-    auto route = router.upstreamPool(key);
+    const auto route = router.upstreamPool(key);
     if (route) {
       pending_request.conn_pool_ = route->upstream();
-      pending_request.handle_ = route->upstream()->makeRequest(key, single_mget, pending_request);
-      if (pending_request.handle_) {
-        mirrorRequest(route, "get", key, single_mget);
-      }
+      pending_request.handle_ = makeRequest(route, "get", key, single_mget, pending_request);
     }
 
     if (!pending_request.handle_) {
@@ -386,13 +392,10 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
     single_mset.asArray()[2].asString() = incoming_request->asArray()[i + 1].asString();
 
     ENVOY_LOG(debug, "redis: parallel set: '{}'", single_mset.toString());
-    auto route = router.upstreamPool(key);
+    const auto route = router.upstreamPool(key);
     if (route) {
       pending_request.conn_pool_ = route->upstream();
-      pending_request.handle_ = route->upstream()->makeRequest(key, single_mset, pending_request);
-      if (pending_request.handle_) {
-        mirrorRequest(route, "set", key, single_mset);
-      }
+      pending_request.handle_ = makeRequest(route, "set", key, single_mset, pending_request);
     }
 
     if (!pending_request.handle_) {
@@ -483,14 +486,11 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
     single_fragment.asArray()[1].asString() = key;
     ENVOY_LOG(debug, "redis: parallel {}: '{}'", incoming_request->asArray()[0].asString(),
               single_fragment.toString());
-    auto route = router.upstreamPool(key);
+    const auto route = router.upstreamPool(key);
     if (route) {
       pending_request.conn_pool_ = route->upstream();
-      pending_request.handle_ =
-          route->upstream()->makeRequest(key, single_fragment, pending_request);
-      if (pending_request.handle_) {
-        mirrorRequest(route, single_fragment.asArray()[0].asString(), key, single_fragment);
-      }
+      pending_request.handle_ = makeRequest(route, single_fragment.asArray()[0].asString(), key,
+                                            single_fragment, pending_request);
     }
 
     if (!pending_request.handle_) {

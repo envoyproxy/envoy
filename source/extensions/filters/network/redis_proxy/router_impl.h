@@ -30,7 +30,6 @@ public:
   MirrorPolicyImpl(const envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes::
                        Route::RequestMirrorPolicy&,
                    const ConnPool::InstanceSharedPtr, Runtime::Loader& runtime);
-  ~MirrorPolicyImpl() = default;
 
   ConnPool::InstanceSharedPtr upstream() const override { return upstream_; };
 
@@ -51,7 +50,7 @@ public:
       Upstreams& upstreams, Runtime::Loader& runtime);
 
   ConnPool::InstanceSharedPtr upstream() const override { return upstream_; }
-  const MirrorPolicies& mirrorPolicies() const override { return mirrorPolicies_; };
+  const MirrorPolicies& mirrorPolicies() const override { return mirror_policies_; };
   const std::string& prefix() const { return prefix_; }
   bool removePrefix() const { return remove_prefix_; }
 
@@ -59,10 +58,10 @@ private:
   const std::string prefix_;
   const bool remove_prefix_;
   const ConnPool::InstanceSharedPtr upstream_;
-  MirrorPolicies mirrorPolicies_;
+  MirrorPolicies mirror_policies_;
 };
 
-typedef std::shared_ptr<Prefix> PrefixPtr;
+typedef std::shared_ptr<Prefix> PrefixSharedPtr;
 
 class PrefixRoutes : public Router {
 public:
@@ -73,7 +72,7 @@ public:
   RouteSharedPtr upstreamPool(std::string& key) override;
 
 private:
-  TrieLookupTable<PrefixPtr> prefix_lookup_table_;
+  TrieLookupTable<PrefixSharedPtr> prefix_lookup_table_;
   const ToLowerTable to_lower_table_;
   const bool case_insensitive_;
   Upstreams upstreams_;

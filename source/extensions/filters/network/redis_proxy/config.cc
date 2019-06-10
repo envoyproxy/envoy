@@ -7,6 +7,8 @@
 #include "extensions/filters/network/redis_proxy/proxy_filter.h"
 #include "extensions/filters/network/redis_proxy/router_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -14,7 +16,7 @@ namespace RedisProxy {
 
 namespace {
 inline void addUniqueClusters(
-    std::set<std::string>& clusters,
+    absl::flat_hash_set<std::string>& clusters,
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy_PrefixRoutes_Route& route) {
   clusters.emplace(route.cluster());
   for (auto& mirror : route.request_mirror_policy()) {
@@ -43,14 +45,13 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       throw EnvoyException("cannot configure a redis-proxy without any upstream");
     }
 
-    //    prefix_routes.set_catch_all_cluster(proto_config.cluster());
     prefix_routes.mutable_catch_all_route()->set_cluster(proto_config.cluster());
   } else if (!prefix_routes.catch_all_cluster().empty() && !prefix_routes.has_catch_all_route()) {
     // Set the catch-all route from the deprecated catch-all cluster.
     prefix_routes.mutable_catch_all_route()->set_cluster(prefix_routes.catch_all_cluster());
   }
 
-  std::set<std::string> unique_clusters;
+  absl::flat_hash_set<std::string> unique_clusters;
   for (auto& route : prefix_routes.routes()) {
     addUniqueClusters(unique_clusters, route);
   }

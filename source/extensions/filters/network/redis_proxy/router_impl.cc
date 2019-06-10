@@ -5,7 +5,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-// MirrorPolicy
 MirrorPolicyImpl::MirrorPolicyImpl(const envoy::config::filter::network::redis_proxy::v2::
                                        RedisProxy::PrefixRoutes::Route::RequestMirrorPolicy& config,
                                    const ConnPool::InstanceSharedPtr upstream,
@@ -32,14 +31,13 @@ bool MirrorPolicyImpl::shouldMirror(const std::string& command) const {
   return true;
 }
 
-// Prefix
 Prefix::Prefix(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes::Route route,
     Upstreams& upstreams, Runtime::Loader& runtime)
     : prefix_(route.prefix()), remove_prefix_(route.remove_prefix()),
       upstream_(upstreams.at(route.cluster())) {
   for (auto const& mirror_policy : route.request_mirror_policy()) {
-    mirrorPolicies_.emplace_back(std::make_shared<MirrorPolicyImpl>(
+    mirror_policies_.emplace_back(std::make_shared<MirrorPolicyImpl>(
         mirror_policy, upstreams.at(mirror_policy.cluster()), runtime));
   }
 }
@@ -68,7 +66,7 @@ PrefixRoutes::PrefixRoutes(
 }
 
 RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
-  PrefixPtr value = nullptr;
+  PrefixSharedPtr value = nullptr;
   if (case_insensitive_) {
     std::string copy(key);
     to_lower_table_.toLowerCase(copy);
