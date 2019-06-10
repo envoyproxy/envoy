@@ -33,6 +33,7 @@ Version history
 * original_src filter: added the :ref:`filter<config_http_filters_original_src>`.
 * rbac: migrated from v2alpha to v2.
 * redis: add support for Redis cluster custom cluster type.
+* redis: automatically route commands using cluster slots for Redis cluster.
 * redis: added :ref:`prefix routing <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.prefix_routes>` to enable routing commands based on their key's prefix to different upstream.
 * redis: add support for zpopmax and zpopmin commands.
 * redis: added

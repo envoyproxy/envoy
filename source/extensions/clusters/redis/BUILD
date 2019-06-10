@@ -9,12 +9,37 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "crc16_lib",
+    srcs = [
+        "crc16.cc",
+        "crc16.h",
+    ],
+)
+
+envoy_cc_library(
+    name = "redis_cluster_lb",
+    srcs = [
+        "redis_cluster_lb.cc",
+        "redis_cluster_lb.h",
+    ],
+    deps = [
+        ":crc16_lib",
+        "//include/envoy/upstream:thread_local_cluster_interface",
+        "//include/envoy/upstream:upstream_interface",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//source/extensions/clusters:well_known_names",
+    ],
+)
+
+envoy_cc_library(
     name = "redis_cluster",
     srcs = [
         "redis_cluster.cc",
         "redis_cluster.h",
     ],
     deps = [
+        "redis_cluster_lb",
         "//include/envoy/api:api_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/upstream:cluster_factory_interface",
