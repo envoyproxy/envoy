@@ -10,7 +10,7 @@ namespace Ssl {
 
 class PrivateKeyConnectionCallbacks {
 public:
-  virtual ~PrivateKeyConnectionCallbacks() {}
+  virtual ~PrivateKeyConnectionCallbacks() = default;
 
   /**
    * Callback function which is called when the asynchronous private key

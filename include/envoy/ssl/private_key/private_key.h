@@ -24,7 +24,7 @@ typedef std::shared_ptr<SSL_PRIVATE_KEY_METHOD> BoringSslPrivateKeyMethodSharedP
 
 class PrivateKeyMethodProvider {
 public:
-  virtual ~PrivateKeyMethodProvider() {}
+  virtual ~PrivateKeyMethodProvider() = default;
 
   /**
    * Register an SSL connection to private key operations by the provider.
@@ -65,7 +65,7 @@ typedef std::shared_ptr<PrivateKeyMethodProvider> PrivateKeyMethodProviderShared
  */
 class PrivateKeyMethodManager {
 public:
-  virtual ~PrivateKeyMethodManager() {}
+  virtual ~PrivateKeyMethodManager() = default;
 
   /**
    * Finds and returns a private key operations provider for BoringSSL.

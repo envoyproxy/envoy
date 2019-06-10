@@ -26,9 +26,7 @@ void RsaPrivateKeyConnection::delayed_op() {
 static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* out_len,
                                                size_t max_out, uint16_t signature_algorithm,
                                                const uint8_t* in, size_t in_len) {
-  RSA* rsa;
   bssl::ScopedEVP_MD_CTX ctx;
-  const EVP_MD* md;
   RsaPrivateKeyConnection* ops = static_cast<RsaPrivateKeyConnection*>(
       SSL_get_ex_data(ssl, RsaPrivateKeyMethodProvider::ssl_rsa_connection_index));
   unsigned char hash[EVP_MAX_MD_SIZE];
@@ -48,12 +46,12 @@ static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* o
     return ssl_private_key_failure;
   }
 
-  rsa = ops->getPrivateKey();
+  RSA* rsa = ops->getPrivateKey();
   if (rsa == nullptr) {
     return ssl_private_key_failure;
   }
 
-  md = SSL_get_signature_algorithm_digest(signature_algorithm);
+  const EVP_MD* md = SSL_get_signature_algorithm_digest(signature_algorithm);
   if (!md) {
     return ssl_private_key_failure;
   }
@@ -96,7 +94,6 @@ static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* o
 static ssl_private_key_result_t privateKeyDecrypt(SSL* ssl, uint8_t* out, size_t* out_len,
                                                   size_t max_out, const uint8_t* in,
                                                   size_t in_len) {
-  RSA* rsa;
   RsaPrivateKeyConnection* ops = static_cast<RsaPrivateKeyConnection*>(
       SSL_get_ex_data(ssl, RsaPrivateKeyMethodProvider::ssl_rsa_connection_index));
 
@@ -114,7 +111,7 @@ static ssl_private_key_result_t privateKeyDecrypt(SSL* ssl, uint8_t* out, size_t
     return ssl_private_key_failure;
   }
 
-  rsa = ops->getPrivateKey();
+  RSA* rsa = ops->getPrivateKey();
   if (rsa == nullptr) {
     return ssl_private_key_failure;
   }

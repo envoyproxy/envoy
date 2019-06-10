@@ -23,15 +23,11 @@ void EcdsaPrivateKeyConnection::delayed_op() {
   timer_->enableTimer(timeout_0ms);
 }
 
-static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* out_len,
-                                               size_t max_out, uint16_t signature_algorithm,
-                                               const uint8_t* in, size_t in_len) {
-  (void)out_len;
-  (void)max_out;
-  (void)signature_algorithm;
+static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t*, size_t,
+                                               uint16_t signature_algorithm, const uint8_t* in,
+                                               size_t in_len) {
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int hash_len;
-  const EVP_MD* md;
   bssl::ScopedEVP_MD_CTX ctx;
   EcdsaPrivateKeyConnection* ops = static_cast<EcdsaPrivateKeyConnection*>(
       SSL_get_ex_data(ssl, EcdsaPrivateKeyMethodProvider::ssl_ecdsa_connection_index));
@@ -46,7 +42,7 @@ static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* o
     return ssl_private_key_failure;
   }
 
-  md = SSL_get_signature_algorithm_digest(signature_algorithm);
+  const EVP_MD* md = SSL_get_signature_algorithm_digest(signature_algorithm);
   if (!md) {
     return ssl_private_key_failure;
   }
@@ -70,16 +66,8 @@ static ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* o
   return ssl_private_key_retry;
 }
 
-static ssl_private_key_result_t privateKeyDecrypt(SSL* ssl, uint8_t* out, size_t* out_len,
-                                                  size_t max_out, const uint8_t* in,
-                                                  size_t in_len) {
-  (void)ssl;
-  (void)out;
-  (void)out_len;
-  (void)max_out;
-  (void)in;
-  (void)in_len;
-
+static ssl_private_key_result_t privateKeyDecrypt(SSL*, uint8_t*, size_t*, size_t, const uint8_t*,
+                                                  size_t) {
   return ssl_private_key_failure;
 }
 

@@ -11,7 +11,7 @@ namespace Ssl {
 
 class PrivateKeyMethodProviderInstanceFactory {
 public:
-  virtual ~PrivateKeyMethodProviderInstanceFactory() {}
+  virtual ~PrivateKeyMethodProviderInstanceFactory() = default;
   virtual PrivateKeyMethodProviderSharedPtr
   createPrivateKeyMethodProviderInstance(const envoy::api::v2::auth::PrivateKeyMethod& message,
                                          Server::Configuration::TransportSocketFactoryContext&
