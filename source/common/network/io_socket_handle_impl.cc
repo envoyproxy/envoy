@@ -184,12 +184,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     Address::InstanceConstSharedPtr& local_address,
                                                     Address::InstanceConstSharedPtr& peer_address) {
 
+#ifndef __APPLE__
   // The minimum cmsg buffer size to filled in destination address and packets dropped when
   // receiving a packet. It is possible for a received packet to contain both IPv4 and IPv6
   // addresses.
   constexpr int cmsg_space = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
                              CMSG_SPACE(sizeof(struct in6_pktinfo));
-#ifndef __APPLE__
   char cbuf[cmsg_space];
 #else
   // CMSG_SPACE() is supposed to be a constant expression, and most
@@ -222,7 +222,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   // and should cause a quick death if ever violated, since NaCl startup
   // code involves the use of descriptor passing through the affected
   // code.)
-  char cbuf[128];
+  constexpr int cmsg_space = 128;
+  char cbuf[cmsg_space];
 #endif
 
   STACK_ARRAY(iov, iovec, num_slice);
