@@ -273,6 +273,13 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
         sslConnectionInfoStringTimeHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.expirationPeerCertificate();
         });
+  } else if (field_name == "UPSTREAM_REMOTE_ADDRESS") {
+    field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
+      if (stream_info.upstreamHost()) {
+        return stream_info.upstreamHost()->address()->asString();
+      }
+      return "";
+    };
   } else if (field_name.find("START_TIME") == 0) {
     const std::string pattern = fmt::format("%{}%", field_name);
     if (start_time_formatters_.find(pattern) == start_time_formatters_.end()) {
