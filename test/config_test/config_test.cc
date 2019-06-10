@@ -6,6 +6,7 @@
 
 #include "common/common/fmt.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "server/config_validation/server.h"
 #include "server/configuration_impl.h"
@@ -39,6 +40,15 @@ OptionsImpl asConfigYaml(const OptionsImpl& src, Api::Api& api) {
                                               src.localAddressIpVersion());
 }
 
+class ScopedRuntimeInjector {
+public:
+  ScopedRuntimeInjector(Runtime::Loader& runtime) {
+    Runtime::LoaderSingleton::initialize(&runtime);
+  }
+
+  ~ScopedRuntimeInjector() { Runtime::LoaderSingleton::clear(); }
+};
+
 } // namespace
 
 class ConfigTest {
@@ -54,6 +64,20 @@ public:
     ON_CALL(file_system_, fileReadToEnd(StrNe("/etc/envoy/lightstep_access_token")))
         .WillByDefault(Invoke([&](const std::string& file) -> std::string {
           return api_->fileSystem().fileReadToEnd(file);
+        }));
+
+    // Here we setup runtime to mimic the actual deprecated feature list used in the
+    // production code. Note that this test is actually more strict than production because
+    // in production runtime is not setup until after the bootstrap config is loaded. This seems
+    // better for configuration tests.
+    ScopedRuntimeInjector scoped_runtime(server_.runtime());
+    ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_))
+        .WillByDefault(Invoke([](const std::string& key) {
+          if (Runtime::RuntimeFeaturesDefaults::get().disallowedByDefault(key)) {
+            return false;
+          } else {
+            return true;
+          }
         }));
 
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
