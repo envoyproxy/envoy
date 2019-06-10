@@ -75,7 +75,7 @@ public class MainActivity extends Activity {
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         int status = connection.getResponseCode();
         if (status != 200) {
-            Log.d("MainActivity", "non 200 status: " + status);
+            throw new IOException("non 200 status: " + status);
         }
 
         List<String> serverHeaderField = connection.getHeaderFields().get("server");
