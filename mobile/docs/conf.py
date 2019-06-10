@@ -69,15 +69,11 @@ blob_sha = os.environ['ENVOY_BLOB_SHA']
 # ones.
 extensions = ['sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig']
 extlinks = {
-    'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), ''),
-    'api': ('https://github.com/envoyproxy/envoy/blob/{}/api/%s'.format(blob_sha), ''),
+    'repo': ('https://github.com/lyft/envoy-mobile/blob/{}/%s'.format(blob_sha), ''),
 }
 
 # Setup global substitutions
-if 'pre-release' in release_level:
-  substitutions = [('|envoy_docker_image|', 'envoy-dev:{}'.format(blob_sha))]
-else:
-  substitutions = [('|envoy_docker_image|', 'envoy:{}'.format(blob_sha))]
+# substitutions = []
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -94,7 +90,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'envoy'
+project = u'envoy-mobile'
 copyright = u'2019-{}, Lyft'.format(datetime.now().year)
 author = u'Lyft'
 
