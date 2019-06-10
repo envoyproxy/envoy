@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/filter/http/cache/v2alpha/cache.pb.h"
+#include "envoy/config/filter/http/cache/v2alpha/cache.pb.validate.h"
 
 #include "extensions/filters/http/cache/cache_filter.h"
 #include "extensions/filters/http/common/factory_base.h"

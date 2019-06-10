@@ -14,6 +14,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
+namespace {
 
 using absl::string_view;
 using Event::SimulatedTimeSystem;
@@ -21,6 +22,7 @@ using Http::Headers;
 using Http::TestHeaderMapImpl;
 using Registry::FactoryRegistry;
 using std::string;
+using std::vector;
 using testing::Combine;
 using testing::get;
 using testing::tuple;
@@ -28,7 +30,7 @@ using testing::Values;
 using testing::ValuesIn;
 using testing::WithParamInterface;
 
-static constexpr char kEpochDate[] = "Thu, 01 Jan 1970 00:00:00 GMT";
+const string kEpochDate = "Thu, 01 Jan 1970 00:00:00 GMT";
 
 class SimpleHttpCacheTest : public testing::Test {
 protected:
@@ -60,7 +62,7 @@ protected:
     insert(lookup(request_path), response_headers, response_body);
   }
 
-  string getBody(LookupContext& context, int start, int end) {
+  string getBody(LookupContext& context, uint64_t start, uint64_t end) {
     AdjustedByteRange range(start, end);
     string body;
     context.getBody(range, [&body](Buffer::InstancePtr&& data) {
@@ -89,7 +91,7 @@ protected:
     if (!lookup_context) {
       return AssertionFailure() << "Expected nonnull lookup_context";
     }
-    const string actual_body = getBody(*lookup_context, 0, body.size() - 1);
+    const string actual_body = getBody(*lookup_context, 0, body.size() - 1u);
     if (body != actual_body) {
       return AssertionFailure() << "Expected body == " << body << "\n  Actual:  " << actual_body;
     }
@@ -166,29 +168,24 @@ TEST_P(SimpleHttpCacheTest1Response, Expired) {
   EXPECT_EQ(expectedStatus(), lookup_result_.cache_entry_status);
 }
 
-auto expiredHeaders() {
-  const TestHeaderMapImpl expired_headers[] = {
-      {{"date", "Thu, 01 Jan 2100 00:00:00 GMT"}, {"cache-control", "public, max-age=3600"}},
-      {{"cache-control", "public, s-max-age=-1"}},
-      {{"cache-control", "public, max-age=-1"}},
-      {{"date", "foo"}},
-      {{"date", kEpochDate}, {"expires", "foo"}},
-      {{"expires", kEpochDate}, {"cache-control", "public"}},
-      {{"age", "2"}, {"cache-control", "public"}},
-      {{"age", "6000"}}};
-  return ValuesIn(expired_headers);
-}
+const vector<TestHeaderMapImpl> expired_headers = {
+    {{"date", "Thu, 01 Jan 2100 00:00:00 GMT"}, {"cache-control", "public, max-age=3600"}},
+    {{"cache-control", "public, s-max-age=-1"}},
+    {{"cache-control", "public, max-age=-1"}},
+    {{"date", "foo"}},
+    {{"date", kEpochDate}, {"expires", "foo"}},
+    {{"expires", kEpochDate}, {"cache-control", "public"}},
+    {{"age", "2"}, {"cache-control", "public"}},
+    {{"age", "6000"}}};
 
-auto okHeaders() {
-  const TestHeaderMapImpl ok_headers[] = {{{"cache-control", "public, max-age=3600"}}};
-  return ValuesIn(ok_headers);
-};
+const vector<TestHeaderMapImpl> ok_headers = {{{"cache-control", "public, max-age=3600"}}};
 
 INSTANTIATE_TEST_SUITE_P(Expired, SimpleHttpCacheTest1Response,
-                         Combine(Values(CacheEntryStatus::RequiresValidation), expiredHeaders()));
+                         Combine(Values(CacheEntryStatus::RequiresValidation),
+                                 ValuesIn(expired_headers)));
 
 INSTANTIATE_TEST_SUITE_P(Ok, SimpleHttpCacheTest1Response,
-                         Combine(Values(CacheEntryStatus::Ok), okHeaders()));
+                         Combine(Values(CacheEntryStatus::Ok), ValuesIn(ok_headers)));
 
 TEST_F(SimpleHttpCacheTest, RequestSmallMinFresh) {
   request_headers_.setReferenceKey(Headers::get().CacheControl, "min-fresh=1000");
@@ -242,6 +239,7 @@ TEST(Registration, getFactory) {
   EXPECT_EQ(factory->getCache().cacheInfo().name_, "SimpleHttpCache");
 }
 
+} // namespace
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

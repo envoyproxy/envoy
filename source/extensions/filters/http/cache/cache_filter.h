@@ -43,9 +43,9 @@ private:
   void onUnusableHeaders();
   void onBody(Envoy::Buffer::InstancePtr&& body);
   void onTrailers(Http::HeaderMapPtr&& trailers);
-  static void onHeadersAsync(CacheFilterSharedPtr self, LookupResult&& result);
-  static void onBodyAsync(CacheFilterSharedPtr self, Envoy::Buffer::InstancePtr&& body);
-  static void onTrailersAsync(CacheFilterSharedPtr self, Http::HeaderMapPtr&& trailers);
+  static void onHeadersAsync(const CacheFilterSharedPtr& self, LookupResult&& result);
+  static void onBodyAsync(const CacheFilterSharedPtr& self, Envoy::Buffer::InstancePtr&& body);
+  static void onTrailersAsync(const CacheFilterSharedPtr& self, Http::HeaderMapPtr&& trailers);
   void post(std::function<void()> f) const;
 
   TimeSource& time_source_;

@@ -122,7 +122,7 @@ void CacheFilter::onUnusableHeaders() {
   }
 }
 
-void CacheFilter::onHeadersAsync(CacheFilterSharedPtr self, LookupResult&& result) {
+void CacheFilter::onHeadersAsync(const CacheFilterSharedPtr& self, LookupResult&& result) {
   switch (result.cache_entry_status) {
   case CacheEntryStatus::RequiresValidation:
   case CacheEntryStatus::FoundNotModified:
@@ -151,7 +151,7 @@ void CacheFilter::getBody() {
                    [self](Buffer::InstancePtr&& body) { self->onBody(std::move(body)); });
 }
 
-void CacheFilter::onBodyAsync(CacheFilterSharedPtr self, Buffer::InstancePtr&& body) {
+void CacheFilter::onBodyAsync(const CacheFilterSharedPtr& self, Buffer::InstancePtr&& body) {
   self->post([self, body = body.release()] { self->onBody(WrapUnique(body)); });
 }
 
@@ -193,7 +193,7 @@ void CacheFilter::onTrailers(HeaderMapPtr&& trailers) {
   }
 }
 
-void CacheFilter::onTrailersAsync(CacheFilterSharedPtr self, HeaderMapPtr&& trailers) {
+void CacheFilter::onTrailersAsync(const CacheFilterSharedPtr& self, HeaderMapPtr&& trailers) {
   self->post([self, trailers = trailers.release()] { self->onTrailers(WrapUnique(trailers)); });
 }
 

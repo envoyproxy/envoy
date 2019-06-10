@@ -10,7 +10,7 @@
 
 using absl::Duration;
 using absl::FromChrono;
-using absl::Seconds;
+using absl::ZeroDuration;
 using Envoy::Extensions::HttpFilters::Cache::Internal::effectiveMaxAge;
 using Envoy::Extensions::HttpFilters::Cache::Internal::httpTime;
 using Envoy::Http::HeaderEntry;
@@ -60,7 +60,7 @@ bool LookupRequest::fresh(const HeaderMap& response_headers) const {
   if (cache_control_header) {
     const Duration effective_max_age =
         effectiveMaxAge(cache_control_header->value().getStringView());
-    if (effective_max_age >= Seconds(0)) {
+    if (effective_max_age >= ZeroDuration()) {
       return FromChrono(timestamp_) - httpTime(response_headers.Date()) < effective_max_age;
     }
   }

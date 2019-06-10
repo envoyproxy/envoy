@@ -1,5 +1,6 @@
 #include "extensions/filters/http/cache/http_cache_utils.h"
 
+#include <array>
 #include <string>
 
 #include "absl/algorithm/container.h"
@@ -17,7 +18,9 @@ using absl::Seconds;
 using absl::SimpleAtoi;
 using absl::string_view;
 using absl::Time;
+using absl::ZeroDuration;
 using Envoy::Http::HeaderEntry;
+using std::array;
 using std::string;
 
 namespace Envoy {
@@ -78,7 +81,7 @@ Duration eatLeadingDuration(string_view* s) {
   const string_view::iterator digits_end = c_find_if_not(*s, &ascii_isdigit);
   const size_t digits_length = digits_end - s->begin();
   if (digits_length == 0) {
-    return Seconds(0);
+    return ZeroDuration();
   }
   const string_view digits(s->begin(), digits_length);
   s->remove_prefix(digits_length);
@@ -156,8 +159,8 @@ Time httpTime(const HeaderEntry* header_entry) {
   // Sun, 06 Nov 1994 08:49:37 GMT    ; IMF-fixdate
   // Sunday, 06-Nov-94 08:49:37 GMT   ; obsolete RFC 850 format
   // Sun Nov  6 08:49:37 1994         ; ANSI C's asctime() format
-  const string rfc7231_date_formats[] = {"%a, %d %b %Y %H:%M:%S GMT", "%A, %d-%b-%y %H:%M:%S GMT",
-                                         "%a %b %e %H:%M:%S %Y"};
+  const array<string, 3> rfc7231_date_formats = {
+      "%a, %d %b %Y %H:%M:%S GMT", "%A, %d-%b-%y %H:%M:%S GMT", "%a %b %e %H:%M:%S %Y"};
   for (const string& format : rfc7231_date_formats) {
     if (ParseTime(format, input, &time, nullptr)) {
       return time;

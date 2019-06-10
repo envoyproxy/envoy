@@ -1,3 +1,5 @@
+#include <vector>
+
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/http/cache/http_cache_utils.h"
@@ -25,7 +27,7 @@ protected:
   TestHeaderMapImpl response_headers_{{"date", GetParam()}};
 };
 
-const string ok_times[] = {
+const std::vector<string> ok_times = {
     "Sun, 06 Nov 1994 08:49:37 GMT",  // IMF-fixdate
     "Sunday, 06-Nov-94 08:49:37 GMT", // obsolete RFC 850 format
     "Sun Nov  6 08:49:37 1994"        // ANSI C's asctime() format
