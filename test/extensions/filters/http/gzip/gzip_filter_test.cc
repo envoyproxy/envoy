@@ -65,7 +65,7 @@ protected:
   void setUpFilter(std::string&& json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     envoy::config::filter::http::gzip::v2::Gzip gzip;
-    MessageUtil::loadFromJson(json, gzip);
+    TestUtility::loadFromJson(json, gzip);
     config_.reset(new GzipFilterConfig(gzip, "test.", stats_, runtime_));
     filter_ = std::make_unique<GzipFilter>(config_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -143,6 +143,21 @@ protected:
     EXPECT_EQ(TestUtility::flipOrder<uint32_t>(size), input_size);
   }
 
+  void expectValidCompressionStrategyAndLevel(
+      Compressor::ZlibCompressorImpl::CompressionStrategy strategy, absl::string_view strategy_name,
+      Compressor::ZlibCompressorImpl::CompressionLevel level, absl::string_view level_name) {
+    setUpFilter(fmt::format(R"EOF({{"compression_strategy": "{}", "compression_level": "{}"}})EOF",
+                            strategy_name, level_name));
+    EXPECT_EQ(strategy, config_->compressionStrategy());
+    EXPECT_EQ(level, config_->compressionLevel());
+    EXPECT_EQ(5, config_->memoryLevel());
+    EXPECT_EQ(30, config_->minimumLength());
+    EXPECT_EQ(28, config_->windowBits());
+    EXPECT_EQ(false, config_->disableOnEtagHeader());
+    EXPECT_EQ(false, config_->removeAcceptEncodingHeader());
+    EXPECT_EQ(8, config_->contentTypeValues().size());
+  }
+
   void doResponseNoCompression(Http::TestHeaderMapImpl&& headers) {
     uint64_t content_length;
     ASSERT_TRUE(absl::SimpleAtoi(headers.get_("content-length"), &content_length));
@@ -191,6 +206,21 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
   EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
             config_->compressionLevel());
   EXPECT_EQ(8, config_->contentTypeValues().size());
+}
+
+TEST_F(GzipFilterTest, AvailableCombinationCompressionStrategyAndLevelConfig) {
+  expectValidCompressionStrategyAndLevel(
+      Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered, "FILTERED",
+      Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
+  expectValidCompressionStrategyAndLevel(
+      Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman, "HUFFMAN",
+      Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
+  expectValidCompressionStrategyAndLevel(
+      Compressor::ZlibCompressorImpl::CompressionStrategy::Rle, "RLE",
+      Compressor::ZlibCompressorImpl::CompressionLevel::Speed, "SPEED");
+  expectValidCompressionStrategyAndLevel(
+      Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, "DEFAULT",
+      Compressor::ZlibCompressorImpl::CompressionLevel::Standard, "DEFAULT");
 }
 
 // Acceptance Testing with default configuration.

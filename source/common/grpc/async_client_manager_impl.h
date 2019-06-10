@@ -16,7 +16,7 @@ public:
                          const envoy::api::v2::core::GrpcService& config, bool skip_cluster_check,
                          TimeSource& time_source);
 
-  AsyncClientPtr create() override;
+  RawAsyncClientPtr create() override;
 
 private:
   Upstream::ClusterManager& cm_;
@@ -30,7 +30,7 @@ public:
                                Stats::Scope& scope, const envoy::api::v2::core::GrpcService& config,
                                Api::Api& api);
 
-  AsyncClientPtr create() override;
+  RawAsyncClientPtr create() override;
 
 private:
   ThreadLocal::Instance& tls_;

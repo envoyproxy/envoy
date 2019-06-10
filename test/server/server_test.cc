@@ -5,6 +5,7 @@
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
+#include "server/process_context_impl.h"
 #include "server/server.h"
 
 #include "test/integration/server.h"
@@ -39,7 +40,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   Stats::IsolatedStoreImpl store;
   Stats::Counter& c = store.counter("hello");
   c.inc();
-  store.gauge("world").set(5);
+  store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
   store.histogram("histogram");
 
   std::list<Stats::SinkPtr> sinks;
@@ -147,12 +148,16 @@ protected:
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
     }
     thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+    if (process_object_ != nullptr) {
+      process_context_ = std::make_unique<ProcessContextImpl>(*process_object_);
+    }
     server_ = std::make_unique<InstanceImpl>(
         options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
+        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+        std::move(process_context_));
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
@@ -170,7 +175,7 @@ protected:
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
+        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
@@ -187,12 +192,35 @@ protected:
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;
   DangerousDeprecatedTestTime test_time_;
+  ProcessObject* process_object_ = nullptr;
+  std::unique_ptr<ProcessContextImpl> process_context_;
   std::unique_ptr<InstanceImpl> server_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
+  absl::Notification started;
+
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    initialize("test/server/node_bootstrap.yaml");
+    auto startup_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
+                                                    [&] { started.Notify(); });
+    auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                                                     [&](Event::PostCb) { FAIL(); });
+    shutdown_handle = nullptr; // unregister callback
+    server_->run();
+    startup_handle = nullptr;
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  started.WaitForNotification();
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   bool startup = false, shutdown = false, shutdown_with_completion = false;
@@ -302,10 +330,30 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
 }
 
-// Validate server runtime is parsed from bootstrap.
+// Validate server runtime is parsed from bootstrap and that we can read from
+// service cluster specified disk-based overrides.
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
+  options_.service_cluster_name_ = "some_service";
   initialize("test/server/runtime_bootstrap.yaml");
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo"));
+  // This should access via the override/some_service overlay.
+  EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz"));
+}
+
+// Validate that a runtime absent an admin layer will fail mutating operations
+// but still support inspection of runtime values.
+TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
+  options_.service_cluster_name_ = "some_service";
+  initialize("test/server/runtime_bootstrap.yaml");
+  Http::TestHeaderMapImpl response_headers;
+  std::string response_body;
+  EXPECT_EQ(Http::Code::OK,
+            server_->admin().request("/runtime", "GET", response_headers, response_body));
+  EXPECT_THAT(response_body, HasSubstr("fozz"));
+  EXPECT_EQ(
+      Http::Code::ServiceUnavailable,
+      server_->admin().request("/runtime_modify?foo=bar", "POST", response_headers, response_body));
+  EXPECT_EQ("No admin layer specified", response_body);
 }
 
 // Validate invalid runtime in bootstrap is rejected.
@@ -432,7 +480,7 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
           Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest())),
+          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr)),
       EnvoyException, "At least one of --config-path and --config-yaml should be non-empty");
 }
 
@@ -491,6 +539,28 @@ TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
   // so we look for a successful dynamic cast to HttpTracerImpl, rather
   // than HttpNullTracer.
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpTracerImpl*>(tracer()));
+}
+
+class TestObject : public ProcessObject {
+public:
+  void setFlag(bool value) { boolean_flag_ = value; }
+
+  bool boolean_flag_ = true;
+};
+
+TEST_P(ServerInstanceImplTest, WithProcessContext) {
+  TestObject object;
+  process_object_ = &object;
+
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+
+  ProcessContext& context = server_->processContext();
+  auto& object_from_context = dynamic_cast<TestObject&>(context.get());
+  EXPECT_EQ(&object_from_context, &object);
+  EXPECT_TRUE(object_from_context.boolean_flag_);
+
+  object.boolean_flag_ = false;
+  EXPECT_FALSE(object_from_context.boolean_flag_);
 }
 
 } // namespace

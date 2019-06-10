@@ -51,9 +51,9 @@ TEST_F(HotRestartingParentTest, exportStatsToChild) {
   {
     store.counter("c1").inc();
     store.counter("c2").add(2);
-    store.gauge("g0").set(0);
-    store.gauge("g1").set(123);
-    store.gauge("g2").set(456);
+    store.gauge("g0", Stats::Gauge::ImportMode::Accumulate).set(0);
+    store.gauge("g1", Stats::Gauge::ImportMode::Accumulate).set(123);
+    store.gauge("g2", Stats::Gauge::ImportMode::Accumulate).set(456);
     HotRestartMessage::Reply::Stats stats;
     hot_restarting_parent_.exportStatsToChild(&stats);
     EXPECT_EQ(1, stats.counter_deltas().at("c1"));
@@ -65,8 +65,8 @@ TEST_F(HotRestartingParentTest, exportStatsToChild) {
   // When a counter has not changed since its last export, it should not be included in the message.
   {
     store.counter("c2").add(2);
-    store.gauge("g1").add(1);
-    store.gauge("g2").sub(1);
+    store.gauge("g1", Stats::Gauge::ImportMode::Accumulate).add(1);
+    store.gauge("g2", Stats::Gauge::ImportMode::Accumulate).sub(1);
     HotRestartMessage::Reply::Stats stats;
     hot_restarting_parent_.exportStatsToChild(&stats);
     EXPECT_EQ(stats.counter_deltas().end(), stats.counter_deltas().find("c1"));

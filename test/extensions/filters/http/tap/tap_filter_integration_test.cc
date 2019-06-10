@@ -194,7 +194,7 @@ config:
   ASSERT_NE(pb_file, files.end());
 
   envoy::data::tap::v2alpha::TraceWrapper trace;
-  MessageUtil::loadFromFile(*pb_file, trace, *api_);
+  TestUtility::loadFromFile(*pb_file, trace, *api_);
   EXPECT_TRUE(trace.has_http_buffered_trace());
 }
 
@@ -243,7 +243,7 @@ tap_config:
   // Wait for the tap message.
   admin_response_->waitForBodyData(1);
   envoy::data::tap::v2alpha::TraceWrapper trace;
-  MessageUtil::loadFromYaml(admin_response_->body(), trace);
+  TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ(trace.http_buffered_trace().request().headers().size(), 8);
   EXPECT_EQ(trace.http_buffered_trace().response().headers().size(), 4);
   admin_response_->clearBody();
@@ -256,7 +256,7 @@ tap_config:
 
   // Wait for the tap message.
   admin_response_->waitForBodyData(1);
-  MessageUtil::loadFromYaml(admin_response_->body(), trace);
+  TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ(trace.http_buffered_trace().request().headers().size(), 7);
   EXPECT_EQ(
       "http",
@@ -302,7 +302,7 @@ tap_config:
 
   // Wait for the tap message.
   admin_response_->waitForBodyData(1);
-  MessageUtil::loadFromYaml(admin_response_->body(), trace);
+  TestUtility::loadFromYaml(admin_response_->body(), trace);
 
   admin_client_->close();
   EXPECT_EQ(3UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
@@ -340,7 +340,7 @@ tap_config:
 
   envoy::data::tap::v2alpha::TraceWrapper trace;
   admin_response_->waitForBodyData(1);
-  MessageUtil::loadFromYaml(admin_response_->body(), trace);
+  TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ("bar",
             findHeader("foo_trailer", trace.http_buffered_trace().request().trailers())->value());
   EXPECT_EQ("baz",
@@ -371,7 +371,7 @@ tap_config:
               nullptr);
   envoy::data::tap::v2alpha::TraceWrapper trace;
   admin_response_->waitForBodyData(1);
-  MessageUtil::loadFromYaml(admin_response_->body(), trace);
+  TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ("hello", trace.http_buffered_trace().request().body().as_bytes());
   EXPECT_FALSE(trace.http_buffered_trace().request().body().truncated());
   EXPECT_EQ("world", trace.http_buffered_trace().response().body().as_bytes());
@@ -403,7 +403,7 @@ tap_config:
               nullptr);
   envoy::data::tap::v2alpha::TraceWrapper trace;
   admin_response_->waitForBodyData(1);
-  MessageUtil::loadFromYaml(admin_response_->body(), trace);
+  TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ("hello", trace.http_buffered_trace().request().body().as_string());
   EXPECT_FALSE(trace.http_buffered_trace().request().body().truncated());
   EXPECT_EQ("world", trace.http_buffered_trace().response().body().as_string());
@@ -436,7 +436,7 @@ tap_config:
               nullptr);
   envoy::data::tap::v2alpha::TraceWrapper trace;
   admin_response_->waitForBodyData(1);
-  MessageUtil::loadFromYaml(admin_response_->body(), trace);
+  TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ("hel", trace.http_buffered_trace().request().body().as_bytes());
   EXPECT_TRUE(trace.http_buffered_trace().request().body().truncated());
   EXPECT_EQ("worl", trace.http_buffered_trace().response().body().as_bytes());

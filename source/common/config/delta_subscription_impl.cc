@@ -11,15 +11,15 @@ namespace Envoy {
 namespace Config {
 
 DeltaSubscriptionImpl::DeltaSubscriptionImpl(
-    const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
+    const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
     Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
     absl::string_view type_url, Runtime::RandomGenerator& random, Stats::Scope& scope,
-    const RateLimitSettings& rate_limit_settings, SubscriptionStats stats,
-    std::chrono::milliseconds init_fetch_timeout)
+    const RateLimitSettings& rate_limit_settings, SubscriptionCallbacks& callbacks,
+    SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
-      type_url_(type_url), local_info_(local_info), stats_(stats), dispatcher_(dispatcher),
-      init_fetch_timeout_(init_fetch_timeout) {}
+      type_url_(type_url), local_info_(local_info), callbacks_(callbacks), stats_(stats),
+      dispatcher_(dispatcher), init_fetch_timeout_(init_fetch_timeout) {}
 
 void DeltaSubscriptionImpl::pause() { state_->pause(); }
 void DeltaSubscriptionImpl::resume() {
@@ -28,12 +28,11 @@ void DeltaSubscriptionImpl::resume() {
 }
 
 // Config::Subscription
-void DeltaSubscriptionImpl::start(const std::set<std::string>& resources,
-                                  SubscriptionCallbacks& callbacks) {
-  state_ = std::make_unique<DeltaSubscriptionState>(type_url_, resources, callbacks, local_info_,
-                                                    init_fetch_timeout_, dispatcher_, stats_);
+void DeltaSubscriptionImpl::start(const std::set<std::string>& resource_names) {
+  state_ = std::make_unique<DeltaSubscriptionState>(
+      type_url_, resource_names, callbacks_, local_info_, init_fetch_timeout_, dispatcher_, stats_);
   grpc_stream_.establishNewStream();
-  updateResources(resources);
+  updateResources(resource_names);
 }
 
 void DeltaSubscriptionImpl::updateResources(const std::set<std::string>& update_to_these_names) {

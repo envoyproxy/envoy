@@ -33,8 +33,8 @@ TEST(GoogleGrpcUtilsTest, MakeBufferInstance1) {
 
 // Test building a Buffer::Instance from 3 grpc::Slice(s).
 TEST(GoogleGrpcUtilsTest, MakeBufferInstance3) {
-  std::array<grpc::Slice, 3> slices = {grpc::string("test"), grpc::string(" "),
-                                       grpc::string("this")};
+  std::array<grpc::Slice, 3> slices = {
+      {grpc::string("test"), grpc::string(" "), grpc::string("this")}};
   grpc::ByteBuffer byte_buffer(&slices[0], 3);
   auto buffer_instance = GoogleGrpcUtils::makeBufferInstance(byte_buffer);
   EXPECT_EQ(buffer_instance->toString(), "test this");
@@ -45,7 +45,7 @@ TEST(GoogleGrpcUtilsTest, MakeByteBuffer1) {
   buffer->add("test", 4);
   auto byte_buffer = GoogleGrpcUtils::makeByteBuffer(std::move(buffer));
   std::vector<grpc::Slice> slices;
-  byte_buffer.Dump(&slices);
+  RELEASE_ASSERT(byte_buffer.Dump(&slices).ok(), "");
   std::string str;
   for (auto& s : slices) {
     str.append(std::string(reinterpret_cast<const char*>(s.begin()), s.size()));
@@ -64,7 +64,7 @@ TEST(GoogleGrpcUtilsTest, MakeByteBuffer3) {
   buffer->addBufferFragment(f3);
   auto byte_buffer = GoogleGrpcUtils::makeByteBuffer(std::move(buffer));
   std::vector<grpc::Slice> slices;
-  byte_buffer.Dump(&slices);
+  RELEASE_ASSERT(byte_buffer.Dump(&slices).ok(), "");
   std::string str;
   for (auto& s : slices) {
     str.append(std::string(reinterpret_cast<const char*>(s.begin()), s.size()));
@@ -74,8 +74,8 @@ TEST(GoogleGrpcUtilsTest, MakeByteBuffer3) {
 
 // Test building a Buffer::Instance from a grpc::ByteBuffer from a Bufffer::Instance with 3 slices.
 TEST(GoogleGrpcUtilsTest, ByteBufferInstanceRoundTrip) {
-  std::array<grpc::Slice, 3> slices = {grpc::string("test"), grpc::string(" "),
-                                       grpc::string("this")};
+  std::array<grpc::Slice, 3> slices = {
+      {grpc::string("test"), grpc::string(" "), grpc::string("this")}};
   grpc::ByteBuffer byte_buffer(&slices[0], 3);
   auto buffer_instance1 = GoogleGrpcUtils::makeBufferInstance(byte_buffer);
   auto byte_buffer2 = GoogleGrpcUtils::makeByteBuffer(std::move(buffer_instance1));

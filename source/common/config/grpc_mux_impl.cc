@@ -8,8 +8,8 @@
 namespace Envoy {
 namespace Config {
 
-GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
-                         Event::Dispatcher& dispatcher,
+GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
+                         Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings)
@@ -23,7 +23,7 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
 GrpcMuxImpl::~GrpcMuxImpl() {
   for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second.watches_) {
-      watch->inserted_ = false;
+      watch->clear();
     }
   }
 }

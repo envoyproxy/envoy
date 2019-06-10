@@ -68,7 +68,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
   envoy::api::v2::RouteConfiguration route_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
-  MessageUtil::loadFromFile(router_config_file, route_config, *api);
+  TestUtility::loadFromFile(router_config_file, route_config, *api);
 
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
@@ -84,12 +84,14 @@ RouterCheckTool::RouterCheckTool(
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
       stats_(std::move(stats)), api_(std::move(api)) {}
 
+// TODO(jyotima): Remove this code path once the json schema code path is deprecated.
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json, *api_);
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
 
   bool no_failures = true;
   for (const Json::ObjectSharedPtr& check_config : loader->asObjectArray()) {
+    headers_finalized_ = false;
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
@@ -157,12 +159,13 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
   const std::string contents = api->fileSystem().fileReadToEnd(expected_routes);
-  MessageUtil::loadFromFile(expected_routes, validation_config, *api);
+  TestUtility::loadFromFile(expected_routes, validation_config, *api);
   MessageUtil::validate(validation_config);
 
   bool no_failures = true;
   for (const envoy::RouterCheckToolSchema::ValidationItem& check_config :
        validation_config.tests()) {
+    headers_finalized_ = false;
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
@@ -264,8 +267,12 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
   Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
                                                 factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
-                                                             true);
+    if (!headers_finalized_) {
+      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
+                                                               true);
+      headers_finalized_ = true;
+    }
+
     actual = tool_config.headers_->get_(Http::Headers::get().Path);
   }
   return compareResults(actual, expected, "path_rewrite");
@@ -287,8 +294,12 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
   Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
                                                 factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
-                                                             true);
+    if (!headers_finalized_) {
+      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
+                                                               true);
+      headers_finalized_ = true;
+    }
+
     actual = tool_config.headers_->get_(Http::Headers::get().Host);
   }
   return compareResults(actual, expected, "host_rewrite");
@@ -383,5 +394,42 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
               << "], test type: " << test_type << std::endl;
   }
   return false;
+}
+
+Options::Options(int argc, char** argv) {
+  TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
+  TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
+  TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
+  TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", false,
+                                           "", "string", cmd);
+  TCLAP::ValueArg<std::string> test_path("t", "test-path", "Path to test file.", false, "",
+                                         "string", cmd);
+  TCLAP::UnlabeledMultiArg<std::string> unlabelled_configs(
+      "unlabelled-configs", "unlabelled configs", false, "unlabelledConfigStrings", cmd);
+  try {
+    cmd.parse(argc, argv);
+  } catch (TCLAP::ArgException& e) {
+    std::cerr << "error: " << e.error() << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+  is_proto_ = is_proto.getValue();
+  is_detailed_ = is_detailed.getValue();
+
+  if (is_proto_) {
+    config_path_ = config_path.getValue();
+    test_path_ = test_path.getValue();
+    if (config_path_.empty() || test_path_.empty()) {
+      std::cerr << "error: "
+                << "Both --config-path/c and --test-path/t are mandatory with --useproto"
+                << std::endl;
+      exit(EXIT_FAILURE);
+    }
+  } else {
+    if (!unlabelled_configs.getValue().empty()) {
+      unlabelled_config_path_ = unlabelled_configs.getValue()[0];
+      unlabelled_test_path_ = unlabelled_configs.getValue()[1];
+    }
+  }
 }
 } // namespace Envoy

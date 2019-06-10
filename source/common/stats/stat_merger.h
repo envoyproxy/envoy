@@ -21,17 +21,6 @@ public:
   void mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
                   const Protobuf::Map<std::string, uint64_t>& gauges);
 
-  // TODO(fredlas) add void verifyCombineLogicSpecified(absl::string_view gauge_name), to
-  // be called at gauge allocation, to ensure (with an ASSERT) that anyone adding a new stat
-  // will be forced to come across this code and explicitly specify combination logic.
-  //
-  // OR,
-  // switch from the combination logic table to requiring the stat macro declarations themselves
-  // to indicate the logic.
-
-  // Returns true if the parent's value can be added in, false if we should do nothing.
-  static bool shouldImport(Gauge& gauge, const std::string& gauge_name);
-
 private:
   void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas);
   void mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges);

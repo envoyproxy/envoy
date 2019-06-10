@@ -51,6 +51,7 @@ DESC
 DFATAL
 DFS
 DGRAM
+DHE
 DLOG
 DNS
 DRYs
@@ -91,6 +92,7 @@ FIN
 FIPS
 FQDN
 FUZZER
+FUZZERS
 GB
 GC
 GCC
@@ -150,6 +152,7 @@ MGET
 MSET
 MSVC
 MTLS
+MTU
 MiB
 NACK
 NACKs
@@ -158,6 +161,7 @@ NBF
 NBSP
 NDEBUG
 NGHTTP
+NOAUTH
 NOLINT
 NOLINTNEXTLINE
 NONCES
@@ -245,6 +249,7 @@ TBD
 TCLAP
 TCMalloc
 TCP
+TDS
 TE
 TFO
 TID
@@ -280,6 +285,7 @@ WS
 Welford's
 Werror
 XDS
+sendto
 vip
 xDSes
 XFCC
@@ -298,6 +304,7 @@ accessors
 acls
 addr
 agg
+alignas
 alignof
 alloc
 alloca
@@ -315,6 +322,7 @@ argv
 artisanal
 ary
 async
+atomicity
 atomicly
 atomics
 atoull
@@ -709,6 +717,7 @@ strtoull
 struct
 structs
 subexpr
+subdirs
 symlink
 symlinked
 sync
@@ -818,3 +827,5 @@ zag
 zig
 zlib
 zxid
+xmodem
+citt

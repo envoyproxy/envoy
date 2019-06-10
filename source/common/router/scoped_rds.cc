@@ -19,6 +19,44 @@ using Envoy::Config::ConfigProviderPtr;
 namespace Envoy {
 namespace Router {
 
+namespace ScopedRoutesConfigProviderUtil {
+
+ConfigProviderPtr
+create(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+           config,
+       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+       ConfigProviderManager& scoped_routes_config_provider_manager) {
+  ASSERT(config.route_specifier_case() == envoy::config::filter::network::http_connection_manager::
+                                              v2::HttpConnectionManager::kScopedRoutes);
+
+  switch (config.scoped_routes().config_specifier_case()) {
+  case envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
+      kScopedRouteConfigurationsList: {
+    const envoy::config::filter::network::http_connection_manager::v2::
+        ScopedRouteConfigurationsList& scoped_route_list =
+            config.scoped_routes().scoped_route_configurations_list();
+    return scoped_routes_config_provider_manager.createStaticConfigProvider(
+        RepeatedPtrUtil::convertToConstMessagePtrVector(
+            scoped_route_list.scoped_route_configurations()),
+        factory_context,
+        ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
+                                                config.scoped_routes().rds_config_source(),
+                                                config.scoped_routes().scope_key_builder()));
+  }
+  case envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::kScopedRds:
+    return scoped_routes_config_provider_manager.createXdsConfigProvider(
+        config.scoped_routes().scoped_rds(), factory_context, stat_prefix,
+        ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
+                                                config.scoped_routes().rds_config_source(),
+                                                config.scoped_routes().scope_key_builder()));
+  default:
+    // Proto validation enforces that is not reached.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+} // namespace ScopedRoutesConfigProviderUtil
+
 InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
     ProtobufTypes::ConstMessagePtrVector&& config_protos, std::string name,
     Server::Configuration::FactoryContext& factory_context,
@@ -45,15 +83,15 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
           factory_context.timeSource().systemTime(), factory_context.localInfo()),
       name_(name),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
-      stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}) {
+      stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
+      validation_visitor_(factory_context.messageValidationVisitor()) {
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       scoped_rds.scoped_rds_config_source(), factory_context.localInfo(),
       factory_context.dispatcher(), factory_context.clusterManager(), factory_context.random(),
-      *scope_, "envoy.api.v2.ScopedRoutesDiscoveryService.FetchScopedRoutes",
-      "envoy.api.v2.ScopedRoutesDiscoveryService.StreamScopedRoutes",
+      *scope_,
       Grpc::Common::typeUrl(
           envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
-      factory_context.api());
+      validation_visitor_, factory_context.api(), *this);
 }
 
 void ScopedRdsConfigSubscription::onConfigUpdate(
@@ -61,8 +99,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     const std::string& version_info) {
   std::vector<envoy::api::v2::ScopedRouteConfiguration> scoped_routes;
   for (const auto& resource_any : resources) {
-    scoped_routes.emplace_back(
-        MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource_any));
+    scoped_routes.emplace_back(MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
+        resource_any, validation_visitor_));
   }
 
   std::unordered_set<std::string> resource_names;
@@ -197,7 +235,7 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createStaticConfigProvider(
     Server::Configuration::FactoryContext& factory_context,
     const ConfigProviderManager::OptionalArg& optarg) {
   const auto& typed_optarg = static_cast<const ScopedRoutesConfigProviderManagerOptArg&>(optarg);
-  return absl::make_unique<InlineScopedRoutesConfigProvider>(
+  return std::make_unique<InlineScopedRoutesConfigProvider>(
       std::move(config_protos), typed_optarg.scoped_routes_name_, factory_context, *this,
       typed_optarg.rds_config_source_, typed_optarg.scope_key_builder_);
 }

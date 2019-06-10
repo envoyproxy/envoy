@@ -53,7 +53,7 @@ public:
   void initialize(std::string&& yaml) {
     envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
     if (!yaml.empty()) {
-      MessageUtil::loadFromYaml(yaml, proto_config);
+      TestUtility::loadFromYaml(yaml, proto_config);
     }
     config_.reset(
         new FilterConfig(proto_config, local_info_, stats_store_, runtime_, http_context_));
@@ -115,7 +115,7 @@ envoy::config::filter::http::ext_authz::v2::ExtAuthz GetFilterConfig() {
   )EOF";
 
   envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
-  MessageUtil::loadFromYaml(http_client ? http_config : grpc_config, proto_config);
+  TestUtility::loadFromYaml(http_client ? http_config : grpc_config, proto_config);
   proto_config.set_failure_mode_allow(failure_mode_allow_value);
   return proto_config;
 }
@@ -182,6 +182,47 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.Status()->value().getStringView(),
+                  std::to_string(enumToInt(Http::Code::Forbidden)));
+      }));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
+}
+
+// Verifies that the filter responds with a configurable HTTP status when an network error occurs.
+TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  status_on_error: 
+    code: 503
+  )EOF");
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.Status()->value().getStringView(),
+                  std::to_string(enumToInt(Http::Code::ServiceUnavailable)));
+      }));
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -263,7 +304,7 @@ TEST_F(HttpFilterTest, BadConfig) {
   failure_mode_allow: true
   )EOF";
   envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
-  MessageUtil::loadFromYaml(filter_config, proto_config);
+  TestUtility::loadFromYaml(filter_config, proto_config);
   EXPECT_THROW(
       MessageUtil::downcastAndValidate<const envoy::config::filter::http::ext_authz::v2::ExtAuthz&>(
           proto_config),

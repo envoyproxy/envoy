@@ -168,11 +168,13 @@ public:
       : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().LogicalDns) {}
 
 private:
-  ClusterImplBaseSharedPtr
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) override;
 };
+
+DECLARE_FACTORY(LogicalDnsClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

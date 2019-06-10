@@ -11,6 +11,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -82,7 +83,7 @@ protected:
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
-        singleton_manager_, tls_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_);
     cluster_.reset(
         new EdsClusterImpl(eds_cluster_, runtime_, factory_context, std::move(scope), false));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
@@ -107,6 +108,7 @@ protected:
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
 };
 
@@ -222,7 +224,10 @@ TEST_F(EdsTest, OnConfigUpdateEmpty) {
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
   cluster_->onConfigUpdate({}, "");
-  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_empty").value());
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resources;
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  cluster_->onConfigUpdate(resources, removed_resources, "");
+  EXPECT_EQ(2UL, stats_.counter("cluster.name.update_empty").value());
   EXPECT_TRUE(initialized);
 }
 
@@ -247,6 +252,23 @@ TEST_F(EdsTest, OnConfigUpdateSuccess) {
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized);
+  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+}
+
+// Validate that delta-style onConfigUpdate() with the expected cluster accepts config.
+TEST_F(EdsTest, DeltaOnConfigUpdateSuccess) {
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  bool initialized = false;
+  cluster_->initialize([&initialized] { initialized = true; });
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resources;
+  auto* resource = resources.Add();
+  resource->mutable_resource()->PackFrom(cluster_load_assignment);
+  resource->set_version("v1");
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, {}, "v1"));
+
   EXPECT_TRUE(initialized);
   EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
 }

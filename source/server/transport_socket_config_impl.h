@@ -12,16 +12,16 @@ namespace Configuration {
  */
 class TransportSocketFactoryContextImpl : public TransportSocketFactoryContext {
 public:
-  TransportSocketFactoryContextImpl(Server::Admin& admin, Ssl::ContextManager& context_manager,
-                                    Stats::Scope& stats_scope, Upstream::ClusterManager& cm,
-                                    const LocalInfo::LocalInfo& local_info,
-                                    Event::Dispatcher& dispatcher,
-                                    Envoy::Runtime::RandomGenerator& random, Stats::Store& stats,
-                                    Singleton::Manager& singleton_manager,
-                                    ThreadLocal::SlotAllocator& tls, Api::Api& api)
+  TransportSocketFactoryContextImpl(
+      Server::Admin& admin, Ssl::ContextManager& context_manager, Stats::Scope& stats_scope,
+      Upstream::ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
+      Event::Dispatcher& dispatcher, Envoy::Runtime::RandomGenerator& random, Stats::Store& stats,
+      Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+      ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
       : admin_(admin), context_manager_(context_manager), stats_scope_(stats_scope),
         cluster_manager_(cm), local_info_(local_info), dispatcher_(dispatcher), random_(random),
-        stats_(stats), singleton_manager_(singleton_manager), tls_(tls), api_(api) {}
+        stats_(stats), singleton_manager_(singleton_manager), tls_(tls),
+        validation_visitor_(validation_visitor), api_(api) {}
 
   // TransportSocketFactoryContext
   Server::Admin& admin() override { return admin_; }
@@ -39,7 +39,9 @@ public:
   Init::Manager* initManager() override { return init_manager_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
-
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return validation_visitor_;
+  }
   Api::Api& api() override { return api_; }
 
 private:
@@ -54,6 +56,7 @@ private:
   Singleton::Manager& singleton_manager_;
   ThreadLocal::SlotAllocator& tls_;
   Init::Manager* init_manager_{};
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
 };
 
