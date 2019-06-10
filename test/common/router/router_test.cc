@@ -908,7 +908,7 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   // First connection is successful and reset happens later on.
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
-                        absl::optional<uint64_t>(0)));
+                        absl::optional<uint64_t>(absl::nullopt)));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
   router_.decodeHeaders(headers, true);
@@ -1350,7 +1350,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _))
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                        absl::optional<uint64_t>(absl::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -1428,7 +1429,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   Http::HeaderMapPtr response_headers1(new Http::TestHeaderMapImpl{{":status", "500"}});
   // Local origin connect success happens for first and third try.
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _))
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                        absl::optional<uint64_t>(absl::nullopt)))
       .Times(2);
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(500));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
@@ -1509,7 +1511,8 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _))
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                        absl::optional<uint64_t>(absl::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -1572,7 +1575,8 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _))
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                        absl::optional<uint64_t>(absl::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -1668,7 +1672,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _))
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                        absl::optional<uint64_t>(absl::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -1733,7 +1738,8 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _))
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                        absl::optional<uint64_t>(absl::nullopt)))
       .Times(1);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -1761,7 +1767,8 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _))
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                        absl::optional<uint64_t>(absl::nullopt)))
       .Times(1);
   expectPerTryTimerCreate();
   router_.retry_state_->callback_();
@@ -1815,7 +1822,8 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
               putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _))
       .Times(1);
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _))
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                        absl::optional<uint64_t>(absl::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -1889,7 +1897,8 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _))
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                        absl::optional<uint64_t>(absl::nullopt)))
       .Times(1);
 
   Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
@@ -2011,7 +2020,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
         response_decoder = &decoder;
         EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
                     putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
-                              absl::optional<uint64_t>(0)));
+                              absl::optional<uint64_t>(absl::nullopt)));
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
       }));
@@ -2064,7 +2073,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
         response_decoder = &decoder;
         EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
                     putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
-                              absl::optional<uint64_t>(0)));
+                              absl::optional<uint64_t>(absl::nullopt)));
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
       }));

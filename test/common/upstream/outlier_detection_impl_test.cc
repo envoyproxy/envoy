@@ -784,8 +784,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowNonHttpCodesExternalOrigin) {
   // Make sure that one CONNECT_SUCCESS with optional code zero, does not
   // interrupt sequence of LOCAL_ORIGIN_CONNECT_FAILED.
   loadRq(hosts_[0], 1, Result::LOCAL_ORIGIN_CONNECT_FAILED);
-  hosts_[0]->outlierDetector().putResult(Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
-                                         absl::optional<uint64_t>(0));
+  hosts_[0]->outlierDetector().putResult(Result::LOCAL_ORIGIN_CONNECT_SUCCESS);
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(hosts_[0], 3, Result::LOCAL_ORIGIN_CONNECT_FAILED);
 

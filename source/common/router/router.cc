@@ -776,12 +776,10 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
                    Http::Utility::resetReasonToString(reset_reason));
 
-  /*
-    TODO: The reset may also come from upstream over the wire. In this case it should be
-    treated as external origin error and distinguished from local origin error.
-    This matters only when running OutlierDetection with split_external_local_origin_errors config
-    param set to true.
-  */
+  // TODO: The reset may also come from upstream over the wire. In this case it should be
+  // treated as external origin error and distinguished from local origin error.
+  // This matters only when running OutlierDetection with split_external_local_origin_errors config
+  // param set to true.
   updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, upstream_request,
                          absl::nullopt);
 
@@ -1411,12 +1409,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host) {
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
 
-  // Send value zero for optional HTTP code. It is invalid code and means that
-  // LOCAL_ORIGIN_CONNECT_SUCCESS is not mapped to HTTP code when running in outlier non-split mode.
-  // If it was mapped to HTTP code it would interfere with code returned by HTTP server and two
-  // codes would be reported to outlier detector for one request.
-  host->outlierDetector().putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
-                                    absl::optional<uint64_t>(0));
+  host->outlierDetector().putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS);
 
   // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);

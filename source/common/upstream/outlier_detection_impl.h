@@ -35,7 +35,7 @@ public:
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
   const absl::optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
-  double successRate(SuccessRateMonitorType) const override { return -1; }
+  double successRate(SuccessRateMonitorType) override { return -1; }
 
 private:
   const absl::optional<MonotonicTime> time_;
@@ -143,7 +143,7 @@ public:
   void resetConsecutive5xx() { consecutive_5xx_ = 0; }
   void resetConsecutiveGatewayFailure() { consecutive_gateway_failure_ = 0; }
   void resetConsecutiveLocalOriginFailure() { consecutive_local_origin_failure_ = 0; }
-  static Http::Code resultToHttpCode(Result result);
+  static absl::optional<Http::Code> resultToHttpCode(Result result);
 
   // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return num_ejections_; }
@@ -155,17 +155,17 @@ public:
     return last_unejection_time_;
   }
 
-  const std::unique_ptr<SuccessRateMonitor>& getSRMonitor(SuccessRateMonitorType type) const {
+  SuccessRateMonitor& getSRMonitor(SuccessRateMonitorType type) {
     return (SuccessRateMonitorType::ExternalOrigin == type) ? external_origin_SR_monitor_
                                                             : local_origin_SR_monitor_;
   }
 
-  double successRate(SuccessRateMonitorType type) const override {
-    return getSRMonitor(type)->getSuccessRate();
+  double successRate(SuccessRateMonitorType type) override {
+    return getSRMonitor(type).getSuccessRate();
   }
   void updateCurrentSuccessRateBucket();
   void successRate(SuccessRateMonitorType type, double new_success_rate) {
-    getSRMonitor(type)->setSuccessRate(new_success_rate);
+    getSRMonitor(type).setSuccessRate(new_success_rate);
   }
 
   // handlers for reporting local origin errors
@@ -191,8 +191,8 @@ private:
   //   and for external origin failures when external/local events are split
   // - local origin: for local events when external/local events are split and
   //   not used when external/local events are not split.
-  std::unique_ptr<SuccessRateMonitor> external_origin_SR_monitor_;
-  std::unique_ptr<SuccessRateMonitor> local_origin_SR_monitor_;
+  SuccessRateMonitor external_origin_SR_monitor_;
+  SuccessRateMonitor local_origin_SR_monitor_;
 
   void putResultNoLocalExternalSplit(Result result, absl::optional<uint64_t> code);
   void putResultWithLocalExternalSplit(Result result, absl::optional<uint64_t> code);

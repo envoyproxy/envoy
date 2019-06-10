@@ -37,10 +37,9 @@ DetectorHostMonitorImpl::DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> d
                                                  HostSharedPtr host)
     : detector_(detector), host_(host),
       // add Success Rate monitors
-      external_origin_SR_monitor_(std::make_unique<SuccessRateMonitor>(
-          envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE)),
-      local_origin_SR_monitor_(std::make_unique<SuccessRateMonitor>(
-          envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN)) {
+      external_origin_SR_monitor_(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE),
+      local_origin_SR_monitor_(
+          envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN) {
   // Setup method to call when putResult is invoked. Depending on the config's
   // split_external_local_origin_errors_ boolean value different method is called.
   put_result_func_ = detector->config().splitExternalLocalOriginErrors()
@@ -60,12 +59,12 @@ void DetectorHostMonitorImpl::uneject(MonotonicTime unejection_time) {
 }
 
 void DetectorHostMonitorImpl::updateCurrentSuccessRateBucket() {
-  external_origin_SR_monitor_->updateCurrentSuccessRateBucket();
-  local_origin_SR_monitor_->updateCurrentSuccessRateBucket();
+  external_origin_SR_monitor_.updateCurrentSuccessRateBucket();
+  local_origin_SR_monitor_.updateCurrentSuccessRateBucket();
 }
 
 void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
-  external_origin_SR_monitor_->incTotalReqCounter();
+  external_origin_SR_monitor_.incTotalReqCounter();
   if (Http::CodeUtility::is5xx(response_code)) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (!detector) {
@@ -88,18 +87,18 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
       detector->onConsecutive5xx(host_.lock());
     }
   } else {
-    external_origin_SR_monitor_->incSuccessReqCounter();
+    external_origin_SR_monitor_.incSuccessReqCounter();
     consecutive_5xx_ = 0;
     consecutive_gateway_failure_ = 0;
   }
 }
 
-Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
+absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result result) {
   Http::Code http_code = Http::Code::InternalServerError;
 
   switch (result) {
   case Result::EXT_ORIGIN_REQUEST_SUCCESS:
-  case Result::LOCAL_ORIGIN_CONNECT_SUCCESS:
+  case Result::LOCAL_ORIGIN_CONNECT_SUCCESS_FINAL:
     http_code = Http::Code::OK;
     break;
   case Result::LOCAL_ORIGIN_TIMEOUT:
@@ -111,30 +110,33 @@ Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
   case Result::EXT_ORIGIN_REQUEST_FAILED:
     http_code = Http::Code::InternalServerError;
     break;
+  /* LOCAL_ORIGIN_CONNECT_SUCCESS  is used is 2-layer protocols, like HTTP.
+     First connection is established and then higher level protocol runs.
+     If error happens in higher layer protocol, it will be mapped to
+     HTTP code indicating error. In order not to intervene with result of
+     higher layer protocol, this code is not mapped to HTTP code.
+  */
+  case Result::LOCAL_ORIGIN_CONNECT_SUCCESS:
+    return absl::nullopt;
   }
 
-  return http_code;
+  return absl::optional<Http::Code>(http_code);
 }
 
 // Method is called by putResult when external and local origin errors
 // are not treated differently. All errors are mapped to HTTP codes.
 // Depending on the value of the parameter *code* the function behaves differently:
 // - if the *code* is not defined, mapping uses resultToHttpCode method to do mapping.
-// - if *code* is zero, no mapping takes place: result is dropped and not reported to outlier
-// detector.
 // - if *code* is non-zero, it is taken as HTTP code and reported as such to outlier detector.
 void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
                                                             absl::optional<uint64_t> code) {
   if (code) {
-    if (0 == code.value()) {
-      // Zero value of the code parameter indicates NOP. No mapping should take place
-      // between result parameter and HTTP code.
-      return;
-    } else {
-      putHttpResponseCode(code.value());
-    }
+    putHttpResponseCode(code.value());
   } else {
-    putHttpResponseCode(enumToInt(resultToHttpCode(result)));
+    absl::optional<Http::Code> http_code = resultToHttpCode(result);
+    if (http_code) {
+      putHttpResponseCode(enumToInt(http_code.value()));
+    }
   }
 }
 
@@ -147,6 +149,7 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
   // SUCCESS is used to report success for connection level. Server may still respond with
   // error, but connection to server was OK.
   case Result::LOCAL_ORIGIN_CONNECT_SUCCESS:
+  case Result::LOCAL_ORIGIN_CONNECT_SUCCESS_FINAL:
     return localOriginNoFailure();
   // Connectivity related errors.
   case Result::LOCAL_ORIGIN_TIMEOUT:
@@ -183,7 +186,7 @@ void DetectorHostMonitorImpl::localOriginFailure() {
     // It's possible for the cluster/detector to go away while we still have a host in use.
     return;
   }
-  local_origin_SR_monitor_->incTotalReqCounter();
+  local_origin_SR_monitor_.incTotalReqCounter();
   if (++consecutive_local_origin_failure_ ==
       detector->runtime().snapshot().getInteger(
           "outlier_detection.consecutive_local_origin_failure",
@@ -199,8 +202,8 @@ void DetectorHostMonitorImpl::localOriginNoFailure() {
     return;
   }
 
-  local_origin_SR_monitor_->incTotalReqCounter();
-  local_origin_SR_monitor_->incSuccessReqCounter();
+  local_origin_SR_monitor_.incTotalReqCounter();
+  local_origin_SR_monitor_.incSuccessReqCounter();
 
   resetConsecutiveLocalOriginFailure();
 }
@@ -573,7 +576,7 @@ void DetectorImpl::processSuccessRateEjections(
     // Don't do work if the host is already ejected.
     if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
       absl::optional<double> host_success_rate = host.second->getSRMonitor(monitor_type)
-                                                     ->successRateAccumulator()
+                                                     .successRateAccumulator()
                                                      .getSuccessRate(success_rate_request_volume);
 
       if (host_success_rate) {
@@ -600,7 +603,7 @@ void DetectorImpl::processSuccessRateEjections(
         const envoy::data::cluster::v2alpha::OutlierEjectionType type =
             host_monitors_[host_success_rate_pair.host_]
                 ->getSRMonitor(monitor_type)
-                ->getEjectionType();
+                .getEjectionType();
         updateDetectedEjectionStats(type);
         ejectHost(host_success_rate_pair.host_, type);
       }

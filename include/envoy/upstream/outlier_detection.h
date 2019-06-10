@@ -27,9 +27,18 @@ namespace Outlier {
  */
 enum class Result {
   // Local origin errors detected by Envoy.
-  LOCAL_ORIGIN_TIMEOUT,         // Timed out while connecting or executing a request.
-  LOCAL_ORIGIN_CONNECT_SUCCESS, // Successfully established a connection to upstream host
-  LOCAL_ORIGIN_CONNECT_FAILED,  // Remote host rejected the connection.
+  LOCAL_ORIGIN_TIMEOUT,               // Timed out while connecting or executing a request.
+  LOCAL_ORIGIN_CONNECT_FAILED,        // Remote host rejected the connection.
+  LOCAL_ORIGIN_CONNECT_SUCCESS,       // Successfully established a connection to upstream host.
+                                      // Use this code when there is another protocol on top of
+                                      // transport protocol. For example HTTP runs on top of tcp.
+                                      // The same for redis. It first establishes TCP and then runs
+                                      // a transaction.
+  LOCAL_ORIGIN_CONNECT_SUCCESS_FINAL, // Successfully established a connection to upstream host
+                                      // Use this code when there is no other protocol on top of the
+                                      // protocol used by a filter. For example tcp_proxy filter
+                                      // serves only tcp level. There is no other protocol on top of
+                                      // tcp which the tcp_proxy filter is aware of.
 
   // The entries below only make sense when Envoy understands requests/responses for the
   // protocol being proxied. They do not make sense for TcpProxy, for example.
@@ -94,13 +103,13 @@ public:
    *         -1 means that the host did not have enough request volume to calculate success rate
    *         or the cluster did not have enough hosts to run through success rate outlier ejection.
    * @param type specifies for which Success Rate Monitor the success rate value should be returned.
-   If the outlier detector is configured not to split external and local origin errors,
-   ExternalOrigin type returns success rate for all types of errors: external and local origin and
-   LocalOrigin type returns -1. If the outlier detector is configured to split external and local
-   origin errors, ExternalOrigin type returns success rate for external origin errors and
-   LocalOrigin type returns success rate for local origin errors.
+   *         If the outlier detector is configured not to split external and local origin errors,
+   *         ExternalOrigin type returns success rate for all types of errors: external and local
+   * origin and LocalOrigin type returns -1. If the outlier detector is configured to split external
+   * and local origin errors, ExternalOrigin type returns success rate for external origin errors
+   * and LocalOrigin type returns success rate for local origin errors.
    */
-  virtual double successRate(SuccessRateMonitorType type) const PURE;
+  virtual double successRate(SuccessRateMonitorType type) PURE;
 };
 
 typedef std::unique_ptr<DetectorHostMonitor> DetectorHostMonitorPtr;
