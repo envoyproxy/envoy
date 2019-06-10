@@ -55,7 +55,7 @@ private:
   // NOTE: if another subscription of the same type_url has already been started, this value will be
   // ignored in favor of the other subscription's.
   std::chrono::milliseconds init_fetch_timeout_;
-  WatchPr watch_;
+  WatchPtr watch_;
 };
 
 } // namespace Config

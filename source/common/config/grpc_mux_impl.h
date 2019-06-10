@@ -25,7 +25,7 @@ class GrpcMuxImpl : public GrpcMux,
                     public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
                     public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
+  GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Runtime::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings);
@@ -39,16 +39,11 @@ public:
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
 
-  /*WatchMap::Token*/ uint64_t addWatch(const std::string&, const std::set<std::string>&,
-                                        SubscriptionCallbacks&,
-                                        std::chrono::milliseconds) override {
+  WatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
+                    std::chrono::milliseconds) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  virtual void removeWatch(const std::string&, /*WatchMap::Token*/ uint64_t) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-  virtual void updateWatch(const std::string&, /*WatchMap::Token*/ uint64_t,
-                           const std::set<std::string>&) override {
+  virtual void updateWatch(const std::string&, Watch*, const std::set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
@@ -140,16 +135,11 @@ public:
   void pause(const std::string&) override {}
   void resume(const std::string&) override {}
 
-  /*WatchMap::Token*/ uint64_t addWatch(const std::string&, const std::set<std::string>&,
-                                        SubscriptionCallbacks&,
-                                        std::chrono::milliseconds) override {
+  WatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
+                    std::chrono::milliseconds) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
-  virtual void removeWatch(const std::string&, /*WatchMap::Token*/ uint64_t) override {
-    throw EnvoyException("ADS must be configured to support an ADS config source");
-  }
-  virtual void updateWatch(const std::string&, /*WatchMap::Token*/ uint64_t,
-                           const std::set<std::string>&) override {
+  virtual void updateWatch(const std::string&, Watch*, const std::set<std::string>&) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
 

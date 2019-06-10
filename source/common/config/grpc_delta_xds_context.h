@@ -22,7 +22,7 @@ namespace Envoy {
 namespace Config {
 
 // TODO TODO not actually needed; just an adapter to the old-style subscribe().
-class TokenizedGrpcMuxWatch : public GrpcMuxWatch {
+/*class TokenizedGrpcMuxWatch : public GrpcMuxWatch {
 public:
   TokenizedGrpcMuxWatch(GrpcMux& context, const std::string& type_url, WatchMap::Token token)
       : context_(context), type_url_(type_url), token_(token) {}
@@ -32,7 +32,7 @@ private:
   GrpcMux& context_;
   std::string type_url_;
   WatchMap::Token token_;
-};
+};*/
 
 // Manages subscriptions to one or more type of resource. The logical protocol
 // state of those subscription(s) is handled by DeltaSubscriptionState.
@@ -43,7 +43,7 @@ class GrpcDeltaXdsContext : public GrpcMux,
                             public GrpcStreamCallbacks<envoy::api::v2::DeltaDiscoveryResponse>,
                             Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcDeltaXdsContext(Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
+  GrpcDeltaXdsContext(Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                       const Protobuf::MethodDescriptor& service_method,
                       Runtime::RandomGenerator& random, Stats::Scope& scope,
                       const RateLimitSettings& rate_limit_settings,
@@ -54,9 +54,9 @@ public:
     std::cerr << "making a GrpcDeltaXdsContext" << std::endl;
   }
 
-  WatchMap::Token addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                           SubscriptionCallbacks& callbacks,
-                           std::chrono::milliseconds init_fetch_timeout) override {
+  WatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
+                    SubscriptionCallbacks& callbacks,
+                    std::chrono::milliseconds init_fetch_timeout) override {
     auto entry = subscriptions_.find(type_url);
     if (entry == subscriptions_.end()) {
       // We don't yet have a subscription for type_url! Make one!
@@ -64,42 +64,43 @@ public:
       return addWatch(type_url, resources, callbacks, init_fetch_timeout);
     }
 
-    WatchMap::Token watch_token = entry->second->watch_map_.addWatch(callbacks);
+    WatchPtr watch = entry->second->watch_map_.addWatch(callbacks);
     // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
-    updateWatch(type_url, watch_token, resources);
-    return watch_token;
+    updateWatch(type_url, watch.get(), resources);
+    return watch;
   }
 
-  void removeWatch(const std::string& type_url, WatchMap::Token watch_token) override {
-    if (watch_token == WatchMap::InvalidToken) {
-      return;
-    }
-    // updateWatch() queues a discovery request if any resources were watched only by this watch.
-    updateWatch(type_url, watch_token, {});
+  /* TODO TODO TRIM?  void removeWatch(const std::string& type_url, Watch* watch) override {
+      if (watch == nullptr) {
+        return;
+      }
+      // updateWatch() queues a discovery request if any resources were watched only by this watch.
+      updateWatch(type_url, watch, {});
 
-    auto entry = subscriptions_.find(type_url);
-    if (entry == subscriptions_.end()) {
-      ENVOY_LOG(error, "Asked to remove watch of {}, but there is no subscription...", type_url);
-      return;
-    }
-    if (entry->second->watch_map_.removeWatch(watch_token)) {
-      // removeWatch() told us that watch_token was the last watch on the entire subscription.
-      removeSubscription(type_url);
-    }
-  }
+      auto entry = subscriptions_.find(type_url);
+      if (entry == subscriptions_.end()) {
+        ENVOY_LOG(error, "Asked to remove watch of {}, but there is no subscription...", type_url);
+        return;
+      }
+      if (entry->second->watch_map_.removeWatch(watch)) {
+        // removeWatch() told us that watch was the last watch on the entire subscription.
+        removeSubscription(type_url);
+      }
+    }*/
 
   // Updates the list of resource names watched by the given watch. If an added name is new across
   // the whole subscription, or if a removed name has no other watch interested in it, then the
   // subscription will enqueue and attempt to send an appropriate discovery request.
-  void updateWatch(const std::string& type_url, WatchMap::Token watch_token,
+  void updateWatch(const std::string& type_url, Watch* watch,
                    const std::set<std::string>& resources) override {
     auto sub = subscriptions_.find(type_url);
     if (sub == subscriptions_.end()) {
       ENVOY_LOG(error, "Watch of {} has no subscription to update.", type_url);
       return;
     }
-    auto added_removed = sub->second->watch_map_.updateWatchInterest(watch_token, resources);
-    sub->second->sub_state_.updateSubscriptionInterest(added_removed.first, added_removed.second);
+    auto added_removed = sub->second->watch_map_.updateWatchInterest(watch, resources);
+    sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_,
+                                                       added_removed.removed_);
     // Tell the server about our new interests, if there are any.
     trySendDiscoveryRequests();
   }
@@ -280,7 +281,7 @@ private:
         : sub_state_(type_url, watch_map_, local_info, init_fetch_timeout, dispatcher),
           init_fetch_timeout_(init_fetch_timeout) {}
 
-    WatchMap watch_map_;
+    WatchMapImpl watch_map_;
     DeltaSubscriptionState sub_state_;
     const std::chrono::milliseconds init_fetch_timeout_;
 

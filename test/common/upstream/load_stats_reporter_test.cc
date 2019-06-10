@@ -44,7 +44,7 @@ public:
       return response_timer_;
     }));
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info_, cm_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_);
+        local_info_, cm_, stats_store_, Grpc::RawAsyncClientPtr(async_client_), dispatcher_);
   }
 
   void expectSendMessage(
@@ -53,7 +53,7 @@ public:
     expected_request.mutable_node()->MergeFrom(local_info_.node());
     std::copy(expected_cluster_stats.begin(), expected_cluster_stats.end(),
               Protobuf::RepeatedPtrFieldBackInserter(expected_request.mutable_cluster_stats()));
-    EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
+    EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));
   }
 
   void deliverLoadStatsResponse(const std::vector<std::string>& cluster_names) {
@@ -83,34 +83,34 @@ public:
 
 // Validate that stream creation results in a timer based retry.
 TEST_F(LoadStatsReporterTest, StreamCreationFailure) {
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(*retry_timer_, enableTimer(_));
   createLoadStatsReporter();
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   retry_timer_cb_();
 }
 
 TEST_F(LoadStatsReporterTest, TestPubSub) {
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createLoadStatsReporter();
   deliverLoadStatsResponse({"foo"});
 
-  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
   response_timer_cb_();
 
   deliverLoadStatsResponse({"bar"});
 
-  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
   response_timer_cb_();
 }
 
 // Validate treatment of existing clusters across updates.
 TEST_F(LoadStatsReporterTest, ExistingClusters) {
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
   // Initially, we have no clusters to report on.
   expectSendMessage({});
   createLoadStatsReporter();
@@ -218,13 +218,13 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
 
 // Validate that the client can recover from a remote stream closure via retry.
 TEST_F(LoadStatsReporterTest, RemoteStreamClose) {
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
   EXPECT_CALL(*response_timer_, disableTimer());
   EXPECT_CALL(*retry_timer_, enableTimer(_));
   load_stats_reporter_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   retry_timer_cb_();
 }

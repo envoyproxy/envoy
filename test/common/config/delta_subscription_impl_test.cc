@@ -1,3 +1,5 @@
+#include "common/buffer/zero_copy_input_stream_impl.h"
+
 #include "test/common/config/delta_subscription_test_harness.h"
 
 namespace Envoy {
@@ -107,23 +109,50 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
         ->onDiscoveryResponse(std::move(message));
   }
   // All ACK sendMessage()s will happen upon calling resume().
-  EXPECT_CALL(async_stream_, sendMessage(_, _))
-      .WillRepeatedly([this](const Protobuf::Message& message, bool) {
-        const std::string nonce =
-            static_cast<const envoy::api::v2::DeltaDiscoveryRequest&>(message).response_nonce();
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
+      .WillRepeatedly(Invoke([this](Buffer::InstancePtr& buffer, bool) {
+        envoy::api::v2::DeltaDiscoveryRequest message;
+        EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
+        const std::string nonce = message.response_nonce();
         if (!nonce.empty()) {
           nonce_acks_sent_.push(nonce);
         }
-      });
+      }));
   subscription_->resume();
   // DeltaSubscriptionTestHarness's dtor will check that all ACKs were sent with the correct nonces,
   // in the correct order.
 }
 
-TEST_F(DeltaSubscriptionImplTest, NoGrpcStream) {
-  EXPECT_CALL(async_stream_, sendMessage(_, _)).Times(0);
-  subscription_->start({"name1"});
-  subscription_->updateResources({"name1", "name2"});
+TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
+  Stats::IsolatedStoreImpl stats_store;
+  SubscriptionStats stats(Utility::generateStats(stats_store));
+
+  envoy::api::v2::core::Node node;
+  node.set_id("fo0");
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  EXPECT_CALL(local_info, node()).WillRepeatedly(testing::ReturnRef(node));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockRandomGenerator> random;
+  Envoy::Config::RateLimitSettings rate_limit_settings;
+  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks;
+  Grpc::MockAsyncClient* async_client = new Grpc::MockAsyncClient();
+
+  const Protobuf::MethodDescriptor* method_descriptor =
+      Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
+  std::shared_ptr<GrpcDeltaXdsContext> xds_context = std::make_shared<GrpcDeltaXdsContext>(
+      std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor, random,
+      stats_store, rate_limit_settings, local_info);
+
+  std::unique_ptr<DeltaSubscriptionImpl> subscription = std::make_unique<DeltaSubscriptionImpl>(
+      xds_context, Config::TypeUrl::get().ClusterLoadAssignment, callbacks, stats,
+      std::chrono::milliseconds(12345));
+
+  EXPECT_CALL(*async_client, startRaw(_, _, _)).WillOnce(Return(nullptr));
+
+  subscription->start({"name1"});
+  subscription->updateResources({"name1", "name2"});
 }
 
 } // namespace

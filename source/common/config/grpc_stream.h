@@ -8,6 +8,7 @@
 #include "common/common/backoff_strategy.h"
 #include "common/common/token_bucket_impl.h"
 #include "common/config/utility.h"
+#include "common/grpc/typed_async_client.h"
 
 namespace Envoy {
 namespace Config {
@@ -16,10 +17,10 @@ namespace Config {
 // xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of
 // requests.
 template <class RequestProto, class ResponseProto>
-class GrpcStream : public Grpc::TypedAsyncStreamCallbacks<ResponseProto>,
+class GrpcStream : public Grpc::AsyncStreamCallbacks<ResponseProto>,
                    public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::AsyncClientPtr async_client,
+  GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::RawAsyncClientPtr async_client,
              const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
              Event::Dispatcher& dispatcher, Stats::Scope& scope,
              const RateLimitSettings& rate_limit_settings)
@@ -131,8 +132,8 @@ private:
   const uint32_t RETRY_INITIAL_DELAY_MS = 500;
   const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
 
-  Grpc::AsyncClientPtr async_client_;
-  Grpc::AsyncStream* stream_{};
+  Grpc::AsyncClient<RequestProto, ResponseProto> async_client_;
+  Grpc::AsyncStream<RequestProto> stream_{};
   const Protobuf::MethodDescriptor& service_method_;
   ControlPlaneStats control_plane_stats_;
 

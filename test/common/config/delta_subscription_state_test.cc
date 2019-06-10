@@ -328,18 +328,6 @@ TEST_F(DeltaSubscriptionStateTest, CheckUpdatePending) {
   EXPECT_TRUE(state_.subscriptionUpdatePending());
 }
 
-TEST_F(DeltaSubscriptionStateTest, PauseAndResume) {
-  EXPECT_FALSE(state_.paused());
-  state_.pause();
-  EXPECT_TRUE(state_.paused());
-  state_.resume();
-  EXPECT_FALSE(state_.paused());
-  state_.pause();
-  EXPECT_TRUE(state_.paused());
-  state_.resume();
-  EXPECT_FALSE(state_.paused());
-}
-
 // The next three tests test that duplicate resource names (whether additions or removals) cause
 // DeltaSubscriptionState to reject the update without even trying to hand it to the consuming API's
 // onConfigUpdate().

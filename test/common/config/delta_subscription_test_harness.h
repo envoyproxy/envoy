@@ -3,6 +3,7 @@
 #include <queue>
 
 #include "common/config/delta_subscription_impl.h"
+#include "common/grpc/common.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
@@ -39,11 +40,12 @@ public:
     subscription_ = std::make_unique<DeltaSubscriptionImpl>(
         xds_context_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
         init_fetch_timeout);
+    EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
   }
 
   void doSubscriptionTearDown() override {
     if (subscription_started_) {
-      EXPECT_CALL(async_stream_, sendMessage(_, _));
+      EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
       subscription_.reset();
     }
   }
@@ -66,7 +68,6 @@ public:
   void startSubscription(const std::set<std::string>& cluster_names) override {
     subscription_started_ = true;
     last_cluster_names_ = cluster_names;
-    EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
     expectSendMessage(last_cluster_names_, "");
     subscription_->start(cluster_names);
     xds_context_->start();
@@ -106,10 +107,12 @@ public:
       error_detail->set_message(error_message);
     }
     EXPECT_CALL(async_stream_,
-                sendMessage(ProtoEqIgnoringField(expected_request, "response_nonce"), false))
-        .WillOnce([this](const Protobuf::Message& message, bool) {
-          const std::string nonce =
-              static_cast<const envoy::api::v2::DeltaDiscoveryRequest&>(message).response_nonce();
+                sendMessageRaw_(
+                    Grpc::ProtoBufferEqIgnoringField(expected_request, "response_nonce"), false))
+        .WillOnce([this](Buffer::InstancePtr& buffer, bool) {
+          envoy::api::v2::DeltaDiscoveryRequest message;
+          EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
+          const std::string nonce = message.response_nonce();
           if (!nonce.empty()) {
             nonce_acks_sent_.push(nonce);
           }

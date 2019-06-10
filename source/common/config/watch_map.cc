@@ -3,20 +3,20 @@
 namespace Envoy {
 namespace Config {
 
-WatchPtr WatchMap::addWatch(SubscriptionCallbacks& callbacks) {
+WatchPtr WatchMapImpl::addWatch(SubscriptionCallbacks& callbacks) {
   auto watch = std::make_unique<Watch>(*this, callbacks);
   wildcard_watches_.insert(watch.get());
   watches_.insert(watch.get());
   return watch;
 }
 
-void WatchMap::removeWatch(Watch* watch) {
+void WatchMapImpl::removeWatch(Watch* watch) {
   wildcard_watches_.erase(watch); // may or may not be in there, but we want it gone.
   watches_.erase(watch);
 }
 
-AddedRemoved WatchMap::updateWatchInterest(Watch* watch,
-                                           const std::set<std::string>& update_to_these_names) {
+AddedRemoved WatchMapImpl::updateWatchInterest(Watch* watch,
+                                               const std::set<std::string>& update_to_these_names) {
   if (update_to_these_names.empty()) {
     wildcard_watches_.insert(watch);
   } else {
@@ -39,7 +39,7 @@ AddedRemoved WatchMap::updateWatchInterest(Watch* watch,
                       findRemovals(newly_removed_from_watch, watch));
 }
 
-absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
+absl::flat_hash_set<Watch*> WatchMapImpl::watchesInterestedIn(const std::string& resource_name) {
   // Note that std::set_union needs sorted sets. Better to do it ourselves with insert().
   absl::flat_hash_set<Watch*> ret = wildcard_watches_;
   auto watches_interested = watch_interest_.find(resource_name);
@@ -51,10 +51,10 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
   return ret;
 }
 
-void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                              const std::string& version_info) {
+void WatchMapImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                  const std::string& version_info) {
   if (watches_.empty()) {
-    ENVOY_LOG(warn, "WatchMap::onConfigUpdate: there are no watches!");
+    ENVOY_LOG(warn, "WatchMapImpl::onConfigUpdate: there are no watches!");
     return;
   }
   SubscriptionCallbacks& name_getter = (*watches_.begin())->callbacks_;
@@ -85,7 +85,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   }
 }
 
-void WatchMap::onConfigUpdate(
+void WatchMapImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
@@ -127,14 +127,14 @@ void WatchMap::onConfigUpdate(
   }
 }
 
-void WatchMap::onConfigUpdateFailed(const EnvoyException* e) {
+void WatchMapImpl::onConfigUpdateFailed(const EnvoyException* e) {
   for (auto& watch : watches_) {
     watch->callbacks_.onConfigUpdateFailed(e);
   }
 }
 
-std::set<std::string> WatchMap::findAdditions(const std::vector<std::string>& newly_added_to_watch,
-                                              Watch* watch) {
+std::set<std::string>
+WatchMapImpl::findAdditions(const std::vector<std::string>& newly_added_to_watch, Watch* watch) {
   std::set<std::string> newly_added_to_subscription;
   for (const auto& name : newly_added_to_watch) {
     auto entry = watch_interest_.find(name);
@@ -149,12 +149,12 @@ std::set<std::string> WatchMap::findAdditions(const std::vector<std::string>& ne
 }
 
 std::set<std::string>
-WatchMap::findRemovals(const std::vector<std::string>& newly_removed_from_watch, Watch* watch) {
+WatchMapImpl::findRemovals(const std::vector<std::string>& newly_removed_from_watch, Watch* watch) {
   std::set<std::string> newly_removed_from_subscription;
   for (const auto& name : newly_removed_from_watch) {
     auto entry = watch_interest_.find(name);
     if (entry == watch_interest_.end()) {
-      ENVOY_LOG(warn, "WatchMap: tried to remove a watch from untracked resource {}", name);
+      ENVOY_LOG(warn, "WatchMapImpl: tried to remove a watch from untracked resource {}", name);
       continue;
     }
 

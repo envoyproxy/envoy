@@ -84,7 +84,6 @@ void DeltaSubscriptionState::handleGoodResponse(
           fmt::format("duplicate name {} found in the union of added+removed resources", name));
     }
   }
-  std::cerr << "handleGoodResponse now callbacks_.onConfigUpdate()" << std::endl;
   callbacks_.onConfigUpdate(message.resources(), message.removed_resources(),
                             message.system_version_info());
   for (const auto& resource : message.resources()) {

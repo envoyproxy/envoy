@@ -126,6 +126,7 @@ envoy_cc_library(
         "//source/common/common:backoff_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:token_bucket_impl_lib",
+        "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",
     ],
 )
@@ -426,7 +427,7 @@ envoy_cc_library(
     srcs = ["watch_map.cc"],
     hdrs = ["watch_map.h"],
     deps = [
-        "//include/envoy/config:subscription_interface",
+        "//include/envoy/config:watch_map_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf",

@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/watch_map.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/protobuf/protobuf.h"
@@ -110,13 +111,11 @@ public:
   virtual void resume(const std::string& type_url) PURE;
 
   // For delta
-  virtual /*WatchMap::Token*/ uint64_t addWatch(const std::string& type_url,
-                                                const std::set<std::string>& resources,
-                                                SubscriptionCallbacks& callbacks,
-                                                std::chrono::milliseconds init_fetch_timeout) PURE;
-  virtual void removeWatch(const std::string& type_url,
-                           /*WatchMap::Token*/ uint64_t watch_token) PURE;
-  virtual void updateWatch(const std::string& type_url, /*WatchMap::Token*/ uint64_t watch_token,
+  virtual WatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
+                            SubscriptionCallbacks& callbacks,
+                            std::chrono::milliseconds init_fetch_timeout) PURE;
+  // TODO TODO TRIM?  virtual void removeWatch(const std::string& type_url, Watch* watch) PURE;
+  virtual void updateWatch(const std::string& type_url, Watch* watch,
                            const std::set<std::string>& resources) PURE;
 };
 
