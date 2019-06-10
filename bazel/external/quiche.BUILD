@@ -56,6 +56,7 @@ quiche_copt = [
     "-Wno-unused-parameter",
     # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
     "-Wno-invalid-offsetof",
+    "-Wno-shift-negative-value",
 ]
 
 envoy_cc_test_library(
@@ -293,6 +294,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/platform/api/quic_ip_address.h"],
     repository = "@envoy",
     visibility = ["//visibility:public"],
+    copts = quiche_copt,
     deps = [
         ":quic_platform_export",
         ":quic_platform_ip_address_family",
