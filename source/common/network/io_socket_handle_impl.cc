@@ -2,8 +2,6 @@
 
 #include <errno.h>
 
-#include <cstdint>
-
 #include "envoy/buffer/buffer.h"
 
 #include "common/api/os_sys_calls_impl.h"
@@ -168,11 +166,14 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cms
   return nullptr;
 }
 
-absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(struct cmsghdr* cmsg) {
+absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(
 #ifdef SO_RXQ_OVFL
+    struct cmsghdr* cmsg) {
   if (cmsg->cmsg_type == SO_RXQ_OVFL) {
     return *reinterpret_cast<uint32_t*>(CMSG_DATA(cmsg));
   }
+#else
+    struct cmsghdr*) {
 #endif
   return absl::nullopt;
 }
@@ -186,10 +187,43 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   // The minimum cmsg buffer size to filled in destination address and packets dropped when
   // receiving a packet. It is possible for a received packet to contain both IPv4 and IPv6
   // addresses.
-  const int cmsg_space = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
-                         CMSG_SPACE(sizeof(struct in6_pktinfo));
-  char cbuf[CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
-            CMSG_SPACE(sizeof(struct in6_pktinfo))];
+  constexpr int cmsg_space = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
+                             CMSG_SPACE(sizeof(struct in6_pktinfo));
+#ifndef __APPLE__
+  char cbuf[cmsg_space];
+#else
+  // CMSG_SPACE() is supposed to be a constant expression, and most
+  // BSD-ish code uses it to determine the size of buffers used to
+  // send/receive descriptors in the control message for
+  // sendmsg/recvmsg. Such buffers are often automatic variables.
+
+  // In Darwin, CMSG_SPACE uses __DARWIN_ALIGN. And __DARWIN_ALIGN(p)
+  // expands to
+
+  // ((__darwin_size_t)((char *)(__darwin_size_t)(p) + __DARNWIN_ALIGNBYTES)
+  //  &~ __DARWIN_ALIGNBYTES)
+
+  // which Clang (to which many Apple employees contribute!) complains
+  // about when invoked with -pedantic -- and with our -Werror, causes
+  // Clang-based builds to fail. Clang says this is not a constant
+  // expression:
+
+  // error: variable length array folded to constant array as an
+  // extension [-Werror,-pedantic]
+
+  // Possibly true per standard definition, since that cast to (char *)
+  // is ugly, but actually Clang was able to convert to a compile-time
+  // constant... it just had to work harder.
+
+  // As a ugly workaround, we define the following constant for use in
+  // automatic array declarations, and in all cases have an assert to
+  // verify that the value is of sufficient size. (The assert should
+  // constant propagate and be dead-code eliminated in normal compiles
+  // and should cause a quick death if ever violated, since NaCl startup
+  // code involves the use of descriptor passing through the affected
+  // code.)
+  char cbuf[128];
+#endif
 
   STACK_ARRAY(iov, iovec, num_slice);
   uint64_t num_slices_for_read = 0;
