@@ -261,34 +261,75 @@ public:
                                         bool keep_empty_string = false);
 
   /**
+   * Takes a Protobuf::RepeatedPtrField and sticks the individual protos into a std::list.
+   *
+   * @param repeated the RepeatedPtrField to convert into a list.
+   * @return a std::list with individual protos.
+   */
+  template <class ProtoType>
+  static std::list<ProtoType>
+  repeatedProtoToList(const Protobuf::RepeatedPtrField<ProtoType>& repeated) {
+    std::list<ProtoType> ret;
+    for (const auto& proto : repeated) {
+      ret.push_back(repeated[i]);
+    }
+    return ret;
+  }
+
+  /**
    * Compare two RepeatedPtrFields of the same type for equality.
    *
    * @param lhs RepeatedPtrField on LHS.
    * @param rhs RepeatedPtrField on RHS.
+   * @param ignore_repeated_field_ordering if ordering should be ignored. Note if true this turns
+   *   comparison into an N^2 operation.
    * @return bool indicating whether the RepeatedPtrField are equal. TestUtility::protoEqual() is
    *              used for individual element testing.
    */
   template <class ProtoType>
   static bool repeatedPtrFieldEqual(const Protobuf::RepeatedPtrField<ProtoType>& lhs,
-                                    const Protobuf::RepeatedPtrField<ProtoType>& rhs) {
+                                    const Protobuf::RepeatedPtrField<ProtoType>& rhs,
+                                    bool ignore_repeated_field_ordering = false) {
     if (lhs.size() != rhs.size()) {
       return false;
     }
 
-    for (int i = 0; i < lhs.size(); ++i) {
-      if (!TestUtility::protoEqual(lhs[i], rhs[i], /*ignore_repeated_field_ordering=*/false)) {
+    if (ignore_repeated_field_ordering == false) {
+      for (int i = 0; i < lhs.size(); ++i) {
+        if (!TestUtility::protoEqual(lhs[i], rhs[i], /*ignore_repeated_field_ordering=*/false)) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+    // ignore_repeated_field_ordering = true
+    std::list<ProtoType> lhs_list = repeatedProtoToList(lhs);
+    std::list<ProtoType> rhs_list = repeatedProtoToList(rhs);
+    while (!lhs_list.empty()) {
+      bool found = false;
+      for (auto it = rhs_list.begin(); it != rhs_list.end(); ++it) {
+        if (TestUtility::protoEqual(lhs_list.front(), *it,
+                                    /*ignore_repeated_field_ordering=*/true)) {
+          lhs_list.pop_front();
+          rhs_list.erase(it);
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
         return false;
       }
     }
-
     return true;
   }
 
   template <class ProtoType>
   static AssertionResult
   assertRepeatedPtrFieldEqual(const Protobuf::RepeatedPtrField<ProtoType>& lhs,
-                              const Protobuf::RepeatedPtrField<ProtoType>& rhs) {
-    if (!repeatedPtrFieldEqual(lhs, rhs)) {
+                              const Protobuf::RepeatedPtrField<ProtoType>& rhs,
+                              bool ignore_repeated_field_ordering = false) {
+    if (!repeatedPtrFieldEqual(lhs, rhs, ignore_repeated_field_ordering)) {
       return AssertionFailure() << RepeatedPtrUtil::debugString(lhs) << " does not match "
                                 << RepeatedPtrUtil::debugString(rhs);
     }
