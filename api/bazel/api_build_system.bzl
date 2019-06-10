@@ -2,9 +2,11 @@ load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_grpc_library", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
+load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 
 _PY_SUFFIX = "_py"
 _CC_SUFFIX = "_cc"
+_CC_GRPC_SUFFIX = "_cc_grpc"
 _GO_PROTO_SUFFIX = "_go_proto"
 _GO_GRPC_SUFFIX = "_go_grpc"
 _GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/data-plane-api/api/"
@@ -72,6 +74,15 @@ def api_go_grpc_library(name, proto, deps = []):
             "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
             "@googleapis//:http_api_go_proto",
         ],
+    )
+
+def api_cc_grpc_library(name, proto, deps = []):
+    cc_grpc_library(
+        name = _Suffix(name, _CC_GRPC_SUFFIX),
+        srcs = [proto],
+        deps = deps,
+        proto_only = False,
+        grpc_only = True,
     )
 
 # This is api_proto_library plus some logic internal to //envoy/api.
