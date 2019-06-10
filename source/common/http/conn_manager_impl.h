@@ -467,7 +467,7 @@ private:
                                 // A filter can still stop the stream from being complete as seen
                                 // by the codec.
       bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written all
-                                         // the way through to the codec.
+                                          // the way through to the codec.
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
       bool created_filter_chain_ : 1;
