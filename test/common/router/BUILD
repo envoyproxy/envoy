@@ -174,16 +174,14 @@ filegroup(
     name = "route_corpus",
     testonly = 1,
     srcs = select({
-        "ppc_build": [],
-        "//conditions:default": [":corpus_from_config_impl"],
+        # TODO(asraa): Clean this up for cross-compilation. Right now we assume
+        # the host and target are the same on x86 builds, so we only execute the
+        # corpus generation binary on x86 platforms.
+        "//bazel:x86": [":corpus_from_config_impl"],
+        "//conditions:default": [],
     }) + glob([
         "route_corpus/**",
     ]),
-)
-
-config_setting(
-    name = "ppc_build",
-    values = {"cpu": "ppc"},
 )
 
 envoy_cc_fuzz_test(
