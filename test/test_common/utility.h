@@ -271,7 +271,7 @@ public:
   repeatedProtoToList(const Protobuf::RepeatedPtrField<ProtoType>& repeated) {
     std::list<ProtoType> ret;
     for (const auto& proto : repeated) {
-      ret.push_back(repeated[i]);
+      ret.push_back(proto);
     }
     return ret;
   }
