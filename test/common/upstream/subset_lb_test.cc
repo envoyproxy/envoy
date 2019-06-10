@@ -667,6 +667,40 @@ TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabled) {
   EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
 }
 
+TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabledMultipleLists) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  std::vector<std::set<std::string>> subset_keys = {{"version"}};
+  EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
+  EXPECT_CALL(subset_info_, listAsAny()).WillRepeatedly(Return(true));
+
+  init({});
+  modifyHosts(
+      {makeHost("tcp://127.0.0.1:8000", {{"version", std::vector<std::string>{"1.2.1", "1.2"}}}),
+       makeHost("tcp://127.0.0.1:8000", {{"version", std::vector<std::string>{"1.2.2", "1.2"}}}),
+       makeHost("tcp://127.0.0.1:8001", {{"version", "1.0"}})},
+      {}, {}, 0);
+
+  {
+    TestLoadBalancerContext context({{"version", "1.0"}});
+    EXPECT_TRUE(host_set_.hosts()[2] == lb_->chooseHost(&context));
+  }
+  {
+    // This should LB between both hosts mared with version 1.2.
+    TestLoadBalancerContext context({{"version", "1.2"}});
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
+  }
+  {
+    TestLoadBalancerContext context({{"version", "1.2.1"}});
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+  }
+
+  TestLoadBalancerContext context({{"version", "1.2.2"}});
+  EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+}
+
 TEST_P(SubsetLoadBalancerTest, ListAsAnyDisable) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));

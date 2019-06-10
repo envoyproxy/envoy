@@ -152,6 +152,8 @@ private:
 
   void findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadata& kvs, uint32_t idx,
                           std::vector<LbSubsetEntryPtr>& entries);
+  LbSubsetEntryPtr getOrCreateSubset(LbSubsetMap& subsets, const std::string& name,
+                                     const HashedValue& value);
   void forEachSubset(LbSubsetMap& subsets, std::function<void(LbSubsetEntryPtr)> cb);
 
   SubsetMetadata extractSubsetMetadata(const std::set<std::string>& subset_keys, const Host& host);

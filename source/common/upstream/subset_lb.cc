@@ -335,21 +335,23 @@ bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host
 
     // If configured to do so, we attempt to match the metadata value with the contents
     // of the list specified on the host.
-    if (list_as_any_) {
-      bool list_match = false;
-      for (const auto& l : entry_it->second.list_value().values()) {
-        if (ValueUtil::equal(l, kv.second)) {
-          list_match = true;
+    if (list_as_any_ && entry_it->second.kind_case() == ProtobufWkt::Value::kListValue &&
+        kv.second.kind_case() == ProtobufWkt::Value::kListValue) {
+      bool any_match = false;
+      for (const auto& host_value : entry_it->second.list_value().values()) {
+        for (const auto& kv_value : kv.second.list_value().values()) {
+          if (ValueUtil::equal(host_value, kv_value)) {
+            any_match = true;
+          }
         }
       }
-
-      if (list_match) {
-        continue;
+      if (!any_match) {
+        return false;
       }
-    }
-
-    if (!ValueUtil::equal(entry_it->second, kv.second)) {
-      return false;
+    } else {
+      if (!ValueUtil::equal(entry_it->second, kv.second)) {
+        return false;
+      }
     }
   }
 
@@ -377,19 +379,7 @@ SubsetLoadBalancer::extractSubsetMetadata(const std::set<std::string>& subset_ke
       break;
     }
 
-    if (list_as_any_) {
-      // TODO(snowp): Should we switch on the the type of the oneof instead? This might add an empty
-      // list.
-      if (it->second.list_value().values().empty()) {
-        kvs.emplace_back(std::make_pair(key, it->second));
-      } else {
-        for (const auto& v : it->second.list_value().values()) {
-          kvs.emplace_back(std::make_pair(key, v));
-        }
-      }
-    } else {
-      kvs.emplace_back(std::make_pair(key, it->second));
-    }
+    kvs.emplace_back(std::make_pair(key, it->second));
   }
 
   return kvs;
@@ -415,6 +405,34 @@ std::string SubsetLoadBalancer::describeMetadata(const SubsetLoadBalancer::Subse
   return buf.str();
 }
 
+SubsetLoadBalancer::LbSubsetEntryPtr
+SubsetLoadBalancer::getOrCreateSubset(LbSubsetMap& subsets, const std::string& name,
+                                      const HashedValue& value) {
+  const auto& kv_it = subsets.find(name);
+
+  if (kv_it != subsets.end()) {
+    ValueSubsetMap& value_subset_map = kv_it->second;
+    const auto vs_it = value_subset_map.find(value);
+
+    // Return the existing subset.
+    if (vs_it != value_subset_map.end()) {
+      return vs_it->second;
+    }
+
+    // A ValueSubsetMap exists, but doesn't have an entry for this value. Add one in.
+    auto entry = std::make_shared<LbSubsetEntry>();
+    value_subset_map.emplace(value, entry);
+    return entry;
+  }
+
+  // Subset doesn't already exist for this name. Create a new one.
+  auto entry = std::make_shared<LbSubsetEntry>();
+  ValueSubsetMap value_subset_map = {{value, entry}};
+  subsets.emplace(name, value_subset_map);
+
+  return entry;
+}
+
 // Given a vector of key-values (from extractSubsetMetadata), recursively finds the matching
 // LbSubsetEntryPtr.
 void SubsetLoadBalancer::findOrCreateSubset(
@@ -424,54 +442,36 @@ void SubsetLoadBalancer::findOrCreateSubset(
 
   const std::string& name = kvs[idx].first;
   const ProtobufWkt::Value& pb_value = kvs[idx].second;
-  const HashedValue value(pb_value);
   LbSubsetEntryPtr entry;
 
-  const auto& kv_it = subsets.find(name);
-  if (kv_it != subsets.end()) {
-    ValueSubsetMap& value_subset_map = kv_it->second;
-    const auto vs_it = value_subset_map.find(value);
-    if (vs_it != value_subset_map.end()) {
-      entry = vs_it->second;
-    }
-  }
-
-  if (!entry) {
-    // Not found. Create an uninitialized entry.
-    entry.reset(new LbSubsetEntry());
-    if (kv_it != subsets.end()) {
-      ValueSubsetMap& value_subset_map = kv_it->second;
-      value_subset_map.emplace(value, entry);
-    } else {
-      ValueSubsetMap value_subset_map = {{value, entry}};
-      subsets.emplace(name, value_subset_map);
-    }
-  }
-
   idx++;
+  if (list_as_any_ && pb_value.kind_case() == ProtobufWkt::Value::kListValue) {
+    for (const auto& v : pb_value.list_value().values()) {
+      const HashedValue value(v);
+      auto entry = getOrCreateSubset(subsets, name, value);
+      if (idx == kvs.size()) {
+        // We've matched all the key-values, so add the entry to the list of modified
+        // entries.
+        entries.emplace_back(entry);
+      } else {
+        // Keep recursing down to match the new
+        findOrCreateSubset(entry->children_, kvs, idx, entries);
+      }
+    }
+  } else {
+    const HashedValue value(pb_value);
+    auto entry = getOrCreateSubset(subsets, name, value);
+    if (idx == kvs.size()) {
+      // We've matched all the key-values, so we're done. Add the entry to the list of modified
+      // entries.
+      entries.emplace_back(entry);
+      return;
+    }
 
-  // It's possible that there are duplicate kvs entries with the same name (i.e. when we treat a
-  // list metadata on the host as matching any of the containing values), so we need special
-  // handling here to ensure that we create subsets for each value of this subset. This also ensures
-  // that we're able to return the collection of entries for subsets that hosts that generated this
-  // kvs will be matched with.
-  //
-  // Conceptually we're now traversing siblings nodes, continuing the DFS for each sibling.
-  for (; kvs[idx].first == name && idx < kvs.size(); ++idx) {
-    findOrCreateSubset(subsets, kvs, idx, entries);
+    // Keep recursing down to match the new
+    findOrCreateSubset(entry->children_, kvs, idx, entries);
   }
-
-  if (idx == kvs.size()) {
-    // We've matched all the key-values, so we're done. Add the entry to the list of modified
-    // entries.
-    entries.emplace_back(entry);
-    return;
-  }
-
-  // Keep recursing down to match the new
-  findOrCreateSubset(entry->children_, kvs, idx, entries);
-} // namespace Upstream
-
+}
 // Invokes cb for each LbSubsetEntryPtr in subsets.
 void SubsetLoadBalancer::forEachSubset(LbSubsetMap& subsets,
                                        std::function<void(LbSubsetEntryPtr)> cb) {
@@ -634,8 +634,8 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     }
   }
 
-  // Since the removed hosts would not be present in the list of all hosts, we need to evaluate the
-  // predicate directly for these hosts.
+  // Since the removed hosts would not be present in the list of all hosts, we need to evaluate
+  // the predicate directly for these hosts.
   HostVector filtered_removed;
   for (const auto& host : hosts_removed) {
     if (predicate(*host)) {
