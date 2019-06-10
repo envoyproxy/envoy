@@ -108,7 +108,7 @@ message DiscoveryResponse {
 // With Delta xDS, the DeltaDiscoveryResponses do not need to include a full
 // snapshot of the tracked resources. Instead, DeltaDiscoveryResponses are a
 // diff to the state of a xDS client.
-// In Delta XDS there are per resource versions, which allow tracking state at
+// In Delta XDS there are per-resource versions, which allow tracking state at
 // the resource granularity.
 // An xDS Delta session is always in the context of a gRPC bidirectional
 // stream. This allows the xDS server to keep track of the state of xDS clients
@@ -119,22 +119,27 @@ message DiscoveryResponse {
 // Optionally, a response message level system_version_info is present for
 // debugging purposes only.
 //
-// DeltaDiscoveryRequest can be sent in 3 situations:
-//   1. Initial message in a xDS bidirectional gRPC stream.
-//   2. As a ACK or NACK response to a previous DeltaDiscoveryResponse.
-//      In this case the response_nonce is set to the nonce value in the Response.
-//      ACK or NACK is determined by the absence or presence of error_detail.
-//   3. Spontaneous DeltaDiscoveryRequest from the client.
-//      This can be done to dynamically add or remove elements from the tracked
-//      resource_names set. In this case response_nonce must be omitted.
+// DeltaDiscoveryRequest plays two independent roles. Any DeltaDiscoveryRequest
+// can be either or both of: [1] informing the server of what resources the
+// client has gained/lost interest in (using resource_names_subscribe and
+// resource_names_unsubscribe), or [2] (N)ACKing an earlier resource update from
+// the server (using response_nonce, with presence of error_detail making it a NACK).
+// Additionally, the first message (for a given type_url) of a reconnected gRPC stream
+// has a third role: informing the server of the resources (and their versions)
+// that the client already possesses, using the initial_resource_versions field.
+//
+// As with state-of-the-world, when multiple resource types are multiplexed (ADS),
+// all requests/acknowledgments/updates are logically walled off by type_url:
+// a Cluster ACK exists in a completely separate world from a prior Route NACK.
+// In particular, initial_resource_versions being sent at the "start" of every
+// gRPC stream actually entails a message for each type_url, each with its own
+// initial_resource_versions.
 message DeltaDiscoveryRequest {
   // The node making the request.
   core.Node node = 1;
 
   // Type of the resource that is being requested, e.g.
-  // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment". This is implicit
-  // in requests made via singleton xDS APIs such as CDS, LDS, etc. but is
-  // required for ADS.
+  // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment".
   string type_url = 2;
 
   // DeltaDiscoveryRequests allow the client to add or remove individual
@@ -142,19 +147,20 @@ message DeltaDiscoveryRequest {
   // All resource names in the resource_names_subscribe list are added to the
   // set of tracked resources and all resource names in the resource_names_unsubscribe
   // list are removed from the set of tracked resources.
-  // Unlike in state-of-the-world xDS, an empty resource_names_subscribe or
+  //
+  // *Unlike* state-of-the-world xDS, an empty resource_names_subscribe or
   // resource_names_unsubscribe list simply means that no resources are to be
   // added or removed to the resource list.
-  // The xDS server must send updates for all tracked resources but can also
-  // send updates for resources the client has not subscribed to. This behavior
-  // is similar to state-of-the-world xDS.
-  // These two fields can be set for all types of DeltaDiscoveryRequests
-  // (initial, ACK/NACK or spontaneous).
+  // *Like* state-of-the-world xDS, the server must send updates for all tracked
+  // resources, but can also send updates for resources the client has not subscribed to.
   //
   // NOTE: the server must respond with all resources listed in resource_names_subscribe,
   // even if it believes the client has the most recent version of them. The reason:
   // the client may have dropped them, but then regained interest before it had a chance
   // to send the unsubscribe message. See DeltaSubscriptionStateTest.RemoveThenAdd.
+  //
+  // These two fields can be set in any DeltaDiscoveryRequest, including ACKs
+  // and initial_resource_versions.
   //
   // A list of Resource names to add to the list of tracked resources.
   repeated string resource_names_subscribe = 3;
@@ -162,12 +168,14 @@ message DeltaDiscoveryRequest {
   // A list of Resource names to remove from the list of tracked resources.
   repeated string resource_names_unsubscribe = 4;
 
-  // This map must be populated when the DeltaDiscoveryRequest is the
-  // first in a stream (assuming there are any resources - this field's purpose is to enable
-  // a session to continue in a reconnected gRPC stream, and so will not be used in the very
-  // first stream of a session). The keys are the resources names of the xDS resources
-  // known to the xDS client. The values in the map are the associated resource
-  // level version info.
+  // Informs the server of the versions of the resources the xDS client knows of, to enable the
+  // client to continue the same logical xDS session even in the face of gRPC stream reconnection.
+  // It will not be populated: [1] in the very first stream of a session, since the client will
+  // not yet have any resources,  [2] in any message after the first in a stream (for a given
+  // type_url), since the server will already be correctly tracking the client's state.
+  // (In ADS, the first message *of each type_url* of a reconnected stream populates this map.)
+  // The map's keys are names of xDS resources known to the xDS client.
+  // The map's values are opaque resource versions.
   map<string, string> initial_resource_versions = 5;
 
   // When the DeltaDiscoveryRequest is a ACK or NACK message in response
@@ -186,8 +194,8 @@ message DeltaDiscoveryResponse {
   // The version of the response data (used for debugging).
   string system_version_info = 1;
 
-  // The response resources. These are typed resources that match the type url
-  // in the DeltaDiscoveryRequest.
+  // The response resources. These are typed resources, whose types must match
+  // the type_url field.
   repeated Resource resources = 2 [(gogoproto.nullable) = false];
 
   // field id 3 IS available!
@@ -201,7 +209,7 @@ message DeltaDiscoveryResponse {
   repeated string removed_resources = 6;
 
   // The nonce provides a way for DeltaDiscoveryRequests to uniquely
-  // reference a DeltaDiscoveryResponse. The nonce is required.
+  // reference a DeltaDiscoveryResponse when (N)ACKing. The nonce is required.
   string nonce = 5;
 }
 
