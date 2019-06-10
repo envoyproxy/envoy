@@ -296,6 +296,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(response->body()));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/cpuprofiler", "",
                                                 downstreamProtocol(), version_);
@@ -351,6 +352,13 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  auto listeners = test_server_->server().listenerManager().listeners();
+  auto listener_it = listeners.cbegin();
+  for (; listener_it != listeners.end(); ++listener_it) {
+    EXPECT_THAT(response->body(), testing::HasSubstr(fmt::format(
+                                      "{}::{}", listener_it->get().name(),
+                                      listener_it->get().socket().localAddress()->asString())));
+  }
 
   response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/listeners?format=json", "", downstreamProtocol(), version_);
@@ -361,8 +369,8 @@ TEST_P(IntegrationAdminTest, Admin) {
   json = Json::Factory::loadFromString(response->body());
   std::vector<Json::ObjectSharedPtr> listener_info = json->getObjectArray("listener_statuses");
   auto listener_info_it = listener_info.cbegin();
-  auto listeners = test_server_->server().listenerManager().listeners();
-  auto listener_it = listeners.cbegin();
+  listeners = test_server_->server().listenerManager().listeners();
+  listener_it = listeners.cbegin();
   for (; listener_info_it != listener_info.end() && listener_it != listeners.end();
        ++listener_info_it, ++listener_it) {
     auto local_address = (*listener_info_it)->getObject("local_address");
