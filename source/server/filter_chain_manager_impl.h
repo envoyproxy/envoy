@@ -3,6 +3,8 @@
 #include <memory>
 
 #include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/protobuf/message_validator.h"
+#include "envoy/server/transport_socket_config.h"
 
 #include "common/common/logger.h"
 #include "common/network/cidr_range.h"
@@ -13,15 +15,32 @@
 namespace Envoy {
 namespace Server {
 
+class FilterChainFactoryBuilder {
+public:
+  virtual ~FilterChainFactoryBuilder() = default;
+  virtual std::unique_ptr<Network::FilterChain>
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const = 0;
+};
+
 /**
  * Implementation of FilterChainManager.
  */
 class FilterChainManagerImpl : public Network::FilterChainManager,
                                Logger::Loggable<Logger::Id::config> {
 public:
+  FilterChainManagerImpl(Network::Address::InstanceConstSharedPtr address,
+                         ProtobufMessage::ValidationVisitor& visitor)
+      : address_(address), validation_visitor_(visitor) {}
+
   // Network::FilterChainManager
   const Network::FilterChain*
   findFilterChain(const Network::ConnectionSocket& socket) const override;
+
+  // Currently for listener only
+  void
+  addFilterChain(absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
+                 FilterChainFactoryBuilder& b);
+
   void
   addFilterChain(uint16_t destination_port, const std::vector<std::string>& destination_ips,
                  const std::vector<std::string>& server_names,
@@ -122,12 +141,14 @@ private:
   // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
+  Network::Address::InstanceConstSharedPtr address_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 class FilterChainImpl : public Network::FilterChain {
 public:
   FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                  std::vector<Network::FilterFactoryCb> filters_factory)
+                  std::vector<Network::FilterFactoryCb>&& filters_factory)
       : transport_socket_factory_(std::move(transport_socket_factory)),
         filters_factory_(std::move(filters_factory)) {}
 

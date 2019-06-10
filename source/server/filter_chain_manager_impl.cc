@@ -1,6 +1,15 @@
 #include "server/filter_chain_manager_impl.h"
 
 #include "common/common/empty_string.h"
+#include "common/common/fmt.h"
+#include "common/config/utility.h"
+#include "common/protobuf/utility.h"
+
+#include "server/configuration_impl.h"
+
+#include "extensions/filters/listener/well_known_names.h"
+#include "extensions/filters/network/well_known_names.h"
+#include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -22,6 +31,85 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
 }
 
+void FilterChainManagerImpl::addFilterChain(
+    absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
+    FilterChainFactoryBuilder& b) {
+  std::unordered_set<envoy::api::v2::listener::FilterChainMatch, MessageUtil, MessageUtil>
+      filter_chains;
+  for (const auto& filter_chain : filter_chain_span) {
+
+    const auto& filter_chain_match = filter_chain->filter_chain_match();
+    if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
+                                       "unimplemented fields",
+                                       address_->asString()));
+    }
+    if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
+                                       "the same matching rules are defined",
+                                       address_->asString()));
+    }
+    filter_chains.insert(filter_chain_match);
+
+    // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
+    // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
+    // We copy by value first then override if necessary.
+    auto transport_socket = filter_chain->transport_socket();
+    if (!filter_chain->has_transport_socket()) {
+      if (filter_chain->has_tls_context()) {
+        transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
+        MessageUtil::jsonConvert(filter_chain->tls_context(), *transport_socket.mutable_config());
+      } else {
+        transport_socket.set_name(
+            Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
+      }
+    }
+
+    auto& config_factory = Config::Utility::getAndCheckFactory<
+        Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        transport_socket, validation_visitor_, config_factory);
+
+    // Validate IP addresses.
+    std::vector<std::string> destination_ips;
+    destination_ips.reserve(filter_chain_match.prefix_ranges().size());
+    for (const auto& destination_ip : filter_chain_match.prefix_ranges()) {
+      const auto& cidr_range = Network::Address::CidrRange::create(destination_ip);
+      destination_ips.push_back(cidr_range.asString());
+    }
+
+    std::vector<std::string> server_names(filter_chain_match.server_names().begin(),
+                                          filter_chain_match.server_names().end());
+
+    // Reject partial wildcards, we don't match on them.
+    for (const auto& server_name : server_names) {
+      if (server_name.find('*') != std::string::npos &&
+          !FilterChainManagerImpl::isWildcardServerName(server_name)) {
+        throw EnvoyException(
+            fmt::format("error adding listener '{}': partial wildcards are not supported in "
+                        "\"server_names\"",
+                        address_->asString()));
+      }
+    }
+
+    std::vector<std::string> source_ips;
+    source_ips.reserve(filter_chain_match.source_prefix_ranges().size());
+    for (const auto& source_ip : filter_chain_match.source_prefix_ranges()) {
+      const auto& cidr_range = Network::Address::CidrRange::create(source_ip);
+      source_ips.push_back(cidr_range.asString());
+    }
+
+    std::vector<std::string> application_protocols(
+        filter_chain_match.application_protocols().begin(),
+        filter_chain_match.application_protocols().end());
+    addFilterChainForDestinationPorts(
+        destination_ports_map_,
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
+        server_names, filter_chain_match.transport_protocol(), application_protocols,
+        filter_chain_match.source_type(), source_ips, filter_chain_match.source_ports(),
+        std::shared_ptr<Network::FilterChain>(b.buildFilterChain(*filter_chain)));
+  }
+}
 void FilterChainManagerImpl::addFilterChain(
     uint16_t destination_port, const std::vector<std::string>& destination_ips,
     const std::vector<std::string>& server_names, const std::string& transport_protocol,
@@ -168,9 +256,9 @@ void FilterChainManagerImpl::addFilterChainForSourcePorts(
     // If we got here and found already configured branch, then it means that this FilterChainMatch
     // is a duplicate, and that there is some overlap in the repeated fields with already processed
     // FilterChainMatches.
-    // TODO(lambdai): bring back the address in exception
-    throw EnvoyException(fmt::format("error adding listener: multiple filter chains with "
-                                     "overlapping matching rules are defined"));
+    throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
+                                     "overlapping matching rules are defined",
+                                     address_->asString()));
   }
 }
 
@@ -200,6 +288,7 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
 
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
+  ENVOY_LOG(error, "will call socket local address()");
   const auto& address = socket.localAddress();
 
   // Match on destination port (only for IP addresses).
