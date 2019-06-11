@@ -165,9 +165,8 @@ absl::optional<std::regex> filterParam(Http::Utility::QueryParams params) {
 
 // Helper method to get the format parameter
 absl::optional<std::string> formatParam(Http::Utility::QueryParams params) {
-  return (params.find("format") != params.end())
-             ? absl::optional<std::string>{params.at("format")}
-             : absl::nullopt;
+  return (params.find("format") != params.end()) ? absl::optional<std::string>{params.at("format")}
+                                                 : absl::nullopt;
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the
