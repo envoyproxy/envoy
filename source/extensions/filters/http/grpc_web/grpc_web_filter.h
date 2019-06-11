@@ -8,7 +8,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/non_copyable.h"
 #include "common/grpc/codec.h"
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 
 namespace Envoy {
 namespace Extensions {
