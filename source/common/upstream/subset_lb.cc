@@ -243,9 +243,8 @@ void SubsetLoadBalancer::processSubsets(
         std::vector<SubsetMetadata> all_kvs = extractSubsetMetadata(keys, *host);
         for (auto& kvs : all_kvs) {
           // The host has metadata for each key, find or create its subset.
-          std::vector<LbSubsetEntryPtr> entries;
-          findOrCreateSubsets(subsets_, kvs, 0, entries);
-          for (const auto& entry : entries) {
+          auto entry = findOrCreateSubset(subsets_, kvs, 0);
+          if (entry != nullptr) {
             if (subsets_modified.find(entry) != subsets_modified.end()) {
               // We've already invoked the callback for this entry.
               continue;
@@ -436,73 +435,48 @@ std::string SubsetLoadBalancer::describeMetadata(const SubsetLoadBalancer::Subse
   return buf.str();
 }
 
-SubsetLoadBalancer::LbSubsetEntryPtr
-SubsetLoadBalancer::getOrCreateSubset(LbSubsetMap& subsets, const std::string& name,
-                                      const HashedValue& value) {
-  const auto& kv_it = subsets.find(name);
-
-  if (kv_it != subsets.end()) {
-    ValueSubsetMap& value_subset_map = kv_it->second;
-    const auto vs_it = value_subset_map.find(value);
-
-    // Return the existing subset.
-    if (vs_it != value_subset_map.end()) {
-      return vs_it->second;
-    }
-
-    // A ValueSubsetMap exists, but doesn't have an entry for this value. Add one in.
-    auto entry = std::make_shared<LbSubsetEntry>();
-    value_subset_map.emplace(value, entry);
-    return entry;
-  }
-
-  // Subset doesn't already exist for this name. Create a new one.
-  auto entry = std::make_shared<LbSubsetEntry>();
-  ValueSubsetMap value_subset_map = {{value, entry}};
-  subsets.emplace(name, value_subset_map);
-
-  return entry;
-}
-
 // Given a vector of key-values (from extractSubsetMetadata), recursively finds the matching
 // LbSubsetEntryPtr.
-void SubsetLoadBalancer::findOrCreateSubsets(
-    LbSubsetMap& subsets, const SubsetMetadata& kvs, uint32_t idx,
-    std::vector<SubsetLoadBalancer::LbSubsetEntryPtr>& entries) {
+SubsetLoadBalancer::LbSubsetEntryPtr
+SubsetLoadBalancer::findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadata& kvs,
+                                       uint32_t idx) {
   ASSERT(idx < kvs.size());
 
   const std::string& name = kvs[idx].first;
   const ProtobufWkt::Value& pb_value = kvs[idx].second;
   LbSubsetEntryPtr entry;
 
-  idx++;
-  if (list_as_any_ && pb_value.kind_case() == ProtobufWkt::Value::kListValue) {
-    for (const auto& v : pb_value.list_value().values()) {
-      const HashedValue value(v);
-      auto entry = getOrCreateSubset(subsets, name, value);
-      if (idx == kvs.size()) {
-        // We've matched all the key-values, so add the entry to the list of modified
-        // entries.
-        entries.emplace_back(entry);
-      } else {
-        // Keep recursing down to match the new
-        findOrCreateSubsets(entry->children_, kvs, idx, entries);
-      }
-    }
-  } else {
-    const HashedValue value(pb_value);
-    auto entry = getOrCreateSubset(subsets, name, value);
-    if (idx == kvs.size()) {
-      // We've matched all the key-values, so we're done. Add the entry to the list of modified
-      // entries.
-      entries.emplace_back(entry);
-      return;
-    }
+  const auto& kv_it = subsets.find(name);
 
-    // Keep recursing down to match the new
-    findOrCreateSubsets(entry->children_, kvs, idx, entries);
+  if (kv_it != subsets.end()) {
+    ValueSubsetMap& value_subset_map = kv_it->second;
+    const auto vs_it = value_subset_map.find(pb_value);
+    if (vs_it != value_subset_map.end()) {
+      entry = vs_it->second;
+    }
   }
+
+  if (!entry) {
+    // Not found. Create an uninitialized entry.
+    entry.reset(new LbSubsetEntry());
+    if (kv_it != subsets.end()) {
+      ValueSubsetMap& value_subset_map = kv_it->second;
+      value_subset_map.emplace(pb_value, entry);
+    } else {
+      ValueSubsetMap value_subset_map = {{pb_value, entry}};
+      subsets.emplace(name, value_subset_map);
+    }
+  }
+
+  idx++;
+
+  if (idx == kvs.size()) {
+    // We've matched all the key-values, return the entry.
+    return entry;
+  }
+  return findOrCreateSubset(entry->children_, kvs, idx);
 }
+
 // Invokes cb for each LbSubsetEntryPtr in subsets.
 void SubsetLoadBalancer::forEachSubset(LbSubsetMap& subsets,
                                        std::function<void(LbSubsetEntryPtr)> cb) {
