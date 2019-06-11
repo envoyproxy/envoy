@@ -693,7 +693,10 @@ TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabledMultipleLists) {
     EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
   }
   {
+    // Choose a host multiple times to ensure that hosts()[0] is the *only*
+    // thing selected for this subset.
     TestLoadBalancerContext context({{"version", "1.2.1"}});
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
     EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
   }
 
