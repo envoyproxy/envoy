@@ -18,7 +18,7 @@ namespace ExtAuthz {
 constexpr char V2[] = "envoy.service.auth.v2.Authorization.Check";
 constexpr char V2alpha[] = "envoy.service.auth.v2alpha.Authorization.Check";
 
-GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
+GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
                                bool use_alpha)
     : service_method_(getMethodDescriptor(use_alpha)), async_client_(std::move(async_client)),

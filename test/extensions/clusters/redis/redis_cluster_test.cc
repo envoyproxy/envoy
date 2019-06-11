@@ -12,6 +12,7 @@
 #include "source/extensions/clusters/redis/redis_cluster.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
@@ -78,12 +79,13 @@ protected:
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
-
+    cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
     cluster_.reset(new RedisCluster(
         cluster_config,
         MessageUtil::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
             config),
-        *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false));
+        *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false,
+        cluster_callback_));
     // This allows us to create expectation on cluster slot response without waiting for
     // makeRequest.
     pool_callbacks_ = &cluster_->redis_discovery_session_;
@@ -348,6 +350,7 @@ protected:
     EXPECT_CALL(initialized_, ready());
     cluster_->initialize([&]() -> void { initialized_.ready(); });
 
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
     expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
     // TODO(hyang): this will change once we register slaves as well
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
@@ -356,12 +359,14 @@ protected:
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
     resolve_timer_->callback_();
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
     expectClusterSlotResponse(twoSlotsMasters());
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
     // No change.
     expectRedisResolve();
     resolve_timer_->callback_();
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1).WillOnce(Return(false));
     expectClusterSlotResponse(twoSlotsMasters());
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
@@ -369,6 +374,7 @@ protected:
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
     resolve_timer_->callback_();
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
     expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
   }
@@ -412,6 +418,7 @@ protected:
   Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest pool_request_;
   Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks* pool_callbacks_{};
   std::shared_ptr<RedisCluster> cluster_;
+  std::shared_ptr<NiceMock<MockClusterSlotUpdateCallBack>> cluster_callback_;
 };
 
 typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>,
@@ -485,6 +492,7 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         std::list<std::string> address_pair = std::get<2>(GetParam());
         cb(TestUtility::makeDnsResponse(address_pair));
+        EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
         expectClusterSlotResponse(
             singleSlotMasterSlave(address_pair.front(), address_pair.back(), 22120));
         return nullptr;
@@ -580,6 +588,7 @@ TEST_F(RedisClusterTest, RedisResolveFailure) {
   resolve_timer_->callback_();
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
   expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
 
@@ -611,7 +620,7 @@ TEST_F(RedisClusterTest, FactoryInitNotRedisClusterTypeFailure) {
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(setupFactoryFromV2Yaml(basic_yaml_hosts), EnvoyException,
-                            "Redis cluster can only created with redis cluster type");
+                            "Redis cluster can only created with redis cluster type.");
 }
 
 TEST_F(RedisClusterTest, FactoryInitRedisClusterTypeSuccess) {
@@ -670,6 +679,7 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
   hello_world_response->type(NetworkFilters::Common::Redis::RespType::Array);
   hello_world_response->asArray().swap(hello_world);
 
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(0);
   expectClusterSlotResponse(std::move(hello_world_response));
   EXPECT_EQ(1U, cluster_->info()->stats().update_attempt_.value());
   EXPECT_EQ(1U, cluster_->info()->stats().update_failure_.value());
@@ -678,6 +688,7 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
   resolve_timer_->callback_();
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
   expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
 
@@ -689,6 +700,9 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
     std::bitset<10> flags(i);
     expectRedisResolve();
     resolve_timer_->callback_();
+    if (flags.all()) {
+      EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1).WillOnce(Return(false));
+    }
     expectClusterSlotResponse(createResponse(flags));
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
     EXPECT_EQ(++update_attempt, cluster_->info()->stats().update_attempt_.value());

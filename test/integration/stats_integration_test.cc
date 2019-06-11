@@ -213,8 +213,10 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/05/07  6794     49957               Stats for excluded hosts in cluster
   // 2019/04/27  6733     50213               Use SymbolTable API for HTTP codes
   // 2019/05/31  6866     50157               libstdc++ upgrade in CI
+  // 2019/06/03  7199     49393               absl update
+  // 2019/06/06  7208     49650               make memory targets approximate
 
-  EXPECT_EQ(m_per_cluster, 50157);
+  EXPECT_LE(m_per_cluster, 49650);
 }
 
 } // namespace

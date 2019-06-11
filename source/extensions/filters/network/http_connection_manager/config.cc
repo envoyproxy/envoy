@@ -7,7 +7,6 @@
 
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
-#include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
 
 #include "common/access_log/access_log_impl.h"
@@ -221,6 +220,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (set_current_client_cert_details.cert()) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Cert);
   }
+  if (set_current_client_cert_details.chain()) {
+    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Chain);
+  }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, subject, false)) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
   }
@@ -348,7 +350,7 @@ void HttpConnectionManagerConfig::processFilter(
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           string_name);
   Http::FilterFactoryCb callback;
-  if (filter_config->getBoolean("deprecated_v1", false)) {
+  if (Config::Utility::allowDeprecatedV1Config(context_.runtime(), *filter_config)) {
     callback = factory.createFilterFactory(*filter_config->getObject("value", true), stats_prefix_,
                                            context_);
   } else {
