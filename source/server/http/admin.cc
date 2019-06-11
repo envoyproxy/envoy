@@ -163,6 +163,13 @@ absl::optional<std::regex> filterParam(Http::Utility::QueryParams params) {
              : absl::nullopt;
 }
 
+// Helper method to get the format parameter
+absl::optional<std::string> formatParam(Http::Utility::QueryParams params) {
+  return (params.find("format") != params.end())
+             ? absl::optional<std::string>{params.at("format")}
+             : absl::nullopt;
+}
+
 // Helper method that ensures that we've setting flags based on all the health flag values on the
 // host.
 void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
@@ -474,9 +481,9 @@ void AdminImpl::writeListenersAsText(Buffer::Instance& response) {
 Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  auto it = query_params.find("format");
+  const auto format_value = formatParam(query_params);
 
-  if (it != query_params.end() && it->second == "json") {
+  if (format_value.has_value() && format_value.value() == "json") {
     writeClustersAsJson(response);
     response_headers.insertContentType().value().setReference(
         Http::Headers::get().ContentTypeValues.Json);
@@ -721,7 +728,6 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
 
   const bool used_only = params.find("usedonly") != params.end();
-  const bool has_format = !(params.find("format") == params.end());
   const absl::optional<std::regex> regex = filterParam(params);
 
   std::map<std::string, uint64_t> all_stats;
@@ -738,14 +744,13 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     }
   }
 
-  if (has_format) {
-    const std::string format_value = params.at("format");
-    if (format_value == "json") {
+  if (const auto format_value = formatParam(params)) {
+    if (format_value.value() == "json") {
       response_headers.insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Json);
       response.add(
           AdminImpl::statsAsJson(all_stats, server_.stats().histograms(), used_only, regex));
-    } else if (format_value == "prometheus") {
+    } else if (format_value.value() == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response, admin_stream);
     } else {
       response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
@@ -981,9 +986,9 @@ Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::HeaderMap&,
 Http::Code AdminImpl::handlerListenerInfo(absl::string_view url, Http::HeaderMap& response_headers,
                                           Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  const auto& it = query_params.find("format");
+  const auto format_value = formatParam(query_params);
 
-  if (it != query_params.end() && it->second == "json") {
+  if (format_value.has_value() && format_value.value() == "json") {
     writeListenersAsJson(response);
     response_headers.insertContentType().value().setReference(
         Http::Headers::get().ContentTypeValues.Json);
