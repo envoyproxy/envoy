@@ -161,12 +161,12 @@ SplitRequestPtr SimpleRequest::create(Router& router,
   std::unique_ptr<SimpleRequest> request_ptr{
       new SimpleRequest(callbacks, command_stats, time_source, latency_in_micros)};
 
-  std::string& key = incoming_request->asArray()[1].asString();
-  const auto route = router.upstreamPool(key);
+  const auto route = router.upstreamPool(incoming_request->asArray()[1].asString());
   if (route) {
     request_ptr->conn_pool_ = route->upstream();
-    request_ptr->handle_ = makeRequest(route, incoming_request->asArray()[0].asString(), key,
-                                       *incoming_request, *request_ptr);
+    request_ptr->handle_ =
+        makeRequest(route, incoming_request->asArray()[0].asString(),
+                    incoming_request->asArray()[1].asString(), *incoming_request, *request_ptr);
   }
 
   if (!request_ptr->handle_) {
@@ -192,12 +192,12 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
   std::unique_ptr<EvalRequest> request_ptr{
       new EvalRequest(callbacks, command_stats, time_source, latency_in_micros)};
 
-  std::string& key = incoming_request->asArray()[3].asString();
-  const auto route = router.upstreamPool(key);
+  const auto route = router.upstreamPool(incoming_request->asArray()[3].asString());
   if (route) {
     request_ptr->conn_pool_ = route->upstream();
-    request_ptr->handle_ = makeRequest(route, incoming_request->asArray()[0].asString(), key,
-                                       *incoming_request, *request_ptr);
+    request_ptr->handle_ =
+        makeRequest(route, incoming_request->asArray()[0].asString(),
+                    incoming_request->asArray()[3].asString(), *incoming_request, *request_ptr);
   }
 
   if (!request_ptr->handle_) {
@@ -257,13 +257,13 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
     request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    std::string& key = incoming_request->asArray()[i].asString();
-    single_mget.asArray()[1].asString() = key;
+    single_mget.asArray()[1].asString() = incoming_request->asArray()[i].asString();
     ENVOY_LOG(debug, "redis: parallel get: '{}'", single_mget.toString());
-    const auto route = router.upstreamPool(key);
+    const auto route = router.upstreamPool(incoming_request->asArray()[i].asString());
     if (route) {
       pending_request.conn_pool_ = route->upstream();
-      pending_request.handle_ = makeRequest(route, "get", key, single_mget, pending_request);
+      pending_request.handle_ = makeRequest(route, "get", incoming_request->asArray()[i].asString(),
+                                            single_mget, pending_request);
     }
 
     if (!pending_request.handle_) {
@@ -387,15 +387,15 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
     request_ptr->pending_requests_.emplace_back(*request_ptr, fragment_index++);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    std::string& key = incoming_request->asArray()[i].asString();
-    single_mset.asArray()[1].asString() = key;
+    single_mset.asArray()[1].asString() = incoming_request->asArray()[i].asString();
     single_mset.asArray()[2].asString() = incoming_request->asArray()[i + 1].asString();
 
     ENVOY_LOG(debug, "redis: parallel set: '{}'", single_mset.toString());
-    const auto route = router.upstreamPool(key);
+    const auto route = router.upstreamPool(incoming_request->asArray()[i].asString());
     if (route) {
       pending_request.conn_pool_ = route->upstream();
-      pending_request.handle_ = makeRequest(route, "set", key, single_mset, pending_request);
+      pending_request.handle_ = makeRequest(route, "set", incoming_request->asArray()[i].asString(),
+                                            single_mset, pending_request);
     }
 
     if (!pending_request.handle_) {
@@ -482,15 +482,15 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
     request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    std::string& key = incoming_request->asArray()[i].asString();
-    single_fragment.asArray()[1].asString() = key;
+    single_fragment.asArray()[1].asString() = incoming_request->asArray()[i].asString();
     ENVOY_LOG(debug, "redis: parallel {}: '{}'", incoming_request->asArray()[0].asString(),
               single_fragment.toString());
-    const auto route = router.upstreamPool(key);
+    const auto route = router.upstreamPool(incoming_request->asArray()[i].asString());
     if (route) {
       pending_request.conn_pool_ = route->upstream();
-      pending_request.handle_ = makeRequest(route, single_fragment.asArray()[0].asString(), key,
-                                            single_fragment, pending_request);
+      pending_request.handle_ =
+          makeRequest(route, single_fragment.asArray()[0].asString(),
+                      incoming_request->asArray()[i].asString(), single_fragment, pending_request);
     }
 
     if (!pending_request.handle_) {
