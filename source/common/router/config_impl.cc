@@ -522,7 +522,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
     if (header != nullptr) {
       absl::string_view headerValue = header->value().getStringView();
       if (!headerValue.empty()) {
-        headers.Host()->value(std::string(headerValue));
+        headers.Host()->value(headerValue);
       }
     }
   }
