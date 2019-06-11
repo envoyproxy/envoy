@@ -49,7 +49,6 @@ DCHECK
 DER
 DESC
 DFATAL
-DFS
 DGRAM
 DHE
 DLOG
@@ -534,6 +533,7 @@ keepalives
 ketama
 kqueue
 kubernetes
+kv
 kvs
 lala
 latencies
