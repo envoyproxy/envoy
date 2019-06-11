@@ -10,14 +10,13 @@
 namespace Envoy {
 namespace Secret {
 
-SdsApi::SdsApi(const envoy::api::v2::core::ConfigSource& sds_config,
-               const std::string& sds_config_name,
+SdsApi::SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view sds_config_name,
                Config::SubscriptionFactory& subscription_factory,
                ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                Init::Manager& init_manager, std::function<void()> destructor_cb)
     : init_target_(fmt::format("SdsApi {}", sds_config_name), [this] { initialize(); }),
-      stats_(stats), sds_config_(sds_config), sds_config_name_(sds_config_name), secret_hash_(0),
-      clean_up_(destructor_cb), validation_visitor_(validation_visitor),
+      stats_(stats), sds_config_(std::move(sds_config)), sds_config_name_(sds_config_name),
+      secret_hash_(0), clean_up_(std::move(destructor_cb)), validation_visitor_(validation_visitor),
       subscription_factory_(subscription_factory) {
   // TODO(JimmyCYJ): Implement chained_init_manager, so that multiple init_manager
   // can be chained together to behave as one init_manager. In that way, we let

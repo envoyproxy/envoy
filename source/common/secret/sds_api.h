@@ -32,7 +32,7 @@ namespace Secret {
  */
 class SdsApi : public Config::SubscriptionCallbacks {
 public:
-  SdsApi(const envoy::api::v2::core::ConfigSource& sds_config, const std::string& sds_config_name,
+  SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view sds_config_name,
          Config::SubscriptionFactory& subscription_factory,
          ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
          Init::Manager& init_manager, std::function<void()> destructor_cb);
@@ -100,7 +100,7 @@ public:
                        ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                        Init::Manager& init_manager, std::function<void()> destructor_cb)
       : SdsApi(sds_config, sds_config_name, subscription_factory, validation_visitor, stats,
-               init_manager, destructor_cb) {}
+               init_manager, std::move(destructor_cb)) {}
 
   // SecretProvider
   const envoy::api::v2::auth::TlsCertificate* secret() const override {
@@ -148,7 +148,7 @@ public:
                                      Stats::Store& stats, Init::Manager& init_manager,
                                      std::function<void()> destructor_cb)
       : SdsApi(sds_config, sds_config_name, subscription_factory, validation_visitor, stats,
-               init_manager, destructor_cb) {}
+               init_manager, std::move(destructor_cb)) {}
 
   // SecretProvider
   const envoy::api::v2::auth::CertificateValidationContext* secret() const override {
