@@ -44,8 +44,6 @@ TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
 
 TEST_F(HttpSubscriptionImplTest, ConfigNotModified) {
   startSubscription({"cluster0", "cluster1"});
-  EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
-  EXPECT_CALL(*timer_, enableTimer(_));
 
   verifyStats(1, 0, 0, 1, 0);
   timerTick();
