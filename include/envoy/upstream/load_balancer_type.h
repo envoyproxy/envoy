@@ -31,7 +31,7 @@ struct SubsetSelector {
       fallback_policy_;
 };
 
-using SubsetSelectorPtr = std::shared_ptr<SubsetSelector>;
+typedef std::shared_ptr<SubsetSelector> SubsetSelectorPtr;
 
 /**
  * Load Balancer subset configuration.

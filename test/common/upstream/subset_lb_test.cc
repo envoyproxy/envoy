@@ -1734,13 +1734,13 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorNoFallbackPerSelector) {
   EXPECT_EQ(4U, stats_.lb_subsets_selected_.value());
 }
 
-TEST_P(SubsetLoadBalancerTest, SubsetSelectorFallbackAnyMatchesTopLevelOne) {
+TEST_P(SubsetLoadBalancerTest, SubsetSelectorFallbackOverridesTopLevelOne) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
 
   std::vector<SubsetSelectorPtr> subset_selectors = {
       std::make_shared<SubsetSelector>(SubsetSelector{
-          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT})};
+          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NO_FALLBACK})};
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
@@ -1750,8 +1750,7 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorFallbackAnyMatchesTopLevelOne) {
   TestLoadBalancerContext context_unknown_value({{"version", "unknown"}});
 
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_unknown_key));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_unknown_value));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_unknown_value));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_value));
 }
 
 TEST_P(SubsetLoadBalancerTest, SubsetSelectorNoFallbackMatchesTopLevelOne) {

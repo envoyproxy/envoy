@@ -37,12 +37,11 @@ public:
 private:
   typedef std::function<bool(const Host&)> HostPredicate;
   void initSubsetSelectorMap();
-  void initSelectorFallbackSubset(
-      const absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
-                               LbSubsetSelectorFallbackPolicy>&);
+  void initSelectorFallbackSubset(const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
+                                      LbSubsetSelectorFallbackPolicy&);
   HostConstSharedPtr chooseHostForSelectorFallbackPolicy(
-      const absl::optional<envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
-                               LbSubsetSelectorFallbackPolicy>& fallback_policy,
+      const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
+          LbSubsetSelectorFallbackPolicy& fallback_policy,
       LoadBalancerContext* context);
 
   // Represents a subset of an original HostSet.
@@ -127,10 +126,9 @@ private:
   typedef std::unordered_map<std::string, ValueSubsetMap> LbSubsetMap;
 
   struct SubsetSelectorMap {
-    std::unordered_map<std::string, SubsetSelectorMapPtr> subset_keys;
-    absl::optional<
-        envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy>
-        fallback_policy;
+    std::unordered_map<std::string, SubsetSelectorMapPtr> subset_keys_;
+    envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+        fallback_policy_;
   };
 
   // Entry in the subset hierarchy.
