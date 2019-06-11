@@ -59,7 +59,7 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            std::unique_ptr<ProcessContext> process_context)
     : secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), shutdown_(false),
       options_(options), time_source_(time_system), restarter_(restarter),
-      start_time_(time_source_.monotonicTime()), original_start_time_(start_time_),
+      start_time_(time_source_.systemTime()), original_start_time_(start_time_),
       stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),
@@ -176,7 +176,7 @@ void InstanceImpl::flushStats() {
     HotRestart::ServerStatsFromParent parent_stats = restarter_.mergeParentStatsIfAny(stats_store_);
 
     const uint64_t uptime = std::chrono::duration_cast<std::chrono::seconds>(
-                                time_source_.monotonicTime() - original_start_time_)
+                                time_source_.systemTime() - original_start_time_)
                                 .count();
     server_stats_->uptime_.set(uptime);
     server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +

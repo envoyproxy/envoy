@@ -172,12 +172,12 @@ public:
   /**
    * @return the time that the server started during the current hot restart epoch.
    */
-  virtual MonotonicTime startTimeCurrentEpoch() PURE;
+  virtual SystemTime startTimeCurrentEpoch() PURE;
 
   /**
    * @return the time that the server started the first hot restart epoch.
    */
-  virtual MonotonicTime startTimeFirstEpoch() PURE;
+  virtual SystemTime startTimeFirstEpoch() PURE;
 
   /**
    * @return the server-wide stats store.

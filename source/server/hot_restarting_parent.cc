@@ -85,9 +85,7 @@ void HotRestartingParent::shutdown() { socket_event_.reset(); }
 HotRestartMessage HotRestartingParent::Internal::shutdownAdmin() {
   server_->shutdownAdmin();
   HotRestartMessage wrapped_reply;
-  const uint64_t first_epoch = std::chrono::duration_cast<std::chrono::seconds>(
-                                   server_->startTimeFirstEpoch().time_since_epoch())
-                                   .count();
+  const time_t first_epoch = std::chrono::system_clock::to_time_t(server_->startTimeFirstEpoch());
   wrapped_reply.mutable_reply()->mutable_shutdown_admin()->set_original_start_time_unix_seconds(
       first_epoch);
   return wrapped_reply;

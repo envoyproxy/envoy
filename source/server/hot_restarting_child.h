@@ -17,7 +17,7 @@ public:
   int duplicateParentListenSocket(const std::string& address);
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
-  void sendParentAdminShutdownRequest(MonotonicTime& original_start_time);
+  void sendParentAdminShutdownRequest(SystemTime& original_start_time);
   void sendParentTerminateRequest();
   void mergeParentStats(Stats::Store& stats_store,
                         const envoy::HotRestartMessage::Reply::Stats& stats_proto);

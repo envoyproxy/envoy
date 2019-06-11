@@ -85,6 +85,7 @@ envoy_cc_test(
     name = "hot_restarting_parent_test",
     srcs = envoy_select_hot_restart(["hot_restarting_parent_test.cc"]),
     deps = [
+        "//include/envoy/common:time_interface",
         "//source/common/stats:stats_lib",
         "//source/server:hot_restart_lib",
         "//test/mocks/server:server_mocks",

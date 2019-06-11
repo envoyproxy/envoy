@@ -187,8 +187,8 @@ public:
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override;
   const Options& options() override { return options_; }
-  MonotonicTime startTimeCurrentEpoch() override { return start_time_; }
-  MonotonicTime startTimeFirstEpoch() override { return original_start_time_; }
+  SystemTime startTimeCurrentEpoch() override { return start_time_; }
+  SystemTime startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
@@ -236,8 +236,8 @@ private:
   const Options& options_;
   TimeSource& time_source_;
   HotRestart& restarter_;
-  const MonotonicTime start_time_;
-  MonotonicTime original_start_time_;
+  const SystemTime start_time_;
+  SystemTime original_start_time_;
   Stats::StoreRoot& stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;

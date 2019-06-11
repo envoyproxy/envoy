@@ -1,6 +1,8 @@
 #include <chrono>
 #include <memory>
 
+#include "envoy/common/time.h"
+
 #include "server/hot_restarting_parent.h"
 
 #include "test/mocks/server/mocks.h"
@@ -17,11 +19,6 @@ namespace {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
-int64_t timeToSeconds(MonotonicTime monotonic_time) {
-  return std::chrono::duration_cast<std::chrono::seconds>(monotonic_time.time_since_epoch())
-      .count();
-}
-
 class HotRestartingParentTest : public testing::Test {
 public:
   MockInstance server_;
@@ -30,8 +27,9 @@ public:
 };
 
 TEST_F(HotRestartingParentTest, shutdownAdmin) {
-  const auto now = time_system_.monotonicTime();
-  const auto now_seconds = timeToSeconds(now);
+  const auto now = time_system_.systemTime();
+  const int64_t now_seconds =
+      std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
   EXPECT_CALL(server_, shutdownAdmin());
   EXPECT_CALL(server_, startTimeFirstEpoch()).WillOnce(Return(now));
   HotRestartMessage message = hot_restarting_parent_.shutdownAdmin();

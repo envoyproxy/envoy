@@ -92,8 +92,8 @@ public:
   OverloadManager& overloadManager() override { return *overload_manager_; }
   bool healthCheckFailed() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   const Options& options() override { return options_; }
-  MonotonicTime startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  MonotonicTime startTimeFirstEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  SystemTime startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  SystemTime startTimeFirstEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }

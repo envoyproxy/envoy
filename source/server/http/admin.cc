@@ -662,14 +662,16 @@ envoy::admin::v2alpha::ServerInfo::State AdminImpl::serverState() {
 
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
-  const auto current_time = server_.timeSource().monotonicTime();
+  const auto current_time = server_.timeSource().systemTime();
   envoy::admin::v2alpha::ServerInfo server_info;
   server_info.set_version(VersionInfo::version());
   server_info.set_state(serverState());
 
+  ASSERT(current_time > server_.startTimeCurrentEpoch());
   const uint64_t current_uptime = std::chrono::duration_cast<std::chrono::seconds>(
                                       current_time - server_.startTimeCurrentEpoch())
                                       .count();
+  ASSERT(current_time > server_.startTimeFirstEpoch());
   const uint64_t total_uptime =
       std::chrono::duration_cast<std::chrono::seconds>(current_time - server_.startTimeFirstEpoch())
           .count();
