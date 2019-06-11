@@ -19,6 +19,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/cds_json.h"
+#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/async_client_impl.h"
@@ -442,8 +443,7 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
 }
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
-                                            const std::string& version_info,
-                                            ClusterWarmingCallback cluster_warming_cb) {
+                                            const std::string& version_info) {
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration. We check
   // both the warming clusters and the active clusters to see if we need an update or the update
@@ -491,8 +491,26 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
   } else {
     auto& cluster_entry = warming_clusters_.at(cluster_name);
     ENVOY_LOG(info, "add/update cluster {} starting warming", cluster_name);
-    cluster_warming_cb(cluster_name, ClusterWarmingState::Starting);
-    cluster_entry->cluster_->initialize([this, cluster_name, cluster_warming_cb] {
+    // This if, together with the second `if (warming_clusters_.size())` further below, implement a
+    // control flow mechanism that can be used by an ADS implementation to properly sequence CDS and
+    // RDS updates. It is not enforcing on ADS. ADS can use it to detect when a previously sent
+    // cluster becomes warm before sending routes that depend on it. This can improve incidence of
+    // HTTP 503 responses from Envoy when a route is used before it's supporting cluster is ready.
+    //
+    // We achieve that by leaving CDS in the paused state as long as there is at least
+    // one cluster in the warming state. This prevents CDS ACK from being sent to ADS.
+    // Once cluster is warmed up, CDS is resumed, and ACK is sent to ADS, providing a
+    // signal to ADS to proceed with RDS updates.
+    //
+    // Major concern with this approach is CDS being left in the paused state forever.
+    // As long as ClusterManager::removeCluster() is not called on a warming cluster
+    // this is not an issue. CdsApiImpl takes care of doing this properly, and there
+    // is no other component removing clusters from the ClusterManagerImpl. If this
+    // ever changes, we would need to correct the following logic.
+    if (warming_clusters_.size() == 1) {
+      ads_mux_->pause(Config::TypeUrl::get().Cluster);
+    }
+    cluster_entry->cluster_->initialize([this, cluster_name] {
       auto warming_it = warming_clusters_.find(cluster_name);
       auto& cluster_entry = *warming_it->second;
 
@@ -506,7 +524,9 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
       ENVOY_LOG(info, "warming cluster {} complete", cluster_name);
       createOrUpdateThreadLocalCluster(cluster_entry);
       onClusterInit(*cluster_entry.cluster_);
-      cluster_warming_cb(cluster_name, ClusterWarmingState::Finished);
+      if (warming_clusters_.size() == 0) {
+        ads_mux_->resume(Config::TypeUrl::get().Cluster);
+      }
       updateGauges();
     });
   }
