@@ -65,7 +65,6 @@ envoy_cc_test(
     deps = [
         "//source/common/config:filter_json_lib",
         "//source/common/config:utility_lib",
-        "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:rds_lib",
         "//source/server/http:admin_lib",
@@ -101,14 +100,12 @@ envoy_cc_test(
     name = "vhds_test",
     srcs = ["vhds_test.cc"],
     deps = [
-        "//source/common/config:filter_json_lib",
         "//source/common/config:utility_lib",
-        "//source/common/http:message_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/protobuf",
         "//source/common/router:rds_lib",
         "//source/common/router:vhds_lib",
         "//source/server/http:admin_lib",
+        "//test/mocks/config:config_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",

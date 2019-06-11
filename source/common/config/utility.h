@@ -110,7 +110,7 @@ public:
    * @param cluster_name supplies the cluster name to check.
    * @param cm supplies the cluster manager.
    */
-  static void checkCluster(const std::string& error_prefix, const std::string& cluster_name,
+  static void checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
                            Upstream::ClusterManager& cm);
 
   /**
@@ -120,9 +120,8 @@ public:
    * @param cm supplies the cluster manager.
    * @param local_info supplies the local info.
    */
-  static void checkClusterAndLocalInfo(const std::string& error_prefix,
-                                       const std::string& cluster_name,
-                                       Upstream::ClusterManager& cm,
+  static void checkClusterAndLocalInfo(absl::string_view error_prefix,
+                                       absl::string_view cluster_name, Upstream::ClusterManager& cm,
                                        const LocalInfo::LocalInfo& local_info);
 
   /**
@@ -130,7 +129,7 @@ public:
    * @param error_prefix supplies the prefix to use in error messages.
    * @param local_info supplies the local info.
    */
-  static void checkLocalInfo(const std::string& error_prefix,
+  static void checkLocalInfo(absl::string_view error_prefix,
                              const LocalInfo::LocalInfo& local_info);
 
   /**

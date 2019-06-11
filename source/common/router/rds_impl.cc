@@ -65,13 +65,11 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier),
       validation_visitor_(factory_context_.messageValidationVisitor()) {
-  Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
-
-  subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
-      rds.config_source(), factory_context.localInfo(), factory_context.dispatcher(),
-      factory_context.clusterManager(), factory_context.random(), *scope_,
-      Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
-      factory_context.messageValidationVisitor(), factory_context.api(), *this);
+  subscription_ =
+      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+          rds.config_source(),
+          Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
+          *scope_, *this);
 
   config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(
       factory_context.timeSource(), factory_context.messageValidationVisitor());

@@ -11,6 +11,7 @@
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
+#include "envoy/config/subscription_factory.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"
@@ -131,7 +132,7 @@ public:
    * If information about the cluster needs to be kept, use the ThreadLocalCluster::info() method to
    * obtain cluster information that is safe to store.
    */
-  virtual ThreadLocalCluster* get(const std::string& cluster) PURE;
+  virtual ThreadLocalCluster* get(absl::string_view cluster) PURE;
 
   /**
    * Allocate a load balanced HTTP connection pool for a cluster. This is *per-thread* so that
@@ -234,6 +235,14 @@ public:
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
 
   virtual ClusterManagerFactory& clusterManagerFactory() PURE;
+
+  /**
+   * Obtain the subscription factory for the cluster manager. Since subscriptions may have an
+   * upstream component, the factory is a facet of the cluster manager.
+   *
+   * @return Config::SubscriptionFactory& the subscription factory.
+   */
+  virtual Config::SubscriptionFactory& subscriptionFactory() PURE;
 
   virtual std::size_t warmingClusterCount() const PURE;
 };
