@@ -415,7 +415,7 @@ public:
                                     const std::vector<Stats::GaugeSharedPtr>& gauges,
                                     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
                                     Buffer::Instance& response, const bool used_only,
-                                    const absl::optional<std::regex> regex);
+                                    const absl::optional<std::regex>& regex);
   /**
    * Format the given tags, returning a string as a comma-separated list
    * of <tag_name>="<tag_value>" pairs.
