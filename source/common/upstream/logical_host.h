@@ -20,17 +20,19 @@ public:
                  lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
                  lb_endpoint.health_status()) {}
 
-  // Set the new address. Updates are typically rare so a R/W lock is used to address updates.
+  // Set the new address. Updates are typically rare so a R/W lock is used for address updates.
   // Note that the health check address update requires no lock to be held since it is only
-  // used on the main thread.
+  // used on the main thread, but we do so anyway since it shouldn't be perf critical and will
+  // future proof the code.
   void setNewAddress(const Network::Address::InstanceConstSharedPtr& address,
                      const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint) {
     const auto& port_value = lb_endpoint.endpoint().health_check_config().port_value();
-    health_check_address_ =
+    auto health_check_address =
         port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
 
     absl::WriterMutexLock lock(&address_lock_);
     address_ = address;
+    health_check_address_ = health_check_address;
   }
 
   // Upstream::Host
@@ -42,6 +44,10 @@ public:
   Network::Address::InstanceConstSharedPtr address() const override {
     absl::ReaderMutexLock lock(&address_lock_);
     return HostImpl::address();
+  }
+  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
+    absl::ReaderMutexLock lock(&address_lock_);
+    return HostImpl::healthCheckAddress();
   }
 
 private:
@@ -60,12 +66,12 @@ public:
       : address_(address), logical_host_(logical_host) {}
 
   // Upstream:HostDescription
-  bool canary() const override { return false; }
-  void canary(bool) override {}
+  bool canary() const override { return logical_host_->canary(); }
+  void canary(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const override {
     return logical_host_->metadata();
   }
-  void metadata(const envoy::api::v2::core::Metadata&) override {}
+  void metadata(const envoy::api::v2::core::Metadata&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
   HealthCheckHostMonitor& healthChecker() const override { return logical_host_->healthChecker(); }
