@@ -129,8 +129,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
 
 void RdsRouteConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    const std::string& system_version_info) {
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   if (!removed_resources.empty()) {
     // TODO(#2500) when on-demand resource loading is supported, an RDS removal may make sense (see
     // discussion in #6879), and so we should do something other than ignoring here.
@@ -139,13 +138,10 @@ void RdsRouteConfigSubscription::onConfigUpdate(
         "Server sent a delta RDS update attempting to remove a resource (name: {}). Ignoring.",
         removed_resources[0]);
   }
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
   if (!added_resources.empty()) {
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
     *unwrapped_resource.Add() = added_resources[0].resource();
     onConfigUpdate(unwrapped_resource, added_resources[0].version());
-  } else {
-    onConfigUpdate({}, system_version_info);
-    return;
   }
 }
 
