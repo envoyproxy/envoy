@@ -155,6 +155,13 @@ void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_ma
   header_map.addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
 }
 
+// Helper method to get filter parameter
+absl::optional<std::regex> filterParam(Http::Utility::QueryParams params) {
+  return (params.find("filter") != params.end())
+             ? absl::optional<std::regex>{std::regex(params.at("filter"))}
+             : absl::nullopt;
+}
+
 // Helper method that ensures that we've setting flags based on all the health flag values on the
 // host.
 void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
@@ -696,10 +703,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
 
   const bool used_only = params.find("usedonly") != params.end();
   const bool has_format = !(params.find("format") == params.end());
-  const absl::optional<std::regex> regex =
-      (params.find("filter") != params.end())
-          ? absl::optional<std::regex>{std::regex(params.at("filter"))}
-          : absl::nullopt;
+  const absl::optional<std::regex> regex = filterParam(params);
 
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
@@ -753,8 +757,10 @@ Http::Code AdminImpl::handlerPrometheusStats(absl::string_view path_and_query, H
                                              Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();
+  const absl::optional<std::regex> regex = filterParam(params);
   PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
-                                              server_.stats().histograms(), response, used_only);
+                                              server_.stats().histograms(), response, used_only,
+                                              regex);
   return Http::Code::OK;
 }
 
@@ -788,10 +794,10 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::CounterSharedPtr>& counters,
     const std::vector<Stats::GaugeSharedPtr>& gauges,
     const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
-    const bool used_only) {
+    const bool used_only, const absl::optional<std::regex>& regex) {
   std::unordered_set<std::string> metric_type_tracker;
   for (const auto& counter : counters) {
-    if (!shouldShowMetric(counter, used_only)) {
+    if (!shouldShowMetric(counter, used_only, regex)) {
       continue;
     }
 
@@ -805,7 +811,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   }
 
   for (const auto& gauge : gauges) {
-    if (!shouldShowMetric(gauge, used_only)) {
+    if (!shouldShowMetric(gauge, used_only, regex)) {
       continue;
     }
 
@@ -819,7 +825,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   }
 
   for (const auto& histogram : histograms) {
-    if (!shouldShowMetric(histogram, used_only)) {
+    if (!shouldShowMetric(histogram, used_only, regex)) {
       continue;
     }
 

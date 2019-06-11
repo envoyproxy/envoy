@@ -7,17 +7,17 @@
 namespace Envoy {
 namespace Grpc {
 
-// Per-service factory for Grpc::AsyncClients. This factory is thread aware and will instantiate
+// Per-service factory for Grpc::RawAsyncClients. This factory is thread aware and will instantiate
 // with thread local state. Clients will use ThreadLocal::Instance::dispatcher() for event handling.
 class AsyncClientFactory {
 public:
   virtual ~AsyncClientFactory() {}
 
   /**
-   * Create a gRPC::AsyncClient.
-   * @return AsyncClientPtr async client.
+   * Create a gRPC::RawAsyncClient.
+   * @return RawAsyncClientPtr async client.
    */
-  virtual AsyncClientPtr create() PURE;
+  virtual RawAsyncClientPtr create() PURE;
 };
 
 typedef std::unique_ptr<AsyncClientFactory> AsyncClientFactoryPtr;

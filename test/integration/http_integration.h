@@ -39,6 +39,7 @@ public:
   bool waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::milliseconds(0));
   Network::ClientConnection* connection() const { return connection_.get(); }
   Network::ConnectionEvent last_connection_event() const { return last_connection_event_; }
+  Network::Connection& rawConnection() { return *connection_; }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {

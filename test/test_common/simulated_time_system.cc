@@ -62,7 +62,7 @@ public:
   void enableTimer(const std::chrono::milliseconds& duration) override;
   bool enabled() override {
     Thread::LockGuard lock(time_system_.mutex_);
-    return armed_;
+    return armed_ || base_timer_->enabled();
   }
 
   void disableTimerLockHeld() EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_);

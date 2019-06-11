@@ -44,7 +44,7 @@ void Utility::translateApiConfigSource(const std::string& cluster, uint32_t refr
       Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
 }
 
-void Utility::checkCluster(const std::string& error_prefix, const std::string& cluster_name,
+void Utility::checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
                            Upstream::ClusterManager& cm) {
   Upstream::ThreadLocalCluster* cluster = cm.get(cluster_name);
   if (cluster == nullptr) {
@@ -58,15 +58,14 @@ void Utility::checkCluster(const std::string& error_prefix, const std::string& c
   }
 }
 
-void Utility::checkClusterAndLocalInfo(const std::string& error_prefix,
-                                       const std::string& cluster_name,
-                                       Upstream::ClusterManager& cm,
+void Utility::checkClusterAndLocalInfo(absl::string_view error_prefix,
+                                       absl::string_view cluster_name, Upstream::ClusterManager& cm,
                                        const LocalInfo::LocalInfo& local_info) {
   checkCluster(error_prefix, cluster_name, cm);
   checkLocalInfo(error_prefix, local_info);
 }
 
-void Utility::checkLocalInfo(const std::string& error_prefix,
+void Utility::checkLocalInfo(absl::string_view error_prefix,
                              const LocalInfo::LocalInfo& local_info) {
   if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
     throw EnvoyException(
@@ -285,6 +284,28 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
   if (!config.fields().empty()) {
     MessageUtil::jsonConvert(config, validation_visitor, out_proto);
   }
+}
+
+bool Utility::allowDeprecatedV1Config(Runtime::Loader& runtime, const Json::Object& config) {
+  if (!config.getBoolean("deprecated_v1", false)) {
+    return false;
+  }
+
+  constexpr char error[] =
+      "Using deprecated v1 JSON config load via 'deprecated_v1: true'. This configuration will "
+      "be removed from Envoy soon. Please see "
+      "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details. The "
+      "`envoy.deprecated_features.v1_filter_json_config` runtime key can be used to temporarily "
+      "enable this feature once the deprecation becomes fail by default.";
+
+  if (!runtime.snapshot().deprecatedFeatureEnabled(
+          "envoy.deprecated_features.v1_filter_json_config")) {
+    throw EnvoyException(error);
+  } else {
+    ENVOY_LOG_MISC(warn, "{}", error);
+  }
+
+  return true;
 }
 
 } // namespace Config

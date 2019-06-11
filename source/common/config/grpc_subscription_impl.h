@@ -14,7 +14,7 @@ namespace Config {
 
 class GrpcSubscriptionImpl : public Config::Subscription {
 public:
-  GrpcSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
+  GrpcSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                        const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
                        SubscriptionCallbacks& callbacks, SubscriptionStats stats,

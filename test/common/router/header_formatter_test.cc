@@ -727,6 +727,8 @@ TEST(HeaderParserTest, TestParseInternal) {
        {},
        {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
         "...]), actual format UPSTREAM_METADATA([\"ns\"])"}},
+      {"%START_TIME(%85n)%", {}, {"Invalid header configuration. Format string contains newline."}},
+
   };
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;

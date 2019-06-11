@@ -80,6 +80,8 @@ public:
   MOCK_CONST_METHOD0(lbConfig, const envoy::api::v2::Cluster::CommonLbConfig&());
   MOCK_CONST_METHOD0(lbType, LoadBalancerType());
   MOCK_CONST_METHOD0(type, envoy::api::v2::Cluster::DiscoveryType());
+  MOCK_CONST_METHOD0(clusterType,
+                     const absl::optional<envoy::api::v2::Cluster::CustomClusterType>&());
   MOCK_CONST_METHOD0(lbRingHashConfig,
                      const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&());
   MOCK_CONST_METHOD0(lbLeastRequestConfig,
@@ -119,6 +121,7 @@ public:
   Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   envoy::api::v2::Cluster::DiscoveryType type_{envoy::api::v2::Cluster::STRICT_DNS};
+  absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig> lb_original_dst_config_;

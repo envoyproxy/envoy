@@ -110,19 +110,18 @@ struct HdsDelegateStats {
  * server with a set of hosts to healthcheck, healthchecking them, and reporting
  * back the results.
  */
-class HdsDelegate
-    : Grpc::TypedAsyncStreamCallbacks<envoy::service::discovery::v2::HealthCheckSpecifier>,
-      Logger::Loggable<Logger::Id::upstream> {
+class HdsDelegate : Grpc::AsyncStreamCallbacks<envoy::service::discovery::v2::HealthCheckSpecifier>,
+                    Logger::Loggable<Logger::Id::upstream> {
 public:
-  HdsDelegate(Stats::Scope& scope, Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
-              Runtime::Loader& runtime, Envoy::Stats::Store& stats,
+  HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
+              Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Envoy::Stats::Store& stats,
               Ssl::ContextManager& ssl_context_manager, Runtime::RandomGenerator& random,
               ClusterInfoFactory& info_factory, AccessLog::AccessLogManager& access_log_manager,
               ClusterManager& cm, const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
               Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
               ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
-  // Grpc::TypedAsyncStreamCallbacks
+  // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override;
   void onReceiveMessage(
@@ -147,8 +146,11 @@ private:
   HdsDelegateStats stats_;
   const Protobuf::MethodDescriptor& service_method_;
 
-  Grpc::AsyncClientPtr async_client_;
-  Grpc::AsyncStream* stream_{};
+  Grpc::AsyncClient<envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse,
+                    envoy::service::discovery::v2::HealthCheckSpecifier>
+      async_client_;
+  Grpc::AsyncStream<envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse>
+      stream_{};
   Event::Dispatcher& dispatcher_;
   Runtime::Loader& runtime_;
   Envoy::Stats::Store& store_stats;

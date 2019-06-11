@@ -1,3 +1,5 @@
+#include "common/buffer/zero_copy_input_stream_impl.h"
+
 #include "test/common/config/delta_subscription_test_harness.h"
 
 namespace Envoy {
@@ -90,14 +92,15 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     subscription_->onDiscoveryResponse(std::move(message));
   }
   // All ACK sendMessage()s will happen upon calling resume().
-  EXPECT_CALL(async_stream_, sendMessage(_, _))
-      .WillRepeatedly([this](const Protobuf::Message& message, bool) {
-        const std::string nonce =
-            static_cast<const envoy::api::v2::DeltaDiscoveryRequest&>(message).response_nonce();
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
+      .WillRepeatedly(Invoke([this](Buffer::InstancePtr& buffer, bool) {
+        envoy::api::v2::DeltaDiscoveryRequest message;
+        EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
+        const std::string nonce = message.response_nonce();
         if (!nonce.empty()) {
           nonce_acks_sent_.push(nonce);
         }
-      });
+      }));
   subscription_->resume();
   // DeltaSubscriptionTestHarness's dtor will check that all ACKs were sent with the correct nonces,
   // in the correct order.
@@ -106,8 +109,8 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
 TEST_F(DeltaSubscriptionImplTest, NoGrpcStream) {
   // Have to call start() to get state_ populated (which this test needs to not segfault), but
   // start() also tries to start the GrpcStream. So, have that attempt return nullptr.
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(async_stream_, sendMessage(_, _)).Times(0);
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _)).Times(0);
   subscription_->start({"name1"});
   subscription_->updateResources({"name1", "name2"});
 }

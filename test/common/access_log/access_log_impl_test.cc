@@ -559,18 +559,19 @@ TEST_F(AccessLogImplTest, multipleOperators) {
 }
 
 TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
-  std::string filter_json = R"EOF(
-    {
-      "filter": {"type": "duration", "op": ">=", "value": 1000000, "runtime_key": "key"}
-    }
+  std::string filter_yaml = R"EOF(
+duration_filter:
+  comparison:
+    op: GE
+    value:
+      default_value: 1000000
+      runtime_key: key
     )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(filter_json);
   NiceMock<Runtime::MockLoader> runtime;
 
-  Json::ObjectSharedPtr filter_object = loader->getObject("filter");
   envoy::config::filter::accesslog::v2::AccessLogFilter config;
-  Config::FilterJson::translateAccessLogFilter(*filter_object, config);
+  TestUtility::loadFromYaml(filter_yaml, config);
   DurationFilter filter(config.duration_filter(), runtime);
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   Http::TestHeaderMapImpl response_headers;
@@ -595,18 +596,19 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
 }
 
 TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
-  std::string filter_json = R"EOF(
-    {
-      "filter": {"type": "status_code", "op": ">=", "value": 300, "runtime_key": "key"}
-    }
+  std::string filter_yaml = R"EOF(
+status_code_filter:
+  comparison:
+    op: GE
+    value:
+      default_value: 300
+      runtime_key: key
     )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(filter_json);
   NiceMock<Runtime::MockLoader> runtime;
 
-  Json::ObjectSharedPtr filter_object = loader->getObject("filter");
   envoy::config::filter::accesslog::v2::AccessLogFilter config;
-  Config::FilterJson::translateAccessLogFilter(*filter_object, config);
+  TestUtility::loadFromYaml(filter_yaml, config);
   StatusCodeFilter filter(config.status_code_filter(), runtime);
 
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};

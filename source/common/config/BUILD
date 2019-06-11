@@ -127,6 +127,7 @@ envoy_cc_library(
         "//source/common/common:backoff_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:token_bucket_impl_lib",
+        "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",
     ],
 )
@@ -262,6 +263,7 @@ envoy_cc_library(
     deps = [
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
         "@envoy_api//envoy/service/discovery/v2:sds_cc",
+        "@envoy_api//envoy/service/discovery/v2:tds_cc",
         "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )
@@ -309,8 +311,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "subscription_factory_lib",
-    srcs = ["subscription_factory.cc"],
-    hdrs = ["subscription_factory.h"],
+    srcs = ["subscription_factory_impl.cc"],
+    hdrs = ["subscription_factory_impl.h"],
     deps = [
         ":delta_subscription_lib",
         ":filesystem_subscription_lib",
@@ -319,6 +321,7 @@ envoy_cc_library(
         ":http_subscription_lib",
         ":type_to_endpoint_lib",
         ":utility_lib",
+        "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/protobuf",

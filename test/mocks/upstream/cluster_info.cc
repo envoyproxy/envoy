@@ -75,6 +75,7 @@ MockClusterInfo::MockClusterInfo()
         }
         return *typed_metadata_;
       }));
+  ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
 }
 
 MockClusterInfo::~MockClusterInfo() {}

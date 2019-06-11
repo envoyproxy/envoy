@@ -74,7 +74,7 @@ protected:
 
     ActiveClient& parent_;
     bool encode_complete_{};
-    bool saw_close_header_{};
+    bool close_connection_{};
     bool decode_complete_{};
   };
 

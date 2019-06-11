@@ -13,13 +13,14 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/hash.h"
 #include "common/network/address_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "source/extensions/clusters/redis/redis_cluster_lb.h"
 
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
@@ -101,17 +102,6 @@ private:
     Envoy::Common::CallbackHandle* host_set_member_update_cb_handle_{};
     std::unordered_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
     std::string auth_password_;
-  };
-
-  struct LbContextImpl : public Upstream::LoadBalancerContextBase {
-    LbContextImpl(const std::string& key, bool enabled_hashtagging)
-        : hash_key_(MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))) {}
-
-    absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
-
-    absl::string_view hashtag(absl::string_view v, bool enabled);
-
-    const absl::optional<uint64_t> hash_key_;
   };
 
   Upstream::ClusterManager& cm_;

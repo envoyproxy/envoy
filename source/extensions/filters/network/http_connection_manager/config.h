@@ -47,6 +47,8 @@ private:
       Server::Configuration::FactoryContext& context) override;
 };
 
+DECLARE_FACTORY(HttpConnectionManagerFilterConfigFactory);
+
 /**
  * Determines if an address is internal based on user provided config.
  */

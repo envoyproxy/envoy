@@ -144,7 +144,7 @@ enum class ForwardClientCertType {
  * Configuration for the fields of the client cert, used for populating the current client cert
  * information to the next hop.
  */
-enum class ClientCertDetailsType { Cert, Subject, URI, DNS };
+enum class ClientCertDetailsType { Cert, Chain, Subject, URI, DNS };
 
 /**
  * Configuration for what addresses should be considered internal beyond the defaults.
