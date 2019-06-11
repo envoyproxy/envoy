@@ -243,7 +243,7 @@ TEST(ScopeKeyTest, Matches) {
   EXPECT_EQ(makeKey({"", ""}), makeKey({"", ""}));
   EXPECT_EQ(makeKey({"a", "", ""}), makeKey({"a", "", ""}));
 
-  // Non empty fragments  comparision.
+  // Non empty fragments  comparison.
   EXPECT_EQ(makeKey({"A", "b"}), makeKey({"A", "b"}));
 }
 
