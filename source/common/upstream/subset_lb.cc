@@ -240,8 +240,8 @@ void SubsetLoadBalancer::processSubsets(
       for (const auto& keys : subset_keys_) {
         // For each host, for each subset key, attempt to extract the metadata corresponding to the
         // key from the host.
-        SubsetMetadata kvs = extractSubsetMetadata(keys, *host);
-        if (!kvs.empty()) {
+        std::vector<SubsetMetadata> all_kvs = extractSubsetMetadata(keys, *host);
+        for (auto& kvs : all_kvs) {
           // The host has metadata for each key, find or create its subset.
           std::vector<LbSubsetEntryPtr> entries;
           findOrCreateSubsets(subsets_, kvs, 0, entries);
@@ -333,25 +333,22 @@ bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host
       return false;
     }
 
-    // If configured to do so, we attempt to match the metadata value with the contents
-    // of the list specified on the host.
-    if (list_as_any_ && entry_it->second.kind_case() == ProtobufWkt::Value::kListValue &&
-        kv.second.kind_case() == ProtobufWkt::Value::kListValue) {
+    if (list_as_any_ && entry_it->second.kind_case() == ProtobufWkt::Value::kListValue) {
       bool any_match = false;
-      for (const auto& host_value : entry_it->second.list_value().values()) {
-        for (const auto& kv_value : kv.second.list_value().values()) {
-          if (ValueUtil::equal(host_value, kv_value)) {
-            any_match = true;
-          }
+      for (const auto& v : entry_it->second.list_value().values()) {
+        if (ValueUtil::equal(v, kv.second)) {
+          any_match = true;
+          continue;
         }
       }
-      if (!any_match) {
-        return false;
+
+      if (any_match) {
+        continue;
       }
-    } else {
-      if (!ValueUtil::equal(entry_it->second, kv.second)) {
-        return false;
-      }
+    }
+
+    if (!ValueUtil::equal(entry_it->second, kv.second)) {
+      return false;
     }
   }
 
@@ -360,29 +357,63 @@ bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host
 
 // Iterates over subset_keys looking up values from the given host's metadata. Each key-value pair
 // is appended to kvs. Returns a non-empty value if the host has a value for each key.
-SubsetLoadBalancer::SubsetMetadata
+std::vector<SubsetLoadBalancer::SubsetMetadata>
 SubsetLoadBalancer::extractSubsetMetadata(const std::set<std::string>& subset_keys,
                                           const Host& host) {
-  SubsetMetadata kvs;
+  std::vector<SubsetMetadata> all_kvs;
 
   const envoy::api::v2::core::Metadata& metadata = *host.metadata();
   const auto& filter_it = metadata.filter_metadata().find(Config::MetadataFilters::get().ENVOY_LB);
   if (filter_it == metadata.filter_metadata().end()) {
-    return kvs;
+    return all_kvs;
   }
 
   const auto& fields = filter_it->second.fields();
   for (const auto key : subset_keys) {
     const auto it = fields.find(key);
     if (it == fields.end()) {
-      kvs.clear();
+      all_kvs.clear();
       break;
     }
 
-    kvs.emplace_back(std::make_pair(key, it->second));
+    if (list_as_any_ && it->second.kind_case() == ProtobufWkt::Value::kListValue) {
+      // If the list of kvs is empty, we initialize one kvs for each value in the list.
+      // Otherwise, we branch the list of kvs by generating one new kvs per old kvs per
+      // new value.
+      //
+      // For example, two kvs (<a=b>, <c=d>) joined with the kv foo=[bar,baz] results in four kvs:
+      //   <a=b,foo=bar>
+      //   <a=b,foo=baz>
+      //   <c=d,foo=bar>
+      //   <c=d,foo=baz>
+      if (all_kvs.empty()) {
+        for (const auto& v : it->second.list_value().values()) {
+          all_kvs.emplace_back(SubsetMetadata({make_pair(key, v)}));
+        }
+      } else {
+        std::vector<SubsetMetadata> new_kvs;
+        for (const auto& kvs : all_kvs) {
+          for (const auto& v : it->second.list_value().values()) {
+            auto kv_copy = kvs;
+            kv_copy.emplace_back(make_pair(key, v));
+            new_kvs.emplace_back(kv_copy);
+          }
+        }
+        all_kvs = new_kvs;
+      }
+
+    } else {
+      if (all_kvs.empty()) {
+        all_kvs.emplace_back(SubsetMetadata({std::make_pair(key, it->second)}));
+      } else {
+        for (auto& kvs : all_kvs) {
+          kvs.emplace_back(std::make_pair(key, it->second));
+        }
+      }
+    }
   }
 
-  return kvs;
+  return all_kvs;
 }
 
 std::string SubsetLoadBalancer::describeMetadata(const SubsetLoadBalancer::SubsetMetadata& kvs) {

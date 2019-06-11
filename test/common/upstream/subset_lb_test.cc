@@ -701,7 +701,7 @@ TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabledMultipleLists) {
   }
 
   TestLoadBalancerContext context({{"version", "1.2.2"}});
-  EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+  EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
 }
 
 TEST_P(SubsetLoadBalancerTest, ListAsAnyDisable) {
