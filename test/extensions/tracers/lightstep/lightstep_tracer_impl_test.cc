@@ -89,7 +89,7 @@ public:
   StreamInfo::MockStreamInfo stream_info_;
 
   Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
-  Grpc::Common grpc_context_;
+  Grpc::ContextImpl grpc_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::IsolatedStoreImpl stats_;
   std::unique_ptr<LightStepDriver> driver_;

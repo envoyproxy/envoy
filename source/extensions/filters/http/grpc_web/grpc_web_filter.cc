@@ -6,7 +6,7 @@
 #include "common/common/base64.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
@@ -234,7 +234,7 @@ void GrpcWebFilter::setupStatTracking(const Http::HeaderMap& headers) {
 }
 
 void GrpcWebFilter::chargeStat(const Http::HeaderMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::Common::Protocol::GrpcWeb, *request_names_,
+  context_.chargeStat(*cluster_, Grpc::Context::Protocol::GrpcWeb, *request_names_,
                       headers.GrpcStatus());
 }
 

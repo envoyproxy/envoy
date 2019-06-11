@@ -233,6 +233,12 @@ TEST_F(SimulatedTimeSystemTest, DuplicateTimer) {
   thread->join();
 }
 
+TEST_F(SimulatedTimeSystemTest, Enabled) {
+  TimerPtr timer = scheduler_->createTimer({});
+  timer->enableTimer(std::chrono::milliseconds(0));
+  EXPECT_TRUE(timer->enabled());
+}
+
 } // namespace
 } // namespace Test
 } // namespace Event

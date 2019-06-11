@@ -363,6 +363,37 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_core_arena_scoped_ptr_lib",
+    hdrs = ["quiche/quic/core/quic_arena_scoped_ptr.h"],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [":quic_platform_base"],
+)
+
+envoy_cc_library(
+    name = "quic_core_alarm_lib",
+    srcs = ["quiche/quic/core/quic_alarm.cc"],
+    hdrs = ["quiche/quic/core/quic_alarm.h"],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_arena_scoped_ptr_lib",
+        ":quic_core_time_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_core_alarm_factory_lib",
+    hdrs = ["quiche/quic/core/quic_alarm_factory.h"],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_alarm_lib",
+        ":quic_core_one_block_arena_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_core_buffer_allocator_lib",
     srcs = [
         "quiche/quic/core/quic_buffer_allocator.cc",
@@ -385,6 +416,18 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [":quic_platform_export"],
+)
+
+envoy_cc_library(
+    name = "quic_core_one_block_arena_lib",
+    srcs = ["quiche/quic/core/quic_one_block_arena.h"],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_arena_scoped_ptr_lib",
+        ":quic_core_types_lib",
+        ":quic_platform_base",
+    ],
 )
 
 envoy_cc_library(

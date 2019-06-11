@@ -15,7 +15,7 @@ envoy_cc_library(
     hdrs = ["typed_async_client.h"],
     deps = [
         ":codec_lib",
-        ":common_lib",
+        ":context_lib",
         "//include/envoy/grpc:async_client_interface",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/http:async_client_lib",
@@ -28,7 +28,7 @@ envoy_cc_library(
     hdrs = ["async_client_impl.h"],
     deps = [
         ":codec_lib",
-        ":common_lib",
+        ":context_lib",
         ":typed_async_client_lib",
         "//include/envoy/grpc:async_client_interface",
         "//source/common/buffer:zero_copy_input_stream_lib",
@@ -42,7 +42,7 @@ envoy_cc_library(
     hdrs = ["async_client_manager_impl.h"],
     deps = [
         ":async_client_lib",
-        ":common_lib",
+        ":context_lib",
         "//include/envoy/grpc:async_client_manager_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
@@ -78,7 +78,6 @@ envoy_cc_library(
     hdrs = ["common.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/grpc:context_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",
         "//include/envoy/stats:stats_interface",
@@ -97,6 +96,19 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "context_lib",
+    srcs = ["context_impl.cc"],
+    hdrs = ["context_impl.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//include/envoy/grpc:context_interface",
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/common:hash_lib",
         "//source/common/stats:symbol_table_lib",
     ],
 )
@@ -129,7 +141,7 @@ envoy_cc_library(
         "grpc",
     ],
     deps = [
-        ":common_lib",
+        ":context_lib",
         ":google_grpc_creds_lib",
         ":google_grpc_utils_lib",
         ":typed_async_client_lib",
