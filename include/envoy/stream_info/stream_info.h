@@ -132,6 +132,8 @@ struct ResponseCodeDetailValues {
   // indicates that original "success" headers may have been sent downstream
   // despite the subsequent failure.
   const std::string LateUpstreamReset = "upstream_reset_after_response_started";
+  // The request was rejected due to invalid HTTP headers
+  const std::string InvalidHeader = "invalid_http_header";
 };
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;

@@ -6,6 +6,7 @@
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/match.h"
+#include "nghttp2/nghttp2.h"
 
 namespace Envoy {
 namespace Http {
@@ -115,6 +116,27 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
   }
 
   return match != header_data.invert_match_;
+}
+
+bool HeaderUtility::validateHeaders(const Http::HeaderMap& headers) {
+  bool headers_are_valid = true;
+
+  headers.iterate(
+      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+        const absl::string_view header_value = header.value().getStringView();
+        if (nghttp2_check_header_value(
+                reinterpret_cast<const uint8_t*>(std::string(header_value).data()),
+                header_value.size()) == 0) {
+          bool* valid = static_cast<bool*>(context);
+          *valid = false;
+          return Http::HeaderMap::Iterate::Break;
+        }
+
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      &headers_are_valid);
+
+  return headers_are_valid;
 }
 
 void HeaderUtility::addHeaders(Http::HeaderMap& headers, const Http::HeaderMap& headers_to_add) {

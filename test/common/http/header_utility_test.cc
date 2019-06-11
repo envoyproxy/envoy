@@ -403,6 +403,26 @@ invert_match: true
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
+TEST(ValidateHeadersTest, InvalidHeaderValuesAreRejected) {
+
+  // ASCII values 1-31 are control characters (with the exception of ASCII
+  // value 9, which is a horizontal tab), and are not valid in an HTTP header,
+  // per RFC 7230, section 3.2
+  for (uint i = 1; i < 32; i++) {
+    if (i == 9 || i == 13 || i == 10) {
+      continue;
+    }
+
+    TestHeaderMapImpl headers{{"invalidheader", std::string(1, i)}};
+    EXPECT_FALSE(HeaderUtility::validateHeaders(headers));
+  }
+}
+
+TEST(ValidateHeadersTest, ValidHeaderValuesAreAccepted) {
+  TestHeaderMapImpl headers{{"validheader", "some-value"}, {"anotherHeader", "Some Other Value"}};
+  EXPECT_TRUE(HeaderUtility::validateHeaders(headers));
+}
+
 TEST(HeaderAddTest, HeaderAdd) {
   TestHeaderMapImpl headers{{"myheader1", "123value"}};
   TestHeaderMapImpl headers_to_add{{"myheader2", "456value"}};

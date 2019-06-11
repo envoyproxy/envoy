@@ -44,6 +44,7 @@ Version history
 * http: added a :ref:header_prefix` <envoy_api_field_config.bootstrap.v2.Bootstrap.header_prefix>` configuration option to allow Envoy to send and process x-custom- prefixed headers rather than x-envoy.
 * http: added :ref:`dynamic forward proxy <arch_overview_http_dynamic_forward_proxy>` support.
 * http: tracking the active stream and dumping state in Envoy crash handlers. This can be disabled by building with `--define disable_object_dump_on_signal_trace=disabled`
+* http: added support for rejecting requests containing invalid HTTP header values.
 * jwt_authn: make filter's parsing of JWT more flexible, allowing syntax like ``jwt=eyJhbGciOiJS...ZFnFIw,extra=7,realm=123``
 * listener: added :ref:`source IP <envoy_api_field_listener.FilterChainMatch.source_prefix_ranges>`
   and :ref:`source port <envoy_api_field_listener.FilterChainMatch.source_ports>` filter
