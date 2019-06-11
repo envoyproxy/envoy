@@ -4,7 +4,7 @@ set -eu
 
 # Check whether any git repositories are defined.
 # Git repository definition contains `commit` and `remote` fields.
-if grep -nr "commit =\|remote =" --include=*.bzl .; then
+if grep -nr "commit =\|remote =" --include=*.bzl --exclude=./bazel-* .; then
   echo "Using git repositories is not allowed."
   echo "To ensure that all dependencies can be stored offline in distdir, only HTTP repositories are allowed."
   exit 1
