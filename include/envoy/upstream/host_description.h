@@ -113,11 +113,6 @@ public:
   virtual Network::Address::InstanceConstSharedPtr healthCheckAddress() const PURE;
 
   /**
-   * Set the address used to health check the host.
-   */
-  virtual void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr) PURE;
-
-  /**
    * @return the priority of the host.
    */
   virtual uint32_t priority() const PURE;

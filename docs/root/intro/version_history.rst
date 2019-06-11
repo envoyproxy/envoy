@@ -70,6 +70,8 @@ Version history
   that allows ignoring new hosts for the purpose of load balancing calculations until they have
   been health checked for the first time.
 * upstream: added runtime error checking to prevent setting dns type to STRICT_DNS or LOGICAL_DNS when custom resolver name is specified.
+* upstream: the :ref:`logical DNS cluster <arch_overview_service_discovery_types_logical_dns>` now
+  displays the current resolved IP address in admin output instead of 0.0.0.0.
 
 1.10.0 (Apr 5, 2019)
 ====================

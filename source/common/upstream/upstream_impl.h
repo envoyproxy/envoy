@@ -135,8 +135,6 @@ public:
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     return health_check_address_;
   }
-  // Setting health check address is usually done at initialization. This is NOP by default.
-  void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr) override {}
   const envoy::api::v2::core::Locality& locality() const override { return locality_; }
   Stats::StatName localityZoneStatName() const override {
     return locality_zone_stat_name_.statName();
