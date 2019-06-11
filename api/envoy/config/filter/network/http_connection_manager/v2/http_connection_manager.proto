@@ -317,6 +317,7 @@ message HttpConnectionManager {
   ForwardClientCertDetails forward_client_cert_details = 16
       [(validate.rules).enum.defined_only = true];
 
+  // [#comment:next free field: 7]
   message SetCurrentClientCertDetails {
     // Whether to forward the subject of the client cert. Defaults to false.
     google.protobuf.BoolValue subject = 1;
@@ -327,6 +328,12 @@ message HttpConnectionManager {
     // XFCC header comma separated from other values with the value Cert="PEM".
     // Defaults to false.
     bool cert = 3;
+
+    // Whether to forward the entire client cert chain (including the leaf cert) in URL encoded PEM
+    // format. This will appear in the XFCC header comma separated from other values with the value
+    // Chain="PEM".
+    // Defaults to false.
+    bool chain = 6;
 
     // Whether to forward the DNS type Subject Alternative Names of the client cert.
     // Defaults to false.

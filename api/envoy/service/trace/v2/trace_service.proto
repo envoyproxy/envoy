@@ -11,7 +11,7 @@ option go_package = "v2";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
-import "trace.proto";
+import "opencensus/proto/trace/v1/trace.proto";
 
 import "google/api/annotations.proto";
 

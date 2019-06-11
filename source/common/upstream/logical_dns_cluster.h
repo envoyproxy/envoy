@@ -174,5 +174,7 @@ private:
                     Stats::ScopePtr&& stats_scope) override;
 };
 
+DECLARE_FACTORY(LogicalDnsClusterFactory);
+
 } // namespace Upstream
 } // namespace Envoy
