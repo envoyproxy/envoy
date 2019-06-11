@@ -220,6 +220,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (set_current_client_cert_details.cert()) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Cert);
   }
+  if (set_current_client_cert_details.chain()) {
+    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Chain);
+  }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, subject, false)) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
   }

@@ -16,6 +16,7 @@
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -294,38 +295,45 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
       config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     const auto uri_sans_local_cert = connection.ssl()->uriSanLocalCertificate();
     if (!uri_sans_local_cert.empty()) {
-      client_cert_details.push_back("By=" + uri_sans_local_cert[0]);
+      client_cert_details.push_back(absl::StrCat("By=", uri_sans_local_cert[0]));
     }
     const std::string cert_digest = connection.ssl()->sha256PeerCertificateDigest();
     if (!cert_digest.empty()) {
-      client_cert_details.push_back("Hash=" + cert_digest);
+      client_cert_details.push_back(absl::StrCat("Hash=", cert_digest));
     }
     for (const auto& detail : config.setCurrentClientCertDetails()) {
       switch (detail) {
       case ClientCertDetailsType::Cert: {
         const std::string peer_cert = connection.ssl()->urlEncodedPemEncodedPeerCertificate();
         if (!peer_cert.empty()) {
-          client_cert_details.push_back("Cert=\"" + peer_cert + "\"");
+          client_cert_details.push_back(absl::StrCat("Cert=\"", peer_cert, "\""));
+        }
+        break;
+      }
+      case ClientCertDetailsType::Chain: {
+        const std::string peer_chain = connection.ssl()->urlEncodedPemEncodedPeerCertificateChain();
+        if (!peer_chain.empty()) {
+          client_cert_details.push_back(absl::StrCat("Chain=\"", peer_chain, "\""));
         }
         break;
       }
       case ClientCertDetailsType::Subject:
         // The "Subject" key still exists even if the subject is empty.
-        client_cert_details.push_back("Subject=\"" + connection.ssl()->subjectPeerCertificate() +
-                                      "\"");
+        client_cert_details.push_back(
+            absl::StrCat("Subject=\"", connection.ssl()->subjectPeerCertificate(), "\""));
         break;
       case ClientCertDetailsType::URI: {
         // The "URI" key still exists even if the URI is empty.
         const auto sans = connection.ssl()->uriSanPeerCertificate();
         const auto& uri_san = sans.empty() ? "" : sans[0];
-        client_cert_details.push_back("URI=" + uri_san);
+        client_cert_details.push_back(absl::StrCat("URI=", uri_san));
         break;
       }
       case ClientCertDetailsType::DNS: {
         const std::vector<std::string> dns_sans = connection.ssl()->dnsSansPeerCertificate();
         if (!dns_sans.empty()) {
           for (const std::string& dns : dns_sans) {
-            client_cert_details.push_back("DNS=" + dns);
+            client_cert_details.push_back(absl::StrCat("DNS=", dns));
           }
         }
         break;
