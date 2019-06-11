@@ -444,13 +444,15 @@ SubsetLoadBalancer::findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadat
 
   const std::string& name = kvs[idx].first;
   const ProtobufWkt::Value& pb_value = kvs[idx].second;
+  const HashedValue value(pb_value);
+
   LbSubsetEntryPtr entry;
 
   const auto& kv_it = subsets.find(name);
 
   if (kv_it != subsets.end()) {
     ValueSubsetMap& value_subset_map = kv_it->second;
-    const auto vs_it = value_subset_map.find(pb_value);
+    const auto vs_it = value_subset_map.find(value);
     if (vs_it != value_subset_map.end()) {
       entry = vs_it->second;
     }
@@ -461,19 +463,19 @@ SubsetLoadBalancer::findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadat
     entry.reset(new LbSubsetEntry());
     if (kv_it != subsets.end()) {
       ValueSubsetMap& value_subset_map = kv_it->second;
-      value_subset_map.emplace(pb_value, entry);
+      value_subset_map.emplace(value, entry);
     } else {
-      ValueSubsetMap value_subset_map = {{pb_value, entry}};
+      ValueSubsetMap value_subset_map = {{value, entry}};
       subsets.emplace(name, value_subset_map);
     }
   }
 
   idx++;
-
   if (idx == kvs.size()) {
     // We've matched all the key-values, return the entry.
     return entry;
   }
+
   return findOrCreateSubset(entry->children_, kvs, idx);
 }
 
