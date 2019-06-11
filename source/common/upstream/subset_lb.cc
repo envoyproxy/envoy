@@ -305,7 +305,7 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
           // with only removed hosts is a degenerate case and we leave the entry
           // uninitialized.)
           entry->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
-              *this, predicate, locality_weight_aware_, scale_locality_weight_));
+              *this, predicate, locality_weight_aware_, scale_locality_weight_);
           stats_.lb_subsets_active_.inc();
           stats_.lb_subsets_created_.inc();
         }
