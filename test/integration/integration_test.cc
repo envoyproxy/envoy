@@ -9,6 +9,7 @@
 #include "common/protobuf/utility.h"
 
 #include "test/integration/autonomous_upstream.h"
+#include "test/integration/filters/process_context_filter.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -790,6 +791,46 @@ TEST_P(IntegrationTest, NoConnectionPoolsFree) {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_pool_overflow")->value(), 1);
+}
+
+TEST_P(IntegrationTest, ProcessObjectHealthy) {
+  config_helper_.addFilter("{ name: process-context-filter, config: {} }");
+
+  ProcessObjectForFilter healthy_object(true);
+  process_object_ = healthy_object;
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                   {":path", "/healthcheck"},
+                                                                   {":authority", "host"},
+                                                                   {"connection", "close"}});
+  response->waitForEndStream();
+  codec_client_->waitForDisconnect();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+}
+
+TEST_P(IntegrationTest, ProcessObjectUnealthy) {
+  config_helper_.addFilter("{ name: process-context-filter, config: {} }");
+
+  ProcessObjectForFilter unhealthy_object(false);
+  process_object_ = unhealthy_object;
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                   {":path", "/healthcheck"},
+                                                                   {":authority", "host"},
+                                                                   {"connection", "close"}});
+  response->waitForEndStream();
+  codec_client_->waitForDisconnect();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("500"));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
