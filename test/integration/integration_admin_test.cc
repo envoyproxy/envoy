@@ -534,6 +534,8 @@ TEST_P(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
 // blocks on its creation (see waitForCounterGe and the suite of waitFor* functions).
 // If this invariant is changed, this test must be rewritten.
 TEST_P(StatsMatcherIntegrationTest, IncludeExact) {
+  // Stats matching does not play well with LDS, at least in test. See #7215.
+  use_lds_ = false;
   stats_matcher_.mutable_inclusion_list()->add_patterns()->set_exact(
       "listener_manager.listener_create_success");
   initialize();

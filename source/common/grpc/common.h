@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/common/exception.h"
-#include "envoy/grpc/context.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -13,7 +12,6 @@
 #include "common/common/hash.h"
 #include "common/grpc/status.h"
 #include "common/protobuf/protobuf.h"
-#include "common/stats/symbol_table_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -28,16 +26,8 @@ public:
   const absl::optional<uint64_t> grpc_status_;
 };
 
-struct Context::RequestNames {
-  Stats::StatName service_; // supplies the service name.
-  Stats::StatName method_;  // supplies the method name.
-};
-
-// TODO(jmarantz): Rename 'Common' to 'ContextImpl'.
-class Common : public Context {
+class Common {
 public:
-  explicit Common(Stats::SymbolTable& symbol_table);
-
   /**
    * @param headers the headers to parse.
    * @return bool indicating whether content-type is gRPC.
@@ -85,23 +75,6 @@ public:
    */
   static void toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::HeaderString& value);
 
-  // Context
-  void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                  const RequestNames& request_names, const Http::HeaderEntry* grpc_status) override;
-  void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                  const RequestNames& request_names, bool success) override;
-  void chargeStat(const Upstream::ClusterInfo& cluster, const RequestNames& request_names,
-                  bool success) override;
-
-  /**
-   * Resolve the gRPC service and method from the HTTP2 :path header.
-   * @param path supplies the :path header.
-   * @param service supplies the output pointer of the gRPC service.
-   * @param method supplies the output pointer of the gRPC method.
-   * @return bool true if both gRPC serve and method have been resolved successfully.
-   */
-  absl::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path) override;
-
   /**
    * Serialize protobuf message with gRPC frame header.
    */
@@ -143,11 +116,6 @@ public:
    */
   static void prependGrpcFrameHeader(Buffer::Instance& buffer);
 
-  Stats::StatName successStatName(bool success) const { return success ? success_ : failure_; }
-  Stats::StatName protocolStatName(Protocol protocol) const {
-    return protocol == Context::Protocol::Grpc ? grpc_ : grpc_web_;
-  }
-
   /**
    * Parse a Buffer::Instance into a Protobuf::Message.
    * @param buffer containing the data to be parsed.
@@ -158,25 +126,6 @@ public:
 
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);
-
-  // Makes a stat name from a string, if we don't already have one for it.
-  // This always takes a lock on mutex_, and if we haven't seen the name
-  // before, it also takes a lock on the symbol table.
-  //
-  // TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/7008 for
-  // a lock-free approach to creating dynamic stat-names based on requests.
-  Stats::StatName makeDynamicStatName(absl::string_view name);
-
-  Stats::SymbolTable& symbol_table_;
-  mutable Thread::MutexBasicLockable mutex_;
-  Stats::StatNamePool stat_name_pool_ GUARDED_BY(mutex_);
-  StringMap<Stats::StatName> stat_name_map_ GUARDED_BY(mutex_);
-  const Stats::StatName grpc_;
-  const Stats::StatName grpc_web_;
-  const Stats::StatName success_;
-  const Stats::StatName failure_;
-  const Stats::StatName total_;
-  const Stats::StatName zero_;
 };
 
 } // namespace Grpc

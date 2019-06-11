@@ -173,7 +173,15 @@ envoy_directory_genrule(
 filegroup(
     name = "route_corpus",
     testonly = 1,
-    srcs = [":corpus_from_config_impl"] + glob(["route_corpus/**"]),
+    srcs = select({
+        # TODO(asraa): Clean this up for cross-compilation. Right now we assume
+        # the host and target are the same on x86 builds, so we only execute the
+        # corpus generation binary on x86 platforms.
+        "//bazel:x86": [":corpus_from_config_impl"],
+        "//conditions:default": [],
+    }) + glob([
+        "route_corpus/**",
+    ]),
 )
 
 envoy_cc_fuzz_test(
