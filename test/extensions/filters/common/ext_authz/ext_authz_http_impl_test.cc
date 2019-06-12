@@ -114,6 +114,7 @@ public:
   ClientConfigSharedPtr config_;
   RawHttpClientImpl client_;
   MockRequestCallbacks request_callbacks_;
+  Tracing::MockSpan span_;
 };
 
 // Test HTTP client config default values.
@@ -229,7 +230,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
 
-  client_.onSuccess(std::move(check_response));
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  client_.onSuccess(std::move(check_response), span_);
 }
 
 // Verify client response headers when authorization_headers_to_add is configured.
