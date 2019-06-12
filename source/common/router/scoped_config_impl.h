@@ -22,6 +22,8 @@ using envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes;
  */
 class ScopeKeyFragmentBase {
 public:
+  bool operator!=(const ScopeKeyFragmentBase& other) const { return !(*this == other); }
+
   bool operator==(const ScopeKeyFragmentBase& other) const {
     if (typeid(*this) == typeid(other)) {
       return equals(other);
@@ -35,13 +37,18 @@ private:
   virtual bool equals(const ScopeKeyFragmentBase&) const PURE;
 };
 
+/**
+ *  Scope Key is composed of non-null fragments.
+ *
+ **/
 class ScopeKey {
 public:
   ScopeKey() = default;
   ScopeKey(ScopeKey&& other) = default;
-  void addFragment(std::unique_ptr<ScopeKeyFragmentBase>&& part) {
-    contains_null_fragment_ = contains_null_fragment_ || (part == nullptr);
-    fragments_.emplace_back(std::move(part));
+
+  // Caller should guarantee the fragment is not nullptr.
+  void addFragment(std::unique_ptr<ScopeKeyFragmentBase>&& fragment) {
+    fragments_.emplace_back(std::move(fragment));
   }
 
   bool operator!=(const ScopeKey& other) const;
@@ -49,8 +56,6 @@ public:
   bool operator==(const ScopeKey& other) const;
 
 private:
-  // If there is a NULL fragment in the key.
-  bool contains_null_fragment_{false};
   std::vector<std::unique_ptr<ScopeKeyFragmentBase>> fragments_;
 };
 
@@ -105,7 +110,8 @@ public:
   explicit ScopeKeyBuilderBase(ScopedRoutes::ScopeKeyBuilder config) : config_(std::move(config)) {}
   virtual ~ScopeKeyBuilderBase() = default;
 
-  virtual const ScopeKey computeScopeKey(const Http::HeaderMap& headers) const PURE;
+  // Computes scope key for given headers, returns nullptr if a key can't be computed.
+  virtual std::unique_ptr<ScopeKey> computeScopeKey(const Http::HeaderMap& headers) const PURE;
 
 protected:
   ScopedRoutes::ScopeKeyBuilder config_;
@@ -115,7 +121,7 @@ class ScopeKeyBuilderImpl : public ScopeKeyBuilderBase {
 public:
   explicit ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder config);
 
-  const ScopeKey computeScopeKey(const Http::HeaderMap& headers) const override;
+  std::unique_ptr<ScopeKey> computeScopeKey(const Http::HeaderMap& headers) const override;
 
 private:
   std::vector<std::unique_ptr<FragmentBuilderBase>> fragment_builders_;

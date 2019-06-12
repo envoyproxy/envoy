@@ -21,7 +21,7 @@ TEST(ScopeKeyFragmentBaseTest, EqualSign) {
   FooFragment foo;
   StringKeyFragment bar("a random string");
 
-  EXPECT_FALSE(foo == bar);
+  EXPECT_NE(foo, bar);
 }
 
 TEST(StringKeyFragmentTest, Empty) {
@@ -31,7 +31,7 @@ TEST(StringKeyFragmentTest, Empty) {
 
   StringKeyFragment non_empty("ABC");
 
-  EXPECT_FALSE(a == non_empty);
+  EXPECT_NE(a, non_empty);
 }
 
 TEST(StringKeyFragmentTest, Normal) {
@@ -41,13 +41,13 @@ TEST(StringKeyFragmentTest, Normal) {
   EXPECT_EQ(str, same_str);
 
   StringKeyFragment upper_cased_str("ABC");
-  EXPECT_FALSE(str == upper_cased_str);
+  EXPECT_NE(str, upper_cased_str);
 
   StringKeyFragment another_str("DEF");
-  EXPECT_FALSE(str == another_str);
+  EXPECT_NE(str, another_str);
 }
 
-TEST(HeaderValueExtractorImplTest, InvalidConfig) {
+TEST(HeaderValueExtractorImplDeathTest, InvalidConfig) {
   ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config;
   // Type not set.
   EXPECT_DEATH(HeaderValueExtractorImpl{config}, "header_value_extractor is not set.");
@@ -206,11 +206,7 @@ TEST(HeaderValueExtractorImplTest, ElementSeparatorEmpty) {
 ScopeKey makeKey(const std::vector<const char*>& parts) {
   ScopeKey key;
   for (const auto& part : parts) {
-    if (part != nullptr) {
-      key.addFragment(std::make_unique<StringKeyFragment>(part));
-    } else {
-      key.addFragment(nullptr);
-    }
+    key.addFragment(std::make_unique<StringKeyFragment>(part));
   }
   return key;
 }
@@ -226,14 +222,9 @@ TEST(ScopeKeyTest, Unmatches) {
 
   EXPECT_EQ(makeKey({"a", "b", "c"}), makeKey({"a", "b", "c"}));
 
-  // A null part matches nothing.
-  EXPECT_NE(makeKey({"a", "b", "c"}), makeKey({"a", "b", nullptr}));
-
-  // A null part doesn't match "".
-  EXPECT_NE(makeKey({"a", "b", ""}), makeKey({"a", "b", nullptr}));
-
   // Two keys of different length won't match.
   EXPECT_NE(makeKey({"a", "b"}), makeKey({"a", "b", "c"}));
+
   // Case sensitive.
   EXPECT_NE(makeKey({"a", "b"}), makeKey({"A", "b"}));
 }
@@ -245,6 +236,76 @@ TEST(ScopeKeyTest, Matches) {
 
   // Non empty fragments  comparison.
   EXPECT_EQ(makeKey({"A", "b"}), makeKey({"A", "b"}));
+}
+
+TEST(ScopeKeyBuilderImplTest, Parse) {
+  std::string yaml_plain = R"EOF(
+  fragments:
+  - header_value_extractor:
+      name: 'foo_header'
+      element_separator: ','
+      element:
+        key: 'bar'
+        separator: '='
+  - header_value_extractor:
+      name: 'bar_header'
+      element_separator: ';'
+      index: 2
+)EOF";
+
+  ScopedRoutes::ScopeKeyBuilder config;
+  TestUtility::loadFromYaml(yaml_plain, config);
+  ScopeKeyBuilderImpl key_builder(config);
+
+  std::unique_ptr<ScopeKey> key = key_builder.computeScopeKey(TestHeaderMapImpl{
+      {"foo_header", "a=b,bar=bar_value,e=f"},
+      {"bar_header", "a=b;bar=bar_value;index2"},
+  });
+  EXPECT_NE(key, nullptr);
+  EXPECT_EQ(*key, makeKey({"bar_value", "index2"}));
+
+  // Empty string fragment is fine.
+  key = key_builder.computeScopeKey(TestHeaderMapImpl{
+      {"foo_header", "a=b,bar,e=f"},
+      {"bar_header", "a=b;bar=bar_value;"},
+  });
+  EXPECT_NE(key, nullptr);
+  EXPECT_EQ(*key, makeKey({"", ""}));
+
+  // Key not found.
+  key = key_builder.computeScopeKey(TestHeaderMapImpl{
+      {"foo_header", "a=b,meh,e=f"},
+      {"bar_header", "a=b;bar=bar_value;"},
+  });
+  EXPECT_EQ(key, nullptr);
+
+  // Index out of bound.
+  key = key_builder.computeScopeKey(TestHeaderMapImpl{
+      {"foo_header", "a=b,bar=bar_value,e=f"},
+      {"bar_header", "a=b;bar=bar_value"},
+  });
+  EXPECT_EQ(key, nullptr);
+
+  // Header missing.
+  key = key_builder.computeScopeKey(TestHeaderMapImpl{
+      {"foo_header", "a=b,bar=bar_value,e=f"},
+      {"foobar_header", "a=b;bar=bar_value;index2"},
+  });
+  EXPECT_EQ(key, nullptr);
+
+  // Header value empty.
+  key = key_builder.computeScopeKey(TestHeaderMapImpl{
+      {"foo_header", ""},
+      {"bar_header", "a=b;bar=bar_value;index2"},
+  });
+  EXPECT_EQ(key, nullptr);
+
+  // Case sensitive.
+  key = key_builder.computeScopeKey(TestHeaderMapImpl{
+      {"foo_header", "a=b,Bar=bar_value,e=f"},
+      {"bar_header", "a=b;bar=bar_value;index2"},
+  });
+  EXPECT_EQ(key, nullptr);
 }
 
 } // namespace

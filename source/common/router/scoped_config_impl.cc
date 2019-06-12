@@ -13,10 +13,6 @@ bool ScopeKey::operator==(const ScopeKey& other) const {
     // An empty key equals to nothing, "NULL" != "NULL".
     return false;
   }
-  // A "NULL" fragment value equals to nothing.
-  if (this->contains_null_fragment_ || other.contains_null_fragment_) {
-    return false;
-  }
   return std::equal(this->fragments_.begin(), this->fragments_.end(), other.fragments_.begin(),
                     [](const std::unique_ptr<ScopeKeyFragmentBase>& left,
                        const std::unique_ptr<ScopeKeyFragmentBase>& right) -> bool {
@@ -96,12 +92,18 @@ ScopeKeyBuilderImpl::ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder config)
   }
 }
 
-const ScopeKey ScopeKeyBuilderImpl::computeScopeKey(const Http::HeaderMap& headers) const {
+std::unique_ptr<ScopeKey>
+ScopeKeyBuilderImpl::computeScopeKey(const Http::HeaderMap& headers) const {
   ScopeKey key;
   for (const auto& builder : fragment_builders_) {
-    key.addFragment(builder->computeFragment(headers));
+    // returns nullopt if a null fragment is found.
+    std::unique_ptr<ScopeKeyFragmentBase> fragment = builder->computeFragment(headers);
+    if (fragment == nullptr) {
+      return nullptr;
+    }
+    key.addFragment(std::move(fragment));
   }
-  return key;
+  return std::make_unique<ScopeKey>(std::move(key));
 }
 
 void ThreadLocalScopedConfigImpl::addOrUpdateRoutingScope(const ScopedRouteInfoConstSharedPtr&) {}
