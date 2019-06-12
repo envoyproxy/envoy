@@ -214,7 +214,7 @@ public:
   virtual bool generateRequestId() PURE;
 
   /**
-   * @return whether the x-request-id should be reset on edge entry inside mesh
+   * @return whether the x-request-id should not be reset on edge entry inside mesh
    */
   virtual bool preserveExternalRequestId() const PURE;
 
