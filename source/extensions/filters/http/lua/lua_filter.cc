@@ -7,8 +7,9 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
-#include "common/crypto/utility.h"
 #include "common/http/message_impl.h"
+
+#include "extensions/transport_sockets/tls/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -447,8 +448,8 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   const std::vector<uint8_t> text_vec(clear_text, clear_text + text_len);
 
   // Step 5: verify signature
-  auto output = Common::Crypto::Utility::verifySignature(hash, reinterpret_cast<EVP_PKEY*>(ptr),
-                                                         sig_vec, text_vec);
+  auto output = Envoy::Extensions::TransportSockets::Tls::Utility::verifySignature(
+      hash, reinterpret_cast<EVP_PKEY*>(ptr), sig_vec, text_vec);
 
   lua_pushboolean(state, output.result_);
   if (output.result_) {
@@ -469,7 +470,9 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
     public_key_wrapper_.pushStack();
   } else {
     public_key_wrapper_.reset(
-        PublicKeyWrapper::create(state, Common::Crypto::Utility::importPublicKey(key)), true);
+        PublicKeyWrapper::create(
+            state, Envoy::Extensions::TransportSockets::Tls::Utility::importPublicKey(key)),
+        true);
   }
 
   return 1;

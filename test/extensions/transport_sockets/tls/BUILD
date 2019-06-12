@@ -88,6 +88,8 @@ envoy_cc_test(
     external_deps = ["ssl"],
     deps = [
         ":ssl_test_utils",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:hex_lib",
         "//source/extensions/transport_sockets/tls:utility_lib",
         "//test/extensions/transport_sockets/tls/test_data:cert_infos",
         "//test/test_common:environment_lib",

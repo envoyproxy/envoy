@@ -5,10 +5,10 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
-#include "common/crypto/utility.h"
 #include "common/http/headers.h"
 
 #include "extensions/filters/http/common/aws/utility.h"
+#include "extensions/transport_sockets/tls/utility.h"
 
 #include "absl/strings/str_join.h"
 
@@ -66,8 +66,10 @@ std::string SignerImpl::createContentHash(Http::Message& message, bool sign_body
     return SignatureConstants::get().HashedEmptyString;
   }
   const auto content_hash =
-      message.body() ? Hex::encode(Envoy::Common::Crypto::Utility::getSha256Digest(*message.body()))
-                     : SignatureConstants::get().HashedEmptyString;
+      message.body()
+          ? Hex::encode(
+                Envoy::Extensions::TransportSockets::Tls::Utility::getSha256Digest(*message.body()))
+          : SignatureConstants::get().HashedEmptyString;
   message.headers().addCopy(SignatureHeaders::get().ContentSha256, content_hash);
   return content_hash;
 }
@@ -81,7 +83,7 @@ std::string SignerImpl::createStringToSign(absl::string_view canonical_request,
                                            absl::string_view long_date,
                                            absl::string_view credential_scope) const {
   return fmt::format(SignatureConstants::get().StringToSignFormat, long_date, credential_scope,
-                     Hex::encode(Envoy::Common::Crypto::Utility::getSha256Digest(
+                     Hex::encode(Envoy::Extensions::TransportSockets::Tls::Utility::getSha256Digest(
                          Buffer::OwnedImpl(canonical_request))));
 }
 
@@ -90,13 +92,16 @@ std::string SignerImpl::createSignature(absl::string_view secret_access_key,
                                         absl::string_view string_to_sign) const {
   const auto secret_key =
       absl::StrCat(SignatureConstants::get().SignatureVersion, secret_access_key);
-  const auto date_key = Envoy::Common::Crypto::Utility::getSha256Hmac(
+  const auto date_key = Envoy::Extensions::TransportSockets::Tls::Utility::getSha256Hmac(
       std::vector<uint8_t>(secret_key.begin(), secret_key.end()), short_date);
-  const auto region_key = Envoy::Common::Crypto::Utility::getSha256Hmac(date_key, region_);
-  const auto service_key = Envoy::Common::Crypto::Utility::getSha256Hmac(region_key, service_name_);
-  const auto signing_key = Envoy::Common::Crypto::Utility::getSha256Hmac(
+  const auto region_key =
+      Envoy::Extensions::TransportSockets::Tls::Utility::getSha256Hmac(date_key, region_);
+  const auto service_key =
+      Envoy::Extensions::TransportSockets::Tls::Utility::getSha256Hmac(region_key, service_name_);
+  const auto signing_key = Envoy::Extensions::TransportSockets::Tls::Utility::getSha256Hmac(
       service_key, SignatureConstants::get().Aws4Request);
-  return Hex::encode(Envoy::Common::Crypto::Utility::getSha256Hmac(signing_key, string_to_sign));
+  return Hex::encode(Envoy::Extensions::TransportSockets::Tls::Utility::getSha256Hmac(
+      signing_key, string_to_sign));
 }
 
 std::string
