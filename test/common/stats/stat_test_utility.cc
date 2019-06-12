@@ -127,7 +127,7 @@ MemoryTest::Mode MemoryTest::mode() {
   if (!hasDeterministicMallocStats()) {
     return Mode::Disabled;
   }
-#ifdef MEMORY_TEST_EXACT // Set in "ci/do_ci.sh" for 'release' tests.
+#ifdef MEMORY_TEST_EXACT // Set in do_ci.sh for 'release' tests.
   return Mode::Canonical;
 #else
   return Mode::Approximate;
