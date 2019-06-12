@@ -210,6 +210,10 @@ envoy_cc_library(
     name = "socket_option_lib",
     srcs = ["socket_option_impl.cc"],
     hdrs = ["socket_option_impl.h"],
+    copts = select({
+        "//bazel:apple": ["-D__APPLE_USE_RFC_3542"],
+        "//conditions:default": [],
+    }),
     external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
