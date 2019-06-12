@@ -83,6 +83,7 @@ def api_cc_grpc_library(name, proto, deps = []):
         deps = deps,
         proto_only = False,
         grpc_only = True,
+        visibility = ["//visibility:public"],
     )
 
 # This is api_proto_library plus some logic internal to //envoy/api.

@@ -28,6 +28,9 @@ api_proto_library_internal(
 )
 
 api_cc_grpc_library(
-    name = "external_auth_cc",
+    name = "external_auth_service",
     proto = ":external_auth",
+    deps = [
+        ":external_auth_cc",
+    ],
 )
