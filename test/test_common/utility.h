@@ -289,28 +289,29 @@ public:
   template <class ProtoType>
   static bool repeatedPtrFieldEqual(const Protobuf::RepeatedPtrField<ProtoType>& lhs,
                                     const Protobuf::RepeatedPtrField<ProtoType>& rhs,
-                                    bool ignore_repeated_field_ordering = false) {
+                                    bool ignore_ordering = false) {
     if (lhs.size() != rhs.size()) {
       return false;
     }
 
-    if (ignore_repeated_field_ordering == false) {
+    if (!ignore_ordering) {
       for (int i = 0; i < lhs.size(); ++i) {
-        if (!TestUtility::protoEqual(lhs[i], rhs[i], /*ignore_repeated_field_ordering=*/false)) {
+        if (!TestUtility::protoEqual(lhs[i], rhs[i], /*ignore_ordering=*/false)) {
           return false;
         }
       }
 
       return true;
     }
-    // ignore_repeated_field_ordering = true
+    // Iterate through using protoEqual as ignore_ordering is true, and fields
+    // in the sub-protos may also be out of order.
     std::list<ProtoType> lhs_list = repeatedProtoToList(lhs);
     std::list<ProtoType> rhs_list = repeatedProtoToList(rhs);
     while (!lhs_list.empty()) {
       bool found = false;
       for (auto it = rhs_list.begin(); it != rhs_list.end(); ++it) {
         if (TestUtility::protoEqual(lhs_list.front(), *it,
-                                    /*ignore_repeated_field_ordering=*/true)) {
+                                    /*ignore_ordering=*/true)) {
           lhs_list.pop_front();
           rhs_list.erase(it);
           found = true;
@@ -328,8 +329,8 @@ public:
   static AssertionResult
   assertRepeatedPtrFieldEqual(const Protobuf::RepeatedPtrField<ProtoType>& lhs,
                               const Protobuf::RepeatedPtrField<ProtoType>& rhs,
-                              bool ignore_repeated_field_ordering = false) {
-    if (!repeatedPtrFieldEqual(lhs, rhs, ignore_repeated_field_ordering)) {
+                              bool ignore_ordering = false) {
+    if (!repeatedPtrFieldEqual(lhs, rhs, ignore_ordering)) {
       return AssertionFailure() << RepeatedPtrUtil::debugString(lhs) << " does not match "
                                 << RepeatedPtrUtil::debugString(rhs);
     }
