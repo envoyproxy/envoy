@@ -16,6 +16,7 @@
 
 using testing::_;
 using testing::AllOf;
+using testing::Eq;
 using testing::Invoke;
 using testing::Ref;
 using testing::Return;
