@@ -27,8 +27,8 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-typedef Grpc::AsyncRequestCallbacks<envoy::service::ratelimit::v2::RateLimitResponse>
-    RateLimitAsyncCallbacks;
+using RateLimitAsyncCallbacks =
+    Grpc::AsyncRequestCallbacks<envoy::service::ratelimit::v2::RateLimitResponse>;
 
 struct ConstantValues {
   const std::string TraceStatus = "ratelimit_status";

@@ -219,8 +219,8 @@ protected:
   Api::ApiPtr api_;
 };
 
-typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>
-    LogicalDnsConfigTuple;
+using LogicalDnsConfigTuple =
+    std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>;
 std::vector<LogicalDnsConfigTuple> generateLogicalDnsParams() {
   std::vector<LogicalDnsConfigTuple> dns_config;
   {

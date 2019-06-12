@@ -92,8 +92,8 @@ public:
    * @param cluster_name name of the cluster.
    * @param warming_state state the cluster transitioned to.
    */
-  typedef std::function<void(const std::string& cluster_name, ClusterWarmingState warming_state)>
-      ClusterWarmingCallback;
+  using ClusterWarmingCallback =
+      std::function<void(const std::string& cluster_name, ClusterWarmingState warming_state)>;
 
   /**
    * Add or update a cluster via API. The semantics of this API are:

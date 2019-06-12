@@ -287,8 +287,8 @@ private:
       HostConstSharedPtr host_;
       Network::ClientConnection& connection_;
     };
-    typedef std::unordered_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>
-        TcpConnectionsMap;
+    using TcpConnectionsMap =
+        std::unordered_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>;
 
     struct ClusterEntry : public ThreadLocalCluster {
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,

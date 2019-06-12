@@ -359,8 +359,8 @@ public:
   /**
    * Definition of unordered set of case-insensitive std::string.
    */
-  typedef absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>
-      CaseUnorderedSet;
+  using CaseUnorderedSet =
+      absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>;
 
   /**
    * Removes all the character indices from str contained in the interval-set.

@@ -20,10 +20,9 @@ namespace Alts {
  * @param local_address the local address of the connection.
  * @param remote_address the remote address of the connection.
  */
-typedef std::function<TsiHandshakerPtr(
+using HandshakerFactory = std::function<TsiHandshakerPtr(
     Event::Dispatcher& dispatcher, const Network::Address::InstanceConstSharedPtr& local_address,
-    const Network::Address::InstanceConstSharedPtr& remote_address)>
-    HandshakerFactory;
+    const Network::Address::InstanceConstSharedPtr& remote_address)>;
 
 /**
  * A function to validate the peer of the connection.

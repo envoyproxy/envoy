@@ -209,8 +209,8 @@ using DegradedHostVectorConstSharedPtr = std::shared_ptr<const DegradedHostVecto
 using ExcludedHostVectorConstSharedPtr = std::shared_ptr<const ExcludedHostVector>;
 
 using HostListPtr = std::unique_ptr<HostVector>;
-typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
-    LocalityWeightsMap;
+using LocalityWeightsMap =
+    std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
 using PriorityState = std::vector<std::pair<HostListPtr, LocalityWeightsMap>>;
 
 /**
@@ -392,12 +392,11 @@ using HostSetPtr = std::unique_ptr<HostSet>;
  */
 class PrioritySet {
 public:
-  typedef std::function<void(const HostVector& hosts_added, const HostVector& hosts_removed)>
-      MemberUpdateCb;
+  using MemberUpdateCb =
+      std::function<void(const HostVector& hosts_added, const HostVector& hosts_removed)>;
 
-  typedef std::function<void(uint32_t priority, const HostVector& hosts_added,
-                             const HostVector& hosts_removed)>
-      PriorityUpdateCb;
+  using PriorityUpdateCb = std::function<void(uint32_t priority, const HostVector& hosts_added,
+                                              const HostVector& hosts_removed)>;
 
   virtual ~PrioritySet() = default;
 

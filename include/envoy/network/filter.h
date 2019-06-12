@@ -404,9 +404,8 @@ public:
   virtual void addReadFilter(UdpListenerReadFilterPtr&& filter) PURE;
 };
 
-typedef std::function<void(UdpListenerFilterManager& udp_listener_filter_manager,
-                           UdpReadFilterCallbacks& callbacks)>
-    UdpListenerFilterFactoryCb;
+using UdpListenerFilterFactoryCb = std::function<void(
+    UdpListenerFilterManager& udp_listener_filter_manager, UdpReadFilterCallbacks& callbacks)>;
 
 /**
  * Creates a chain of network filters for a new connection.

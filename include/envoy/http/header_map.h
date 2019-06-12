@@ -81,8 +81,8 @@ using LowerCaseStrUnorderedSet = std::unordered_set<LowerCaseString, LowerCaseSt
 /**
  * Convenient type for a vector of lower case string and string pair.
  */
-typedef std::vector<std::pair<const Http::LowerCaseString, const std::string>>
-    LowerCaseStrPairVector;
+using LowerCaseStrPairVector =
+    std::vector<std::pair<const Http::LowerCaseString, const std::string>>;
 
 /**
  * This is a string implementation for use in header processing. It is heavily optimized for

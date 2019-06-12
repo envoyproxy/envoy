@@ -118,9 +118,8 @@ public:
   };
 
   using TestSessionPtr = std::unique_ptr<TestSession>;
-  typedef std::unordered_map<std::string,
-                             const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig>
-      HostWithHealthCheckMap;
+  using HostWithHealthCheckMap =
+      std::unordered_map<std::string, const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig>;
 
   HttpHealthCheckerImplTest()
       : cluster_(new NiceMock<MockClusterMockPrioritySet>()),

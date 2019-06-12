@@ -26,8 +26,8 @@ public:
     template <typename T> std::size_t operator()(T t) const { return static_cast<std::size_t>(t); }
   };
 
-  typedef std::unordered_map<SerializationType, std::string, SerializationTypeHash>
-      DeserializerTypeNameMap;
+  using DeserializerTypeNameMap =
+      std::unordered_map<SerializationType, std::string, SerializationTypeHash>;
 
   const DeserializerTypeNameMap deserializerTypeNameMap = {
       {SerializationType::Hessian, "hessian"},

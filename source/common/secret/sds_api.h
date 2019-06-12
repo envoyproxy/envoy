@@ -73,8 +73,8 @@ private:
 class TlsCertificateSdsApi;
 class CertificateValidationContextSdsApi;
 using TlsCertificateSdsApiSharedPtr = std::shared_ptr<TlsCertificateSdsApi>;
-typedef std::shared_ptr<CertificateValidationContextSdsApi>
-    CertificateValidationContextSdsApiSharedPtr;
+using CertificateValidationContextSdsApiSharedPtr =
+    std::shared_ptr<CertificateValidationContextSdsApi>;
 
 /**
  * TlsCertificateSdsApi implementation maintains and updates dynamic TLS certificate secrets.

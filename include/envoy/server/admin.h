@@ -80,11 +80,9 @@ public:
    * its data.
    * @return Http::Code the response code.
    */
-  typedef std::function<Http::Code(absl::string_view path_and_query,
-                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                   AdminStream& admin_stream)>
-
-      HandlerCb;
+  using HandlerCb =
+      std::function<Http::Code(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                               Buffer::Instance& response, AdminStream& admin_stream)>;
 
   /**
    * Add an admin handler.

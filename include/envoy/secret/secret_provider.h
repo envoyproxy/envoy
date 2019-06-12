@@ -34,16 +34,16 @@ public:
 };
 
 using TlsCertificatePtr = std::unique_ptr<envoy::api::v2::auth::TlsCertificate>;
-typedef std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext>
-    CertificateValidationContextPtr;
+using CertificateValidationContextPtr =
+    std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext>;
 
 using TlsCertificateConfigProvider = SecretProvider<envoy::api::v2::auth::TlsCertificate>;
 using TlsCertificateConfigProviderSharedPtr = std::shared_ptr<TlsCertificateConfigProvider>;
 
-typedef SecretProvider<envoy::api::v2::auth::CertificateValidationContext>
-    CertificateValidationContextConfigProvider;
-typedef std::shared_ptr<CertificateValidationContextConfigProvider>
-    CertificateValidationContextConfigProviderSharedPtr;
+using CertificateValidationContextConfigProvider =
+    SecretProvider<envoy::api::v2::auth::CertificateValidationContext>;
+using CertificateValidationContextConfigProviderSharedPtr =
+    std::shared_ptr<CertificateValidationContextConfigProvider>;
 
 } // namespace Secret
 } // namespace Envoy

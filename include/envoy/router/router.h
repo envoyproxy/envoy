@@ -442,9 +442,8 @@ public:
    * @param ttl the lifetime of the cookie
    * @return std::string the opaque value of the cookie that will be set
    */
-  typedef std::function<std::string(const std::string& key, const std::string& path,
-                                    std::chrono::seconds ttl)>
-      AddCookieCallback;
+  using AddCookieCallback = std::function<std::string(
+      const std::string& key, const std::string& path, std::chrono::seconds ttl)>;
 
   /**
    * @param downstream_address is the address of the connected client host, or nullptr if the

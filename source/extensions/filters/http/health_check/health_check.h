@@ -50,8 +50,8 @@ private:
 using HealthCheckCacheManagerSharedPtr = std::shared_ptr<HealthCheckCacheManager>;
 
 using ClusterMinHealthyPercentages = std::map<std::string, double>;
-typedef std::shared_ptr<const ClusterMinHealthyPercentages>
-    ClusterMinHealthyPercentagesConstSharedPtr;
+using ClusterMinHealthyPercentagesConstSharedPtr =
+    std::shared_ptr<const ClusterMinHealthyPercentages>;
 
 using HeaderDataVectorSharedPtr = std::shared_ptr<std::vector<Http::HeaderUtility::HeaderData>>;
 
