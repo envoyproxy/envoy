@@ -11,7 +11,7 @@ Version history
 * admin: extend :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to support parameters within the request body.
 * api: track and report requests issued since last load report.
 * build: releases are built with Clang and linked with LLD.
-* control-plane: HTTP 304 can be used to indicate that config is up to date for Envoy proxies polling a REST API config source
+* control-plane: HTTP 304 can be used to indicate that config is up to date for Envoy proxies polling a :ref:`REST API Config Type <envoy_api_field_core.ApiConfigSource.api_type>`
 * dubbo_proxy: support the :ref:`Dubbo proxy filter <config_network_filters_dubbo_proxy>`.
 * eds: added support to specify max time for which endpoints can be used :ref:`gRPC filter <envoy_api_msg_ClusterLoadAssignment.Policy>`.
 * event: added :ref:`loop duration and poll delay statistics <operations_performance>`.
