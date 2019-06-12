@@ -28,7 +28,8 @@ public:
          const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Runtime::Loader& runtime,
          Upstream::ClusterManager& cm)
       : domain_(config.domain()), stage_(config.stage()), local_info_(local_info), scope_(scope),
-        runtime_(runtime), cm_(cm), failure_mode_deny_(config.failure_mode_deny()) {}
+        runtime_(runtime), cm_(cm), failure_mode_deny_(config.failure_mode_deny()),
+        stat_name_pool_(scope_.symbolTable()), stat_names_(stat_name_pool_) {}
 
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
@@ -39,6 +40,20 @@ public:
 
   bool failureModeAllow() const { return !failure_mode_deny_; };
 
+  struct StatNames {
+    StatNames(Stats::StatNamePool& pool)
+        : ok_(pool.add("ratelimit.ok")),
+          error_(pool.add("ratelimit.error")),
+          failure_mode_allowed_(pool.add("ratelimit.failure_mode_allowed")),
+          over_limit_(pool.add("ratelimit.over_limit")) {}
+    Stats::StatName ok_;
+    Stats::StatName error_;
+    Stats::StatName failure_mode_allowed_;
+    Stats::StatName over_limit_;
+  };
+
+  StatNames& statNames() { return stat_names_; }
+
 private:
   const std::string domain_;
   const uint32_t stage_;
@@ -47,6 +62,8 @@ private:
   Runtime::Loader& runtime_;
   Upstream::ClusterManager& cm_;
   const bool failure_mode_deny_;
+  Stats::StatNamePool stat_name_pool_;
+  StatNames stat_names_;
 };
 
 typedef std::shared_ptr<Config> ConfigSharedPtr;
