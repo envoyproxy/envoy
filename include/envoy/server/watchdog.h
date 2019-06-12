@@ -17,7 +17,7 @@ namespace Server {
  */
 class WatchDog {
 public:
-  virtual ~WatchDog() {}
+  virtual ~WatchDog() = default;
 
   /**
    * Start a recurring touch timer in the dispatcher passed as argument.

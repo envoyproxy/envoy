@@ -176,7 +176,7 @@ struct UpstreamTiming {
  */
 class StreamInfo {
 public:
-  virtual ~StreamInfo() {}
+  virtual ~StreamInfo() = default;
 
   /**
    * @param response_flag the response flag. Each filter can set independent response flags. The

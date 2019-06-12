@@ -30,7 +30,7 @@ typedef std::function<void(uint32_t events)> FileReadyCb;
  */
 class FileEvent {
 public:
-  virtual ~FileEvent() {}
+  virtual ~FileEvent() = default;
 
   /**
    * Activate the file event explicitly for a set of events. Should be a logical OR of FileReadyType

@@ -25,7 +25,7 @@ namespace Http {
  */
 class CodecClientCallbacks {
 public:
-  virtual ~CodecClientCallbacks() {}
+  virtual ~CodecClientCallbacks() = default;
 
   /**
    * Called every time an owned stream is destroyed, whether complete or not.

@@ -192,7 +192,7 @@ typedef std::unique_ptr<CommandReplyMessage> CommandReplyMessagePtr;
  */
 class DecoderCallbacks {
 public:
-  virtual ~DecoderCallbacks() {}
+  virtual ~DecoderCallbacks() = default;
 
   virtual void decodeGetMore(GetMoreMessagePtr&& message) PURE;
   virtual void decodeInsert(InsertMessagePtr&& message) PURE;
@@ -208,7 +208,7 @@ public:
  */
 class Decoder {
 public:
-  virtual ~Decoder() {}
+  virtual ~Decoder() = default;
 
   virtual void onData(Buffer::Instance& data) PURE;
 };
@@ -220,7 +220,7 @@ typedef std::unique_ptr<Decoder> DecoderPtr;
  */
 class Encoder {
 public:
-  virtual ~Encoder() {}
+  virtual ~Encoder() = default;
 
   virtual void encodeGetMore(const GetMoreMessage& message) PURE;
   virtual void encodeInsert(const InsertMessage& message) PURE;

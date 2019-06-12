@@ -218,7 +218,7 @@ typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
  */
 class HostsPerLocality {
 public:
-  virtual ~HostsPerLocality() {}
+  virtual ~HostsPerLocality() = default;
 
   /**
    * @return bool is local locality one of the locality buckets? If so, the
@@ -267,7 +267,7 @@ typedef std::shared_ptr<const LocalityWeights> LocalityWeightsConstSharedPtr;
 // TODO(snowp): Remove the const ref accessors in favor of the shared_ptr ones.
 class HostSet {
 public:
-  virtual ~HostSet() {}
+  virtual ~HostSet() = default;
 
   /**
    * @return all hosts that make up the set at the current time.
@@ -399,7 +399,7 @@ public:
                              const HostVector& hosts_removed)>
       PriorityUpdateCb;
 
-  virtual ~PrioritySet() {}
+  virtual ~PrioritySet() = default;
 
   /**
    * Install a callback that will be invoked when any of the HostSets in the PrioritySet changes.
@@ -461,7 +461,7 @@ public:
    */
   class HostUpdateCb {
   public:
-    virtual ~HostUpdateCb() {}
+    virtual ~HostUpdateCb() = default;
     /**
      * Updates the hosts in a given host set.
      *
@@ -483,7 +483,7 @@ public:
    */
   class BatchUpdateCb {
   public:
-    virtual ~BatchUpdateCb() {}
+    virtual ~BatchUpdateCb() = default;
 
     /**
      * Performs a batch host update. Implementors should use the provided callback to update hosts
@@ -638,7 +638,7 @@ struct ClusterCircuitBreakersStats {
  */
 class ProtocolOptionsConfig {
 public:
-  virtual ~ProtocolOptionsConfig() {}
+  virtual ~ProtocolOptionsConfig() = default;
 };
 typedef std::shared_ptr<const ProtocolOptionsConfig> ProtocolOptionsConfigConstSharedPtr;
 
@@ -662,7 +662,7 @@ public:
     static const uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
   };
 
-  virtual ~ClusterInfo() {}
+  virtual ~ClusterInfo() = default;
 
   /**
    * @return bool whether the cluster was added via API (if false the cluster was present in the
@@ -866,7 +866,7 @@ class HealthChecker;
  */
 class Cluster {
 public:
-  virtual ~Cluster() {}
+  virtual ~Cluster() = default;
 
   enum class InitializePhase { Primary, Secondary };
 

@@ -21,7 +21,7 @@ struct StreamBuffer {
  */
 class ReadBufferSource {
 public:
-  virtual ~ReadBufferSource() {}
+  virtual ~ReadBufferSource() = default;
 
   /**
    * Fetch the read buffer for the source.
@@ -34,7 +34,7 @@ public:
  */
 class WriteBufferSource {
 public:
-  virtual ~WriteBufferSource() {}
+  virtual ~WriteBufferSource() = default;
 
   /**
    * Fetch the write buffer for the source.
@@ -81,7 +81,7 @@ class FilterManagerConnection : public virtual Connection,
                                 public ReadBufferSource,
                                 public WriteBufferSource {
 public:
-  virtual ~FilterManagerConnection() {}
+  virtual ~FilterManagerConnection() = default;
 
   /**
    * Write data to the connection bypassing filter chain.

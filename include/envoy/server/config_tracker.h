@@ -32,7 +32,7 @@ public:
    */
   class EntryOwner {
   public:
-    virtual ~EntryOwner() {}
+    virtual ~EntryOwner() = default;
 
   protected:
     EntryOwner(){}; // A sly way to make this class "abstract."

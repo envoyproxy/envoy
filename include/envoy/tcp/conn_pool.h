@@ -32,7 +32,7 @@ enum class CancelPolicy {
  */
 class Cancellable {
 public:
-  virtual ~Cancellable() {}
+  virtual ~Cancellable() = default;
 
   /**
    * Cancel the pending connection request.
@@ -63,7 +63,7 @@ enum class PoolFailureReason {
  */
 class UpstreamCallbacks : public Network::ConnectionCallbacks {
 public:
-  virtual ~UpstreamCallbacks() {}
+  virtual ~UpstreamCallbacks() = default;
 
   /*
    * Invoked when data is delivered from the upstream connection while the connection is owned by a
@@ -85,7 +85,7 @@ public:
  */
 class ConnectionState {
 public:
-  virtual ~ConnectionState() {}
+  virtual ~ConnectionState() = default;
 };
 
 typedef std::unique_ptr<ConnectionState> ConnectionStatePtr;
@@ -96,7 +96,7 @@ typedef std::unique_ptr<ConnectionState> ConnectionStatePtr;
  */
 class ConnectionData {
 public:
-  virtual ~ConnectionData() {}
+  virtual ~ConnectionData() = default;
 
   /**
    * @return the ClientConnection for the connection.
@@ -138,7 +138,7 @@ typedef std::unique_ptr<ConnectionData> ConnectionDataPtr;
  */
 class Callbacks {
 public:
-  virtual ~Callbacks() {}
+  virtual ~Callbacks() = default;
 
   /**
    * Called when a pool error occurred and no connection could be acquired for making the request.
@@ -168,7 +168,7 @@ public:
  */
 class Instance : public Event::DeferredDeletable {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   /**
    * Called when a connection pool has been drained of pending requests, busy connections, and

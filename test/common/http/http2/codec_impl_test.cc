@@ -54,7 +54,7 @@ public:
 
   Http2CodecImplTestFixture(Http2SettingsTuple client_settings, Http2SettingsTuple server_settings)
       : client_settings_(client_settings), server_settings_(server_settings) {}
-  virtual ~Http2CodecImplTestFixture() {}
+  virtual ~Http2CodecImplTestFixture() = default;
 
   virtual void initialize() {
     Http2SettingsFromTuple(client_http2settings_, client_settings_);

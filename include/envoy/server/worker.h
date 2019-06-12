@@ -13,7 +13,7 @@ namespace Server {
  */
 class Worker {
 public:
-  virtual ~Worker() {}
+  virtual ~Worker() = default;
 
   /**
    * Completion called when a listener has been added on a worker and is listening for new
@@ -88,7 +88,7 @@ typedef std::unique_ptr<Worker> WorkerPtr;
  */
 class WorkerFactory {
 public:
-  virtual ~WorkerFactory() {}
+  virtual ~WorkerFactory() = default;
 
   /**
    * @return WorkerPtr a new worker.

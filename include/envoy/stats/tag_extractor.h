@@ -18,7 +18,7 @@ namespace Stats {
  */
 class TagExtractor {
 public:
-  virtual ~TagExtractor() {}
+  virtual ~TagExtractor() = default;
 
   /**
    * Identifier for the tag extracted by this object.

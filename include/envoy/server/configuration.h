@@ -22,7 +22,7 @@ namespace Configuration {
  */
 class Main {
 public:
-  virtual ~Main() {}
+  virtual ~Main() = default;
 
   /**
    * @return Upstream::ClusterManager* singleton for use by the entire server.
@@ -76,7 +76,7 @@ public:
  */
 class Admin {
 public:
-  virtual ~Admin() {}
+  virtual ~Admin() = default;
 
   /**
    * @return const std::string& the admin access log path.
@@ -99,7 +99,7 @@ public:
  */
 class Initial {
 public:
-  virtual ~Initial() {}
+  virtual ~Initial() = default;
 
   /**
    * @return Admin& the admin config.

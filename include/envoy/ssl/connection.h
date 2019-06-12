@@ -16,7 +16,7 @@ namespace Ssl {
  */
 class ConnectionInfo {
 public:
-  virtual ~ConnectionInfo() {}
+  virtual ~ConnectionInfo() = default;
 
   /**
    * @return bool whether the peer certificate is presented.

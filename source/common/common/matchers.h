@@ -19,7 +19,7 @@ typedef std::shared_ptr<const ValueMatcher> ValueMatcherConstSharedPtr;
 
 class ValueMatcher {
 public:
-  virtual ~ValueMatcher() {}
+  virtual ~ValueMatcher() = default;
 
   /**
    * Check whether the value is matched to the matcher.

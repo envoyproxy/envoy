@@ -14,7 +14,7 @@ namespace Api {
 
 class LinuxOsSysCalls {
 public:
-  virtual ~LinuxOsSysCalls() {}
+  virtual ~LinuxOsSysCalls() = default;
 
   /**
    * @see sched_getaffinity (man 2 sched_getaffinity)

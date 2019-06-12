@@ -10,7 +10,7 @@ namespace Singleton {
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 };
 
 typedef std::shared_ptr<Instance> InstanceSharedPtr;

@@ -31,7 +31,7 @@ namespace ThriftProxy {
  */
 class Config {
 public:
-  virtual ~Config() {}
+  virtual ~Config() = default;
 
   virtual ThriftFilters::FilterChainFactory& filterFactory() PURE;
   virtual ThriftFilterStats& stats() PURE;
@@ -45,7 +45,7 @@ public:
  */
 class ProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {
 public:
-  virtual ~ProtocolOptionsConfig() {}
+  virtual ~ProtocolOptionsConfig() = default;
 
   virtual TransportType transport(TransportType downstream_transport) const PURE;
   virtual ProtocolType protocol(ProtocolType downstream_protocol) const PURE;

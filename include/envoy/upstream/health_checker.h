@@ -32,7 +32,7 @@ enum class HealthTransition {
  */
 class HealthChecker {
 public:
-  virtual ~HealthChecker() {}
+  virtual ~HealthChecker() = default;
 
   /**
    * Called when a host has been health checked.
@@ -66,7 +66,7 @@ std::ostream& operator<<(std::ostream& out, HealthTransition changed_state);
  */
 class HealthCheckEventLogger {
 public:
-  virtual ~HealthCheckEventLogger() {}
+  virtual ~HealthCheckEventLogger() = default;
 
   /**
    * Log an unhealthy host ejection event.

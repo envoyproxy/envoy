@@ -42,7 +42,7 @@ enum class Result {
  */
 class DetectorHostMonitor {
 public:
-  virtual ~DetectorHostMonitor() {}
+  virtual ~DetectorHostMonitor() = default;
 
   /**
    * @return the number of times this host has been ejected.
@@ -93,7 +93,7 @@ typedef std::unique_ptr<DetectorHostMonitor> DetectorHostMonitorPtr;
  */
 class Detector {
 public:
-  virtual ~Detector() {}
+  virtual ~Detector() = default;
 
   /**
    * Outlier detection change state callback.
@@ -132,7 +132,7 @@ enum class EjectionType { Consecutive5xx, SuccessRate, ConsecutiveGatewayFailure
  */
 class EventLogger {
 public:
-  virtual ~EventLogger() {}
+  virtual ~EventLogger() = default;
 
   /**
    * Log an ejection event.

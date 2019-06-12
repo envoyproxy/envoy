@@ -24,7 +24,7 @@ typedef absl::optional<std::pair<int, int>> SocketOptionName;
  */
 class Socket {
 public:
-  virtual ~Socket() {}
+  virtual ~Socket() = default;
 
   /**
    * @return the local address of the socket.
@@ -65,7 +65,7 @@ public:
    */
   class Option {
   public:
-    virtual ~Option() {}
+    virtual ~Option() = default;
 
     /**
      * @param socket the socket on which to apply options.
@@ -155,7 +155,7 @@ typedef std::shared_ptr<Socket> SocketSharedPtr;
  */
 class ConnectionSocket : public virtual Socket {
 public:
-  virtual ~ConnectionSocket() {}
+  virtual ~ConnectionSocket() = default;
 
   /**
    * @return the remote address of the socket.

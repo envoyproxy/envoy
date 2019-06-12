@@ -20,14 +20,14 @@ struct ResourceUsage {
 
 class ResourceMonitor {
 public:
-  virtual ~ResourceMonitor() {}
+  virtual ~ResourceMonitor() = default;
 
   /**
    * Notifies caller of updated resource usage.
    */
   class Callbacks {
   public:
-    virtual ~Callbacks() {}
+    virtual ~Callbacks() = default;
 
     /**
      * Called when the request for updated resource usage succeeds.

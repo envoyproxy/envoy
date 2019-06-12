@@ -19,7 +19,7 @@ enum class FilterStatus {
 
 class DecoderEventHandler {
 public:
-  virtual ~DecoderEventHandler() {}
+  virtual ~DecoderEventHandler() = default;
 
   /**
    * Indicates the start of a Thrift transport frame was detected. Unframed transports generate

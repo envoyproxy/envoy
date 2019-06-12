@@ -16,7 +16,7 @@ namespace Network {
  */
 class ActiveDnsQuery {
 public:
-  virtual ~ActiveDnsQuery() {}
+  virtual ~ActiveDnsQuery() = default;
 
   /**
    * Cancel an outstanding DNS request.
@@ -31,7 +31,7 @@ enum class DnsLookupFamily { V4Only, V6Only, Auto };
  */
 class DnsResolver {
 public:
-  virtual ~DnsResolver() {}
+  virtual ~DnsResolver() = default;
 
   /**
    * Called when a resolution attempt is complete.

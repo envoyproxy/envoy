@@ -19,7 +19,7 @@ namespace Server {
 
 class AdminStream {
 public:
-  virtual ~AdminStream() {}
+  virtual ~AdminStream() = default;
 
   /**
    * @param end_stream set to false for streaming response. Default is true, which will
@@ -68,7 +68,7 @@ public:
  */
 class Admin {
 public:
-  virtual ~Admin() {}
+  virtual ~Admin() = default;
 
   /**
    * Callback for admin URL handlers.

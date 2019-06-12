@@ -30,7 +30,7 @@ enum class LoadBalancerType {
  */
 class LoadBalancerSubsetInfo {
 public:
-  virtual ~LoadBalancerSubsetInfo() {}
+  virtual ~LoadBalancerSubsetInfo() = default;
 
   /**
    * @return bool true if load balancer subsets are configured.

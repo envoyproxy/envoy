@@ -16,7 +16,7 @@ typedef std::unique_ptr<const Matcher> MatcherConstPtr;
  */
 class Matcher {
 public:
-  virtual ~Matcher() {}
+  virtual ~Matcher() = default;
 
   /**
    * Returns if a HTTP request matches with the rules of the matcher.

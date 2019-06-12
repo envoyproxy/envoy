@@ -15,7 +15,7 @@ namespace ThreadLocal {
  */
 class ThreadLocalObject {
 public:
-  virtual ~ThreadLocalObject() {}
+  virtual ~ThreadLocalObject() = default;
 };
 
 typedef std::shared_ptr<ThreadLocalObject> ThreadLocalObjectSharedPtr;
@@ -26,7 +26,7 @@ typedef std::shared_ptr<ThreadLocalObject> ThreadLocalObjectSharedPtr;
  */
 class Slot {
 public:
-  virtual ~Slot() {}
+  virtual ~Slot() = default;
 
   /**
    * @return ThreadLocalObjectSharedPtr a thread local object stored in the slot.
@@ -73,7 +73,7 @@ typedef std::unique_ptr<Slot> SlotPtr;
  */
 class SlotAllocator {
 public:
-  virtual ~SlotAllocator() {}
+  virtual ~SlotAllocator() = default;
 
   /**
    * @return SlotPtr a dedicated slot for use in further calls to get(), set(), etc.

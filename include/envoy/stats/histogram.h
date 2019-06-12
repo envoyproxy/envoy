@@ -15,7 +15,7 @@ namespace Stats {
  */
 class HistogramStatistics {
 public:
-  virtual ~HistogramStatistics() {}
+  virtual ~HistogramStatistics() = default;
 
   /**
    * Returns quantile summary representation of the histogram.
@@ -73,7 +73,7 @@ public:
  */
 class Histogram : public virtual Metric {
 public:
-  virtual ~Histogram() {}
+  virtual ~Histogram() = default;
 
   /**
    * Records an unsigned value. If a timer, values are in units of milliseconds.
@@ -88,7 +88,7 @@ typedef std::shared_ptr<Histogram> HistogramSharedPtr;
  */
 class ParentHistogram : public virtual Histogram {
 public:
-  virtual ~ParentHistogram() {}
+  virtual ~ParentHistogram() = default;
 
   /**
    * This method is called during the main stats flush process for each of the histograms and used

@@ -11,7 +11,7 @@ namespace Envoy {
  */
 class BackOffStrategy {
 public:
-  virtual ~BackOffStrategy() {}
+  virtual ~BackOffStrategy() = default;
 
   /**
    * @return the next backoff interval in milli seconds.

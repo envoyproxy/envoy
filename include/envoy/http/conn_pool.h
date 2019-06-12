@@ -17,7 +17,7 @@ namespace ConnectionPool {
  */
 class Cancellable {
 public:
-  virtual ~Cancellable() {}
+  virtual ~Cancellable() = default;
 
   /**
    * Cancel the pending request.
@@ -41,7 +41,7 @@ enum class PoolFailureReason {
  */
 class Callbacks {
 public:
-  virtual ~Callbacks() {}
+  virtual ~Callbacks() = default;
 
   /**
    * Called when a pool error occurred and no connection could be acquired for making the request.
@@ -68,7 +68,7 @@ public:
  */
 class Instance : public Event::DeferredDeletable {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   /**
    * @return Http::Protocol Reports the protocol in use by this connection pool.

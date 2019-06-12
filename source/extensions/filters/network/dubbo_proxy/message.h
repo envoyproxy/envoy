@@ -55,7 +55,7 @@ enum class RpcResponseType : uint8_t {
 
 class Message {
 public:
-  virtual ~Message() {}
+  virtual ~Message() = default;
   virtual MessageType messageType() const PURE;
   virtual int32_t bodySize() const PURE;
   virtual bool isEvent() const PURE;
@@ -65,7 +65,7 @@ public:
 
 class RequestMessage : public virtual Message {
 public:
-  virtual ~RequestMessage() {}
+  virtual ~RequestMessage() = default;
   virtual SerializationType serializationType() const PURE;
   virtual bool isTwoWay() const PURE;
 };
@@ -74,7 +74,7 @@ typedef std::unique_ptr<RequestMessage> RequestMessagePtr;
 
 class ResponseMessage : public virtual Message {
 public:
-  virtual ~ResponseMessage() {}
+  virtual ~ResponseMessage() = default;
   virtual ResponseStatus responseStatus() const PURE;
 };
 

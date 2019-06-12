@@ -214,7 +214,7 @@ private:
  */
 class HeaderEntry {
 public:
-  virtual ~HeaderEntry() {}
+  virtual ~HeaderEntry() = default;
 
   /**
    * @return the header key.
@@ -359,7 +359,7 @@ private:
  */
 class HeaderMap {
 public:
-  virtual ~HeaderMap() {}
+  virtual ~HeaderMap() = default;
 
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER)
 

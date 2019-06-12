@@ -13,7 +13,7 @@ namespace Config {
  */
 template <class ResponseProto> class GrpcStreamCallbacks {
 public:
-  virtual ~GrpcStreamCallbacks() {}
+  virtual ~GrpcStreamCallbacks() = default;
 
   /**
    * For the GrpcStream to prompt the context to take appropriate action in response to the

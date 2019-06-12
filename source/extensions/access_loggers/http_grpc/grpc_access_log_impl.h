@@ -28,7 +28,7 @@ namespace HttpGrpc {
  */
 class GrpcAccessLogStreamer {
 public:
-  virtual ~GrpcAccessLogStreamer() {}
+  virtual ~GrpcAccessLogStreamer() = default;
 
   /**
    * Send an access log.

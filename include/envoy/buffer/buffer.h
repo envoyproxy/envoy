@@ -49,7 +49,7 @@ public:
   virtual void done() PURE;
 
 protected:
-  virtual ~BufferFragment() {}
+  virtual ~BufferFragment() = default;
 };
 
 /**
@@ -57,7 +57,7 @@ protected:
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   /**
    * Copy data into the buffer (deprecated, use absl::string_view variant
@@ -364,7 +364,7 @@ typedef std::unique_ptr<Instance> InstancePtr;
  */
 class WatermarkFactory {
 public:
-  virtual ~WatermarkFactory() {}
+  virtual ~WatermarkFactory() = default;
 
   /**
    * Creates and returns a unique pointer to a new buffer.

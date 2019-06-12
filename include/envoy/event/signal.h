@@ -16,7 +16,7 @@ typedef std::function<void()> SignalCb;
  */
 class SignalEvent {
 public:
-  virtual ~SignalEvent() {}
+  virtual ~SignalEvent() = default;
 };
 
 typedef std::unique_ptr<SignalEvent> SignalEventPtr;

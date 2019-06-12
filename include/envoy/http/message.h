@@ -14,7 +14,7 @@ namespace Http {
  */
 class Message {
 public:
-  virtual ~Message() {}
+  virtual ~Message() = default;
 
   /**
    * @return HeaderMap& the message headers.

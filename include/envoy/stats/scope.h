@@ -28,7 +28,7 @@ typedef std::shared_ptr<Scope> ScopeSharedPtr;
  */
 class Scope {
 public:
-  virtual ~Scope() {}
+  virtual ~Scope() = default;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes

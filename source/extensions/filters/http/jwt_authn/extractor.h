@@ -24,7 +24,7 @@ namespace JwtAuthn {
  */
 class JwtLocation {
 public:
-  virtual ~JwtLocation() {}
+  virtual ~JwtLocation() = default;
 
   // Get the token string
   virtual const std::string& token() const PURE;
@@ -63,7 +63,7 @@ typedef std::unique_ptr<const Extractor> ExtractorConstPtr;
  */
 class Extractor {
 public:
-  virtual ~Extractor() {}
+  virtual ~Extractor() = default;
 
   /**
    * Extract all JWT tokens from the headers. If set of header_keys or param_keys

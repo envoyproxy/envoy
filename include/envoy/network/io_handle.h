@@ -18,7 +18,7 @@ class Instance;
  */
 class IoHandle {
 public:
-  virtual ~IoHandle() {}
+  virtual ~IoHandle() = default;
 
   /**
    * Return data associated with IoHandle.

@@ -34,7 +34,7 @@ typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
  */
 class Protocol {
 public:
-  virtual ~Protocol() {}
+  virtual ~Protocol() = default;
 
   /**
    * @return const std::string& the human-readable name of the protocol
@@ -469,7 +469,7 @@ typedef std::unique_ptr<Protocol> ProtocolPtr;
  */
 class DirectResponse {
 public:
-  virtual ~DirectResponse() {}
+  virtual ~DirectResponse() = default;
 
   enum class ResponseType {
     // DirectResponse encodes MessageType::Reply with success payload
@@ -500,7 +500,7 @@ public:
  */
 class NamedProtocolConfigFactory {
 public:
-  virtual ~NamedProtocolConfigFactory() {}
+  virtual ~NamedProtocolConfigFactory() = default;
 
   /**
    * Create a particular Thrift protocol

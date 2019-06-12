@@ -173,7 +173,7 @@ typedef std::unique_ptr<DecoderStateMachine> DecoderStateMachinePtr;
 
 class DecoderCallbacks {
 public:
-  virtual ~DecoderCallbacks() {}
+  virtual ~DecoderCallbacks() = default;
 
   /**
    * @return DecoderEventHandler& a new DecoderEventHandler for a message.

@@ -43,7 +43,7 @@ class ClusterInfo;
  */
 class HostDescription {
 public:
-  virtual ~HostDescription() {}
+  virtual ~HostDescription() = default;
 
   /**
    * @return whether the host is a canary.

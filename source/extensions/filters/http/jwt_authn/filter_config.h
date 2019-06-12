@@ -61,7 +61,7 @@ struct JwtAuthnFilterStats {
  */
 class FilterConfig : public Logger::Loggable<Logger::Id::config>, public AuthFactory {
 public:
-  virtual ~FilterConfig() {}
+  virtual ~FilterConfig() = default;
 
   FilterConfig(
       const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& proto_config,

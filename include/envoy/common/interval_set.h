@@ -15,7 +15,7 @@ namespace Envoy {
  */
 template <typename Value> class IntervalSet {
 public:
-  virtual ~IntervalSet() {}
+  virtual ~IntervalSet() = default;
 
   typedef std::pair<Value, Value> Interval;
 

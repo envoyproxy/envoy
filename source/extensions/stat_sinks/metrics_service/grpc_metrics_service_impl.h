@@ -25,7 +25,7 @@ namespace MetricsService {
 class GrpcMetricsStreamer
     : public Grpc::AsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse> {
 public:
-  virtual ~GrpcMetricsStreamer() {}
+  virtual ~GrpcMetricsStreamer() = default;
 
   /**
    * Send Metrics Message.

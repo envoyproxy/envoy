@@ -10,7 +10,7 @@ namespace Ssl {
 
 class TlsCertificateConfig {
 public:
-  virtual ~TlsCertificateConfig() {}
+  virtual ~TlsCertificateConfig() = default;
 
   /**
    * @return a string of certificate chain.

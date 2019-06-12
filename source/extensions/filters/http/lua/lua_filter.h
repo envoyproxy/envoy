@@ -31,7 +31,7 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
  */
 class FilterCallbacks {
 public:
-  virtual ~FilterCallbacks() {}
+  virtual ~FilterCallbacks() = default;
 
   /**
    * Add data to the connection manager buffer.

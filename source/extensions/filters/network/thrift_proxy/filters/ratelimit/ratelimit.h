@@ -64,7 +64,7 @@ class Filter : public ThriftProxy::ThriftFilters::DecoderFilter,
 public:
   Filter(ConfigSharedPtr config, Filters::Common::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
-  virtual ~Filter() {}
+  virtual ~Filter() = default;
 
   // ThriftFilters::ThriftDecoderFilter
   virtual void onDestroy() override;

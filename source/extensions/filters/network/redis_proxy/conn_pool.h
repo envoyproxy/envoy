@@ -21,7 +21,7 @@ namespace ConnPool {
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   /**
    * Makes a redis request.

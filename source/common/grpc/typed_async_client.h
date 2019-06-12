@@ -54,7 +54,7 @@ private:
  */
 template <typename Response> class AsyncRequestCallbacks : public RawAsyncRequestCallbacks {
 public:
-  virtual ~AsyncRequestCallbacks() {}
+  virtual ~AsyncRequestCallbacks() = default;
   virtual void onSuccess(std::unique_ptr<Response>&& response, Tracing::Span& span) PURE;
 
 private:
@@ -75,7 +75,7 @@ private:
  */
 template <typename Response> class AsyncStreamCallbacks : public RawAsyncStreamCallbacks {
 public:
-  virtual ~AsyncStreamCallbacks() {}
+  virtual ~AsyncStreamCallbacks() = default;
   virtual void onReceiveMessage(std::unique_ptr<Response>&& message) PURE;
 
 private:

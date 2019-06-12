@@ -39,7 +39,7 @@ class FileSharedImpl : public File {
 public:
   FileSharedImpl(const std::string& path) : fd_(-1), path_(path) {}
 
-  virtual ~FileSharedImpl() {}
+  virtual ~FileSharedImpl() = default;
 
   // Filesystem::File
   Api::IoCallBoolResult open() override;

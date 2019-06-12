@@ -29,7 +29,7 @@ namespace chromium_url {
 template <typename T> class CanonOutputT {
 public:
   CanonOutputT() : buffer_(NULL), buffer_len_(0), cur_len_(0) {}
-  virtual ~CanonOutputT() {}
+  virtual ~CanonOutputT() = default;
 
   // Implemented to resize the buffer. This function should update the buffer
   // pointer to point to the new buffer, and any old data up to |cur_len_| in

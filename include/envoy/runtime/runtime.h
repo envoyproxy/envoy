@@ -23,7 +23,7 @@ namespace Runtime {
  */
 class RandomGenerator {
 public:
-  virtual ~RandomGenerator() {}
+  virtual ~RandomGenerator() = default;
 
   /**
    * @return uint64_t a new random number.
@@ -44,7 +44,7 @@ typedef std::unique_ptr<RandomGenerator> RandomGeneratorPtr;
  */
 class Snapshot {
 public:
-  virtual ~Snapshot() {}
+  virtual ~Snapshot() = default;
 
   struct Entry {
     std::string raw_string_value_;
@@ -61,7 +61,7 @@ public:
    */
   class OverrideLayer {
   public:
-    virtual ~OverrideLayer() {}
+    virtual ~OverrideLayer() = default;
 
     /**
      * @return const absl::flat_hash_map<std::string, Entry>& the values in this layer.
@@ -204,7 +204,7 @@ public:
  */
 class Loader {
 public:
-  virtual ~Loader() {}
+  virtual ~Loader() = default;
 
   /**
    * @return Snapshot& the current snapshot. This reference is safe to use for the duration of

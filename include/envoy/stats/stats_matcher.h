@@ -11,7 +11,7 @@ namespace Stats {
 
 class StatsMatcher {
 public:
-  virtual ~StatsMatcher() {}
+  virtual ~StatsMatcher() = default;
 
   /**
    * Take a metric name and report whether or not it should be instantiated.

@@ -46,7 +46,7 @@ struct IoResult {
  */
 class TransportSocketCallbacks {
 public:
-  virtual ~TransportSocketCallbacks() {}
+  virtual ~TransportSocketCallbacks() = default;
 
   /**
    * @return reference to the IoHandle associated with the connection.
@@ -89,7 +89,7 @@ public:
  */
 class TransportSocket {
 public:
-  virtual ~TransportSocket() {}
+  virtual ~TransportSocket() = default;
 
   /**
    * Called by connection once to initialize the transport socket callbacks that the transport
@@ -154,7 +154,7 @@ typedef std::unique_ptr<TransportSocket> TransportSocketPtr;
  */
 class TransportSocketOptions {
 public:
-  virtual ~TransportSocketOptions() {}
+  virtual ~TransportSocketOptions() = default;
 
   /**
    * @return the const optional server name to set in the transport socket, for example SNI for
@@ -180,7 +180,7 @@ typedef std::shared_ptr<TransportSocketOptions> TransportSocketOptionsSharedPtr;
  */
 class TransportSocketFactory {
 public:
-  virtual ~TransportSocketFactory() {}
+  virtual ~TransportSocketFactory() = default;
 
   /**
    * @return bool whether the transport socket implements secure transport.

@@ -15,14 +15,14 @@ typedef std::unique_ptr<const Verifier> VerifierConstPtr;
  */
 class Verifier {
 public:
-  virtual ~Verifier() {}
+  virtual ~Verifier() = default;
 
   /**
    * Handle for notifying Verifier callers of request completion.
    */
   class Callbacks {
   public:
-    virtual ~Callbacks() {}
+    virtual ~Callbacks() = default;
 
     /**
      * Successfully verified JWT payload are stored in the struct with its
@@ -43,7 +43,7 @@ public:
   // Context object to hold data needed for verifier.
   class Context {
   public:
-    virtual ~Context() {}
+    virtual ~Context() = default;
 
     /**
      * Returns the request headers wrapped in this context.

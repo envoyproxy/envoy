@@ -36,7 +36,7 @@ enum class LimitStatus {
  */
 class RequestCallbacks {
 public:
-  virtual ~RequestCallbacks() {}
+  virtual ~RequestCallbacks() = default;
 
   /**
    * Called when a limit request is complete. The resulting status and
@@ -50,7 +50,7 @@ public:
  */
 class Client {
 public:
-  virtual ~Client() {}
+  virtual ~Client() = default;
 
   /**
    * Cancel an inflight limit request.

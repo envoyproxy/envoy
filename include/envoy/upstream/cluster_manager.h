@@ -38,7 +38,7 @@ namespace Upstream {
  */
 class ClusterUpdateCallbacks {
 public:
-  virtual ~ClusterUpdateCallbacks() {}
+  virtual ~ClusterUpdateCallbacks() = default;
 
   /**
    * onClusterAddOrUpdate is called when a new cluster is added or an existing cluster
@@ -61,7 +61,7 @@ public:
  */
 class ClusterUpdateCallbacksHandle {
 public:
-  virtual ~ClusterUpdateCallbacksHandle() {}
+  virtual ~ClusterUpdateCallbacksHandle() = default;
 };
 
 typedef std::unique_ptr<ClusterUpdateCallbacksHandle> ClusterUpdateCallbacksHandlePtr;
@@ -74,7 +74,7 @@ class ClusterManagerFactory;
  */
 class ClusterManager {
 public:
-  virtual ~ClusterManager() {}
+  virtual ~ClusterManager() = default;
 
   /**
    * Warming state a cluster is currently in. Used as an argument for the ClusterWarmingCallback.
@@ -254,7 +254,7 @@ typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;
  */
 class CdsApi {
 public:
-  virtual ~CdsApi() {}
+  virtual ~CdsApi() = default;
 
   /**
    * Start the first fetch of CDS data.
@@ -280,7 +280,7 @@ typedef std::unique_ptr<CdsApi> CdsApiPtr;
  */
 class ClusterManagerFactory {
 public:
-  virtual ~ClusterManagerFactory() {}
+  virtual ~ClusterManagerFactory() = default;
 
   /**
    * Allocate a cluster manager from configuration proto.
@@ -331,7 +331,7 @@ public:
  */
 class ClusterInfoFactory {
 public:
-  virtual ~ClusterInfoFactory() {}
+  virtual ~ClusterInfoFactory() = default;
 
   /**
    * Parameters for createClusterInfo().

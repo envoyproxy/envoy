@@ -15,7 +15,7 @@ namespace Upstream {
  */
 class RetryPriority {
 public:
-  virtual ~RetryPriority() {}
+  virtual ~RetryPriority() = default;
 
   /**
    * Determines what PriorityLoad to use.
@@ -51,7 +51,7 @@ typedef std::shared_ptr<RetryPriority> RetryPrioritySharedPtr;
  */
 class RetryHostPredicate {
 public:
-  virtual ~RetryHostPredicate() {}
+  virtual ~RetryHostPredicate() = default;
 
   /**
    * Determines whether a host should be rejected during host selection.
@@ -77,7 +77,7 @@ typedef std::shared_ptr<RetryHostPredicate> RetryHostPredicateSharedPtr;
  */
 class RetryPriorityFactory {
 public:
-  virtual ~RetryPriorityFactory() {}
+  virtual ~RetryPriorityFactory() = default;
 
   virtual RetryPrioritySharedPtr createRetryPriority(const Protobuf::Message& config,
                                                      uint32_t retry_count) PURE;
@@ -92,7 +92,7 @@ public:
  */
 class RetryHostPredicateFactory {
 public:
-  virtual ~RetryHostPredicateFactory() {}
+  virtual ~RetryHostPredicateFactory() = default;
 
   virtual RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message& config,
                                                           uint32_t retry_count) PURE;

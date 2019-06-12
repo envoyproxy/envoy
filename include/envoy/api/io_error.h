@@ -28,7 +28,7 @@ public:
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };
-  virtual ~IoError() {}
+  virtual ~IoError() = default;
 
   virtual IoErrorCode getErrorCode() const PURE;
   virtual std::string getErrorDetails() const PURE;
@@ -50,7 +50,7 @@ template <typename ReturnValue> struct IoCallResult {
   IoCallResult(IoCallResult<ReturnValue>&& result)
       : rc_(result.rc_), err_(std::move(result.err_)) {}
 
-  virtual ~IoCallResult() {}
+  virtual ~IoCallResult() = default;
 
   IoCallResult& operator=(IoCallResult&& result) {
     rc_ = result.rc_;

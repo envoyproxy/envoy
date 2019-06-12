@@ -36,7 +36,7 @@ namespace Router {
  */
 class Matchable {
 public:
-  virtual ~Matchable() {}
+  virtual ~Matchable() = default;
 
   /**
    * See if this object matches the incoming headers.
@@ -294,7 +294,7 @@ public:
 
   class HashMethod {
   public:
-    virtual ~HashMethod() {}
+    virtual ~HashMethod() = default;
     virtual absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
                                               const Http::HeaderMap& headers,
                                               const AddCookieCallback add_cookie) const PURE;

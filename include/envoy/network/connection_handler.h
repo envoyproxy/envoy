@@ -17,7 +17,7 @@ namespace Network {
  */
 class ConnectionHandler {
 public:
-  virtual ~ConnectionHandler() {}
+  virtual ~ConnectionHandler() = default;
 
   /**
    * @return uint64_t the number of active connections owned by the handler.

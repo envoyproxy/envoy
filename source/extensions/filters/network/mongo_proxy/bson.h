@@ -63,7 +63,7 @@ public:
     std::string options_;
   };
 
-  virtual ~Field() {}
+  virtual ~Field() = default;
 
   virtual double asDouble() const PURE;
   virtual const std::string& asString() const PURE;
@@ -94,7 +94,7 @@ typedef std::unique_ptr<Field> FieldPtr;
  */
 class Document {
 public:
-  virtual ~Document() {}
+  virtual ~Document() = default;
 
   virtual DocumentSharedPtr addDouble(const std::string& key, double value) PURE;
   virtual DocumentSharedPtr addString(const std::string& key, std::string&& value) PURE;

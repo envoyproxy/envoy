@@ -21,7 +21,7 @@ namespace Api {
 
 class OsSysCalls {
 public:
-  virtual ~OsSysCalls() {}
+  virtual ~OsSysCalls() = default;
 
   /**
    * @see bind (man 2 bind)

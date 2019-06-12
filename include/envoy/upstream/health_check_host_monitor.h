@@ -15,7 +15,7 @@ namespace Upstream {
  */
 class HealthCheckHostMonitor {
 public:
-  virtual ~HealthCheckHostMonitor() {}
+  virtual ~HealthCheckHostMonitor() = default;
 
   /**
    * Mark the host as unhealthy. Note that this may not be immediate as events may need to be

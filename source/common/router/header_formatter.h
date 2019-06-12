@@ -16,7 +16,7 @@ namespace Router {
  */
 class HeaderFormatter {
 public:
-  virtual ~HeaderFormatter() {}
+  virtual ~HeaderFormatter() = default;
 
   virtual const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const PURE;
 

@@ -16,7 +16,7 @@ namespace Tls {
  */
 class SslSocketConfigFactory : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
-  virtual ~SslSocketConfigFactory() {}
+  virtual ~SslSocketConfigFactory() = default;
   std::string name() const override { return TransportSocketNames::get().Tls; }
 };
 

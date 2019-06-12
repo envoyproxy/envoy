@@ -31,7 +31,7 @@ enum class ResponseStatus {
  */
 class DecoderFilterCallbacks {
 public:
-  virtual ~DecoderFilterCallbacks() {}
+  virtual ~DecoderFilterCallbacks() = default;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
@@ -105,7 +105,7 @@ public:
  */
 class DecoderFilter : public virtual DecoderEventHandler {
 public:
-  virtual ~DecoderFilter() {}
+  virtual ~DecoderFilter() = default;
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
@@ -133,7 +133,7 @@ typedef std::shared_ptr<DecoderFilter> DecoderFilterSharedPtr;
  */
 class FilterChainFactoryCallbacks {
 public:
-  virtual ~FilterChainFactoryCallbacks() {}
+  virtual ~FilterChainFactoryCallbacks() = default;
 
   /**
    * Add a decoder filter that is used when reading connection data.
@@ -160,7 +160,7 @@ typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> FilterFactor
  */
 class FilterChainFactory {
 public:
-  virtual ~FilterChainFactory() {}
+  virtual ~FilterChainFactory() = default;
 
   /**
    * Called when a new Thrift stream is created on the connection.

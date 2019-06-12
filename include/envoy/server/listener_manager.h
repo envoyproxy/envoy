@@ -18,7 +18,7 @@ namespace Server {
  */
 class LdsApi {
 public:
-  virtual ~LdsApi() {}
+  virtual ~LdsApi() = default;
 
   /**
    * @return std::string the last received version by the xDS API for LDS.
@@ -33,7 +33,7 @@ typedef std::unique_ptr<LdsApi> LdsApiPtr;
  */
 class ListenerComponentFactory {
 public:
-  virtual ~ListenerComponentFactory() {}
+  virtual ~ListenerComponentFactory() = default;
 
   /**
    * @return an LDS API provider.
@@ -101,7 +101,7 @@ public:
  */
 class ListenerManager {
 public:
-  virtual ~ListenerManager() {}
+  virtual ~ListenerManager() = default;
 
   /**
    * Add or update a listener. Listeners are referenced by a unique name. If no name is provided,

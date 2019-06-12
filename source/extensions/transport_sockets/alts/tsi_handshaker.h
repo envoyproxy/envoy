@@ -20,7 +20,7 @@ namespace Alts {
  */
 class TsiHandshakerCallbacks {
 public:
-  virtual ~TsiHandshakerCallbacks() {}
+  virtual ~TsiHandshakerCallbacks() = default;
 
   struct NextResult {
     // A enum of the result.

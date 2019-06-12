@@ -35,7 +35,7 @@ enum class FilterStatus {
  */
 class NetworkFilterCallbacks {
 public:
-  virtual ~NetworkFilterCallbacks() {}
+  virtual ~NetworkFilterCallbacks() = default;
 
   /**
    * @return the connection that owns this filter.
@@ -48,7 +48,7 @@ public:
  */
 class WriteFilterCallbacks : public virtual NetworkFilterCallbacks {
 public:
-  virtual ~WriteFilterCallbacks() {}
+  virtual ~WriteFilterCallbacks() = default;
 
   /**
    * Pass data directly to subsequent filters in the filter chain. This method is used in
@@ -75,7 +75,7 @@ public:
  */
 class WriteFilter {
 public:
-  virtual ~WriteFilter() {}
+  virtual ~WriteFilter() = default;
 
   /**
    * Called when data is to be written on the connection.
@@ -106,7 +106,7 @@ typedef std::shared_ptr<WriteFilter> WriteFilterSharedPtr;
  */
 class ReadFilterCallbacks : public virtual NetworkFilterCallbacks {
 public:
-  virtual ~ReadFilterCallbacks() {}
+  virtual ~ReadFilterCallbacks() = default;
 
   /**
    * If a read filter stopped filter iteration, continueReading() can be called to continue the
@@ -158,7 +158,7 @@ public:
  */
 class ReadFilter {
 public:
-  virtual ~ReadFilter() {}
+  virtual ~ReadFilter() = default;
 
   /**
    * Called when data is read on the connection.
@@ -205,7 +205,7 @@ typedef std::shared_ptr<Filter> FilterSharedPtr;
  */
 class FilterManager {
 public:
-  virtual ~FilterManager() {}
+  virtual ~FilterManager() = default;
 
   /**
    * Add a write filter to the connection. Filters are invoked in LIFO order (the last added
@@ -249,7 +249,7 @@ typedef std::function<void(FilterManager& filter_manager)> FilterFactoryCb;
  */
 class ListenerFilterCallbacks {
 public:
-  virtual ~ListenerFilterCallbacks() {}
+  virtual ~ListenerFilterCallbacks() = default;
 
   /**
    * @return ConnectionSocket the socket the filter is operating on.
@@ -276,7 +276,7 @@ public:
  */
 class ListenerFilter {
 public:
-  virtual ~ListenerFilter() {}
+  virtual ~ListenerFilter() = default;
 
   /**
    * Called when a new connection is accepted, but before a Connection is created.
@@ -294,7 +294,7 @@ typedef std::unique_ptr<ListenerFilter> ListenerFilterPtr;
  */
 class ListenerFilterManager {
 public:
-  virtual ~ListenerFilterManager() {}
+  virtual ~ListenerFilterManager() = default;
 
   /**
    * Add a filter to the listener. Filters are invoked in FIFO order (the filter added
@@ -319,7 +319,7 @@ typedef std::function<void(ListenerFilterManager& filter_manager)> ListenerFilte
  */
 class FilterChain {
 public:
-  virtual ~FilterChain() {}
+  virtual ~FilterChain() = default;
 
   /**
    * @return const TransportSocketFactory& a transport socket factory to be used by the new
@@ -340,7 +340,7 @@ typedef std::shared_ptr<FilterChain> FilterChainSharedPtr;
  */
 class FilterChainManager {
 public:
-  virtual ~FilterChainManager() {}
+  virtual ~FilterChainManager() = default;
 
   /**
    * Find filter chain that's matching metadata from the new connection.
@@ -357,7 +357,7 @@ public:
  */
 class UdpReadFilterCallbacks {
 public:
-  virtual ~UdpReadFilterCallbacks() {}
+  virtual ~UdpReadFilterCallbacks() = default;
 
   /**
    * @return the udp listener that owns this read filter.
@@ -370,7 +370,7 @@ public:
  */
 class UdpListenerReadFilter {
 public:
-  virtual ~UdpListenerReadFilter() {}
+  virtual ~UdpListenerReadFilter() = default;
 
   /**
    * Called when a new data packet is received on a UDP listener.
@@ -394,7 +394,7 @@ typedef std::unique_ptr<UdpListenerReadFilter> UdpListenerReadFilterPtr;
  */
 class UdpListenerFilterManager {
 public:
-  virtual ~UdpListenerFilterManager() {}
+  virtual ~UdpListenerFilterManager() = default;
 
   /**
    * Add a read filter to the udp listener. Filters are invoked in FIFO order (the
@@ -413,7 +413,7 @@ typedef std::function<void(UdpListenerFilterManager& udp_listener_filter_manager
  */
 class FilterChainFactory {
 public:
-  virtual ~FilterChainFactory() {}
+  virtual ~FilterChainFactory() = default;
 
   /**
    * Called to create the network filter chain.

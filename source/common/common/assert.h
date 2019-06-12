@@ -9,7 +9,7 @@ namespace Assert {
 
 class ActionRegistration {
 public:
-  virtual ~ActionRegistration() {}
+  virtual ~ActionRegistration() = default;
 };
 typedef std::unique_ptr<ActionRegistration> ActionRegistrationPtr;
 

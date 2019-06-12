@@ -22,7 +22,7 @@ struct Tag;
  */
 class Metric {
 public:
-  virtual ~Metric() {}
+  virtual ~Metric() = default;
   /**
    * Returns the full name of the Metric. This is intended for most uses, such
    * as streaming out the name to a stats sink or admin request, or comparing
@@ -114,7 +114,7 @@ public:
  */
 class Counter : public virtual Metric {
 public:
-  virtual ~Counter() {}
+  virtual ~Counter() = default;
   virtual void add(uint64_t amount) PURE;
   virtual void inc() PURE;
   virtual uint64_t latch() PURE;
@@ -135,7 +135,7 @@ public:
     Accumulate,    // Transfers gauge state on hot-restart.
   };
 
-  virtual ~Gauge() {}
+  virtual ~Gauge() = default;
 
   virtual void add(uint64_t amount) PURE;
   virtual void dec() PURE;

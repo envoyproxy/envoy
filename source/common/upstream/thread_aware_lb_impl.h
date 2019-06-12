@@ -21,7 +21,7 @@ public:
    */
   class HashingLoadBalancer {
   public:
-    virtual ~HashingLoadBalancer() {}
+    virtual ~HashingLoadBalancer() = default;
     virtual HostConstSharedPtr chooseHost(uint64_t hash) const PURE;
   };
   typedef std::shared_ptr<HashingLoadBalancer> HashingLoadBalancerSharedPtr;

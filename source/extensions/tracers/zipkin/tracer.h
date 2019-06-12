@@ -25,7 +25,7 @@ public:
   /**
    * Destructor.
    */
-  virtual ~Reporter() {}
+  virtual ~Reporter() = default;
 
   /**
    * Method that a concrete Reporter class must implement to handle finished spans.

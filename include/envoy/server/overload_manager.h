@@ -81,7 +81,7 @@ typedef ConstSingleton<OverloadActionNameValues> OverloadActionNames;
  */
 class OverloadManager {
 public:
-  virtual ~OverloadManager() {}
+  virtual ~OverloadManager() = default;
 
   /**
    * Start a recurring timer to monitor resources and notify listeners when overload actions

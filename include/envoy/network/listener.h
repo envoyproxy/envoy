@@ -20,7 +20,7 @@ class UdpListenerFilterManager;
  */
 class ListenerConfig {
 public:
-  virtual ~ListenerConfig() {}
+  virtual ~ListenerConfig() = default;
 
   /**
    * @return FilterChainManager& the factory for adding and searching through configured
@@ -90,7 +90,7 @@ public:
  */
 class ListenerCallbacks {
 public:
-  virtual ~ListenerCallbacks() {}
+  virtual ~ListenerCallbacks() = default;
 
   /**
    * Called when a new connection is accepted.
@@ -179,7 +179,7 @@ public:
  */
 class Listener {
 public:
-  virtual ~Listener() {}
+  virtual ~Listener() = default;
 
   /**
    * Temporarily disable accepting new connections.
@@ -199,7 +199,7 @@ typedef std::unique_ptr<Listener> ListenerPtr;
  */
 class UdpListener : public virtual Listener {
 public:
-  virtual ~UdpListener() {}
+  virtual ~UdpListener() = default;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this listener.

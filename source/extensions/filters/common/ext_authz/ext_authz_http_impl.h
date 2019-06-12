@@ -22,7 +22,7 @@ typedef std::shared_ptr<Matcher> MatcherSharedPtr;
  */
 class Matcher {
 public:
-  virtual ~Matcher() {}
+  virtual ~Matcher() = default;
 
   /**
    * Returns whether or not the header key matches the rules of the matcher.

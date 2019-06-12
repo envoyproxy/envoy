@@ -23,7 +23,7 @@ public:
     std::string version_;
   };
 
-  virtual ~RouteConfigProvider() {}
+  virtual ~RouteConfigProvider() = default;
 
   /**
    * @return Router::ConfigConstSharedPtr a route configuration for use during a single request. The

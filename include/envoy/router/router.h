@@ -36,7 +36,7 @@ namespace Router {
  */
 class ResponseEntry {
 public:
-  virtual ~ResponseEntry() {}
+  virtual ~ResponseEntry() = default;
 
   /**
    * Do potentially destructive header transforms on response headers prior to forwarding. For
@@ -54,7 +54,7 @@ public:
  */
 class DirectResponseEntry : public ResponseEntry {
 public:
-  virtual ~DirectResponseEntry() {}
+  virtual ~DirectResponseEntry() = default;
 
   /**
    * Returns the HTTP status code to return.
@@ -98,7 +98,7 @@ public:
  */
 class CorsPolicy {
 public:
-  virtual ~CorsPolicy() {}
+  virtual ~CorsPolicy() = default;
 
   /**
    * @return std::list<std::string>& access-control-allow-origin values.
@@ -165,7 +165,7 @@ public:
   static const uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
   // clang-format on
 
-  virtual ~RetryPolicy() {}
+  virtual ~RetryPolicy() = default;
 
   /**
    * @return std::chrono::milliseconds timeout per retry attempt.
@@ -235,7 +235,7 @@ class RetryState {
 public:
   typedef std::function<void()> DoRetryCallback;
 
-  virtual ~RetryState() {}
+  virtual ~RetryState() = default;
 
   /**
    * @return true if a policy is in place for the active request that allows retries.
@@ -328,7 +328,7 @@ typedef std::unique_ptr<RetryState> RetryStatePtr;
  */
 class ShadowPolicy {
 public:
-  virtual ~ShadowPolicy() {}
+  virtual ~ShadowPolicy() = default;
 
   /**
    * @return the name of the cluster that a matching request should be shadowed to. Returns empty
@@ -357,7 +357,7 @@ public:
  */
 class VirtualCluster {
 public:
-  virtual ~VirtualCluster() {}
+  virtual ~VirtualCluster() = default;
 
   /**
    * @return the stat-name of the virtual cluster.
@@ -375,7 +375,7 @@ class Config;
  */
 class RouteSpecificFilterConfig {
 public:
-  virtual ~RouteSpecificFilterConfig() {}
+  virtual ~RouteSpecificFilterConfig() = default;
 };
 typedef std::shared_ptr<const RouteSpecificFilterConfig> RouteSpecificFilterConfigConstSharedPtr;
 
@@ -384,7 +384,7 @@ typedef std::shared_ptr<const RouteSpecificFilterConfig> RouteSpecificFilterConf
  */
 class VirtualHost {
 public:
-  virtual ~VirtualHost() {}
+  virtual ~VirtualHost() = default;
 
   /**
    * @return const CorsPolicy* the CORS policy for this virtual host.
@@ -433,7 +433,7 @@ public:
  */
 class HashPolicy {
 public:
-  virtual ~HashPolicy() {}
+  virtual ~HashPolicy() = default;
 
   /**
    * A callback used for requesting that a cookie be set with the given lifetime.
@@ -465,7 +465,7 @@ public:
  */
 class HedgePolicy {
 public:
-  virtual ~HedgePolicy() {}
+  virtual ~HedgePolicy() = default;
 
   /**
    * @return number of upstream requests that should be sent initially.
@@ -488,7 +488,7 @@ public:
 
 class MetadataMatchCriterion {
 public:
-  virtual ~MetadataMatchCriterion() {}
+  virtual ~MetadataMatchCriterion() = default;
 
   /*
    * @return const std::string& the name of the metadata key
@@ -508,7 +508,7 @@ typedef std::unique_ptr<const MetadataMatchCriteria> MetadataMatchCriteriaConstP
 
 class MetadataMatchCriteria {
 public:
-  virtual ~MetadataMatchCriteria() {}
+  virtual ~MetadataMatchCriteria() = default;
 
   /*
    * @return std::vector<MetadataMatchCriterionConstSharedPtr>& a vector of
@@ -545,7 +545,7 @@ enum class PathMatchType {
  */
 class PathMatchCriterion {
 public:
-  virtual ~PathMatchCriterion() {}
+  virtual ~PathMatchCriterion() = default;
 
   /**
    * @return PathMatchType type of path match.
@@ -568,7 +568,7 @@ class HttpRouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory
  */
 class RouteEntry : public ResponseEntry {
 public:
-  virtual ~RouteEntry() {}
+  virtual ~RouteEntry() = default;
 
   /**
    * @return const std::string& the upstream cluster that owns the route.
@@ -751,7 +751,7 @@ public:
  */
 class Decorator {
 public:
-  virtual ~Decorator() {}
+  virtual ~Decorator() = default;
 
   /**
    * This method decorates the supplied span.
@@ -773,7 +773,7 @@ typedef std::unique_ptr<const Decorator> DecoratorConstPtr;
  */
 class RouteTracing {
 public:
-  virtual ~RouteTracing() {}
+  virtual ~RouteTracing() = default;
 
   /**
    * This method returns the client sampling percentage.
@@ -801,7 +801,7 @@ typedef std::unique_ptr<const RouteTracing> RouteTracingConstPtr;
  */
 class Route {
 public:
-  virtual ~Route() {}
+  virtual ~Route() = default;
 
   /**
    * @return the direct response entry or nullptr if there is no direct response for the request.
@@ -846,7 +846,7 @@ typedef std::shared_ptr<const Route> RouteConstSharedPtr;
  */
 class Config {
 public:
-  virtual ~Config() {}
+  virtual ~Config() = default;
 
   /**
    * Based on the incoming HTTP request headers, determine the target route (containing either a

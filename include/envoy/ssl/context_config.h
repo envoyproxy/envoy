@@ -16,7 +16,7 @@ namespace Ssl {
  */
 class ContextConfig {
 public:
-  virtual ~ContextConfig() {}
+  virtual ~ContextConfig() = default;
 
   /**
    * The list of supported protocols exposed via ALPN. Client connections will send these

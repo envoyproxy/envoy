@@ -16,7 +16,7 @@ namespace Secret {
  */
 template <class SecretType> class SecretProvider {
 public:
-  virtual ~SecretProvider() {}
+  virtual ~SecretProvider() = default;
 
   /**
    * @return the secret. Returns nullptr if the secret is not ready.

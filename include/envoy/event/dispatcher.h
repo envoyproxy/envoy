@@ -50,7 +50,7 @@ typedef std::function<void()> PostCb;
  */
 class Dispatcher {
 public:
-  virtual ~Dispatcher() {}
+  virtual ~Dispatcher() = default;
 
   /**
    * Returns a time-source to use with this dispatcher.

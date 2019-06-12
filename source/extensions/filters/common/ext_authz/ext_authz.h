@@ -51,7 +51,7 @@ typedef std::unique_ptr<Response> ResponsePtr;
  */
 class RequestCallbacks {
 public:
-  virtual ~RequestCallbacks() {}
+  virtual ~RequestCallbacks() = default;
 
   /**
    * Called when a check request is complete. The resulting ResponsePtr is supplied.
@@ -62,7 +62,7 @@ public:
 class Client {
 public:
   // Destructor
-  virtual ~Client() {}
+  virtual ~Client() = default;
 
   /**
    * Cancel an inflight Check request.

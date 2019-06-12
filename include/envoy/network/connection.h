@@ -39,7 +39,7 @@ enum class ConnectionBufferType { Read, Write };
  */
 class ConnectionCallbacks {
 public:
-  virtual ~ConnectionCallbacks() {}
+  virtual ~ConnectionCallbacks() = default;
 
   /**
    * Callback for connection events.
@@ -93,7 +93,7 @@ public:
     Stats::Counter* delayed_close_timeouts_;
   };
 
-  virtual ~Connection() {}
+  virtual ~Connection() = default;
 
   /**
    * Register callbacks that fire when connection events occur.

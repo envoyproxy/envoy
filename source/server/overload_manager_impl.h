@@ -34,7 +34,7 @@ public:
 
   class Trigger {
   public:
-    virtual ~Trigger() {}
+    virtual ~Trigger() = default;
 
     // Updates the current value of the metric and returns whether the trigger has changed state.
     virtual bool updateValue(double value) PURE;

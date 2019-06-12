@@ -42,7 +42,7 @@ struct Decision {
  */
 class Config {
 public:
-  virtual ~Config() {}
+  virtual ~Config() = default;
 
   /**
    * @return operation name for tracing, e.g., ingress.
@@ -68,7 +68,7 @@ typedef std::unique_ptr<Span> SpanPtr;
  */
 class Span {
 public:
-  virtual ~Span() {}
+  virtual ~Span() = default;
 
   /**
    * Set the operation name.
@@ -126,7 +126,7 @@ public:
  */
 class Driver {
 public:
-  virtual ~Driver() {}
+  virtual ~Driver() = default;
 
   /**
    * Start driver specific span.
@@ -144,7 +144,7 @@ typedef std::unique_ptr<Driver> DriverPtr;
  */
 class HttpTracer {
 public:
-  virtual ~HttpTracer() {}
+  virtual ~HttpTracer() = default;
 
   virtual SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                             const StreamInfo::StreamInfo& stream_info,

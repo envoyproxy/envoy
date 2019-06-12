@@ -105,7 +105,7 @@ template <class T> class BaseLuaObject : protected Logger::Loggable<Logger::Id::
 public:
   typedef std::vector<std::pair<const char*, lua_CFunction>> ExportedFunctions;
 
-  virtual ~BaseLuaObject() {}
+  virtual ~BaseLuaObject() = default;
 
   /**
    * Create a new object of this type, owned by Lua. This type must have previously been registered

@@ -23,7 +23,7 @@ namespace MySQLProxy {
  */
 class DecoderCallbacks {
 public:
-  virtual ~DecoderCallbacks() {}
+  virtual ~DecoderCallbacks() = default;
 
   virtual void onProtocolError() PURE;
   virtual void onNewMessage(MySQLSession::State) PURE;
@@ -41,7 +41,7 @@ public:
  */
 class Decoder {
 public:
-  virtual ~Decoder() {}
+  virtual ~Decoder() = default;
 
   virtual void onData(Buffer::Instance& data) PURE;
   virtual MySQLSession& getSession() PURE;

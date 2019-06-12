@@ -25,7 +25,7 @@ typedef std::shared_ptr<const Matcher> MatcherConstSharedPtr;
  */
 class Matcher {
 public:
-  virtual ~Matcher() {}
+  virtual ~Matcher() = default;
 
   /**
    * Returns whether or not the permission/principal matches the rules of the matcher.

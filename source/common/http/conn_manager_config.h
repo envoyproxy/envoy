@@ -151,7 +151,7 @@ enum class ClientCertDetailsType { Cert, Chain, Subject, URI, DNS };
  */
 class InternalAddressConfig {
 public:
-  virtual ~InternalAddressConfig() {}
+  virtual ~InternalAddressConfig() = default;
   virtual bool isInternalAddress(const Network::Address::Instance& address) const PURE;
 };
 
@@ -170,7 +170,7 @@ public:
  */
 class ConnectionManagerConfig {
 public:
-  virtual ~ConnectionManagerConfig() {}
+  virtual ~ConnectionManagerConfig() = default;
 
   /**
    *  @return const std::list<AccessLog::InstanceSharedPtr>& the access logs to write to.

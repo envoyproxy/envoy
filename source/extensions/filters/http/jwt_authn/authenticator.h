@@ -31,7 +31,7 @@ typedef std::function<Common::JwksFetcherPtr(Upstream::ClusterManager&)> CreateJ
  */
 class Authenticator {
 public:
-  virtual ~Authenticator() {}
+  virtual ~Authenticator() = default;
 
   // Verify if headers satisfies the JWT requirements. Can be limited to single provider with
   // extract_param.
@@ -54,7 +54,7 @@ public:
  */
 class AuthFactory {
 public:
-  virtual ~AuthFactory() {}
+  virtual ~AuthFactory() = default;
 
   // Factory method for creating authenticator, and populate it with provider config.
   virtual AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,

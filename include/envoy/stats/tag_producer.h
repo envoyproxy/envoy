@@ -14,7 +14,7 @@ namespace Stats {
 
 class TagProducer {
 public:
-  virtual ~TagProducer() {}
+  virtual ~TagProducer() = default;
 
   /**
    * Take a metric name and a vector then add proper tags into the vector and

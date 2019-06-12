@@ -31,7 +31,7 @@ public:
  */
 class Object {
 public:
-  virtual ~Object() {}
+  virtual ~Object() = default;
 
   /**
    * Convert a generic object into an array of objects. This is useful for dealing

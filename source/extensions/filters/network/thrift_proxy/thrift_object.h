@@ -20,7 +20,7 @@ class ThriftBase;
  */
 class ThriftValue {
 public:
-  virtual ~ThriftValue() {}
+  virtual ~ThriftValue() = default;
 
   /**
    * @return FieldType the type of this value
@@ -108,7 +108,7 @@ typedef std::list<std::pair<ThriftValuePtr, ThriftValuePtr>> ThriftValuePtrPairL
  */
 class ThriftField {
 public:
-  virtual ~ThriftField() {}
+  virtual ~ThriftField() = default;
 
   /**
    * @return FieldType this field's type
@@ -134,7 +134,7 @@ typedef std::list<ThriftFieldPtr> ThriftFieldPtrList;
  */
 class ThriftListValue {
 public:
-  virtual ~ThriftListValue() {}
+  virtual ~ThriftListValue() = default;
 
   /**
    * @return const ThriftValuePtrList& containing the ThriftValues that comprise the list
@@ -157,7 +157,7 @@ public:
  */
 class ThriftSetValue {
 public:
-  virtual ~ThriftSetValue() {}
+  virtual ~ThriftSetValue() = default;
 
   /**
    * @return const ThriftValuePtrList& containing the ThriftValues that comprise the set
@@ -180,7 +180,7 @@ public:
  */
 class ThriftMapValue {
 public:
-  virtual ~ThriftMapValue() {}
+  virtual ~ThriftMapValue() = default;
 
   /**
    * @return const ThriftValuePtrPairList& containing the ThriftValue key-value pairs that comprise
@@ -209,7 +209,7 @@ public:
  */
 class ThriftStructValue {
 public:
-  virtual ~ThriftStructValue() {}
+  virtual ~ThriftStructValue() = default;
 
   /**
    * @return const ThriftFieldPtrList& containing the ThriftFields that comprise the struct.
@@ -227,7 +227,7 @@ public:
  */
 class ThriftObject : public ThriftStructValue {
 public:
-  virtual ~ThriftObject() {}
+  virtual ~ThriftObject() = default;
 
   /*
    * Consumes bytes from the buffer until a single complete Thrift struct has been consumed.

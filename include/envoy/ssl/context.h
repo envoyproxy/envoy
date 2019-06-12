@@ -16,7 +16,7 @@ typedef std::unique_ptr<envoy::admin::v2alpha::CertificateDetails> CertificateDe
  */
 class Context {
 public:
-  virtual ~Context() {}
+  virtual ~Context() = default;
 
   /**
    * @return the number of days in this context until the next certificate will expire

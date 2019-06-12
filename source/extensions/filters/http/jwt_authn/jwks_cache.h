@@ -35,12 +35,12 @@ typedef std::unique_ptr<JwksCache> JwksCachePtr;
 
 class JwksCache {
 public:
-  virtual ~JwksCache() {}
+  virtual ~JwksCache() = default;
 
   // Interface to access a Jwks config rule and its cached Jwks object.
   class JwksData {
   public:
-    virtual ~JwksData() {}
+    virtual ~JwksData() = default;
 
     // Check if a list of audiences are allowed.
     virtual bool areAudiencesAllowed(const std::vector<std::string>& audiences) const PURE;

@@ -23,7 +23,7 @@ public:
     static const uint32_t Modified = 0x2;
   };
 
-  virtual ~Watcher() {}
+  virtual ~Watcher() = default;
 
   /**
    * Add a file watch.

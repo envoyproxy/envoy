@@ -20,7 +20,7 @@ typedef std::function<void()> TimerCb;
  */
 class Timer {
 public:
-  virtual ~Timer() {}
+  virtual ~Timer() = default;
 
   /**
    * Disable a pending timeout without destroying the underlying timer.
@@ -42,7 +42,7 @@ typedef std::unique_ptr<Timer> TimerPtr;
 
 class Scheduler {
 public:
-  virtual ~Scheduler() {}
+  virtual ~Scheduler() = default;
 
   /**
    * Creates a timer.

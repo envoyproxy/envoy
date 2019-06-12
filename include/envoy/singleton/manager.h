@@ -16,7 +16,7 @@ namespace Singleton {
  */
 class Registration {
 public:
-  virtual ~Registration() {}
+  virtual ~Registration() = default;
   virtual std::string name() PURE;
 };
 
@@ -61,7 +61,7 @@ typedef std::function<InstanceSharedPtr()> SingletonFactoryCb;
  */
 class Manager {
 public:
-  virtual ~Manager() {}
+  virtual ~Manager() = default;
 
   /**
    * This is a helper on top of get() that casts the object stored to the specified type. Since the

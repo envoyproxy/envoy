@@ -15,7 +15,7 @@ namespace Stats {
  */
 class CompletableTimespan {
 public:
-  virtual ~CompletableTimespan() {}
+  virtual ~CompletableTimespan() = default;
 
   /**
    * Complete the timespan.

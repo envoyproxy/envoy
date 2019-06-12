@@ -26,7 +26,7 @@ struct ControlPlaneStats {
 
 class GrpcMuxCallbacks {
 public:
-  virtual ~GrpcMuxCallbacks() {}
+  virtual ~GrpcMuxCallbacks() = default;
 
   /**
    * Called when a configuration update is received.
@@ -58,7 +58,7 @@ public:
  */
 class GrpcMuxWatch {
 public:
-  virtual ~GrpcMuxWatch() {}
+  virtual ~GrpcMuxWatch() = default;
 };
 
 typedef std::unique_ptr<GrpcMuxWatch> GrpcMuxWatchPtr;
@@ -69,7 +69,7 @@ typedef std::unique_ptr<GrpcMuxWatch> GrpcMuxWatchPtr;
  */
 class GrpcMux {
 public:
-  virtual ~GrpcMux() {}
+  virtual ~GrpcMux() = default;
 
   /**
    * Initiate stream with management server.

@@ -14,7 +14,7 @@ namespace LocalInfo {
  */
 class LocalInfo {
 public:
-  virtual ~LocalInfo() {}
+  virtual ~LocalInfo() = default;
 
   /**
    * @return the local (non-loopback) address of the server.

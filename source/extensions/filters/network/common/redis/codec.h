@@ -74,7 +74,7 @@ typedef std::unique_ptr<RespValue> RespValuePtr;
  */
 class DecoderCallbacks {
 public:
-  virtual ~DecoderCallbacks() {}
+  virtual ~DecoderCallbacks() = default;
 
   /**
    * Called when a new top level RESP value has been decoded. This value may include multiple
@@ -89,7 +89,7 @@ public:
  */
 class Decoder {
 public:
-  virtual ~Decoder() {}
+  virtual ~Decoder() = default;
 
   /**
    * Decode redis protocol bytes.
@@ -106,7 +106,7 @@ typedef std::unique_ptr<Decoder> DecoderPtr;
  */
 class DecoderFactory {
 public:
-  virtual ~DecoderFactory() {}
+  virtual ~DecoderFactory() = default;
 
   /**
    * Create a decoder given a set of decoder callbacks.
@@ -119,7 +119,7 @@ public:
  */
 class Encoder {
 public:
-  virtual ~Encoder() {}
+  virtual ~Encoder() = default;
 
   /**
    * Encode a RESP value to a buffer.

@@ -83,7 +83,7 @@ private:
     ActiveListenerBase(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                        Network::ListenerConfig& config);
 
-    virtual ~ActiveListenerBase() {}
+    virtual ~ActiveListenerBase() = default;
 
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;

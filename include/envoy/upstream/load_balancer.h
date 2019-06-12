@@ -17,7 +17,7 @@ namespace Upstream {
  */
 class LoadBalancerContext {
 public:
-  virtual ~LoadBalancerContext() {}
+  virtual ~LoadBalancerContext() = default;
 
   /**
    * Compute and return an optional hash key to use during load balancing. This
@@ -83,7 +83,7 @@ public:
  */
 class LoadBalancer {
 public:
-  virtual ~LoadBalancer() {}
+  virtual ~LoadBalancer() = default;
 
   /**
    * Ask the load balancer for the next host to use depending on the underlying LB algorithm.
@@ -101,7 +101,7 @@ typedef std::unique_ptr<LoadBalancer> LoadBalancerPtr;
  */
 class LoadBalancerFactory {
 public:
-  virtual ~LoadBalancerFactory() {}
+  virtual ~LoadBalancerFactory() = default;
 
   /**
    * @return LoadBalancerPtr a new load balancer.
@@ -139,7 +139,7 @@ typedef std::shared_ptr<LoadBalancerFactory> LoadBalancerFactorySharedPtr;
  */
 class ThreadAwareLoadBalancer {
 public:
-  virtual ~ThreadAwareLoadBalancer() {}
+  virtual ~ThreadAwareLoadBalancer() = default;
 
   /**
    * @return LoadBalancerFactorySharedPtr the shared factory to use for creating new worker local

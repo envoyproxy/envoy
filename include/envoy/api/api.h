@@ -17,7 +17,7 @@ namespace Api {
  */
 class Api {
 public:
-  virtual ~Api() {}
+  virtual ~Api() = default;
 
   /**
    * Allocate a dispatcher.

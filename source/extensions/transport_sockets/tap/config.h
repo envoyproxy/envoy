@@ -15,7 +15,7 @@ namespace Tap {
  */
 class TapSocketConfigFactory : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
-  virtual ~TapSocketConfigFactory() {}
+  virtual ~TapSocketConfigFactory() = default;
   std::string name() const override { return TransportSocketNames::get().Tap; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };

@@ -11,7 +11,7 @@ namespace Grpc {
 // with thread local state. Clients will use ThreadLocal::Instance::dispatcher() for event handling.
 class AsyncClientFactory {
 public:
-  virtual ~AsyncClientFactory() {}
+  virtual ~AsyncClientFactory() = default;
 
   /**
    * Create a gRPC::RawAsyncClient.
@@ -27,7 +27,7 @@ typedef std::unique_ptr<AsyncClientFactory> AsyncClientFactoryPtr;
 // be destroyed before the AsyncClientManager can be safely destructed.
 class AsyncClientManager {
 public:
-  virtual ~AsyncClientManager() {}
+  virtual ~AsyncClientManager() = default;
 
   /**
    * Create a Grpc::AsyncClients factory for a service. Validation of the service is performed and

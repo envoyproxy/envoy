@@ -61,7 +61,7 @@ struct CommandStats {
 
 class CommandHandler {
 public:
-  virtual ~CommandHandler() {}
+  virtual ~CommandHandler() = default;
 
   virtual SplitRequestPtr startRequest(Common::Redis::RespValuePtr&& request,
                                        SplitCallbacks& callbacks, CommandStats& command_stats,
