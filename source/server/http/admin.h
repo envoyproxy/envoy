@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/admin/v2alpha/clusters.pb.h"
+#include "envoy/admin/v2alpha/listeners.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -209,6 +210,12 @@ private:
                       Buffer::Instance& response);
   void writeClustersAsJson(Buffer::Instance& response);
   void writeClustersAsText(Buffer::Instance& response);
+
+  /**
+   * Helper methods for the /listeners url handler.
+   */
+  void writeListenersAsJson(Buffer::Instance& response);
+  void writeListenersAsText(Buffer::Instance& response);
 
   static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {
