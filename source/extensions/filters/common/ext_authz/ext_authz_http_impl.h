@@ -119,7 +119,7 @@ private:
   const std::string cluster_name_;
   const std::chrono::milliseconds timeout_;
   const std::string path_prefix_;
-  const str::string tracing_name_;
+  const std::string tracing_name_;
 };
 
 typedef std::shared_ptr<ClientConfig> ClientConfigSharedPtr;
