@@ -464,7 +464,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_alarm_lib",
+    name = "quic_core_alarm_interface",
     srcs = ["quiche/quic/core/quic_alarm.cc"],
     hdrs = ["quiche/quic/core/quic_alarm.h"],
     repository = "@envoy",
@@ -476,12 +476,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_alarm_factory_lib",
+    name = "quic_core_alarm_factory_interface",
     hdrs = ["quiche/quic/core/quic_alarm_factory.h"],
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
-        ":quic_core_alarm_lib",
+        ":quic_core_alarm_interface",
         ":quic_core_one_block_arena_lib",
     ],
 )
@@ -752,8 +752,8 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
-        ":quic_core_alarm_factory_lib",
-        ":quic_core_alarm_lib",
+        ":quic_core_alarm_factory_interface",
+        ":quic_core_alarm_interface",
         ":quic_core_bandwidth_lib",
         ":quic_core_blocked_writer_interface",
         ":quic_core_config_lib",
