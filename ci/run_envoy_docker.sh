@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -x
 
 . ci/envoy_build_sha.sh
 

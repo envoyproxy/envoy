@@ -123,6 +123,17 @@ void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> 
   }
 }
 
+MemoryTest::Mode MemoryTest::mode() {
+  if (!hasDeterministicMallocStats()) {
+    return Mode::Disabled;
+  }
+#ifdef MEMORY_TEST_EXACT // Set in ci/do_ci.sh for 'release' tests.
+  return Mode::Canonical;
+#else
+  return Mode::Approximate;
+#endif
+}
+
 } // namespace TestUtil
 } // namespace Stats
 } // namespace Envoy
