@@ -1,7 +1,7 @@
 from util import get_blob
 from util import true, false
 
-ROUTER_HTTP_FILTER_BLOB = {"dynamic_stats": true}
+ROUTER_HTTP_FILTER_BLOB = {"dynamic_stats": true, "strict_check_headers": []}
 
 
 def test(writer):

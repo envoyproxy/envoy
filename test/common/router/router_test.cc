@@ -48,6 +48,7 @@ using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Router {
@@ -79,11 +80,12 @@ public:
 
 class RouterTestBase : public testing::Test {
 public:
-  RouterTestBase(bool start_child_span, bool suppress_envoy_headers)
+  RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
+                 Protobuf::RepeatedPtrField<std::string> strict_headers_to_check)
       : http_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
         config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
                 ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
-                test_time_.timeSystem(), http_context_),
+                strict_headers_to_check, test_time_.timeSystem(), http_context_),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
     upstream_locality_.set_zone("to_az");
@@ -256,14 +258,15 @@ public:
 
 class RouterTest : public RouterTestBase {
 public:
-  RouterTest() : RouterTestBase(false, false) {
+  RouterTest() : RouterTestBase(false, false, Protobuf::RepeatedPtrField<std::string>{}) {
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
   };
 };
 
 class RouterTestSuppressEnvoyHeaders : public RouterTestBase {
 public:
-  RouterTestSuppressEnvoyHeaders() : RouterTestBase(false, true) {}
+  RouterTestSuppressEnvoyHeaders()
+      : RouterTestBase(false, true, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 TEST_F(RouterTest, RouteNotFound) {
@@ -4013,7 +4016,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
 
 class RouterTestChildSpan : public RouterTestBase {
 public:
-  RouterTestChildSpan() : RouterTestBase(true, false) {}
+  RouterTestChildSpan() : RouterTestBase(true, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 // Make sure child spans start/inject/finish with a normal flow.
@@ -4080,6 +4083,143 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
 
   EXPECT_CALL(*child_span, finishSpan());
   encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+}
+
+Protobuf::RepeatedPtrField<std::string> protobufStrList(std::vector<std::string> v) {
+  Protobuf::RepeatedPtrField<std::string> res;
+  for (auto& field : v) {
+    *res.Add() = field;
+  }
+
+  return res;
+}
+
+class RouterTestStrictCheckOneHeader : public RouterTestBase,
+                                       public testing::WithParamInterface<std::string> {
+public:
+  RouterTestStrictCheckOneHeader() : RouterTestBase(false, false, protobufStrList({GetParam()})){};
+};
+
+INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckOneHeader,
+                         testing::Values("x-envoy-upstream-rq-timeout-ms",
+                                         "x-envoy-upstream-rq-per-try-timeout-ms",
+                                         "x-envoy-max-retries", "x-envoy-retry-on",
+                                         "x-envoy-retry-grpc-on"));
+
+// Each test param instantiates a router that strict-checks one particular header.
+// This test decodes a set of headers with invalid values and asserts that the
+// strict header check only fails for the single header specified by the test param
+TEST_P(RouterTestStrictCheckOneHeader, SingleInvalidHeader) {
+  Http::TestHeaderMapImpl req_headers{
+      {"X-envoy-Upstream-rq-timeout-ms", "10.0"},
+      {"x-envoy-upstream-rq-per-try-timeout-ms", "1.0"},
+      {"x-envoy-max-retries", "2.0"},
+      {"x-envoy-retry-on", "5xx,cancelled"},            // 'cancelled' is an invalid entry
+      {"x-envoy-retry-grpc-on", "cancelled, internal"}, // spaces are considered errors
+  };
+  HttpTestUtility::addDefaultHeaders(req_headers);
+  auto checked_header = GetParam();
+
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders));
+
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](Http::HeaderMap& response_headers, bool end_stream) -> void {
+        EXPECT_EQ(enumToInt(Http::Code::BadRequest),
+                  Envoy::Http::Utility::getResponseStatus(response_headers));
+        EXPECT_FALSE(end_stream);
+      }));
+
+  EXPECT_CALL(callbacks_, encodeData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) -> void {
+        EXPECT_THAT(data.toString(),
+                    StartsWith(fmt::format("invalid header '{}' with value ", checked_header)));
+        EXPECT_TRUE(end_stream);
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, router_.decodeHeaders(req_headers, true));
+  EXPECT_EQ(callbacks_.details_,
+            fmt::format("request_headers_failed_strict_check{{{}}}", checked_header));
+}
+
+class RouterTestStrictCheckSomeHeaders
+    : public RouterTestBase,
+      public testing::WithParamInterface<std::vector<std::string>> {
+public:
+  RouterTestStrictCheckSomeHeaders() : RouterTestBase(false, false, protobufStrList(GetParam())){};
+};
+
+INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckSomeHeaders,
+                         testing::Values(std::vector<std::string>{"x-envoy-upstream-rq-timeout-ms",
+                                                                  "x-envoy-max-retries"},
+                                         std::vector<std::string>{}));
+
+// Request has headers with invalid values, but headers are *excluded* from the
+// set to which strict-checks apply. Assert that these headers are not rejected.
+TEST_P(RouterTestStrictCheckSomeHeaders, IgnoreOmittedHeaders) {
+  // Invalid, but excluded from the configured set of headers to strictly-check
+  Http::TestHeaderMapImpl headers{
+      {"x-envoy-upstream-rq-per-try-timeout-ms", "1.0"},
+      {"x-envoy-upstream-rq-timeout-ms", "5000"},
+      {"x-envoy-retry-on", "5xx,cancelled"},
+  };
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  expectResponseTimerCreate();
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, router_.decodeHeaders(headers, true));
+  router_.onDestroy();
+}
+
+TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
+  Http::TestHeaderMapImpl headers{
+      {"X-envoy-Upstream-rq-timeout-ms", "100"},
+      {"x-envoy-upstream-rq-per-try-timeout-ms", "100"},
+      {"x-envoy-max-retries", "2"},
+      {"not-checked", "always passes"},
+      {"x-envoy-retry-on",
+       "5xx,gateway-error,retriable-4xx,refused-stream,connect-failure,retriable-status-codes"},
+      {"x-envoy-retry-grpc-on",
+       "cancelled,internal,deadline-exceeded,resource-exhausted,unavailable"},
+  };
+
+  std::string target_headers[] = {
+      "X-ENVOY-UPSTREAM-RQ-TIMEOUT-MS",
+      "x-envoy-upstream-rq-per-try-timeout-ms",
+      "x-envoy-max-retries",
+      "x-envoy-retry-on",
+      "x-envoy-retry-grpc-on",
+      "unchecked-header",
+      "unset-header",
+  };
+
+  for (const auto& target : target_headers) {
+    EXPECT_TRUE(
+        FilterUtility::StrictHeaderChecker::test(headers, Http::LowerCaseString(target)).valid_)
+        << fmt::format("'{}' should have passed strict validation", target);
+  }
+
+  Http::TestHeaderMapImpl failing_headers{
+      {"X-envoy-Upstream-rq-timeout-ms", "10.0"},
+      {"x-envoy-upstream-rq-per-try-timeout-ms", "1.0"},
+      {"x-envoy-max-retries", "2.0"},
+      {"x-envoy-retry-on", "5xx,cancelled"},            // 'cancelled' is an invalid entry
+      {"x-envoy-retry-grpc-on", "cancelled, internal"}, // spaces are considered errors
+  };
+
+  std::string fail_targets[] = {
+      "X-ENVOY-UPSTREAM-RQ-TIMEOUT-MS",
+      "x-envoy-upstream-rq-per-try-timeout-ms",
+      "x-envoy-max-retries",
+      "x-envoy-retry-on",
+      "x-envoy-retry-grpc-on",
+  };
+
+  for (const auto& target : fail_targets) {
+    EXPECT_FALSE(
+        FilterUtility::StrictHeaderChecker::test(failing_headers, Http::LowerCaseString(target))
+            .valid_)
+        << fmt::format("'{}' should have failed strict validation", target);
+  }
 }
 
 } // namespace Router

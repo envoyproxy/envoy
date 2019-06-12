@@ -222,6 +222,28 @@ Filter::~Filter() {
   ASSERT(!retry_state_);
 }
 
+const FilterUtility::StrictHeaderChecker::HeaderCheckResult
+FilterUtility::StrictHeaderChecker::test(Http::HeaderMap& headers,
+                                         const Http::LowerCaseString& target_header) {
+  HeaderCheckResult r;
+  auto all = Http::Headers::get();
+  if (target_header == all.EnvoyUpstreamRequestTimeoutMs) {
+    return is_integral(headers.EnvoyUpstreamRequestTimeoutMs());
+  } else if (target_header == all.EnvoyUpstreamRequestPerTryTimeoutMs) {
+    return is_integral(headers.EnvoyUpstreamRequestPerTryTimeoutMs());
+  } else if (target_header == all.EnvoyMaxRetries) {
+    return is_integral(headers.EnvoyMaxRetries());
+  } else if (target_header == all.EnvoyRetryOn) {
+    return has_valid_retry_fields(headers.EnvoyRetryOn(),
+                                  &Router::RetryStateImpl::parseRetryOnStrict);
+  } else if (target_header == all.EnvoyRetryGrpcOn) {
+    return has_valid_retry_fields(headers.EnvoyRetryGrpcOn(),
+                                  &Router::RetryStateImpl::parseRetryGrpcOnStrict);
+  }
+
+  return r;
+}
+
 Stats::StatName Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
   return upstream_host ? upstream_host->localityZoneStatName() : config_.empty_stat_name_;
 }
@@ -380,6 +402,24 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   request_vcluster_ = route_entry_->virtualCluster(headers);
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
                    route_entry_->clusterName(), headers.Path()->value().getStringView());
+
+  if (!config_.strict_check_headers_.empty()) {
+    for (const auto& header : config_.strict_check_headers_) {
+      auto res = FilterUtility::StrictHeaderChecker::test(headers, header);
+      if (!res.valid_) {
+        callbacks_->streamInfo().setResponseFlag(
+            StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders);
+        std::string body = fmt::format("invalid header '{}' with value '{}'",
+                                       std::string(res.entry_->key().getStringView()),
+                                       std::string(res.entry_->value().getStringView()));
+        const std::string details =
+            absl::StrCat(StreamInfo::ResponseCodeDetails::get().InvalidEnvoyRequestHeaders, "{",
+                         res.entry_->key().getStringView(), "}");
+        callbacks_->sendLocalReply(Http::Code::BadRequest, body, nullptr, absl::nullopt, details);
+        return Http::FilterHeadersStatus::StopIteration;
+      }
+    }
+  }
 
   const Http::HeaderEntry* request_alt_name = headers.EnvoyUpstreamAltStatName();
   if (request_alt_name) {

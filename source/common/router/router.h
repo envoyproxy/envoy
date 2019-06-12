@@ -67,6 +67,39 @@ public:
     bool hedge_on_per_try_timeout_;
   };
 
+  class StrictHeaderChecker {
+  public:
+    struct HeaderCheckResult {
+      bool valid_ = true;
+      const Http::HeaderEntry* entry_;
+    };
+
+    static const HeaderCheckResult test(Http::HeaderMap& headers,
+                                        const Http::LowerCaseString& target_header);
+
+  private:
+    static HeaderCheckResult has_valid_retry_fields(Http::HeaderEntry* header_entry,
+                                                    uint32_t (*parseFn)(absl::string_view)) {
+      HeaderCheckResult r;
+      if (header_entry) {
+        auto flags = parseFn(header_entry->value().getStringView());
+        r.valid_ = (flags & RetryPolicy::RETRY_UNKNOWN_FIELD_ERROR) == 0;
+        r.entry_ = header_entry;
+      }
+      return r;
+    }
+
+    static HeaderCheckResult is_integral(Http::HeaderEntry* header_entry) {
+      HeaderCheckResult r;
+      if (header_entry) {
+        uint64_t out;
+        r.valid_ = absl::SimpleAtoi(header_entry->value().getStringView(), &out);
+        r.entry_ = header_entry;
+      }
+      return r;
+    }
+  };
+
   /**
    * Set the :scheme header based on the properties of the upstream cluster.
    */
@@ -115,6 +148,7 @@ public:
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
+               const Protobuf::RepeatedPtrField<std::string> strict_check_headers,
                TimeSource& time_source, Http::Context& http_context)
       : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
@@ -123,7 +157,11 @@ public:
         stat_name_pool_(scope_.symbolTable()), retry_(stat_name_pool_.add("retry")),
         zone_name_(stat_name_pool_.add(local_info_.zoneName())),
         empty_stat_name_(stat_name_pool_.add("")), shadow_writer_(std::move(shadow_writer)),
-        time_source_(time_source) {}
+        time_source_(time_source) {
+    for (const auto& header : strict_check_headers) {
+      strict_check_headers_.emplace_back(Http::LowerCaseString(header));
+    }
+  }
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
@@ -132,7 +170,8 @@ public:
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
                      config.start_child_span(), config.suppress_envoy_headers(),
-                     context.api().timeSource(), context.httpContext()) {
+                     config.strict_check_headers(), context.api().timeSource(),
+                     context.httpContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
@@ -150,6 +189,7 @@ public:
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
   const bool suppress_envoy_headers_;
+  std::vector<Http::LowerCaseString> strict_check_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
   Stats::StatNamePool stat_name_pool_;

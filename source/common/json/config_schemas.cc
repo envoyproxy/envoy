@@ -1122,7 +1122,11 @@ const std::string Json::Schema::ROUTER_HTTP_FILTER_SCHEMA(R"EOF(
     "type" : "object",
     "properties" : {
       "dynamic_stats" : {"type" : "boolean"},
-      "start_child_span" : {"type" : "boolean"}
+      "start_child_span" : {"type" : "boolean"},
+      "strict_check_headers" : {
+        "type" : "array",
+        "items" : {"type" : "string"}
+      }
     },
     "additionalProperties" : false
   }

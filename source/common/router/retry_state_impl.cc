@@ -114,6 +114,22 @@ void RetryStateImpl::enableBackoffTimer() {
 }
 
 uint32_t RetryStateImpl::parseRetryOn(absl::string_view config) {
+  return parseRetryOn_(config, false);
+}
+
+uint32_t RetryStateImpl::parseRetryGrpcOn(absl::string_view config) {
+  return parseRetryGrpcOn_(config, false);
+}
+
+uint32_t RetryStateImpl::parseRetryOnStrict(absl::string_view config) {
+  return parseRetryOn_(config, true);
+}
+
+uint32_t RetryStateImpl::parseRetryGrpcOnStrict(absl::string_view config) {
+  return parseRetryGrpcOn_(config, true);
+}
+
+uint32_t RetryStateImpl::parseRetryOn_(absl::string_view config, bool flag_parse_failures) {
   uint32_t ret = 0;
   for (const auto retry_on : StringUtil::splitToken(config, ",")) {
     if (retry_on == Http::Headers::get().EnvoyRetryOnValues._5xx) {
@@ -128,13 +144,16 @@ uint32_t RetryStateImpl::parseRetryOn(absl::string_view config) {
       ret |= RetryPolicy::RETRY_ON_REFUSED_STREAM;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RetriableStatusCodes) {
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
+    } else if (flag_parse_failures) {
+      ret |= RetryPolicy::RETRY_UNKNOWN_FIELD_ERROR;
     }
   }
 
   return ret;
 }
 
-uint32_t RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header) {
+uint32_t RetryStateImpl::parseRetryGrpcOn_(absl::string_view retry_grpc_on_header,
+                                           bool flag_parse_failures) {
   uint32_t ret = 0;
   for (const auto retry_on : StringUtil::splitToken(retry_grpc_on_header, ",")) {
     if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Cancelled) {
@@ -147,6 +166,8 @@ uint32_t RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header
       ret |= RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Internal) {
       ret |= RetryPolicy::RETRY_ON_GRPC_INTERNAL;
+    } else if (flag_parse_failures) {
+      ret |= RetryPolicy::RETRY_UNKNOWN_FIELD_ERROR;
     }
   }
 
