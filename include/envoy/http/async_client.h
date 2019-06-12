@@ -226,7 +226,7 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 };
 
-typedef std::unique_ptr<AsyncClient> AsyncClientPtr;
+using AsyncClientPtr = std::unique_ptr<AsyncClient>;
 
 } // namespace Http
 } // namespace Envoy

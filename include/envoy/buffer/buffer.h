@@ -357,7 +357,7 @@ public:
   }
 };
 
-typedef std::unique_ptr<Instance> InstancePtr;
+using InstancePtr = std::unique_ptr<Instance>;
 
 /**
  * A factory for creating buffers which call callbacks when reaching high and low watermarks.
@@ -378,7 +378,7 @@ public:
                              std::function<void()> above_high_watermark) PURE;
 };
 
-typedef std::unique_ptr<WatermarkFactory> WatermarkFactoryPtr;
+using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;
 
 } // namespace Buffer
 } // namespace Envoy

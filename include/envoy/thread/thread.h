@@ -18,7 +18,7 @@ public:
   virtual bool isCurrentThreadId() const PURE;
 };
 
-typedef std::unique_ptr<ThreadId> ThreadIdPtr;
+using ThreadIdPtr = std::unique_ptr<ThreadId>;
 
 class Thread {
 public:
@@ -30,7 +30,7 @@ public:
   virtual void join() PURE;
 };
 
-typedef std::unique_ptr<Thread> ThreadPtr;
+using ThreadPtr = std::unique_ptr<Thread>;
 
 /**
  * Interface providing a mechanism for creating threads.

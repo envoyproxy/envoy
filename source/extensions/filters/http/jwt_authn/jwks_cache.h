@@ -13,7 +13,7 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 class JwksCache;
-typedef std::unique_ptr<JwksCache> JwksCachePtr;
+using JwksCachePtr = std::unique_ptr<JwksCache>;
 
 /**
  * Interface to access all configured Jwt rules and their cached Jwks objects.

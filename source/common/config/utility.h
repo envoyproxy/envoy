@@ -50,7 +50,7 @@ struct RateLimitSettings {
   bool enabled_{false};
 };
 
-typedef ConstSingleton<ApiTypeValues> ApiType;
+using ApiType = ConstSingleton<ApiTypeValues>;
 
 /**
  * General config API utilities.

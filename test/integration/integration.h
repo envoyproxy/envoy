@@ -80,7 +80,7 @@ private:
   Http::StreamResetReason reset_reason_{};
 };
 
-typedef std::unique_ptr<IntegrationStreamDecoder> IntegrationStreamDecoderPtr;
+using IntegrationStreamDecoderPtr = std::unique_ptr<IntegrationStreamDecoder>;
 
 /**
  * TCP client used during integration testing.
@@ -119,7 +119,7 @@ private:
   MockWatermarkBuffer* client_write_buffer_;
 };
 
-typedef std::unique_ptr<IntegrationTcpClient> IntegrationTcpClientPtr;
+using IntegrationTcpClientPtr = std::unique_ptr<IntegrationTcpClient>;
 
 struct ApiFilesystemConfig {
   std::string bootstrap_path_;

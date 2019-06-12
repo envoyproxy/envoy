@@ -46,7 +46,7 @@ public:
   virtual const std::string& passwordPath() const PURE;
 };
 
-typedef std::unique_ptr<TlsCertificateConfig> TlsCertificateConfigPtr;
+using TlsCertificateConfigPtr = std::unique_ptr<TlsCertificateConfig>;
 
 } // namespace Ssl
 } // namespace Envoy

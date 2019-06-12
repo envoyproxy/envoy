@@ -18,7 +18,7 @@ public:
   virtual ~ThreadLocalObject() = default;
 };
 
-typedef std::shared_ptr<ThreadLocalObject> ThreadLocalObjectSharedPtr;
+using ThreadLocalObjectSharedPtr = std::shared_ptr<ThreadLocalObject>;
 
 /**
  * An individual allocated TLS slot. When the slot is destroyed the stored thread local will
@@ -62,11 +62,11 @@ public:
    *                     a shared_ptr. Thus, this is a flexible mechanism that can be used to share
    *                     the same data across all threads or to share different data on each thread.
    */
-  typedef std::function<ThreadLocalObjectSharedPtr(Event::Dispatcher& dispatcher)> InitializeCb;
+  using InitializeCb = std::function<ThreadLocalObjectSharedPtr(Event::Dispatcher& dispatcher)>;
   virtual void set(InitializeCb cb) PURE;
 };
 
-typedef std::unique_ptr<Slot> SlotPtr;
+using SlotPtr = std::unique_ptr<Slot>;
 
 /**
  * Interface used to allocate thread local slots.

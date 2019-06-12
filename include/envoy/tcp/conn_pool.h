@@ -63,7 +63,7 @@ enum class PoolFailureReason {
  */
 class UpstreamCallbacks : public Network::ConnectionCallbacks {
 public:
-  virtual ~UpstreamCallbacks() = default;
+  ~UpstreamCallbacks() override = default;
 
   /*
    * Invoked when data is delivered from the upstream connection while the connection is owned by a
@@ -88,7 +88,7 @@ public:
   virtual ~ConnectionState() = default;
 };
 
-typedef std::unique_ptr<ConnectionState> ConnectionStatePtr;
+using ConnectionStatePtr = std::unique_ptr<ConnectionState>;
 
 /*
  * ConnectionData wraps a ClientConnection allocated to a caller. Open ClientConnections are
@@ -130,7 +130,7 @@ protected:
   virtual ConnectionState* connectionState() PURE;
 };
 
-typedef std::unique_ptr<ConnectionData> ConnectionDataPtr;
+using ConnectionDataPtr = std::unique_ptr<ConnectionData>;
 
 /**
  * Pool callbacks invoked in the context of a newConnection() call, either synchronously or
@@ -168,13 +168,13 @@ public:
  */
 class Instance : public Event::DeferredDeletable {
 public:
-  virtual ~Instance() = default;
+  ~Instance() override = default;
 
   /**
    * Called when a connection pool has been drained of pending requests, busy connections, and
    * ready connections.
    */
-  typedef std::function<void()> DrainedCb;
+  using DrainedCb = std::function<void()>;
 
   /**
    * Register a callback that gets called when the connection pool is fully drained. No actual
@@ -205,7 +205,7 @@ public:
   virtual Cancellable* newConnection(Callbacks& callbacks) PURE;
 };
 
-typedef std::unique_ptr<Instance> InstancePtr;
+using InstancePtr = std::unique_ptr<Instance>;
 
 } // namespace ConnectionPool
 } // namespace Tcp

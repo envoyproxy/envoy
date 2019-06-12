@@ -67,7 +67,7 @@ private:
   RespType type_;
 };
 
-typedef std::unique_ptr<RespValue> RespValuePtr;
+using RespValuePtr = std::unique_ptr<RespValue>;
 
 /**
  * Callbacks that the decoder fires.
@@ -99,7 +99,7 @@ public:
   virtual void decode(Buffer::Instance& data) PURE;
 };
 
-typedef std::unique_ptr<Decoder> DecoderPtr;
+using DecoderPtr = std::unique_ptr<Decoder>;
 
 /**
  * A factory for a redis decoder.
@@ -129,7 +129,7 @@ public:
   virtual void encode(const RespValue& value, Buffer::Instance& out) PURE;
 };
 
-typedef std::unique_ptr<Encoder> EncoderPtr;
+using EncoderPtr = std::unique_ptr<Encoder>;
 
 /**
  * A redis protocol error.

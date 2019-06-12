@@ -61,7 +61,7 @@ public:
   virtual ~GrpcMuxWatch() = default;
 };
 
-typedef std::unique_ptr<GrpcMuxWatch> GrpcMuxWatchPtr;
+using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;
 
 /**
  * Manage one or more gRPC subscriptions on a single stream to management server. This can be used
@@ -109,7 +109,7 @@ public:
   virtual void resume(const std::string& type_url) PURE;
 };
 
-typedef std::unique_ptr<GrpcMux> GrpcMuxPtr;
+using GrpcMuxPtr = std::unique_ptr<GrpcMux>;
 
 } // namespace Config
 } // namespace Envoy

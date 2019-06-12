@@ -850,7 +850,7 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
 // Make sure we have coverage for high and low values for various  combinations and permutations
 // of HTTP settings in at least one test fixture.
 // Use with caution as any test using this runs 255 times.
-typedef Http2CodecImplTest Http2CodecImplTestAll;
+using Http2CodecImplTestAll = Http2CodecImplTest;
 
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTestAll,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,

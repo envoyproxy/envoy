@@ -369,7 +369,7 @@ public:
  */
 class ServerConnection : public virtual Connection {};
 
-typedef std::unique_ptr<ServerConnection> ServerConnectionPtr;
+using ServerConnectionPtr = std::unique_ptr<ServerConnection>;
 
 /**
  * A client side HTTP connection.
@@ -384,7 +384,7 @@ public:
   virtual StreamEncoder& newStream(StreamDecoder& response_decoder) PURE;
 };
 
-typedef std::unique_ptr<ClientConnection> ClientConnectionPtr;
+using ClientConnectionPtr = std::unique_ptr<ClientConnection>;
 
 } // namespace Http
 } // namespace Envoy

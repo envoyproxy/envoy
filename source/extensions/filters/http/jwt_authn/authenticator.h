@@ -15,16 +15,16 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 class Authenticator;
-typedef std::unique_ptr<Authenticator> AuthenticatorPtr;
+using AuthenticatorPtr = std::unique_ptr<Authenticator>;
 
-typedef std::function<void(const ::google::jwt_verify::Status& status)> AuthenticatorCallback;
+using AuthenticatorCallback = std::function<void(const ::google::jwt_verify::Status& status)>;
 
-typedef std::function<void(const std::string&, const ProtobufWkt::Struct&)> SetPayloadCallback;
+using SetPayloadCallback = std::function<void(const std::string&, const ProtobufWkt::Struct&)>;
 
 /**
  *  CreateJwksFetcherCb is a callback interface for creating a JwksFetcher instance.
  */
-typedef std::function<Common::JwksFetcherPtr(Upstream::ClusterManager&)> CreateJwksFetcherCb;
+using CreateJwksFetcherCb = std::function<Common::JwksFetcherPtr(Upstream::ClusterManager&)>;
 
 /**
  *  Authenticator object to handle all JWT authentication flow.

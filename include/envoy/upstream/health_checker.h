@@ -56,7 +56,7 @@ public:
   virtual void start() PURE;
 };
 
-typedef std::shared_ptr<HealthChecker> HealthCheckerSharedPtr;
+using HealthCheckerSharedPtr = std::shared_ptr<HealthChecker>;
 
 std::ostream& operator<<(std::ostream& out, HealthState state);
 std::ostream& operator<<(std::ostream& out, HealthTransition changed_state);
@@ -118,7 +118,7 @@ public:
                       const HostDescriptionConstSharedPtr& host) PURE;
 };
 
-typedef std::unique_ptr<HealthCheckEventLogger> HealthCheckEventLoggerPtr;
+using HealthCheckEventLoggerPtr = std::unique_ptr<HealthCheckEventLogger>;
 
 } // namespace Upstream
 } // namespace Envoy

@@ -194,24 +194,24 @@ public:
   virtual void used(bool new_used) PURE;
 };
 
-typedef std::shared_ptr<const Host> HostConstSharedPtr;
+using HostConstSharedPtr = std::shared_ptr<const Host>;
 
-typedef std::vector<HostSharedPtr> HostVector;
-typedef Phantom<HostVector, Healthy> HealthyHostVector;
-typedef Phantom<HostVector, Degraded> DegradedHostVector;
-typedef Phantom<HostVector, Excluded> ExcludedHostVector;
-typedef std::unordered_map<std::string, Upstream::HostSharedPtr> HostMap;
-typedef std::shared_ptr<HostVector> HostVectorSharedPtr;
-typedef std::shared_ptr<const HostVector> HostVectorConstSharedPtr;
+using HostVector = std::vector<HostSharedPtr>;
+using HealthyHostVector = Phantom<HostVector, Healthy>;
+using DegradedHostVector = Phantom<HostVector, Degraded>;
+using ExcludedHostVector = Phantom<HostVector, Excluded>;
+using HostMap = std::unordered_map<std::string, Upstream::HostSharedPtr>;
+using HostVectorSharedPtr = std::shared_ptr<HostVector>;
+using HostVectorConstSharedPtr = std::shared_ptr<const HostVector>;
 
-typedef std::shared_ptr<const HealthyHostVector> HealthyHostVectorConstSharedPtr;
-typedef std::shared_ptr<const DegradedHostVector> DegradedHostVectorConstSharedPtr;
-typedef std::shared_ptr<const ExcludedHostVector> ExcludedHostVectorConstSharedPtr;
+using HealthyHostVectorConstSharedPtr = std::shared_ptr<const HealthyHostVector>;
+using DegradedHostVectorConstSharedPtr = std::shared_ptr<const DegradedHostVector>;
+using ExcludedHostVectorConstSharedPtr = std::shared_ptr<const ExcludedHostVector>;
 
-typedef std::unique_ptr<HostVector> HostListPtr;
+using HostListPtr = std::unique_ptr<HostVector>;
 typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
     LocalityWeightsMap;
-typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
+using PriorityState = std::vector<std::pair<HostListPtr, LocalityWeightsMap>>;
 
 /**
  * Bucket hosts by locality.
@@ -252,13 +252,13 @@ public:
   }
 };
 
-typedef std::shared_ptr<HostsPerLocality> HostsPerLocalitySharedPtr;
-typedef std::shared_ptr<const HostsPerLocality> HostsPerLocalityConstSharedPtr;
+using HostsPerLocalitySharedPtr = std::shared_ptr<HostsPerLocality>;
+using HostsPerLocalityConstSharedPtr = std::shared_ptr<const HostsPerLocality>;
 
 // Weight for each locality index in HostsPerLocality.
-typedef std::vector<uint32_t> LocalityWeights;
-typedef std::shared_ptr<LocalityWeights> LocalityWeightsSharedPtr;
-typedef std::shared_ptr<const LocalityWeights> LocalityWeightsConstSharedPtr;
+using LocalityWeights = std::vector<uint32_t>;
+using LocalityWeightsSharedPtr = std::shared_ptr<LocalityWeights>;
+using LocalityWeightsConstSharedPtr = std::shared_ptr<const LocalityWeights>;
 
 /**
  * Base host set interface. This contains all of the endpoints for a given LocalityLbEndpoints
@@ -384,7 +384,7 @@ public:
   virtual uint32_t overprovisioningFactor() const PURE;
 };
 
-typedef std::unique_ptr<HostSet> HostSetPtr;
+using HostSetPtr = std::unique_ptr<HostSet>;
 
 /**
  * This class contains all of the HostSets for a given cluster grouped by priority, for
@@ -640,7 +640,7 @@ class ProtocolOptionsConfig {
 public:
   virtual ~ProtocolOptionsConfig() = default;
 };
-typedef std::shared_ptr<const ProtocolOptionsConfig> ProtocolOptionsConfigConstSharedPtr;
+using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOptionsConfig>;
 
 /**
  *  Base class for all cluster typed metadata factory.
@@ -856,7 +856,7 @@ protected:
   extensionProtocolOptions(const std::string& name) const PURE;
 };
 
-typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;
+using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
 
 class HealthChecker;
 
@@ -915,7 +915,7 @@ public:
   virtual const PrioritySet& prioritySet() const PURE;
 };
 
-typedef std::shared_ptr<Cluster> ClusterSharedPtr;
+using ClusterSharedPtr = std::shared_ptr<Cluster>;
 
 } // namespace Upstream
 } // namespace Envoy

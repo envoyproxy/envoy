@@ -13,7 +13,7 @@ public:
   virtual ~Instance() = default;
 };
 
-typedef std::shared_ptr<Instance> InstanceSharedPtr;
+using InstanceSharedPtr = std::shared_ptr<Instance>;
 
 } // namespace Singleton
 } // namespace Envoy

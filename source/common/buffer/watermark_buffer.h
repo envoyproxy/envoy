@@ -56,7 +56,7 @@ private:
   bool above_high_watermark_called_{false};
 };
 
-typedef std::unique_ptr<WatermarkBuffer> WatermarkBufferPtr;
+using WatermarkBufferPtr = std::unique_ptr<WatermarkBuffer>;
 
 class WatermarkBufferFactory : public WatermarkFactory {
 public:

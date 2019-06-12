@@ -15,9 +15,9 @@
 namespace Envoy {
 class TestEnvironment {
 public:
-  typedef std::unordered_map<std::string, uint32_t> PortMap;
+  using PortMap = std::unordered_map<std::string, uint32_t>;
 
-  typedef std::unordered_map<std::string, std::string> ParamMap;
+  using ParamMap = std::unordered_map<std::string, std::string>;
 
   /**
    * Initialize command-line options for later access by tests in getOptions().

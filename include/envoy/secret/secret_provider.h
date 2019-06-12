@@ -33,12 +33,12 @@ public:
   virtual Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) PURE;
 };
 
-typedef std::unique_ptr<envoy::api::v2::auth::TlsCertificate> TlsCertificatePtr;
+using TlsCertificatePtr = std::unique_ptr<envoy::api::v2::auth::TlsCertificate>;
 typedef std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext>
     CertificateValidationContextPtr;
 
-typedef SecretProvider<envoy::api::v2::auth::TlsCertificate> TlsCertificateConfigProvider;
-typedef std::shared_ptr<TlsCertificateConfigProvider> TlsCertificateConfigProviderSharedPtr;
+using TlsCertificateConfigProvider = SecretProvider<envoy::api::v2::auth::TlsCertificate>;
+using TlsCertificateConfigProviderSharedPtr = std::shared_ptr<TlsCertificateConfigProvider>;
 
 typedef SecretProvider<envoy::api::v2::auth::CertificateValidationContext>
     CertificateValidationContextConfigProvider;

@@ -8,7 +8,7 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 class Verifier;
-typedef std::unique_ptr<const Verifier> VerifierConstPtr;
+using VerifierConstPtr = std::unique_ptr<const Verifier>;
 
 /**
  * Supports verification of JWTs with configured requirements.
@@ -65,7 +65,7 @@ public:
     virtual void cancel() PURE;
   };
 
-  typedef std::shared_ptr<Context> ContextSharedPtr;
+  using ContextSharedPtr = std::shared_ptr<Context>;
 
   // Verify all tokens on headers, and signal the caller with callback.
   virtual void verify(ContextSharedPtr context) const PURE;
@@ -81,7 +81,7 @@ public:
   static ContextSharedPtr createContext(Http::HeaderMap& headers, Callbacks* callback);
 };
 
-typedef std::shared_ptr<Verifier::Context> ContextSharedPtr;
+using ContextSharedPtr = std::shared_ptr<Verifier::Context>;
 
 } // namespace JwtAuthn
 } // namespace HttpFilters

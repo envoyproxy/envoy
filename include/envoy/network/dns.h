@@ -38,7 +38,7 @@ public:
    * @param address_list supplies the list of resolved IP addresses. The list will be empty if
    *                     the resolution failed.
    */
-  typedef std::function<void(std::list<Address::InstanceConstSharedPtr>&& address_list)> ResolveCb;
+  using ResolveCb = std::function<void(std::list<Address::InstanceConstSharedPtr>&& address_list)>;
 
   /**
    * Initiate an async DNS resolution.
@@ -52,7 +52,7 @@ public:
                                   ResolveCb callback) PURE;
 };
 
-typedef std::shared_ptr<DnsResolver> DnsResolverSharedPtr;
+using DnsResolverSharedPtr = std::shared_ptr<DnsResolver>;
 
 } // namespace Network
 } // namespace Envoy

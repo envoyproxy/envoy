@@ -48,7 +48,7 @@ public:
  */
 class WriteFilterCallbacks : public virtual NetworkFilterCallbacks {
 public:
-  virtual ~WriteFilterCallbacks() = default;
+  ~WriteFilterCallbacks() override = default;
 
   /**
    * Pass data directly to subsequent filters in the filter chain. This method is used in
@@ -99,14 +99,14 @@ public:
   virtual void initializeWriteFilterCallbacks(WriteFilterCallbacks&) {}
 };
 
-typedef std::shared_ptr<WriteFilter> WriteFilterSharedPtr;
+using WriteFilterSharedPtr = std::shared_ptr<WriteFilter>;
 
 /**
  * Callbacks used by individual read filter instances to communicate with the filter manager.
  */
 class ReadFilterCallbacks : public virtual NetworkFilterCallbacks {
 public:
-  virtual ~ReadFilterCallbacks() = default;
+  ~ReadFilterCallbacks() override = default;
 
   /**
    * If a read filter stopped filter iteration, continueReading() can be called to continue the
@@ -191,14 +191,14 @@ public:
   virtual void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) PURE;
 };
 
-typedef std::shared_ptr<ReadFilter> ReadFilterSharedPtr;
+using ReadFilterSharedPtr = std::shared_ptr<ReadFilter>;
 
 /**
  * A combination read and write filter. This allows a single filter instance to cover
  * both the read and write paths.
  */
 class Filter : public WriteFilter, public ReadFilter {};
-typedef std::shared_ptr<Filter> FilterSharedPtr;
+using FilterSharedPtr = std::shared_ptr<Filter>;
 
 /**
  * Interface for adding individual network filters to a manager.
@@ -241,7 +241,7 @@ public:
  * to. Typically the function will install a single filter, but it's technically possibly to
  * install more than one if desired.
  */
-typedef std::function<void(FilterManager& filter_manager)> FilterFactoryCb;
+using FilterFactoryCb = std::function<void(FilterManager& filter_manager)>;
 
 /**
  * Callbacks used by individual listener filter instances to communicate with the listener filter
@@ -287,7 +287,7 @@ public:
   virtual FilterStatus onAccept(ListenerFilterCallbacks& cb) PURE;
 };
 
-typedef std::unique_ptr<ListenerFilter> ListenerFilterPtr;
+using ListenerFilterPtr = std::unique_ptr<ListenerFilter>;
 
 /**
  * Interface for filter callbacks and adding listener filters to a manager.
@@ -312,7 +312,7 @@ public:
  * Typically the function will install a single filter, but it's technically possibly to install
  * more than one if desired.
  */
-typedef std::function<void(ListenerFilterManager& filter_manager)> ListenerFilterFactoryCb;
+using ListenerFilterFactoryCb = std::function<void(ListenerFilterManager& filter_manager)>;
 
 /**
  * Interface representing a single filter chain.
@@ -333,7 +333,7 @@ public:
   virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
 };
 
-typedef std::shared_ptr<FilterChain> FilterChainSharedPtr;
+using FilterChainSharedPtr = std::shared_ptr<FilterChain>;
 
 /**
  * Interface for searching through configured filter chains.
@@ -387,7 +387,7 @@ protected:
   UdpReadFilterCallbacks* read_callbacks_{};
 };
 
-typedef std::unique_ptr<UdpListenerReadFilter> UdpListenerReadFilterPtr;
+using UdpListenerReadFilterPtr = std::unique_ptr<UdpListenerReadFilter>;
 
 /**
  * Interface for adding UDP listener filters to a manager.

@@ -32,7 +32,7 @@ typedef std::function<TsiHandshakerPtr(
  * output param that should be populated by the function implementation.
  * @return true if the peer is valid or false if the peer is invalid.
  */
-typedef std::function<bool(const tsi_peer& peer, std::string& err)> HandshakeValidator;
+using HandshakeValidator = std::function<bool(const tsi_peer& peer, std::string& err)>;
 
 /**
  * A implementation of Network::TransportSocket based on gRPC TSI

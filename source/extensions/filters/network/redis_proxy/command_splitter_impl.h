@@ -314,7 +314,7 @@ private:
     std::reference_wrapper<CommandHandler> handler_;
   };
 
-  typedef std::shared_ptr<HandlerData> HandlerDataPtr;
+  using HandlerDataPtr = std::shared_ptr<HandlerData>;
 
   void addHandler(Stats::Scope& scope, const std::string& stat_prefix, const std::string& name,
                   CommandHandler& handler);

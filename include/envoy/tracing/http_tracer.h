@@ -61,7 +61,7 @@ public:
 };
 
 class Span;
-typedef std::unique_ptr<Span> SpanPtr;
+using SpanPtr = std::unique_ptr<Span>;
 
 /**
  * Basic abstraction for span.
@@ -136,7 +136,7 @@ public:
                             const Tracing::Decision tracing_decision) PURE;
 };
 
-typedef std::unique_ptr<Driver> DriverPtr;
+using DriverPtr = std::unique_ptr<Driver>;
 
 /**
  * HttpTracer is responsible for handling traces and delegate actions to the
@@ -151,7 +151,7 @@ public:
                             const Tracing::Decision tracing_decision) PURE;
 };
 
-typedef std::unique_ptr<HttpTracer> HttpTracerPtr;
+using HttpTracerPtr = std::unique_ptr<HttpTracer>;
 
 } // namespace Tracing
 } // namespace Envoy

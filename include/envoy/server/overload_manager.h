@@ -26,7 +26,7 @@ enum class OverloadActionState {
 /**
  * Callback invoked when an overload action changes state.
  */
-typedef std::function<void(OverloadActionState)> OverloadActionCb;
+using OverloadActionCb = std::function<void(OverloadActionState)>;
 
 /**
  * Thread-local copy of the state of each configured overload action.
@@ -72,7 +72,7 @@ public:
   const std::string ShrinkHeap = "envoy.overload_actions.shrink_heap";
 };
 
-typedef ConstSingleton<OverloadActionNameValues> OverloadActionNames;
+using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;
 
 /**
  * The OverloadManager protects the Envoy instance from being overwhelmed by client

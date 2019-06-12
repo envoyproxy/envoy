@@ -43,7 +43,7 @@ struct DispatcherStats {
 /**
  * Callback invoked when a dispatcher post() runs.
  */
-typedef std::function<void()> PostCb;
+using PostCb = std::function<void()>;
 
 /**
  * Abstract event dispatching loop.
@@ -201,7 +201,7 @@ public:
   virtual Buffer::WatermarkFactory& getWatermarkFactory() PURE;
 };
 
-typedef std::unique_ptr<Dispatcher> DispatcherPtr;
+using DispatcherPtr = std::unique_ptr<Dispatcher>;
 
 } // namespace Event
 } // namespace Envoy

@@ -94,7 +94,7 @@ public:
   virtual HostConstSharedPtr chooseHost(LoadBalancerContext* context) PURE;
 };
 
-typedef std::unique_ptr<LoadBalancer> LoadBalancerPtr;
+using LoadBalancerPtr = std::unique_ptr<LoadBalancer>;
 
 /**
  * Factory for load balancers.
@@ -109,7 +109,7 @@ public:
   virtual LoadBalancerPtr create() PURE;
 };
 
-typedef std::shared_ptr<LoadBalancerFactory> LoadBalancerFactorySharedPtr;
+using LoadBalancerFactorySharedPtr = std::shared_ptr<LoadBalancerFactory>;
 
 /**
  * A thread aware load balancer is a load balancer that is global to all workers on behalf of a
@@ -156,7 +156,7 @@ public:
   virtual void initialize() PURE;
 };
 
-typedef std::unique_ptr<ThreadAwareLoadBalancer> ThreadAwareLoadBalancerPtr;
+using ThreadAwareLoadBalancerPtr = std::unique_ptr<ThreadAwareLoadBalancer>;
 
 } // namespace Upstream
 } // namespace Envoy

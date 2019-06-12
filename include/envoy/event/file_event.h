@@ -23,7 +23,7 @@ enum class FileTriggerType { Level, Edge };
 /**
  * Callback invoked when a FileEvent is ready for reading or writing.
  */
-typedef std::function<void(uint32_t events)> FileReadyCb;
+using FileReadyCb = std::function<void(uint32_t events)>;
 
 /**
  * Wrapper for file based (read/write) event notifications.
@@ -47,7 +47,7 @@ public:
   virtual void setEnabled(uint32_t events) PURE;
 };
 
-typedef std::unique_ptr<FileEvent> FileEventPtr;
+using FileEventPtr = std::unique_ptr<FileEvent>;
 
 } // namespace Event
 } // namespace Envoy

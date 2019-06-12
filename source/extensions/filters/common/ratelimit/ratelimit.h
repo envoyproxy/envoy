@@ -74,7 +74,7 @@ public:
                      Tracing::Span& parent_span) PURE;
 };
 
-typedef std::unique_ptr<Client> ClientPtr;
+using ClientPtr = std::unique_ptr<Client>;
 
 } // namespace RateLimit
 } // namespace Common

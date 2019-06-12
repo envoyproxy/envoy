@@ -41,7 +41,7 @@ public:
   virtual bool rejectsAll() const PURE;
 };
 
-typedef std::unique_ptr<const StatsMatcher> StatsMatcherPtr;
+using StatsMatcherPtr = std::unique_ptr<const StatsMatcher>;
 
 } // namespace Stats
 } // namespace Envoy

@@ -58,7 +58,7 @@ public:
   virtual absl::string_view prefixToken() const PURE;
 };
 
-typedef std::unique_ptr<const TagExtractor> TagExtractorPtr;
+using TagExtractorPtr = std::unique_ptr<const TagExtractor>;
 
 } // namespace Stats
 } // namespace Envoy

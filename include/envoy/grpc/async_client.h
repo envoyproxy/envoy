@@ -177,7 +177,7 @@ public:
                                    RawAsyncStreamCallbacks& callbacks) PURE;
 };
 
-typedef std::unique_ptr<RawAsyncClient> RawAsyncClientPtr;
+using RawAsyncClientPtr = std::unique_ptr<RawAsyncClient>;
 
 } // namespace Grpc
 } // namespace Envoy

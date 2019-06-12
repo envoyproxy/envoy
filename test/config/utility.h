@@ -64,7 +64,7 @@ public:
   static void initializeTls(const ServerSslOptions& options,
                             envoy::api::v2::auth::CommonTlsContext& common_context);
 
-  typedef std::function<void(envoy::config::bootstrap::v2::Bootstrap&)> ConfigModifierFunction;
+  using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v2::Bootstrap&)>;
   typedef std::function<void(
       envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&)>
       HttpModifierFunction;

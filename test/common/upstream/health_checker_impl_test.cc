@@ -117,7 +117,7 @@ public:
     Http::StreamDecoder* stream_response_callbacks_{};
   };
 
-  typedef std::unique_ptr<TestSession> TestSessionPtr;
+  using TestSessionPtr = std::unique_ptr<TestSession>;
   typedef std::unordered_map<std::string,
                              const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig>
       HostWithHealthCheckMap;
@@ -2845,7 +2845,7 @@ public:
     CodecClientForTest* codec_client_{};
   };
 
-  typedef std::unique_ptr<TestSession> TestSessionPtr;
+  using TestSessionPtr = std::unique_ptr<TestSession>;
 
   struct ResponseSpec {
     struct ChunkSpec {

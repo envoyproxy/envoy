@@ -12,7 +12,7 @@ namespace HttpFilters {
 namespace Common {
 
 class JwksFetcher;
-typedef std::unique_ptr<JwksFetcher> JwksFetcherPtr;
+using JwksFetcherPtr = std::unique_ptr<JwksFetcher>;
 /**
  * JwksFetcher interface can be used to retrieve remote JWKS
  * (https://tools.ietf.org/html/rfc7517) data structures returning a concrete,

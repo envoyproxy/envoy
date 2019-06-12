@@ -40,7 +40,7 @@ public:
   virtual MonotonicTime lastTouchTime() const PURE;
 };
 
-typedef std::shared_ptr<WatchDog> WatchDogSharedPtr;
+using WatchDogSharedPtr = std::shared_ptr<WatchDog>;
 
 } // namespace Server
 } // namespace Envoy

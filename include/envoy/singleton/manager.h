@@ -54,7 +54,7 @@ public:
 /**
  * Callback function used to create a singleton.
  */
-typedef std::function<InstanceSharedPtr()> SingletonFactoryCb;
+using SingletonFactoryCb = std::function<InstanceSharedPtr()>;
 
 /**
  * A manager for all server-side singletons.
@@ -84,7 +84,7 @@ public:
   virtual InstanceSharedPtr get(const std::string& name, SingletonFactoryCb) PURE;
 };
 
-typedef std::unique_ptr<Manager> ManagerPtr;
+using ManagerPtr = std::unique_ptr<Manager>;
 
 } // namespace Singleton
 } // namespace Envoy

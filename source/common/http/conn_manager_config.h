@@ -109,7 +109,7 @@ struct TracingConnectionManagerConfig {
   bool verbose_;
 };
 
-typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManagerConfigPtr;
+using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManagerConfig>;
 
 /**
  * Connection manager per listener stats. @see stats_macros.h

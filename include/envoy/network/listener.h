@@ -192,14 +192,14 @@ public:
   virtual void enable() PURE;
 };
 
-typedef std::unique_ptr<Listener> ListenerPtr;
+using ListenerPtr = std::unique_ptr<Listener>;
 
 /**
  * A UDP listener interface.
  */
 class UdpListener : public virtual Listener {
 public:
-  virtual ~UdpListener() = default;
+  ~UdpListener() override = default;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this listener.

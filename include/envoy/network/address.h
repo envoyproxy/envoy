@@ -163,7 +163,7 @@ public:
   virtual Type type() const PURE;
 };
 
-typedef std::shared_ptr<const Instance> InstanceConstSharedPtr;
+using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
 
 } // namespace Address
 } // namespace Network

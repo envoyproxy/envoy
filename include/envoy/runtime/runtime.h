@@ -37,7 +37,7 @@ public:
   virtual std::string uuid() PURE;
 };
 
-typedef std::unique_ptr<RandomGenerator> RandomGeneratorPtr;
+using RandomGeneratorPtr = std::unique_ptr<RandomGenerator>;
 
 /**
  * A snapshot of runtime data.
@@ -53,7 +53,7 @@ public:
     absl::optional<bool> bool_value_;
   };
 
-  typedef absl::flat_hash_map<std::string, Entry> EntryMap;
+  using EntryMap = absl::flat_hash_map<std::string, Entry>;
 
   /**
    * A provider of runtime values. One or more of these compose the snapshot's source of values,
@@ -74,7 +74,7 @@ public:
     virtual const std::string& name() const PURE;
   };
 
-  typedef std::unique_ptr<const OverrideLayer> OverrideLayerConstPtr;
+  using OverrideLayerConstPtr = std::unique_ptr<const OverrideLayer>;
 
   // Returns true if a deprecated feature is allowed.
   //

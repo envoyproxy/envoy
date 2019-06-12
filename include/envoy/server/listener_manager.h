@@ -26,7 +26,7 @@ public:
   virtual std::string versionInfo() const PURE;
 };
 
-typedef std::unique_ptr<LdsApi> LdsApiPtr;
+using LdsApiPtr = std::unique_ptr<LdsApi>;
 
 /**
  * Factory for creating listener components.

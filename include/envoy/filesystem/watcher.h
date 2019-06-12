@@ -16,7 +16,7 @@ namespace Filesystem {
  */
 class Watcher {
 public:
-  typedef std::function<void(uint32_t events)> OnChangedCb;
+  using OnChangedCb = std::function<void(uint32_t events)>;
 
   struct Events {
     static const uint32_t MovedTo = 0x1;

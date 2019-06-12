@@ -50,7 +50,7 @@ public:
   virtual void updateResourceUsage(Callbacks& callbacks) PURE;
 };
 
-typedef std::unique_ptr<ResourceMonitor> ResourceMonitorPtr;
+using ResourceMonitorPtr = std::unique_ptr<ResourceMonitor>;
 
 } // namespace Server
 } // namespace Envoy

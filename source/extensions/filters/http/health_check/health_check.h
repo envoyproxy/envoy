@@ -47,13 +47,13 @@ private:
   std::atomic<bool> last_response_degraded_{};
 };
 
-typedef std::shared_ptr<HealthCheckCacheManager> HealthCheckCacheManagerSharedPtr;
+using HealthCheckCacheManagerSharedPtr = std::shared_ptr<HealthCheckCacheManager>;
 
-typedef std::map<std::string, double> ClusterMinHealthyPercentages;
+using ClusterMinHealthyPercentages = std::map<std::string, double>;
 typedef std::shared_ptr<const ClusterMinHealthyPercentages>
     ClusterMinHealthyPercentagesConstSharedPtr;
 
-typedef std::shared_ptr<std::vector<Http::HeaderUtility::HeaderData>> HeaderDataVectorSharedPtr;
+using HeaderDataVectorSharedPtr = std::shared_ptr<std::vector<Http::HeaderUtility::HeaderData>>;
 
 /**
  * Health check responder filter.

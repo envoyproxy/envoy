@@ -13,10 +13,10 @@ namespace Envoy {
 namespace Json {
 class Object;
 
-typedef std::shared_ptr<Object> ObjectSharedPtr;
+using ObjectSharedPtr = std::shared_ptr<Object>;
 
 // @return false if immediate exit from iteration required.
-typedef std::function<bool(const std::string&, const Object&)> ObjectCallback;
+using ObjectCallback = std::function<bool(const std::string&, const Object&)>;
 
 /**
  * Exception thrown when a JSON error occurs.

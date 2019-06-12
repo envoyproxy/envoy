@@ -72,7 +72,7 @@ private:
 
 class TlsCertificateSdsApi;
 class CertificateValidationContextSdsApi;
-typedef std::shared_ptr<TlsCertificateSdsApi> TlsCertificateSdsApiSharedPtr;
+using TlsCertificateSdsApiSharedPtr = std::shared_ptr<TlsCertificateSdsApi>;
 typedef std::shared_ptr<CertificateValidationContextSdsApi>
     CertificateValidationContextSdsApiSharedPtr;
 

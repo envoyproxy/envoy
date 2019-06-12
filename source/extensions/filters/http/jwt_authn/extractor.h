@@ -36,10 +36,10 @@ public:
   virtual void removeJwt(Http::HeaderMap& headers) const PURE;
 };
 
-typedef std::unique_ptr<const JwtLocation> JwtLocationConstPtr;
+using JwtLocationConstPtr = std::unique_ptr<const JwtLocation>;
 
 class Extractor;
-typedef std::unique_ptr<const Extractor> ExtractorConstPtr;
+using ExtractorConstPtr = std::unique_ptr<const Extractor>;
 
 /**
  * Extracts JWT from locations specified in the config.

@@ -28,7 +28,7 @@ public:
                       std::chrono::milliseconds timeout) PURE;
 };
 
-typedef std::unique_ptr<ShadowWriter> ShadowWriterPtr;
+using ShadowWriterPtr = std::unique_ptr<ShadowWriter>;
 
 } // namespace Router
 } // namespace Envoy

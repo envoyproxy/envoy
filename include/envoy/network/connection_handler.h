@@ -70,7 +70,7 @@ public:
   virtual void enableListeners() PURE;
 };
 
-typedef std::unique_ptr<ConnectionHandler> ConnectionHandlerPtr;
+using ConnectionHandlerPtr = std::unique_ptr<ConnectionHandler>;
 
 } // namespace Network
 } // namespace Envoy

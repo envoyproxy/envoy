@@ -40,7 +40,7 @@ enum class Mode {
   // to be validated in a non-prod environment.
 };
 
-typedef std::unique_ptr<envoy::admin::v2alpha::CommandLineOptions> CommandLineOptionsPtr;
+using CommandLineOptionsPtr = std::unique_ptr<envoy::admin::v2alpha::CommandLineOptions>;
 
 /**
  * General options for the server.

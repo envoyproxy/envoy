@@ -15,7 +15,7 @@ struct RcDetailsValues {
   // The jwt_authn filter rejected the request
   const std::string JwtAuthnAccessDenied = "jwt_authn_access_denied";
 };
-typedef ConstSingleton<RcDetailsValues> RcDetails;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 Filter::Filter(FilterConfigSharedPtr config) : stats_(config->stats()), config_(config) {}
 

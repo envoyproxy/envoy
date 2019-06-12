@@ -39,7 +39,7 @@ public:
   virtual void onHostAttempted(HostDescriptionConstSharedPtr attempted_host) PURE;
 };
 
-typedef std::shared_ptr<RetryPriority> RetryPrioritySharedPtr;
+using RetryPrioritySharedPtr = std::shared_ptr<RetryPriority>;
 
 /**
  * Used to decide whether a selected host should be rejected during retries. Host selection will be
@@ -70,7 +70,7 @@ public:
   virtual void onHostAttempted(HostDescriptionConstSharedPtr attempted_host) PURE;
 };
 
-typedef std::shared_ptr<RetryHostPredicate> RetryHostPredicateSharedPtr;
+using RetryHostPredicateSharedPtr = std::shared_ptr<RetryHostPredicate>;
 
 /**
  * Factory for RetryPriority.

@@ -15,7 +15,7 @@ namespace Envoy {
 namespace Matchers {
 
 class ValueMatcher;
-typedef std::shared_ptr<const ValueMatcher> ValueMatcherConstSharedPtr;
+using ValueMatcherConstSharedPtr = std::shared_ptr<const ValueMatcher>;
 
 class ValueMatcher {
 public:

@@ -99,9 +99,9 @@ public:
   static FieldType getFieldType() { return FieldType::String; }
 };
 
-typedef std::unique_ptr<ThriftValue> ThriftValuePtr;
-typedef std::list<ThriftValuePtr> ThriftValuePtrList;
-typedef std::list<std::pair<ThriftValuePtr, ThriftValuePtr>> ThriftValuePtrPairList;
+using ThriftValuePtr = std::unique_ptr<ThriftValue>;
+using ThriftValuePtrList = std::list<ThriftValuePtr>;
+using ThriftValuePtrPairList = std::list<std::pair<ThriftValuePtr, ThriftValuePtr>>;
 
 /**
  * ThriftField is a field within a ThriftStruct.
@@ -126,8 +126,8 @@ public:
   virtual const ThriftValue& getValue() const PURE;
 };
 
-typedef std::unique_ptr<ThriftField> ThriftFieldPtr;
-typedef std::list<ThriftFieldPtr> ThriftFieldPtrList;
+using ThriftFieldPtr = std::unique_ptr<ThriftField>;
+using ThriftFieldPtrList = std::list<ThriftFieldPtr>;
 
 /**
  * ThriftListValue is an ordered list of ThriftValues.
@@ -227,7 +227,7 @@ public:
  */
 class ThriftObject : public ThriftStructValue {
 public:
-  virtual ~ThriftObject() = default;
+  ~ThriftObject() override = default;
 
   /*
    * Consumes bytes from the buffer until a single complete Thrift struct has been consumed.
@@ -239,7 +239,7 @@ public:
   virtual bool onData(Buffer::Instance& buffer) PURE;
 };
 
-typedef std::unique_ptr<ThriftObject> ThriftObjectPtr;
+using ThriftObjectPtr = std::unique_ptr<ThriftObject>;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

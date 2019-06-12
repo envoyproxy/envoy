@@ -65,20 +65,20 @@ public:
 
 class RequestMessage : public virtual Message {
 public:
-  virtual ~RequestMessage() = default;
+  ~RequestMessage() override = default;
   virtual SerializationType serializationType() const PURE;
   virtual bool isTwoWay() const PURE;
 };
 
-typedef std::unique_ptr<RequestMessage> RequestMessagePtr;
+using RequestMessagePtr = std::unique_ptr<RequestMessage>;
 
 class ResponseMessage : public virtual Message {
 public:
-  virtual ~ResponseMessage() = default;
+  ~ResponseMessage() override = default;
   virtual ResponseStatus responseStatus() const PURE;
 };
 
-typedef std::unique_ptr<ResponseMessage> ResponseMessagePtr;
+using ResponseMessagePtr = std::unique_ptr<ResponseMessage>;
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

@@ -33,7 +33,7 @@ public:
                                   const Network::Address::Instance& remote_address) const PURE;
 };
 
-typedef std::unique_ptr<RateLimitAction> RateLimitActionPtr;
+using RateLimitActionPtr = std::unique_ptr<RateLimitAction>;
 
 /**
  * Rate limit configuration.

@@ -76,7 +76,7 @@ public:
                            Buffer::Instance& message) PURE;
 };
 
-typedef std::unique_ptr<Transport> TransportPtr;
+using TransportPtr = std::unique_ptr<Transport>;
 
 /**
  * Implemented by each Thrift transport and registered via Registry::registerFactory or the

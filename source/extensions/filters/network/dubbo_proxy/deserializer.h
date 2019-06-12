@@ -43,7 +43,7 @@ public:
   }
 };
 
-typedef ConstSingleton<DeserializerNameValues> DeserializerNames;
+using DeserializerNames = ConstSingleton<DeserializerNameValues>;
 
 /**
  * RpcInvocation represent an rpc call
@@ -58,7 +58,7 @@ public:
   virtual const std::string& getServiceVersion() const PURE;
 };
 
-typedef std::unique_ptr<RpcInvocation> RpcInvocationPtr;
+using RpcInvocationPtr = std::unique_ptr<RpcInvocation>;
 
 /**
  * RpcResult represent the result of an rpc call
@@ -71,7 +71,7 @@ public:
   virtual bool hasException() const PURE;
 };
 
-typedef std::unique_ptr<RpcResult> RpcResultPtr;
+using RpcResultPtr = std::unique_ptr<RpcResult>;
 
 class Deserializer {
 public:
@@ -121,7 +121,7 @@ public:
                                     RpcResponseType type) PURE;
 };
 
-typedef std::unique_ptr<Deserializer> DeserializerPtr;
+using DeserializerPtr = std::unique_ptr<Deserializer>;
 
 /**
  * Implemented by each Dubbo deserialize and registered via Registry::registerFactory or the

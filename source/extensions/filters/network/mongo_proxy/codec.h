@@ -62,7 +62,7 @@ public:
   virtual void cursorId(int64_t cursor_id) PURE;
 };
 
-typedef std::unique_ptr<GetMoreMessage> GetMoreMessagePtr;
+using GetMoreMessagePtr = std::unique_ptr<GetMoreMessage>;
 
 /**
  * Mongo OP_INSERT message.
@@ -79,7 +79,7 @@ public:
   virtual std::list<Bson::DocumentSharedPtr>& documents() PURE;
 };
 
-typedef std::unique_ptr<InsertMessage> InsertMessagePtr;
+using InsertMessagePtr = std::unique_ptr<InsertMessage>;
 
 /**
  * Mongo OP_KILL_CURSORS message.
@@ -94,7 +94,7 @@ public:
   virtual void cursorIds(std::vector<int64_t>&& cursors_ids) PURE;
 };
 
-typedef std::unique_ptr<KillCursorsMessage> KillCursorsMessagePtr;
+using KillCursorsMessagePtr = std::unique_ptr<KillCursorsMessage>;
 
 /**
  * Mongo OP_QUERY message.
@@ -126,7 +126,7 @@ public:
   virtual void returnFieldsSelector(Bson::DocumentSharedPtr&& fields) PURE;
 };
 
-typedef std::unique_ptr<QueryMessage> QueryMessagePtr;
+using QueryMessagePtr = std::unique_ptr<QueryMessage>;
 
 /**
  * Mongo OP_REPLY
@@ -154,7 +154,7 @@ public:
   virtual std::list<Bson::DocumentSharedPtr>& documents() PURE;
 };
 
-typedef std::unique_ptr<ReplyMessage> ReplyMessagePtr;
+using ReplyMessagePtr = std::unique_ptr<ReplyMessage>;
 
 class CommandMessage : public virtual Message {
 public:
@@ -172,7 +172,7 @@ public:
   virtual std::list<Bson::DocumentSharedPtr>& inputDocs() PURE;
 };
 
-typedef std::unique_ptr<CommandMessage> CommandMessagePtr;
+using CommandMessagePtr = std::unique_ptr<CommandMessage>;
 
 class CommandReplyMessage : public virtual Message {
 public:
@@ -185,7 +185,7 @@ public:
   virtual std::list<Bson::DocumentSharedPtr>& outputDocs() PURE;
 };
 
-typedef std::unique_ptr<CommandReplyMessage> CommandReplyMessagePtr;
+using CommandReplyMessagePtr = std::unique_ptr<CommandReplyMessage>;
 
 /**
  * General callbacks for dispatching decoded mongo messages to a sink.
@@ -213,7 +213,7 @@ public:
   virtual void onData(Buffer::Instance& data) PURE;
 };
 
-typedef std::unique_ptr<Decoder> DecoderPtr;
+using DecoderPtr = std::unique_ptr<Decoder>;
 
 /**
  * Mongo message encoder.

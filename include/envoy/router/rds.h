@@ -50,7 +50,7 @@ public:
   virtual void onConfigUpdate() PURE;
 };
 
-typedef std::unique_ptr<RouteConfigProvider> RouteConfigProviderPtr;
+using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider>;
 
 } // namespace Router
 } // namespace Envoy

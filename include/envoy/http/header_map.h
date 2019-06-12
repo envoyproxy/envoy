@@ -76,7 +76,7 @@ struct LowerCaseStringHash {
 /**
  * Convenient type for unordered set of lower case string.
  */
-typedef std::unordered_set<LowerCaseString, LowerCaseStringHash> LowerCaseStrUnorderedSet;
+using LowerCaseStrUnorderedSet = std::unordered_set<LowerCaseString, LowerCaseStringHash>;
 
 /**
  * Convenient type for a vector of lower case string and string pair.
@@ -545,12 +545,12 @@ public:
   }
 };
 
-typedef std::unique_ptr<HeaderMap> HeaderMapPtr;
+using HeaderMapPtr = std::unique_ptr<HeaderMap>;
 
 /**
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.
  */
-typedef std::vector<std::pair<LowerCaseString, std::string>> HeaderVector;
+using HeaderVector = std::vector<std::pair<LowerCaseString, std::string>>;
 
 } // namespace Http
 } // namespace Envoy

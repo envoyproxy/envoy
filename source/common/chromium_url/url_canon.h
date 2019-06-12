@@ -163,7 +163,7 @@ extern template class EXPORT_TEMPLATE_DECLARE(COMPONENT_EXPORT(URL)) CanonOutput
 // Normally, all canonicalization output is in narrow characters. We support
 // the templates so it can also be used internally if a wide buffer is
 // required.
-typedef CanonOutputT<char> CanonOutput;
+using CanonOutput = CanonOutputT<char>;
 
 template <int fixed_capacity>
 class RawCanonOutput : public RawCanonOutputT<char, fixed_capacity> {};

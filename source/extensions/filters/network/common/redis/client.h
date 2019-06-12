@@ -69,7 +69,7 @@ public:
  */
 class Client : public Event::DeferredDeletable {
 public:
-  virtual ~Client() = default;
+  ~Client() override = default;
 
   /**
    * Adds network connection callbacks to the underlying network connection.
@@ -91,7 +91,7 @@ public:
   virtual PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) PURE;
 };
 
-typedef std::unique_ptr<Client> ClientPtr;
+using ClientPtr = std::unique_ptr<Client>;
 
 /**
  * Configuration for a redis connection pool.

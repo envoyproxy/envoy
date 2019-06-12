@@ -24,7 +24,7 @@ public:
   virtual void setUnhealthy() PURE;
 };
 
-typedef std::unique_ptr<HealthCheckHostMonitor> HealthCheckHostMonitorPtr;
+using HealthCheckHostMonitorPtr = std::unique_ptr<HealthCheckHostMonitor>;
 
 } // namespace Upstream
 } // namespace Envoy

@@ -20,7 +20,7 @@ public:
   virtual RawAsyncClientPtr create() PURE;
 };
 
-typedef std::unique_ptr<AsyncClientFactory> AsyncClientFactoryPtr;
+using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 
 // Singleton gRPC client manager. Grpc::AsyncClientManager can be used to create per-service
 // Grpc::AsyncClientFactory instances. All manufactured Grpc::AsyncClients must
@@ -44,7 +44,7 @@ public:
                         bool skip_cluster_check) PURE;
 };
 
-typedef std::unique_ptr<AsyncClientManager> AsyncClientManagerPtr;
+using AsyncClientManagerPtr = std::unique_ptr<AsyncClientManager>;
 
 } // namespace Grpc
 } // namespace Envoy

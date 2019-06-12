@@ -51,7 +51,7 @@ struct RcDetailsValues {
   // This will generally be accompanied by details about the transcoder failure.
   const std::string GrpcTranscodeFailed = "grpc_json_transcode_failure";
 };
-typedef ConstSingleton<RcDetailsValues> RcDetails;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
 // Transcoder:

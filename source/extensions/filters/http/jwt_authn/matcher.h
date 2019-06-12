@@ -9,7 +9,7 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 class Matcher;
-typedef std::unique_ptr<const Matcher> MatcherConstPtr;
+using MatcherConstPtr = std::unique_ptr<const Matcher>;
 
 /**
  * Supports matching a HTTP requests with JWT requirements.

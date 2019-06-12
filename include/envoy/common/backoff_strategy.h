@@ -24,5 +24,5 @@ public:
   virtual void reset() PURE;
 };
 
-typedef std::unique_ptr<BackOffStrategy> BackOffStrategyPtr;
+using BackOffStrategyPtr = std::unique_ptr<BackOffStrategy>;
 } // namespace Envoy

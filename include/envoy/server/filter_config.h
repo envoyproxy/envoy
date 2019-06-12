@@ -212,7 +212,7 @@ public:
  */
 class NamedListenerFilterConfigFactory : public ListenerFilterConfigFactoryBase {
 public:
-  virtual ~NamedListenerFilterConfigFactory() = default;
+  ~NamedListenerFilterConfigFactory() override = default;
 
   /**
    * Create a particular listener filter factory implementation. If the implementation is unable to
@@ -234,7 +234,7 @@ public:
  */
 class NamedUdpListenerFilterConfigFactory : public ListenerFilterConfigFactoryBase {
 public:
-  virtual ~NamedUdpListenerFilterConfigFactory() = default;
+  ~NamedUdpListenerFilterConfigFactory() override = default;
 
   /**
    * Create a particular UDP listener filter factory implementation. If the implementation is unable
@@ -283,7 +283,7 @@ public:
  */
 class NamedNetworkFilterConfigFactory : public ProtocolOptionsFactory {
 public:
-  virtual ~NamedNetworkFilterConfigFactory() = default;
+  ~NamedNetworkFilterConfigFactory() override = default;
 
   /**
    * Create a particular network filter factory implementation. If the implementation is unable to
@@ -329,7 +329,7 @@ public:
  */
 class NamedHttpFilterConfigFactory : public ProtocolOptionsFactory {
 public:
-  virtual ~NamedHttpFilterConfigFactory() = default;
+  ~NamedHttpFilterConfigFactory() override = default;
 
   /**
    * Create a particular http filter factory implementation. If the implementation is unable to

@@ -64,7 +64,7 @@ public:
   virtual ~ClusterUpdateCallbacksHandle() = default;
 };
 
-typedef std::unique_ptr<ClusterUpdateCallbacksHandle> ClusterUpdateCallbacksHandlePtr;
+using ClusterUpdateCallbacksHandlePtr = std::unique_ptr<ClusterUpdateCallbacksHandle>;
 
 class ClusterManagerFactory;
 
@@ -114,7 +114,7 @@ public:
    */
   virtual void setInitializedCb(std::function<void()> callback) PURE;
 
-  typedef std::unordered_map<std::string, std::reference_wrapper<const Cluster>> ClusterInfoMap;
+  using ClusterInfoMap = std::unordered_map<std::string, std::reference_wrapper<const Cluster>>;
 
   /**
    * @return ClusterInfoMap all current clusters. These are the primary (not thread local)
@@ -247,7 +247,7 @@ public:
   virtual std::size_t warmingClusterCount() const PURE;
 };
 
-typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;
+using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
 
 /**
  * Abstract interface for a CDS API provider.
@@ -273,7 +273,7 @@ public:
   virtual const std::string versionInfo() const PURE;
 };
 
-typedef std::unique_ptr<CdsApi> CdsApiPtr;
+using CdsApiPtr = std::unique_ptr<CdsApi>;
 
 /**
  * Factory for objects needed during cluster manager operation.

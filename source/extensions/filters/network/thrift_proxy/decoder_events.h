@@ -134,7 +134,7 @@ public:
   virtual FilterStatus setEnd() PURE;
 };
 
-typedef std::shared_ptr<DecoderEventHandler> DecoderEventHandlerSharedPtr;
+using DecoderEventHandlerSharedPtr = std::shared_ptr<DecoderEventHandler>;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

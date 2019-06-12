@@ -105,7 +105,7 @@ public:
  */
 class DecoderFilter : public virtual DecoderEventHandler {
 public:
-  virtual ~DecoderFilter() = default;
+  ~DecoderFilter() override = default;
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
@@ -125,7 +125,7 @@ public:
   virtual void setDecoderFilterCallbacks(DecoderFilterCallbacks& callbacks) PURE;
 };
 
-typedef std::shared_ptr<DecoderFilter> DecoderFilterSharedPtr;
+using DecoderFilterSharedPtr = std::shared_ptr<DecoderFilter>;
 
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
@@ -150,7 +150,7 @@ public:
  * function will install a single filter, but it's technically possibly to install more than one
  * if desired.
  */
-typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> FilterFactoryCb;
+using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
 
 /**
  * A FilterChainFactory is used by a connection manager to create a Thrift level filter chain when

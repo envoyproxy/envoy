@@ -169,7 +169,7 @@ private:
   std::vector<Frame> stack_;
 };
 
-typedef std::unique_ptr<DecoderStateMachine> DecoderStateMachinePtr;
+using DecoderStateMachinePtr = std::unique_ptr<DecoderStateMachine>;
 
 class DecoderCallbacks {
 public:
@@ -209,7 +209,7 @@ private:
 
     DecoderEventHandler& handler_;
   };
-  typedef std::unique_ptr<ActiveRequest> ActiveRequestPtr;
+  using ActiveRequestPtr = std::unique_ptr<ActiveRequest>;
 
   void complete();
 
@@ -223,7 +223,7 @@ private:
   bool frame_ended_{false};
 };
 
-typedef std::unique_ptr<Decoder> DecoderPtr;
+using DecoderPtr = std::unique_ptr<Decoder>;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

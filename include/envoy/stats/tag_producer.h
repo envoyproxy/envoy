@@ -32,7 +32,7 @@ public:
   virtual std::string produceTags(absl::string_view metric_name, std::vector<Tag>& tags) const PURE;
 };
 
-typedef std::unique_ptr<const TagProducer> TagProducerPtr;
+using TagProducerPtr = std::unique_ptr<const TagProducer>;
 
 } // namespace Stats
 } // namespace Envoy

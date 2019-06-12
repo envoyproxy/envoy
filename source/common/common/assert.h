@@ -11,7 +11,7 @@ class ActionRegistration {
 public:
   virtual ~ActionRegistration() = default;
 };
-typedef std::unique_ptr<ActionRegistration> ActionRegistrationPtr;
+using ActionRegistrationPtr = std::unique_ptr<ActionRegistration>;
 
 /**
  * Sets an action to be invoked when a debug assertion failure is detected

@@ -54,7 +54,7 @@ public:
  */
 class DirectResponseEntry : public ResponseEntry {
 public:
-  virtual ~DirectResponseEntry() = default;
+  ~DirectResponseEntry() override = default;
 
   /**
    * Returns the HTTP status code to return.
@@ -233,7 +233,7 @@ enum class InternalRedirectAction { PassThrough, Handle };
  */
 class RetryState {
 public:
-  typedef std::function<void()> DoRetryCallback;
+  using DoRetryCallback = std::function<void()>;
 
   virtual ~RetryState() = default;
 
@@ -321,7 +321,7 @@ public:
   virtual uint32_t hostSelectionMaxAttempts() const PURE;
 };
 
-typedef std::unique_ptr<RetryState> RetryStatePtr;
+using RetryStatePtr = std::unique_ptr<RetryState>;
 
 /**
  * Per route policy for request shadowing.
@@ -377,7 +377,7 @@ class RouteSpecificFilterConfig {
 public:
   virtual ~RouteSpecificFilterConfig() = default;
 };
-typedef std::shared_ptr<const RouteSpecificFilterConfig> RouteSpecificFilterConfigConstSharedPtr;
+using RouteSpecificFilterConfigConstSharedPtr = std::shared_ptr<const RouteSpecificFilterConfig>;
 
 /**
  * Virtual host definition.
@@ -501,10 +501,10 @@ public:
   virtual const HashedValue& value() const PURE;
 };
 
-typedef std::shared_ptr<const MetadataMatchCriterion> MetadataMatchCriterionConstSharedPtr;
+using MetadataMatchCriterionConstSharedPtr = std::shared_ptr<const MetadataMatchCriterion>;
 
 class MetadataMatchCriteria;
-typedef std::unique_ptr<const MetadataMatchCriteria> MetadataMatchCriteriaConstPtr;
+using MetadataMatchCriteriaConstPtr = std::unique_ptr<const MetadataMatchCriteria>;
 
 class MetadataMatchCriteria {
 public:
@@ -568,7 +568,7 @@ class HttpRouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory
  */
 class RouteEntry : public ResponseEntry {
 public:
-  virtual ~RouteEntry() = default;
+  ~RouteEntry() override = default;
 
   /**
    * @return const std::string& the upstream cluster that owns the route.
@@ -729,7 +729,7 @@ public:
    */
   virtual bool includeAttemptCount() const PURE;
 
-  typedef std::map<std::string, bool> UpgradeMap;
+  using UpgradeMap = std::map<std::string, bool>;
   /**
    * @return a map of route-specific upgrades to their enabled/disabled status.
    */
@@ -766,7 +766,7 @@ public:
   virtual const std::string& getOperation() const PURE;
 };
 
-typedef std::unique_ptr<const Decorator> DecoratorConstPtr;
+using DecoratorConstPtr = std::unique_ptr<const Decorator>;
 
 /**
  * An interface representing the Tracing for the route configuration.
@@ -794,7 +794,7 @@ public:
   virtual const envoy::type::FractionalPercent& getOverallSampling() const PURE;
 };
 
-typedef std::unique_ptr<const RouteTracing> RouteTracingConstPtr;
+using RouteTracingConstPtr = std::unique_ptr<const RouteTracing>;
 
 /**
  * An interface that holds a DirectResponseEntry or RouteEntry for a request.
@@ -839,7 +839,7 @@ public:
   }
 };
 
-typedef std::shared_ptr<const Route> RouteConstSharedPtr;
+using RouteConstSharedPtr = std::shared_ptr<const Route>;
 
 /**
  * The router configuration.
@@ -876,7 +876,7 @@ public:
   virtual bool usesVhds() const PURE;
 };
 
-typedef std::shared_ptr<const Config> ConfigConstSharedPtr;
+using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
 } // namespace Router
 } // namespace Envoy

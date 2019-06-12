@@ -103,7 +103,7 @@ template <typename T> inline T* allocateLuaUserData(lua_State* state) {
  */
 template <class T> class BaseLuaObject : protected Logger::Loggable<Logger::Id::lua> {
 public:
-  typedef std::vector<std::pair<const char*, lua_CFunction>> ExportedFunctions;
+  using ExportedFunctions = std::vector<std::pair<const char*, lua_CFunction>>;
 
   virtual ~BaseLuaObject() = default;
 
@@ -351,7 +351,7 @@ private:
   State state_{State::NotStarted};
 };
 
-typedef std::unique_ptr<Coroutine> CoroutinePtr;
+using CoroutinePtr = std::unique_ptr<Coroutine>;
 
 /**
  * This class wraps a Lua state that can be used safely across threads. The model is that every

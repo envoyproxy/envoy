@@ -114,7 +114,7 @@ public:
  */
 class Counter : public virtual Metric {
 public:
-  virtual ~Counter() = default;
+  ~Counter() override = default;
   virtual void add(uint64_t amount) PURE;
   virtual void inc() PURE;
   virtual uint64_t latch() PURE;
@@ -122,7 +122,7 @@ public:
   virtual uint64_t value() const PURE;
 };
 
-typedef std::shared_ptr<Counter> CounterSharedPtr;
+using CounterSharedPtr = std::shared_ptr<Counter>;
 
 /**
  * A gauge that can both increment and decrement.
@@ -135,7 +135,7 @@ public:
     Accumulate,    // Transfers gauge state on hot-restart.
   };
 
-  virtual ~Gauge() = default;
+  ~Gauge() override = default;
 
   virtual void add(uint64_t amount) PURE;
   virtual void dec() PURE;
@@ -161,7 +161,7 @@ public:
   virtual void mergeImportMode(ImportMode import_mode) PURE;
 };
 
-typedef std::shared_ptr<Gauge> GaugeSharedPtr;
+using GaugeSharedPtr = std::shared_ptr<Gauge>;
 
 } // namespace Stats
 } // namespace Envoy

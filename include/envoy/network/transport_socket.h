@@ -147,7 +147,7 @@ public:
   virtual const Ssl::ConnectionInfo* ssl() const PURE;
 };
 
-typedef std::unique_ptr<TransportSocket> TransportSocketPtr;
+using TransportSocketPtr = std::unique_ptr<TransportSocket>;
 
 /**
  * Options for creating transport sockets.
@@ -173,7 +173,7 @@ public:
   virtual void hashKey(std::vector<uint8_t>& key) const PURE;
 };
 
-typedef std::shared_ptr<TransportSocketOptions> TransportSocketOptionsSharedPtr;
+using TransportSocketOptionsSharedPtr = std::shared_ptr<TransportSocketOptions>;
 
 /**
  * A factory for creating transport socket. It will be associated to filter chains and clusters.
@@ -195,7 +195,7 @@ public:
   createTransportSocket(TransportSocketOptionsSharedPtr options) const PURE;
 };
 
-typedef std::unique_ptr<TransportSocketFactory> TransportSocketFactoryPtr;
+using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;
 
 } // namespace Network
 } // namespace Envoy

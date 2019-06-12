@@ -203,7 +203,7 @@ private:
     CodecClient& parent_;
   };
 
-  typedef std::unique_ptr<ActiveRequest> ActiveRequestPtr;
+  using ActiveRequestPtr = std::unique_ptr<ActiveRequest>;
 
   /**
    * Called when a response finishes decoding. This is called *before* forwarding on to the
@@ -233,7 +233,7 @@ private:
   bool remote_closed_{};
 };
 
-typedef std::unique_ptr<CodecClient> CodecClientPtr;
+using CodecClientPtr = std::unique_ptr<CodecClient>;
 
 /**
  * Production implementation that installs a real codec.

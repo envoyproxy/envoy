@@ -26,7 +26,7 @@ public:
   virtual SysCallIntResult shmUnlink(const char* name) PURE;
 };
 
-typedef std::unique_ptr<HotRestartOsSysCalls> HotRestartOsSysCallsPtr;
+using HotRestartOsSysCallsPtr = std::unique_ptr<HotRestartOsSysCalls>;
 
 } // namespace Api
 } // namespace Envoy
