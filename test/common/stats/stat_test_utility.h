@@ -30,17 +30,24 @@ bool hasDeterministicMallocStats();
  */
 void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> fn);
 
-// Defines a test-macro for expected memory consumption. There are 3 cases:
-//   1. Memory usage API is available, and is built using with a canonical
-//      toolchain, enabling exact comparisons against an expected number of
-//      bytes consumed. The canonical environment is Envoy CI release builds.
-//   2. Memory usage API is available, but the current build may subtly differ
-//      in memory consumption from #1. We'd still like to track memory usage
-//      but it needs to be approximate.
-//   3. Memory usage API is not available. In this case, the code is executed
-//      but no testing occurs.
+// Tracks memory consumption over a span of time. Test classes should
+// instantiate a MemoryTest object when they want to start measuring heap
+// memory, and call consumedBytes() to determine how much as been consumed since
+// the class was instantiated.
+//
+// That value should then be passed to EXPECT_MEMORY_EQ and EXPECT_MEMORY_LE,
+// defined below.
 class MemoryTest {
 public:
+  // There are 3 cases:
+  //   1. Memory usage API is available, and is built using with a canonical
+  //      toolchain, enabling exact comparisons against an expected number of
+  //      bytes consumed. The canonical environment is Envoy CI release builds.
+  //   2. Memory usage API is available, but the current build may subtly differ
+  //      in memory consumption from #1. We'd still like to track memory usage
+  //      but it needs to be approximate.
+  //   3. Memory usage API is not available. In this case, the code is executed
+  //      but no testing occurs.
   enum class Mode {
     Disabled,    // No memory usage data available on platform.
     Canonical,   // Memory usage is available, and current platform is canonical.
@@ -49,6 +56,10 @@ public:
 
   MemoryTest() : memory_at_construction_(Memory::Stats::totalCurrentlyAllocated()) {}
 
+  /**
+   * @return the memory execution testability mode for the current compiler, architecture,
+   *         and compile flags.
+   */
   static Mode mode();
 
   size_t consumedBytes() const {
@@ -59,25 +70,34 @@ private:
   const size_t memory_at_construction_;
 };
 
+// Compares the memory consumed against an exact expected value, but only
+// on canonical platforms. This is currently enabled only for 'release' tests
+// in ci. On other platforms an info log is emitted, indicating that the test
+// is being skipped.
 #define EXPECT_MEMORY_EQ(consumed_bytes, expected_value)                                           \
   do {                                                                                             \
     if (Stats::TestUtil::MemoryTest::mode() == Stats::TestUtil::MemoryTest::Mode::Canonical) {     \
       EXPECT_EQ(consumed_bytes, expected_value);                                                   \
     } else {                                                                                       \
       ENVOY_LOG_MISC(info,                                                                         \
-                     "Skipping exact memory test against {} bytes as platform is non-canonical",   \
-                     expected_value);                                                              \
+                     "Skipping exact memory test of actual={} versus expected={} "                 \
+                     "bytes as platform is non-canonical",                                         \
+                     consumed_bytes, expected_value);                                              \
     }                                                                                              \
   } while (false)
 
-#define EXPECT_MEMORY_LE(consumed_bytes, expected_value)                                           \
+// Compares the memory consumed against an expected upper bound, but only
+// on platforms where memory consumption can be measured via API. This is
+// currently enabled only for builds with TCMALLOC. On other platforms, an info
+// log is emitted, indicating that the test is being skipped.
+#define EXPECT_MEMORY_LE(consumed_bytes, upper_bound)                                              \
   do {                                                                                             \
     if (Stats::TestUtil::MemoryTest::mode() != Stats::TestUtil::MemoryTest::Mode::Disabled) {      \
-      EXPECT_LE(consumed_bytes, expected_value);                                                   \
+      EXPECT_LE(consumed_bytes, upper_bound);                                                      \
     } else {                                                                                       \
       ENVOY_LOG_MISC(                                                                              \
-          info, "Skipping approximate memory test against {} bytes as platform lacks tcmalloc",    \
-          expected_value);                                                                         \
+          info, "Skipping upper-bound memory test against {} bytes as platform lacks tcmalloc",    \
+          upper_bound);                                                                            \
     }                                                                                              \
   } while (false)
 

@@ -850,16 +850,16 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   MockSink sink;
   Stats::FakeSymbolTableImpl symbol_table;
   HeapStatDataAllocator alloc(symbol_table);
-  auto store = std::make_unique<ThreadLocalStoreImpl>(alloc);
-  store->addSink(sink);
+  ThreadLocalStoreImpl store(alloc);
+  store.addSink(sink);
 
   // Use a tag producer that will produce tags.
   envoy::config::metrics::v2::StatsConfig stats_config;
-  store->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+  store.setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
 
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      1000, [&store](absl::string_view name) { store->counter(std::string(name)); });
+      1000, [&store](absl::string_view name) { store.counter(std::string(name)); });
   const size_t million = 1000 * 1000;
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 19601552); // as of March 14, 2019
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 20 * million);
@@ -868,22 +868,22 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
   Stats::FakeSymbolTableImpl symbol_table;
   HeapStatDataAllocator alloc(symbol_table);
-  auto store = std::make_unique<ThreadLocalStoreImpl>(alloc);
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  ThreadLocalStoreImpl store(alloc);
 
   // Use a tag producer that will produce tags.
   envoy::config::metrics::v2::StatsConfig stats_config;
-  store->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+  store.setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
 
-  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
-  NiceMock<ThreadLocal::MockInstance> tls;
-  store->initializeThreading(main_thread_dispatcher, tls);
+  store.initializeThreading(main_thread_dispatcher, tls);
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      1000, [&store](absl::string_view name) { store->counter(std::string(name)); });
+      1000, [&store](absl::string_view name) { store.counter(std::string(name)); });
   const size_t million = 1000 * 1000;
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 22880912);
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 23 * million);
-  store->shutdownThreading();
+  store.shutdownThreading();
   tls.shutdownThread();
 }
 
