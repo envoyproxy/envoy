@@ -337,16 +337,14 @@ bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host
       for (const auto& v : entry_it->second.list_value().values()) {
         if (ValueUtil::equal(v, kv.second)) {
           any_match = true;
-          continue;
+          break;
         }
       }
 
-      if (any_match) {
-        continue;
+      if (!any_match) {
+        return false;
       }
-    }
-
-    if (!ValueUtil::equal(entry_it->second, kv.second)) {
+    } else if (!ValueUtil::equal(entry_it->second, kv.second)) {
       return false;
     }
   }
