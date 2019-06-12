@@ -50,8 +50,8 @@ namespace Server {
 class FilterChainManagerImplTest : public testing::Test {
 public:
   void SetUp() override {
-    local_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
-    remote_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
+    local_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
+    remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
   }
 
   // Helper for test
@@ -115,7 +115,7 @@ public:
 };
 
 TEST_F(FilterChainManagerImplTest, FilterChainMatchNothing) {
-  auto filter_chain =
+  const auto* filter_chain =
       findFilterChainHelper(0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
   EXPECT_EQ(filter_chain, nullptr);
 }

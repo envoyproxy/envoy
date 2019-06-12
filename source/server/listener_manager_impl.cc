@@ -282,7 +282,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   // Convert both destination and source IP CIDRs to tries for faster lookups.
   filter_chain_manager_.finishFilterChain();
 
-  bool need_tls_inspector =
+  const bool need_tls_inspector =
       std::any_of(
           config.filter_chains().begin(), config.filter_chains().end(),
           [](const auto& filter_chain) {
