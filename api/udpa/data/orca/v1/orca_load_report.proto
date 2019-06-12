@@ -26,10 +26,11 @@ message OrcaLoadReport {
   // responsible for.
   uint64 rps = 3;
 
-  // Application specific requests costs. Each value may be an absolute cost (e.g.
-  // 3487 bytes of storage) or utilization associated with the request,
-  // expressed as a fraction of total resources available. Utilization
-  // metrics should be derived from a sample or measurement taken
-  // during the request.
-  map<string, double> request_cost_or_utilization = 4;
+  // Application specific requests costs. Each value is an absolute cost (e.g. 3487 bytes of
+  // storage) associated with the request.
+  map<string, double> request_cost = 4;
+
+  // Resource utilization values. Each value is expressed as a fraction of total resources
+  // available, derived from the latest sample or measurement.
+  map<string, double> utilization = 5;
 }
