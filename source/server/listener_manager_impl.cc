@@ -183,25 +183,6 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
   return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
-// void makeTransportSocketFactory(envoy.api.v2.core.TransportSocket& transport_socket,
-//                                 ProtobufMessage::ValidationVisitor& vistor) {
-//   if (!filter_chain.has_transport_socket()) {
-//     if (filter_chain.has_tls_context()) {
-//       transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-//       MessageUtil::jsonConvert(filter_chain.tls_context(), *transport_socket.mutable_config());
-//     } else {
-//       transport_socket.set_name(
-//           Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
-//     }
-//   }
-
-//   auto& config_factory = Config::Utility::getAndCheckFactory<
-//       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
-//   ProtobufTypes::MessagePtr message =
-//       Config::Utility::translateToFactoryConfig(transport_socket, visitor, config_factory);
-//   config_factory.createTransportSocketFactory(*message, factory_context, server_names),
-// }
-
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                            ListenerManagerImpl& parent, const std::string& name, bool modifiable,
                            bool workers_started, uint64_t hash)
@@ -289,11 +270,6 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
   }
 
-  bool need_tls_inspector = false;
-  std::unordered_set<envoy::api::v2::listener::FilterChainMatch, MessageUtil, MessageUtil>
-      filter_chains;
-
-  // TODO(lambdai): move the trie construction to FilterChainManagerImpl
   Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
@@ -303,38 +279,37 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   factory_context.setInitManager(initManager());
   ListenerFilterChainFactoryBuilder builder(*this, factory_context);
   filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
-
   // Convert both destination and source IP CIDRs to tries for faster lookups.
   filter_chain_manager_.finishFilterChain();
-  need_tls_inspector |= std::any_of(
-      config.filter_chains().begin(), config.filter_chains().end(), [](const auto& filter_chain) {
-        const auto& matcher = filter_chain.filter_chain_match();
-        return matcher.transport_protocol() == "tls" ||
-               (matcher.transport_protocol().empty() &&
-                (!matcher.server_names().empty() || !matcher.application_protocols().empty()));
-      });
+
+  bool need_tls_inspector =
+      std::any_of(
+          config.filter_chains().begin(), config.filter_chains().end(),
+          [](const auto& filter_chain) {
+            const auto& matcher = filter_chain.filter_chain_match();
+            return matcher.transport_protocol() == "tls" ||
+                   (matcher.transport_protocol().empty() &&
+                    (!matcher.server_names().empty() || !matcher.application_protocols().empty()));
+          }) &&
+      std::all_of(config.listener_filters().begin(), config.listener_filters().end(),
+                  [](const auto& filter) {
+                    return filter.name() !=
+                           Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector;
+                  });
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
   if (need_tls_inspector) {
-    for (const auto& filter : config.listener_filters()) {
-      if (filter.name() == Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector) {
-        need_tls_inspector = false;
-        break;
-      }
-    }
-    if (need_tls_inspector) {
-      const std::string message =
-          fmt::format("adding listener '{}': filter chain match rules require TLS Inspector "
-                      "listener filter, but it isn't configured, trying to inject it "
-                      "(this might fail if Envoy is compiled without it)",
-                      address_->asString());
-      ENVOY_LOG(warn, "{}", message);
+    const std::string message =
+        fmt::format("adding listener '{}': filter chain match rules require TLS Inspector "
+                    "listener filter, but it isn't configured, trying to inject it "
+                    "(this might fail if Envoy is compiled without it)",
+                    address_->asString());
+    ENVOY_LOG(warn, "{}", message);
 
-      auto& factory =
-          Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
-              Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector);
-      listener_filter_factories_.push_back(
-          factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
-    }
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+            Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector);
+    listener_filter_factories_.push_back(
+        factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
   }
 }
 
