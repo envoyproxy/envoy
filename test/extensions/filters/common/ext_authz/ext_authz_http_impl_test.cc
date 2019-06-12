@@ -252,7 +252,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
-  client_.onSuccess(std::move(check_response));
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  client_.onSuccess(std::move(check_response), span_);
 }
 
 // Verify client response headers when allow_upstream_headers is configured.
@@ -276,8 +277,10 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
                                          {"bar", "foo", false},
                                          {"x-baz", "foo", false},
                                          {"foobar", "foo", false}});
+
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
   auto message_response = TestCommon::makeMessageResponse(check_response_headers);
-  client_.onSuccess(std::move(message_response));
+  client_.onSuccess(std::move(message_response), span_);
 }
 
 // Test the client when a denied response is received.
@@ -292,7 +295,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
 
-  client_.onSuccess(TestCommon::makeMessageResponse(expected_headers));
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  client_.onSuccess(TestCommon::makeMessageResponse(expected_headers), span_);
 }
 
 // Verify client response headers and body when the authorization server denies the request.
@@ -307,8 +311,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
-
-  client_.onSuccess(TestCommon::makeMessageResponse(expected_headers, expected_body));
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  client_.onSuccess(TestCommon::makeMessageResponse(expected_headers, expected_body), span_);
 }
 
 // Verify client response headers when the authorization server denies the request and
@@ -329,7 +333,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
                                                                          {"x-foo", "bar", false},
                                                                          {":status", "401", false},
                                                                          {"foo", "bar", false}});
-  client_.onSuccess(TestCommon::makeMessageResponse(check_response_headers, expected_body));
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  client_.onSuccess(TestCommon::makeMessageResponse(check_response_headers, expected_body), span_);
 }
 
 // Test the client when an unknown error occurs.
