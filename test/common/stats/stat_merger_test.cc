@@ -207,7 +207,6 @@ TEST_F(StatMergerThreadLocalTest, newStatFromParent) {
   {
     StatMerger stat_merger(store_);
 
-    Protobuf::Map<std::string, uint64_t> counter_values;
     Protobuf::Map<std::string, uint64_t> counter_deltas;
     Protobuf::Map<std::string, uint64_t> gauges;
     counter_deltas["newcounter0"] = 0;
@@ -229,6 +228,19 @@ TEST_F(StatMergerThreadLocalTest, newStatFromParent) {
   EXPECT_FALSE(TestUtility::findCounter(store_, "newcounter2"));
   EXPECT_TRUE(TestUtility::findGauge(store_, "newgauge1"));
   EXPECT_FALSE(TestUtility::findGauge(store_, "newgauge2"));
+}
+
+TEST_F(StatMergerThreadLocalTest, retainImportModeAfterMerge) {
+  Gauge& gauge = store_.gauge("mygauge", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(Gauge::ImportMode::Accumulate, gauge.importMode());
+  {
+    StatMerger stat_merger(store_);
+    Protobuf::Map<std::string, uint64_t> counter_deltas;
+    Protobuf::Map<std::string, uint64_t> gauges;
+    gauges["mygauge"] = 1;
+    stat_merger.mergeStats(counter_deltas, gauges);
+  }
+  EXPECT_EQ(Gauge::ImportMode::Accumulate, gauge.importMode());
 }
 
 } // namespace
