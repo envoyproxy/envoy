@@ -1,0 +1,58 @@
+trigger:
+- master
+
+jobs:
+  - job: iOS_dist
+    timeoutInMinutes: 360
+    pool:
+      vmImage: 'macos-10.14'
+    steps:
+      - checkout: self
+        submodules: true
+      - script: ./envoy/ci/mac_ci_setup.sh
+        displayName: 'Install dependencies'
+      - script: bazel build --config=ios //:ios_dist
+        displayName: 'Build Envoy.framework distributable'
+      - task: PublishPipelineArtifact@0
+        displayName: 'Publish Envoy.framework distributable'
+        inputs:
+          artifactName: 'Envoy.framework'
+          targetPath: 'dist/Envoy.framework'
+  - job: iOS_objc
+    dependsOn: iOS_dist
+    timeoutInMinutes: 360
+    pool:
+      vmImage: 'macos-10.14'
+    steps:
+      - checkout: self
+        submodules: true
+      - script: ./envoy/ci/mac_ci_setup.sh
+        displayName: 'Install dependencies'
+      - script: mkdir -p dist/Envoy.framework
+        displayName: 'Create directory for distributable'
+      - task: DownloadPipelineArtifact@0
+        displayName: 'Download Envoy.framework distributable'
+        inputs:
+          artifactName: Envoy.framework
+          targetPath: ./dist/Envoy.framework
+      - script: bazel build --config=ios //examples/objective-c/hello_world:app
+        displayName: 'Build objective-c app'
+  - job: iOS_swift
+    dependsOn: iOS_dist
+    timeoutInMinutes: 360
+    pool:
+      vmImage: 'macos-10.14'
+    steps:
+      - checkout: self
+        submodules: true
+      - script: ./envoy/ci/mac_ci_setup.sh
+        displayName: 'Install dependencies'
+      - script: mkdir -p dist/Envoy.framework
+        displayName: 'Create directory for distributable'
+      - task: DownloadPipelineArtifact@0
+        displayName: 'Download Envoy.framework distributable'
+        inputs:
+          artifactName: Envoy.framework
+          targetPath: ./dist/Envoy.framework
+      - script: bazel build --config=ios //examples/swift/hello_world:app
+        displayName: 'Build swift app'
