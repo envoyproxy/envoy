@@ -28,6 +28,7 @@ Version history
 * http: fixed a bug where large unbufferable responses were not tracked in stats and logs correctly.
 * http: fixed a crashing bug where gRPC local replies would cause segfaults when upstream access logging was on.
 * http: mitigated a race condition with the :ref:`delayed_close_timeout<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.delayed_close_timeout>` where it could trigger while actively flushing a pending write buffer for a downstream connection.
+* http: added support for :ref:`preserve_external_request_id<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.preserve_external_request_id>` that represents whether the x-request-id should not be reset on edge entry inside mesh
 * http: changed `sendLocalReply` to send percent-encoded `GrpcMessage`.
 * jwt_authn: make filter's parsing of JWT more flexible, allowing syntax like ``jwt=eyJhbGciOiJS...ZFnFIw,extra=7,realm=123``
 * listener: added :ref:`source IP <envoy_api_field_listener.FilterChainMatch.source_prefix_ranges>`
