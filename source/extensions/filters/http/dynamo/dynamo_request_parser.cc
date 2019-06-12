@@ -38,6 +38,7 @@ const std::vector<std::string> RequestParser::SUPPORTED_ERROR_TYPES{
     // 4xx
     "AccessDeniedException",
     "ConditionalCheckFailedException",
+    "IdempotentParameterMismatchException",
     "IncompleteSignatureException",
     "ItemCollectionSizeLimitExceededException",
     "LimitExceededException",
@@ -46,12 +47,17 @@ const std::vector<std::string> RequestParser::SUPPORTED_ERROR_TYPES{
     "ResourceInUseException",
     "ResourceNotFoundException",
     "ThrottlingException",
+    "TransactionCanceledException",
+    "TransactionInProgressException",
     "UnrecognizedClientException",
     "ValidationException"};
 
 // clang-format on
 
 const std::vector<std::string> RequestParser::BATCH_OPERATIONS{"BatchGetItem", "BatchWriteItem"};
+
+const std::vector<std::string> RequestParser::TRANSACT_OPERATIONS{"TransactGetItems",
+                                                                  "TransactWriteItems"};
 
 std::string RequestParser::parseOperation(const Http::HeaderMap& headerMap) {
   std::string operation;
@@ -91,6 +97,10 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
       }
       return true;
     });
+  } else if (find(TRANSACT_OPERATIONS.begin(), TRANSACT_OPERATIONS.end(), operation) !=
+             TRANSACT_OPERATIONS.end()) {
+    // transactions are always multi-table operations
+    table.is_single_table = false;
   }
 
   return table;
