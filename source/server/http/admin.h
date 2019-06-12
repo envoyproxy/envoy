@@ -104,6 +104,7 @@ public:
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return false; }
+  bool preserveExternalRequestId() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
