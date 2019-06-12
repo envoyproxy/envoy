@@ -86,8 +86,6 @@ namespace Network {
 #define ENVOY_RECV_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_RECVDSTADDR))
 #elif IP_PKTINFO
 #define ENVOY_RECV_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_PKTINFO))
-#else
-#define ENVOY_RECV_IP_PKT_INFO Network::SocketOptionName()
 #endif
 
 #ifdef IPV6_RECVPKTINFO
@@ -96,6 +94,8 @@ namespace Network {
 #elif IPV6_PKTINFO
 #define ENVOY_RECV_IPV6_PKT_INFO                                                                   \
   Network::SocketOptionName(std::make_pair(IPPROTO_IPV6, IPV6_PKTINFO))
+#else
+#define ENVOY_RECV_IPV6_PKT_INFO Network::SocketOptionName()
 #endif
 
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
