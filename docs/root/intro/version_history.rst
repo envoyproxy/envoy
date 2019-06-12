@@ -12,6 +12,7 @@ Version history
 * admin: the :ref:`/listener endpoint <operations_admin_interface_listeners>` now returns :ref:`listeners.proto<envoy_api_msg_admin.v2alpha.Listeners>` which includes listener names and ports.
 * api: track and report requests issued since last load report.
 * build: releases are built with Clang and linked with LLD.
+* control-plane: management servers can respond with HTTP 304 to indicate that config is up to date for Envoy proxies polling a :ref:`REST API Config Type <envoy_api_field_core.ApiConfigSource.api_type>`
 * dubbo_proxy: support the :ref:`Dubbo proxy filter <config_network_filters_dubbo_proxy>`.
 * eds: added support to specify max time for which endpoints can be used :ref:`gRPC filter <envoy_api_msg_ClusterLoadAssignment.Policy>`.
 * event: added :ref:`loop duration and poll delay statistics <operations_performance>`.
