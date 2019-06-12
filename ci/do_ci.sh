@@ -55,6 +55,12 @@ function cp_binary_for_image_build() {
   strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_"$1"_stripped/envoy
 }
 
+# When testing memory consumption, we want to test against exact byte-counts
+# where possible. As these differ between platforms and compile options, we
+# define the 'release' builds as canonical and test them only in CI, so the
+# toolchain is kept consistent. This ifdef is checked in
+# test/common/stats/stat_test_utility.cc when computing
+# Stats::TestUtil::MemoryTest::mode().
 MEMORY_TEST_EXACT_ARGS="--cxxopt=-DMEMORY_TEST_EXACT=1"
 
 function bazel_binary_build() {

@@ -30,13 +30,13 @@ bool hasDeterministicMallocStats();
  */
 void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> fn);
 
-// Tracks memory consumption over a span of time. Test classes should
-// instantiate a MemoryTest object when they want to start measuring heap
-// memory, and call consumedBytes() to determine how much as been consumed since
-// the class was instantiated.
+// Tracks memory consumption over a span of time. Test classes instantiate a
+// MemoryTest object to start measuring heap memory, and call consumedBytes() to
+// determine how many bytes have been consumed since the class was instantiated.
 //
 // That value should then be passed to EXPECT_MEMORY_EQ and EXPECT_MEMORY_LE,
-// defined below.
+// defined below, as the interpretation of this value can differ based on
+// platform and compilation mode.
 class MemoryTest {
 public:
   // There are 3 cases:
