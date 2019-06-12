@@ -73,7 +73,7 @@ class ClusterManagerFactory;
  */
 class ClusterManager {
 public:
-  virtual ~ClusterManager() {}
+  virtual ~ClusterManager() = default;
 
   /**
    * Add or update a cluster via API. The semantics of this API are:

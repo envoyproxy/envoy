@@ -660,9 +660,9 @@ void ClusterManagerImpl::updateClusterCounts() {
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
   if (ads_mux_) {
     int previous_warming = cm_stats_.warming_clusters_.value();
-    if (previous_warming == 0 && warming_clusters_.size() > 0) {
+    if (previous_warming == 0 && !warming_clusters_.empty()) {
       ads_mux_->pause(Config::TypeUrl::get().Cluster);
-    } else if (previous_warming > 0 && warming_clusters_.size() == 0) {
+    } else if (previous_warming > 0 && warming_clusters_.empty()) {
       ads_mux_->resume(Config::TypeUrl::get().Cluster);
     }
   }
