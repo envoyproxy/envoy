@@ -241,7 +241,7 @@ void SubsetLoadBalancer::processSubsets(
         // For each host, for each subset key, attempt to extract the metadata corresponding to the
         // key from the host.
         std::vector<SubsetMetadata> all_kvs = extractSubsetMetadata(keys, *host);
-        for (auto& kvs : all_kvs) {
+        for (const auto& kvs : all_kvs) {
           // The host has metadata for each key, find or create its subset.
           auto entry = findOrCreateSubset(subsets_, kvs, 0);
           if (entry != nullptr) {
@@ -378,11 +378,11 @@ SubsetLoadBalancer::extractSubsetMetadata(const std::set<std::string>& subset_ke
       // Otherwise, we branch the list of kvs by generating one new kvs per old kvs per
       // new value.
       //
-      // For example, two kvs (<a=b>, <c=d>) joined with the kv foo=[bar,baz] results in four kvs:
-      //   <a=b,foo=bar>
-      //   <a=b,foo=baz>
-      //   <c=d,foo=bar>
-      //   <c=d,foo=baz>
+      // For example, two kvs (<a=1>, <a=2>) joined with the kv foo=[bar,baz] results in four kvs:
+      //   <a=1,foo=bar>
+      //   <a=2,foo=baz>
+      //   <a=1,foo=bar>
+      //   <a=2,foo=baz>
       if (all_kvs.empty()) {
         for (const auto& v : it->second.list_value().values()) {
           all_kvs.emplace_back(SubsetMetadata({make_pair(key, v)}));
