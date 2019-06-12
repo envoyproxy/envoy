@@ -380,8 +380,8 @@ SubsetLoadBalancer::extractSubsetMetadata(const std::set<std::string>& subset_ke
       //
       // For example, two kvs (<a=1>, <a=2>) joined with the kv foo=[bar,baz] results in four kvs:
       //   <a=1,foo=bar>
-      //   <a=2,foo=baz>
-      //   <a=1,foo=bar>
+      //   <a=1,foo=baz>
+      //   <a=2,foo=bar>
       //   <a=2,foo=baz>
       if (all_kvs.empty()) {
         for (const auto& v : it->second.list_value().values()) {
