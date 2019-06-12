@@ -3,6 +3,51 @@
 namespace Envoy {
 namespace Router {
 
+bool ScopeKey::operator!=(const ScopeKey& other) const { return !(*this == other); }
+
+bool ScopeKey::operator==(const ScopeKey& other) const {
+  if (this->fragments_.size() != other.fragments_.size()) {
+    return false;
+  }
+  if (this->fragments_.size() == 0 || other.fragments_.size() == 0) {
+    // An empty key equals to nothing, "NULL" != "NULL".
+    return false;
+  }
+  // A "NULL" fragment value equals to nothing.
+  if (this->contains_null_fragment_ || other.contains_null_fragment_) {
+    return false;
+  }
+  return std::equal(this->fragments_.begin(), this->fragments_.end(), other.fragments_.begin(),
+                    [](const std::unique_ptr<ScopeKeyFragmentBase>& left,
+                       const std::unique_ptr<ScopeKeyFragmentBase>& right) -> bool {
+                      // Both should be non-NULL now.
+                      return *left == *right;
+                    });
+}
+
+HeaderValueExtractorImpl::HeaderValueExtractorImpl(
+    ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config)
+    : FragmentBuilderBase(config),
+      header_value_extractor_config_(config_.header_value_extractor()) {
+  ASSERT(config_.type_case() ==
+             ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::kHeaderValueExtractor,
+         "header_value_extractor is not set.");
+  if (header_value_extractor_config_.extract_type_case() ==
+      ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::HeaderValueExtractor::kIndex) {
+    if (header_value_extractor_config_.index() != 0 &&
+        header_value_extractor_config_.element_separator().length() == 0) {
+      throw ProtoValidationException("when element separator is set to an empty string, index "
+                                     "should be set to 0 in HeaderValueExtractor.",
+                                     header_value_extractor_config_);
+    }
+  }
+  if (header_value_extractor_config_.extract_type_case() ==
+      ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::HeaderValueExtractor::EXTRACT_TYPE_NOT_SET) {
+    throw ProtoValidationException("HeaderValueExtractor extract_type not set.",
+                                   header_value_extractor_config_);
+  }
+}
+
 std::unique_ptr<ScopeKeyFragmentBase>
 HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const {
   const Envoy::Http::HeaderEntry* header_entry =
