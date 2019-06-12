@@ -76,7 +76,8 @@ TEST(DynamoRequestParser, parseTableNameSingleOperation) {
 
 TEST(DynamoRequestParser, parseTableNameTransactOperation) {
   {
-    std::vector<std::string> supported_transact_operations{"TransactGetItems", "TransactWriteItems"};
+    std::vector<std::string> supported_transact_operations{"TransactGetItems",
+                                                           "TransactWriteItems"};
     std::string json_string = R"EOF(
     {
       "TransactItems": [
