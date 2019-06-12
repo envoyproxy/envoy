@@ -9,7 +9,7 @@ bool ScopeKey::operator==(const ScopeKey& other) const {
   if (this->fragments_.size() != other.fragments_.size()) {
     return false;
   }
-  if (this->fragments_.size() == 0 || other.fragments_.size() == 0) {
+  if (this->fragments_.empty() || other.fragments_.empty()) {
     // An empty key equals to nothing, "NULL" != "NULL".
     return false;
   }
@@ -23,7 +23,7 @@ bool ScopeKey::operator==(const ScopeKey& other) const {
 
 HeaderValueExtractorImpl::HeaderValueExtractorImpl(
     ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config)
-    : FragmentBuilderBase(config),
+    : FragmentBuilderBase(std::move(config)),
       header_value_extractor_config_(config_.header_value_extractor()) {
   ASSERT(config_.type_case() ==
              ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::kHeaderValueExtractor,

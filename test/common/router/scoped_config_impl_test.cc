@@ -14,7 +14,7 @@ using ::Envoy::Http::TestHeaderMapImpl;
 
 class FooFragment : public ScopeKeyFragmentBase {
 private:
-  virtual bool equals(const ScopeKeyFragmentBase&) const { return true; };
+  bool equals(const ScopeKeyFragmentBase&) const override { return true; };
 };
 
 TEST(ScopeKeyFragmentBaseTest, EqualSign) {
