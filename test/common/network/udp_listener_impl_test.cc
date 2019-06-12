@@ -37,7 +37,7 @@ public:
   void SetUp() override {
     // Set listening socket options.
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());
-    server_socket_->addOptions(SocketOptionFactory::buildRxQueueOverFlowOptions());
+    // server_socket_->addOptions(SocketOptionFactory::buildRxQueueOverFlowOptions());
 
     listener_ = std::make_unique<UdpListenerImpl>(
         dispatcherImpl(), *server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
