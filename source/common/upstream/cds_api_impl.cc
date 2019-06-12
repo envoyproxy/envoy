@@ -9,7 +9,6 @@
 #include "common/common/cleanup.h"
 #include "common/common/utility.h"
 #include "common/config/resources.h"
-#include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -17,27 +16,18 @@ namespace Envoy {
 namespace Upstream {
 
 CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
-                             ClusterManager& cm, Event::Dispatcher& dispatcher,
-                             Runtime::RandomGenerator& random,
-                             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                             ProtobufMessage::ValidationVisitor& validation_visitor,
-                             Api::Api& api) {
-  return CdsApiPtr{new CdsApiImpl(cds_config, cm, dispatcher, random, local_info, scope,
-                                  validation_visitor, api)};
+                             ClusterManager& cm, Stats::Scope& scope,
+                             ProtobufMessage::ValidationVisitor& validation_visitor) {
+  return CdsApiPtr{new CdsApiImpl(cds_config, cm, scope, validation_visitor)};
 }
 
 CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-                       Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+                       Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
       validation_visitor_(validation_visitor) {
-  Config::Utility::checkLocalInfo("cds", local_info);
-
-  subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
-      cds_config, local_info, dispatcher, cm, random, *scope_,
-      Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()),
-      validation_visitor, api, *this);
+  subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
+      cds_config, Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()),
+      *scope_, *this);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

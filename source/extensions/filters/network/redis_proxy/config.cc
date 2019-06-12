@@ -1,23 +1,29 @@
 #include "extensions/filters/network/redis_proxy/config.h"
 
-#include <memory>
-#include <string>
-
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
-#include "envoy/registry/registry.h"
-
 #include "common/config/filter_json.h"
 
 #include "extensions/filters/network/common/redis/client_impl.h"
-#include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "extensions/filters/network/redis_proxy/proxy_filter.h"
 #include "extensions/filters/network/redis_proxy/router_impl.h"
+
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
+
+namespace {
+inline void addUniqueClusters(
+    absl::flat_hash_set<std::string>& clusters,
+    const envoy::config::filter::network::redis_proxy::v2::RedisProxy_PrefixRoutes_Route& route) {
+  clusters.emplace(route.cluster());
+  for (auto& mirror : route.request_mirror_policy()) {
+    clusters.emplace(mirror.cluster());
+  }
+}
+} // namespace
 
 Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy& proto_config,
@@ -32,20 +38,24 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes prefix_routes(
       proto_config.prefix_routes());
 
-  // set the catch-all route from the deprecated cluster and settings parameters.
-  if (prefix_routes.catch_all_cluster().empty() && prefix_routes.routes_size() == 0) {
+  // Set the catch-all route from the deprecated cluster and settings parameters.
+  if (prefix_routes.catch_all_cluster().empty() && prefix_routes.routes_size() == 0 &&
+      !prefix_routes.has_catch_all_route()) {
     if (proto_config.cluster().empty()) {
       throw EnvoyException("cannot configure a redis-proxy without any upstream");
     }
 
-    prefix_routes.set_catch_all_cluster(proto_config.cluster());
+    prefix_routes.mutable_catch_all_route()->set_cluster(proto_config.cluster());
+  } else if (!prefix_routes.catch_all_cluster().empty() && !prefix_routes.has_catch_all_route()) {
+    // Set the catch-all route from the deprecated catch-all cluster.
+    prefix_routes.mutable_catch_all_route()->set_cluster(prefix_routes.catch_all_cluster());
   }
 
-  std::set<std::string> unique_clusters;
+  absl::flat_hash_set<std::string> unique_clusters;
   for (auto& route : prefix_routes.routes()) {
-    unique_clusters.emplace(route.cluster());
+    addUniqueClusters(unique_clusters, route);
   }
-  unique_clusters.emplace(prefix_routes.catch_all_cluster());
+  addUniqueClusters(unique_clusters, prefix_routes.catch_all_route());
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
@@ -56,7 +66,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
                                    context.scope().symbolTable()));
   }
 
-  auto router = std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams));
+  auto router =
+      std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams), context.runtime());
 
   std::shared_ptr<CommandSplitter::Instance> splitter =
       std::make_shared<CommandSplitter::InstanceImpl>(

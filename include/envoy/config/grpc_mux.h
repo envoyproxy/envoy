@@ -107,6 +107,13 @@ public:
    * e.g.type.googleapis.com/envoy.api.v2.Cluster.
    */
   virtual void resume(const std::string& type_url) PURE;
+
+  /**
+   * Retrieves the current pause state as set by pause()/resume().
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * @return bool whether the API is paused.
+   */
+  virtual bool paused(const std::string& type_url) const PURE;
 };
 
 typedef std::unique_ptr<GrpcMux> GrpcMuxPtr;

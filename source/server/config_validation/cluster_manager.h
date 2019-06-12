@@ -55,8 +55,9 @@ public:
                            ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                            AccessLog::AccessLogManager& log_manager, Event::Dispatcher& dispatcher,
-                           Server::Admin& admin, Api::Api& api, Http::Context& http_context,
-                           Event::TimeSystem& time_system);
+                           Server::Admin& admin,
+                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                           Http::Context& http_context, Event::TimeSystem& time_system);
 
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string&, ResourcePriority,
                                                          Http::Protocol,
