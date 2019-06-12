@@ -50,7 +50,7 @@ TEST(StringKeyFragmentTest, Normal) {
 TEST(HeaderValueExtractorImplDeathTest, InvalidConfig) {
   ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config;
   // Type not set.
-  EXPECT_DEATH(HeaderValueExtractorImpl{config}, "header_value_extractor is not set.");
+  EXPECT_DEBUG_DEATH(HeaderValueExtractorImpl{config}, "header_value_extractor is not set.");
 
   // Index non-zero when element separator is an empty string.
   std::string yaml_plain = R"EOF(
