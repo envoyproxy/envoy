@@ -89,15 +89,20 @@ public:
   const MatcherSharedPtr& clientHeaderMatchers() const { return client_header_matchers_; }
 
   /**
-   *  Returns a list of matchers used for selecting the authorization response headers that
+   * Returns a list of matchers used for selecting the authorization response headers that
    * should be send to an the upstream server.
    */
   const MatcherSharedPtr& upstreamHeaderMatchers() const { return upstream_header_matchers_; }
 
   /**
-   * @return List of headers that will be add to the authorization request.
+   * Returns a list of headers that will be add to the authorization request.
    */
   const Http::LowerCaseStrPairVector& headersToAdd() const { return authorization_headers_to_add_; }
+
+  /**
+   * Returns the name used for tracing.
+   */
+  const std::string& tracingName() { return tracing_name_; }
 
 private:
   static MatcherSharedPtr toRequestMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
@@ -114,6 +119,7 @@ private:
   const std::string cluster_name_;
   const std::chrono::milliseconds timeout_;
   const std::string path_prefix_;
+  const str::string tracing_name_;
 };
 
 typedef std::shared_ptr<ClientConfig> ClientConfigSharedPtr;

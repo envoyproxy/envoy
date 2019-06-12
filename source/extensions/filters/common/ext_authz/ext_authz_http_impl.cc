@@ -78,7 +78,8 @@ ClientConfig::ClientConfig(const envoy::config::filter::http::ext_authz::v2::Ext
       authorization_headers_to_add_(
           toHeadersAdd(config.http_service().authorization_request().headers_to_add())),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
-      path_prefix_(path_prefix) {}
+      path_prefix_(path_prefix),
+      tracing_name_("async " + config.http_service().server_uri().cluster() + " egress") {}
 
 MatcherSharedPtr
 ClientConfig::toRequestMatchers(const envoy::type::matcher::ListStringMatcher& list) {
@@ -166,7 +167,8 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
 
   callbacks_ = &callbacks;
 
-  span_ = parent_span.spawnChild(Tracing::EgressConfig::get(), "async "+ config_->cluster() + " egress", real_time_.systemTime());
+  span_ = parent_span.spawnChild(Tracing::EgressConfig::get(), config_->tracingName(),
+                                 real_time_.systemTime());
   span_->setTag(Tracing::Tags::get().UpstreamCluster, config_->cluster());
 
   Http::HeaderMapPtr headers;
