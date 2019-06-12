@@ -307,6 +307,36 @@ QUICHE_FLAG(bool, quic_reloadable_flag_send_quic_fallback_server_config_on_leto_
             "to contact Leto by sending a REJ containing a fallback ServerConfig, allowing the "
             "client to continue the handshake.")
 
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_fix_bbr_cwnd_in_bandwidth_resumption, true,
+            " If true, adjust congestion window when doing bandwidth resumption in BBR.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_no_lumpy_pacing_at_low_bw, false,
+            "If true, disable lumpy pacing for low bandwidth flows.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_conservative_cwnd_and_pacing_gains, false,
+            "If true, uses conservative cwnd gain and pacing gain.")
+
+QUICHE_FLAG(
+    bool, quic_reloadable_flag_quic_do_not_accept_stop_waiting, false,
+    "In v44 and above, where STOP_WAITING is never sent, close the connection if it's received.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_loss_removes_from_inflight, false,
+            "When true, remove packets from inflight where they're declared lost, rather than in "
+            "MarkForRetransmission. Also no longer marks handshake packets as no longer inflight "
+            "when they're retransmitted.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_conservative_bursts, false,
+            "If true, set burst token to 2 in cwnd bootstrapping experiment.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_deprecate_queued_control_frames, false,
+            "If true, deprecate queued_control_frames_ from QuicPacketGenerator.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_check_connected_before_flush, false,
+            "If true, check whether connection is connected before flush.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_ignore_tlpr_if_sending_ping, false,
+            "If true, ignore TLPR for retransmission delay when sending pings from ping alarm.")
+
 QUICHE_FLAG(bool, quic_restart_flag_quic_allow_loas_multipacket_chlo, false,
             "If true, inspects QUIC CHLOs for kLOAS and early creates sessions "
             "to allow multi-packet CHLOs")
@@ -376,6 +406,10 @@ QUICHE_FLAG(
     bool, quic_restart_flag_dont_fetch_quic_private_keys_from_leto, false,
     "If true, GFE will not request private keys when fetching QUIC ServerConfigs from Leto.")
 
+QUICHE_FLAG(bool, quic_restart_flag_quic_use_allocated_connection_ids, false,
+            "When true, QuicConnectionId will allocate long connection IDs on the heap instead of "
+            "inline in the object.")
+
 QUICHE_FLAG(bool, quic_allow_chlo_buffering, true,
             "If true, allows packets to be buffered in anticipation of a "
             "future CHLO, and allow CHLO packets to be buffered until next "
@@ -429,6 +463,9 @@ QUICHE_FLAG(int32_t, quic_max_pace_time_into_future_ms, 10,
 QUICHE_FLAG(double, quic_pace_time_into_future_srtt_fraction,
             0.125f, // One-eighth smoothed RTT
             "Smoothed RTT fraction that a connection can pace packets into the future.")
+
+QUICHE_FLAG(bool, quic_export_server_num_packets_per_write_histogram, false,
+            "If true, export number of packets written per write operation histogram.")
 
 QUICHE_FLAG(bool, http2_reloadable_flag_http2_testonly_default_false, false,
             "A testonly reloadable flag that will always default to false.")

@@ -180,3 +180,17 @@ public:
 QuicLogSink* SetLogSink(QuicLogSink* new_sink);
 
 } // namespace quic
+
+namespace std {
+
+// Overload ::operator<< to output a vector.
+template <class T> std::ostream& operator<<(std::ostream& out, const std::vector<T>& v) {
+  out << "{ ";
+  for (T item : v) {
+    out << item << " ";
+  }
+  out << "}";
+  return out;
+}
+
+} // namespace std
