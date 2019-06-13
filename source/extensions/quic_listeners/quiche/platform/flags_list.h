@@ -337,6 +337,9 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_check_connected_before_flush, false,
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_ignore_tlpr_if_sending_ping, false,
             "If true, ignore TLPR for retransmission delay when sending pings from ping alarm.")
 
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_terminate_gquic_connection_as_ietf, false,
+            "If true, terminate Google QUIC connections similary as IETF QUIC.")
+
 QUICHE_FLAG(bool, quic_restart_flag_quic_allow_loas_multipacket_chlo, false,
             "If true, inspects QUIC CHLOs for kLOAS and early creates sessions "
             "to allow multi-packet CHLOs")

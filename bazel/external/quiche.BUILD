@@ -1246,6 +1246,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_core_process_packet_interface",
+    hdrs = ["quiche/quic/core/quic_process_packet_interface.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":quic_core_packets_lib",
+        ":quic_platform_base",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_core_received_packet_manager_lib",
     srcs = ["quiche/quic/core/quic_received_packet_manager.cc"],
     hdrs = ["quiche/quic/core/quic_received_packet_manager.h"],
@@ -1295,6 +1306,41 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":quic_platform_base",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_core_server_lib",
+    srcs = [
+        "quiche/quic/core/chlo_extractor.cc",
+        "quiche/quic/core/quic_buffered_packet_store.cc",
+        "quiche/quic/core/quic_dispatcher.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/chlo_extractor.h",
+        "quiche/quic/core/quic_buffered_packet_store.h",
+        "quiche/quic/core/quic_dispatcher.h",
+    ],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":quic_core_alarm_factory_interface",
+        ":quic_core_alarm_interface",
+        ":quic_core_blocked_writer_interface",
+        ":quic_core_connection_lib",
+        ":quic_core_crypto_crypto_handshake_lib",
+        ":quic_core_crypto_encryption_lib",
+        ":quic_core_crypto_random_lib",
+        ":quic_core_framer_lib",
+        ":quic_core_packets_lib",
+        ":quic_core_process_packet_interface",
+        ":quic_core_session_lib",
+        ":quic_core_time_lib",
+        ":quic_core_time_wait_list_manager_lib",
+        ":quic_core_types_lib",
+        ":quic_core_utils_lib",
+        ":quic_core_version_manager_lib",
+        ":quic_platform",
     ],
 )
 
@@ -1456,6 +1502,25 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [":quic_platform_base"],
+)
+
+envoy_cc_library(
+    name = "quic_core_time_wait_list_manager_lib",
+    srcs = ["quiche/quic/core/quic_time_wait_list_manager.cc"],
+    hdrs = ["quiche/quic/core/quic_time_wait_list_manager.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":quic_core_blocked_writer_interface",
+        ":quic_core_crypto_encryption_lib",
+        ":quic_core_framer_lib",
+        ":quic_core_packet_writer_interface",
+        ":quic_core_packets_lib",
+        ":quic_core_session_lib",
+        ":quic_core_types_lib",
+        ":quic_core_utils_lib",
+        ":quic_platform",
+    ],
 )
 
 envoy_cc_library(
