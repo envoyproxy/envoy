@@ -1,7 +1,22 @@
+resources:
+  containers:
+  - container: swiftlint-container
+    image: norionomura/swiftlint:0.33.0_swift-5.0
+
 trigger:
 - master
 
 jobs:
+  - job: ios_swift_lint
+    timeoutInMinutes: 360
+    pool:
+      vmImage: 'Ubuntu 16.04'
+    container: swiftlint-container
+    steps:
+      - checkout: self
+        submodules: true
+      - script: swiftlint lint --strict
+        displayName: 'Run SwiftLint'
   - job: iOS_dist
     timeoutInMinutes: 360
     pool:
