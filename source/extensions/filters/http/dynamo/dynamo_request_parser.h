@@ -61,7 +61,7 @@ public:
   /**
    * @return string name of table in transaction object, or empty string if none
    */
-  static std::string RequestParser::getTableNameFromTransaction(const Json::ObjectSharedPtr& transact_item);
+  static std::string getTableNameFromTransaction(const Json::ObjectSharedPtr& transact_item);
 
   /**
    * Parse error details which might be provided for a given response code.
