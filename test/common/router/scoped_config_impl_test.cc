@@ -52,6 +52,9 @@ TEST(HeaderValueExtractorImplDeathTest, InvalidConfig) {
   // Type not set, ASSERT only fails in debug mode.
 #if !defined(NDEBUG)
   EXPECT_DEBUG_DEATH(HeaderValueExtractorImpl{config}, "header_value_extractor is not set.");
+#else
+  EXPECT_THROW_WITH_REGEX(HeaderValueExtractorImpl{config}, ProtoValidationException,
+                          "HeaderValueExtractor extract_type not set.+");
 #endif // !defined(NDEBUG)
 
   // Index non-zero when element separator is an empty string.
@@ -211,6 +214,13 @@ ScopeKey makeKey(const std::vector<const char*>& parts) {
     key.addFragment(std::make_unique<StringKeyFragment>(part));
   }
   return key;
+}
+
+TEST(ScopeKeyDeathTest, AddNullFragment) {
+  ScopeKey key;
+#if !defined(NDEBUG)
+  EXPECT_DEATH(key.addFragment(nullptr), "null fragment not allowed in ScopeKey.");
+#endif // !defined(NDEBUG)
 }
 
 TEST(ScopeKeyTest, Unmatches) {

@@ -39,15 +39,19 @@ private:
 
 /**
  *  Scope Key is composed of non-null fragments.
- *
  **/
 class ScopeKey {
 public:
   ScopeKey() = default;
   ScopeKey(ScopeKey&& other) = default;
 
+  // Scopekey is not copy-assignable and copy-constructible as it contains unique_ptr inside itself.
+  ScopeKey(const ScopeKey&) = delete;
+  ScopeKey operator=(const ScopeKey&) = delete;
+
   // Caller should guarantee the fragment is not nullptr.
   void addFragment(std::unique_ptr<ScopeKeyFragmentBase>&& fragment) {
+    ASSERT(fragment != nullptr, "null fragment not allowed in ScopeKey.");
     fragments_.emplace_back(std::move(fragment));
   }
 

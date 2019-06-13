@@ -6,14 +6,12 @@ namespace Router {
 bool ScopeKey::operator!=(const ScopeKey& other) const { return !(*this == other); }
 
 bool ScopeKey::operator==(const ScopeKey& other) const {
-  if (this->fragments_.size() != other.fragments_.size()) {
-    return false;
-  }
   if (this->fragments_.empty() || other.fragments_.empty()) {
     // An empty key equals to nothing, "NULL" != "NULL".
     return false;
   }
   return std::equal(this->fragments_.begin(), this->fragments_.end(), other.fragments_.begin(),
+                    other.fragments_.end(),
                     [](const std::unique_ptr<ScopeKeyFragmentBase>& left,
                        const std::unique_ptr<ScopeKeyFragmentBase>& right) -> bool {
                       // Both should be non-NULL now.
