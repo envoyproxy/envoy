@@ -136,7 +136,7 @@ private:
 
   struct ActiveWriteFilter : public WriteFilterCallbacks, LinkedObject<ActiveWriteFilter> {
     ActiveWriteFilter(FilterManagerImpl& parent, WriteFilterSharedPtr filter)
-        : parent_(parent), filter_(filter) {}
+        : parent_(parent), filter_(std::move(filter)) {}
 
     Connection& connection() override { return parent_.connection_; }
     void injectWriteDataToFilterChain(Buffer::Instance& data, bool end_stream) override {

@@ -39,7 +39,7 @@ public:
   };
   using EntryOwnerPtr = std::unique_ptr<EntryOwner>;
 
-  virtual ~ConfigTracker(){};
+  virtual ~ConfigTracker() = default;
 
   /**
    * @return const CbsMap& The map of string keys to tracked callbacks.

@@ -58,7 +58,7 @@ protected:
   using ConnectionWrapperSharedPtr = std::shared_ptr<ConnectionWrapper>;
 
   struct ConnectionDataImpl : public ConnectionPool::ConnectionData {
-    ConnectionDataImpl(ConnectionWrapperSharedPtr wrapper) : wrapper_(wrapper) {}
+    ConnectionDataImpl(ConnectionWrapperSharedPtr wrapper) : wrapper_(std::move(wrapper)) {}
     ~ConnectionDataImpl() { wrapper_->release(false); }
 
     // ConnectionPool::ConnectionData

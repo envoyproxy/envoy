@@ -17,7 +17,8 @@ struct RcDetailsValues {
 };
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
-Filter::Filter(FilterConfigSharedPtr config) : stats_(config->stats()), config_(config) {}
+Filter::Filter(FilterConfigSharedPtr config)
+    : stats_(config->stats()), config_(std::move(config)) {}
 
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);

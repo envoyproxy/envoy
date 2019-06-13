@@ -34,7 +34,7 @@ public:
     OP_COMMANDREPLY = 2011
   };
 
-  virtual ~Message(){};
+  virtual ~Message() = default;
 
   virtual int32_t requestId() const PURE;
   virtual int32_t responseTo() const PURE;

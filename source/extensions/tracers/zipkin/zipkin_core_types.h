@@ -288,7 +288,7 @@ private:
   std::string key_;
   std::string value_;
   absl::optional<Endpoint> endpoint_;
-  AnnotationType annotation_type_;
+  AnnotationType annotation_type_{};
 };
 
 using SpanPtr = std::unique_ptr<Span>;

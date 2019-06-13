@@ -777,8 +777,7 @@ private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
 
   using WildcardVirtualHosts =
-      std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>,
-               std::greater<int64_t>>;
+      std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
   using SubstringFunction = std::function<std::string(const std::string&, int)>;
   const VirtualHostImpl* findWildcardVirtualHost(const std::string& host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,

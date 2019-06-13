@@ -64,7 +64,7 @@ private:
 
   void cleanup();
 
-  RespType type_;
+  RespType type_{};
 };
 
 using RespValuePtr = std::unique_ptr<RespValue>;

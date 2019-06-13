@@ -30,7 +30,7 @@ public:
       InvalidJwks,
     };
 
-    virtual ~JwksReceiver(){};
+    virtual ~JwksReceiver() = default;
     /*
      * Successful retrieval callback.
      * of the returned JWKS object.
@@ -44,7 +44,7 @@ public:
     virtual void onJwksError(Failure reason) PURE;
   };
 
-  virtual ~JwksFetcher(){};
+  virtual ~JwksFetcher() = default;
 
   /*
    * Cancel any in-flight request.
