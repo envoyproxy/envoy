@@ -22,13 +22,6 @@ jobs:
       - run: docs/publish.sh
       - store_artifacts:
           path: generated/docs
-  format:
-    executor: ubuntu-build
-    # TODO(mattklein123): resource_class: small
-    steps:
-      - checkout
-      - run: git submodule update --init
-      - run: tools/check_format.sh
 
 workflows:
   version: 2
@@ -38,4 +31,3 @@ workflows:
           filters:
             tags:
               only: /^v.*/
-      - format
