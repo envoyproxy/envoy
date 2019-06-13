@@ -46,18 +46,19 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
   }
 
   for (; entry != upstream_filters_.end(); entry++) {
-    if (!(*entry)->initialized_) {
+    if (!(*entry)->initialized_ && connection_.state() == Connection::State::Open) {
       (*entry)->initialized_ = true;
       FilterStatus status = (*entry)->filter_->onNewConnection();
-      if (status == FilterStatus::StopIteration) {
+      if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
         return;
       }
     }
 
     StreamBuffer read_buffer = buffer_source.getReadBuffer();
-    if (read_buffer.buffer.length() > 0 || read_buffer.end_stream) {
+    if ((read_buffer.buffer.length() > 0 || read_buffer.end_stream) &&
+        connection_.state() == Connection::State::Open) {
       FilterStatus status = (*entry)->filter_->onData(read_buffer.buffer, read_buffer.end_stream);
-      if (status == FilterStatus::StopIteration) {
+      if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
         return;
       }
     }
@@ -81,10 +82,13 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
   }
 
   for (; entry != downstream_filters_.end(); entry++) {
-    StreamBuffer write_buffer = buffer_source.getWriteBuffer();
-    FilterStatus status = (*entry)->filter_->onWrite(write_buffer.buffer, write_buffer.end_stream);
-    if (status == FilterStatus::StopIteration) {
-      return status;
+    if (connection_.state() == Connection::State::Open) {
+      StreamBuffer write_buffer = buffer_source.getWriteBuffer();
+      FilterStatus status =
+          (*entry)->filter_->onWrite(write_buffer.buffer, write_buffer.end_stream);
+      if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
+        return FilterStatus::StopIteration;
+      }
     }
   }
 
