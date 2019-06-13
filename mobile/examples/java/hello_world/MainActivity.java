@@ -11,16 +11,12 @@ import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 
 import java.io.BufferedReader;
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import io.envoyproxy.envoymobile.Envoy;
@@ -28,7 +24,14 @@ import io.envoyproxy.envoymobile.Envoy;
 public class MainActivity extends Activity {
   private static final String ENDPOINT =
       "http://0.0.0.0:9001/api.lyft.com/static/demo/hello_world.txt";
+
+  private static final String ENVOY_SERVER_HEADER = "server";
+
+  private static final String REQUEST_HANDLER_THREAD_NAME = "hello_envoy_java";
+
   private RecyclerView recyclerView;
+
+  private HandlerThread thread = new HandlerThread(REQUEST_HANDLER_THREAD_NAME);
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -54,7 +57,6 @@ public class MainActivity extends Activity {
     DividerItemDecoration dividerItemDecoration =
         new DividerItemDecoration(recyclerView.getContext(), DividerItemDecoration.VERTICAL);
     recyclerView.addItemDecoration(dividerItemDecoration);
-    HandlerThread thread = new HandlerThread("");
     thread.start();
 
     final Handler handler = new Handler(thread.getLooper());
@@ -71,7 +73,12 @@ public class MainActivity extends Activity {
         // Make a call again
         handler.postDelayed(this, TimeUnit.SECONDS.toMillis(1));
       }
-    }, 0);
+    }, TimeUnit.SECONDS.toMillis(1));
+  }
+
+  protected void onDestroy() {
+    super.onDestroy();
+    thread.quit();
   }
 
   private Response makeRequest() throws IOException {
@@ -82,7 +89,7 @@ public class MainActivity extends Activity {
       throw new IOException("non 200 status: " + status);
     }
 
-    List<String> serverHeaderField = connection.getHeaderFields().get("server");
+    List<String> serverHeaderField = connection.getHeaderFields().get(ENVOY_SERVER_HEADER);
     InputStream inputStream = connection.getInputStream();
     String body = deserialize(inputStream);
     inputStream.close();
