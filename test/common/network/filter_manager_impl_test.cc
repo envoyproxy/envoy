@@ -109,7 +109,42 @@ TEST_F(NetworkFilterManagerTest, All) {
   manager.onWrite();
 }
 
-TEST_F(NetworkFilterManagerTest, AbnormalExit) {
+TEST_F(NetworkFilterManagerTest, CloseConnectionAndReturnStop) {
+  InSequence s;
+
+  Upstream::HostDescription* host_description(new NiceMock<Upstream::MockHostDescription>());
+  MockReadFilter* read_filter(new MockReadFilter());
+  MockFilter* filter(new LocalMockFilter());
+
+  FilterManagerImpl manager(connection_);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
+  manager.addFilter(FilterSharedPtr{filter});
+
+  read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
+  EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
+
+  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::StopIteration));
+  EXPECT_EQ(manager.initializeReadFilters(), true);
+
+  EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  read_filter->callbacks_->continueReading();
+
+  read_buffer_.add("hello");
+  read_end_stream_ = false;
+  EXPECT_CALL(connection_, state()).WillOnce(Return(Connection::State::Open));
+  EXPECT_CALL(*read_filter, onData(BufferStringEqual("hello"), false))
+      .WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(connection_, state()).WillOnce(Return(Connection::State::Closing));
+  EXPECT_CALL(*filter, onData(_, _)).Times(0);
+  manager.onRead();
+
+  write_end_stream_ = false;
+  EXPECT_CALL(connection_, state()).WillOnce(Return(Connection::State::Closed));
+  EXPECT_CALL(*filter, onWrite(_, _)).Times(0);
+  manager.onWrite();
+}
+
+TEST_F(NetworkFilterManagerTest, CloseConnectionAndCallback) {
   InSequence s;
 
   Upstream::HostDescription* host_description(new NiceMock<Upstream::MockHostDescription>());
