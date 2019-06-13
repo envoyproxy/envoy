@@ -109,7 +109,7 @@ TEST_F(NetworkFilterManagerTest, All) {
   manager.onWrite();
 }
 
-TEST_F(NetworkFilterManagerTest, CloseConnectionAndReturnStop) {
+TEST_F(NetworkFilterManagerTest, CloseConnectionAndReturnContinue) {
   InSequence s;
 
   Upstream::HostDescription* host_description(new NiceMock<Upstream::MockHostDescription>());
