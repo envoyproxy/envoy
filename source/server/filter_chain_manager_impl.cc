@@ -273,7 +273,6 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
 
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
-  ENVOY_LOG(error, "will call socket local address()");
   const auto& address = socket.localAddress();
 
   // Match on destination port (only for IP addresses).

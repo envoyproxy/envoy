@@ -51,9 +51,11 @@ namespace Server {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
   std::unique_ptr<Network::FilterChain>
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain&) const override {
-    return nullptr;
+    // A place holder to be found
+    return std::make_unique<Network::MockFilterChain>();
   }
 };
+
 class FilterChainManagerImplTest : public testing::Test {
 public:
   void SetUp() override {
@@ -110,7 +112,7 @@ public:
 
   // Reuseable template
   const std::string filter_chain_yaml = R"EOF(
-    - filter_chain_match:
+      filter_chain_match:
         destination_port: 10000
       tls_context:
         common_tls_context:
@@ -131,14 +133,14 @@ public:
 };
 
 TEST_F(FilterChainManagerImplTest, FilterChainMatchNothing) {
-  const auto* filter_chain =
+  auto filter_chain =
       findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 }
 
 TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
   addSingleFilterChainHelper(filter_chain_template_);
-  const auto* filter_chain =
+  auto* filter_chain =
       findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
 }
