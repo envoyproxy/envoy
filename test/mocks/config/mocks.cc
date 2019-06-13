@@ -9,14 +9,30 @@
 namespace Envoy {
 namespace Config {
 
-MockGrpcMuxWatch::MockGrpcMuxWatch() {}
+MockSubscriptionFactory::MockSubscriptionFactory() {
+  ON_CALL(*this, subscriptionFromConfigSource(_, _, _, _))
+      .WillByDefault(testing::Invoke([this](const envoy::api::v2::core::ConfigSource&,
+                                            absl::string_view, Stats::Scope&,
+                                            SubscriptionCallbacks& callbacks) -> SubscriptionPtr {
+        auto ret = std::make_unique<testing::NiceMock<MockSubscription>>();
+        subscription_ = ret.get();
+        callbacks_ = &callbacks;
+        return ret;
+      }));
+  ON_CALL(*this, messageValidationVisitor())
+      .WillByDefault(testing::ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+}
+
+MockSubscriptionFactory::~MockSubscriptionFactory() = default;
+
+MockGrpcMuxWatch::MockGrpcMuxWatch() = default;
 MockGrpcMuxWatch::~MockGrpcMuxWatch() { cancel(); }
 
-MockGrpcMux::MockGrpcMux() {}
-MockGrpcMux::~MockGrpcMux() {}
+MockGrpcMux::MockGrpcMux() = default;
+MockGrpcMux::~MockGrpcMux() = default;
 
-MockGrpcStreamCallbacks::MockGrpcStreamCallbacks() {}
-MockGrpcStreamCallbacks::~MockGrpcStreamCallbacks() {}
+MockGrpcStreamCallbacks::MockGrpcStreamCallbacks() = default;
+MockGrpcStreamCallbacks::~MockGrpcStreamCallbacks() = default;
 
 GrpcMuxWatchPtr MockGrpcMux::subscribe(const std::string& type_url,
                                        const std::set<std::string>& resources,
@@ -29,7 +45,7 @@ MockGrpcMuxCallbacks::MockGrpcMuxCallbacks() {
       .WillByDefault(testing::Invoke(TestUtility::xdsResourceName));
 }
 
-MockGrpcMuxCallbacks::~MockGrpcMuxCallbacks() {}
+MockGrpcMuxCallbacks::~MockGrpcMuxCallbacks() = default;
 
 MockMutableConfigProviderBase::MockMutableConfigProviderBase(
     std::shared_ptr<ConfigSubscriptionInstance>&& subscription,

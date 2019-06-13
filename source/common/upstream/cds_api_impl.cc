@@ -9,7 +9,6 @@
 #include "common/common/cleanup.h"
 #include "common/common/utility.h"
 #include "common/config/resources.h"
-#include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -17,27 +16,18 @@ namespace Envoy {
 namespace Upstream {
 
 CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
-                             ClusterManager& cm, Event::Dispatcher& dispatcher,
-                             Runtime::RandomGenerator& random,
-                             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                             ProtobufMessage::ValidationVisitor& validation_visitor,
-                             Api::Api& api) {
-  return CdsApiPtr{new CdsApiImpl(cds_config, cm, dispatcher, random, local_info, scope,
-                                  validation_visitor, api)};
+                             ClusterManager& cm, Stats::Scope& scope,
+                             ProtobufMessage::ValidationVisitor& validation_visitor) {
+  return CdsApiPtr{new CdsApiImpl(cds_config, cm, scope, validation_visitor)};
 }
 
 CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-                       Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+                       Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
       validation_visitor_(validation_visitor) {
-  Config::Utility::checkLocalInfo("cds", local_info);
-
-  subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
-      cds_config, local_info, dispatcher, cm, random, *scope_,
-      Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()),
-      validation_visitor, api, *this);
+  subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
+      cds_config, Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()),
+      *scope_, *this);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -80,7 +70,8 @@ void CdsApiImpl::onConfigUpdate(
                                                                  validation_visitor_);
       MessageUtil::validate(cluster);
       if (!cluster_names.insert(cluster.name()).second) {
-        // NOTE: at this point, the first of these duplicates has already been successfully applied.
+        // NOTE: at this point, the first of these duplicates has already been successfully
+        // applied.
         throw EnvoyException(fmt::format("duplicate cluster {} found", cluster.name()));
       }
       if (cm_.addOrUpdateCluster(
@@ -88,21 +79,22 @@ void CdsApiImpl::onConfigUpdate(
               [this](const std::string&, ClusterManager::ClusterWarmingState state) {
                 // Following if/else block implements a control flow mechanism that can be used
                 // by an ADS implementation to properly sequence CDS and RDS update. It is not
-                // enforcing on ADS. ADS can use it to detect when a previously sent cluster becomes
-                // warm before sending routes that depend on it. This can improve incidence of HTTP
-                // 503 responses from Envoy when a route is used before it's supporting cluster is
-                // ready.
+                // enforcing on ADS. ADS can use it to detect when a previously sent cluster
+                // becomes warm before sending routes that depend on it. This can improve
+                // incidence of HTTP 503 responses from Envoy when a route is used before it's
+                // supporting cluster is ready.
                 //
-                // We achieve that by leaving CDS in the paused state as long as there is at least
-                // one cluster in the warming state. This prevents CDS ACK from being sent to ADS.
-                // Once cluster is warmed up, CDS is resumed, and ACK is sent to ADS, providing a
-                // signal to ADS to proceed with RDS updates.
+                // We achieve that by leaving CDS in the paused state as long as there is at
+                // least one cluster in the warming state. This prevents CDS ACK from being sent
+                // to ADS. Once cluster is warmed up, CDS is resumed, and ACK is sent to ADS,
+                // providing a signal to ADS to proceed with RDS updates.
                 //
-                // Major concern with this approach is CDS being left in the paused state forever.
-                // As long as ClusterManager::removeCluster() is not called on a warming cluster
-                // this is not an issue. CdsApiImpl takes care of doing this properly, and there
-                // is no other component removing clusters from the ClusterManagerImpl. If this
-                // ever changes, we would need to correct the following logic.
+                // Major concern with this approach is CDS being left in the paused state
+                // forever. As long as ClusterManager::removeCluster() is not called on a
+                // warming cluster this is not an issue. CdsApiImpl takes care of doing this
+                // properly, and there is no other component removing clusters from the
+                // ClusterManagerImpl. If this ever changes, we would need to correct the
+                // following logic.
                 if (state == ClusterManager::ClusterWarmingState::Starting &&
                     cm_.warmingClusterCount() == 1) {
                   cm_.adsMux().pause(Config::TypeUrl::get().Cluster);

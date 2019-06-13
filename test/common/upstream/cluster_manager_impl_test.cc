@@ -155,6 +155,16 @@ class TestClusterManagerImpl : public ClusterManagerImpl {
 public:
   using ClusterManagerImpl::ClusterManagerImpl;
 
+  TestClusterManagerImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                         ClusterManagerFactory& factory, Stats::Store& stats,
+                         ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                         Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                         AccessLog::AccessLogManager& log_manager,
+                         Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                         Api::Api& api, Http::Context& http_context)
+      : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
+                           main_thread_dispatcher, admin, validation_visitor_, api, http_context) {}
+
   std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
     std::map<std::string, std::reference_wrapper<Cluster>> clusters;
     for (auto& cluster : active_clusters_) {
@@ -162,6 +172,8 @@ public:
     }
     return clusters;
   }
+
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
 // Override postThreadLocalClusterUpdate so we can test that merged updates calls

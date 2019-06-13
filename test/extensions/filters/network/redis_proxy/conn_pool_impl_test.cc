@@ -45,7 +45,7 @@ public:
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
     if (!cluster_exists) {
-      EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
+      EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
     }
 
     std::unique_ptr<InstanceImpl> conn_pool_impl = std::make_unique<InstanceImpl>(

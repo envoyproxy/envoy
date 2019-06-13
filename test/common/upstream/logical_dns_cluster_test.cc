@@ -51,8 +51,8 @@ protected:
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
-    cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
-                                         factory_context, std::move(scope), false));
+    cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, factory_context,
+                                         std::move(scope), false));
     cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
@@ -70,8 +70,8 @@ protected:
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
-    cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
-                                         factory_context, std::move(scope), false));
+    cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, factory_context,
+                                         std::move(scope), false));
     cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
@@ -90,7 +90,8 @@ protected:
   }
 
   void testBasicSetup(const std::string& config, const std::string& expected_address,
-                      const uint32_t expected_port, ConfigType config_type = ConfigType::V2_YAML) {
+                      uint32_t expected_port, uint32_t expected_hc_port,
+                      ConfigType config_type = ConfigType::V2_YAML) {
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     if (config_type == ConfigType::V1_JSON) {
       setupFromV1Json(config);
@@ -114,11 +115,9 @@ protected:
               cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
     HostSharedPtr logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
 
-    // Regression test for issue #3908. Make sure we do not get "0.0.0.0:0" as the logical host's
-    // health check address.
-    EXPECT_NE("0.0.0.0:0", logical_host->healthCheckAddress()->asString());
-    EXPECT_EQ(fmt::format("127.0.0.1:{}", expected_port),
+    EXPECT_EQ("127.0.0.1:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
+    EXPECT_EQ("127.0.0.1:" + std::to_string(expected_port), logical_host->address()->asString());
 
     EXPECT_CALL(dispatcher_,
                 createClientConnection_(
@@ -134,9 +133,9 @@ protected:
     EXPECT_CALL(*resolve_timer_, enableTimer(_));
     dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
 
-    EXPECT_NE("0.0.0.0:0", logical_host->healthCheckAddress()->asString());
-    EXPECT_EQ(fmt::format("127.0.0.1:{}", expected_port),
+    EXPECT_EQ("127.0.0.1:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
+    EXPECT_EQ("127.0.0.1:" + std::to_string(expected_port), logical_host->address()->asString());
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
     EXPECT_CALL(dispatcher_,
@@ -166,9 +165,9 @@ protected:
     EXPECT_CALL(*resolve_timer_, enableTimer(_));
     dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
-    EXPECT_NE("0.0.0.0:0", logical_host->healthCheckAddress()->asString());
-    EXPECT_EQ(fmt::format("127.0.0.3:{}", expected_port),
+    EXPECT_EQ("127.0.0.3:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
+    EXPECT_EQ("127.0.0.3:" + std::to_string(expected_port), logical_host->address()->asString());
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
     EXPECT_CALL(dispatcher_,
@@ -443,10 +442,10 @@ TEST_F(LogicalDnsClusterTest, Basic) {
               port_value: 8000
   )EOF";
 
-  testBasicSetup(json, "foo.bar.com", 443, ConfigType::V1_JSON);
-  testBasicSetup(basic_yaml_hosts, "foo.bar.com", 443);
+  testBasicSetup(json, "foo.bar.com", 443, 443, ConfigType::V1_JSON);
+  testBasicSetup(basic_yaml_hosts, "foo.bar.com", 443, 443);
   // Expect to override the health check address port value.
-  testBasicSetup(basic_yaml_load_assignment, "foo.bar.com", 8000);
+  testBasicSetup(basic_yaml_load_assignment, "foo.bar.com", 443, 8000);
 }
 
 } // namespace

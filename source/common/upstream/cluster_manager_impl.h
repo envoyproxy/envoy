@@ -22,6 +22,7 @@
 
 #include "common/common/cleanup.h"
 #include "common/config/grpc_mux_impl.h"
+#include "common/config/subscription_factory_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/priority_conn_pool_map.h"
@@ -171,7 +172,8 @@ public:
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin, Api::Api& api,
+                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                      Http::Context& http_context);
 
   // Upstream::ClusterManager
@@ -190,7 +192,7 @@ public:
 
     return clusters_map;
   }
-  ThreadLocalCluster* get(const std::string& cluster) override;
+  ThreadLocalCluster* get(absl::string_view cluster) override;
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
                                                          ResourcePriority priority,
                                                          Http::Protocol protocol,
@@ -224,6 +226,8 @@ public:
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
+
+  Config::SubscriptionFactory& subscriptionFactory() override { return subscription_factory_; }
 
   std::size_t warmingClusterCount() const override { return warming_clusters_.size(); }
 
@@ -340,7 +344,7 @@ private:
 
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
-    std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
+    absl::flat_hash_map<std::string, ClusterEntryPtr> thread_local_clusters_;
 
     // These maps are owned by the ThreadLocalClusterManagerImpl instead of the ClusterEntry
     // to prevent lifetime/ownership issues when a cluster is dynamically removed.
@@ -464,6 +468,7 @@ private:
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
+  Config::SubscriptionFactoryImpl subscription_factory_;
 };
 
 } // namespace Upstream
