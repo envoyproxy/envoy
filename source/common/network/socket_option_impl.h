@@ -1,6 +1,11 @@
 #pragma once
 
 #include <netinet/in.h>
+
+#ifdef _NETINET6_IN6_H_
+#include <netinet/in6.h>
+#endif
+
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 
@@ -94,8 +99,6 @@ namespace Network {
 #elif IPV6_PKTINFO
 #define ENVOY_RECV_IPV6_PKT_INFO                                                                   \
   Network::SocketOptionName(std::make_pair(IPPROTO_IPV6, IPV6_PKTINFO))
-#else
-#define ENVOY_RECV_IPV6_PKT_INFO Network::SocketOptionName()
 #endif
 
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
