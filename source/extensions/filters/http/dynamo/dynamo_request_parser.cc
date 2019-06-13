@@ -105,7 +105,7 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
         json_data.getObjectArray("TransactItems", true);
     std::string table_name = "";
     for (const Json::ObjectSharedPtr& transact_item : transact_items) {
-      table_name = getTableNameFromTransaction(*transact_item);
+      table_name = getTableNameFromTransactItem(*transact_item);
       if (table_name == "") {
         // if an operation is missing a table name, we want to throw the normal set of errors
         table.table_name = "";
@@ -124,12 +124,12 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
   return table;
 }
 
-std::string RequestParser::getTableNameFromTransaction(const Json::Object& transact_item) {
-  Json::ObjectSharedPtr item{};
+std::string RequestParser::getTableNameFromTransactItem(const Json::Object& transact_item) {
+  Json::Object item{};
   std::string table_name = "";
   for (const std::string& operation : TRANSACT_ITEM_OPERATIONS) {
-    item = transact_item.getObject(operation, true);
-    table_name = item->getString("TableName", "");
+    item = *transact_item.getObject(operation, true);
+    table_name = item.getString("TableName", "");
     if (table_name != "") {
       return table_name;
     }
