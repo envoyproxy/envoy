@@ -562,7 +562,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        std::string sni = options.transportSocketOptions() != NULL &&
+        std::string sni = options.transportSocketOptions() != nullptr &&
                                   options.transportSocketOptions()->serverNameOverride().has_value()
                               ? options.transportSocketOptions()->serverNameOverride().value()
                               : options.clientCtxProto().sni();

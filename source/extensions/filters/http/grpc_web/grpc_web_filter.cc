@@ -6,7 +6,7 @@
 #include "common/common/base64.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
@@ -140,7 +140,7 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers,
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (do_stat_tracking_) {
+  if (doStatTracking()) {
     chargeStat(headers);
   }
   if (is_text_response_) {
@@ -192,7 +192,7 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
     return Http::FilterTrailersStatus::Continue;
   }
 
-  if (do_stat_tracking_) {
+  if (doStatTracking()) {
     chargeStat(trailers);
   }
 
@@ -230,13 +230,12 @@ void GrpcWebFilter::setupStatTracking(const Http::HeaderMap& headers) {
   if (!cluster_) {
     return;
   }
-  do_stat_tracking_ =
-      Grpc::Common::resolveServiceAndMethod(headers.Path(), &grpc_service_, &grpc_method_);
+  request_names_ = context_.resolveServiceAndMethod(headers.Path());
 }
 
 void GrpcWebFilter::chargeStat(const Http::HeaderMap& headers) {
-  Grpc::Common::chargeStat(*cluster_, "grpc-web", grpc_service_, grpc_method_,
-                           headers.GrpcStatus());
+  context_.chargeStat(*cluster_, Grpc::Context::Protocol::GrpcWeb, *request_names_,
+                      headers.GrpcStatus());
 }
 
 } // namespace GrpcWeb

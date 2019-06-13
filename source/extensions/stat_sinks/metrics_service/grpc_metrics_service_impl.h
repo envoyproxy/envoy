@@ -12,6 +12,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/grpc/typed_async_client.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,7 +23,7 @@ namespace MetricsService {
  * Interface for metrics streamer.
  */
 class GrpcMetricsStreamer
-    : public Grpc::TypedAsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse> {
+    : public Grpc::AsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse> {
 public:
   virtual ~GrpcMetricsStreamer() {}
 
@@ -32,7 +33,7 @@ public:
    */
   virtual void send(envoy::service::metrics::v2::StreamMetricsMessage& message) PURE;
 
-  // Grpc::TypedAsyncStreamCallbacks
+  // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap&) override {}
   void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
   void
@@ -55,12 +56,14 @@ public:
   // GrpcMetricsStreamer
   void send(envoy::service::metrics::v2::StreamMetricsMessage& message) override;
 
-  // Grpc::TypedAsyncStreamCallbacks
+  // Grpc::AsyncStreamCallbacks
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override { stream_ = nullptr; }
 
 private:
-  Grpc::AsyncStream* stream_{};
-  Grpc::AsyncClientPtr client_;
+  Grpc::AsyncStream<envoy::service::metrics::v2::StreamMetricsMessage> stream_{};
+  Grpc::AsyncClient<envoy::service::metrics::v2::StreamMetricsMessage,
+                    envoy::service::metrics::v2::StreamMetricsResponse>
+      client_;
   const LocalInfo::LocalInfo& local_info_;
 };
 

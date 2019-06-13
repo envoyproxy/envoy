@@ -13,6 +13,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -26,6 +27,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Config {
+namespace {
 
 TEST(UtilityTest, ComputeHashedVersion) {
   EXPECT_EQ("hash_2e1472b57af294d1", Utility::computeHashedVersion("{}").first);
@@ -166,6 +168,41 @@ TEST(UtilityTest, ParseRateLimitSettings) {
   EXPECT_EQ(true, rate_limit_settings.enabled_);
   EXPECT_EQ(500, rate_limit_settings.max_tokens_);
   EXPECT_EQ(4, rate_limit_settings.fill_rate_);
+}
+
+TEST(UtilityTest, AllowDeprecatedV1Config) {
+  NiceMock<Runtime::MockLoader> runtime;
+  const Json::ObjectSharedPtr no_v1_config = Json::Factory::loadFromString("{}");
+  const Json::ObjectSharedPtr v1_config =
+      Json::Factory::loadFromString("{\"deprecated_v1\": true}");
+
+  // No v1 config.
+  EXPECT_FALSE(Utility::allowDeprecatedV1Config(runtime, *no_v1_config));
+
+  // v1 config, runtime not allowed.
+  EXPECT_CALL(runtime.snapshot_,
+              deprecatedFeatureEnabled("envoy.deprecated_features.v1_filter_json_config"))
+      .WillOnce(Return(false));
+  EXPECT_THROW_WITH_MESSAGE(
+      Utility::allowDeprecatedV1Config(runtime, *v1_config), EnvoyException,
+      "Using deprecated v1 JSON config load via 'deprecated_v1: true'. This configuration will be "
+      "removed from Envoy soon. Please see "
+      "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details. The "
+      "`envoy.deprecated_features.v1_filter_json_config` runtime key can be used to temporarily "
+      "enable this feature once the deprecation becomes fail by default.");
+
+  // v1 config, runtime allowed.
+  EXPECT_CALL(runtime.snapshot_,
+              deprecatedFeatureEnabled("envoy.deprecated_features.v1_filter_json_config"))
+      .WillOnce(Return(true));
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Using deprecated v1 JSON config load via 'deprecated_v1: true'. This configuration will be "
+      "removed from Envoy soon. Please see "
+      "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details. The "
+      "`envoy.deprecated_features.v1_filter_json_config` runtime key can be used to temporarily "
+      "enable this feature once the deprecation becomes fail by default.",
+      Utility::allowDeprecatedV1Config(runtime, *v1_config));
 }
 
 // TEST(UtilityTest, FactoryForGrpcApiConfigSource) should catch misconfigured
@@ -359,5 +396,6 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTy
   Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source);
 }
 
+} // namespace
 } // namespace Config
 } // namespace Envoy

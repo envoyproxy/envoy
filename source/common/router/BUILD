@@ -67,6 +67,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "debug_config_lib",
+    srcs = ["debug_config.cc"],
+    hdrs = ["debug_config.h"],
+    deps = [
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
     name = "route_config_update_impl_lib",
     srcs = ["route_config_update_receiver_impl.cc"],
     hdrs = ["route_config_update_receiver_impl.h"],
@@ -204,6 +215,7 @@ envoy_cc_library(
     hdrs = ["router.h"],
     deps = [
         ":config_lib",
+        ":debug_config_lib",
         ":header_parser_lib",
         ":retry_state_lib",
         "//include/envoy/event:dispatcher_interface",

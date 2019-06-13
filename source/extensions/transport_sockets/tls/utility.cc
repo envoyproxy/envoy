@@ -54,7 +54,7 @@ const ASN1_TIME& epochASN1_Time() {
   static ASN1_TIME* e = []() -> ASN1_TIME* {
     ASN1_TIME* epoch = ASN1_TIME_new();
     const time_t epoch_time = 0;
-    RELEASE_ASSERT(ASN1_TIME_set(epoch, epoch_time) != NULL, "");
+    RELEASE_ASSERT(ASN1_TIME_set(epoch, epoch_time) != nullptr, "");
     return epoch;
   }();
   return *e;
@@ -63,7 +63,7 @@ const ASN1_TIME& epochASN1_Time() {
 inline bssl::UniquePtr<ASN1_TIME> currentASN1_Time(TimeSource& time_source) {
   bssl::UniquePtr<ASN1_TIME> current_asn_time(ASN1_TIME_new());
   const time_t current_time = std::chrono::system_clock::to_time_t(time_source.systemTime());
-  RELEASE_ASSERT(ASN1_TIME_set(current_asn_time.get(), current_time) != NULL, "");
+  RELEASE_ASSERT(ASN1_TIME_set(current_asn_time.get(), current_time) != nullptr, "");
   return current_asn_time;
 }
 

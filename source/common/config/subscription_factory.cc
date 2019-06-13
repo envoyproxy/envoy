@@ -5,6 +5,7 @@
 #include "common/config/grpc_mux_subscription_impl.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
+#include "common/config/type_to_endpoint.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -14,16 +15,16 @@ namespace Config {
 std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
     const envoy::api::v2::core::ConfigSource& config, const LocalInfo::LocalInfo& local_info,
     Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
-    Stats::Scope& scope, const std::string& rest_method, const std::string& grpc_method,
-    absl::string_view type_url, ProtobufMessage::ValidationVisitor& validation_visitor,
-    Api::Api& api) {
+    Stats::Scope& scope, absl::string_view type_url,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+    SubscriptionCallbacks& callbacks) {
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
   switch (config.config_source_specifier_case()) {
   case envoy::api::v2::core::ConfigSource::kPath: {
     Utility::checkFilesystemSubscriptionBackingPath(config.path(), api);
-    result = std::make_unique<Config::FilesystemSubscriptionImpl>(dispatcher, config.path(), stats,
-                                                                  validation_visitor, api);
+    result = std::make_unique<Config::FilesystemSubscriptionImpl>(
+        dispatcher, config.path(), callbacks, stats, validation_visitor, api);
     break;
   }
   case envoy::api::v2::core::ConfigSource::kApiConfigSource: {
@@ -39,9 +40,8 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
       result = std::make_unique<HttpSubscriptionImpl>(
           local_info, cm, api_config_source.cluster_names()[0], dispatcher, random,
           Utility::apiConfigSourceRefreshDelay(api_config_source),
-          Utility::apiConfigSourceRequestTimeout(api_config_source),
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method), stats,
-          Utility::configSourceInitialFetchTimeout(config), validation_visitor);
+          Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url),
+          callbacks, stats, Utility::configSourceInitialFetchTimeout(config), validation_visitor);
       break;
     case envoy::api::v2::core::ApiConfigSource::GRPC:
       result = std::make_unique<GrpcSubscriptionImpl>(
@@ -49,9 +49,8 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
           Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
                                                          api_config_source, scope)
               ->create(),
-          dispatcher, random,
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), type_url,
-          stats, scope, Utility::parseRateLimitSettings(api_config_source),
+          dispatcher, random, sotwGrpcMethod(type_url), type_url, callbacks, stats, scope,
+          Utility::parseRateLimitSettings(api_config_source),
           Utility::configSourceInitialFetchTimeout(config));
       break;
     case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
@@ -61,8 +60,8 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
           Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
                                                          api_config_source, scope)
               ->create(),
-          dispatcher, *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method),
-          type_url, random, scope, Utility::parseRateLimitSettings(api_config_source), stats,
+          dispatcher, deltaGrpcMethod(type_url), type_url, random, scope,
+          Utility::parseRateLimitSettings(api_config_source), callbacks, stats,
           Utility::configSourceInitialFetchTimeout(config));
       break;
     }
@@ -73,7 +72,8 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
   }
   case envoy::api::v2::core::ConfigSource::kAds: {
     result = std::make_unique<GrpcMuxSubscriptionImpl>(
-        cm.adsMux(), stats, type_url, dispatcher, Utility::configSourceInitialFetchTimeout(config));
+        cm.adsMux(), callbacks, stats, type_url, dispatcher,
+        Utility::configSourceInitialFetchTimeout(config));
     break;
   }
   default:

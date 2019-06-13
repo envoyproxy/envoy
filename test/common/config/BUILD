@@ -112,6 +112,7 @@ envoy_cc_test(
     srcs = ["grpc_subscription_impl_test.cc"],
     deps = [
         ":grpc_subscription_test_harness",
+        "//source/common/buffer:zero_copy_input_stream_lib",
     ],
 )
 
@@ -139,6 +140,7 @@ envoy_cc_test_library(
     deps = [
         ":subscription_test_harness",
         "//source/common/config:delta_subscription_lib",
+        "//source/common/grpc:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
@@ -268,6 +270,7 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
     ],

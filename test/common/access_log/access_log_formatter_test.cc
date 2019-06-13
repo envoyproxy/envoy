@@ -1055,7 +1055,9 @@ TEST(AccessLogFormatterTest, ParserFailures) {
       "%TRAILER(TEST):23u1%",
       "%TRAILER(X?Y?Z)%",
       "%TRAILER(:TEST):10",
-      "%DYNAMIC_METADATA(TEST"};
+      "%DYNAMIC_METADATA(TEST",
+      "%START_TIME(%85n)%",
+      "%START_TIME(%#__88n)%"};
 
   for (const std::string& test_case : test_cases) {
     EXPECT_THROW(parser.parse(test_case), EnvoyException) << test_case;

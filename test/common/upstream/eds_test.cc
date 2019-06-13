@@ -224,7 +224,10 @@ TEST_F(EdsTest, OnConfigUpdateEmpty) {
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
   cluster_->onConfigUpdate({}, "");
-  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_empty").value());
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resources;
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  cluster_->onConfigUpdate(resources, removed_resources, "");
+  EXPECT_EQ(2UL, stats_.counter("cluster.name.update_empty").value());
   EXPECT_TRUE(initialized);
 }
 

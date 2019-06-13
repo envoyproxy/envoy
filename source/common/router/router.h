@@ -497,6 +497,7 @@ private:
   MonotonicTime downstream_request_complete_time_;
   uint32_t buffer_limit_{0};
   MetadataMatchCriteriaConstPtr metadata_match_;
+  std::function<void(Http::HeaderMap&)> modify_headers_;
 
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;

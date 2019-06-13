@@ -140,6 +140,25 @@ public:
     }
     return HashUtil::xxHash64(text);
   }
+
+  /**
+   * Converts a proto repeated field into a generic vector of const Protobuf::Message unique_ptr's.
+   *
+   * @param repeated_field the proto repeated field to convert.
+   * @return ProtobufType::ConstMessagePtrVector the vector of const Message pointers.
+   */
+  template <typename ProtoType>
+  static ProtobufTypes::ConstMessagePtrVector
+  convertToConstMessagePtrVector(const Protobuf::RepeatedPtrField<ProtoType>& repeated_field) {
+    ProtobufTypes::ConstMessagePtrVector ret_vector;
+    std::transform(repeated_field.begin(), repeated_field.end(), std::back_inserter(ret_vector),
+                   [](const ProtoType& proto_message) -> std::unique_ptr<const Protobuf::Message> {
+                     Protobuf::Message* clone = proto_message.New();
+                     clone->MergeFrom(proto_message);
+                     return std::unique_ptr<const Protobuf::Message>(clone);
+                   });
+    return ret_vector;
+  }
 };
 
 class ProtoValidationException : public EnvoyException {

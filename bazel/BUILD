@@ -254,8 +254,22 @@ alias(
             ":ios_i386": ":ios_i386",
             ":ios_x86_64": ":ios_x86_64",
             # If we're not on an apple platform return a value that will never match in the select() statement calling this
-            # since it would have already been matched above
+            # since it would have already been matched above.
             "//conditions:default": ":darwin",
+        },
+    ),
+)
+
+alias(
+    name = "linux",
+    actual = select(
+        {
+            ":linux_x86_64": ":linux_x86_64",
+            ":linux_aarch64": ":linux_aarch64",
+            ":linux_ppc": ":linux_ppc",
+            # If we're not on an linux platform return a value that will never match in the select() statement calling this
+            # since it would have already been matched above.
+            "//conditions:default": ":linux_x86_64",
         },
     ),
 )

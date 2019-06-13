@@ -43,9 +43,10 @@ TEST(MiscFilesystemSubscriptionImplTest, BadWatch) {
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(_, _, _)).WillOnce(Throw(EnvoyException("bad path")));
-  EXPECT_THROW_WITH_MESSAGE(
-      FilesystemSubscriptionImpl(dispatcher, "##!@/dev/null", stats, validation_visitor, *api),
-      EnvoyException, "bad path");
+  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks;
+  EXPECT_THROW_WITH_MESSAGE(FilesystemSubscriptionImpl(dispatcher, "##!@/dev/null", callbacks,
+                                                       stats, validation_visitor, *api),
+                            EnvoyException, "bad path");
 }
 
 } // namespace

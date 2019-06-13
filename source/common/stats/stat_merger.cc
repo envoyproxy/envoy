@@ -7,51 +7,6 @@ namespace Stats {
 
 StatMerger::StatMerger(Stats::Store& target_store) : temp_scope_(target_store.createScope("")) {}
 
-bool StatMerger::shouldImportBasedOnRegex(const std::string& gauge_name) {
-  // Gauge name *substrings*, and special logic to use for combining those gauges' values.
-  static const auto* nonstandard_combine_logic = new std::vector<std::regex>{
-      // Any .version is either a static property of the binary, or an opaque identifier for
-      // resources that are not passed across hot restart.
-      std::regex(".*\\.version$"),
-      std::regex("^version$"),
-      // Once the child is up and reporting stats, its own control plane state and liveness is what
-      // we're interested in.
-      std::regex(".*\\.control_plane.connected_state$"),
-      std::regex("^control_plane.connected_state$"),
-      std::regex("^server.live$"),
-      // Properties that should reasonably have some continuity across hot restart. The parent's
-      // last value should be a relatively accurate starting point, and then the child can update
-      // from there when appropriate. (All of these exceptional stats used with set() rather than
-      // add()/sub(), so the child's new value will in fact overwrite.)
-      std::regex("^cluster_manager.active_clusters$"),
-      std::regex("^cluster_manager.warming_clusters$"),
-      std::regex("^cluster\\..*\\.membership_.*$"),
-      std::regex("^membership_.*$"),
-      std::regex("^cluster\\..*\\.max_host_weight$"),
-      std::regex("^max_host_weight$"),
-      std::regex(".*\\.total_principals$"),
-      std::regex("^listener_manager.total_listeners_active$"),
-      std::regex("^overload\\..*\\.pressure$"),
-      // Due to the fd passing, the parent's view of whether its listeners are in transitive states
-      // is not useful.
-      std::regex("^listener_manager.total_listeners_draining$"),
-      std::regex("^listener_manager.total_listeners_warming$"),
-      // Static properties known at startup.
-      std::regex("^server.concurrency$"),
-      std::regex("^server.hot_restart_epoch$"),
-      std::regex("^runtime.admin_overrides_active$"),
-      std::regex("^runtime.num_keys$"),
-      std::regex("^runtime.num_layers$"),
-  };
-  std::smatch match;
-  for (const auto& exception : *nonstandard_combine_logic) {
-    if (std::regex_match(gauge_name, match, exception)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas) {
   for (const auto& counter : counter_deltas) {
     temp_scope_->counter(counter.first).add(counter.second);

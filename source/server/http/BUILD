@@ -53,6 +53,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/profiler:profiler_lib",
         "//source/common/router:config_lib",
+        "//source/common/router:scoped_config_lib",
         "//source/common/stats:histogram_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",

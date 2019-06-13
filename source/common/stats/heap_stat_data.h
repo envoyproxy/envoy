@@ -75,32 +75,8 @@ public:
 
   GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
                            const std::vector<Tag>& tags, Gauge::ImportMode import_mode) override {
-    GaugeSharedPtr gauge = std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(
+    return std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(
         alloc(name), *this, tag_extracted_name, tags, import_mode);
-
-    // TODO(jmarantz): Remove this double-checking ASAP. This is left in only
-    // for the transition while #7083 gets reviewed, while new code may be
-    // concurrently added that updates the regex library. Once #7083 is merged
-    // the regex table and this double-check can be deleted.
-    switch (gauge->importMode()) {
-    case Gauge::ImportMode::Accumulate:
-      if (!StatMerger::shouldImportBasedOnRegex(gauge->name())) {
-        std::cerr << "ImportMode conflict: regex says no, arg says yes: " << gauge->name()
-                  << std::endl;
-        new std::string; // Makes tests fail due to leak, but allows the process to keep running.
-      }
-      break;
-    case Gauge::ImportMode::NeverImport:
-      if (StatMerger::shouldImportBasedOnRegex(gauge->name())) {
-        std::cerr << "ImportMode conflict: regex says yes, arg says no: " << gauge->name()
-                  << std::endl;
-        new std::string; // Makes tests fail due to leak, but allows the process to keep running.
-      }
-      break;
-    case Gauge::ImportMode::Uninitialized:
-      break;
-    }
-    return gauge;
   }
 
 #ifndef ENVOY_CONFIG_COVERAGE

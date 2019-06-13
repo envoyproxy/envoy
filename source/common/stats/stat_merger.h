@@ -21,12 +21,6 @@ public:
   void mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
                   const Protobuf::Map<std::string, uint64_t>& gauges);
 
-  /**
-   * @return true if the name is recognized as a gauge that should be accumulated across
-   *         hot restart.
-   */
-  static bool shouldImportBasedOnRegex(const std::string& gauge_name);
-
 private:
   void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas);
   void mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges);

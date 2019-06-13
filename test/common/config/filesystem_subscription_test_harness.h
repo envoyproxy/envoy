@@ -30,7 +30,7 @@ public:
   FilesystemSubscriptionTestHarness()
       : path_(TestEnvironment::temporaryPath("eds.json")),
         api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
-        subscription_(*dispatcher_, path_, stats_, validation_visitor_, *api_) {}
+        subscription_(*dispatcher_, path_, callbacks_, stats_, validation_visitor_, *api_) {}
 
   ~FilesystemSubscriptionTestHarness() {
     if (::access(path_.c_str(), F_OK) != -1) {
@@ -41,7 +41,7 @@ public:
   void startSubscription(const std::set<std::string>& cluster_names) override {
     std::ifstream config_file(path_);
     file_at_start_ = config_file.good();
-    subscription_.start(cluster_names, callbacks_);
+    subscription_.start(cluster_names);
   }
 
   void updateResources(const std::set<std::string>& cluster_names) override {

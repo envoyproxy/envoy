@@ -4,6 +4,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/grpc/context.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
 #include "envoy/http/filter.h"
@@ -147,6 +148,11 @@ public:
    * @return Http::Context& a reference to the http context.
    */
   virtual Http::Context& httpContext() PURE;
+
+  /**
+   * @return Grpc::Context& a reference to the grpc context.
+   */
+  virtual Grpc::Context& grpcContext() PURE;
 
   /**
    * @return ProcessContext& a reference to the process context.

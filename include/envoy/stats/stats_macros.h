@@ -32,12 +32,13 @@ namespace Envoy {
  *     MY_COOL_STATS(POOL_COUNTER(...), POOL_GAUGE(...), POOL_HISTOGRAM(...))};
  */
 
-#define GENERATE_COUNTER_STRUCT(NAME) Stats::Counter& NAME##_;
-#define GENERATE_GAUGE_STRUCT(NAME, MODE) Stats::Gauge& NAME##_;
-#define GENERATE_HISTOGRAM_STRUCT(NAME) Stats::Histogram& NAME##_;
+// Fully-qualified for use in external callsites.
+#define GENERATE_COUNTER_STRUCT(NAME) Envoy::Stats::Counter& NAME##_;
+#define GENERATE_GAUGE_STRUCT(NAME, MODE) Envoy::Stats::Gauge& NAME##_;
+#define GENERATE_HISTOGRAM_STRUCT(NAME) Envoy::Stats::Histogram& NAME##_;
 
 #define FINISH_STAT_DECL_(X) + std::string(#X)),
-#define FINISH_STAT_DECL_MODE_(X, MODE) + std::string(#X), Stats::Gauge::ImportMode::MODE),
+#define FINISH_STAT_DECL_MODE_(X, MODE) + std::string(#X), Envoy::Stats::Gauge::ImportMode::MODE),
 
 #define POOL_COUNTER_PREFIX(POOL, PREFIX) (POOL).counter(PREFIX FINISH_STAT_DECL_
 #define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gauge(PREFIX FINISH_STAT_DECL_MODE_

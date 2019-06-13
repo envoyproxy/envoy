@@ -40,19 +40,17 @@ TEST(ClientSslAuthAllowedPrincipalsTest, EmptyString) {
 }
 
 TEST(ClientSslAuthConfigTest, BadClientSslAuthConfig) {
-  std::string json = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "auth_api_cluster" : "fake_cluster",
-    "ip_white_list": ["192.168.3.0/24"],
-    "test" : "a"
-  }
+  std::string yaml = R"EOF(
+stat_prefix: my_stat_prefix
+auth_api_cluster: fake_cluster
+ip_white_list:
+- address_prefix: 192.168.3.0
+  prefix_len: 24
+test: a
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
-  EXPECT_THROW(Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config),
-               Json::Exception);
+  EXPECT_THROW(TestUtility::loadFromYaml(yaml, proto_config), EnvoyException);
 }
 
 class ClientSslAuthFilterTest : public testing::Test {
@@ -63,20 +61,18 @@ protected:
   ~ClientSslAuthFilterTest() { tls_.shutdownThread(); }
 
   void setup() {
-    std::string json = R"EOF(
-    {
-      "auth_api_cluster": "vpn",
-      "stat_prefix": "vpn",
-      "ip_white_list":
-        [ "1.2.3.4/32",
-          "2001:abcd::/64"
-        ]
-    }
+    std::string yaml = R"EOF(
+auth_api_cluster: vpn
+stat_prefix: vpn
+ip_white_list:
+- address_prefix: 1.2.3.4
+  prefix_len: 32
+- address_prefix: '2001:abcd::'
+  prefix_len: 64
     )EOF";
 
-    Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
     envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
-    Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
+    TestUtility::loadFromYaml(yaml, proto_config);
     EXPECT_CALL(cm_, get("vpn"));
     setupRequest();
     config_ =
@@ -122,16 +118,13 @@ protected:
 };
 
 TEST_F(ClientSslAuthFilterTest, NoCluster) {
-  std::string json = R"EOF(
-  {
-    "auth_api_cluster": "bad_cluster",
-    "stat_prefix": "bad_cluster"
-  }
+  std::string yaml = R"EOF(
+auth_api_cluster: bad_cluster
+stat_prefix: bad_cluster
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
-  Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
+  TestUtility::loadFromYaml(yaml, proto_config);
   EXPECT_CALL(cm_, get("bad_cluster")).WillOnce(Return(nullptr));
   EXPECT_THROW(
       ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_),
