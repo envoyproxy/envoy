@@ -106,16 +106,15 @@ MemoryTest::Mode MemoryTest::mode() {
   // library for Envoy is TCMALLOC that's what we test for here. If we switch
   // to a different malloc library than we'd have to re-evaluate all the
   // thresholds in the tests referencing hasDeterministicMallocStats().
-  //
-  // Note that different versions of STL and other compiler/architecture
-  // differences may also impact memory usage, so unfortunately memory
-  // comparisons need to have some slack. There have recently emerged
-  // some memory-allocation differences between development and Envoy CI
-  // and Bazel CI (which compiles Envoy as a test of Bazel).
   return Mode::Disabled;
 #elif defined(MEMORY_TEST_EXACT) // Set in "ci/do_ci.sh" for 'release' tests.
   return Mode::Canonical;
 #else
+  // Different versions of STL and other compiler/architecture differences may
+  // also impact memory usage, so unfortunately memory comparisons need to have
+  // some slack. There have recently emerged some memory-allocation differences
+  // between development and Envoy CI and Bazel CI (which compiles Envoy as a
+  // test of Bazel).
   return Mode::Approximate;
 #endif
 }

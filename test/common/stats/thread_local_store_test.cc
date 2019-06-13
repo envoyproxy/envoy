@@ -861,7 +861,7 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   TestUtil::forEachSampleStat(
       1000, [&store](absl::string_view name) { store.counter(std::string(name)); });
   const size_t million = 1000 * 1000;
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 19601552); // as of March 14, 2019
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 19602128); // June 13, 2019
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 20 * million);
 }
 
@@ -881,7 +881,7 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
   TestUtil::forEachSampleStat(
       1000, [&store](absl::string_view name) { store.counter(std::string(name)); });
   const size_t million = 1000 * 1000;
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 22880912);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 22879216);
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 23 * million);
   store.shutdownThreading();
   tls.shutdownThread();
