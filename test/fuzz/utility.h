@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common/network/utility.h"
 #include "common/common/empty_string.h"
+#include "common/network/utility.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/fuzz/common.pb.h"
