@@ -21,7 +21,7 @@ struct RcDetailsValues {
   // The grpc web filter couldn't decode the data provided.
   const std::string GrpcDecodeFailedDueToData = "grpc_base_64_decode_failed";
 };
-typedef ConstSingleton<RcDetailsValues> RcDetails;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 // Bit mask denotes a trailers frame of gRPC-Web.
 const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;

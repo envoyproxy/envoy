@@ -11,6 +11,7 @@
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
+#include "envoy/config/subscription_factory.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"
@@ -37,7 +38,7 @@ namespace Upstream {
  */
 class ClusterUpdateCallbacks {
 public:
-  virtual ~ClusterUpdateCallbacks() {}
+  virtual ~ClusterUpdateCallbacks() = default;
 
   /**
    * onClusterAddOrUpdate is called when a new cluster is added or an existing cluster
@@ -60,10 +61,10 @@ public:
  */
 class ClusterUpdateCallbacksHandle {
 public:
-  virtual ~ClusterUpdateCallbacksHandle() {}
+  virtual ~ClusterUpdateCallbacksHandle() = default;
 };
 
-typedef std::unique_ptr<ClusterUpdateCallbacksHandle> ClusterUpdateCallbacksHandlePtr;
+using ClusterUpdateCallbacksHandlePtr = std::unique_ptr<ClusterUpdateCallbacksHandle>;
 
 class ClusterManagerFactory;
 
@@ -73,7 +74,7 @@ class ClusterManagerFactory;
  */
 class ClusterManager {
 public:
-  virtual ~ClusterManager() {}
+  virtual ~ClusterManager() = default;
 
   /**
    * Warming state a cluster is currently in. Used as an argument for the ClusterWarmingCallback.
@@ -91,8 +92,8 @@ public:
    * @param cluster_name name of the cluster.
    * @param warming_state state the cluster transitioned to.
    */
-  typedef std::function<void(const std::string& cluster_name, ClusterWarmingState warming_state)>
-      ClusterWarmingCallback;
+  using ClusterWarmingCallback =
+      std::function<void(const std::string& cluster_name, ClusterWarmingState warming_state)>;
 
   /**
    * Add or update a cluster via API. The semantics of this API are:
@@ -113,7 +114,7 @@ public:
    */
   virtual void setInitializedCb(std::function<void()> callback) PURE;
 
-  typedef std::unordered_map<std::string, std::reference_wrapper<const Cluster>> ClusterInfoMap;
+  using ClusterInfoMap = std::unordered_map<std::string, std::reference_wrapper<const Cluster>>;
 
   /**
    * @return ClusterInfoMap all current clusters. These are the primary (not thread local)
@@ -131,7 +132,7 @@ public:
    * If information about the cluster needs to be kept, use the ThreadLocalCluster::info() method to
    * obtain cluster information that is safe to store.
    */
-  virtual ThreadLocalCluster* get(const std::string& cluster) PURE;
+  virtual ThreadLocalCluster* get(absl::string_view cluster) PURE;
 
   /**
    * Allocate a load balanced HTTP connection pool for a cluster. This is *per-thread* so that
@@ -235,17 +236,25 @@ public:
 
   virtual ClusterManagerFactory& clusterManagerFactory() PURE;
 
+  /**
+   * Obtain the subscription factory for the cluster manager. Since subscriptions may have an
+   * upstream component, the factory is a facet of the cluster manager.
+   *
+   * @return Config::SubscriptionFactory& the subscription factory.
+   */
+  virtual Config::SubscriptionFactory& subscriptionFactory() PURE;
+
   virtual std::size_t warmingClusterCount() const PURE;
 };
 
-typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;
+using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
 
 /**
  * Abstract interface for a CDS API provider.
  */
 class CdsApi {
 public:
-  virtual ~CdsApi() {}
+  virtual ~CdsApi() = default;
 
   /**
    * Start the first fetch of CDS data.
@@ -264,14 +273,14 @@ public:
   virtual const std::string versionInfo() const PURE;
 };
 
-typedef std::unique_ptr<CdsApi> CdsApiPtr;
+using CdsApiPtr = std::unique_ptr<CdsApi>;
 
 /**
  * Factory for objects needed during cluster manager operation.
  */
 class ClusterManagerFactory {
 public:
-  virtual ~ClusterManagerFactory() {}
+  virtual ~ClusterManagerFactory() = default;
 
   /**
    * Allocate a cluster manager from configuration proto.
@@ -322,7 +331,7 @@ public:
  */
 class ClusterInfoFactory {
 public:
-  virtual ~ClusterInfoFactory() {}
+  virtual ~ClusterInfoFactory() = default;
 
   /**
    * Parameters for createClusterInfo().

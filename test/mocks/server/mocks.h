@@ -506,6 +506,7 @@ public:
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   MOCK_METHOD0(api, Api::Api&());
 
+  testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<Api::MockApi> api_;
 };

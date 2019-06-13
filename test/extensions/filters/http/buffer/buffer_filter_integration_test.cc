@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace {
 
-typedef HttpProtocolIntegrationTest BufferIntegrationTest;
+using BufferIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, BufferIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),

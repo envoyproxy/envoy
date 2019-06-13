@@ -27,7 +27,7 @@ namespace Stats {
  */
 class StatDataAllocator {
 public:
-  virtual ~StatDataAllocator() {}
+  virtual ~StatDataAllocator() = default;
 
   /**
    * @param name the full name of the stat.

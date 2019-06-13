@@ -1979,9 +1979,9 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_CALL(factory_context_.cluster_manager_, get("www2"))
+  EXPECT_CALL(factory_context_.cluster_manager_, get(Eq("www2")))
       .WillRepeatedly(Return(&factory_context_.cluster_manager_.thread_local_cluster_));
-  EXPECT_CALL(factory_context_.cluster_manager_, get("some_cluster"))
+  EXPECT_CALL(factory_context_.cluster_manager_, get(Eq("some_cluster")))
       .WillRepeatedly(Return(nullptr));
 
   EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
@@ -2001,7 +2001,7 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_CALL(factory_context_.cluster_manager_, get("www2")).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(factory_context_.cluster_manager_, get(Eq("www2"))).WillRepeatedly(Return(nullptr));
 
   EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
                EnvoyException);
@@ -2020,7 +2020,7 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_CALL(factory_context_.cluster_manager_, get("www2")).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(factory_context_.cluster_manager_, get(Eq("www2"))).WillRepeatedly(Return(nullptr));
 
   TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, false);
 }
@@ -2039,7 +2039,7 @@ virtual_hosts:
       cluster: www
   )EOF";
 
-  EXPECT_CALL(factory_context_.cluster_manager_, get("www2")).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(factory_context_.cluster_manager_, get(Eq("www2"))).WillRepeatedly(Return(nullptr));
 
   TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 }
@@ -3794,11 +3794,11 @@ virtual_hosts:
           weight: 34
   )EOF";
 
-  EXPECT_CALL(factory_context_.cluster_manager_, get("cluster1"))
+  EXPECT_CALL(factory_context_.cluster_manager_, get(Eq("cluster1")))
       .WillRepeatedly(Return(&factory_context_.cluster_manager_.thread_local_cluster_));
-  EXPECT_CALL(factory_context_.cluster_manager_, get("cluster2"))
+  EXPECT_CALL(factory_context_.cluster_manager_, get(Eq("cluster2")))
       .WillRepeatedly(Return(&factory_context_.cluster_manager_.thread_local_cluster_));
-  EXPECT_CALL(factory_context_.cluster_manager_, get("cluster3-invalid"))
+  EXPECT_CALL(factory_context_.cluster_manager_, get(Eq("cluster3-invalid")))
       .WillRepeatedly(Return(nullptr));
 
   EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),

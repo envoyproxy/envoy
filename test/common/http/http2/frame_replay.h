@@ -17,7 +17,7 @@ namespace Http {
 namespace Http2 {
 
 // A byte vector representation of an HTTP/2 frame.
-typedef std::vector<uint8_t> Frame;
+using Frame = std::vector<uint8_t>;
 
 // An HTTP/2 frame derived from a file location.
 class FileFrame {

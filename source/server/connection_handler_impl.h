@@ -61,20 +61,20 @@ public:
 
 private:
   struct ActiveListenerBase;
-  typedef std::unique_ptr<ActiveListenerBase> ActiveListenerBasePtr;
+  using ActiveListenerBasePtr = std::unique_ptr<ActiveListenerBase>;
 
   struct ActiveTcpListener;
-  typedef std::unique_ptr<ActiveTcpListener> ActiveTcpListenerPtr;
+  using ActiveTcpListenerPtr = std::unique_ptr<ActiveTcpListener>;
 
   struct ActiveUdpListener;
-  typedef std::unique_ptr<ActiveUdpListener> ActiveUdpListenerPtr;
+  using ActiveUdpListenerPtr = std::unique_ptr<ActiveUdpListener>;
 
   ActiveListenerBase* findActiveListenerByAddress(const Network::Address::Instance& address);
 
   struct ActiveConnection;
-  typedef std::unique_ptr<ActiveConnection> ActiveConnectionPtr;
+  using ActiveConnectionPtr = std::unique_ptr<ActiveConnection>;
   struct ActiveSocket;
-  typedef std::unique_ptr<ActiveSocket> ActiveSocketPtr;
+  using ActiveSocketPtr = std::unique_ptr<ActiveSocket>;
 
   /**
    * Wrapper for an active listener owned by this handler.
@@ -83,7 +83,7 @@ private:
     ActiveListenerBase(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                        Network::ListenerConfig& config);
 
-    virtual ~ActiveListenerBase() {}
+    virtual ~ActiveListenerBase() = default;
 
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;

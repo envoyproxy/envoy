@@ -26,7 +26,7 @@ struct ControlPlaneStats {
 
 class GrpcMuxCallbacks {
 public:
-  virtual ~GrpcMuxCallbacks() {}
+  virtual ~GrpcMuxCallbacks() = default;
 
   /**
    * Called when a configuration update is received.
@@ -58,10 +58,10 @@ public:
  */
 class GrpcMuxWatch {
 public:
-  virtual ~GrpcMuxWatch() {}
+  virtual ~GrpcMuxWatch() = default;
 };
 
-typedef std::unique_ptr<GrpcMuxWatch> GrpcMuxWatchPtr;
+using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;
 
 /**
  * Manage one or more gRPC subscriptions on a single stream to management server. This can be used
@@ -69,7 +69,7 @@ typedef std::unique_ptr<GrpcMuxWatch> GrpcMuxWatchPtr;
  */
 class GrpcMux {
 public:
-  virtual ~GrpcMux() {}
+  virtual ~GrpcMux() = default;
 
   /**
    * Initiate stream with management server.
@@ -109,7 +109,7 @@ public:
   virtual void resume(const std::string& type_url) PURE;
 };
 
-typedef std::unique_ptr<GrpcMux> GrpcMuxPtr;
+using GrpcMuxPtr = std::unique_ptr<GrpcMux>;
 
 } // namespace Config
 } // namespace Envoy
