@@ -31,4 +31,8 @@ envoy_cc_library(
         "os_sys_calls_hot_restart.h",
         "os_sys_calls_linux.h",
     ],
+    copts = select({
+        "//bazel:apple": ["-D__APPLE_USE_RFC_3542"],
+        "//conditions:default": [],
+    }),
 )
