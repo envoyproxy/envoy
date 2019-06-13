@@ -173,15 +173,20 @@ public:
   }
 
   void mergeImportMode(ImportMode import_mode) override {
+    ImportMode current = importMode();
+    if (current == import_mode) {
+      return;
+    }
+
     switch (import_mode) {
     case ImportMode::Uninitialized:
       break;
     case ImportMode::Accumulate:
-      ASSERT(canTransitionToImportMode(ImportMode::Accumulate));
+      ASSERT(current == ImportMode::Uninitialized);
       data_.flags_ |= Flags::LogicAccumulate;
       break;
     case ImportMode::NeverImport:
-      ASSERT(canTransitionToImportMode(ImportMode::NeverImport));
+      ASSERT(current == ImportMode::Uninitialized);
       // A previous revision of Envoy may have transferred a gauge that it
       // thought was Accumulate. But the new version thinks it's NeverImport, so
       // we clear the accumulated value.
@@ -195,11 +200,6 @@ public:
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
 
 protected:
-  bool canTransitionToImportMode(ImportMode new_import_mode) const {
-    ImportMode current = importMode();
-    return current == ImportMode::Uninitialized || current == new_import_mode;
-  }
-
   StatData& data_;
   StatDataAllocatorImpl<StatData>& alloc_;
 };
