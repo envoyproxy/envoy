@@ -180,6 +180,8 @@ public:
 
     switch (import_mode) {
     case ImportMode::Uninitialized:
+      // mergeImportNode(ImportMode::Uninitialized) is called when merging an
+      // existing stat with importMode() == Accumulate or NeverImport.
       break;
     case ImportMode::Accumulate:
       ASSERT(current == ImportMode::Uninitialized);
