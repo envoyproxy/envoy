@@ -11,6 +11,8 @@
 namespace Envoy {
 namespace Fuzz {
 
+std::string kEmptyString = "";
+
 // The HeaderMap code assumes that input does not contain certain characters, and
 // this is validated by the HTTP parser. Some fuzzers will create strings with
 // these characters, however, and this creates not very interesting fuzz test
@@ -87,6 +89,8 @@ inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
 
 inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info,
                                      const Ssl::MockConnectionInfo* connection_info) {
+  // Set mocks' default string return value to be an empty string.
+  testing::DefaultValue<std::string&>::Set(kEmptyString);
   TestStreamInfo test_stream_info;
   test_stream_info.metadata_ = stream_info.dynamic_metadata();
   // libc++ clocks don't track at nanosecond on macOS.
