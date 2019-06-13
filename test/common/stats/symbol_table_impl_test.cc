@@ -542,10 +542,6 @@ TEST_P(StatNameTest, SharedStatNameStorageSetSwap) {
 // 2M. Note that only SymbolTableImpl is tested for memory consumption,
 // and not FakeSymbolTableImpl.
 TEST(SymbolTableTest, Memory) {
-  if (!TestUtil::hasDeterministicMallocStats()) {
-    return;
-  }
-
   // Tests a stat-name allocation strategy.
   auto test_memory_usage = [](std::function<void(absl::string_view)> fn) -> size_t {
     TestUtil::MemoryTest memory_test;
@@ -577,7 +573,7 @@ TEST(SymbolTableTest, Memory) {
   // symbol_table_mem_used:  1726056 (3.9x) -- does not seem to depend on STL sizes.
   EXPECT_MEMORY_LE(string_mem_used, 7759488);
   EXPECT_MEMORY_LE(symbol_table_mem_used, string_mem_used / 3);
-  EXPECT_MEMORY_EQ(symbol_table_mem_used, 1726057);
+  EXPECT_MEMORY_EQ(symbol_table_mem_used, 1726056);
 }
 
 } // namespace Stats

@@ -6,30 +6,6 @@ namespace Envoy {
 namespace Stats {
 namespace TestUtil {
 
-bool hasDeterministicMallocStats() {
-#if defined(TCMALLOC) && !defined(ENVOY_MEMORY_DEBUG_ENABLED)
-  // We can only test absolute memory usage if the malloc library is a known
-  // quantity. This decision is centralized here. As the preferred malloc
-  // library for Envoy is TCMALLOC that's what we test for here. If we switch
-  // to a different malloc library than we'd have to re-evaluate all the
-  // thresholds in the tests referencing hasDeterministicMallocStats().
-  //
-  // Note that different versions of STL and other compiler/architecture
-  // differences may also impact memory usage, so unfortunately memory
-  // comparisons need to have some slack. There have recently emerged
-  // some memory-allocation differences between development and Envoy CI
-  // and Bazel CI (which compiles Envoy as a test of Bazel).
-
-  // Do one quick sanity check to see if we can measure memory usage at all.
-  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
-  std::unique_ptr<char[]> data(new char[10000]);
-  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
-  return end_mem - start_mem >= 10000; // actually 10240
-#else
-  return false;
-#endif
-}
-
 void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> fn) {
   // These are stats that are repeated for each cluster as of Oct 2018, with a
   // very basic configuration with no traffic.
@@ -124,10 +100,20 @@ void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> 
 }
 
 MemoryTest::Mode MemoryTest::mode() {
-  if (!hasDeterministicMallocStats()) {
-    return Mode::Disabled;
-  }
-#ifdef MEMORY_TEST_EXACT // Set in "ci/do_ci.sh" for 'release' tests.
+#if !defined(TCMALLOC) || defined(ENVOY_MEMORY_DEBUG_ENABLED)
+  // We can only test absolute memory usage if the malloc library is a known
+  // quantity. This decision is centralized here. As the preferred malloc
+  // library for Envoy is TCMALLOC that's what we test for here. If we switch
+  // to a different malloc library than we'd have to re-evaluate all the
+  // thresholds in the tests referencing hasDeterministicMallocStats().
+  //
+  // Note that different versions of STL and other compiler/architecture
+  // differences may also impact memory usage, so unfortunately memory
+  // comparisons need to have some slack. There have recently emerged
+  // some memory-allocation differences between development and Envoy CI
+  // and Bazel CI (which compiles Envoy as a test of Bazel).
+  return Mode::Disabled;
+#elif defined(MEMORY_TEST_EXACT) // Set in "ci/do_ci.sh" for 'release' tests.
   return Mode::Canonical;
 #else
   return Mode::Approximate;

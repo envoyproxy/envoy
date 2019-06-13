@@ -11,13 +11,6 @@ namespace Stats {
 namespace TestUtil {
 
 /**
- * Determines whether the library has deterministic malloc-stats results.
- *
- * @return bool true if the Memory::Stats::totalCurrentlyAllocated() has stable results.
- */
-bool hasDeterministicMallocStats();
-
-/**
  * Calls fn for a sampling of plausible stat names given a number of clusters.
  * This is intended for memory and performance benchmarking, where the syntax of
  * the names may be material to the measurements. Here we are deliberately not
@@ -70,13 +63,14 @@ private:
   const size_t memory_at_construction_;
 };
 
-// Compares the memory consumed against an exact expected value, but only
-// on canonical platforms. This is currently enabled only for 'release' tests
-// in ci. On other platforms an info log is emitted, indicating that the test
-// is being skipped.
+// Compares the memory consumed against an exact expected value, but only on
+// canonical platforms, or when the expected value is zero. Canonical platforms
+// currently include only for 'release' tests in ci. On other platforms an info
+// log is emitted, indicating that the test is being skipped.
 #define EXPECT_MEMORY_EQ(consumed_bytes, expected_value)                                           \
   do {                                                                                             \
-    if (Stats::TestUtil::MemoryTest::mode() == Stats::TestUtil::MemoryTest::Mode::Canonical) {     \
+    if (expected_value == 0 ||                                                                     \
+        Stats::TestUtil::MemoryTest::mode() == Stats::TestUtil::MemoryTest::Mode::Canonical) {     \
       EXPECT_EQ(consumed_bytes, expected_value);                                                   \
     } else {                                                                                       \
       ENVOY_LOG_MISC(info,                                                                         \
@@ -94,6 +88,7 @@ private:
   do {                                                                                             \
     if (Stats::TestUtil::MemoryTest::mode() != Stats::TestUtil::MemoryTest::Mode::Disabled) {      \
       EXPECT_LE(consumed_bytes, upper_bound);                                                      \
+      EXPECT_GT(consumed_bytes, 0);                                                                \
     } else {                                                                                       \
       ENVOY_LOG_MISC(                                                                              \
           info, "Skipping upper-bound memory test against {} bytes as platform lacks tcmalloc",    \
