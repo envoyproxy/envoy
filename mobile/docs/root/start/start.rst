@@ -6,5 +6,5 @@ Getting Started
 .. toctree::
   :maxdepth: 2
 
-  android/android
-  ios/ios
+  building/building
+  examples/hello_world
