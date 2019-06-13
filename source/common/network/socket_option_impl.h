@@ -1,11 +1,10 @@
 #pragma once
 
-#include <netinet/in.h>
-
-#ifdef _NETINET6_IN6_H_
-#include <netinet/in6.h>
+#ifdef __APPLE__
+#define __APPLE_USE_RFC_3542
 #endif
 
+#include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 
