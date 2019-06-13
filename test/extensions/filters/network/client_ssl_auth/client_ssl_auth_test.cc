@@ -21,6 +21,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
@@ -73,7 +74,7 @@ ip_white_list:
 
     envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
-    EXPECT_CALL(cm_, get("vpn"));
+    EXPECT_CALL(cm_, get(Eq("vpn")));
     setupRequest();
     config_ =
         ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_);
@@ -125,7 +126,7 @@ stat_prefix: bad_cluster
 
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
   TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_CALL(cm_, get("bad_cluster")).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, get(Eq("bad_cluster"))).WillOnce(Return(nullptr));
   EXPECT_THROW(
       ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_),
       EnvoyException);

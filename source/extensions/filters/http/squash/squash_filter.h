@@ -51,7 +51,7 @@ private:
   const static std::regex ENV_REGEX;
 };
 
-typedef std::shared_ptr<SquashFilterConfig> SquashFilterConfigSharedPtr;
+using SquashFilterConfigSharedPtr = std::shared_ptr<SquashFilterConfig>;
 
 class AsyncClientCallbackShim : public Http::AsyncClient::Callbacks {
 public:

@@ -43,8 +43,8 @@ private:
   const envoy::config::filter::network::rbac::v2::RBAC::EnforcementType enforcement_type_;
 };
 
-typedef std::shared_ptr<RoleBasedAccessControlFilterConfig>
-    RoleBasedAccessControlFilterConfigSharedPtr;
+using RoleBasedAccessControlFilterConfigSharedPtr =
+    std::shared_ptr<RoleBasedAccessControlFilterConfig>;
 
 /**
  * Implementation of a basic RBAC network filter.

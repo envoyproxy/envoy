@@ -22,6 +22,7 @@
 
 #include "common/common/cleanup.h"
 #include "common/config/grpc_mux_impl.h"
+#include "common/config/subscription_factory_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/priority_conn_pool_map.h"
@@ -171,7 +172,8 @@ public:
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin, Api::Api& api,
+                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                      Http::Context& http_context);
 
   // Upstream::ClusterManager
@@ -190,7 +192,7 @@ public:
 
     return clusters_map;
   }
-  ThreadLocalCluster* get(const std::string& cluster) override;
+  ThreadLocalCluster* get(absl::string_view cluster) override;
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
                                                          ResourcePriority priority,
                                                          Http::Protocol protocol,
@@ -225,6 +227,8 @@ public:
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
+  Config::SubscriptionFactory& subscriptionFactory() override { return subscription_factory_; }
+
   std::size_t warmingClusterCount() const override { return warming_clusters_.size(); }
 
 protected:
@@ -244,7 +248,7 @@ private:
       ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
           : pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
 
-      typedef PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance> ConnPools;
+      using ConnPools = PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance>;
 
       // This is a shared_ptr so we can keep it alive while cleaning up.
       std::shared_ptr<ConnPools> pools_;
@@ -253,7 +257,7 @@ private:
     };
 
     struct TcpConnPoolsContainer {
-      typedef std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr> ConnPools;
+      using ConnPools = std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
 
       ConnPools pools_;
       uint64_t drains_remaining_{};
@@ -283,8 +287,8 @@ private:
       HostConstSharedPtr host_;
       Network::ClientConnection& connection_;
     };
-    typedef std::unordered_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>
-        TcpConnectionsMap;
+    using TcpConnectionsMap =
+        std::unordered_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>;
 
     struct ClusterEntry : public ThreadLocalCluster {
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
@@ -315,7 +319,7 @@ private:
       Http::AsyncClientImpl http_async_client_;
     };
 
-    typedef std::unique_ptr<ClusterEntry> ClusterEntryPtr;
+    using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;
 
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   const absl::optional<std::string>& local_cluster_name);
@@ -340,7 +344,7 @@ private:
 
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
-    std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
+    absl::flat_hash_map<std::string, ClusterEntryPtr> thread_local_clusters_;
 
     // These maps are owned by the ThreadLocalClusterManagerImpl instead of the ClusterEntry
     // to prevent lifetime/ownership issues when a cluster is dynamically removed.
@@ -387,9 +391,9 @@ private:
         : RaiiListElement<ClusterUpdateCallbacks*>(parent, &cb) {}
   };
 
-  typedef std::unique_ptr<ClusterData> ClusterDataPtr;
+  using ClusterDataPtr = std::unique_ptr<ClusterData>;
   // This map is ordered so that config dumping is consistent.
-  typedef std::map<std::string, ClusterDataPtr> ClusterMap;
+  using ClusterMap = std::map<std::string, ClusterDataPtr>;
 
   struct PendingUpdates {
     ~PendingUpdates() { disableTimer(); }
@@ -464,6 +468,7 @@ private:
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
+  Config::SubscriptionFactoryImpl subscription_factory_;
 };
 
 } // namespace Upstream

@@ -33,7 +33,7 @@ public:
   const std::string OperationDelete{"delete"};
 };
 
-typedef ConstSingleton<DynamicMetadataKeys> DynamicMetadataKeysSingleton;
+using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
 
 AccessLog::AccessLog(const std::string& file_name, Envoy::AccessLog::AccessLogManager& log_manager,
                      TimeSource& time_source)

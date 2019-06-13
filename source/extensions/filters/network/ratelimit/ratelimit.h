@@ -62,7 +62,7 @@ private:
   const bool failure_mode_deny_;
 };
 
-typedef std::shared_ptr<Config> ConfigSharedPtr;
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
  * TCP rate limit filter instance. This filter will call the rate limit service with the given

@@ -25,7 +25,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 32]
+// [#comment:next free field: 33]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -286,6 +286,12 @@ message HttpConnectionManager {
   // true. Generating a random UUID4 is expensive so in high throughput scenarios where this feature
   // is not desired it can be disabled.
   google.protobuf.BoolValue generate_request_id = 15;
+
+  // Whether the connection manager will keep the :ref:`x-request-id
+  // <config_http_conn_man_headers_x-request-id>` header if passed for a request that is edge
+  // (Edge request is the request from external clients to front Envoy) and not reset it, which
+  // is the current Envoy behaviour. This defaults to false.
+  bool preserve_external_request_id = 32;
 
   // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP
   // header.

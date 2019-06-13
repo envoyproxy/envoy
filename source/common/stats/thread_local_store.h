@@ -120,7 +120,7 @@ using ParentHistogramImplSharedPtr = std::shared_ptr<ParentHistogramImpl>;
  */
 class TlsScope : public Scope {
 public:
-  virtual ~TlsScope() {}
+  ~TlsScope() override = default;
 
   // TODO(ramaraochavali): Allow direct TLS access for the advanced consumers.
   /**

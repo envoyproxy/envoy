@@ -477,7 +477,7 @@ public:
 
 // For the tests which mutate primary and failover host sets explicitly, only
 // run once.
-typedef RoundRobinLoadBalancerTest FailoverTest;
+using FailoverTest = RoundRobinLoadBalancerTest;
 
 // Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
 TEST_P(FailoverTest, BasicFailover) {
