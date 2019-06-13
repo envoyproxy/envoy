@@ -163,6 +163,13 @@ config_setting(
     values = {"define": "quiche=enabled"},
 )
 
+config_setting(
+    name = "disable_boringssl",
+    define_values = {
+        "boringssl": "disable",
+    },
+)
+
 # Alias pointing to the selected version of BoringSSL:
 # - BoringSSL FIPS from @boringssl_fips//:ssl,
 # - non-FIPS BoringSSL from @boringssl//:ssl.

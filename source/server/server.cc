@@ -351,8 +351,9 @@ void InstanceImpl::initialize(const Options& options,
   hooks.onRuntimeCreated();
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_source_);
+  auto& factory = Envoy::Config::Utility::getAndCheckFactory<Ssl::ContextManagerFactory>(
+      Ssl::ContextManagerFactory::name());
+  ssl_context_manager_ = factory.createContextManager(time_source_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,

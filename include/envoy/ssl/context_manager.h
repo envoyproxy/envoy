@@ -40,5 +40,16 @@ public:
   virtual void iterateContexts(std::function<void(const Context&)> callback) PURE;
 };
 
+using ContextManagerPtr = std::unique_ptr<ContextManager>;
+
+class ContextManagerFactory {
+public:
+  virtual ~ContextManagerFactory() = default;
+  virtual ContextManagerPtr createContextManager(TimeSource& time_source) PURE;
+
+  // There could be only one factory thus the name is static.
+  static std::string name() { return "ssl_context_manager"; }
+};
+
 } // namespace Ssl
 } // namespace Envoy
