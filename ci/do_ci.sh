@@ -94,14 +94,14 @@ if [[ "$1" == "bazel.release" ]]; then
   setup_clang_toolchain
   echo "bazel release build with tests..."
   bazel_binary_build release
-  bazel_release_options="test ${BAZEL_TEST_OPTIONS} -c opt ${MEMORY_TEST_EXACT_ARGS}"
+  BAZEL_RELEASE_OPTIONS="test ${BAZEL_TEST_OPTIONS} -c opt ${MEMORY_TEST_EXACT_ARGS}"
 
   if [[ $# -gt 1 ]]; then
     shift
     echo "Testing $* ..."
     # Run only specified tests. Argument can be a single test
     # (e.g. '//test/common/common:assert_test') or a test group (e.g. '//test/common/...')
-    bazel_with_collection $bazel_release_options $*
+    bazel_with_collection $BAZEL_RELEASE_OPTIONS $*
   else
     echo "Testing..."
     # We have various test binaries in the test directory such as tools, benchmarks, etc. We
@@ -109,7 +109,7 @@ if [[ "$1" == "bazel.release" ]]; then
 
     bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
     # Now run all of the tests which should already be compiled.
-    bazel_with_collection $bazel_release_options //test/...
+    bazel_with_collection $BAZEL_RELEASE_OPTIONS //test/...
   fi
   exit 0
 elif [[ "$1" == "bazel.release.server_only" ]]; then

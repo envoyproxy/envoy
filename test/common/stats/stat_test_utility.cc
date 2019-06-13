@@ -1,5 +1,6 @@
 #include "test/common/stats/stat_test_utility.h"
 
+#include "common/common/assert.h"
 #include "common/memory/stats.h"
 
 namespace Envoy {
@@ -101,13 +102,19 @@ void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> 
 
 MemoryTest::Mode MemoryTest::mode() {
 #if !defined(TCMALLOC) || defined(ENVOY_MEMORY_DEBUG_ENABLED)
+  return Mode::Disabled;
+#else
   // We can only test absolute memory usage if the malloc library is a known
   // quantity. This decision is centralized here. As the preferred malloc
   // library for Envoy is TCMALLOC that's what we test for here. If we switch
   // to a different malloc library than we'd have to re-evaluate all the
   // thresholds in the tests referencing hasDeterministicMallocStats().
-  return Mode::Disabled;
-#elif defined(MEMORY_TEST_EXACT) // Set in "ci/do_ci.sh" for 'release' tests.
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+  std::string long_string("more than 22 chars to exceed libc++ short-string optimization");
+  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+
+#if defined(MEMORY_TEST_EXACT) // Set in "ci/do_ci.sh" for 'release' tests.
+  RELEASE_ASSERT(end_mem > start_mem, "Compiling for exact, but memory measurement looks broken");
   return Mode::Canonical;
 #else
   // Different versions of STL and other compiler/architecture differences may
@@ -115,7 +122,8 @@ MemoryTest::Mode MemoryTest::mode() {
   // some slack. There have recently emerged some memory-allocation differences
   // between development and Envoy CI and Bazel CI (which compiles Envoy as a
   // test of Bazel).
-  return Mode::Approximate;
+  return (end_mem > start_mem) ? Mode::Approximate : Mode::Disabled;
+#endif
 #endif
 }
 
