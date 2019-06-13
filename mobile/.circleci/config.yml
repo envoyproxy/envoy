@@ -29,12 +29,6 @@ jobs:
       - checkout
       - run: git submodule update --init
       - run: tools/check_format.sh
-  swiftlint:
-    docker:
-      - image: norionomura/swiftlint:0.33.0_swift-5.0
-    steps:
-      - checkout
-      - run: swiftlint lint --strict
 
 workflows:
   version: 2
@@ -45,4 +39,3 @@ workflows:
             tags:
               only: /^v.*/
       - format
-      - swiftlint
