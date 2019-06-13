@@ -16,14 +16,14 @@ namespace Common {
 namespace ExtAuthz {
 
 class Matcher;
-typedef std::shared_ptr<Matcher> MatcherSharedPtr;
+using MatcherSharedPtr = std::shared_ptr<Matcher>;
 
 /**
  *  Matchers describe the rules for matching authorization request and response headers.
  */
 class Matcher {
 public:
-  virtual ~Matcher() {}
+  virtual ~Matcher() = default;
 
   /**
    * Returns whether or not the header key matches the rules of the matcher.
@@ -122,7 +122,7 @@ private:
   const std::string tracing_name_;
 };
 
-typedef std::shared_ptr<ClientConfig> ClientConfigSharedPtr;
+using ClientConfigSharedPtr = std::shared_ptr<ClientConfig>;
 
 /**
  * This client implementation is used when the Ext_Authz filter needs to communicate with an

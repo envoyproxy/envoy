@@ -22,7 +22,7 @@ public:
       "type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration"};
 };
 
-typedef ConstSingleton<TypeUrlValues> TypeUrl;
+using TypeUrl = ConstSingleton<TypeUrlValues>;
 
 } // namespace Config
 } // namespace Envoy

@@ -47,7 +47,7 @@ public:
   explicit TestWithAuxiliaryFilter(const std::string& auxiliary_filter_name)
       : auxiliary_filter_name_(auxiliary_filter_name) {}
 
-  virtual ~TestWithAuxiliaryFilter() {}
+  virtual ~TestWithAuxiliaryFilter() = default;
 
 protected:
   /**

@@ -121,7 +121,7 @@ private:
     bool expect_reset_{};
   };
 
-  typedef std::unique_ptr<HttpActiveHealthCheckSession> HttpActiveHealthCheckSessionPtr;
+  using HttpActiveHealthCheckSessionPtr = std::unique_ptr<HttpActiveHealthCheckSession>;
 
   virtual Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
 
@@ -201,7 +201,7 @@ public:
  */
 class TcpHealthCheckMatcher {
 public:
-  typedef std::list<std::vector<uint8_t>> MatchSegments;
+  using MatchSegments = std::list<std::vector<uint8_t>>;
 
   static MatchSegments loadProtoBytes(
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload>& byte_array);
@@ -259,7 +259,7 @@ private:
     bool expect_close_{};
   };
 
-  typedef std::unique_ptr<TcpActiveHealthCheckSession> TcpActiveHealthCheckSessionPtr;
+  using TcpActiveHealthCheckSessionPtr = std::unique_ptr<TcpActiveHealthCheckSession>;
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {

@@ -20,7 +20,7 @@ public:
   /**
    * Parameters are max_stat_name_len, hot_restart_enabled
    */
-  typedef std::function<std::string(bool)> HotRestartVersionCb;
+  using HotRestartVersionCb = std::function<std::string(bool)>;
 
   /**
    * @throw NoServingException if Envoy has already done everything specified by the argv (e.g.

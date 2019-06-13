@@ -28,7 +28,7 @@ public:
   MOCK_METHOD1(parse, RequestParseResponse(absl::string_view&));
 };
 
-typedef std::shared_ptr<MockParser> MockParserSharedPtr;
+using MockParserSharedPtr = std::shared_ptr<MockParser>;
 
 class MockRequestParserResolver : public RequestParserResolver {
 public:
@@ -43,7 +43,7 @@ public:
   MOCK_METHOD1(onFailedParse, void(RequestParseFailureSharedPtr));
 };
 
-typedef std::shared_ptr<MockRequestCallback> MockRequestCallbackSharedPtr;
+using MockRequestCallbackSharedPtr = std::shared_ptr<MockRequestCallback>;
 
 class RequestCodecUnitTest : public testing::Test {
 protected:

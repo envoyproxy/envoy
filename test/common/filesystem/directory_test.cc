@@ -70,7 +70,7 @@ struct EntryHash {
   }
 };
 
-typedef std::unordered_set<DirectoryEntry, EntryHash> EntrySet;
+using EntrySet = std::unordered_set<DirectoryEntry, EntryHash>;
 
 EntrySet getDirectoryContents(const std::string& dir_path, bool recursive) {
   Directory directory(dir_path);

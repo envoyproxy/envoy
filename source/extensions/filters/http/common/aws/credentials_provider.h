@@ -44,7 +44,7 @@ public:
   virtual Credentials getCredentials() PURE;
 };
 
-typedef std::shared_ptr<CredentialsProvider> CredentialsProviderSharedPtr;
+using CredentialsProviderSharedPtr = std::shared_ptr<CredentialsProvider>;
 
 } // namespace Aws
 } // namespace Common

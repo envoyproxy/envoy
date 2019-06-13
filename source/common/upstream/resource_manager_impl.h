@@ -112,7 +112,7 @@ private:
   ResourceImpl connection_pools_;
 };
 
-typedef std::unique_ptr<ResourceManagerImpl> ResourceManagerImplPtr;
+using ResourceManagerImplPtr = std::unique_ptr<ResourceManagerImpl>;
 
 } // namespace Upstream
 } // namespace Envoy

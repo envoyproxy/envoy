@@ -35,7 +35,7 @@ class SubsetLoadBalancerDescribeMetadataTester {
 public:
   SubsetLoadBalancerDescribeMetadataTester(std::shared_ptr<SubsetLoadBalancer> lb) : lb_(lb) {}
 
-  typedef std::vector<std::pair<std::string, ProtobufWkt::Value>> MetadataVector;
+  using MetadataVector = std::vector<std::pair<std::string, ProtobufWkt::Value>>;
 
   void test(std::string expected, const MetadataVector& metadata) {
     SubsetLoadBalancer::SubsetMetadata subset_metadata(metadata);
@@ -113,8 +113,8 @@ public:
     least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
 
-  typedef std::map<std::string, std::string> HostMetadata;
-  typedef std::map<std::string, HostMetadata> HostURLMetadataMap;
+  using HostMetadata = std::map<std::string, std::string>;
+  using HostURLMetadataMap = std::map<std::string, HostMetadata>;
 
   void init() {
     init({

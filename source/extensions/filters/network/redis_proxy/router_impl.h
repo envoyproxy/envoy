@@ -23,7 +23,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-typedef std::map<std::string, ConnPool::InstanceSharedPtr> Upstreams;
+using Upstreams = std::map<std::string, ConnPool::InstanceSharedPtr>;
 
 class MirrorPolicyImpl : public MirrorPolicy {
 public:
@@ -61,7 +61,7 @@ private:
   MirrorPolicies mirror_policies_;
 };
 
-typedef std::shared_ptr<Prefix> PrefixSharedPtr;
+using PrefixSharedPtr = std::shared_ptr<Prefix>;
 
 class PrefixRoutes : public Router {
 public:

@@ -16,7 +16,7 @@ namespace RawBuffer {
  */
 class RawBufferSocketFactory : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
-  virtual ~RawBufferSocketFactory() {}
+  ~RawBufferSocketFactory() override = default;
   std::string name() const override { return TransportSocketNames::get().RawBuffer; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };
