@@ -13,7 +13,7 @@ void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& count
 
 void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges) {
   for (const auto& gauge : gauges) {
-    // Merging gauges via RPC from the parent has 3 case; case 2 and 4b are the
+    // Merging gauges via RPC from the parent has 4 cases; case 2 and 4b are the
     // most common.
     //
     // 1. Parent process thinks gauge is NeverImport: no data sent, and we
@@ -22,7 +22,9 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
     // 2. Child thinks gauge is Accumulate : data is combined in
     //    gauge_ref.add() below.
     // 3. Child thinks gauge is NeverImport: we skip this loop entry via
-    //    'continue'.
+    //    'continue'. This only happens with a code-change where the child
+    //    contains a code-change relative to parent, switching a Gauge from
+    //    Accumulate to NeverImport.
     // 4. Child has not yet initialized gauge yet -- this merge is the
     //    first time the child learns of the gauge. It's possible the child
     //    will think the gauge is NeverImport due to a code change. But for

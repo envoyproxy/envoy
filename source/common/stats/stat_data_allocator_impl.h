@@ -119,15 +119,19 @@ public:
             absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
             ImportMode import_mode)
       : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {
-    if (import_mode == ImportMode::Accumulate) {
+    switch (import_mode) {
+    case ImportMode::Accumulate:
       data_.flags_ |= Flags::LogicAccumulate;
-    } else if (import_mode == ImportMode::NeverImport) {
+      break;
+    case ImportMode::NeverImport:
       data_.flags_ |= Flags::NeverImport;
-    } else {
+      break;
+    case ImportMode::Uninitialized:
       // Note that we don't clear any flag bits for import_mode==Uninitialized,
       // as we may have an established import_mode when this stat was created in
       // an alternate scope. See
       // https://github.com/envoyproxy/envoy/issues/7227.
+      break;
     }
   }
   ~GaugeImpl() override {
