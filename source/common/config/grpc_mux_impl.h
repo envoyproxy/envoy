@@ -123,9 +123,7 @@ public:
   }
   void pause(const std::string&) override {}
   void resume(const std::string&) override {}
-  bool paused(const std::string&) const override {
-    throw EnvoyException("ADS must be configured to support an ADS config source");
-  }
+  bool paused(const std::string&) const override { NOT_REACHED_GCOVR_EXCL_LINE; }
 };
 
 } // namespace Config
