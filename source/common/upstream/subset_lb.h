@@ -35,7 +35,8 @@ public:
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
 private:
-  typedef std::function<bool(const Host&)> HostPredicate;
+  using HostPredicate = std::function<bool(const Host&)>;
+
   void initSubsetSelectorMap();
   void initSelectorFallbackSubset(const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
                                       LbSubsetSelectorFallbackPolicy&);
@@ -112,18 +113,18 @@ private:
     bool empty_ = true;
   };
 
-  typedef std::shared_ptr<HostSubsetImpl> HostSubsetImplPtr;
-  typedef std::shared_ptr<PrioritySubsetImpl> PrioritySubsetImplPtr;
+  using HostSubsetImplPtr = std::shared_ptr<HostSubsetImpl>;
+  using PrioritySubsetImplPtr = std::shared_ptr<PrioritySubsetImpl>;
 
-  typedef std::vector<std::pair<std::string, ProtobufWkt::Value>> SubsetMetadata;
+  using SubsetMetadata = std::vector<std::pair<std::string, ProtobufWkt::Value>>;
 
   class LbSubsetEntry;
   struct SubsetSelectorMap;
 
-  typedef std::shared_ptr<LbSubsetEntry> LbSubsetEntryPtr;
-  typedef std::shared_ptr<SubsetSelectorMap> SubsetSelectorMapPtr;
-  typedef std::unordered_map<HashedValue, LbSubsetEntryPtr> ValueSubsetMap;
-  typedef std::unordered_map<std::string, ValueSubsetMap> LbSubsetMap;
+  using LbSubsetEntryPtr = std::shared_ptr<LbSubsetEntry>;
+  using SubsetSelectorMapPtr = std::shared_ptr<SubsetSelectorMap>;
+  using ValueSubsetMap = std::unordered_map<HashedValue, LbSubsetEntryPtr>;
+  using LbSubsetMap = std::unordered_map<std::string, ValueSubsetMap>;
 
   struct SubsetSelectorMap {
     std::unordered_map<std::string, SubsetSelectorMapPtr> subset_keys_;
@@ -154,7 +155,6 @@ private:
 
   void updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
                             const HostVector& hosts_removed);
-
   void processSubsets(
       const HostVector& hosts_added, const HostVector& hosts_removed,
       std::function<void(LbSubsetEntryPtr)> update_cb,

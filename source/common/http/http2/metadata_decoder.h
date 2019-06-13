@@ -77,7 +77,7 @@ private:
 
   // TODO(soya3129): consider sharing the inflater with all streams in a connection. Caveat:
   // inflater failure on one stream can impact other streams.
-  typedef CSmartPtr<nghttp2_hd_inflater, nghttp2_hd_inflate_del> Inflater;
+  using Inflater = CSmartPtr<nghttp2_hd_inflater, nghttp2_hd_inflate_del>;
   Inflater inflater_;
 };
 

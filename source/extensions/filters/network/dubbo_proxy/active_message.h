@@ -58,7 +58,7 @@ private:
   bool complete_ : 1;
 };
 
-typedef std::unique_ptr<ResponseDecoder> ResponseDecoderPtr;
+using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 
 // Wraps a DecoderFilter and acts as the DecoderFilterCallbacks for the filter, enabling filter
 // chain continuation.
@@ -90,7 +90,7 @@ private:
   DubboFilters::DecoderFilterSharedPtr handle_;
 };
 
-typedef std::unique_ptr<ActiveMessageDecoderFilter> ActiveMessageDecoderFilterPtr;
+using ActiveMessageDecoderFilterPtr = std::unique_ptr<ActiveMessageDecoderFilter>;
 
 // ActiveMessage tracks downstream requests for which no response has been received.
 class ActiveMessage : public LinkedObject<ActiveMessage>,
@@ -162,7 +162,7 @@ private:
   bool local_response_sent_ : 1;
 };
 
-typedef std::unique_ptr<ActiveMessage> ActiveMessagePtr;
+using ActiveMessagePtr = std::unique_ptr<ActiveMessage>;
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

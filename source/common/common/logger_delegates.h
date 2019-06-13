@@ -15,7 +15,7 @@ namespace Envoy {
 namespace Logger {
 
 class DelegatingLogSink;
-typedef std::shared_ptr<DelegatingLogSink> DelegatingLogSinkPtr;
+using DelegatingLogSinkPtr = std::shared_ptr<DelegatingLogSink>;
 
 /**
  * SinkDelegate that writes log messages to a file.

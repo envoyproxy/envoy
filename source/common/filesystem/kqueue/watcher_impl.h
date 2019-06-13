@@ -37,7 +37,7 @@ private:
     bool watching_dir_;
   };
 
-  typedef std::shared_ptr<FileWatch> FileWatchPtr;
+  using FileWatchPtr = std::shared_ptr<FileWatch>;
 
   void onKqueueEvent();
   FileWatchPtr addWatch(const std::string& path, uint32_t events, Watcher::OnChangedCb cb,

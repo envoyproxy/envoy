@@ -61,7 +61,7 @@ rules:
             - provider_name: "provider_4"
 )";
 
-typedef std::unordered_map<std::string, const Status&> StatusMap;
+using StatusMap = std::unordered_map<std::string, const Status&>;
 
 constexpr auto allowfailed = "_allow_failed_";
 

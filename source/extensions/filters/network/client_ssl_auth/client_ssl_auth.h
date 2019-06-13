@@ -61,10 +61,10 @@ private:
   std::unordered_set<std::string> allowed_sha256_digests_;
 };
 
-typedef std::shared_ptr<AllowedPrincipals> AllowedPrincipalsSharedPtr;
+using AllowedPrincipalsSharedPtr = std::shared_ptr<AllowedPrincipals>;
 
 class ClientSslAuthConfig;
-typedef std::shared_ptr<ClientSslAuthConfig> ClientSslAuthConfigSharedPtr;
+using ClientSslAuthConfigSharedPtr = std::shared_ptr<ClientSslAuthConfig>;
 
 /**
  * Global configuration for client SSL authentication. The config contacts a JSON API to fetch the

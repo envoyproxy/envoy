@@ -114,7 +114,7 @@ struct GoogleAsyncClientStats {
 // Interface to allow the gRPC stub to be mocked out by tests.
 class GoogleStub {
 public:
-  virtual ~GoogleStub() {}
+  virtual ~GoogleStub() = default;
 
   // See grpc::PrepareCall().
   virtual std::unique_ptr<grpc::GenericClientAsyncReaderWriter>
@@ -139,7 +139,7 @@ private:
 // Interface to allow the gRPC stub creation to be mocked out by tests.
 class GoogleStubFactory {
 public:
-  virtual ~GoogleStubFactory() {}
+  virtual ~GoogleStubFactory() = default;
 
   // Create a stub from a given channel.
   virtual std::shared_ptr<GoogleStub> createStub(std::shared_ptr<grpc::Channel> channel) PURE;

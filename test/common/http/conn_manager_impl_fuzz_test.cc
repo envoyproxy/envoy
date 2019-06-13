@@ -375,7 +375,7 @@ public:
   StreamState response_state_;
 };
 
-typedef std::unique_ptr<FuzzStream> FuzzStreamPtr;
+using FuzzStreamPtr = std::unique_ptr<FuzzStream>;
 
 DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   FuzzConfig config;

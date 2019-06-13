@@ -636,7 +636,7 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, false});
 
-  typedef std::function<bool(absl::string_view key)> DupCallback;
+  using DupCallback = std::function<bool(absl::string_view key)>;
   DupCallback dup_callback = [](absl::string_view key) -> bool {
     static absl::flat_hash_map<std::string, bool> dup;
     if (dup.find(key) == dup.end()) {

@@ -74,7 +74,7 @@ private:
   CsrfStats stats_;
   const CsrfPolicy policy_;
 };
-typedef std::shared_ptr<CsrfFilterConfig> CsrfFilterConfigSharedPtr;
+using CsrfFilterConfigSharedPtr = std::shared_ptr<CsrfFilterConfig>;
 
 class CsrfFilter : public Http::StreamDecoderFilter {
 public:

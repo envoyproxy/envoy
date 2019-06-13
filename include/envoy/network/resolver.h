@@ -18,7 +18,7 @@ namespace Address {
  */
 class Resolver {
 public:
-  virtual ~Resolver() {}
+  virtual ~Resolver() = default;
 
   /**
    * Resolve a custom address string and port to an Address::Instance.

@@ -100,7 +100,7 @@ private:
 };
 
 class DelegatingLogSink;
-typedef std::shared_ptr<DelegatingLogSink> DelegatingLogSinkPtr;
+using DelegatingLogSinkPtr = std::shared_ptr<DelegatingLogSink>;
 
 /**
  * Captures a logging sink that can be delegated to for a bounded amount of time.

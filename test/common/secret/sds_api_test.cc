@@ -234,7 +234,7 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
 
 class CvcValidationCallback {
 public:
-  virtual ~CvcValidationCallback() {}
+  virtual ~CvcValidationCallback() = default;
   virtual void validateCvc(const envoy::api::v2::auth::CertificateValidationContext&) PURE;
 };
 

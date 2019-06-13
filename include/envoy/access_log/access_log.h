@@ -12,7 +12,7 @@ namespace AccessLog {
 
 class AccessLogFile {
 public:
-  virtual ~AccessLogFile() {}
+  virtual ~AccessLogFile() = default;
 
   /**
    * Write data to the file.
@@ -34,7 +34,7 @@ using AccessLogFileSharedPtr = std::shared_ptr<AccessLogFile>;
 
 class AccessLogManager {
 public:
-  virtual ~AccessLogManager() {}
+  virtual ~AccessLogManager() = default;
 
   /**
    * Reopen all of the access log files.
@@ -56,7 +56,7 @@ using AccessLogManagerPtr = std::unique_ptr<AccessLogManager>;
  */
 class Filter {
 public:
-  virtual ~Filter() {}
+  virtual ~Filter() = default;
 
   /**
    * Evaluate whether an access log should be written based on request and response data.
@@ -74,7 +74,7 @@ using FilterPtr = std::unique_ptr<Filter>;
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   /**
    * Log a completed request.
@@ -97,7 +97,7 @@ using InstanceSharedPtr = std::shared_ptr<Instance>;
  */
 class Formatter {
 public:
-  virtual ~Formatter() {}
+  virtual ~Formatter() = default;
 
   /**
    * Return a formatted access log line.
@@ -121,7 +121,7 @@ using FormatterPtr = std::unique_ptr<Formatter>;
  */
 class FormatterProvider {
 public:
-  virtual ~FormatterProvider() {}
+  virtual ~FormatterProvider() = default;
 
   /**
    * Extract a value from the provided headers/trailers/stream.

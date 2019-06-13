@@ -38,7 +38,7 @@ using SubsetSelectorPtr = std::shared_ptr<SubsetSelector>;
  */
 class LoadBalancerSubsetInfo {
 public:
-  virtual ~LoadBalancerSubsetInfo() {}
+  virtual ~LoadBalancerSubsetInfo() = default;
 
   /**
    * @return bool true if load balancer subsets are configured.
