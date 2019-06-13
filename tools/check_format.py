@@ -735,6 +735,13 @@ def checkFormatReturnTraceOnError(file_path):
 
 
 def checkOwners(dir_name, owned_directories, error_messages):
+  """Checks to make sure a given directory is present either in CODEOWNERS or OWNED_EXTENSIONS
+
+  Args:
+    dir_name: the directory being checked.
+    owned_directories: directories currently listed in CODEOWNERS.
+    error_messages: where to put an error message for new unowned directories.
+  """
   found = False
   for owned in owned_directories:
     if owned.startswith(dir_name) or dir_name.startswith(owned):
@@ -747,7 +754,10 @@ def checkFormatVisitor(arg, dir_name, names):
   """Run checkFormat in parallel for the given files.
 
   Args:
-    arg: a tuple (pool, result_list, FIXME) for starting tasks asynchronously.
+    arg: a tuple (pool, result_list, owned_directories, error_messages)
+      pool and result_list are for starting tasks asynchronously.
+      owned_directories tracks directories listed in the CODEOWNERS file.
+      error_messages is a list of string format errors.
     dir_name: the parent directory of the given files.
     names: a list of file names.
   """
@@ -832,6 +842,7 @@ if __name__ == "__main__":
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
 
+  # Returns the list of directories with owners listed in CODEOWNERS
   def ownedDirectories():
     owned = []
     try:
@@ -844,6 +855,7 @@ if __name__ == "__main__":
     except IOError:
       return []  # for the check format tests.
 
+  # Calculate the list of owned directories once per run.
   owned_directories = ownedDirectories()
 
   # Check whether all needed external tools are available.
@@ -859,7 +871,8 @@ if __name__ == "__main__":
     error_messages = []
     # For each file in target_path, start a new task in the pool and collect the
     # results (results is passed by reference, and is used as an output).
-    os.path.walk(target_path, checkFormatVisitor, (pool, results, owned_directories, error_messages))
+    os.path.walk(target_path, checkFormatVisitor,
+                 (pool, results, owned_directories, error_messages))
 
     # Close the pool to new tasks, wait for all of the running tasks to finish,
     # then collect the error messages.
