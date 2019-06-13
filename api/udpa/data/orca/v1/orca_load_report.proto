@@ -31,5 +31,6 @@ message OrcaLoadReport {
 
   // Resource utilization values. Each value is expressed as a fraction of total resources
   // available, derived from the latest sample or measurement.
-  map<string, double> utilization = 5;
+  map<string, double> utilization = 5
+      [(validate.rules).map.values.double.gte = 0, (validate.rules).map.values.double.lte = 1];
 }
