@@ -151,7 +151,7 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
       selector_fallback_subset_any_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer for selector");
     HostPredicate predicate = [](const Host&) -> bool { return true; };
-    selector_fallback_subset_any_ = std::make_unique<LbSubsetEntry>();
+    selector_fallback_subset_any_ = std::make_shared<LbSubsetEntry>();
     selector_fallback_subset_any_->priority_subset_.reset(
         new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
   } else if (fallback_policy ==
@@ -160,7 +160,7 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
     ENVOY_LOG(debug, "subset lb: creating default subset fallback load balancer for selector");
     HostPredicate predicate = std::bind(&SubsetLoadBalancer::hostMatches, this,
                                         default_subset_metadata_, std::placeholders::_1);
-    selector_fallback_subset_default_ = std::make_unique<LbSubsetEntry>();
+    selector_fallback_subset_default_ = std::make_shared<LbSubsetEntry>();
     selector_fallback_subset_default_->priority_subset_.reset(
         new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
   }
