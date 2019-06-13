@@ -82,7 +82,6 @@ void UdpListenerImpl::handleReadCallback() {
     MonotonicTime receive_time = time_source_.monotonicTime();
     Api::IoCallUint64Result result = socket_.ioHandle().recvmsg(
         &slice, num_slices, socket_.localAddress()->ip()->port(),
-        /*v6only=*/socket_.localAddress()->ip()->version() == Address::IpVersion::v6,
         &packets_dropped_, local_address, peer_address);
 
     if (!result.ok()) {

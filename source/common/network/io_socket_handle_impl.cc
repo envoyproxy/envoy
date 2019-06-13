@@ -132,7 +132,7 @@ IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& re
 }
 
 Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cmsg,
-                                                             uint32_t self_port, bool v6only) {
+                                                             uint32_t self_port) {
   if (cmsg->cmsg_type == IPV6_PKTINFO) {
     struct in6_pktinfo* info = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
     sockaddr_in6 ipv6_addr;
@@ -141,7 +141,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cms
     ipv6_addr.sin6_addr = info->ipi6_addr;
     ipv6_addr.sin6_port = htons(self_port);
     return Address::addressFromSockAddr(reinterpret_cast<sockaddr_storage&>(ipv6_addr),
-                                        sizeof(sockaddr_in6), v6only);
+                                        sizeof(sockaddr_in6), /*v6only=*/false);
   }
 #if defined(IP_PKTINFO)
   if (cmsg->cmsg_type == IP_PKTINFO) {
@@ -161,7 +161,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cms
 #endif
     ipv4_addr.sin_port = htons(self_port);
     return Address::addressFromSockAddr(reinterpret_cast<sockaddr_storage&>(ipv4_addr),
-                                        sizeof(sockaddr_in), v6only);
+                                        sizeof(sockaddr_in), /*v6only=*/false);
   }
   return nullptr;
 }
@@ -180,7 +180,7 @@ absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(
 
 Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
-                                                    bool v6only, uint32_t* dropped_packets,
+                                                    uint32_t* dropped_packets,
                                                     Address::InstanceConstSharedPtr& local_address,
                                                     Address::InstanceConstSharedPtr& peer_address) {
 
@@ -261,7 +261,15 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   RELEASE_ASSERT(hdr.msg_namelen > 0,
                  fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
   try {
-    peer_address = Address::addressFromSockAddr(peer_addr, hdr.msg_namelen, v6only);
+    // Set v6only to false so that mapped-v6 address can be normalize to v4
+    // address. Though dual stack may be disabled, it's still okay to assume the
+    // address is from a dual stack socket. This is because mapped-v6 address
+    // must come from a dual stack socket. An actual v6 address can come from
+    // both dual stack socket and v6 only socket. If |peer_addr| is an actual v6
+    // address and the socket is actually v6 only, the returned address will be
+    // regarded as a v6 address from dual stack socket. However, this address is not going to be
+    // used to create socket. Wrong knowledge of dual stack support won't hurt.
+    peer_address = Address::addressFromSockAddr(peer_addr, hdr.msg_namelen, /*v6only=*/false);
   } catch (const EnvoyException& e) {
     ENVOY_LOG(error, "Invalid remote address for fd: {}, error: {}", fd_, e.what());
   }
@@ -270,7 +278,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   if (hdr.msg_controllen > 0) {
     struct cmsghdr* cmsg;
     for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-      Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(cmsg, self_port, v6only);
+      Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(cmsg, self_port);
       if (addr != nullptr) {
         // This is a IP packet info message.
         local_address = std::move(addr);
