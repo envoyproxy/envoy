@@ -58,6 +58,8 @@ const std::vector<std::string> RequestParser::BATCH_OPERATIONS{"BatchGetItem", "
 
 const std::vector<std::string> RequestParser::TRANSACT_OPERATIONS{"TransactGetItems",
                                                                   "TransactWriteItems"};
+const std::vector<std::string> RequestParser::TRANSACT_ITEM_OPERATIONS{"ConditionCheck", "Delete",
+                                                                       "Get", "Put", "Update"};
 
 std::string RequestParser::parseOperation(const Http::HeaderMap& headerMap) {
   std::string operation;
@@ -99,12 +101,40 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
     });
   } else if (find(TRANSACT_OPERATIONS.begin(), TRANSACT_OPERATIONS.end(), operation) !=
              TRANSACT_OPERATIONS.end()) {
-    // transactions are always multi-table operations
-    table.is_single_table = false;
+    std::vector<ObjectSharedPtr> transact_items = json_data.getObjectArray("TransactItems", true);
+    for (const ObjectSharedPtr& transact_item : transact_items) {
+      std::string table_name = getTableNameFromTransaction(transact_items);
+      if (table_name == "") {
+        // if an operation is missing a table name, we want to throw the normal set of errors
+        table.table_name = "";
+        table.is_single_table = true;
+        break;
+      }
+      if (table.table_name.empty()) {
+        table.table_name = table_name;
+      } else if (table.table_name != table_name) {
+        table.table_name = "";
+        table.is_single_table = false;
+        break;
+      }
+    }
   }
-
   return table;
 }
+
+std::string RequestParser::getTableNameFromTransaction(const Json::Object& transact_item) {
+  Json::ObjectSharedPtr item{};
+  std::string table_name = "";
+  for (const std::string& operation : TRANSACT_ITEM_OPERATIONS) {
+    item = transact_item.getObject(operation, true);
+    table_name = item.getString("TableName", "");
+    if (table_name != "") {
+      return table_name;
+    }
+  }
+  return table_name;
+}
+
 std::vector<std::string> RequestParser::parseBatchUnProcessedKeys(const Json::Object& json_data) {
   std::vector<std::string> unprocessed_tables;
   Json::ObjectSharedPtr tables = json_data.getObject("UnprocessedKeys", true);
@@ -115,6 +145,7 @@ std::vector<std::string> RequestParser::parseBatchUnProcessedKeys(const Json::Ob
 
   return unprocessed_tables;
 }
+
 std::string RequestParser::parseErrorType(const Json::Object& json_data) {
   std::string error_type = json_data.getString("__type", "");
   if (error_type.empty()) {
