@@ -1,6 +1,7 @@
 #include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/codes.h"
 
@@ -79,7 +80,7 @@ ClientConfig::ClientConfig(const envoy::config::filter::http::ext_authz::v2::Ext
           toHeadersAdd(config.http_service().authorization_request().headers_to_add())),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(path_prefix),
-      tracing_name_("async " + config.http_service().server_uri().cluster() + " egress") {}
+      tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())) {}
 
 MatcherSharedPtr
 ClientConfig::toRequestMatchers(const envoy::type::matcher::ListStringMatcher& list) {
