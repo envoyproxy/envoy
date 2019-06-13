@@ -36,22 +36,9 @@ public:
   const Network::FilterChain*
   findFilterChain(const Network::ConnectionSocket& socket) const override;
 
-  // Currently for listener only
   void
   addFilterChain(absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
                  FilterChainFactoryBuilder& b);
-
-  void
-  addFilterChain(uint16_t destination_port, const std::vector<std::string>& destination_ips,
-                 const std::vector<std::string>& server_names,
-                 const std::string& transport_protocol,
-                 const std::vector<std::string>& application_protocols,
-                 const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
-                 const std::vector<std::string>& source_ips,
-                 const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
-                 Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                 std::vector<Network::FilterFactoryCb> filters_factory);
-  void finishFilterChain() { convertIPsToTries(); }
   static bool isWildcardServerName(const std::string& name);
 
 private:

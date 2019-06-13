@@ -279,9 +279,6 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   factory_context.setInitManager(initManager());
   ListenerFilterChainFactoryBuilder builder(*this, factory_context);
   filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
-  // Convert both destination and source IP CIDRs to tries for faster lookups.
-  filter_chain_manager_.finishFilterChain();
-
   const bool need_tls_inspector =
       std::any_of(
           config.filter_chains().begin(), config.filter_chains().end(),

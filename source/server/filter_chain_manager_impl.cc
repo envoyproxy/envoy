@@ -37,7 +37,6 @@ void FilterChainManagerImpl::addFilterChain(
   std::unordered_set<envoy::api::v2::listener::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
   for (const auto& filter_chain : filter_chain_span) {
-
     const auto& filter_chain_match = filter_chain->filter_chain_match();
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
       throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
@@ -109,21 +108,7 @@ void FilterChainManagerImpl::addFilterChain(
         filter_chain_match.source_type(), source_ips, filter_chain_match.source_ports(),
         std::shared_ptr<Network::FilterChain>(b.buildFilterChain(*filter_chain)));
   }
-}
-void FilterChainManagerImpl::addFilterChain(
-    uint16_t destination_port, const std::vector<std::string>& destination_ips,
-    const std::vector<std::string>& server_names, const std::string& transport_protocol,
-    const std::vector<std::string>& application_protocols,
-    const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
-    const std::vector<std::string>& source_ips,
-    const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
-    Network::TransportSocketFactoryPtr&& transport_socket_factory,
-    std::vector<Network::FilterFactoryCb> filters_factory) {
-  const auto filter_chain = std::make_shared<FilterChainImpl>(std::move(transport_socket_factory),
-                                                              std::move(filters_factory));
-  addFilterChainForDestinationPorts(destination_ports_map_, destination_port, destination_ips,
-                                    server_names, transport_protocol, application_protocols,
-                                    source_type, source_ips, source_ports, filter_chain);
+  convertIPsToTries();
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(

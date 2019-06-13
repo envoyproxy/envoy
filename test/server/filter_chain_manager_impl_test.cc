@@ -47,11 +47,21 @@ using testing::Throw;
 
 namespace Envoy {
 namespace Server {
+
+class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
+  std::unique_ptr<Network::FilterChain>
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&) const override {
+    return nullptr;
+  }
+};
 class FilterChainManagerImplTest : public testing::Test {
 public:
   void SetUp() override {
     local_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
     remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
+    TestUtility::loadFromYaml(
+        TestEnvironment::substitute(filter_chain_yaml, Network::Address::IpVersion::v4),
+        filter_chain_template_);
   }
 
   // Helper for test
@@ -87,26 +97,32 @@ public:
     return filter_chain_manager_.findFilterChain(*mock_socket);
   }
 
-  void addFilterChainHelper(
-      uint16_t destination_port, const std::vector<std::string>& destination_ips,
-      const std::vector<std::string>& server_names, const std::string& transport_protocol,
-      const std::vector<std::string>& application_protocols,
-      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
-      const std::vector<std::string>& source_ips,
-      const Protobuf::RepeatedField<Protobuf::uint32>& source_ports) {
-    Network::TransportSocketFactoryPtr dummy_mock_socketfactory{};
-    std::vector<Network::FilterFactoryCb> dummy_filter_factory{};
+  void addSingleFilterChainHelper(const envoy::api::v2::listener::FilterChain& filter_chain) {
     filter_chain_manager_.addFilterChain(
-        destination_port, destination_ips, server_names, transport_protocol, application_protocols,
-        source_type, source_ips, source_ports, std::move(dummy_mock_socketfactory),
-        std::move(dummy_filter_factory));
+        std::vector<const envoy::api::v2::listener::FilterChain*>{&filter_chain},
+        filter_chain_factory_builder_);
   }
 
   // Intermedia state
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
-
   std::vector<std::shared_ptr<Network::MockConnectionSocket>> sockets_;
+
+  // Reuseable template
+  const std::string filter_chain_yaml = R"EOF(
+    - filter_chain_match:
+        destination_port: 10000
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+        session_ticket_keys:
+          keys:
+          - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+  )EOF";
+  envoy::api::v2::listener::FilterChain filter_chain_template_;
+  MockFilterChainFactoryBuilder filter_chain_factory_builder_;
 
   // Test target
   FilterChainManagerImpl filter_chain_manager_{
@@ -116,8 +132,15 @@ public:
 
 TEST_F(FilterChainManagerImplTest, FilterChainMatchNothing) {
   const auto* filter_chain =
-      findFilterChainHelper(0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
+      findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
+}
+
+TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
+  addSingleFilterChainHelper(filter_chain_template_);
+  const auto* filter_chain =
+      findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_NE(filter_chain, nullptr);
 }
 } // namespace Server
 } // namespace Envoy
