@@ -59,6 +59,7 @@ NSString* _ENDPOINT = @"http://0.0.0.0:9001/api.lyft.com/static/demo/hello_world
 
 - (void)performRequest {
   NSURLSession* session = [NSURLSession sharedSession];
+  // Note that the request is sent to the envoy thread listening locally on port 9001.
   NSURL* url = [NSURL URLWithString:_ENDPOINT];
   NSURLRequest* request = [NSURLRequest requestWithURL:url];
   NSLog(@"Starting request to '%@'", url.path);

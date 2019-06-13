@@ -7,6 +7,8 @@ envoy_package()
 
 # NOTE: You must first build the top-level targets //:ios_dist and //:android_dist to use the
 # artifacts referenced here.
+# You can also download the distributables referenced here from envoy-mobile's releases page:
+# https://github.com/lyft/envoy-mobile/releases
 
 aar_import(
     name = "envoy_mobile_android",

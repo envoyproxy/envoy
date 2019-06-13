@@ -6,6 +6,7 @@ import android.util.Log;
 
 import java.io.*;
 
+// Wrapper class that allows for easy calling of Envoy's JNI interface in native Java.
 public class Envoy {
 
   public void load() { System.loadLibrary("envoy_jni"); }

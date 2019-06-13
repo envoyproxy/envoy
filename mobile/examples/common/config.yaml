@@ -1,3 +1,6 @@
+# Envoy config used by the example applications.
+# More information about Envoy's config can be found at:
+# https://www.envoyproxy.io/docs/envoy/latest/configuration/configuration
 static_resources:
   listeners:
     - address:

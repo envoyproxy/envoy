@@ -27,6 +27,7 @@ final class ViewController: UITableViewController {
   }
 
   private func performRequest() {
+    // Note that the request is sent to the envoy thread listening locally on port 9001.
     let request = URLRequest(url: kURL)
     NSLog("Starting request to '\(kURL.path)")
     let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in

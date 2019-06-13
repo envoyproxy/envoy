@@ -20,6 +20,12 @@ extern "C" int run_envoy(const char* config) {
   char* envoy_argv[] = {strdup("envoy"), strdup("--config-yaml"), strdup(config), nullptr};
 
   // Ensure static factory registration occurs on time.
+  // Envoy's static factory registration happens when main is run.
+  // However, when compiled as a library, there is no guarantee that such registration will happen
+  // before the names are needed.
+  // The following calls ensure that registration happens before the entities are needed.
+  // Note that as more registrations are needed, explicit initialization calls will need to be added
+  // here.
   Envoy::Extensions::HttpFilters::RouterFilter::forceRegisterRouterFilterConfig();
   Envoy::Extensions::NetworkFilters::HttpConnectionManager::
       forceRegisterHttpConnectionManagerFilterConfigFactory();
@@ -31,6 +37,9 @@ extern "C" int run_envoy(const char* config) {
   // Initialize the server's main context under a try/catch loop and simply
   // return EXIT_FAILURE as needed. Whatever code in the initialization path
   // that fails is expected to log an error message so the user can diagnose.
+  // Note that in the Android examples logging will not be seen.
+  // This is a known problem, and will be addressed by:
+  // https://github.com/lyft/envoy-mobile/issues/34
   try {
     main_common = std::make_unique<Envoy::MainCommon>(3, envoy_argv);
   } catch (const Envoy::NoServingException& e) {

@@ -38,6 +38,7 @@ public class MainActivity extends Activity {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
 
+    // Load an envoy config, and run envoy on a separate thread.
     Envoy envoy = new Envoy();
     envoy.load();
     String config = null;
@@ -59,6 +60,7 @@ public class MainActivity extends Activity {
     recyclerView.addItemDecoration(dividerItemDecoration);
     thread.start();
 
+    // Run a request loop until the application exits.
     final Handler handler = new Handler(thread.getLooper());
     handler.postDelayed(new Runnable() {
       @Override
@@ -83,6 +85,7 @@ public class MainActivity extends Activity {
 
   private Response makeRequest() throws IOException {
     URL url = new URL(ENDPOINT);
+    // Open connection to the envoy thread listening locally on port 9001.
     HttpURLConnection connection = (HttpURLConnection)url.openConnection();
     int status = connection.getResponseCode();
     if (status != 200) {
