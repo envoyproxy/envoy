@@ -9,7 +9,7 @@ namespace Retry {
 namespace Host {
 
 class OmitCanaryHostsRetryPredicateFactory : public Upstream::RetryHostPredicateFactory {
-  
+
 public:
   Upstream::RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message&,
                                                             uint32_t) override {
@@ -19,7 +19,7 @@ public:
   std::string name() override { return RetryHostPredicateValues::get().OmitCanaryHostsPredicate; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    return ProtobufTypes::MessagePtr{std::make_unique<Envoy::ProtobufWkt::Empty>()};
   }
 };
 

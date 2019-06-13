@@ -26,12 +26,12 @@ TEST(OmitCanaryHostsRetryPredicateTest, PredicateTest) {
   ProtobufWkt::Struct config;
   auto predicate = factory->createHostPredicate(config, 3);
 
-  auto host1 = std::make_shared<NiceMock<Upstream::MockHost>>();  
+  auto host1 = std::make_shared<NiceMock<Upstream::MockHost>>();
   auto host2 = std::make_shared<NiceMock<Upstream::MockHost>>();
-  
+
   ON_CALL(*host1, canary()).WillByDefault(Return(false));
   ON_CALL(*host2, canary()).WillByDefault(Return(true));
-  
+
   ASSERT_FALSE(predicate->shouldSelectAnotherHost(*host1));
   ASSERT_TRUE(predicate->shouldSelectAnotherHost(*host2));
 }

@@ -4,13 +4,13 @@
 #include "envoy/upstream/retry.h"
 
 namespace Envoy {
-  namespace Extensions {
-    namespace Retry {
-      namespace Host {
+namespace Extensions {
+namespace Retry {
+namespace Host {
 
-	REGISTER_FACTORY(OmitCanaryHostsRetryPredicateFactory, Upstream::RetryHostPredicateFactory);
+REGISTER_FACTORY(OmitCanaryHostsRetryPredicateFactory, Upstream::RetryHostPredicateFactory);
 
-      }
-    } // namespace Retry
-  } // namespace Extensions
+}
+} // namespace Retry
+} // namespace Extensions
 } // namespace Envoy

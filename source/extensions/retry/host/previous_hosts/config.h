@@ -20,7 +20,7 @@ public:
   std::string name() override { return RetryHostPredicateValues::get().PreviousHostsPredicate; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    return ProtobufTypes::MessagePtr{std::make_unique<Envoy::ProtobufWkt::Empty>()};
   }
 };
 

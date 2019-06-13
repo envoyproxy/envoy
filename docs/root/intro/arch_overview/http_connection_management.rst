@@ -60,7 +60,7 @@ can be used to modify this behavior, and they fall into two categories:
   * *envoy.retry_host_predicates.previous_hosts*: This will keep track of previously attempted hosts, and rejects
     hosts that have already been attempted.
 
-  * *community.retry_host_predicates.omit_canary_hosts*: This will ensure that a retry will always be done on
+  * *envoy.retry_host_predicates.omit_canary_hosts*: This will ensure that a retry will always be done on
     a non canary host.
     
 * :ref:`Priority Predicates<envoy_api_field_route.RetryPolicy.retry_priority>`: These predicates can
