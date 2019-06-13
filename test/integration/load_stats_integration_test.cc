@@ -197,16 +197,32 @@ public:
           upstream_locality_stats->set_total_issued_requests(
               upstream_locality_stats->total_issued_requests() +
               local_upstream_locality_stats.total_issued_requests());
-          // Unlike most stats, current requests in progress replaces old
-          // requests in progress.
-          upstream_locality_stats->set_total_requests_in_progress(
-              upstream_locality_stats->total_requests_in_progress());
+          // Unlike most stats, current requests in progress replaces old requests in progress.
           break;
         }
       }
       if (!copied) {
         auto* upstream_locality_stats = cluster_stats->add_upstream_locality_stats();
         upstream_locality_stats->CopyFrom(local_upstream_locality_stats);
+      }
+    }
+
+    // Unfortunately because we don't issue an update when total_requests_in_progress goes from
+    // non-zero to zero, we have to go through and zero it out for any locality stats we didn't see.
+    for (int i = 0; i < cluster_stats->upstream_locality_stats_size(); ++i) {
+      auto upstream_locality_stats = cluster_stats->mutable_upstream_locality_stats(i);
+      bool found = false;
+      for (int j = 0; j < local_cluster_stats.upstream_locality_stats_size(); ++j) {
+        auto& local_upstream_locality_stats = local_cluster_stats.upstream_locality_stats(j);
+        if (TestUtility::protoEqual(upstream_locality_stats->locality(),
+                                    local_upstream_locality_stats.locality()) &&
+            upstream_locality_stats->priority() == local_upstream_locality_stats.priority()) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        upstream_locality_stats->set_total_requests_in_progress(0);
       }
     }
   }

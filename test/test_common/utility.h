@@ -261,22 +261,6 @@ public:
                                         bool keep_empty_string = false);
 
   /**
-   * Takes a Protobuf::RepeatedPtrField and sticks the individual protos into a std::list.
-   *
-   * @param repeated the RepeatedPtrField to convert into a list.
-   * @return a std::list with individual protos.
-   */
-  template <class ProtoType>
-  static std::list<ProtoType>
-  repeatedProtoToList(const Protobuf::RepeatedPtrField<ProtoType>& repeated) {
-    std::list<ProtoType> ret;
-    for (const auto& proto : repeated) {
-      ret.push_back(proto);
-    }
-    return ret;
-  }
-
-  /**
    * Compare two RepeatedPtrFields of the same type for equality.
    *
    * @param lhs RepeatedPtrField on LHS.
@@ -286,7 +270,7 @@ public:
    * @return bool indicating whether the RepeatedPtrField are equal. TestUtility::protoEqual() is
    *              used for individual element testing.
    */
-  template <class ProtoType>
+  template <typename ProtoType>
   static bool repeatedPtrFieldEqual(const Protobuf::RepeatedPtrField<ProtoType>& lhs,
                                     const Protobuf::RepeatedPtrField<ProtoType>& rhs,
                                     bool ignore_ordering = false) {
@@ -303,14 +287,17 @@ public:
 
       return true;
     }
+    typedef std::list<std::unique_ptr<const Protobuf::Message>> ProtoList;
     // Iterate through using protoEqual as ignore_ordering is true, and fields
     // in the sub-protos may also be out of order.
-    std::list<ProtoType> lhs_list = repeatedProtoToList(lhs);
-    std::list<ProtoType> rhs_list = repeatedProtoToList(rhs);
+    ProtoList lhs_list =
+        RepeatedPtrUtil::convertToConstMessagePtrContainer<ProtoType, ProtoList>(lhs);
+    ProtoList rhs_list =
+        RepeatedPtrUtil::convertToConstMessagePtrContainer<ProtoType, ProtoList>(rhs);
     while (!lhs_list.empty()) {
       bool found = false;
       for (auto it = rhs_list.begin(); it != rhs_list.end(); ++it) {
-        if (TestUtility::protoEqual(lhs_list.front(), *it,
+        if (TestUtility::protoEqual(*lhs_list.front(), **it,
                                     /*ignore_ordering=*/true)) {
           lhs_list.pop_front();
           rhs_list.erase(it);
