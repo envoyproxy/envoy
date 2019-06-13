@@ -37,9 +37,9 @@ template <typename T> Api::IoCallResult<T> resultSuccess(T result) {
 
 class FileSharedImpl : public File {
 public:
-  FileSharedImpl(const std::string& path) : fd_(-1), path_(path) {}
+  FileSharedImpl(std::string path) : fd_(-1), path_(std::move(path)) {}
 
-  virtual ~FileSharedImpl() {}
+  ~FileSharedImpl() override = default;
 
   // Filesystem::File
   Api::IoCallBoolResult open() override;

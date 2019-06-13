@@ -9,7 +9,7 @@ namespace Envoy {
  */
 class ProcessObject {
 public:
-  virtual ~ProcessObject() {}
+  virtual ~ProcessObject() = default;
 };
 
 /**
@@ -18,7 +18,7 @@ public:
  */
 class ProcessContext {
 public:
-  virtual ~ProcessContext() {}
+  virtual ~ProcessContext() = default;
 
   /**
    * @return the ProcessObject for this context.

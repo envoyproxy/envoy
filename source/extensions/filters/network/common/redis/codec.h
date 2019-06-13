@@ -64,17 +64,17 @@ private:
 
   void cleanup();
 
-  RespType type_;
+  RespType type_{};
 };
 
-typedef std::unique_ptr<RespValue> RespValuePtr;
+using RespValuePtr = std::unique_ptr<RespValue>;
 
 /**
  * Callbacks that the decoder fires.
  */
 class DecoderCallbacks {
 public:
-  virtual ~DecoderCallbacks() {}
+  virtual ~DecoderCallbacks() = default;
 
   /**
    * Called when a new top level RESP value has been decoded. This value may include multiple
@@ -89,7 +89,7 @@ public:
  */
 class Decoder {
 public:
-  virtual ~Decoder() {}
+  virtual ~Decoder() = default;
 
   /**
    * Decode redis protocol bytes.
@@ -99,14 +99,14 @@ public:
   virtual void decode(Buffer::Instance& data) PURE;
 };
 
-typedef std::unique_ptr<Decoder> DecoderPtr;
+using DecoderPtr = std::unique_ptr<Decoder>;
 
 /**
  * A factory for a redis decoder.
  */
 class DecoderFactory {
 public:
-  virtual ~DecoderFactory() {}
+  virtual ~DecoderFactory() = default;
 
   /**
    * Create a decoder given a set of decoder callbacks.
@@ -119,7 +119,7 @@ public:
  */
 class Encoder {
 public:
-  virtual ~Encoder() {}
+  virtual ~Encoder() = default;
 
   /**
    * Encode a RESP value to a buffer.
@@ -129,7 +129,7 @@ public:
   virtual void encode(const RespValue& value, Buffer::Instance& out) PURE;
 };
 
-typedef std::unique_ptr<Encoder> EncoderPtr;
+using EncoderPtr = std::unique_ptr<Encoder>;
 
 /**
  * A redis protocol error.

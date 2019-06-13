@@ -98,7 +98,7 @@ private:
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
 };
 
-typedef std::shared_ptr<IpTaggingFilterConfig> IpTaggingFilterConfigSharedPtr;
+using IpTaggingFilterConfigSharedPtr = std::shared_ptr<IpTaggingFilterConfig>;
 
 /**
  * A filter that gets all tags associated with a request's downstream remote address and

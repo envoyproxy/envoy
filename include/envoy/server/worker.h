@@ -13,7 +13,7 @@ namespace Server {
  */
 class Worker {
 public:
-  virtual ~Worker() {}
+  virtual ~Worker() = default;
 
   /**
    * Completion called when a listener has been added on a worker and is listening for new
@@ -21,7 +21,7 @@ public:
    * @param success supplies whether the addition was successful or not. FALSE can be returned
    *                when there is a race condition between bind() and listen().
    */
-  typedef std::function<void(bool success)> AddListenerCompletion;
+  using AddListenerCompletion = std::function<void(bool success)>;
 
   /**
    * Add a listener to the worker.
@@ -81,14 +81,14 @@ public:
   virtual void stopListeners() PURE;
 };
 
-typedef std::unique_ptr<Worker> WorkerPtr;
+using WorkerPtr = std::unique_ptr<Worker>;
 
 /**
  * Factory for creating workers.
  */
 class WorkerFactory {
 public:
-  virtual ~WorkerFactory() {}
+  virtual ~WorkerFactory() = default;
 
   /**
    * @return WorkerPtr a new worker.

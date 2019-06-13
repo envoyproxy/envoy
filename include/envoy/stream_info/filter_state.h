@@ -24,10 +24,10 @@ public:
 
   class Object {
   public:
-    virtual ~Object(){};
+    virtual ~Object() = default;
   };
 
-  virtual ~FilterState(){};
+  virtual ~FilterState() = default;
 
   /**
    * @param data_name the name of the data being set.

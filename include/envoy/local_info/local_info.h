@@ -14,7 +14,7 @@ namespace LocalInfo {
  */
 class LocalInfo {
 public:
-  virtual ~LocalInfo() {}
+  virtual ~LocalInfo() = default;
 
   /**
    * @return the local (non-loopback) address of the server.
@@ -42,7 +42,7 @@ public:
   virtual const envoy::api::v2::core::Node& node() const PURE;
 };
 
-typedef std::unique_ptr<LocalInfo> LocalInfoPtr;
+using LocalInfoPtr = std::unique_ptr<LocalInfo>;
 
 } // namespace LocalInfo
 } // namespace Envoy

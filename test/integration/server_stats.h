@@ -7,7 +7,7 @@ namespace Envoy {
 // Abstract interface for IntegrationTestServer stats methods.
 class IntegrationTestServerStats {
 public:
-  virtual ~IntegrationTestServerStats() {}
+  virtual ~IntegrationTestServerStats() = default;
 
   /**
    * Wait for a counter to == a given value.

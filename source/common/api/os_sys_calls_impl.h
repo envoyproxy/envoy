@@ -33,7 +33,7 @@ public:
   SysCallIntResult getsockname(int sockfd, sockaddr* addr, socklen_t* addrlen) override;
 };
 
-typedef ThreadSafeSingleton<OsSysCallsImpl> OsSysCallsSingleton;
+using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;
 
 } // namespace Api
 } // namespace Envoy

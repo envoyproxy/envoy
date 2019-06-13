@@ -17,7 +17,7 @@ namespace Server {
  */
 class GuardDog {
 public:
-  virtual ~GuardDog() {}
+  virtual ~GuardDog() = default;
 
   /**
    * Get a WatchDog object pointer to a new WatchDog.

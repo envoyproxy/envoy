@@ -78,7 +78,7 @@ protected:
     bool decode_complete_{};
   };
 
-  typedef std::unique_ptr<StreamWrapper> StreamWrapperPtr;
+  using StreamWrapperPtr = std::unique_ptr<StreamWrapper>;
 
   struct ActiveClient : LinkedObject<ActiveClient>,
                         public Network::ConnectionCallbacks,
@@ -104,7 +104,7 @@ protected:
     uint64_t remaining_requests_;
   };
 
-  typedef std::unique_ptr<ActiveClient> ActiveClientPtr;
+  using ActiveClientPtr = std::unique_ptr<ActiveClient>;
 
   void attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
                              ConnectionPool::Callbacks& callbacks);

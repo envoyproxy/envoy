@@ -124,7 +124,7 @@ enum class FilterMetadataStatus {
  */
 class StreamFilterCallbacks {
 public:
-  virtual ~StreamFilterCallbacks() {}
+  virtual ~StreamFilterCallbacks() = default;
 
   /**
    * @return const Network::Connection* the originating connection, or nullptr if there is none.
@@ -427,7 +427,7 @@ public:
  */
 class StreamFilterBase {
 public:
-  virtual ~StreamFilterBase() {}
+  virtual ~StreamFilterBase() = default;
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
@@ -480,7 +480,7 @@ public:
   virtual void decodeComplete() {}
 };
 
-typedef std::shared_ptr<StreamDecoderFilter> StreamDecoderFilterSharedPtr;
+using StreamDecoderFilterSharedPtr = std::shared_ptr<StreamDecoderFilter>;
 
 /**
  * Stream encoder filter callbacks add additional callbacks that allow a encoding filter to restart
@@ -666,14 +666,14 @@ public:
   virtual void encodeComplete() {}
 };
 
-typedef std::shared_ptr<StreamEncoderFilter> StreamEncoderFilterSharedPtr;
+using StreamEncoderFilterSharedPtr = std::shared_ptr<StreamEncoderFilter>;
 
 /**
  * A filter that handles both encoding and decoding.
  */
 class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEncoderFilter {};
 
-typedef std::shared_ptr<StreamFilter> StreamFilterSharedPtr;
+using StreamFilterSharedPtr = std::shared_ptr<StreamFilter>;
 
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
@@ -681,7 +681,7 @@ typedef std::shared_ptr<StreamFilter> StreamFilterSharedPtr;
  */
 class FilterChainFactoryCallbacks {
 public:
-  virtual ~FilterChainFactoryCallbacks() {}
+  virtual ~FilterChainFactoryCallbacks() = default;
 
   /**
    * Add a decoder filter that is used when reading stream data.
@@ -716,7 +716,7 @@ public:
  * function will install a single filter, but it's technically possibly to install more than one
  * if desired.
  */
-typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> FilterFactoryCb;
+using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
 
 /**
  * A FilterChainFactory is used by a connection manager to create an HTTP level filter chain when a
@@ -726,7 +726,7 @@ typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> FilterFactor
  */
 class FilterChainFactory {
 public:
-  virtual ~FilterChainFactory() {}
+  virtual ~FilterChainFactory() = default;
 
   /**
    * Called when a new HTTP stream is created on the connection.
@@ -744,7 +744,7 @@ public:
    * @return true if upgrades of this type are allowed and the filter chain has been created.
    *    returns false if this upgrade type is not configured, and no filter chain is created.
    */
-  typedef std::map<std::string, bool> UpgradeMap;
+  using UpgradeMap = std::map<std::string, bool>;
   virtual bool createUpgradeFilterChain(absl::string_view upgrade,
                                         const UpgradeMap* per_route_upgrade_map,
                                         FilterChainFactoryCallbacks& callbacks) PURE;
