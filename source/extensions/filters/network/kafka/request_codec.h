@@ -33,7 +33,7 @@ public:
   virtual void onFailedParse(RequestParseFailureSharedPtr failure_data) PURE;
 };
 
-typedef std::shared_ptr<RequestCallback> RequestCallbackSharedPtr;
+using RequestCallbackSharedPtr = std::shared_ptr<RequestCallback>;
 
 /**
  * Provides initial parser for messages (class extracted to allow injecting test factories).

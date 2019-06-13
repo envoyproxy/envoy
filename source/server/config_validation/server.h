@@ -25,8 +25,6 @@
 #include "server/listener_manager_impl.h"
 #include "server/server.h"
 
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-
 #include "absl/types/optional.h"
 
 namespace Envoy {

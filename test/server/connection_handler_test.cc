@@ -71,7 +71,7 @@ public:
     const std::chrono::milliseconds listener_filters_timeout_;
   };
 
-  typedef std::unique_ptr<TestListener> TestListenerPtr;
+  using TestListenerPtr = std::unique_ptr<TestListener>;
 
   TestListener* addListener(
       uint64_t tag, bool bind_to_port, bool hand_off_restored_destination_connections,

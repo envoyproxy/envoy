@@ -28,7 +28,7 @@ public:
     uint64_t parent_connections_ = 0;
   };
 
-  virtual ~HotRestart() {}
+  virtual ~HotRestart() = default;
 
   /**
    * Shutdown listeners in the parent process if applicable. Listeners will begin draining to

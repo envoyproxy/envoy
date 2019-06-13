@@ -247,6 +247,7 @@ public:
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() override { return true; }
+  bool preserveExternalRequestId() const override { return false; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
@@ -322,6 +323,7 @@ public:
   Stats::IsolatedStoreImpl fake_listener_stats_;
   ConnectionManagerListenerStats listener_stats_;
   bool proxy_100_continue_ = false;
+  bool preserve_external_request_id_ = false;
   Http::Http1Settings http1_settings_;
   bool normalize_path_ = false;
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests

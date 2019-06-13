@@ -25,7 +25,7 @@ protected:
     OwnedImpl::useOldImpl(GetParam() == BufferImplementation::Old);
   }
 
-  virtual ~BufferImplementationParamTest() {}
+  ~BufferImplementationParamTest() override = default;
 
   /** Verify that a buffer has been constructed using the expected implementation. */
   void verifyImplementation(const OwnedImpl& buffer) {

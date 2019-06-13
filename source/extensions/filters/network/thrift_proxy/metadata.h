@@ -118,7 +118,7 @@ private:
   absl::optional<bool> sampled_;
 };
 
-typedef std::shared_ptr<MessageMetadata> MessageMetadataSharedPtr;
+using MessageMetadataSharedPtr = std::shared_ptr<MessageMetadata>;
 
 /**
  * Constant Thrift headers. All lower case.
@@ -129,7 +129,7 @@ public:
   const Http::LowerCaseString Dest{":dest"};
   const Http::LowerCaseString MethodName{":method-name"};
 };
-typedef ConstSingleton<HeaderValues> Headers;
+using Headers = ConstSingleton<HeaderValues>;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

@@ -34,7 +34,7 @@ public:
 
   class Trigger {
   public:
-    virtual ~Trigger() {}
+    virtual ~Trigger() = default;
 
     // Updates the current value of the metric and returns whether the trigger has changed state.
     virtual bool updateValue(double value) PURE;
@@ -42,7 +42,7 @@ public:
     // Returns whether the trigger is currently fired or not.
     virtual bool isFired() const PURE;
   };
-  typedef std::unique_ptr<Trigger> TriggerPtr;
+  using TriggerPtr = std::unique_ptr<Trigger>;
 
 private:
   std::unordered_map<std::string, TriggerPtr> triggers_;
@@ -107,10 +107,10 @@ private:
   std::unordered_map<std::string, Resource> resources_;
   std::unordered_map<std::string, OverloadAction> actions_;
 
-  typedef std::unordered_multimap<std::string, std::string> ResourceToActionMap;
+  using ResourceToActionMap = std::unordered_multimap<std::string, std::string>;
   ResourceToActionMap resource_to_actions_;
 
-  typedef std::unordered_multimap<std::string, ActionCallback> ActionToCallbackMap;
+  using ActionToCallbackMap = std::unordered_multimap<std::string, ActionCallback>;
   ActionToCallbackMap action_to_callbacks_;
 };
 

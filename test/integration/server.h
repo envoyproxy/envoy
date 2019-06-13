@@ -215,7 +215,7 @@ private:
 } // namespace Stats
 
 class IntegrationTestServer;
-typedef std::unique_ptr<IntegrationTestServer> IntegrationTestServerPtr;
+using IntegrationTestServerPtr = std::unique_ptr<IntegrationTestServer>;
 
 /**
  * Wrapper for running the real server for the purpose of integration tests.

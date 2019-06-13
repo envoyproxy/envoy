@@ -168,7 +168,7 @@ private:
     const uint32_t port_;
   };
 
-  typedef std::unique_ptr<DnsDiscoveryResolveTarget> DnsDiscoveryResolveTargetPtr;
+  using DnsDiscoveryResolveTargetPtr = std::unique_ptr<DnsDiscoveryResolveTarget>;
 
   struct RedisDiscoverySession;
 
@@ -185,7 +185,7 @@ private:
     Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client_;
   };
 
-  typedef std::unique_ptr<RedisDiscoveryClient> RedisDiscoveryClientPtr;
+  using RedisDiscoveryClientPtr = std::unique_ptr<RedisDiscoveryClient>;
 
   struct RedisDiscoverySession
       : public Extensions::NetworkFilters::Common::Redis::Client::Config,

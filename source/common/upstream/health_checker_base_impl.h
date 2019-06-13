@@ -80,7 +80,7 @@ protected:
     bool first_check_{true};
   };
 
-  typedef std::unique_ptr<ActiveHealthCheckSession> ActiveHealthCheckSessionPtr;
+  using ActiveHealthCheckSessionPtr = std::unique_ptr<ActiveHealthCheckSession>;
 
   HealthCheckerImplBase(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
