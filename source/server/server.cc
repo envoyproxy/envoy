@@ -361,7 +361,7 @@ void InstanceImpl::initialize(const Options& options,
     listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config());
   }
 
-  // We have to defer TDS initialization until after the cluster manager is
+  // We have to defer RTDS initialization until after the cluster manager is
   // instantiated (which in turn relies on runtime...).
   Runtime::LoaderSingleton::get().initialize(clusterManager());
 

@@ -5,7 +5,7 @@
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/srds.pb.h"
-#include "envoy/service/discovery/v2/tds.pb.h"
+#include "envoy/service/discovery/v2/rtds.pb.h"
 
 #include "common/grpc/common.h"
 

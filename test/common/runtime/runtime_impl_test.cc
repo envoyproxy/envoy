@@ -649,8 +649,8 @@ TEST(NoRuntime, FeatureEnabled) {
   EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
 }
 
-// Test TDS layer(s).
-class TdsLoaderImplTest : public LoaderImplTest {
+// Test RTDS layer(s).
+class RtdsLoaderImplTest : public LoaderImplTest {
 public:
   void setup() override {
     LoaderImplTest::setup();
@@ -664,9 +664,9 @@ public:
     for (const auto& layer_resource_name : layers_) {
       auto* layer = config.add_layers();
       layer->set_name(layer_resource_name);
-      auto* tds_layer = layer->mutable_tds_layer();
-      tds_layer->set_name(layer_resource_name);
-      tds_layer->mutable_tds_config();
+      auto* rtds_layer = layer->mutable_rtds_layer();
+      rtds_layer->set_name(layer_resource_name);
+      rtds_layer->mutable_rtds_config();
     }
     EXPECT_CALL(cm_, subscriptionFactory()).Times(layers_.size());
     EXPECT_CALL(init_manager_, add(_)).WillRepeatedly(Invoke([this](const Init::Target& target) {
@@ -677,14 +677,14 @@ public:
             [this](const envoy::api::v2::core::ConfigSource&, absl::string_view, Stats::Scope&,
                    Config::SubscriptionCallbacks& callbacks) -> Config::SubscriptionPtr {
               auto ret = std::make_unique<testing::NiceMock<Config::MockSubscription>>();
-              tds_subscriptions_.push_back(ret.get());
-              tds_callbacks_.push_back(&callbacks);
+              rtds_subscriptions_.push_back(ret.get());
+              rtds_callbacks_.push_back(&callbacks);
               return ret;
             }));
     loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, config, local_info_, init_manager_,
                                            store_, generator_, validation_visitor_, *api_);
     loader_->initialize(cm_);
-    for (auto* sub : tds_subscriptions_) {
+    for (auto* sub : rtds_subscriptions_) {
       EXPECT_CALL(*sub, start(_));
     }
     for (auto& handle : init_target_handles_) {
@@ -711,7 +711,7 @@ public:
                                      uint32_t callback_index = 0) {
     Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
     resources.Add()->PackFrom(runtime);
-    VERBOSE_EXPECT_NO_THROW(tds_callbacks_[callback_index]->onConfigUpdate(resources, ""));
+    VERBOSE_EXPECT_NO_THROW(rtds_callbacks_[callback_index]->onConfigUpdate(resources, ""));
   }
 
   void doDeltaOnConfigUpdateVerifyNoThrow(const envoy::service::discovery::v2::Runtime& runtime) {
@@ -719,25 +719,25 @@ public:
     auto* resource = resources.Add();
     resource->mutable_resource()->PackFrom(runtime);
     resource->set_version("");
-    VERBOSE_EXPECT_NO_THROW(tds_callbacks_[0]->onConfigUpdate(resources, {}, ""));
+    VERBOSE_EXPECT_NO_THROW(rtds_callbacks_[0]->onConfigUpdate(resources, {}, ""));
   }
 
   std::vector<std::string> layers_{"some_resource"};
-  std::vector<Config::SubscriptionCallbacks*> tds_callbacks_;
-  std::vector<Config::MockSubscription*> tds_subscriptions_;
+  std::vector<Config::SubscriptionCallbacks*> rtds_callbacks_;
+  std::vector<Config::MockSubscription*> rtds_subscriptions_;
   Init::ExpectableWatcherImpl init_watcher_;
   std::vector<Init::TargetHandlePtr> init_target_handles_;
 };
 
 // Empty resource lists are rejected.
-TEST_F(TdsLoaderImplTest, UnexpectedSizeEmpty) {
+TEST_F(RtdsLoaderImplTest, UnexpectedSizeEmpty) {
   setup();
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> runtimes;
 
   EXPECT_CALL(init_watcher_, ready());
-  EXPECT_THROW_WITH_MESSAGE(tds_callbacks_[0]->onConfigUpdate(runtimes, ""), EnvoyException,
-                            "Unexpected TDS resource length: 0");
+  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate(runtimes, ""), EnvoyException,
+                            "Unexpected RTDS resource length: 0");
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
@@ -746,7 +746,7 @@ TEST_F(TdsLoaderImplTest, UnexpectedSizeEmpty) {
 }
 
 // > 1 length lists are rejected.
-TEST_F(TdsLoaderImplTest, UnexpectedSizeTooMany) {
+TEST_F(RtdsLoaderImplTest, UnexpectedSizeTooMany) {
   setup();
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> runtimes;
@@ -754,8 +754,8 @@ TEST_F(TdsLoaderImplTest, UnexpectedSizeTooMany) {
   runtimes.Add();
 
   EXPECT_CALL(init_watcher_, ready());
-  EXPECT_THROW_WITH_MESSAGE(tds_callbacks_[0]->onConfigUpdate(runtimes, ""), EnvoyException,
-                            "Unexpected TDS resource length: 2");
+  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate(runtimes, ""), EnvoyException,
+                            "Unexpected RTDS resource length: 2");
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
@@ -764,11 +764,11 @@ TEST_F(TdsLoaderImplTest, UnexpectedSizeTooMany) {
 }
 
 // Validate behavior when the config fails delivery at the subscription level.
-TEST_F(TdsLoaderImplTest, FailureSubscription) {
+TEST_F(RtdsLoaderImplTest, FailureSubscription) {
   setup();
 
   EXPECT_CALL(init_watcher_, ready());
-  tds_callbacks_[0]->onConfigUpdateFailed({});
+  rtds_callbacks_[0]->onConfigUpdateFailed({});
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
@@ -777,7 +777,7 @@ TEST_F(TdsLoaderImplTest, FailureSubscription) {
 }
 
 // Unexpected runtime resource name.
-TEST_F(TdsLoaderImplTest, WrongResourceName) {
+TEST_F(RtdsLoaderImplTest, WrongResourceName) {
   setup();
 
   auto runtime = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
@@ -788,8 +788,8 @@ TEST_F(TdsLoaderImplTest, WrongResourceName) {
   )EOF");
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   resources.Add()->PackFrom(runtime);
-  EXPECT_THROW_WITH_MESSAGE(tds_callbacks_[0]->onConfigUpdate(resources, ""), EnvoyException,
-                            "Unexpected TDS runtime (expecting some_resource): other_resource");
+  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate(resources, ""), EnvoyException,
+                            "Unexpected RTDS runtime (expecting some_resource): other_resource");
 
   EXPECT_EQ("whatevs", loader_->snapshot().get("foo"));
   EXPECT_EQ("yar", loader_->snapshot().get("bar"));
@@ -802,7 +802,7 @@ TEST_F(TdsLoaderImplTest, WrongResourceName) {
 }
 
 // Successful update.
-TEST_F(TdsLoaderImplTest, OnConfigUpdateSuccess) {
+TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
   setup();
 
   auto runtime = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
@@ -841,7 +841,7 @@ TEST_F(TdsLoaderImplTest, OnConfigUpdateSuccess) {
 }
 
 // Delta style successful update.
-TEST_F(TdsLoaderImplTest, DeltaOnConfigUpdateSuccess) {
+TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateSuccess) {
   setup();
 
   auto runtime = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
@@ -879,8 +879,8 @@ TEST_F(TdsLoaderImplTest, DeltaOnConfigUpdateSuccess) {
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
-// Updates with multiple TDS layers.
-TEST_F(TdsLoaderImplTest, MultipleTdsLayers) {
+// Updates with multiple RTDS layers.
+TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
   addLayer("another_resource");
   setup();
 

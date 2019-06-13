@@ -372,8 +372,7 @@ TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapMissingName) {
 // Validate invalid layered runtime with duplicate names is rejected.
 TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapDuplicateName) {
   EXPECT_THROW_WITH_REGEX(initialize("test/server/invalid_layered_runtime_duplicate_name.yaml"),
-                          EnvoyException,
-                          "Duplicate layer name: some_static_laye");
+                          EnvoyException, "Duplicate layer name: some_static_laye");
 }
 
 // Regression test for segfault when server initialization fails prior to

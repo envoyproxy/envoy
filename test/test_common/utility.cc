@@ -26,7 +26,7 @@
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
-#include "envoy/service/discovery/v2/tds.pb.h"
+#include "envoy/service/discovery/v2/rtds.pb.h"
 
 #include "common/api/api_impl.h"
 #include "common/common/empty_string.h"

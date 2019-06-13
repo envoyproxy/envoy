@@ -213,7 +213,7 @@ public:
 
   /**
    * Post-construction initialization. Runtime will be generally available after
-   * the constructor is finished, with the exception of dynamic TDS layers,
+   * the constructor is finished, with the exception of dynamic RTDS layers,
    * which require ClusterManager.
    * @param cm cluster manager reference.
    */

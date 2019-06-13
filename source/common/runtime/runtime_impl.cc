@@ -410,7 +410,8 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
   }
 }
 
-ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto) : OverrideLayerImpl{name} {
+ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto)
+    : OverrideLayerImpl{name} {
   for (const auto& f : proto.fields()) {
     walkProtoValue(f.second, f.first);
   }
@@ -452,9 +453,8 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
                        const LocalInfo::LocalInfo& local_info, Init::Manager& init_manager,
                        Stats::Store& store, RandomGenerator& generator,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
-    : generator_(generator), stats_(generateStats(store)),
-      tls_(tls.allocateSlot()), config_(config), service_cluster_(local_info.clusterName()),
-      api_(api) {
+    : generator_(generator), stats_(generateStats(store)), tls_(tls.allocateSlot()),
+      config_(config), service_cluster_(local_info.clusterName()), api_(api) {
   std::unordered_set<std::string> layer_names;
   for (const auto& layer : config_.layers()) {
     auto ret = layer_names.insert(layer.name());
@@ -476,9 +476,9 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       watcher_->addWatch(layer.disk_layer().symlink_root(), Filesystem::Watcher::Events::MovedTo,
                          [this](uint32_t) -> void { loadNewSnapshot(); });
       break;
-    case envoy::config::bootstrap::v2::RuntimeLayer::kTdsLayer:
+    case envoy::config::bootstrap::v2::RuntimeLayer::kRtdsLayer:
       subscriptions_.emplace_back(
-          std::make_unique<TdsSubscription>(*this, layer.tds_layer(), store, validation_visitor));
+          std::make_unique<RtdsSubscription>(*this, layer.rtds_layer(), store, validation_visitor));
       init_manager.add(subscriptions_.back()->init_target_);
       break;
     default:
@@ -491,31 +491,31 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
 
 void LoaderImpl::initialize(Upstream::ClusterManager& cm) { cm_ = &cm; }
 
-TdsSubscription::TdsSubscription(
-    LoaderImpl& parent, const envoy::config::bootstrap::v2::RuntimeLayer::TdsLayer& tds_layer,
+RtdsSubscription::RtdsSubscription(
+    LoaderImpl& parent, const envoy::config::bootstrap::v2::RuntimeLayer::RtdsLayer& rtds_layer,
     Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : parent_(parent), config_source_(tds_layer.tds_config()), store_(store),
-      resource_name_(tds_layer.name()),
-      init_target_("TDS " + resource_name_, [this]() { start(); }),
+    : parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
+      resource_name_(rtds_layer.name()),
+      init_target_("RTDS " + resource_name_, [this]() { start(); }),
       validation_visitor_(validation_visitor) {}
 
-void TdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                     const std::string&) {
+void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                      const std::string&) {
   validateUpdateSize(resources.size());
   auto runtime = MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(
       resources[0], validation_visitor_);
   MessageUtil::validate(runtime);
   if (runtime.name() != resource_name_) {
     throw EnvoyException(
-        fmt::format("Unexpected TDS runtime (expecting {}): {}", resource_name_, runtime.name()));
+        fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_, runtime.name()));
   }
-  ENVOY_LOG(debug, "Reloading TDS snapshot for onConfigUpdate");
+  ENVOY_LOG(debug, "Reloading RTDS snapshot for onConfigUpdate");
   proto_.CopyFrom(runtime.layer());
   parent_.loadNewSnapshot();
   init_target_.ready();
 }
 
-void TdsSubscription::onConfigUpdate(
+void RtdsSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
     const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
   validateUpdateSize(resources.size());
@@ -524,13 +524,13 @@ void TdsSubscription::onConfigUpdate(
   onConfigUpdate(unwrapped_resource, resources[0].version());
 }
 
-void TdsSubscription::onConfigUpdateFailed(const EnvoyException*) {
+void RtdsSubscription::onConfigUpdateFailed(const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();
 }
 
-void TdsSubscription::start() {
+void RtdsSubscription::start() {
   // We have to delay the subscription creation until init-time, since the
   // cluster manager resources are not available in the constructor when
   // instantiated in the server instance.
@@ -541,10 +541,10 @@ void TdsSubscription::start() {
   subscription_->start({resource_name_});
 }
 
-void TdsSubscription::validateUpdateSize(uint32_t num_resources) {
+void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {
   if (num_resources != 1) {
     init_target_.ready();
-    throw EnvoyException(fmt::format("Unexpected TDS resource length: {}", num_resources));
+    throw EnvoyException(fmt::format("Unexpected RTDS resource length: {}", num_resources));
     // (would be a return false here)
   }
 }
@@ -577,7 +577,7 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
   std::vector<Snapshot::OverrideLayerConstPtr> layers;
   uint32_t disk_layers = 0;
   uint32_t error_layers = 0;
-  uint32_t tds_layer = 0;
+  uint32_t rtds_layer = 0;
   for (const auto& layer : config_.layers()) {
     switch (layer.layer_specifier_case()) {
     case envoy::config::bootstrap::v2::RuntimeLayer::kStaticLayer:
@@ -594,7 +594,7 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
           ++disk_layers;
         } catch (EnvoyException& e) {
           // TODO(htuch): Consider latching here, rather than ignoring the
-          // layer. This would be consistent with filesystem TDS.
+          // layer. This would be consistent with filesystem RTDS.
           ++error_layers;
           ENVOY_LOG(debug, "error loading runtime values for layer {} from disk: {}",
                     layer.DebugString(), e.what());
@@ -605,8 +605,8 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
     case envoy::config::bootstrap::v2::RuntimeLayer::kAdminLayer:
       layers.push_back(std::make_unique<AdminLayer>(*admin_layer_));
       break;
-    case envoy::config::bootstrap::v2::RuntimeLayer::kTdsLayer: {
-      auto* subscription = subscriptions_[tds_layer++].get();
+    case envoy::config::bootstrap::v2::RuntimeLayer::kRtdsLayer: {
+      auto* subscription = subscriptions_[rtds_layer++].get();
       layers.emplace_back(std::make_unique<const ProtoLayer>(layer.name(), subscription->proto_));
       break;
     }

@@ -38,7 +38,7 @@ envoy_cc_library(
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
-        "@envoy_api//envoy/service/discovery/v2:tds_cc",
+        "@envoy_api//envoy/service/discovery/v2:rtds_cc",
     ],
 )
 

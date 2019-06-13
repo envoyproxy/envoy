@@ -257,13 +257,13 @@ message RuntimeLayer {
   message AdminLayer {
   }
 
-  // :ref:`runTime Discovery Service (TDS) <config_runtime_tds>` layer.
-  message TdsLayer {
-    // Resource to subscribe to at *tds_config* for the TDS layer.
+  // :ref:`Runtime Discovery Service (RTDS) <config_runtime_rtds>` layer.
+  message RtdsLayer {
+    // Resource to subscribe to at *rtds_config* for the RTDS layer.
     string name = 1;
 
-    // TDS configuration source.
-    envoy.api.v2.core.ConfigSource tds_config = 2;
+    // RTDS configuration source.
+    envoy.api.v2.core.ConfigSource rtds_config = 2;
   }
 
   // Descriptive name for the runtime layer. This is only used for the runtime
@@ -278,7 +278,7 @@ message RuntimeLayer {
     google.protobuf.Struct static_layer = 2;
     DiskLayer disk_layer = 3;
     AdminLayer admin_layer = 4;
-    TdsLayer tds_layer = 5;
+    RtdsLayer rtds_layer = 5;
   }
 }
 

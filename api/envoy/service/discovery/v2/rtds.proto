@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.discovery.v2;
 
-option java_outer_classname = "TdsProto";
+option java_outer_classname = "RtdsProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.service.discovery.v2";
 option java_generic_services = true;
@@ -14,12 +14,12 @@ import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
 
-// [#protodoc-title: runTime Discovery Service (TDS)]
-// TDS :ref:`configuration overview <config_runtime_tds>`
+// [#protodoc-title: runTime Discovery Service (RTDS)]
+// RTDS :ref:`configuration overview <config_runtime_rtds>`
 
 // [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing
 // services: https://github.com/google/protobuf/issues/4221
-message TdsDummy {
+message RtdsDummy {
 }
 
 // Discovery service for Runtime resources.
@@ -40,7 +40,7 @@ service RuntimeDiscoveryService {
   }
 }
 
-// TDS resource type. This describes a layer in the runtime virtual filesystem.
+// RTDS resource type. This describes a layer in the runtime virtual filesystem.
 message Runtime {
   // Runtime resource name. This makes the Runtime a self-describing xDS
   // resource.

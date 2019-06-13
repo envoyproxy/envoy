@@ -15,7 +15,7 @@ static_resources:
       socket_address:
         address: 127.0.0.1
         port_value: 0
-  - name: tds_cluster
+  - name: rtds_cluster
     http2_protocol_options: {{}}
     hosts:
       socket_address:
@@ -27,15 +27,15 @@ layered_runtime:
     static_layer:
       foo: whatevs
       bar: yar
-  - name: some_tds_layer
-    tds_layer:
-      name: some_tds_layer
-      tds_config:
+  - name: some_rtds_layer
+    rtds_layer:
+      name: some_rtds_layer
+      rtds_config:
         api_config_source:
           api_type: {}
           grpc_services:
             envoy_grpc:
-              cluster_name: tds_cluster
+              cluster_name: rtds_cluster
   - name: some_admin_layer
     admin_layer: {{}}
 admin:
@@ -48,9 +48,9 @@ admin:
                      api_type);
 }
 
-class TdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
+class RtdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
-  TdsIntegrationTest()
+  RtdsIntegrationTest()
       : HttpIntegrationTest(
             Http::CodecClient::Type::HTTP2, ipVersion(),
             tdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
@@ -71,7 +71,7 @@ public:
     setUpstreamCount(1);
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     HttpIntegrationTest::initialize();
-    // Initial TDS connection.
+    // Initial RTDS connection.
     createXdsConnection();
     AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result, result.message());
@@ -109,25 +109,25 @@ public:
   uint32_t initial_keys_{};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, TdsIntegrationTest, DELTA_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, RtdsIntegrationTest, DELTA_INTEGRATION_PARAMS);
 
-TEST_P(TdsIntegrationTest, TdsReload) {
+TEST_P(RtdsIntegrationTest, RtdsReload) {
   initialize();
 
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));
   EXPECT_EQ("", getRuntimeKey("baz"));
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_tds_layer"},
-                                      {"some_tds_layer"}, {}));
-  auto some_tds_layer = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
-    name: some_tds_layer
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
+                                      {"some_rtds_layer"}, {}));
+  auto some_rtds_layer = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
+    name: some_rtds_layer
     layer:
       foo: bar
       baz: meh
   )EOF");
   sendDiscoveryResponse<envoy::service::discovery::v2::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_tds_layer}, {some_tds_layer}, {}, "1");
+      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
   test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
 
   EXPECT_EQ("bar", getRuntimeKey("foo"));
@@ -140,14 +140,14 @@ TEST_P(TdsIntegrationTest, TdsReload) {
   EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
 
   EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"some_tds_layer"}, {}, {}));
-  some_tds_layer = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
-    name: some_tds_layer
+      compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"some_rtds_layer"}, {}, {}));
+  some_rtds_layer = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
+    name: some_rtds_layer
     layer:
       baz: saz
   )EOF");
   sendDiscoveryResponse<envoy::service::discovery::v2::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_tds_layer}, {some_tds_layer}, {}, "2");
+      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "2");
   test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 2);
 
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));

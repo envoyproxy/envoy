@@ -11,7 +11,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/init/manager.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/service/discovery/v2/tds.pb.validate.h"
+#include "envoy/service/discovery/v2/rtds.pb.validate.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread_local/thread_local.h"
@@ -142,7 +142,8 @@ protected:
  */
 class AdminLayer : public OverrideLayerImpl {
 public:
-  explicit AdminLayer(absl::string_view name, RuntimeStats& stats) : OverrideLayerImpl{name}, stats_{stats} {}
+  explicit AdminLayer(absl::string_view name, RuntimeStats& stats)
+      : OverrideLayerImpl{name}, stats_{stats} {}
   /**
    * Copy-constructible so that it can snapshotted.
    */
@@ -192,10 +193,10 @@ private:
 
 class LoaderImpl;
 
-struct TdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger::Id::runtime> {
-  TdsSubscription(LoaderImpl& parent,
-                  const envoy::config::bootstrap::v2::RuntimeLayer::TdsLayer& tds_layer,
-                  Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);
+struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger::Id::runtime> {
+  RtdsSubscription(LoaderImpl& parent,
+                   const envoy::config::bootstrap::v2::RuntimeLayer::RtdsLayer& rtds_layer,
+                   Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -224,7 +225,7 @@ struct TdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
-using TdsSubscriptionPtr = std::unique_ptr<TdsSubscription>;
+using RtdsSubscriptionPtr = std::unique_ptr<RtdsSubscription>;
 
 /**
  * Implementation of Loader that provides Snapshots of values added via mergeValues().
@@ -246,7 +247,7 @@ public:
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
 
 private:
-  friend TdsSubscription;
+  friend RtdsSubscription;
 
   // Create a new Snapshot
   virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
@@ -262,7 +263,7 @@ private:
   const std::string service_cluster_;
   Filesystem::WatcherPtr watcher_;
   Api::Api& api_;
-  std::vector<TdsSubscriptionPtr> subscriptions_;
+  std::vector<RtdsSubscriptionPtr> subscriptions_;
   Upstream::ClusterManager* cm_{};
 };
 
