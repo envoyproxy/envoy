@@ -121,15 +121,11 @@ public:
                             GrpcMuxCallbacks&) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
-  void pause(const std::string& type_url) override { paused_apis_.insert(type_url); }
-  void resume(const std::string& type_url) override { paused_apis_.erase(type_url); }
-  bool paused(const std::string& type_url) const override {
-    return paused_apis_.find(type_url) != paused_apis_.end();
+  void pause(const std::string&) override {}
+  void resume(const std::string&) override {}
+  bool paused(const std::string&) const override {
+    throw EnvoyException("ADS must be configured to support an ADS config source");
   }
-
-private:
-  // Helpful for testing ClusterManagerImpl.
-  std::unordered_set<std::string> paused_apis_;
 };
 
 } // namespace Config

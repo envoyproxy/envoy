@@ -1270,14 +1270,12 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
-  EXPECT_TRUE(cluster_manager_->adsMux().paused(Config::TypeUrl::get().Cluster));
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   cluster1->initialize_callback_();
 
   EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
   EXPECT_EQ(0, cluster_manager_->warmingClusterCount());
-  EXPECT_FALSE(cluster_manager_->adsMux().paused(Config::TypeUrl::get().Cluster));
 
   // Now try to update again but with the same hash.
   EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
