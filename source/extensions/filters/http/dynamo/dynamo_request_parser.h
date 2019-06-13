@@ -59,6 +59,11 @@ public:
   static TableDescriptor parseTable(const std::string& operation, const Json::Object& json_data);
 
   /**
+   * @return string name of table in transaction object, or empty string if none
+   */
+  static std::string RequestParser::getTableNameFromTransaction(const Json::ObjectSharedPtr& transact_item);
+
+  /**
    * Parse error details which might be provided for a given response code.
    * @return empty string if cannot get error details.
    * For the full list of errors, see
@@ -96,6 +101,7 @@ private:
   static const std::vector<std::string> SINGLE_TABLE_OPERATIONS;
   static const std::vector<std::string> BATCH_OPERATIONS;
   static const std::vector<std::string> TRANSACT_OPERATIONS;
+  static const std::vector<std::string> TRANSACT_ITEM_OPERATIONS;
 
   // http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Programming.Errors.html
   static const std::vector<std::string> SUPPORTED_ERROR_TYPES;
