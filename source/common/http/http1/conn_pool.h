@@ -113,8 +113,7 @@ protected:
   void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event);
   void onDownstreamReset(ActiveClient& client);
   void onResponseComplete(ActiveClient& client);
-  void onUpstreamReady();
-  void processIdleClient(ActiveClient& client, bool delay);
+  void processIdleClient(ActiveClient& client);
 
   Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
@@ -122,8 +121,6 @@ protected:
   std::list<ActiveClientPtr> busy_clients_;
   std::list<DrainedCb> drained_callbacks_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
-  Event::TimerPtr upstream_ready_timer_;
-  bool upstream_ready_enabled_{false};
 };
 
 /**
