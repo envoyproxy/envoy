@@ -351,7 +351,7 @@ void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>&
   stats_.admin_overrides_active_.set(values_.empty() ? 0 : 1);
 }
 
-DiskLayer::DiskLayer(const std::string& name, const std::string& path, Api::Api& api)
+DiskLayer::DiskLayer(absl::string_view name, const std::string& path, Api::Api& api)
     : OverrideLayerImpl{name} {
   walkDirectory(path, "", 1, api);
 }
@@ -410,7 +410,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
   }
 }
 
-ProtoLayer::ProtoLayer(const ProtobufWkt::Struct& proto) : OverrideLayerImpl{"base"} {
+ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto) : OverrideLayerImpl{name} {
   for (const auto& f : proto.fields()) {
     walkProtoValue(f.second, f.first);
   }
@@ -452,18 +452,22 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
                        const LocalInfo::LocalInfo& local_info, Init::Manager& init_manager,
                        Stats::Store& store, RandomGenerator& generator,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
-    : generator_(generator), stats_(generateStats(store)), admin_layer_(stats_),
+    : generator_(generator), stats_(generateStats(store)),
       tls_(tls.allocateSlot()), config_(config), service_cluster_(local_info.clusterName()),
       api_(api) {
+  std::unordered_set<std::string> layer_names;
   for (const auto& layer : config_.layers()) {
+    auto ret = layer_names.insert(layer.name());
+    if (!ret.second) {
+      throw EnvoyException(absl::StrCat("Duplicate layer name: ", layer.name()));
+    }
     switch (layer.layer_specifier_case()) {
     case envoy::config::bootstrap::v2::RuntimeLayer::kAdminLayer:
-      if (config_has_admin_layer_) {
+      if (admin_layer_ != nullptr) {
         throw EnvoyException(
             "Too many admin layers specified in LayeredRuntime, at most one may be specified");
-      } else {
-        config_has_admin_layer_ = true;
       }
+      admin_layer_ = std::make_unique<AdminLayer>(layer.name(), stats_);
       break;
     case envoy::config::bootstrap::v2::RuntimeLayer::kDiskLayer:
       if (watcher_ == nullptr) {
@@ -497,7 +501,6 @@ TdsSubscription::TdsSubscription(
 
 void TdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                      const std::string&) {
-  ENVOY_LOG(debug, "TDS onConfigUpdate");
   validateUpdateSize(resources.size());
   auto runtime = MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(
       resources[0], validation_visitor_);
@@ -556,10 +559,10 @@ void LoaderImpl::loadNewSnapshot() {
 Snapshot& LoaderImpl::snapshot() { return tls_->getTyped<Snapshot>(); }
 
 void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>& values) {
-  if (!config_has_admin_layer_) {
+  if (admin_layer_ == nullptr) {
     throw EnvoyException("No admin layer specified");
   }
-  admin_layer_.mergeValues(values);
+  admin_layer_->mergeValues(values);
   loadNewSnapshot();
 }
 
@@ -578,7 +581,7 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
   for (const auto& layer : config_.layers()) {
     switch (layer.layer_specifier_case()) {
     case envoy::config::bootstrap::v2::RuntimeLayer::kStaticLayer:
-      layers.emplace_back(std::make_unique<const ProtoLayer>(layer.static_layer()));
+      layers.emplace_back(std::make_unique<const ProtoLayer>(layer.name(), layer.static_layer()));
       break;
     case envoy::config::bootstrap::v2::RuntimeLayer::kDiskLayer: {
       std::string path = layer.disk_layer().symlink_root();
@@ -600,11 +603,11 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
       break;
     }
     case envoy::config::bootstrap::v2::RuntimeLayer::kAdminLayer:
-      layers.push_back(std::make_unique<AdminLayer>(admin_layer_));
+      layers.push_back(std::make_unique<AdminLayer>(*admin_layer_));
       break;
     case envoy::config::bootstrap::v2::RuntimeLayer::kTdsLayer: {
       auto* subscription = subscriptions_[tds_layer++].get();
-      layers.emplace_back(std::make_unique<const ProtoLayer>(subscription->proto_));
+      layers.emplace_back(std::make_unique<const ProtoLayer>(layer.name(), subscription->proto_));
       break;
     }
     default:

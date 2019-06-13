@@ -23,10 +23,12 @@ static_resources:
         port_value: 0
 layered_runtime:
   layers:
-  - static_layer:
+  - name: some_static_layer
+    static_layer:
       foo: whatevs
       bar: yar
-  - tds_layer:
+  - name: some_tds_layer
+    tds_layer:
       name: some_tds_layer
       tds_config:
         api_config_source:
@@ -34,7 +36,8 @@ layered_runtime:
           grpc_services:
             envoy_grpc:
               cluster_name: tds_cluster
-  - admin_layer: {{}}
+  - name: some_admin_layer
+    admin_layer: {{}}
 admin:
   access_log_path: /dev/null
   address:

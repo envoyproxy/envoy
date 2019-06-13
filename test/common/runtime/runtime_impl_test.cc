@@ -151,10 +151,16 @@ TEST_F(DiskLoaderImplTest, All) {
   EXPECT_EQ(2UL, loader_->snapshot().getInteger("file3", 1));
   EXPECT_EQ(123UL, loader_->snapshot().getInteger("file4", 1));
 
-  // Boolean getting.
   bool value;
   SnapshotImpl* snapshot = reinterpret_cast<SnapshotImpl*>(&loader_->snapshot());
 
+  // Validate that the layer name is set properly for static layers.
+  EXPECT_EQ("base", snapshot->getLayers()[0]->name());
+  EXPECT_EQ("root", snapshot->getLayers()[1]->name());
+  EXPECT_EQ("override", snapshot->getLayers()[2]->name());
+  EXPECT_EQ("admin", snapshot->getLayers()[3]->name());
+
+  // Boolean getting.
   EXPECT_EQ(true, snapshot->getBoolean("file11", value));
   EXPECT_EQ(true, value);
   EXPECT_EQ(true, snapshot->getBoolean("file12", value));
@@ -438,8 +444,16 @@ TEST_F(DiskLoaderImplTest, LayersOverride) {
 TEST_F(DiskLoaderImplTest, MultipleAdminLayersFail) {
   setup();
   envoy::config::bootstrap::v2::LayeredRuntime layered_runtime;
-  layered_runtime.add_layers()->mutable_admin_layer();
-  layered_runtime.add_layers()->mutable_admin_layer();
+  {
+    auto* layer = layered_runtime.add_layers();
+    layer->set_name("admin_0");
+    layer->mutable_admin_layer();
+  }
+  {
+    auto* layer = layered_runtime.add_layers();
+    layer->set_name("admin_1");
+    layer->mutable_admin_layer();
+  }
   EXPECT_THROW_WITH_MESSAGE(
       std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, init_manager_,
                                    store_, generator_, validation_visitor_, *api_),
@@ -452,8 +466,16 @@ protected:
   void setup() override {
     LoaderImplTest::setup();
     envoy::config::bootstrap::v2::LayeredRuntime layered_runtime;
-    layered_runtime.add_layers()->mutable_static_layer()->MergeFrom(base_);
-    layered_runtime.add_layers()->mutable_admin_layer();
+    {
+      auto* layer = layered_runtime.add_layers();
+      layer->set_name("base");
+      layer->mutable_static_layer()->MergeFrom(base_);
+    }
+    {
+      auto* layer = layered_runtime.add_layers();
+      layer->set_name("admin");
+      layer->mutable_admin_layer();
+    }
     loader_ =
         std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, init_manager_,
                                      store_, generator_, validation_visitor_, *api_);
@@ -668,6 +690,9 @@ public:
     for (auto& handle : init_target_handles_) {
       handle->initialize(init_watcher_);
     }
+
+    // Validate that the layer name is set properly for dynamic layers.
+    EXPECT_EQ(layers_[0], loader_->snapshot().getLayers()[1]->name());
 
     EXPECT_EQ("whatevs", loader_->snapshot().get("foo"));
     EXPECT_EQ("yar", loader_->snapshot().get("bar"));

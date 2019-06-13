@@ -126,7 +126,7 @@ private:
  */
 class OverrideLayerImpl : public Snapshot::OverrideLayer {
 public:
-  explicit OverrideLayerImpl(const std::string& name) : name_{name} {}
+  explicit OverrideLayerImpl(absl::string_view name) : name_{name} {}
   const Snapshot::EntryMap& values() const override { return values_; }
   const std::string& name() const override { return name_; }
 
@@ -142,11 +142,11 @@ protected:
  */
 class AdminLayer : public OverrideLayerImpl {
 public:
-  explicit AdminLayer(RuntimeStats& stats) : OverrideLayerImpl{"admin"}, stats_{stats} {}
+  explicit AdminLayer(absl::string_view name, RuntimeStats& stats) : OverrideLayerImpl{name}, stats_{stats} {}
   /**
    * Copy-constructible so that it can snapshotted.
    */
-  AdminLayer(const AdminLayer& admin_layer) : AdminLayer{admin_layer.stats_} {
+  AdminLayer(const AdminLayer& admin_layer) : AdminLayer{admin_layer.name_, admin_layer.stats_} {
     values_ = admin_layer.values();
   }
 
@@ -160,12 +160,14 @@ private:
   RuntimeStats& stats_;
 };
 
+using AdminLayerPtr = std::unique_ptr<AdminLayer>;
+
 /**
  * Extension of OverrideLayerImpl that loads values from the file system upon construction.
  */
 class DiskLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
-  DiskLayer(const std::string& name, const std::string& path, Api::Api& api);
+  DiskLayer(absl::string_view name, const std::string& path, Api::Api& api);
 
 private:
   void walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
@@ -182,7 +184,7 @@ private:
  */
 class ProtoLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
-  ProtoLayer(const ProtobufWkt::Struct& proto);
+  ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto);
 
 private:
   void walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix);
@@ -252,10 +254,9 @@ private:
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
 
-  bool config_has_admin_layer_{};
   RandomGenerator& generator_;
   RuntimeStats stats_;
-  AdminLayer admin_layer_;
+  AdminLayerPtr admin_layer_;
   ThreadLocal::SlotPtr tls_;
   const envoy::config::bootstrap::v2::LayeredRuntime config_;
   const std::string service_cluster_;
