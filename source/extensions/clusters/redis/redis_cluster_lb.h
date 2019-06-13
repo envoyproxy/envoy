@@ -24,9 +24,9 @@ namespace Redis {
 
 static const uint64_t MaxSlot = 16384;
 
-typedef std::array<Upstream::HostSharedPtr, MaxSlot> SlotArray;
+using SlotArray = std::array<Upstream::HostSharedPtr, MaxSlot>;
 
-typedef std::shared_ptr<const SlotArray> SlotArraySharedPtr;
+using SlotArraySharedPtr = std::shared_ptr<const SlotArray>;
 
 class ClusterSlot {
 public:
@@ -93,7 +93,7 @@ public:
                                    Upstream::HostMap all_hosts) PURE;
 };
 
-typedef std::shared_ptr<ClusterSlotUpdateCallBack> ClusterSlotUpdateCallBackSharedPtr;
+using ClusterSlotUpdateCallBackSharedPtr = std::shared_ptr<ClusterSlotUpdateCallBack>;
 
 /**
  * This factory is created and returned by RedisCluster's factory() method, the create() method will

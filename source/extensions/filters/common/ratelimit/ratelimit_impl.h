@@ -27,8 +27,8 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-typedef Grpc::AsyncRequestCallbacks<envoy::service::ratelimit::v2::RateLimitResponse>
-    RateLimitAsyncCallbacks;
+using RateLimitAsyncCallbacks =
+    Grpc::AsyncRequestCallbacks<envoy::service::ratelimit::v2::RateLimitResponse>;
 
 struct ConstantValues {
   const std::string TraceStatus = "ratelimit_status";
@@ -36,7 +36,7 @@ struct ConstantValues {
   const std::string TraceOk = "ok";
 };
 
-typedef ConstSingleton<ConstantValues> Constants;
+using Constants = ConstSingleton<ConstantValues>;
 
 // TODO(htuch): We should have only one client per thread, but today we create one per filter stack.
 // This will require support for more than one outstanding request per client (limit() assumes only

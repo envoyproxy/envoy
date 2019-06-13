@@ -47,7 +47,7 @@ public:
 private:
   void parse(const std::string& format_string);
 
-  typedef std::vector<int32_t> SpecifierOffsets;
+  using SpecifierOffsets = std::vector<int32_t>;
   std::string fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
                                                  const std::string& seconds_str) const;
 
@@ -359,8 +359,8 @@ public:
   /**
    * Definition of unordered set of case-insensitive std::string.
    */
-  typedef absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>
-      CaseUnorderedSet;
+  using CaseUnorderedSet =
+      absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>;
 
   /**
    * Removes all the character indices from str contained in the interval-set.
@@ -458,7 +458,7 @@ public:
 template <typename Value> class IntervalSetImpl : public IntervalSet<Value> {
 public:
   // Interval is a pair of Values.
-  typedef typename IntervalSet<Value>::Interval Interval;
+  using Interval = typename IntervalSet<Value>::Interval;
 
   void insert(Value left, Value right) override {
     if (left == right) {

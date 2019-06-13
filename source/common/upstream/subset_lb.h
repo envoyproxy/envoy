@@ -35,7 +35,7 @@ public:
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
 private:
-  typedef std::function<bool(const Host&)> HostPredicate;
+  using HostPredicate = std::function<bool(const Host&)>;
 
   // Represents a subset of an original HostSet.
   class HostSubsetImpl : public HostSetImpl {
@@ -105,15 +105,15 @@ private:
     bool empty_ = true;
   };
 
-  typedef std::shared_ptr<HostSubsetImpl> HostSubsetImplPtr;
-  typedef std::shared_ptr<PrioritySubsetImpl> PrioritySubsetImplPtr;
+  using HostSubsetImplPtr = std::shared_ptr<HostSubsetImpl>;
+  using PrioritySubsetImplPtr = std::shared_ptr<PrioritySubsetImpl>;
 
-  typedef std::vector<std::pair<std::string, ProtobufWkt::Value>> SubsetMetadata;
+  using SubsetMetadata = std::vector<std::pair<std::string, ProtobufWkt::Value>>;
 
   class LbSubsetEntry;
-  typedef std::shared_ptr<LbSubsetEntry> LbSubsetEntryPtr;
-  typedef std::unordered_map<HashedValue, LbSubsetEntryPtr> ValueSubsetMap;
-  typedef std::unordered_map<std::string, ValueSubsetMap> LbSubsetMap;
+  using LbSubsetEntryPtr = std::shared_ptr<LbSubsetEntry>;
+  using ValueSubsetMap = std::unordered_map<HashedValue, LbSubsetEntryPtr>;
+  using LbSubsetMap = std::unordered_map<std::string, ValueSubsetMap>;
 
   // Entry in the subset hierarchy.
   class LbSubsetEntry {

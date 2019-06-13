@@ -16,7 +16,7 @@ struct HttpProtocolTestParams {
 //
 // Usage:
 //
-// typedef HttpProtocolIntegrationTest MyTest
+// using MyTest = HttpProtocolIntegrationTest;
 //
 // INSTANTIATE_TEST_SUITE_P(Protocols, MyTest,
 //                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),

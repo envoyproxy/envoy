@@ -103,10 +103,10 @@ protected:
 };
 
 using TcpListenSocket = NetworkListenSocket<NetworkSocketTrait<Address::SocketType::Stream>>;
-typedef std::unique_ptr<TcpListenSocket> TcpListenSocketPtr;
+using TcpListenSocketPtr = std::unique_ptr<TcpListenSocket>;
 
 using UdpListenSocket = NetworkListenSocket<NetworkSocketTrait<Address::SocketType::Datagram>>;
-typedef std::unique_ptr<UdpListenSocket> UdpListenSocketPtr;
+using UdpListenSocketPtr = std::unique_ptr<UdpListenSocket>;
 
 class UdsListenSocket : public ListenSocketImpl {
 public:

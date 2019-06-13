@@ -55,10 +55,10 @@ protected:
     bool conn_valid_{true};
   };
 
-  typedef std::shared_ptr<ConnectionWrapper> ConnectionWrapperSharedPtr;
+  using ConnectionWrapperSharedPtr = std::shared_ptr<ConnectionWrapper>;
 
   struct ConnectionDataImpl : public ConnectionPool::ConnectionData {
-    ConnectionDataImpl(ConnectionWrapperSharedPtr wrapper) : wrapper_(wrapper) {}
+    ConnectionDataImpl(ConnectionWrapperSharedPtr wrapper) : wrapper_(std::move(wrapper)) {}
     ~ConnectionDataImpl() { wrapper_->release(false); }
 
     // ConnectionPool::ConnectionData
@@ -118,7 +118,7 @@ protected:
     bool timed_out_;
   };
 
-  typedef std::unique_ptr<ActiveConn> ActiveConnPtr;
+  using ActiveConnPtr = std::unique_ptr<ActiveConn>;
 
   struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
     PendingRequest(ConnPoolImpl& parent, ConnectionPool::Callbacks& callbacks);
@@ -133,7 +133,7 @@ protected:
     ConnectionPool::Callbacks& callbacks_;
   };
 
-  typedef std::unique_ptr<PendingRequest> PendingRequestPtr;
+  using PendingRequestPtr = std::unique_ptr<PendingRequest>;
 
   void assignConnection(ActiveConn& conn, ConnectionPool::Callbacks& callbacks);
   void createNewConnection();

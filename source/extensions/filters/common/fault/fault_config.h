@@ -17,7 +17,7 @@ public:
   const Http::LowerCaseString ThroughputResponse{"x-envoy-fault-throughput-response"};
 };
 
-typedef ConstSingleton<HeaderNameValues> HeaderNames;
+using HeaderNames = ConstSingleton<HeaderNameValues>;
 
 /**
  * Generic configuration for a delay fault.

@@ -11,7 +11,7 @@ namespace Http {
  */
 class DateProvider {
 public:
-  virtual ~DateProvider() {}
+  virtual ~DateProvider() = default;
 
   /**
    * Set the Date header potentially using a cached value.

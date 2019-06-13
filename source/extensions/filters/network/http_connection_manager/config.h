@@ -86,7 +86,7 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
+  using FilterFactoriesList = std::list<Http::FilterFactoryCb>;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;

@@ -270,7 +270,7 @@ private:
     bool is_grpc_request_{};
   };
 
-  typedef std::unique_ptr<ActiveStreamDecoderFilter> ActiveStreamDecoderFilterPtr;
+  using ActiveStreamDecoderFilterPtr = std::unique_ptr<ActiveStreamDecoderFilter>;
 
   /**
    * Wrapper for a stream encoder filter.
@@ -323,7 +323,7 @@ private:
     StreamEncoderFilterSharedPtr handle_;
   };
 
-  typedef std::unique_ptr<ActiveStreamEncoderFilter> ActiveStreamEncoderFilterPtr;
+  using ActiveStreamEncoderFilterPtr = std::unique_ptr<ActiveStreamEncoderFilter>;
 
   /**
    * Wraps a single active stream on the connection. These are either full request/response pairs
@@ -536,7 +536,7 @@ private:
     Network::Socket::OptionsSharedPtr upstream_options_;
   };
 
-  typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
+  using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
 
   /**
    * Check to see if the connection can be closed after gracefully waiting to send pending codec

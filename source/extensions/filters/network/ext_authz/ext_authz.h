@@ -59,7 +59,7 @@ private:
   bool failure_mode_allow_;
 };
 
-typedef std::shared_ptr<Config> ConfigSharedPtr;
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
  * ExtAuthz filter instance. This filter will call the Authorization service with the given

@@ -82,7 +82,7 @@ private:
 
   // TODO(soya3129): share deflater among all encoders in the same connection. The benefit is less
   // memory, and the caveat is encoding error on one stream can impact other streams.
-  typedef CSmartPtr<nghttp2_hd_deflater, nghttp2_hd_deflate_del> Deflater;
+  using Deflater = CSmartPtr<nghttp2_hd_deflater, nghttp2_hd_deflate_del>;
   Deflater deflater_;
 
   // Stores the remaining payload size of each metadata_map to be packed. The payload size is needed

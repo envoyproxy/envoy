@@ -22,7 +22,7 @@ public:
   const std::string EngineResultDenied{"denied"};
 };
 
-typedef ConstSingleton<DynamicMetadataKeys> DynamicMetadataKeysSingleton;
+using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
 
 /**
  * All stats for the RBAC filter. @see stats_macros.h

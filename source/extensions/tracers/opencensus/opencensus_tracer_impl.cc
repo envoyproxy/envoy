@@ -31,7 +31,7 @@ public:
   const Http::LowerCaseString X_CLOUD_TRACE_CONTEXT{"x-cloud-trace-context"};
 };
 
-typedef ConstSingleton<ConstantValues> Constants;
+using Constants = ConstSingleton<ConstantValues>;
 
 /**
  * OpenCensus tracing implementation of the Envoy Span object.

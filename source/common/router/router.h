@@ -162,7 +162,7 @@ private:
   TimeSource& time_source_;
 };
 
-typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 /**
  * Service routing filter.
@@ -414,7 +414,7 @@ private:
     bool create_per_try_timeout_on_request_complete_ : 1;
   };
 
-  typedef std::unique_ptr<UpstreamRequest> UpstreamRequestPtr;
+  using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
 
   StreamInfo::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 

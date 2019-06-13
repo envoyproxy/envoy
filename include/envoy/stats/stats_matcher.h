@@ -11,7 +11,7 @@ namespace Stats {
 
 class StatsMatcher {
 public:
-  virtual ~StatsMatcher() {}
+  virtual ~StatsMatcher() = default;
 
   /**
    * Take a metric name and report whether or not it should be instantiated.
@@ -41,7 +41,7 @@ public:
   virtual bool rejectsAll() const PURE;
 };
 
-typedef std::unique_ptr<const StatsMatcher> StatsMatcherPtr;
+using StatsMatcherPtr = std::unique_ptr<const StatsMatcher>;
 
 } // namespace Stats
 } // namespace Envoy

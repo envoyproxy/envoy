@@ -42,7 +42,7 @@ private:
 
   CorsStats stats_;
 };
-typedef std::shared_ptr<CorsFilterConfig> CorsFilterConfigSharedPtr;
+using CorsFilterConfigSharedPtr = std::shared_ptr<CorsFilterConfig>;
 
 class CorsFilter : public Http::StreamFilter {
 public:

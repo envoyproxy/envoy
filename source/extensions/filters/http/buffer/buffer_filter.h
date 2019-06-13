@@ -41,7 +41,7 @@ private:
   const BufferFilterSettings settings_;
 };
 
-typedef std::shared_ptr<BufferFilterConfig> BufferFilterConfigSharedPtr;
+using BufferFilterConfigSharedPtr = std::shared_ptr<BufferFilterConfig>;
 
 /**
  * A filter that is capable of buffering an entire request before dispatching it upstream.

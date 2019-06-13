@@ -69,7 +69,7 @@ private:
   TimeSource& time_source_;
 };
 
-typedef std::unique_ptr<LoadStatsReporter> LoadStatsReporterPtr;
+using LoadStatsReporterPtr = std::unique_ptr<LoadStatsReporter>;
 
 } // namespace Upstream
 } // namespace Envoy

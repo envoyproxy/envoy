@@ -101,7 +101,7 @@ private:
     NetworkFilters::Common::Redis::RespValue request_;
   };
 
-  typedef std::unique_ptr<RedisActiveHealthCheckSession> RedisActiveHealthCheckSessionPtr;
+  using RedisActiveHealthCheckSessionPtr = std::unique_ptr<RedisActiveHealthCheckSession>;
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(Upstream::HostSharedPtr host) override {

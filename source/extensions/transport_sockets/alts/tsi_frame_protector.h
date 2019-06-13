@@ -41,7 +41,7 @@ private:
   CFrameProtectorPtr frame_protector_;
 };
 
-typedef std::unique_ptr<TsiFrameProtector> TsiFrameProtectorPtr;
+using TsiFrameProtectorPtr = std::unique_ptr<TsiFrameProtector>;
 
 } // namespace Alts
 } // namespace TransportSockets

@@ -469,9 +469,8 @@ protected:
   Network::MockActiveDnsQuery active_dns_query_;
 };
 
-typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>,
-                   std::list<std::string>>
-    RedisDnsConfigTuple;
+using RedisDnsConfigTuple = std::tuple<std::string, Network::DnsLookupFamily,
+                                       std::list<std::string>, std::list<std::string>>;
 std::vector<RedisDnsConfigTuple> generateRedisDnsParams() {
   std::vector<RedisDnsConfigTuple> dns_config;
   {
