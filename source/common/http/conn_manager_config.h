@@ -214,6 +214,11 @@ public:
   virtual bool generateRequestId() PURE;
 
   /**
+   * @return whether the x-request-id should not be reset on edge entry inside mesh
+   */
+  virtual bool preserveExternalRequestId() const PURE;
+
+  /**
    * @return optional idle timeout for incoming connection manager connections.
    */
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
