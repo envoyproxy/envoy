@@ -30,6 +30,7 @@ class MainActivity : Activity() {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
 
+    // Load an envoy config, and run envoy on a separate thread.
     val envoy = Envoy()
     envoy.load()
     envoy.run(baseContext, loadEnvoyConfig(baseContext, R.raw.config))
@@ -44,6 +45,7 @@ class MainActivity : Activity() {
     thread.start()
     val handler = Handler(thread.looper)
 
+    // Run a request loop until the application exits.
     handler.postDelayed(object : Runnable {
       override fun run() {
         try {
@@ -66,6 +68,7 @@ class MainActivity : Activity() {
 
   private fun makeRequest(): Response {
     val url = URL(ENDPOINT)
+    // Open connection to the envoy thread listening locally on port 9001
     val connection = url.openConnection() as HttpURLConnection
     val status = connection.responseCode
     if (status != 200) {

@@ -14,6 +14,10 @@ build \
   --xcode_version=10.2.1 \
   --incompatible_bzl_disallow_load_after_statement=false
 
+# Manual Stamping is necessary in order to get versioning information in the ios
+# static framework.
+# More information on stamping can be found here:
+# https://github.com/envoyproxy/envoy/tree/master/bazel#enabling-optional-features
 build:ios --define=manual_stamp=manual_stamp
 
 build:android --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
