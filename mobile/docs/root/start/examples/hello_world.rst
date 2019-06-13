@@ -24,6 +24,7 @@ but for these demos, it acts *purely as a proxy*.
 The demo is available below (along with building instructions) in the following languages:
 
 - `Java`_
+- `Kotlin`_
 - `Objective-C`_
 - `Swift`_
 
@@ -39,6 +40,20 @@ Make sure you have an Android simulator running already:
 ``bazel mobile-install //examples/java/hello_world:hello_envoy --fat_apk_cpu=x86``
 
 You should see a new app installed on your simulator called ``Hello Envoy``.
+Open it up, and requests will start flowing!
+
+------
+Kotlin
+------
+
+First, build the :ref:`android_aar` artifact (or download it from one of the recent releases_).
+
+Next, run the :repo:`sample app <examples/kotlin/hello_world>` using the following Bazel build rule.
+Make sure you have an Android simulator running already:
+
+``bazel mobile-install //examples/kotlin/hello_world:hello_envoy_kotlin --fat_apk_cpu=x86``
+
+You should see a new app installed on your simulator called ``Hello Envoy Kotlin``.
 Open it up, and requests will start flowing!
 
 -----------
