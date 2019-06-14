@@ -38,8 +38,7 @@ def envoy_cc_library(
         linkstamp = None,
         tags = [],
         deps = [],
-        strip_include_prefix = None,
-        textual_hdrs = None):
+        strip_include_prefix = None):
     if tcmalloc_dep:
         deps += _tcmalloc_external_deps(repository)
 
@@ -50,7 +49,6 @@ def envoy_cc_library(
         copts = envoy_copts(repository) + copts,
         visibility = visibility,
         tags = tags,
-        textual_hdrs = textual_hdrs,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             repository + "//include/envoy/common:base_includes",
             repository + "//source/common/common:fmt_lib",
