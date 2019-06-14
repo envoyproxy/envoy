@@ -51,6 +51,14 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
       // On the first iteration through the loop, the gauge will not be loaded into the scope
       // cache even though it might exist in another scope. Thus, we need to check again for
       // the import status to see if we should skip this gauge.
+      //
+      // TODO(mattklein123): There is a race condition here. It's technically possible that
+      // between the time we created this stat, the stat might be created by the child as a
+      // never import stat, making the below math invalid. A follow up solution is to take the
+      // store lock starting from gaugeFromStatName() to the end of this function, but this will
+      // require adding some type of mergeGauge() function to the scope and dealing with recursive
+      // lock acquisition, etc. so we will leave this as a follow up. This race should be incredibly
+      // rare.
       continue;
     }
 
