@@ -107,7 +107,7 @@ public:
     uint32_t bits_;
   };
 
-  virtual ~MySQLCodec() {}
+  virtual ~MySQLCodec() = default;
 
   int decode(Buffer::Instance& data, uint8_t seq, uint32_t len) {
     seq_ = seq;

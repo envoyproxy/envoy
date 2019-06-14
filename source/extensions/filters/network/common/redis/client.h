@@ -18,7 +18,7 @@ namespace Client {
  */
 class PoolRequest {
 public:
-  virtual ~PoolRequest() {}
+  virtual ~PoolRequest() = default;
 
   /**
    * Cancel the request. No further request callbacks will be called.
@@ -31,7 +31,7 @@ public:
  */
 class PoolCallbacks {
 public:
-  virtual ~PoolCallbacks() {}
+  virtual ~PoolCallbacks() = default;
 
   /**
    * Called when a pipelined response is received.
@@ -69,7 +69,7 @@ public:
  */
 class Client : public Event::DeferredDeletable {
 public:
-  virtual ~Client() {}
+  ~Client() override = default;
 
   /**
    * Adds network connection callbacks to the underlying network connection.
@@ -91,14 +91,14 @@ public:
   virtual PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) PURE;
 };
 
-typedef std::unique_ptr<Client> ClientPtr;
+using ClientPtr = std::unique_ptr<Client>;
 
 /**
  * Configuration for a redis connection pool.
  */
 class Config {
 public:
-  virtual ~Config() {}
+  virtual ~Config() = default;
 
   /**
    * @return std::chrono::milliseconds the timeout for an individual redis operation. Currently,
@@ -141,7 +141,7 @@ public:
  */
 class ClientFactory {
 public:
-  virtual ~ClientFactory() {}
+  virtual ~ClientFactory() = default;
 
   /**
    * Create a client given an upstream host.

@@ -27,7 +27,7 @@ struct ControlPlaneStats {
 // TODO(fredlas) redundant to SubscriptionCallbacks; remove this one.
 class GrpcMuxCallbacks {
 public:
-  virtual ~GrpcMuxCallbacks() {}
+  virtual ~GrpcMuxCallbacks() = default;
 
   /**
    * Called when a configuration update is received.
@@ -59,10 +59,10 @@ public:
  */
 class GrpcMuxWatch {
 public:
-  virtual ~GrpcMuxWatch() {}
+  virtual ~GrpcMuxWatch() = default;
 };
 
-typedef std::unique_ptr<GrpcMuxWatch> GrpcMuxWatchPtr;
+using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;
 
 /**
  * Manage one or more gRPC subscriptions on a single stream to management server. This can be used
@@ -70,7 +70,7 @@ typedef std::unique_ptr<GrpcMuxWatch> GrpcMuxWatchPtr;
  */
 class GrpcMux {
 public:
-  virtual ~GrpcMux() {}
+  virtual ~GrpcMux() = default;
 
   /**
    * Initiate stream with management server.
@@ -104,13 +104,20 @@ public:
   /**
    * Resume discovery requests for a given API type. This will send a discovery request if one would
    * have been sent during the pause.
-   * @param type_url type URL corresponding to xDS API,
-   * e.g.type.googleapis.com/envoy.api.v2.Cluster.
+   * @param type_url type URL corresponding to xDS API e.g. type.googleapis.com/envoy.api.v2.Cluster
    */
   virtual void resume(const std::string& type_url) PURE;
+
+  /**
+   * Retrieves the current pause state as set by pause()/resume().
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.api.v2.Cluster
+   * @return bool whether the API is paused.
+   */
+  virtual bool paused(const std::string& type_url) const PURE;
 };
 
-typedef std::unique_ptr<GrpcMux> GrpcMuxPtr;
+using GrpcMuxPtr = std::unique_ptr<GrpcMux>;
 
 } // namespace Config
 } // namespace Envoy

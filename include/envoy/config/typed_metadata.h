@@ -17,10 +17,10 @@ class TypedMetadata {
 public:
   class Object {
   public:
-    virtual ~Object() {}
+    virtual ~Object() = default;
   };
 
-  virtual ~TypedMetadata() {}
+  virtual ~TypedMetadata() = default;
 
   /**
    * @return a T instance by key. If the conversion is not able to complete, or
@@ -52,7 +52,7 @@ protected:
  */
 class TypedMetadataFactory {
 public:
-  virtual ~TypedMetadataFactory() {}
+  virtual ~TypedMetadataFactory() = default;
 
   /**
    * Name of the factory, a reversed DNS name is encouraged to avoid cross-org conflict.

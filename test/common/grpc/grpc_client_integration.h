@@ -16,7 +16,7 @@ enum class SotwOrDelta { Sotw, Delta };
 
 class BaseGrpcClientIntegrationParamTest {
 public:
-  virtual ~BaseGrpcClientIntegrationParamTest(){};
+  virtual ~BaseGrpcClientIntegrationParamTest() = default;
   virtual Network::Address::IpVersion ipVersion() const PURE;
   virtual ClientType clientType() const PURE;
 

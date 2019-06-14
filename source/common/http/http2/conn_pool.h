@@ -74,7 +74,7 @@ protected:
     bool closed_with_active_rq_{};
   };
 
-  typedef std::unique_ptr<ActiveClient> ActiveClientPtr;
+  using ActiveClientPtr = std::unique_ptr<ActiveClient>;
 
   // Http::ConnPoolImplBase
   void checkForDrained() override;

@@ -116,6 +116,10 @@ do
     --max-obj-name-len 500 2>&1)
   check [ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]
 
+  # Verify we can see server.live in the admin port.
+  SERVER_LIVE_0=$(curl -sg http://${ADMIN_ADDRESS_0}/stats | grep server.live)
+  check [ "$SERVER_LIVE_0" = "server.live: 1" ];
+
   enableHeapCheck
 
   start_test Starting epoch 1
@@ -128,6 +132,10 @@ do
 
   # Wait for stat flushing
   sleep 7
+
+  ADMIN_ADDRESS_1=$(cat "${ADMIN_ADDRESS_PATH_1}")
+  SERVER_LIVE_1=$(curl -sg http://${ADMIN_ADDRESS_1}/stats | grep server.live)
+  check [ "$SERVER_LIVE_1" = "server.live: 2" ];
 
   start_test Checking that listener addresses have not changed
   HOT_RESTART_JSON_1="${TEST_TMPDIR}"/hot_restart.1."${TEST_INDEX}".yaml

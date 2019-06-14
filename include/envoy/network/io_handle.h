@@ -18,7 +18,7 @@ class Instance;
  */
 class IoHandle {
 public:
-  virtual ~IoHandle() {}
+  virtual ~IoHandle() = default;
 
   /**
    * Return data associated with IoHandle.
@@ -79,7 +79,7 @@ public:
                                           int flags, const Address::Instance& address) PURE;
 };
 
-typedef std::unique_ptr<IoHandle> IoHandlePtr;
+using IoHandlePtr = std::unique_ptr<IoHandle>;
 
 } // namespace Network
 } // namespace Envoy

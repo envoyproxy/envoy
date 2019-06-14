@@ -237,9 +237,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/1145dd77ffb7a2845c71c8e6ca188ef55e4ff607.tar.gz"],
     ),
     com_github_curl = dict(
-        sha256 = "d483b89062832e211c887d7cf1b65c902d591b48c11fe7d174af781681580b41",
-        strip_prefix = "curl-7.63.0",
-        urls = ["https://github.com/curl/curl/releases/download/curl-7_63_0/curl-7.63.0.tar.gz"],
+        sha256 = "821aeb78421375f70e55381c9ad2474bf279fc454b791b7e95fc83562951c690",
+        strip_prefix = "curl-7.65.1",
+        urls = ["https://github.com/curl/curl/releases/download/curl-7_65_1/curl-7.65.1.tar.gz"],
     ),
     com_googlesource_quiche = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/7bf7c3c358eb954e463bde14ea27444f4bd8ea05.tar.gz

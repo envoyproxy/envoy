@@ -10,7 +10,7 @@ namespace Ssl {
 
 class TlsCertificateConfig {
 public:
-  virtual ~TlsCertificateConfig() {}
+  virtual ~TlsCertificateConfig() = default;
 
   /**
    * @return a string of certificate chain.
@@ -46,7 +46,7 @@ public:
   virtual const std::string& passwordPath() const PURE;
 };
 
-typedef std::unique_ptr<TlsCertificateConfig> TlsCertificateConfigPtr;
+using TlsCertificateConfigPtr = std::unique_ptr<TlsCertificateConfig>;
 
 } // namespace Ssl
 } // namespace Envoy

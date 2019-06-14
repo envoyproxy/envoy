@@ -109,7 +109,7 @@ struct TracingConnectionManagerConfig {
   bool verbose_;
 };
 
-typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManagerConfigPtr;
+using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManagerConfig>;
 
 /**
  * Connection manager per listener stats. @see stats_macros.h
@@ -144,14 +144,14 @@ enum class ForwardClientCertType {
  * Configuration for the fields of the client cert, used for populating the current client cert
  * information to the next hop.
  */
-enum class ClientCertDetailsType { Cert, Subject, URI, DNS };
+enum class ClientCertDetailsType { Cert, Chain, Subject, URI, DNS };
 
 /**
  * Configuration for what addresses should be considered internal beyond the defaults.
  */
 class InternalAddressConfig {
 public:
-  virtual ~InternalAddressConfig() {}
+  virtual ~InternalAddressConfig() = default;
   virtual bool isInternalAddress(const Network::Address::Instance& address) const PURE;
 };
 
@@ -170,7 +170,7 @@ public:
  */
 class ConnectionManagerConfig {
 public:
-  virtual ~ConnectionManagerConfig() {}
+  virtual ~ConnectionManagerConfig() = default;
 
   /**
    *  @return const std::list<AccessLog::InstanceSharedPtr>& the access logs to write to.
@@ -212,6 +212,11 @@ public:
    *         not have one.
    */
   virtual bool generateRequestId() PURE;
+
+  /**
+   * @return whether the x-request-id should not be reset on edge entry inside mesh
+   */
+  virtual bool preserveExternalRequestId() const PURE;
 
   /**
    * @return optional idle timeout for incoming connection manager connections.

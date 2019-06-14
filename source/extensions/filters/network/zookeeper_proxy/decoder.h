@@ -70,7 +70,7 @@ const char* createFlagsToString(CreateFlags flags);
  */
 class DecoderCallbacks {
 public:
-  virtual ~DecoderCallbacks() {}
+  virtual ~DecoderCallbacks() = default;
 
   virtual void onDecodeError() PURE;
   virtual void onRequestBytes(uint64_t bytes) PURE;
@@ -102,12 +102,12 @@ public:
  */
 class Decoder {
 public:
-  virtual ~Decoder() {}
+  virtual ~Decoder() = default;
 
   virtual void onData(Buffer::Instance& data) PURE;
 };
 
-typedef std::unique_ptr<Decoder> DecoderPtr;
+using DecoderPtr = std::unique_ptr<Decoder>;
 
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
 public:

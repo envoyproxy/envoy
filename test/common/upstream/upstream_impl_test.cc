@@ -108,8 +108,8 @@ struct ResolverData {
   Network::MockActiveDnsQuery active_dns_query_;
 };
 
-typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>
-    StrictDnsConfigTuple;
+using StrictDnsConfigTuple =
+    std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>;
 std::vector<StrictDnsConfigTuple> generateStrictDnsParams() {
   std::vector<StrictDnsConfigTuple> dns_config;
   {

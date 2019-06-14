@@ -179,8 +179,8 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
-    name = "subscription_factory_test",
-    srcs = ["subscription_factory_test.cc"],
+    name = "subscription_factory_impl_test",
+    srcs = ["subscription_factory_impl_test.cc"],
     deps = [
         "//source/common/config:subscription_factory_lib",
         "//test/mocks/config:config_mocks",

@@ -31,7 +31,7 @@ config:
           - any: true
 )EOF";
 
-typedef HttpProtocolIntegrationTest RBACIntegrationTest;
+using RBACIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, RBACIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),

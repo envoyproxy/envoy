@@ -36,7 +36,7 @@ struct RcDetailsValues {
   // The health check filter failed given the cluster health was not sufficient.
   const std::string HealthCheckClusterUnhealthy = "health_check_failed_cluster_unhealthy";
 };
-typedef ConstSingleton<RcDetailsValues> RcDetails;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 HealthCheckCacheManager::HealthCheckCacheManager(Event::Dispatcher& dispatcher,
                                                  std::chrono::milliseconds timeout)

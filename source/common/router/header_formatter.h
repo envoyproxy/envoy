@@ -16,7 +16,7 @@ namespace Router {
  */
 class HeaderFormatter {
 public:
-  virtual ~HeaderFormatter() {}
+  virtual ~HeaderFormatter() = default;
 
   virtual const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const PURE;
 
@@ -27,7 +27,7 @@ public:
   virtual bool append() const PURE;
 };
 
-typedef std::unique_ptr<HeaderFormatter> HeaderFormatterPtr;
+using HeaderFormatterPtr = std::unique_ptr<HeaderFormatter>;
 
 /**
  * A formatter that expands the request header variable to a value based on info in StreamInfo.

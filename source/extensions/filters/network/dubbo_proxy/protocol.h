@@ -34,7 +34,7 @@ public:
     template <typename T> std::size_t operator()(T t) const { return static_cast<std::size_t>(t); }
   };
 
-  typedef std::unordered_map<ProtocolType, std::string, ProtocolTypeHash> ProtocolTypeNameMap;
+  using ProtocolTypeNameMap = std::unordered_map<ProtocolType, std::string, ProtocolTypeHash>;
 
   const ProtocolTypeNameMap protocolTypeNameMap = {
       {ProtocolType::Dubbo, "dubbo"},
@@ -50,7 +50,7 @@ public:
   }
 };
 
-typedef ConstSingleton<ProtocolNameValues> ProtocolNames;
+using ProtocolNames = ConstSingleton<ProtocolNameValues>;
 
 /**
  * ProtocolCallbacks are Dubbo protocol-level callbacks.
@@ -107,7 +107,7 @@ public:
                       const MessageMetadata& metadata) PURE;
 };
 
-typedef std::unique_ptr<Protocol> ProtocolPtr;
+using ProtocolPtr = std::unique_ptr<Protocol>;
 
 /**
  * Implemented by each Dubbo protocol and registered via Registry::registerFactory or the
