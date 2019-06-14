@@ -76,6 +76,7 @@ Version history
   that allows ignoring new hosts for the purpose of load balancing calculations until they have
   been health checked for the first time.
 * upstream: added runtime error checking to prevent setting dns type to STRICT_DNS or LOGICAL_DNS when custom resolver name is specified.
+* upstream: added possibility to override fallback_policy per specific selector in :ref:`subset load balancer <arch_overview_load_balancer_subsets>`.
 * upstream: the :ref:`logical DNS cluster <arch_overview_service_discovery_types_logical_dns>` now
   displays the current resolved IP address in admin output instead of 0.0.0.0.
 

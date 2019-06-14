@@ -315,7 +315,7 @@ void TestEnvironment::setEnvVar(const std::string& name, const std::string& valu
   if (!overwrite) {
     size_t requiredSize;
     const int rc = ::getenv_s(&requiredSize, nullptr, 0, name.c_str());
-    ASSERT_EQ(rc, 0);
+    ASSERT_EQ(0, rc);
     if (requiredSize != 0) {
       return;
     }
@@ -324,7 +324,17 @@ void TestEnvironment::setEnvVar(const std::string& name, const std::string& valu
   ASSERT_EQ(0, rc);
 #else
   const int rc = ::setenv(name.c_str(), value.c_str(), overwrite);
-  ASSERT_EQ(rc, 0);
+  ASSERT_EQ(0, rc);
+#endif
+}
+
+void TestEnvironment::unsetEnvVar(const std::string& name) {
+#ifdef WIN32
+  const int rc = ::_putenv_s(name.c_str(), "");
+  ASSERT_EQ(0, rc);
+#else
+  const int rc = ::unsetenv(name.c_str());
+  ASSERT_EQ(0, rc);
 #endif
 }
 
