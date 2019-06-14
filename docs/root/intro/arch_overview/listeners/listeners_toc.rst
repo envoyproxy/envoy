@@ -7,3 +7,4 @@ Listeners
   listeners
   listener_filters
   network_filters
+  tcp_proxy
