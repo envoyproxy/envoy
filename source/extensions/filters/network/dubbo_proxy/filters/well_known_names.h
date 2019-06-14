@@ -20,7 +20,7 @@ public:
   const std::string ROUTER = "envoy.filters.dubbo.router";
 };
 
-typedef ConstSingleton<DubboFilterNameValues> DubboFilterNames;
+using DubboFilterNames = ConstSingleton<DubboFilterNameValues>;
 
 } // namespace DubboFilters
 } // namespace DubboProxy

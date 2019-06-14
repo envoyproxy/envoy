@@ -227,7 +227,7 @@ protected:
     bool reset_due_to_messaging_error_ : 1;
   };
 
-  typedef std::unique_ptr<StreamImpl> StreamImplPtr;
+  using StreamImplPtr = std::unique_ptr<StreamImpl>;
 
   /**
    * Client side stream (request).

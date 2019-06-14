@@ -27,7 +27,7 @@ namespace ThriftProxy {
 
 class ThriftObjectImplTestBase {
 public:
-  virtual ~ThriftObjectImplTestBase() {}
+  virtual ~ThriftObjectImplTestBase() = default;
 
   Expectation expectValue(FieldType field_type) {
     switch (field_type) {

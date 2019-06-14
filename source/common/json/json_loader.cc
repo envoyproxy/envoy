@@ -34,7 +34,7 @@ namespace {
  * Internal representation of Object.
  */
 class Field;
-typedef std::shared_ptr<Field> FieldSharedPtr;
+using FieldSharedPtr = std::shared_ptr<Field>;
 
 class Field : public Object {
 public:

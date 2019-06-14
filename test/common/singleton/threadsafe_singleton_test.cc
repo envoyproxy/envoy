@@ -14,7 +14,7 @@ namespace Envoy {
 
 class TestSingleton {
 public:
-  virtual ~TestSingleton() {}
+  virtual ~TestSingleton() = default;
 
   virtual void addOne() {
     Thread::LockGuard lock(lock_);

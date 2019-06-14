@@ -13,6 +13,7 @@
 #include "envoy/admin/v2alpha/certs.pb.h"
 #include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/admin/v2alpha/listeners.pb.h"
 #include "envoy/admin/v2alpha/memory.pb.h"
 #include "envoy/admin/v2alpha/mutex_stats.pb.h"
 #include "envoy/admin/v2alpha/server_info.pb.h"
@@ -153,6 +154,19 @@ void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_ma
 
   // Under no circumstance should browsers sniff content-type.
   header_map.addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
+}
+
+// Helper method to get filter parameter
+absl::optional<std::regex> filterParam(Http::Utility::QueryParams params) {
+  return (params.find("filter") != params.end())
+             ? absl::optional<std::regex>{std::regex(params.at("filter"))}
+             : absl::nullopt;
+}
+
+// Helper method to get the format parameter
+absl::optional<std::string> formatParam(Http::Utility::QueryParams params) {
+  return (params.find("format") != params.end()) ? absl::optional<std::string>{params.at("format")}
+                                                 : absl::nullopt;
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the
@@ -445,12 +459,30 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
   }
 }
 
+void AdminImpl::writeListenersAsJson(Buffer::Instance& response) {
+  envoy::admin::v2alpha::Listeners listeners;
+  for (const auto& listener : server_.listenerManager().listeners()) {
+    envoy::admin::v2alpha::ListenerStatus& listener_status = *listeners.add_listener_statuses();
+    listener_status.set_name(listener.get().name());
+    Network::Utility::addressToProtobufAddress(*listener.get().socket().localAddress(),
+                                               *listener_status.mutable_local_address());
+  }
+  response.add(MessageUtil::getJsonStringFromMessage(listeners, true)); // pretty-print
+}
+
+void AdminImpl::writeListenersAsText(Buffer::Instance& response) {
+  for (const auto& listener : server_.listenerManager().listeners()) {
+    response.add(fmt::format("{}::{}\n", listener.get().name(),
+                             listener.get().socket().localAddress()->asString()));
+  }
+}
+
 Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  auto it = query_params.find("format");
+  const auto format_value = formatParam(query_params);
 
-  if (it != query_params.end() && it->second == "json") {
+  if (format_value.has_value() && format_value.value() == "json") {
     writeClustersAsJson(response);
     response_headers.insertContentType().value().setReference(
         Http::Headers::get().ContentTypeValues.Json);
@@ -695,11 +727,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
 
   const bool used_only = params.find("usedonly") != params.end();
-  const bool has_format = !(params.find("format") == params.end());
-  const absl::optional<std::regex> regex =
-      (params.find("filter") != params.end())
-          ? absl::optional<std::regex>{std::regex(params.at("filter"))}
-          : absl::nullopt;
+  const absl::optional<std::regex> regex = filterParam(params);
 
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
@@ -715,14 +743,13 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     }
   }
 
-  if (has_format) {
-    const std::string format_value = params.at("format");
-    if (format_value == "json") {
+  if (const auto format_value = formatParam(params)) {
+    if (format_value.value() == "json") {
       response_headers.insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Json);
       response.add(
           AdminImpl::statsAsJson(all_stats, server_.stats().histograms(), used_only, regex));
-    } else if (format_value == "prometheus") {
+    } else if (format_value.value() == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response, admin_stream);
     } else {
       response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
@@ -753,8 +780,10 @@ Http::Code AdminImpl::handlerPrometheusStats(absl::string_view path_and_query, H
                                              Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();
+  const absl::optional<std::regex> regex = filterParam(params);
   PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
-                                              server_.stats().histograms(), response, used_only);
+                                              server_.stats().histograms(), response, used_only,
+                                              regex);
   return Http::Code::OK;
 }
 
@@ -788,10 +817,10 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::CounterSharedPtr>& counters,
     const std::vector<Stats::GaugeSharedPtr>& gauges,
     const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
-    const bool used_only) {
+    const bool used_only, const absl::optional<std::regex>& regex) {
   std::unordered_set<std::string> metric_type_tracker;
   for (const auto& counter : counters) {
-    if (!shouldShowMetric(counter, used_only)) {
+    if (!shouldShowMetric(counter, used_only, regex)) {
       continue;
     }
 
@@ -805,7 +834,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   }
 
   for (const auto& gauge : gauges) {
-    if (!shouldShowMetric(gauge, used_only)) {
+    if (!shouldShowMetric(gauge, used_only, regex)) {
       continue;
     }
 
@@ -819,7 +848,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   }
 
   for (const auto& histogram : histograms) {
-    if (!shouldShowMetric(histogram, used_only)) {
+    if (!shouldShowMetric(histogram, used_only, regex)) {
       continue;
     }
 
@@ -953,15 +982,18 @@ Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerListenerInfo(absl::string_view, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerListenerInfo(absl::string_view url, Http::HeaderMap& response_headers,
                                           Buffer::Instance& response, AdminStream&) {
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Json);
-  std::list<std::string> listeners;
-  for (auto listener : server_.listenerManager().listeners()) {
-    listeners.push_back(listener.get().socket().localAddress()->asString());
+  const Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  const auto format_value = formatParam(query_params);
+
+  if (format_value.has_value() && format_value.value() == "json") {
+    writeListenersAsJson(response);
+    response_headers.insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.Json);
+  } else {
+    writeListenersAsText(response);
   }
-  response.add(Json::Factory::listAsJsonString(listeners));
   return Http::Code::OK;
 }
 
@@ -1201,7 +1233,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
           {"/stats/prometheus", "print server stats in prometheus format",
            MAKE_ADMIN_HANDLER(handlerPrometheusStats), false, false},
-          {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
+          {"/listeners", "print listener info", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),

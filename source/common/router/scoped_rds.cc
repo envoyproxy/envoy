@@ -7,7 +7,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
-#include "common/config/subscription_factory.h"
 
 // Types are deeply nested under Envoy::Config::ConfigProvider; use 'using-directives' across all
 // ConfigProvider related types for consistency.
@@ -85,13 +84,12 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
       validation_visitor_(factory_context.messageValidationVisitor()) {
-  subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
-      scoped_rds.scoped_rds_config_source(), factory_context.localInfo(),
-      factory_context.dispatcher(), factory_context.clusterManager(), factory_context.random(),
-      *scope_,
-      Grpc::Common::typeUrl(
-          envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
-      validation_visitor_, factory_context.api(), *this);
+  subscription_ =
+      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+          scoped_rds.scoped_rds_config_source(),
+          Grpc::Common::typeUrl(
+              envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
+          *scope_, *this);
 }
 
 void ScopedRdsConfigSubscription::onConfigUpdate(

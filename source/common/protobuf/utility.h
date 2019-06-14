@@ -185,7 +185,7 @@ public:
     const std::string Yaml = ".yaml";
   };
 
-  typedef ConstSingleton<FileExtensionValues> FileExtensions;
+  using FileExtensions = ConstSingleton<FileExtensionValues>;
 
   static std::size_t hash(const Protobuf::Message& message) {
     // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same

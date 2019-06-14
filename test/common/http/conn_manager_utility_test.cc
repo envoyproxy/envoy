@@ -36,7 +36,10 @@ public:
 
 class MockConnectionManagerConfig : public ConnectionManagerConfig {
 public:
-  MockConnectionManagerConfig() { ON_CALL(*this, generateRequestId()).WillByDefault(Return(true)); }
+  MockConnectionManagerConfig() {
+    ON_CALL(*this, generateRequestId()).WillByDefault(Return(true));
+    ON_CALL(*this, preserveExternalRequestId()).WillByDefault(Return(false));
+  }
 
   // Http::ConnectionManagerConfig
   ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance& instance,
@@ -51,6 +54,7 @@ public:
   MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
   MOCK_METHOD0(generateRequestId, bool());
+  MOCK_CONST_METHOD0(preserveExternalRequestId, bool());
   MOCK_CONST_METHOD0(maxRequestHeadersKb, uint32_t());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
@@ -1220,5 +1224,87 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
 }
 
+// test preserve_external_request_id true does not reset the passed requestId if passed
+TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestId) {
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-request-id", "my-request-id"}, {"x-forwarded-for", "198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_CALL(random_, uuid()).Times(0);
+  EXPECT_EQ("my-request-id", headers.get_("x-request-id"));
+}
+
+// test preserve_external_request_id true but generates new request id when not passed
+TEST_F(ConnectionManagerUtilityTest, PreseverExternalRequestIdNoReqId) {
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+}
+
+// test preserve_external_request_id true and no edge_request passing requestId should keep the
+// requestID
+TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestKeepRequestId) {
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-request-id", "myReqId"}};
+  EXPECT_EQ("myReqId", headers.get_(Headers::get().RequestId));
+}
+
+// test preserve_external_request_id true and no edge_request not passing requestId should generate
+// new request id
+TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestGenerateNewRequestId) {
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers;
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+}
+
+// test preserve_external_request_id false edge request generates new request id
+TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdEdgeRequestGenerateRequestId) {
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(false));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  // with request id
+  {
+
+    ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+    TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"},
+                              {"x-request-id", "my-request-id"}};
+    EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+  }
+
+  // with no request id
+  {
+    TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
+    EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+  }
+}
+
+// test preserve_external_request_id false not edge request
+TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdNoEdgeRequest) {
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(false));
+
+  // with no request id
+  {
+    TestHeaderMapImpl headers;
+    callMutateRequestHeaders(headers, Protocol::Http2);
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+  }
+
+  // with request id
+  {
+    TestHeaderMapImpl headers{{"x-request-id", "my-request-id"}};
+    callMutateRequestHeaders(headers, Protocol::Http2);
+    EXPECT_EQ("my-request-id", headers.get_(Headers::get().RequestId));
+  }
+}
 } // namespace Http
 } // namespace Envoy

@@ -20,7 +20,7 @@ public:
   const std::string InjectedResource = "envoy.resource_monitors.injected_resource";
 };
 
-typedef ConstSingleton<ResourceMonitorNameValues> ResourceMonitorNames;
+using ResourceMonitorNames = ConstSingleton<ResourceMonitorNameValues>;
 
 } // namespace ResourceMonitors
 } // namespace Extensions

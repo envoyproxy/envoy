@@ -67,7 +67,7 @@ public:
                        ExtAuthorization}) {}
 };
 
-typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;
+using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;
 
 } // namespace HttpFilters
 } // namespace Extensions
