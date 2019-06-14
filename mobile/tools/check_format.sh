@@ -12,8 +12,6 @@ fi
 
 # TODO(mattklein123): WORKSPACE is excluded due to warning about @bazel_tools reference. Fix here
 #                     or in the upstream checker.
-# TODO(mattklein123): Add support upstream for whitelisting paths that don't need to have
-#                     NOLINT(namespace-envoy), such as Objective-C.
 # TODO(mattklein123): We don't need envoy_package() in various files. Somehow fix in upstream
 #                     checker.
 envoy/tools/check_format.py \
