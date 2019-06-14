@@ -18,14 +18,14 @@ namespace Common {
 namespace RBAC {
 
 class Matcher;
-typedef std::shared_ptr<const Matcher> MatcherConstSharedPtr;
+using MatcherConstSharedPtr = std::shared_ptr<const Matcher>;
 
 /**
  *  Matchers describe the rules for matching either a permission action or principal.
  */
 class Matcher {
 public:
-  virtual ~Matcher() {}
+  virtual ~Matcher() = default;
 
   /**
    * Returns whether or not the permission/principal matches the rules of the matcher.

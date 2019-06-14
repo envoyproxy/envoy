@@ -31,6 +31,7 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -68,7 +69,7 @@ public:
 
   void setupValidDriver(Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
                             Common::Ot::OpenTracingDriver::PropagationMode::TracerNative) {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
@@ -89,7 +90,7 @@ public:
   StreamInfo::MockStreamInfo stream_info_;
 
   Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
-  Grpc::Common grpc_context_;
+  Grpc::ContextImpl grpc_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::IsolatedStoreImpl stats_;
   std::unique_ptr<LightStepDriver> driver_;
@@ -120,7 +121,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 
   {
     // Valid config but not valid cluster.
-    EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
 
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
@@ -133,7 +134,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 
   {
     // Valid config, but upstream cluster does not support http2.
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
 
     const std::string yaml_string = R"EOF(
@@ -146,7 +147,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
   }
 
   {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 

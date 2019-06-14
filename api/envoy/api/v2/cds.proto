@@ -367,6 +367,24 @@ message Cluster {
     message LbSubsetSelector {
       // List of keys to match with the weighted cluster metadata.
       repeated string keys = 1;
+      // The behavior used when no endpoint subset matches the selected route's
+      // metadata.
+      LbSubsetSelectorFallbackPolicy fallback_policy = 2
+          [(validate.rules).enum.defined_only = true];
+
+      // Allows to override top level fallback policy per selector.
+      enum LbSubsetSelectorFallbackPolicy {
+        // If NOT_DEFINED top level config fallback policy is used instead.
+        NOT_DEFINED = 0;
+        // If NO_FALLBACK is selected, a result equivalent to no healthy hosts is reported.
+        NO_FALLBACK = 1;
+        // If ANY_ENDPOINT is selected, any cluster endpoint may be returned
+        // (subject to policy, health checks, etc).
+        ANY_ENDPOINT = 2;
+        // If DEFAULT_SUBSET is selected, load balancing is performed over the
+        // endpoints matching the values from the default_subset field.
+        DEFAULT_SUBSET = 3;
+      }
     }
 
     // For each entry, LbEndpoint.Metadata's

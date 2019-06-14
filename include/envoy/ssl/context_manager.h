@@ -14,7 +14,7 @@ namespace Ssl {
  */
 class ContextManager {
 public:
-  virtual ~ContextManager() {}
+  virtual ~ContextManager() = default;
 
   /**
    * Builds a ClientContext from a ClientContextConfig.

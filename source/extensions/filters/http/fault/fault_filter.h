@@ -101,7 +101,7 @@ private:
   TimeSource& time_source_;
 };
 
-typedef std::shared_ptr<FaultFilterConfig> FaultFilterConfigSharedPtr;
+using FaultFilterConfigSharedPtr = std::shared_ptr<FaultFilterConfig>;
 
 /**
  * An HTTP stream rate limiter. Split out for ease of testing and potential code reuse elsewhere.

@@ -40,3 +40,12 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "region_provider_impl_test",
+    srcs = ["region_provider_impl_test.cc"],
+    deps = [
+        "//source/extensions/filters/http/common/aws:region_provider_impl_lib",
+        "//test/test_common:environment_lib",
+    ],
+)

@@ -36,7 +36,10 @@ public:
 
 class MockConnectionManagerConfig : public ConnectionManagerConfig {
 public:
-  MockConnectionManagerConfig() { ON_CALL(*this, generateRequestId()).WillByDefault(Return(true)); }
+  MockConnectionManagerConfig() {
+    ON_CALL(*this, generateRequestId()).WillByDefault(Return(true));
+    ON_CALL(*this, preserveExternalRequestId()).WillByDefault(Return(false));
+  }
 
   // Http::ConnectionManagerConfig
   ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance& instance,
@@ -51,6 +54,7 @@ public:
   MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
   MOCK_METHOD0(generateRequestId, bool());
+  MOCK_CONST_METHOD0(preserveExternalRequestId, bool());
   MOCK_CONST_METHOD0(maxRequestHeadersKb, uint32_t());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
@@ -769,6 +773,9 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("%3D%3Dabc%0Ade%3D");
   EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
+  std::string expected_chain_pem(expected_pem + "%3D%3Dlmn%0Aop%3D");
+  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificateChain())
+      .WillOnce(ReturnRef(expected_chain_pem));
   std::vector<std::string> expected_dns = {"www.example.com"};
   EXPECT_CALL(ssl, dnsSansPeerCertificate()).WillOnce(Return(expected_dns));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
@@ -777,6 +784,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
   std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
   details.push_back(Http::ClientCertDetailsType::URI);
   details.push_back(Http::ClientCertDetailsType::Cert);
+  details.push_back(Http::ClientCertDetailsType::Chain);
   details.push_back(Http::ClientCertDetailsType::DNS);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
   TestHeaderMapImpl headers;
@@ -788,6 +796,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
             "Hash=abcdefg;"
             "URI=test://foo.com/fe;"
             "Cert=\"%3D%3Dabc%0Ade%3D\";"
+            "Chain=\"%3D%3Dabc%0Ade%3D%3D%3Dlmn%0Aop%3D\";"
             "DNS=www.example.com",
             headers.get_("x-forwarded-client-cert"));
 }
@@ -807,6 +816,9 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("%3D%3Dabc%0Ade%3D");
   EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
+  std::string expected_chain_pem(expected_pem + "%3D%3Dlmn%0Aop%3D");
+  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificateChain())
+      .WillOnce(ReturnRef(expected_chain_pem));
   std::vector<std::string> expected_dns = {"www.example.com"};
   EXPECT_CALL(ssl, dnsSansPeerCertificate()).WillOnce(Return(expected_dns));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
@@ -815,6 +827,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
   details.push_back(Http::ClientCertDetailsType::URI);
   details.push_back(Http::ClientCertDetailsType::Cert);
+  details.push_back(Http::ClientCertDetailsType::Chain);
   details.push_back(Http::ClientCertDetailsType::DNS);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
   TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test://foo.com/fe;"
@@ -824,10 +837,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
-  EXPECT_EQ("By=test://foo.com/fe;URI=test://bar.com/be;DNS=test.com;DNS=test.com,"
-            "By=test://foo.com/be;Hash=abcdefg;URI=test://foo.com/fe;"
-            "Cert=\"%3D%3Dabc%0Ade%3D\";DNS=www.example.com",
-            headers.get_("x-forwarded-client-cert"));
+  EXPECT_EQ(
+      "By=test://foo.com/fe;URI=test://bar.com/be;DNS=test.com;DNS=test.com,"
+      "By=test://foo.com/be;Hash=abcdefg;URI=test://foo.com/fe;"
+      "Cert=\"%3D%3Dabc%0Ade%3D\";Chain=\"%3D%3Dabc%0Ade%3D%3D%3Dlmn%0Aop%3D\";DNS=www.example.com",
+      headers.get_("x-forwarded-client-cert"));
 }
 
 // This test assumes the following scenario:
@@ -876,6 +890,9 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("abcde=");
   EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
+  std::string expected_chain_pem(expected_pem + "lmnop=");
+  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificateChain())
+      .WillOnce(ReturnRef(expected_chain_pem));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
@@ -883,6 +900,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   details.push_back(Http::ClientCertDetailsType::Subject);
   details.push_back(Http::ClientCertDetailsType::URI);
   details.push_back(Http::ClientCertDetailsType::Cert);
+  details.push_back(Http::ClientCertDetailsType::Chain);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;URI=test://bar.com/be"}};
@@ -892,7 +910,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/be;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
             "Francisco/OU=Lyft/CN=test.lyft.com\";URI=test://foo.com/"
-            "fe;Cert=\"abcde=\"",
+            "fe;Cert=\"abcde=\";Chain=\"abcde=lmnop=\"",
             headers.get_("x-forwarded-client-cert"));
 }
 
@@ -1206,5 +1224,87 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
 }
 
+// test preserve_external_request_id true does not reset the passed requestId if passed
+TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestId) {
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-request-id", "my-request-id"}, {"x-forwarded-for", "198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_CALL(random_, uuid()).Times(0);
+  EXPECT_EQ("my-request-id", headers.get_("x-request-id"));
+}
+
+// test preserve_external_request_id true but generates new request id when not passed
+TEST_F(ConnectionManagerUtilityTest, PreseverExternalRequestIdNoReqId) {
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+}
+
+// test preserve_external_request_id true and no edge_request passing requestId should keep the
+// requestID
+TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestKeepRequestId) {
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-request-id", "myReqId"}};
+  EXPECT_EQ("myReqId", headers.get_(Headers::get().RequestId));
+}
+
+// test preserve_external_request_id true and no edge_request not passing requestId should generate
+// new request id
+TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestGenerateNewRequestId) {
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers;
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+}
+
+// test preserve_external_request_id false edge request generates new request id
+TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdEdgeRequestGenerateRequestId) {
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(false));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  // with request id
+  {
+
+    ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+    TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"},
+                              {"x-request-id", "my-request-id"}};
+    EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+  }
+
+  // with no request id
+  {
+    TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
+    EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+  }
+}
+
+// test preserve_external_request_id false not edge request
+TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdNoEdgeRequest) {
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(false));
+
+  // with no request id
+  {
+    TestHeaderMapImpl headers;
+    callMutateRequestHeaders(headers, Protocol::Http2);
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+  }
+
+  // with request id
+  {
+    TestHeaderMapImpl headers{{"x-request-id", "my-request-id"}};
+    callMutateRequestHeaders(headers, Protocol::Http2);
+    EXPECT_EQ("my-request-id", headers.get_(Headers::get().RequestId));
+  }
+}
 } // namespace Http
 } // namespace Envoy
