@@ -87,11 +87,7 @@ if [[ $# -gt 1 ]]; then
   shift
   TEST_TARGETS=$*
 else
-  if [[ "$CI_TARGET" == "bazel.coverage" ]]; then
-    TEST_TARGETS=//test/coverage:coverage_tests
-  else
-    TEST_TARGETS=//test/...
-  fi
+  TEST_TARGETS=//test/...
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then

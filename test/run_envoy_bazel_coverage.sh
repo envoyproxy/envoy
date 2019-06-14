@@ -24,18 +24,21 @@ echo "    VALIDATE_COVERAGE=${VALIDATE_COVERAGE}"
 # projects that want to run coverage on a different/combined target.
 # Command-line arguments take precedence over ${COVERAGE_TARGET}.
 if [[ $# -gt 0 ]]; then
-  COVERAGE_TARGET=$*
-elif [[ -z "${COVERAGE_TARGET}" ]]; then
-  COVERAGE_TARGET="//test/coverage:coverage_tests"
+  COVERAGE_TARGETS=$*
+elif [[ -n "${COVERAGE_TARGET}" ]]; then
+  COVERAGE_TARGETS=${COVERAGE_TARGET}
+else
+  COVERAGE_TARGETS=//test/...
 fi
+
 # This is where we are going to copy the .gcno files into.
-GCNO_ROOT=bazel-out/k8-dbg/bin/"${COVERAGE_TARGET/:/\/}".runfiles/"${WORKSPACE}"
+GCNO_ROOT=bazel-out/k8-dbg/bin/test/coverage/coverage_tests.runfiles/"${WORKSPACE}"
 echo "    GCNO_ROOT=${GCNO_ROOT}"
 rm -rf ${GCNO_ROOT}
 
-# Make sure ${COVERAGE_TARGET} is up-to-date.
+# Make sure //test/coverage:coverage_tests is up-to-date.
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
-(BAZEL_BIN="${BAZEL_COVERAGE}" "${SCRIPT_DIR}"/coverage/gen_build.sh)
+(BAZEL_BIN="${BAZEL_COVERAGE}" "${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS})
 
 echo "Cleaning .gcda/.gcov from previous coverage runs..."
 NUM_PREVIOUS_GCOV_FILES=0
@@ -55,7 +58,7 @@ BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
 # https://github.com/bazelbuild/bazel/issues/1118). This works today as we have
 # a single coverage test binary and do not require the "bazel coverage" support
 # for collecting multiple traces and glueing them together.
-"${BAZEL_COVERAGE}" test ${COVERAGE_TARGET} ${BAZEL_TEST_OPTIONS} \
+"${BAZEL_COVERAGE}" test //test/coverage:coverage_tests ${BAZEL_TEST_OPTIONS} \
   --cache_test_results=no --cxxopt="--coverage" --cxxopt="-DENVOY_CONFIG_COVERAGE=1" \
   --linkopt="--coverage" --define ENVOY_CONFIG_COVERAGE=1 --test_output=streamed \
   --strategy=Genrule=standalone --spawn_strategy=standalone --test_timeout=4000 \
