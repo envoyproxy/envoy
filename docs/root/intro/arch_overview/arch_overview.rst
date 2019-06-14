@@ -9,6 +9,7 @@ Architecture overview
   http/http
   upstream/upstream
   observability/observability
+  security/security
   operations/operations
   other_features/other_features
   other_protocols/other_protocols
