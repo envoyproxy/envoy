@@ -44,10 +44,9 @@ public:
 };
 
 /**
- * Implementation of Network::Connection.
+ * Implementation of Network::Connection and Network::FilterManagerConnection.
  */
-class ConnectionImpl : public virtual Connection,
-                       public BufferSource,
+class ConnectionImpl : public FilterManagerConnection,
                        public TransportSocketCallbacks,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
@@ -97,9 +96,13 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   absl::string_view transportFailureReason() const override;
 
-  // Network::BufferSource
-  BufferSource::StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
-  BufferSource::StreamBuffer getWriteBuffer() override {
+  // Network::FilterManagerConnection
+  void rawWrite(Buffer::Instance& data, bool end_stream) override;
+
+  // Network::ReadBufferSource
+  StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
+  // Network::WriteBufferSource
+  StreamBuffer getWriteBuffer() override {
     return {*current_write_buffer_, current_write_end_stream_};
   }
 
@@ -163,6 +166,9 @@ private:
   void onWriteReady();
   void updateReadBufferStats(uint64_t num_read, uint64_t new_size);
   void updateWriteBufferStats(uint64_t num_written, uint64_t new_size);
+
+  // Write data to the connection bypassing filter chain (optionally).
+  void write(Buffer::Instance& data, bool end_stream, bool through_filter_chain);
 
   // Returns true iff end of stream has been both written and read.
   bool bothSidesHalfClosed();

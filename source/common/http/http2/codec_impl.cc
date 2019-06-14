@@ -38,19 +38,6 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
   return true;
 }
 
-void initializeNghttp2Logging() {
-  nghttp2_set_debug_vprintf_callback([](const char* format, va_list args) {
-    char buf[2048];
-    const int n = ::vsnprintf(buf, sizeof(buf), format, args);
-    // nghttp2 inserts new lines, but we also insert a new line in the ENVOY_LOG
-    // below, so avoid double \n.
-    if (n >= 1 && static_cast<size_t>(n) < sizeof(buf) && buf[n - 1] == '\n') {
-      buf[n - 1] = '\0';
-    }
-    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::http2), trace, "nghttp2: {}", buf);
-  });
-}
-
 ConnectionImpl::Http2Callbacks ConnectionImpl::http2_callbacks_;
 
 /**
@@ -524,6 +511,7 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "sent frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
   switch (frame->hd.type) {
   case NGHTTP2_GOAWAY: {
+    ENVOY_CONN_LOG(debug, "sent goaway code={}", connection_, frame->goaway.error_code);
     if (frame->goaway.error_code != NGHTTP2_NO_ERROR) {
       return NGHTTP2_ERR_CALLBACK_FAILURE;
     }

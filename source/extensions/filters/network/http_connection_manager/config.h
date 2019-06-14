@@ -7,6 +7,7 @@
 #include <map>
 #include <string>
 
+#include "envoy/config/config_provider_manager.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -46,6 +47,8 @@ private:
       Server::Configuration::FactoryContext& context) override;
 };
 
+DECLARE_FACTORY(HttpConnectionManagerFilterConfigFactory);
+
 /**
  * Determines if an address is internal based on user provided config.
  */
@@ -78,7 +81,8 @@ public:
       const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
           config,
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
-      Router::RouteConfigProviderManager& route_config_provider_manager);
+      Router::RouteConfigProviderManager& route_config_provider_manager,
+      Config::ConfigProviderManager& scoped_routes_config_provider_manager);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -104,7 +108,12 @@ public:
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
-  Router::RouteConfigProvider& routeConfigProvider() override { return *route_config_provider_; }
+  Router::RouteConfigProvider* routeConfigProvider() override {
+    return route_config_provider_.get();
+  }
+  Config::ConfigProvider* scopedRouteConfigProvider() override {
+    return scoped_routes_config_provider_.get();
+  }
   const std::string& serverName() override { return server_name_; }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
@@ -151,6 +160,7 @@ private:
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Router::RouteConfigProviderManager& route_config_provider_manager_;
+  Config::ConfigProviderManager& scoped_routes_config_provider_manager_;
   CodecType codec_type_;
   const Http::Http2Settings http2_settings_;
   const Http::Http1Settings http1_settings_;
@@ -162,6 +172,7 @@ private:
   std::chrono::milliseconds stream_idle_timeout_;
   std::chrono::milliseconds request_timeout_;
   Router::RouteConfigProviderPtr route_config_provider_;
+  Config::ConfigProviderPtr scoped_routes_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
   Http::DateProvider& date_provider_;

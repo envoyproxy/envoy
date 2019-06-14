@@ -113,7 +113,7 @@ DeserializerPtr ConfigImpl::createDeserializer() {
 }
 
 void ConfigImpl::registerFilter(const DubboFilterConfig& proto_config) {
-  const ProtobufTypes::String& string_name = proto_config.name();
+  const std::string& string_name = proto_config.name();
 
   ENVOY_LOG(debug, "    dubbo filter #{}", filter_factories_.size());
   ENVOY_LOG(debug, "      name: {}", string_name);
@@ -127,7 +127,8 @@ void ConfigImpl::registerFilter(const DubboFilterConfig& proto_config) {
           string_name);
   ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
   Envoy::Config::Utility::translateOpaqueConfig(proto_config.config(),
-                                                ProtobufWkt::Struct::default_instance(), *message);
+                                                ProtobufWkt::Struct::default_instance(),
+                                                context_.messageValidationVisitor(), *message);
   DubboFilters::FilterFactoryCb callback =
       factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
 

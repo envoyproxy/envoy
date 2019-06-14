@@ -24,17 +24,17 @@ public:
   /**
    * Human readable zone name. E.g., "us-east-1a".
    */
-  virtual const std::string zoneName() const PURE;
+  virtual const std::string& zoneName() const PURE;
 
   /**
    * Human readable cluster name. E.g., "eta".
    */
-  virtual const std::string clusterName() const PURE;
+  virtual const std::string& clusterName() const PURE;
 
   /**
    * Human readable individual node name. E.g., "i-123456".
    */
-  virtual const std::string nodeName() const PURE;
+  virtual const std::string& nodeName() const PURE;
 
   /**
    * v2 API Node protobuf. This is the full node identity presented to management servers.

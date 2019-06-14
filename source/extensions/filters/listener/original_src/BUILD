@@ -20,32 +20,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "original_src_socket_option_lib",
-    srcs = ["original_src_socket_option.cc"],
-    hdrs = ["original_src_socket_option.h"],
-    deps = [
-        "//include/envoy/network:listen_socket_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/network:address_lib",
-        "//source/common/network:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "original_src_lib",
     srcs = ["original_src.cc"],
     hdrs = ["original_src.h"],
     deps = [
         ":config_lib",
-        ":original_src_socket_option_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/network:socket_option_factory_lib",
+        "//source/extensions/filters/common/original_src:socket_option_factory_lib",
     ],
 )
 

@@ -47,32 +47,30 @@ typedef ConstSingleton<MongoRuntimeConfigKeys> MongoRuntimeConfig;
 /**
  * All mongo proxy stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_MONGO_PROXY_STATS(COUNTER, GAUGE, HISTOGRAM)                                           \
+  COUNTER(cx_destroy_local_with_active_rq)                                                         \
+  COUNTER(cx_destroy_remote_with_active_rq)                                                        \
+  COUNTER(cx_drain_close)                                                                          \
   COUNTER(decoding_error)                                                                          \
   COUNTER(delays_injected)                                                                         \
+  COUNTER(op_command)                                                                              \
+  COUNTER(op_command_reply)                                                                        \
   COUNTER(op_get_more)                                                                             \
   COUNTER(op_insert)                                                                               \
   COUNTER(op_kill_cursors)                                                                         \
   COUNTER(op_query)                                                                                \
-  COUNTER(op_query_tailable_cursor)                                                                \
-  COUNTER(op_query_no_cursor_timeout)                                                              \
   COUNTER(op_query_await_data)                                                                     \
   COUNTER(op_query_exhaust)                                                                        \
+  COUNTER(op_query_multi_get)                                                                      \
+  COUNTER(op_query_no_cursor_timeout)                                                              \
   COUNTER(op_query_no_max_time)                                                                    \
   COUNTER(op_query_scatter_get)                                                                    \
-  COUNTER(op_query_multi_get)                                                                      \
-  GAUGE  (op_query_active)                                                                         \
+  COUNTER(op_query_tailable_cursor)                                                                \
   COUNTER(op_reply)                                                                                \
   COUNTER(op_reply_cursor_not_found)                                                               \
   COUNTER(op_reply_query_failure)                                                                  \
   COUNTER(op_reply_valid_cursor)                                                                   \
-  COUNTER(cx_destroy_local_with_active_rq)                                                         \
-  COUNTER(cx_destroy_remote_with_active_rq)                                                        \
-  COUNTER(cx_drain_close)                                                                          \
-  COUNTER(op_command)                                                                              \
-  COUNTER(op_command_reply)
-// clang-format on
+  GAUGE(op_query_active, Accumulate)
 
 /**
  * Struct definition for all mongo proxy stats. @see stats_macros.h

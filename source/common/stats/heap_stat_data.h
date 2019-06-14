@@ -12,6 +12,7 @@
 #include "common/common/thread_annotations.h"
 #include "common/stats/metric_impl.h"
 #include "common/stats/stat_data_allocator_impl.h"
+#include "common/stats/stat_merger.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -23,7 +24,7 @@ namespace Stats {
  * This structure is an alternate backing store for both CounterImpl and GaugeImpl. It is designed
  * so that it can be allocated efficiently from the heap on demand.
  */
-struct HeapStatData {
+struct HeapStatData : public InlineStorage {
 private:
   explicit HeapStatData(StatName stat_name) { stat_name.copyToStorage(symbol_storage_); }
 
@@ -40,7 +41,7 @@ public:
   std::atomic<uint64_t> pending_increment_{0};
   std::atomic<uint16_t> flags_{0};
   std::atomic<uint16_t> ref_count_{1};
-  SymbolTable::Storage symbol_storage_;
+  SymbolTable::Storage symbol_storage_; // This is a 'using' nickname for uint8_t[].
 };
 
 template <class Stat> class HeapStat : public Stat {
@@ -49,22 +50,14 @@ public:
            absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
       : Stat(data, alloc, tag_extracted_name, tags) {}
 
+  HeapStat(HeapStatData& data, StatDataAllocatorImpl<HeapStatData>& alloc,
+           absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
+           Gauge::ImportMode import_mode)
+      : Stat(data, alloc, tag_extracted_name, tags, import_mode) {}
+
   StatName statName() const override { return this->data_.statName(); }
 };
 
-// Partially implements a StatDataAllocator, leaving alloc & free for subclasses.
-// We templatize on StatData rather than defining a virtual base StatData class
-// for performance reasons; stat increment is on the hot path.
-//
-// The two production derivations cover using a fixed block of shared-memory for
-// hot restart stat continuity, and heap allocation for more efficient RAM usage
-// for when hot-restart is not required.
-//
-// Also note that RawStatData needs to live in a shared memory block, and it's
-// possible, but not obvious, that a vptr would be usable across processes. In
-// any case, RawStatData is allocated from a shared-memory block rather than via
-// new, so the usual C++ compiler assistance for setting up vptrs will not be
-// available. This could be resolved with placed new, or another nesting level.
 class HeapStatDataAllocator : public StatDataAllocatorImpl<HeapStatData> {
 public:
   HeapStatDataAllocator(SymbolTable& symbol_table) : StatDataAllocatorImpl(symbol_table) {}
@@ -81,9 +74,9 @@ public:
   }
 
   GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
-                           const std::vector<Tag>& tags) override {
-    return std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(alloc(name), *this,
-                                                               tag_extracted_name, tags);
+                           const std::vector<Tag>& tags, Gauge::ImportMode import_mode) override {
+    return std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(
+        alloc(name), *this, tag_extracted_name, tags, import_mode);
   }
 
 #ifndef ENVOY_CONFIG_COVERAGE

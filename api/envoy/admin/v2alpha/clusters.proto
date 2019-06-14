@@ -82,6 +82,9 @@ message HostHealthStatus {
   // health checking.
   bool pending_dynamic_removal = 5;
 
+  // The host has not yet been health checked.
+  bool pending_active_hc = 6;
+
   // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported
   // here.
   // TODO(mrice32): pipe through remaining EDS health status possibilities.

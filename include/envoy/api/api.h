@@ -47,6 +47,11 @@ public:
    * @return a reference to the TimeSource
    */
   virtual TimeSource& timeSource() PURE;
+
+  /**
+   * @return a constant reference to the root Stats::Scope
+   */
+  virtual const Stats::Scope& rootScope() PURE;
 };
 
 typedef std::unique_ptr<Api> ApiPtr;

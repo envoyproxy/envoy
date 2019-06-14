@@ -35,9 +35,9 @@ struct VariableBinding {
   // The location of the field in the protobuf message, where the value
   // needs to be inserted, e.g. "shelf.theme" would mean the "theme" field
   // of the nested "shelf" message of the request protobuf message.
-  std::vector<ProtobufTypes::String> field_path;
+  std::vector<std::string> field_path;
   // The value to be inserted.
-  ProtobufTypes::String value;
+  std::string value;
 };
 
 /**

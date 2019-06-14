@@ -34,7 +34,7 @@ TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
   handshaker_service: 169.254.169.254:8080
   peer_service_accounts: ["server-sa"]
   )EOF";
-  MessageUtil::loadFromYaml(yaml, *config);
+  TestUtility::loadFromYaml(yaml, *config);
 
   auto socket_factory = factory.createTransportSocketFactory(*config, factory_context);
 
@@ -54,7 +54,7 @@ TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
   handshaker_service: 169.254.169.254:8080
   peer_service_accounts: ["server-sa"]
   )EOF";
-  MessageUtil::loadFromYaml(yaml, *config);
+  TestUtility::loadFromYaml(yaml, *config);
 
   auto socket_factory = factory.createTransportSocketFactory(*config, factory_context, {});
 

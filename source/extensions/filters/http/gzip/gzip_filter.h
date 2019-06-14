@@ -84,7 +84,7 @@ private:
   static Compressor::ZlibCompressorImpl::CompressionStrategy compressionStrategyEnum(
       envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy compression_strategy);
   static StringUtil::CaseUnorderedSet
-  contentTypeSet(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& types);
+  contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
 
   static uint64_t contentLengthUint(Protobuf::uint32 length);
   static uint64_t memoryLevelUint(Protobuf::uint32 level);
@@ -137,9 +137,7 @@ public:
   }
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
-    return Http::FilterTrailersStatus::Continue;
-  }
+  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
     return Http::FilterMetadataStatus::Continue;
   }

@@ -69,11 +69,6 @@ public:
 };
 
 /**
- * Setup nghttp2 trace-level logging for when debugging.
- */
-void initializeNghttp2Logging();
-
-/**
  * Base class for HTTP/2 client and server codecs.
  */
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {

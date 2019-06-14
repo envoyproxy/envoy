@@ -3,6 +3,7 @@
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/subscription_factory.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/stats/scope.h"
@@ -20,7 +21,6 @@ namespace Upstream {
  * Cluster implementation that reads host information from the Endpoint Discovery Service.
  */
 class EdsClusterImpl : public BaseDynamicClusterImpl, Config::SubscriptionCallbacks {
-
 public:
   EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                  Server::Configuration::TransportSocketFactoryContext& factory_context,
@@ -29,20 +29,19 @@ public:
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Secondary; }
 
+private:
   // Config::SubscriptionCallbacks
-  // TODO(fredlas) deduplicate
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
-                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource,
+                                                                          validation_visitor_)
+        .cluster_name();
   }
 
-private:
   using LocalityWeightsMap =
       std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
@@ -50,6 +49,7 @@ private:
                               LocalityWeightsMap& new_locality_weights_map,
                               PriorityStateManager& priority_state_manager,
                               std::unordered_map<std::string, HostSharedPtr>& updated_hosts);
+  bool validateUpdateSize(int num_resources);
 
   // ClusterImplBase
   void reloadHealthyHostsHelper(const HostSharedPtr& host) override;
@@ -77,6 +77,7 @@ private:
   std::vector<LocalityWeightsMap> locality_weights_map_;
   HostMap all_hosts_;
   Event::TimerPtr assignment_timeout_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 class EdsClusterFactory : public ClusterFactoryImplBase {
@@ -84,7 +85,7 @@ public:
   EdsClusterFactory() : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().Eds) {}
 
 private:
-  ClusterImplBaseSharedPtr
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) override;

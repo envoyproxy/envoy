@@ -24,6 +24,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
       event_logger_(std::move(event_logger)), interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
       no_traffic_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_interval, 60000)),
+      initial_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, initial_jitter, 0)),
       interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)),
       interval_jitter_percent_(config.interval_jitter_percent()),
       unhealthy_interval_(
@@ -39,8 +40,11 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
 }
 
 HealthCheckerImplBase::~HealthCheckerImplBase() {
-  // Make sure that any sessions that were deferred deleted are cleared before we destruct.
-  dispatcher_.clearDeferredDeleteList();
+  // ASSERTs inside the session destructor check to make sure we have been previously deferred
+  // deleted. Unify that logic here before actual destruction happens.
+  for (auto& session : active_sessions_) {
+    session.second->onDeferredDeleteBase();
+  }
 }
 
 void HealthCheckerImplBase::decHealthy() {
@@ -104,14 +108,19 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
   } else {
     base_time_ms = no_traffic_interval_.count();
   }
+  return intervalWithJitter(base_time_ms, interval_jitter_);
+}
 
+std::chrono::milliseconds
+HealthCheckerImplBase::intervalWithJitter(uint64_t base_time_ms,
+                                          std::chrono::milliseconds interval_jitter) const {
   const uint64_t jitter_percent_mod = interval_jitter_percent_ * base_time_ms / 100;
   if (jitter_percent_mod > 0) {
     base_time_ms += random_.random() % jitter_percent_mod;
   }
 
-  if (interval_jitter_.count() > 0) {
-    base_time_ms += (random_.random() % interval_jitter_.count());
+  if (interval_jitter.count() > 0) {
+    base_time_ms += (random_.random() % interval_jitter.count());
   }
 
   const uint64_t min_interval = runtime_.snapshot().getInteger("health_check.min_interval", 0);
@@ -220,12 +229,9 @@ HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
 }
 
 HealthCheckerImplBase::ActiveHealthCheckSession::~ActiveHealthCheckSession() {
-  if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    parent_.decHealthy();
-  }
-  if (host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
-    parent_.decDegraded();
-  }
+  // Make sure onDeferredDeleteBase() has been called. We should not reference our parent at this
+  // point since we may have been deferred deleted.
+  ASSERT(interval_timer_ == nullptr && timeout_timer_ == nullptr);
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
@@ -233,6 +239,12 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
   // implementation specific state is destroyed.
   interval_timer_.reset();
   timeout_timer_.reset();
+  if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+    parent_.decHealthy();
+  }
+  if (host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
+    parent_.decDegraded();
+  }
   onDeferredDelete();
 }
 
@@ -256,6 +268,8 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
       changed_state = HealthTransition::ChangePending;
     }
   }
+
+  changed_state = clearPendingFlag(changed_state);
 
   if (degraded != host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
     if (degraded) {
@@ -307,6 +321,8 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
     }
   }
 
+  changed_state = clearPendingFlag(changed_state);
+
   if ((first_check_ || parent_.always_log_health_check_failures_) && parent_.event_logger_) {
     parent_.event_logger_->logUnhealthy(parent_.healthCheckerType(), host_, type, first_check_);
   }
@@ -336,6 +352,18 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(
   }
 }
 
+HealthTransition
+HealthCheckerImplBase::ActiveHealthCheckSession::clearPendingFlag(HealthTransition changed_state) {
+  if (host_->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
+    host_->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    // Even though the health value of the host might have not changed, we set this to Changed to
+    // that the cluster can update its list of excluded hosts.
+    return HealthTransition::Changed;
+  }
+
+  return changed_state;
+}
+
 void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
   onInterval();
   timeout_timer_->enableTimer(parent_.timeout_);
@@ -345,6 +373,15 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
 void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
   onTimeout();
   handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
+}
+
+void HealthCheckerImplBase::ActiveHealthCheckSession::onInitialInterval() {
+  if (parent_.initial_jitter_.count() == 0) {
+    onIntervalBase();
+  } else {
+    interval_timer_->enableTimer(
+        std::chrono::milliseconds(parent_.intervalWithJitter(0, parent_.initial_jitter_)));
+  }
 }
 
 void HealthCheckEventLoggerImpl::logEjectUnhealthy(

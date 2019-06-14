@@ -69,8 +69,8 @@ import "validate/validate.proto";
 //
 // An example use of MetadataMatcher is specifying additional metadata in envoy.filters.http.rbac to
 // enforce access control based on dynamic metadata in a request. See :ref:`Permission
-// <envoy_api_msg_config.rbac.v2alpha.Permission>` and :ref:`Principal
-// <envoy_api_msg_config.rbac.v2alpha.Principal>`.
+// <envoy_api_msg_config.rbac.v2.Permission>` and :ref:`Principal
+// <envoy_api_msg_config.rbac.v2.Principal>`.
 message MetadataMatcher {
   // Specifies the segment in a path to retrieve value from Metadata.
   // Note: Currently it's not supported to retrieve a value from a list in Metadata. This means that

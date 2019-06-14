@@ -44,7 +44,7 @@ typed_config:
   )EOF";
 
   envoy::config::filter::accesslog::v2::AccessLog upstream_log;
-  MessageUtil::loadFromYaml(yaml, upstream_log);
+  TestUtility::loadFromYaml(yaml, upstream_log);
 
   return absl::optional<envoy::config::filter::accesslog::v2::AccessLog>(upstream_log);
 }
@@ -266,7 +266,7 @@ typed_config:
   )EOF";
 
   envoy::config::filter::accesslog::v2::AccessLog upstream_log;
-  MessageUtil::loadFromYaml(yaml, upstream_log);
+  TestUtility::loadFromYaml(yaml, upstream_log);
 
   init(absl::optional<envoy::config::filter::accesslog::v2::AccessLog>(upstream_log));
   run(200, {{"x-envoy-original-path", "/foo"}}, {}, {});

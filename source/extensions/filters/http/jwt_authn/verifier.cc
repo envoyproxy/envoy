@@ -182,7 +182,7 @@ private:
 };
 
 VerifierConstPtr innerCreate(const JwtRequirement& requirement,
-                             const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
+                             const Protobuf::Map<std::string, JwtProvider>& providers,
                              const AuthFactory& factory, const Extractor& extractor,
                              const BaseVerifierImpl* parent);
 
@@ -210,7 +210,7 @@ protected:
 class AnyVerifierImpl : public BaseGroupVerifierImpl {
 public:
   AnyVerifierImpl(const JwtRequirementOrList& or_list, const AuthFactory& factory,
-                  const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
+                  const Protobuf::Map<std::string, JwtProvider>& providers,
                   const Extractor& extractor_for_allow_fail, const BaseVerifierImpl* parent)
       : BaseGroupVerifierImpl(parent) {
     for (const auto& it : or_list.requirements()) {
@@ -235,7 +235,7 @@ public:
 class AllVerifierImpl : public BaseGroupVerifierImpl {
 public:
   AllVerifierImpl(const JwtRequirementAndList& and_list, const AuthFactory& factory,
-                  const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
+                  const Protobuf::Map<std::string, JwtProvider>& providers,
                   const Extractor& extractor_for_allow_fail, const BaseVerifierImpl* parent)
       : BaseGroupVerifierImpl(parent) {
     for (const auto& it : and_list.requirements()) {
@@ -267,7 +267,7 @@ public:
 };
 
 VerifierConstPtr innerCreate(const JwtRequirement& requirement,
-                             const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
+                             const Protobuf::Map<std::string, JwtProvider>& providers,
                              const AuthFactory& factory, const Extractor& extractor_for_allow_fail,
                              const BaseVerifierImpl* parent) {
   std::string provider_name;
@@ -313,10 +313,10 @@ ContextSharedPtr Verifier::createContext(Http::HeaderMap& headers, Callbacks* ca
   return std::make_shared<ContextImpl>(headers, callback);
 }
 
-VerifierConstPtr
-Verifier::create(const JwtRequirement& requirement,
-                 const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                 const AuthFactory& factory, const Extractor& extractor_for_allow_fail) {
+VerifierConstPtr Verifier::create(const JwtRequirement& requirement,
+                                  const Protobuf::Map<std::string, JwtProvider>& providers,
+                                  const AuthFactory& factory,
+                                  const Extractor& extractor_for_allow_fail) {
   return innerCreate(requirement, providers, factory, extractor_for_allow_fail, nullptr);
 }
 

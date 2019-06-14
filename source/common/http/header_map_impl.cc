@@ -75,7 +75,6 @@ HeaderString::HeaderString(HeaderString&& move_value) {
     buffer_.dynamic_ = inline_buffer_;
     memcpy(inline_buffer_, move_value.inline_buffer_, string_length_);
     move_value.string_length_ = 0;
-    move_value.inline_buffer_[0] = 0;
     break;
   }
   }
@@ -157,7 +156,6 @@ void HeaderString::clear() {
     break;
   }
   case Type::Inline: {
-    inline_buffer_[0] = 0;
     FALLTHRU;
   }
   case Type::Dynamic: {
@@ -207,7 +205,6 @@ void HeaderString::setCopy(const char* data, uint32_t size) {
   }
 
   memcpy(buffer_.dynamic_, data, size);
-  buffer_.dynamic_[size] = 0;
   string_length_ = size;
   ASSERT(valid());
 }

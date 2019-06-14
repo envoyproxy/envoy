@@ -18,7 +18,8 @@ public:
   virtual ~SubscriptionCallbacks() = default;
 
   /**
-   * Called when a configuration update is received.
+   * Called when a state-of-the-world configuration update is received. (State-of-the-world is
+   * everything other than delta gRPC - filesystem, HTTP, non-delta gRPC).
    * @param resources vector of fetched resources corresponding to the configuration update.
    * @param version_info supplies the version information as supplied by the xDS discovery response.
    * @throw EnvoyException with reason if the configuration is rejected. Otherwise the configuration
@@ -28,9 +29,6 @@ public:
   virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                               const std::string& version_info) PURE;
 
-  // TODO(fredlas) it is a HACK that there are two of these. After delta CDS is merged,
-  //               I intend to reimplement all state-of-the-world xDSes' use of onConfigUpdate
-  //               in terms of this delta-style one (and remove the original).
   /**
    * Called when a delta configuration update is received.
    * @param added_resources resources newly added since the previous fetch.
@@ -70,10 +68,8 @@ public:
    * Start a configuration subscription asynchronously. This should be called once and will continue
    * to fetch throughout the lifetime of the Subscription object.
    * @param resources set of resource names to fetch.
-   * @param callbacks the callbacks to be notified of configuration updates. The callback must not
-   *        result in the deletion of the Subscription object.
    */
-  virtual void start(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks) PURE;
+  virtual void start(const std::set<std::string>& resource_names) PURE;
 
   /**
    * Update the resources to fetch.
@@ -83,17 +79,17 @@ public:
   virtual void updateResources(const std::set<std::string>& update_to_these_names) PURE;
 };
 
+using SubscriptionPtr = std::unique_ptr<Subscription>;
+
 /**
  * Per subscription stats. @see stats_macros.h
  */
-// clang-format off
-#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE) \
-  COUNTER(update_attempt)                      \
-  COUNTER(update_success)                      \
-  COUNTER(update_failure)                      \
-  COUNTER(update_rejected)                     \
-  GAUGE(version)
-// clang-format on
+#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE)                                                     \
+  COUNTER(update_attempt)                                                                          \
+  COUNTER(update_failure)                                                                          \
+  COUNTER(update_rejected)                                                                         \
+  COUNTER(update_success)                                                                          \
+  GAUGE(version, NeverImport)
 
 /**
  * Struct definition for per subscription stats. @see stats_macros.h

@@ -83,8 +83,8 @@ Compressor::ZlibCompressorImpl::CompressionStrategy GzipFilterConfig::compressio
   }
 }
 
-StringUtil::CaseUnorderedSet GzipFilterConfig::contentTypeSet(
-    const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& types) {
+StringUtil::CaseUnorderedSet
+GzipFilterConfig::contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types) {
   return types.empty() ? StringUtil::CaseUnorderedSet(defaultContentEncoding().begin(),
                                                       defaultContentEncoding().end())
                        : StringUtil::CaseUnorderedSet(types.cbegin(), types.cend());
@@ -144,6 +144,16 @@ Http::FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_s
     config_->stats().total_compressed_bytes_.add(data.length());
   }
   return Http::FilterDataStatus::Continue;
+}
+
+Http::FilterTrailersStatus GzipFilter::encodeTrailers(Http::HeaderMap&) {
+  if (!skip_compression_) {
+    Buffer::OwnedImpl empty_buffer;
+    compressor_.compress(empty_buffer, Compressor::State::Finish);
+    config_->stats().total_compressed_bytes_.add(empty_buffer.length());
+    encoder_callbacks_->addEncodedData(empty_buffer, true);
+  }
+  return Http::FilterTrailersStatus::Continue;
 }
 
 bool GzipFilter::hasCacheControlNoTransform(Http::HeaderMap& headers) const {

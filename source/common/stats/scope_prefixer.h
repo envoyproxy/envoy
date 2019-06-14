@@ -18,7 +18,7 @@ public:
   // Scope
   ScopePtr createScope(const std::string& name) override;
   Counter& counterFromStatName(StatName name) override;
-  Gauge& gaugeFromStatName(StatName name) override;
+  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
   Histogram& histogramFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
 
@@ -26,16 +26,21 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return counterFromStatName(storage.statName());
   }
-  Gauge& gauge(const std::string& name) override {
+  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return gaugeFromStatName(storage.statName());
+    return gaugeFromStatName(storage.statName(), import_mode);
   }
   Histogram& histogram(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
     return histogramFromStatName(storage.statName());
   }
 
-  const SymbolTable& symbolTable() const override { return scope_.symbolTable(); }
+  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override;
+  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override;
+  absl::optional<std::reference_wrapper<const Histogram>>
+  findHistogram(StatName name) const override;
+
+  const SymbolTable& constSymbolTable() const override { return scope_.constSymbolTable(); }
   virtual SymbolTable& symbolTable() override { return scope_.symbolTable(); }
 
   NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }

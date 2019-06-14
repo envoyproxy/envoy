@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/io_error.h"
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
@@ -11,6 +12,8 @@
 
 namespace Envoy {
 namespace Network {
+
+class UdpListenerFilterManager;
 
 /**
  * A configuration for an individual listener.
@@ -113,10 +116,11 @@ public:
  * TODO(conqerAtapple): Maybe this belongs inside the UdpListenerCallbacks
  * class.
  */
-struct UdpData {
+struct UdpRecvData {
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr peer_address_; // TODO(conquerAtapple): Fix ownership semantics.
   Buffer::InstancePtr buffer_;
+
   // TODO(conquerAtapple):
   // Add UdpReader here so that the callback handler can
   // then use the reader to do multiple reads(recvmmsg) once the OS notifies it
@@ -126,7 +130,17 @@ struct UdpData {
 };
 
 /**
- * Udp listener callbacks.
+ * Encapsulates the information needed to send a udp packet to a target
+ */
+struct UdpSendData {
+  Address::InstanceConstSharedPtr send_address_;
+  // The buffer is a reference so that it can be reused by the sender to send different
+  // messages
+  Buffer::Instance& buffer_;
+};
+
+/**
+ * UDP listener callbacks.
  */
 class UdpListenerCallbacks {
 public:
@@ -137,9 +151,9 @@ public:
   /**
    * Called whenever data is received by the underlying udp socket.
    *
-   * @param data UdpData from the underlying socket.
+   * @param data UdpRecvData from the underlying socket.
    */
-  virtual void onData(const UdpData& data) PURE;
+  virtual void onData(UdpRecvData& data) PURE;
 
   /**
    * Called when the underlying socket is ready for write.
@@ -151,12 +165,13 @@ public:
   virtual void onWriteReady(const Socket& socket) PURE;
 
   /**
-   * Called when there is an error event.
+   * Called when there is an error event in the receive data path.
+   * The send side error is a return type on the send method.
    *
    * @param error_code ErrorCode for the error event.
    * @param error_number System error number.
    */
-  virtual void onError(const ErrorCode& error_code, int error_number) PURE;
+  virtual void onReceiveError(const ErrorCode& error_code, int error_number) PURE;
 };
 
 /**
@@ -178,6 +193,37 @@ public:
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;
+
+/**
+ * A UDP listener interface.
+ */
+class UdpListener : public virtual Listener {
+public:
+  virtual ~UdpListener() {}
+
+  /**
+   * @return Event::Dispatcher& the dispatcher backing this listener.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return the local address of the socket.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& localAddress() const PURE;
+
+  /**
+   * Send data through the underlying udp socket. If the send buffer of the socket FD is full, an
+   * error code is returned.
+   * TODO(sumukhs): We do not currently handle max MTU size of the datagram. Determine if we could
+   * expose the path MTU information to the caller.
+   *
+   * @param data Supplies the data to send to a target using udp.
+   * @return the error code of the underlying send api. On successfully sending 'n' bytes, the
+   * underlying buffers in the data  are drained by 'n' bytes. The remaining can be retried by the
+   * sender.
+   */
+  virtual Api::IoCallUint64Result send(const UdpSendData& data) PURE;
+};
 
 /**
  * Thrown when there is a runtime error creating/binding a listener.

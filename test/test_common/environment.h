@@ -164,10 +164,12 @@ public:
    *
    * @param filename: the name of the file to use
    * @param contents: the data to go in the file.
+   * @param fully_qualified_path: if true, will write to filename without prepending the tempdir.
    * @return the fully qualified path of the output file.
    */
   static std::string writeStringToFileForTest(const std::string& filename,
-                                              const std::string& contents);
+                                              const std::string& contents,
+                                              bool fully_qualified_path = false);
   /**
    * Dumps the contents of the file into the string.
    *

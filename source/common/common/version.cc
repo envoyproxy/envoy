@@ -4,6 +4,7 @@
 
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
+#include "common/common/version_linkstamp.h"
 
 extern const char build_scm_revision[];
 extern const char build_scm_status[];

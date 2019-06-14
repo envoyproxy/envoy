@@ -39,6 +39,7 @@ envoy_cc_test_library(
         "//source/common/common:utility_lib",
         "//source/common/event:libevent_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/exe:process_wide_lib",
         "//test/test_common:environment_lib",
     ],
 )
@@ -50,6 +51,7 @@ envoy_cc_test_library(
         ":common_proto_cc",
         "//source/common/network:utility_lib",
         "//test/common/stream_info:test_util",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],

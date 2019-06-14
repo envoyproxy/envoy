@@ -7,6 +7,8 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.network.redis_proxy.v2";
 option go_package = "v2";
 
+import "envoy/api/v2/core/base.proto";
+
 import "google/protobuf/duration.proto";
 
 import "validate/validate.proto";
@@ -141,4 +143,23 @@ message RedisProxy {
   // <arch_overview_redis_configuration>` of the architecture overview for recommendations on
   // configuring the backing clusters.
   PrefixRoutes prefix_routes = 5 [(gogoproto.nullable) = false];
+
+  // Authenticate Redis client connections locally by forcing downstream clients to issue a 'Redis
+  // AUTH command <https://redis.io/commands/auth>`_ with this password before enabling any other
+  // command. If an AUTH command's password matches this password, an "OK" response will be returned
+  // to the client. If the AUTH command password does not match this password, then an "ERR invalid
+  // password" error will be returned. If any other command is received before AUTH when this
+  // password is set, then a "NOAUTH Authentication required." error response will be sent to the
+  // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
+  // AUTH, but no password is set" error will be returned.
+  envoy.api.v2.core.DataSource downstream_auth_password = 6;
+}
+
+// RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
+// :ref:`extension_protocol_options<envoy_api_field_Cluster.extension_protocol_options>`, keyed
+// by the name `envoy.redis_proxy`.
+message RedisProtocolOptions {
+  // Upstream server password as defined by the `requirepass directive
+  // <https://redis.io/topics/config>`_ in the server's configuration file.
+  envoy.api.v2.core.DataSource auth_password = 1;
 }

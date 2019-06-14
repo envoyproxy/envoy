@@ -147,6 +147,7 @@ TEST_F(CsrfFilterTest, RequestWithInvalidOrigin) {
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(1U, config_->stats().request_invalid_.value());
   EXPECT_EQ(0U, config_->stats().request_valid_.value());
+  EXPECT_EQ("csrf_origin_mismatch", decoder_callbacks_.details_);
 }
 
 TEST_F(CsrfFilterTest, RequestWithValidOrigin) {

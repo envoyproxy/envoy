@@ -18,6 +18,7 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/router/rds.h"
+#include "envoy/router/scopes.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/ssl/connection.h"
@@ -242,6 +243,14 @@ private:
     uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
     bool recreateStream() override;
 
+    void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
+      Network::Socket::appendOptions(parent_.upstream_options_, options);
+    }
+
+    Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override {
+      return parent_.upstream_options_;
+    }
+
     // Each decoder filter instance checks if the request passed to the filter is gRPC
     // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
     // called here may change the content type, so we must check it before the call.
@@ -442,8 +451,8 @@ private:
     // All state for the stream. Put here for readability.
     struct State {
       State()
-          : remote_complete_(false), local_complete_(false), saw_connection_close_(false),
-            successful_upgrade_(false), created_filter_chain_(false),
+          : remote_complete_(false), local_complete_(false), codec_saw_local_complete_(false),
+            saw_connection_close_(false), successful_upgrade_(false), created_filter_chain_(false),
             is_internally_created_(false) {}
 
       uint32_t filter_call_state_{0};
@@ -454,7 +463,11 @@ private:
       bool decoder_filters_streaming_{true};
       bool destroyed_{false};
       bool remote_complete_ : 1;
-      bool local_complete_ : 1;
+      bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
+                                // A filter can still stop the stream from being complete as seen
+                                // by the codec.
+      bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written all
+                                          // the way through to the codec.
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
       bool created_filter_chain_ : 1;
@@ -479,8 +492,11 @@ private:
     // Per-stream request timeout callback
     void onRequestTimeout();
 
+    bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
+
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
+    Router::ScopedConfigConstSharedPtr snapped_scoped_route_config_;
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
@@ -517,6 +533,7 @@ private:
     // Whether a filter has indicated that the response should be treated as a headers only
     // response.
     bool encoding_headers_only_{};
+    Network::Socket::OptionsSharedPtr upstream_options_;
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

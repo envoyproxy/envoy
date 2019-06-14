@@ -97,7 +97,9 @@ class SpellChecker:
       f.writelines(words)
 
     # Start an aspell process.
-    aspell_args = ["aspell", "pipe", "--run-together", "--encoding=utf-8", "--personal=" + pws]
+    aspell_args = [
+        "aspell", "pipe", "--run-together", "--lang=en_US", "--encoding=utf-8", "--personal=" + pws
+    ]
     self.aspell = subprocess.Popen(
         aspell_args,
         bufsize=4096,

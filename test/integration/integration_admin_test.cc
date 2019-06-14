@@ -151,6 +151,12 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
 
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/ready", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
@@ -313,11 +319,24 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
 
+  response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/runtime_modify", "foo=bar&foo1=bar1", downstreamProtocol(),
+      version_, "host", Http::Headers::get().ContentTypeValues.FormUrlEncoded);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/runtime?format=json",
                                                 "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
+
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  auto entries = json->getObject("entries");
+  auto foo_obj = entries->getObject("foo");
+  EXPECT_EQ("bar", foo_obj->getString("final_value"));
+  auto foo1_obj = entries->getObject("foo1");
+  EXPECT_EQ("bar1", foo1_obj->getString("final_value"));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/listeners", "",
                                                 downstreamProtocol(), version_);
@@ -325,7 +344,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
 
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  json = Json::Factory::loadFromString(response->body());
   std::vector<Json::ObjectSharedPtr> listener_info = json->asObjectArray();
   auto listener_info_it = listener_info.cbegin();
   auto listeners = test_server_->server().listenerManager().listeners();
@@ -347,7 +366,9 @@ TEST_P(IntegrationAdminTest, Admin) {
       "type.googleapis.com/envoy.admin.v2alpha.BootstrapConfigDump",
       "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump",
       "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump",
+      "type.googleapis.com/envoy.admin.v2alpha.ScopedRoutesConfigDump",
       "type.googleapis.com/envoy.admin.v2alpha.RoutesConfigDump"};
+
   for (Json::ObjectSharedPtr obj_ptr : json->getObjectArray("configs")) {
     EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
     index++;
@@ -355,12 +376,12 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   // Validate we can parse as proto.
   envoy::admin::v2alpha::ConfigDump config_dump;
-  MessageUtil::loadFromJson(response->body(), config_dump);
-  EXPECT_EQ(4, config_dump.configs_size());
+  TestUtility::loadFromJson(response->body(), config_dump);
+  EXPECT_EQ(5, config_dump.configs_size());
 
   // .. and that we can unpack one of the entries.
   envoy::admin::v2alpha::RoutesConfigDump route_config_dump;
-  config_dump.configs(3).UnpackTo(&route_config_dump);
+  config_dump.configs(4).UnpackTo(&route_config_dump);
   EXPECT_EQ("route_config_0", route_config_dump.static_route_configs(0).route_config().name());
 }
 
@@ -513,6 +534,8 @@ TEST_P(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
 // blocks on its creation (see waitForCounterGe and the suite of waitFor* functions).
 // If this invariant is changed, this test must be rewritten.
 TEST_P(StatsMatcherIntegrationTest, IncludeExact) {
+  // Stats matching does not play well with LDS, at least in test. See #7215.
+  use_lds_ = false;
   stats_matcher_.mutable_inclusion_list()->add_patterns()->set_exact(
       "listener_manager.listener_create_success");
   initialize();

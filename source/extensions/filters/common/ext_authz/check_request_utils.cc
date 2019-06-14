@@ -109,10 +109,8 @@ void CheckRequestUtils::setHttpRequest(
       [](const Envoy::Http::HeaderEntry& e, void* ctx) {
         // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
         if (e.key().getStringView() != Http::Headers::get().EnvoyAuthPartialBody.get()) {
-          Envoy::Protobuf::Map<Envoy::ProtobufTypes::String, Envoy::ProtobufTypes::String>*
-              mutable_headers =
-                  static_cast<Envoy::Protobuf::Map<Envoy::ProtobufTypes::String,
-                                                   Envoy::ProtobufTypes::String>*>(ctx);
+          Envoy::Protobuf::Map<std::string, std::string>* mutable_headers =
+              static_cast<Envoy::Protobuf::Map<std::string, std::string>*>(ctx);
           (*mutable_headers)[std::string(e.key().getStringView())] =
               std::string(e.value().getStringView());
         }
@@ -144,7 +142,7 @@ void CheckRequestUtils::setAttrContextRequest(
 void CheckRequestUtils::createHttpCheck(
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers,
-    Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>&& context_extensions,
+    Protobuf::Map<std::string, std::string>&& context_extensions,
     envoy::service::auth::v2::CheckRequest& request, uint64_t max_request_bytes) {
 
   auto attrs = request.mutable_attributes();

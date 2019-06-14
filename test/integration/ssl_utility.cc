@@ -48,7 +48,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
   }
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml_plain), tls_context);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), tls_context);
   auto* common_context = tls_context.mutable_common_tls_context();
 
   if (options.alpn_) {

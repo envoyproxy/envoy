@@ -15,7 +15,15 @@ namespace Upstream {
 /**
  * Type of load balancing to perform.
  */
-enum class LoadBalancerType { RoundRobin, LeastRequest, Random, RingHash, OriginalDst, Maglev };
+enum class LoadBalancerType {
+  RoundRobin,
+  LeastRequest,
+  Random,
+  RingHash,
+  OriginalDst,
+  Maglev,
+  ClusterProvided
+};
 
 /**
  * Load Balancer subset configuration.

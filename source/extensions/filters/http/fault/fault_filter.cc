@@ -26,6 +26,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 
+struct RcDetailsValues {
+  // The fault filter injected an abort for this request.
+  const std::string FaultAbort = "fault_filter_abort";
+};
+typedef ConstSingleton<RcDetailsValues> RcDetails;
+
 FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
   if (fault.has_abort()) {
     const auto& abort = fault.abort();
@@ -338,7 +344,7 @@ void FaultFilter::abortWithHTTPStatus() {
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
   decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(abortHttpStatus()),
                                      "fault filter abort", nullptr, absl::nullopt,
-                                     StreamInfo::ResponseCodeDetails::get().FaultAbort);
+                                     RcDetails::get().FaultAbort);
   recordAbortsInjectedStats();
 }
 

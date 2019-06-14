@@ -1,10 +1,12 @@
 #include <memory>
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/api/os_sys_calls_impl_hot_restart.h"
 #include "common/common/hex.h"
 
 #include "server/hot_restart_impl.h"
 
+#include "test/mocks/api/hot_restart.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/logging.h"
@@ -29,8 +31,8 @@ namespace {
 class HotRestartImplTest : public testing::Test {
 public:
   void setup() {
-    EXPECT_CALL(os_sys_calls_, shmUnlink(_)).Times(AnyNumber());
-    EXPECT_CALL(os_sys_calls_, shmOpen(_, _, _));
+    EXPECT_CALL(hot_restart_os_sys_calls_, shmUnlink(_)).Times(AnyNumber());
+    EXPECT_CALL(hot_restart_os_sys_calls_, shmOpen(_, _, _));
     EXPECT_CALL(os_sys_calls_, ftruncate(_, _)).WillOnce(WithArg<1>(Invoke([this](off_t size) {
       buffer_.resize(size);
       return Api::SysCallIntResult{0, 0};
@@ -48,6 +50,9 @@ public:
 
   Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  Api::MockHotRestartOsSysCalls hot_restart_os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::HotRestartOsSysCallsImpl> hot_restart_os_calls{
+      &hot_restart_os_sys_calls_};
   NiceMock<MockOptions> options_;
   std::vector<uint8_t> buffer_;
   std::unique_ptr<HotRestartImpl> hot_restart_;

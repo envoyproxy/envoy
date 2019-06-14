@@ -82,6 +82,10 @@ void HotRestartingChild::sendParentTerminateRequest() {
   parent_terminated_ = true;
   // Once setting parent_terminated_ == true, we can send no more hot restart RPCs, and therefore
   // receive no more responses, including stats. So, now safe to forget our stat transferral state.
+  //
+  // This destruction is actually important far beyond memory efficiency. The scope-based temporary
+  // counter logic relies on the StatMerger getting destroyed once hot restart's stat merging is
+  // all done. (See stat_merger.h for details).
   stat_merger_.reset();
 }
 

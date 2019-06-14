@@ -27,8 +27,9 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       counters_([this](StatName name) -> CounterSharedPtr {
         return alloc_.makeCounter(name, alloc_.symbolTable().toString(name), std::vector<Tag>());
       }),
-      gauges_([this](StatName name) -> GaugeSharedPtr {
-        return alloc_.makeGauge(name, alloc_.symbolTable().toString(name), std::vector<Tag>());
+      gauges_([this](StatName name, Gauge::ImportMode import_mode) -> GaugeSharedPtr {
+        return alloc_.makeGauge(name, alloc_.symbolTable().toString(name), std::vector<Tag>(),
+                                import_mode);
       }),
       histograms_([this](StatName name) -> HistogramSharedPtr {
         return std::make_shared<HistogramImpl>(name, *this, alloc_.symbolTable().toString(name),

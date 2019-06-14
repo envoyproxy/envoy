@@ -101,11 +101,10 @@ public:
     // the stat declaration macros themselves. (Now that stats no longer use shared memory, it's
     // safe to mess with what these flag bits mean whenever we want).
     static const uint8_t LogicAccumulate = 0x02;
-    static const uint8_t LogicNeverImport = 0x04;
-    static const uint8_t LogicCached = LogicAccumulate | LogicNeverImport;
+    static const uint8_t ImportModeUninitialized = 0x04; // Stat was discovered during import.
   };
   virtual SymbolTable& symbolTable() PURE;
-  virtual const SymbolTable& symbolTable() const PURE;
+  virtual const SymbolTable& constSymbolTable() const PURE;
 };
 
 /**
@@ -130,6 +129,12 @@ typedef std::shared_ptr<Counter> CounterSharedPtr;
  */
 class Gauge : public virtual Metric {
 public:
+  enum class ImportMode {
+    Uninitialized, // Gauge was discovered during hot-restart transfer.
+    NeverImport,   // On hot-restart, each process starts with gauge at 0.
+    Accumulate,    // Transfers gauge state on hot-restart.
+  };
+
   virtual ~Gauge() {}
 
   virtual void add(uint64_t amount) PURE;
@@ -140,14 +145,20 @@ public:
   virtual uint64_t value() const PURE;
 
   /**
-   * Returns the stat's combine logic, if known.
+   * @return the import mode, dictating behavior of the gauge across hot restarts.
    */
-  virtual absl::optional<bool> cachedShouldImport() const PURE;
+  virtual ImportMode importMode() const PURE;
 
   /**
-   * Sets the value to be returned by cachedCombineLogic().
+   * Gauges can be created with ImportMode::Uninitialized during hot-restart
+   * merges, if they haven't yet been instantiated by the child process. When
+   * they finally get instantiated, mergeImportMode should be called to
+   * initialize the gauge's import mode. It is only valid to call
+   * mergeImportMode when the current mode is ImportMode::Uninitialized.
+   *
+   * @param import_mode the new import mode.
    */
-  virtual void setShouldImport(bool should_import) PURE;
+  virtual void mergeImportMode(ImportMode import_mode) PURE;
 };
 
 typedef std::shared_ptr<Gauge> GaugeSharedPtr;

@@ -1,5 +1,7 @@
 #include "common/config/delta_subscription_state.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -98,6 +100,20 @@ DeltaSubscriptionState::handleResponse(const envoy::api::v2::DeltaDiscoveryRespo
 void DeltaSubscriptionState::handleGoodResponse(
     const envoy::api::v2::DeltaDiscoveryResponse& message) {
   disableInitFetchTimeoutTimer();
+  absl::flat_hash_set<std::string> names_added_removed;
+  for (const auto& resource : message.resources()) {
+    if (!names_added_removed.insert(resource.name()).second) {
+      throw EnvoyException(
+          fmt::format("duplicate name {} found among added/updated resources", resource.name()));
+    }
+  }
+  for (const auto& name : message.removed_resources()) {
+    if (!names_added_removed.insert(name).second) {
+      throw EnvoyException(
+          fmt::format("duplicate name {} found in the union of added+removed resources", name));
+    }
+  }
+
   callbacks_.onConfigUpdate(message.resources(), message.removed_resources(),
                             message.system_version_info());
   for (const auto& resource : message.resources()) {

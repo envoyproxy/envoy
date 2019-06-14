@@ -15,7 +15,6 @@ envoy_cc_library(
         "histogram.h",
         "scope.h",
         "sink.h",
-        "source.h",
         "stat_data_allocator.h",
         "stats.h",
         "stats_matcher.h",

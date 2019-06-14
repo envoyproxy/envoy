@@ -47,7 +47,7 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                TransportSocketPtr&& transport_socket, bool connected)
     : transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
-      filter_manager_(*this, *this), stream_info_(dispatcher.timeSource()),
+      filter_manager_(*this), stream_info_(dispatcher.timeSource()),
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
@@ -148,10 +148,6 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       return;
     }
 
-    // All close types that follow do not actually close() the socket immediately so that buffered
-    // data can be written. However, we do want to stop reading to apply TCP backpressure.
-    read_enabled_ = false;
-
     // NOTE: At this point, it's already been validated that the connection is not already in
     // delayed close processing and therefore the timer has not yet been created.
     if (delayed_close_timeout_set) {
@@ -244,9 +240,10 @@ void ConnectionImpl::noDelay(bool enable) {
 uint64_t ConnectionImpl::id() const { return id_; }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
-  if (!read_enabled_) {
+  if (!read_enabled_ || inDelayedClose()) {
     return;
   }
+  ASSERT(ioHandle().isOpen());
 
   if (read_buffer_size == 0 && !read_end_stream_) {
     return;
@@ -356,7 +353,15 @@ void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
   bytes_sent_callbacks_.emplace_back(cb);
 }
 
+void ConnectionImpl::rawWrite(Buffer::Instance& data, bool end_stream) {
+  write(data, end_stream, false);
+}
+
 void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
+  write(data, end_stream, true);
+}
+
+void ConnectionImpl::write(Buffer::Instance& data, bool end_stream, bool through_filter_chain) {
   ASSERT(!end_stream || enable_half_close_);
 
   if (write_end_stream_) {
@@ -368,16 +373,18 @@ void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
     return;
   }
 
-  // NOTE: This is kind of a hack, but currently we don't support restart/continue on the write
-  //       path, so we just pass around the buffer passed to us in this function. If we ever support
-  //       buffer/restart/continue on the write path this needs to get more complicated.
-  current_write_buffer_ = &data;
-  current_write_end_stream_ = end_stream;
-  FilterStatus status = filter_manager_.onWrite();
-  current_write_buffer_ = nullptr;
+  if (through_filter_chain) {
+    // NOTE: This is kind of a hack, but currently we don't support restart/continue on the write
+    //       path, so we just pass around the buffer passed to us in this function. If we ever
+    //       support buffer/restart/continue on the write path this needs to get more complicated.
+    current_write_buffer_ = &data;
+    current_write_end_stream_ = end_stream;
+    FilterStatus status = filter_manager_.onWrite();
+    current_write_buffer_ = nullptr;
 
-  if (FilterStatus::StopIteration == status) {
-    return;
+    if (FilterStatus::StopIteration == status) {
+      return;
+    }
   }
 
   write_end_stream_ = end_stream;

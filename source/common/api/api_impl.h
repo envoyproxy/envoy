@@ -16,7 +16,7 @@ namespace Api {
  */
 class Impl : public Api {
 public:
-  Impl(Thread::ThreadFactory& thread_factory, Stats::Store&, Event::TimeSystem& time_system,
+  Impl(Thread::ThreadFactory& thread_factory, Stats::Store& store, Event::TimeSystem& time_system,
        Filesystem::Instance& file_system);
 
   // Api::Api
@@ -25,9 +25,11 @@ public:
   Thread::ThreadFactory& threadFactory() override { return thread_factory_; }
   Filesystem::Instance& fileSystem() override { return file_system_; }
   TimeSource& timeSource() override { return time_system_; }
+  const Stats::Scope& rootScope() override { return store_; }
 
 private:
   Thread::ThreadFactory& thread_factory_;
+  Stats::Store& store_;
   Event::TimeSystem& time_system_;
   Filesystem::Instance& file_system_;
 };

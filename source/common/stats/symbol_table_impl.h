@@ -45,7 +45,7 @@ using SymbolVec = std::vector<Symbol>;
  * reference-counted so that no-longer-used symbols can be reclaimed.
  *
  * We use a uint8_t array to encode a "."-deliminated stat-name into arrays of
- * integer symbol symbol IDs in order to conserve space, as in practice the
+ * integer symbol IDs in order to conserve space, as in practice the
  * majority of token instances in stat names draw from a fairly small set of
  * common names, typically less than 100. The format is somewhat similar to
  * UTF-8, with a variable-length array of uint8_t. See the implementation for
@@ -230,7 +230,7 @@ private:
   // The encode map stores both the symbol and the ref count of that symbol.
   // Using absl::string_view lets us only store the complete string once, in the decode map.
   using EncodeMap = absl::flat_hash_map<absl::string_view, SharedSymbol, StringViewHash>;
-  using DecodeMap = absl::flat_hash_map<Symbol, std::unique_ptr<std::string>>;
+  using DecodeMap = absl::flat_hash_map<Symbol, InlineStringPtr>;
   EncodeMap encode_map_ GUARDED_BY(lock_);
   DecodeMap decode_map_ GUARDED_BY(lock_);
 
@@ -401,7 +401,7 @@ public:
   ~StatNameManagedStorage() { free(symbol_table_); }
 
   SymbolTable& symbolTable() { return symbol_table_; }
-  const SymbolTable& symbolTable() const { return symbol_table_; }
+  const SymbolTable& constSymbolTable() const { return symbol_table_; }
 
 private:
   SymbolTable& symbol_table_;
@@ -417,6 +417,8 @@ private:
  *   StatNamePool pool(symbol_table);
  *   StatName name1 = pool.add("name1");
  *   StatName name2 = pool.add("name2");
+ *   uint8_t* storage = pool.addReturningStorage("name3");
+ *   StatName name3(storage);
  */
 class StatNamePool {
 public:
@@ -433,6 +435,24 @@ public:
    * @return the StatName held in the container for this name.
    */
   StatName add(absl::string_view name);
+
+  /**
+   * Does essentially the same thing as add(), but returns the storage as a
+   * pointer which can later be used to create a StatName. This can be used
+   * to accumulate a vector of uint8_t* which can later be used to create
+   * StatName objects on demand.
+   *
+   * The use-case for this is in source/common/http/codes.cc, where we have a
+   * fixed sized array of atomic pointers, indexed by HTTP code. This API
+   * enables storing the allocated stat-name in that array of atomics, which
+   * enables content-avoidance when finding StatNames for frequently used HTTP
+   * codes.
+   *
+   * @param name the name to add the container.
+   * @return a pointer to the bytes held in the container for this name, suitable for
+   *         using to construct a StatName.
+   */
+  uint8_t* addReturningStorage(absl::string_view name);
 
 private:
   // We keep the stat names in a vector of StatNameStorage, storing the

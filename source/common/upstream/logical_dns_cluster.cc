@@ -74,8 +74,8 @@ void LogicalDnsCluster::startResolve() {
 
   active_dns_query_ = dns_resolver_->resolve(
       dns_address, dns_lookup_family_,
-      [this, dns_address](
-          const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+      [this,
+       dns_address](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_dns_query_ = nullptr;
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address);
         info_->stats().update_success_.inc();
@@ -138,20 +138,22 @@ Upstream::Host::CreateConnectionData LogicalDnsCluster::LogicalHost::createConne
   ASSERT(data.current_resolved_address_);
   return {HostImpl::createConnection(dispatcher, *parent_.info_, data.current_resolved_address_,
                                      options, transport_socket_options),
-          HostDescriptionConstSharedPtr{
-              new RealHostDescription(data.current_resolved_address_, parent_.localityLbEndpoint(),
-                                      parent_.lbEndpoint(), shared_from_this())}};
+          HostDescriptionConstSharedPtr{new RealHostDescription(
+              data.current_resolved_address_, parent_.localityLbEndpoint(), parent_.lbEndpoint(),
+              shared_from_this(), parent_.symbolTable())}};
 }
 
-ClusterImplBaseSharedPtr LogicalDnsClusterFactory::createClusterImpl(
+std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+LogicalDnsClusterFactory::createClusterImpl(
     const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);
 
-  return std::make_unique<LogicalDnsCluster>(cluster, context.runtime(), selected_dns_resolver,
-                                             context.tls(), socket_factory_context,
-                                             std::move(stats_scope), context.addedViaApi());
+  return std::make_pair(std::make_shared<LogicalDnsCluster>(
+                            cluster, context.runtime(), selected_dns_resolver, context.tls(),
+                            socket_factory_context, std::move(stats_scope), context.addedViaApi()),
+                        nullptr);
 }
 
 /**

@@ -12,9 +12,6 @@
 namespace Envoy {
 namespace Http {
 
-const std::list<std::string> AsyncStreamImpl::NullCorsPolicy::allow_origin_;
-const std::list<std::regex> AsyncStreamImpl::NullCorsPolicy::allow_origin_regex_;
-const absl::optional<bool> AsyncStreamImpl::NullCorsPolicy::allow_credentials_;
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
     AsyncStreamImpl::NullRateLimitPolicy::rate_limit_policy_entry_;
 const AsyncStreamImpl::NullHedgePolicy AsyncStreamImpl::RouteEntryImpl::hedge_policy_;

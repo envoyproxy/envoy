@@ -45,11 +45,11 @@ public:
    * @param request is the reference to the check request that will be filled up.
    * @param with_request_body when true, will add the request body to the check request.
    */
-  static void
-  createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                  const Envoy::Http::HeaderMap& headers,
-                  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>&& context_extensions,
-                  envoy::service::auth::v2::CheckRequest& request, uint64_t max_request_bytes);
+  static void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+                              const Envoy::Http::HeaderMap& headers,
+                              Protobuf::Map<std::string, std::string>&& context_extensions,
+                              envoy::service::auth::v2::CheckRequest& request,
+                              uint64_t max_request_bytes);
 
   /**
    * createTcpCheck is used to extract the attributes from the network layer and fill them up

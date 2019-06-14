@@ -109,7 +109,7 @@ protected:
         for (const auto& response_message_str : grpc_response_messages) {
           ResponseType response_message;
           EXPECT_TRUE(TextFormat::ParseFromString(response_message_str, &response_message));
-          auto buffer = Grpc::Common::serializeBody(response_message);
+          auto buffer = Grpc::Common::serializeToGrpcFrame(response_message);
           upstream_request_->encodeData(*buffer, false);
         }
         Http::TestHeaderMapImpl response_trailers;

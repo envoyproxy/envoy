@@ -15,6 +15,7 @@ envoy_cc_library(
     deps = [
         ":metric_impl_lib",
         ":stat_data_allocator_lib",
+        ":stat_merger_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:thread_annotations",
@@ -85,18 +86,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "source_impl_lib",
-    srcs = ["source_impl.cc"],
-    hdrs = ["source_impl.h"],
-    external_deps = [
-        "abseil_optional",
-    ],
-    deps = [
-        "//include/envoy/stats:stats_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "stat_data_allocator_lib",
     hdrs = ["stat_data_allocator_impl.h"],
     deps = [
@@ -122,7 +111,6 @@ envoy_cc_library(
     deps = [
         ":histogram_lib",
         ":metric_impl_lib",
-        ":source_impl_lib",
         ":symbol_table_lib",
         ":tag_extractor_lib",
         ":utility_lib",

@@ -37,7 +37,7 @@ public:
    */
   static HeaderParserPtr configure(
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add,
-      const Protobuf::RepeatedPtrField<ProtobufTypes::String>& headers_to_remove);
+      const Protobuf::RepeatedPtrField<std::string>& headers_to_remove);
 
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const;
 

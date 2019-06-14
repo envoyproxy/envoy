@@ -58,7 +58,7 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
 
 ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {
   ProtobufWkt::Struct pfc;
-  MessageUtil::loadFromJson(json_config, pfc);
+  TestUtility::loadFromJson(json_config, pfc);
 
   return
       [pfc](

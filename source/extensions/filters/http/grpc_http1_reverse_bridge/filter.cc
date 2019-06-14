@@ -14,6 +14,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1ReverseBridge {
 
+struct RcDetailsValues {
+  // The gRPC HTTP/1 reverse bridge failed because the body payload was too
+  // small to be a gRPC frame.
+  const std::string GrpcBridgeFailedTooSmall = "grpc_bridge_data_too_small";
+  // The gRPC HTTP/1 bridge encountered an unsupported content type.
+  const std::string GrpcBridgeFailedContentType = "grpc_bridge_content_type_wrong";
+};
+typedef ConstSingleton<RcDetailsValues> RcDetails;
+
 namespace {
 Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::HeaderMap& headers) {
   const auto http_response_status = Http::Utility::getResponseStatus(headers);
@@ -77,9 +86,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& buffer, bool) {
   if (enabled_ && withhold_grpc_frames_ && !prefix_stripped_) {
     // Fail the request if the body is too small to possibly contain a gRPC frame.
     if (buffer.length() < Grpc::GRPC_FRAME_HEADER_SIZE) {
-      decoder_callbacks_->sendLocalReply(
-          Http::Code::OK, "invalid request body", nullptr, Grpc::Status::GrpcStatus::Unknown,
-          StreamInfo::ResponseCodeDetails::get().GrpcBridgeFailedTooSmall);
+      decoder_callbacks_->sendLocalReply(Http::Code::OK, "invalid request body", nullptr,
+                                         Grpc::Status::GrpcStatus::Unknown,
+                                         RcDetails::get().GrpcBridgeFailedTooSmall);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
@@ -109,7 +118,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) 
       content_type->value(content_type_);
 
       decoder_callbacks_->streamInfo().setResponseCodeDetails(
-          StreamInfo::ResponseCodeDetails::get().GrpcBridgeFailedContentType);
+          RcDetails::get().GrpcBridgeFailedContentType);
       return Http::FilterHeadersStatus::ContinueAndEndStream;
     }
 

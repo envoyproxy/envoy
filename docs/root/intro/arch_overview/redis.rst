@@ -25,6 +25,7 @@ The Redis project offers a thorough reference on partitioning as it relates to R
 * Active and passive healthchecking.
 * Hash tagging.
 * Prefix routing.
+* Separate downstream client and upstream server authentication.
 
 **Planned future enhancements**:
 
@@ -85,10 +86,13 @@ Supported commands
 At the protocol level, pipelines are supported. MULTI (transaction block) is not.
 Use pipelining wherever possible for the best performance.
 
-At the command level, Envoy only supports commands that can be reliably hashed to a server. PING
-is the only exception, which Envoy responds to immediately with PONG. Arguments to PING are not
-allowed. All other supported commands must contain a key. Supported commands are functionally
-identical to the original Redis command except possibly in failure scenarios.
+At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH and PING
+are the only exceptions. AUTH is processed locally by Envoy if a downstream password has been configured, 
+and no other commands will be processed until authentication is successful when a password has been 
+configured. Envoy will transparently issue AUTH commands upon connecting to upstream servers, if upstream 
+authentication passwords are configured for the cluster. Envoy responds to PING immediately with PONG. 
+Arguments to PING are not allowed. All other supported commands must contain a key. Supported commands are 
+functionally identical to the original Redis command except possibly in failure scenarios.
 
 For details on each command's usage see the official
 `Redis command reference <https://redis.io/commands>`_.
@@ -97,6 +101,7 @@ For details on each command's usage see the official
   :header: Command, Group
   :widths: 1, 1
 
+  AUTH, Authentication
   PING, Connection
   DEL, Generic
   DUMP, Generic
@@ -227,6 +232,12 @@ Envoy can also generate its own errors in response to the client.
   responded with a response that not conform to the Redis protocol."
   wrong number of arguments for command, "Certain commands check in Envoy that the number of
   arguments is correct."
+  "NOAUTH Authentication required.", "The command was rejected because a downstream authentication
+  password has been set and the client has not successfully authenticated."
+  ERR invalid password, "The authentication command failed due to an invalid password."
+  "ERR Client sent AUTH, but no password is set", "An authentication command was received, but no 
+  downstream authentication password has been configured."
+
 
 In the case of MGET, each individual key that cannot be fetched will generate an error response.
 For example, if we fetch five keys and two of the keys' backends time out, we would get an error

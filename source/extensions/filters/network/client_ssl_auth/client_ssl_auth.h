@@ -26,16 +26,14 @@ namespace ClientSslAuth {
 /**
  * All client SSL auth stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_CLIENT_SSL_AUTH_STATS(COUNTER, GAUGE)                                                  \
-  COUNTER(update_success)                                                                          \
-  COUNTER(update_failure)                                                                          \
-  COUNTER(auth_no_ssl)                                                                             \
-  COUNTER(auth_ip_white_list)                                                                      \
   COUNTER(auth_digest_match)                                                                       \
   COUNTER(auth_digest_no_match)                                                                    \
-  GAUGE  (total_principals)
-// clang-format on
+  COUNTER(auth_ip_white_list)                                                                      \
+  COUNTER(auth_no_ssl)                                                                             \
+  COUNTER(update_failure)                                                                          \
+  COUNTER(update_success)                                                                          \
+  GAUGE(total_principals, NeverImport)
 
 /**
  * Struct definition for all client SSL auth stats. @see stats_macros.h

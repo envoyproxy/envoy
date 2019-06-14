@@ -20,37 +20,37 @@ void ClientLoginResponse::setServerStatus(uint16_t status) { server_status_ = st
 
 void ClientLoginResponse::setWarnings(uint16_t warnings) { warnings_ = warnings; }
 
-int ClientLoginResponse::parseMessage(Buffer::Instance& buffer, uint64_t& offset, int) {
+int ClientLoginResponse::parseMessage(Buffer::Instance& buffer, uint32_t) {
   uint8_t resp_code = 0;
-  if (BufferHelper::peekUint8(buffer, offset, resp_code) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint8(buffer, resp_code) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing response code in mysql Login Ok msg");
     return MYSQL_FAILURE;
   }
   setRespCode(resp_code);
-  if ((resp_code == MYSQL_RESP_AUTH_SWITCH) && BufferHelper::endOfBuffer(buffer, offset)) {
+  if ((resp_code == MYSQL_RESP_AUTH_SWITCH) && BufferHelper::endOfBuffer(buffer)) {
     // OldAuthSwitchRequest
     return MYSQL_SUCCESS;
   }
   uint8_t affected_rows = 0;
-  if (BufferHelper::peekUint8(buffer, offset, affected_rows) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint8(buffer, affected_rows) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing affected_rows in mysql Login Ok msg");
     return MYSQL_FAILURE;
   }
   setAffectedRows(affected_rows);
   uint8_t last_insert_id = 0;
-  if (BufferHelper::peekUint8(buffer, offset, last_insert_id) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint8(buffer, last_insert_id) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing last_insert_id in mysql Login Ok msg");
     return MYSQL_FAILURE;
   }
   setLastInsertId(last_insert_id);
   uint16_t server_status = 0;
-  if (BufferHelper::peekUint16(buffer, offset, server_status) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint16(buffer, server_status) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing server_status in mysql Login Ok msg");
     return MYSQL_FAILURE;
   }
   setServerStatus(server_status);
   uint16_t warnings = 0;
-  if (BufferHelper::peekUint16(buffer, offset, warnings) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint16(buffer, warnings) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing warnings in mysql Login Ok msg");
     return MYSQL_FAILURE;
   }

@@ -31,9 +31,7 @@ def _proto_path(proto):
 # get docs created.
 def _proto_doc_aspect_impl(target, ctx):
     # Compute RST files from the current proto_library node's dependencies.
-    transitive_outputs = depset()
-    for dep in ctx.rule.attr.deps:
-        transitive_outputs = transitive_outputs | dep.output_groups["rst"]
+    transitive_outputs = depset(transitive = [dep.output_groups["rst"] for dep in ctx.rule.attr.deps])
     proto_sources = target[ProtoInfo].direct_sources
 
     # If this proto_library doesn't actually name any sources, e.g. //api:api,
@@ -74,7 +72,7 @@ def _proto_doc_aspect_impl(target, ctx):
         mnemonic = "ProtoDoc",
         use_default_shell_env = True,
     )
-    transitive_outputs = depset(outputs) | transitive_outputs
+    transitive_outputs = depset(outputs, transitive = [transitive_outputs])
     return [OutputGroupInfo(rst = transitive_outputs)]
 
 proto_doc_aspect = aspect(

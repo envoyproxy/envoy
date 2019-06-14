@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "common/common/hex.h"
+#include "common/common/stack_array.h"
 #include "common/compressor/zlib_compressor_impl.h"
 #include "common/decompressor/zlib_decompressor_impl.h"
 #include "common/protobuf/utility.h"
@@ -63,12 +65,15 @@ protected:
   void setUpFilter(std::string&& json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     envoy::config::filter::http::gzip::v2::Gzip gzip;
-    MessageUtil::loadFromJson(json, gzip);
+    TestUtility::loadFromJson(json, gzip);
     config_.reset(new GzipFilterConfig(gzip, "test.", stats_, runtime_));
     filter_ = std::make_unique<GzipFilter>(config_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  void verifyCompressedData() {
+  void verifyCompressedData(const uint32_t content_length) {
+    // This makes sure we have a finished buffer before sending it to the client.
+    expectValidFinishedBuffer(content_length);
     decompressor_.decompress(data_, decompressed_data_);
     const std::string uncompressed_str{decompressed_data_.toString()};
     ASSERT_EQ(expected_str_.length(), uncompressed_str.length());
@@ -91,17 +96,66 @@ protected:
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, end_stream));
   }
 
-  void doResponseCompression(Http::TestHeaderMapImpl&& headers) {
+  void doResponseCompression(Http::TestHeaderMapImpl&& headers, bool withTrailers) {
     uint64_t content_length;
     ASSERT_TRUE(absl::SimpleAtoi(headers.get_("content-length"), &content_length));
     feedBuffer(content_length);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-length"));
     EXPECT_EQ(Http::Headers::get().ContentEncodingValues.Gzip, headers.get_("content-encoding"));
-    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, true));
-    verifyCompressedData();
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, !withTrailers));
+    if (withTrailers) {
+      Buffer::OwnedImpl trailers_buffer;
+      EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
+          .WillOnce(Invoke([&](Buffer::Instance& data, bool) { data_.move(data); }));
+      EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(headers));
+    }
+    verifyCompressedData(content_length);
     drainBuffer();
     EXPECT_EQ(1U, stats_.counter("test.gzip.compressed").value());
+  }
+
+  void expectValidFinishedBuffer(const uint32_t content_length) {
+    uint64_t num_comp_slices = data_.getRawSlices(nullptr, 0);
+    STACK_ARRAY(compressed_slices, Buffer::RawSlice, num_comp_slices);
+    data_.getRawSlices(compressed_slices.begin(), num_comp_slices);
+
+    const std::string header_hex_str = Hex::encode(
+        reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
+    // HEADER 0x1f = 31 (window_bits)
+    EXPECT_EQ("1f8b", header_hex_str.substr(0, 4));
+    // CM 0x8 = deflate (compression method)
+    EXPECT_EQ("08", header_hex_str.substr(4, 2));
+
+    const std::string footer_bytes_str =
+        Hex::encode(reinterpret_cast<unsigned char*>(compressed_slices[num_comp_slices - 1].mem_),
+                    compressed_slices[num_comp_slices - 1].len_);
+
+    // A valid finished compressed buffer should have trailer with input size in it, i.e. equals to
+    // the value of content_length.
+    expectEqualInputSize(footer_bytes_str, content_length);
+  }
+
+  void expectEqualInputSize(const std::string& footer_bytes, const uint32_t input_size) {
+    const std::string size_bytes = footer_bytes.substr(footer_bytes.size() - 8, 8);
+    uint64_t size;
+    StringUtil::atoull(size_bytes.c_str(), size, 16);
+    EXPECT_EQ(TestUtility::flipOrder<uint32_t>(size), input_size);
+  }
+
+  void expectValidCompressionStrategyAndLevel(
+      Compressor::ZlibCompressorImpl::CompressionStrategy strategy, absl::string_view strategy_name,
+      Compressor::ZlibCompressorImpl::CompressionLevel level, absl::string_view level_name) {
+    setUpFilter(fmt::format(R"EOF({{"compression_strategy": "{}", "compression_level": "{}"}})EOF",
+                            strategy_name, level_name));
+    EXPECT_EQ(strategy, config_->compressionStrategy());
+    EXPECT_EQ(level, config_->compressionLevel());
+    EXPECT_EQ(5, config_->memoryLevel());
+    EXPECT_EQ(30, config_->minimumLength());
+    EXPECT_EQ(28, config_->windowBits());
+    EXPECT_EQ(false, config_->disableOnEtagHeader());
+    EXPECT_EQ(false, config_->removeAcceptEncodingHeader());
+    EXPECT_EQ(8, config_->contentTypeValues().size());
   }
 
   void doResponseNoCompression(Http::TestHeaderMapImpl&& headers) {
@@ -129,6 +183,7 @@ protected:
   std::string expected_str_;
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
 // Test if Runtime Feature is Disabled
@@ -153,6 +208,21 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
   EXPECT_EQ(8, config_->contentTypeValues().size());
 }
 
+TEST_F(GzipFilterTest, AvailableCombinationCompressionStrategyAndLevelConfig) {
+  expectValidCompressionStrategyAndLevel(
+      Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered, "FILTERED",
+      Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
+  expectValidCompressionStrategyAndLevel(
+      Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman, "HUFFMAN",
+      Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
+  expectValidCompressionStrategyAndLevel(
+      Compressor::ZlibCompressorImpl::CompressionStrategy::Rle, "RLE",
+      Compressor::ZlibCompressorImpl::CompressionLevel::Speed, "SPEED");
+  expectValidCompressionStrategyAndLevel(
+      Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, "DEFAULT",
+      Compressor::ZlibCompressorImpl::CompressionLevel::Standard, "DEFAULT");
+}
+
 // Acceptance Testing with default configuration.
 TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
   doRequest({{":method", "get"}, {"accept-encoding", "deflate, gzip"}}, false);
@@ -160,7 +230,16 @@ TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   Http::TestHeaderMapImpl trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
-  doResponseCompression({{":method", "get"}, {"content-length", "256"}});
+  doResponseCompression({{":method", "get"}, {"content-length", "256"}}, false);
+}
+
+TEST_F(GzipFilterTest, AcceptanceGzipEncodingWithTrailers) {
+  doRequest({{":method", "get"}, {"accept-encoding", "deflate, gzip"}}, false);
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  Http::TestHeaderMapImpl trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
+  doResponseCompression({{":method", "get"}, {"content-length", "256"}}, true);
 }
 
 // Verifies isAcceptEncodingAllowed function.
@@ -191,7 +270,7 @@ TEST_F(GzipFilterTest, hasCacheControlNoTransformNoCompression) {
 TEST_F(GzipFilterTest, hasCacheControlNoTransformCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip, deflate"}}, true);
   doResponseCompression(
-      {{":method", "get"}, {"content-length", "256"}, {"cache-control", "no-cache"}});
+      {{":method", "get"}, {"content-length", "256"}, {"cache-control", "no-cache"}}, false);
 }
 
 // Verifies isAcceptEncodingAllowed function.
@@ -318,7 +397,7 @@ TEST_F(GzipFilterTest, AcceptEncodingNoCompression) {
 // Verifies that compression is NOT skipped when accept-encoding header is allowed.
 TEST_F(GzipFilterTest, AcceptEncodingCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip, deflate"}}, true);
-  doResponseCompression({{":method", "get"}, {"content-length", "256"}});
+  doResponseCompression({{":method", "get"}, {"content-length", "256"}}, false);
 }
 
 // Verifies isMinimumContentLength function.
@@ -365,7 +444,7 @@ TEST_F(GzipFilterTest, ContentLengthNoCompression) {
 TEST_F(GzipFilterTest, ContentLengthCompression) {
   setUpFilter(R"EOF({"content_length": 500})EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  doResponseCompression({{":method", "get"}, {"content-length", "1000"}});
+  doResponseCompression({{":method", "get"}, {"content-length", "1000"}}, false);
 }
 
 // Verifies isContentTypeAllowed function.
@@ -477,7 +556,8 @@ TEST_F(GzipFilterTest, ContentTypeCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseCompression({{":method", "get"},
                          {"content-length", "256"},
-                         {"content-type", "application/json;charset=utf-8"}});
+                         {"content-type", "application/json;charset=utf-8"}},
+                        false);
 }
 
 // Verifies sanitizeEtagHeader function.
@@ -597,7 +677,7 @@ TEST_F(GzipFilterTest, isTransferEncodingAllowed) {
 TEST_F(GzipFilterTest, TransferEncodingChunked) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseCompression(
-      {{":method", "get"}, {"content-length", "256"}, {"transfer-encoding", "chunked"}});
+      {{":method", "get"}, {"content-length", "256"}, {"transfer-encoding", "chunked"}}, false);
 }
 
 // Tests compression when Transfer-Encoding header exists.

@@ -79,6 +79,11 @@ public:
   virtual const std::string& configYaml() const PURE;
 
   /**
+   * @return bool allow unknown fields in the configuration?
+   */
+  virtual bool allowUnknownFields() const PURE;
+
+  /**
    * @return const std::string& the admin address output file.
    */
   virtual const std::string& adminAddressPath() const PURE;

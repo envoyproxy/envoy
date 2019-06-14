@@ -25,12 +25,12 @@ public:
     return reinterpret_cast<const char*>((slices[0]).mem_);
   }
 
-  template <typename T> size_t putIntoBuffer(const T arg) {
+  template <typename T> uint32_t putIntoBuffer(const T arg) {
     EncodingContext encoder_{-1}; // Context's api_version is not used when serializing primitives.
     return encoder_.encode(arg, buffer_);
   }
 
-  absl::string_view putGarbageIntoBuffer(size_t size = 10000) {
+  absl::string_view putGarbageIntoBuffer(uint32_t size = 10000) {
     putIntoBuffer(Bytes(size));
     return {getBytes(), size};
   }
@@ -91,7 +91,7 @@ TEST_F(KafkaRequestParserTest, RequestHeaderParserShouldExtractHeaderAndResolveN
   const int16_t api_version{2};
   const int32_t correlation_id{10};
   const NullableString client_id{"aaa"};
-  size_t header_len = 0;
+  uint32_t header_len = 0;
   header_len += putIntoBuffer(api_key);
   header_len += putIntoBuffer(api_version);
   header_len += putIntoBuffer(correlation_id);
@@ -122,7 +122,7 @@ TEST_F(KafkaRequestParserTest, RequestHeaderParserShouldHandleExceptionsDuringFe
   // This deserializer throws during feeding.
   class ThrowingRequestHeaderDeserializer : public RequestHeaderDeserializer {
   public:
-    size_t feed(absl::string_view& data) override {
+    uint32_t feed(absl::string_view& data) override {
       // Move some pointers to simulate data consumption.
       data = {data.data() + FAILED_DESERIALIZER_STEP, data.size() - FAILED_DESERIALIZER_STEP};
       throw EnvoyException("feed");
@@ -166,7 +166,7 @@ TEST_F(KafkaRequestParserTest, RequestDataParserShouldHandleDeserializerExceptio
   // This deserializer throws during feeding.
   class ThrowingDeserializer : public Deserializer<int32_t> {
   public:
-    size_t feed(absl::string_view&) override {
+    uint32_t feed(absl::string_view&) override {
       // Move some pointers to simulate data consumption.
       throw EnvoyException("feed");
     };
@@ -196,7 +196,7 @@ TEST_F(KafkaRequestParserTest, RequestDataParserShouldHandleDeserializerExceptio
 // This deserializer consumes FAILED_DESERIALIZER_STEP bytes and returns 0
 class SomeBytesDeserializer : public Deserializer<int32_t> {
 public:
-  size_t feed(absl::string_view& data) override {
+  uint32_t feed(absl::string_view& data) override {
     data = {data.data() + FAILED_DESERIALIZER_STEP, data.size() - FAILED_DESERIALIZER_STEP};
     return FAILED_DESERIALIZER_STEP;
   };

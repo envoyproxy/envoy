@@ -159,9 +159,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::v6,
             command_line_options->local_address_ip_version());
   EXPECT_EQ(options->drainTime().count(), command_line_options->drain_time().seconds());
-  // The right hand side char* will be converted into fmt::string_view and then compare.
-  EXPECT_EQ(spdlog::level::to_string_view(options->logLevel()),
-            command_line_options->log_level().data());
+  EXPECT_EQ(spdlog::level::to_string_view(options->logLevel()), command_line_options->log_level());
   EXPECT_EQ(options->logFormat(), command_line_options->log_format());
   EXPECT_EQ(options->logPath(), command_line_options->log_path());
   EXPECT_EQ(options->parentShutdownTime().count(),
@@ -303,6 +301,11 @@ TEST_F(OptionsImplTest, SetBothConcurrencyAndCpuset) {
       "Both --concurrency and --cpuset-threads options are set; not applying --cpuset-threads.",
       std::unique_ptr<OptionsImpl> options =
           createOptionsImpl("envoy -c hello --concurrency 42 --cpuset-threads"));
+}
+
+TEST_F(OptionsImplTest, SetCpusetOnly) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello --cpuset-threads");
+  EXPECT_NE(options->concurrency(), 0);
 }
 
 #if defined(__linux__)

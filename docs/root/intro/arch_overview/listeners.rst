@@ -20,7 +20,7 @@ etc.).
 Listeners are optionally also configured with some number of :ref:`listener filters
 <arch_overview_listener_filters>`. These filters are processed before the network level filters,
 and have the opportunity to manipulate the connection metadata, usually to influence how the
-connection is processed later filters or clusters.
+connection is processed by later filters or clusters.
 
 Listeners can also be fetched dynamically via the :ref:`listener discovery service (LDS)
 <config_listeners_lds>`.

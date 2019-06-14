@@ -32,6 +32,7 @@ envoy_cc_test_library(
         "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/config/accesslog/v2:file_cc",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
         "@envoy_api//envoy/config/transport_socket/tap/v2alpha:tap_cc",
     ],
 )

@@ -46,11 +46,12 @@ public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
             Network::TransportSocketOptionsSharedPtr transport_socket_options);
 
-  // Ssl::Connection
+  // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
   std::vector<std::string> uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
   std::string serialNumberPeerCertificate() const override;
+  std::string issuerPeerCertificate() const override;
   std::string subjectPeerCertificate() const override;
   std::string subjectLocalCertificate() const override;
   std::vector<std::string> uriSanPeerCertificate() const override;
@@ -60,6 +61,10 @@ public:
   std::vector<std::string> dnsSansLocalCertificate() const override;
   absl::optional<SystemTime> validFromPeerCertificate() const override;
   absl::optional<SystemTime> expirationPeerCertificate() const override;
+  std::string sessionId() const override;
+  uint16_t ciphersuiteId() const override;
+  std::string ciphersuiteString() const override;
+  std::string tlsVersion() const override;
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -75,6 +80,12 @@ public:
   SSL* rawSslForTest() const { return ssl_.get(); }
 
 private:
+  struct ReadResult {
+    bool commit_slice_{};
+    absl::optional<int> error_;
+  };
+  ReadResult sslReadIntoSlice(Buffer::RawSlice& slice);
+
   Network::PostIoAction doHandshake();
   void drainErrorQueue();
   void shutdownSsl();

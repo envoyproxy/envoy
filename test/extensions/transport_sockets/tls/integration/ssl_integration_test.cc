@@ -344,41 +344,69 @@ public:
   void initialize() override {
     // TODO(mattklein123): Merge/use the code in ConfigHelper::setTapTransportSocket().
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      auto* filter_chain =
-          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-      // Configure inner SSL transport socket based on existing config.
-      envoy::api::v2::core::TransportSocket ssl_transport_socket;
-      ssl_transport_socket.set_name("tls");
-      MessageUtil::jsonConvert(filter_chain->tls_context(), *ssl_transport_socket.mutable_config());
-      // Configure outer tap transport socket.
-      auto* transport_socket = filter_chain->mutable_transport_socket();
-      transport_socket->set_name("envoy.transport_sockets.tap");
-      envoy::config::transport_socket::tap::v2alpha::Tap tap_config;
-      tap_config.mutable_common_config()
-          ->mutable_static_config()
-          ->mutable_match_config()
-          ->set_any_match(true);
-      auto* output_config =
-          tap_config.mutable_common_config()->mutable_static_config()->mutable_output_config();
-      if (max_rx_bytes_.has_value()) {
-        output_config->mutable_max_buffered_rx_bytes()->set_value(max_rx_bytes_.value());
+      // The test supports tapping either the downstream or upstream connection, but not both.
+      if (upstream_tap_) {
+        setupUpstreamTap(bootstrap);
+      } else {
+        setupDownstreamTap(bootstrap);
       }
-      if (max_tx_bytes_.has_value()) {
-        output_config->mutable_max_buffered_tx_bytes()->set_value(max_tx_bytes_.value());
-      }
-
-      auto* output_sink = output_config->mutable_sinks()->Add();
-      output_sink->set_format(format_);
-      output_sink->mutable_file_per_tap()->set_path_prefix(path_prefix_);
-      tap_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
-      MessageUtil::jsonConvert(tap_config, *transport_socket->mutable_config());
-      // Nuke TLS context from legacy location.
-      filter_chain->clear_tls_context();
-      // Rest of TLS initialization.
     });
     SslIntegrationTest::initialize();
     // This confuses our socket counting.
     debug_with_s_client_ = false;
+  }
+
+  void setupUpstreamTap(envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* transport_socket =
+        bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
+    transport_socket->set_name("envoy.transport_sockets.tap");
+    envoy::api::v2::core::TransportSocket raw_transport_socket;
+    raw_transport_socket.set_name("raw_buffer");
+    envoy::config::transport_socket::tap::v2alpha::Tap tap_config =
+        createTapConfig(raw_transport_socket);
+    tap_config.mutable_transport_socket()->MergeFrom(raw_transport_socket);
+    TestUtility::jsonConvert(tap_config, *transport_socket->mutable_config());
+  }
+
+  void setupDownstreamTap(envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    // Configure inner SSL transport socket based on existing config.
+    envoy::api::v2::core::TransportSocket ssl_transport_socket;
+    ssl_transport_socket.set_name("tls");
+    TestUtility::jsonConvert(filter_chain->tls_context(), *ssl_transport_socket.mutable_config());
+    // Configure outer tap transport socket.
+    auto* transport_socket = filter_chain->mutable_transport_socket();
+    transport_socket->set_name("envoy.transport_sockets.tap");
+    envoy::config::transport_socket::tap::v2alpha::Tap tap_config =
+        createTapConfig(ssl_transport_socket);
+    tap_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
+    TestUtility::jsonConvert(tap_config, *transport_socket->mutable_config());
+    // Nuke TLS context from legacy location.
+    filter_chain->clear_tls_context();
+  }
+
+  envoy::config::transport_socket::tap::v2alpha::Tap
+  createTapConfig(const envoy::api::v2::core::TransportSocket& inner_transport) {
+    envoy::config::transport_socket::tap::v2alpha::Tap tap_config;
+    tap_config.mutable_common_config()
+        ->mutable_static_config()
+        ->mutable_match_config()
+        ->set_any_match(true);
+    auto* output_config =
+        tap_config.mutable_common_config()->mutable_static_config()->mutable_output_config();
+    if (max_rx_bytes_.has_value()) {
+      output_config->mutable_max_buffered_rx_bytes()->set_value(max_rx_bytes_.value());
+    }
+    if (max_tx_bytes_.has_value()) {
+      output_config->mutable_max_buffered_tx_bytes()->set_value(max_tx_bytes_.value());
+    }
+
+    auto* output_sink = output_config->mutable_sinks()->Add();
+    output_sink->set_format(format_);
+    output_sink->mutable_file_per_tap()->set_path_prefix(path_prefix_);
+    tap_config.mutable_transport_socket()->MergeFrom(inner_transport);
+    return tap_config;
   }
 
   std::string path_prefix_ = TestEnvironment::temporaryPath("ssl_trace");
@@ -386,6 +414,7 @@ public:
       envoy::service::tap::v2alpha::OutputSink::PROTO_BINARY};
   absl::optional<uint64_t> max_rx_bytes_;
   absl::optional<uint64_t> max_tx_bytes_;
+  bool upstream_tap_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslTapIntegrationTest,
@@ -422,7 +451,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::data::tap::v2alpha::TraceWrapper trace;
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace, *api_);
+  TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace, *api_);
   // Validate general expected properties in the trace.
   EXPECT_EQ(first_id, trace.socket_buffered_trace().trace_id());
   EXPECT_THAT(expected_local_address,
@@ -453,7 +482,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 2);
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace, *api_);
+  TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace, *api_);
   // Validate second connection ID.
   EXPECT_EQ(second_id, trace.socket_buffered_trace().trace_id());
   ASSERT_GE(trace.socket_buffered_trace().events().size(), 2);
@@ -500,7 +529,7 @@ TEST_P(SslTapIntegrationTest, TruncationWithMultipleDataFrames) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
   envoy::data::tap::v2alpha::TraceWrapper trace;
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, id), trace, *api_);
+  TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, id), trace, *api_);
 
   ASSERT_EQ(trace.socket_buffered_trace().events().size(), 2);
   EXPECT_TRUE(trace.socket_buffered_trace().events(0).read().data().truncated());
@@ -521,7 +550,7 @@ TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::data::tap::v2alpha::TraceWrapper trace;
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace, *api_);
+  TestUtility::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace, *api_);
   // Test some obvious properties.
   EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data().as_bytes(),
                                "POST /test/long/url HTTP/1.1"));
@@ -531,25 +560,31 @@ TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
   EXPECT_FALSE(trace.socket_buffered_trace().write_truncated());
 }
 
-// Validate a single request with JSON (body as string) output.
-TEST_P(SslTapIntegrationTest, RequestWithJsonBodyAsString) {
-  max_rx_bytes_ = 4;
-  max_tx_bytes_ = 5;
+// Validate a single request with JSON (body as string) output. This test uses an upstream tap.
+TEST_P(SslTapIntegrationTest, RequestWithJsonBodyAsStringUpstreamTap) {
+  upstream_tap_ = true;
+  max_rx_bytes_ = 5;
+  max_tx_bytes_ = 4;
 
   format_ = envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_STRING;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
   };
-  const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
+  const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 2;
   testRouterRequestAndResponseWithBody(512, 1024, false, &creator);
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_.reset();
+
+  // This must be done after server shutdown so that connection pool connections are closed and
+  // the tap written.
   envoy::data::tap::v2alpha::TraceWrapper trace;
-  MessageUtil::loadFromFile(fmt::format("{}_{}.json", path_prefix_, id), trace, *api_);
+  TestUtility::loadFromFile(fmt::format("{}_{}.json", path_prefix_, id), trace, *api_);
+
   // Test some obvious properties.
-  EXPECT_EQ(trace.socket_buffered_trace().events(0).read().data().as_string(), "POST");
-  EXPECT_EQ(trace.socket_buffered_trace().events(1).write().data().as_string(), "HTTP/");
+  EXPECT_EQ(trace.socket_buffered_trace().events(0).write().data().as_string(), "POST");
+  EXPECT_EQ(trace.socket_buffered_trace().events(1).read().data().as_string(), "HTTP/");
   EXPECT_TRUE(trace.socket_buffered_trace().read_truncated());
   EXPECT_TRUE(trace.socket_buffered_trace().write_truncated());
 }

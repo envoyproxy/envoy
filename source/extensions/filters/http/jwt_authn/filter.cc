@@ -11,6 +11,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
+struct RcDetailsValues {
+  // The jwt_authn filter rejected the request
+  const std::string JwtAuthnAccessDenied = "jwt_authn_access_denied";
+};
+typedef ConstSingleton<RcDetailsValues> RcDetails;
+
 Filter::Filter(FilterConfigSharedPtr config) : stats_(config->stats()), config_(config) {}
 
 void Filter::onDestroy() {
@@ -60,7 +66,7 @@ void Filter::onComplete(const Status& status) {
     Http::Code code = Http::Code::Unauthorized;
     // return failure reason as message body
     decoder_callbacks_->sendLocalReply(code, ::google::jwt_verify::getStatusString(status), nullptr,
-                                       absl::nullopt);
+                                       absl::nullopt, RcDetails::get().JwtAuthnAccessDenied);
     return;
   }
   stats_.allowed_.inc();

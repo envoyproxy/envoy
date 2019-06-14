@@ -118,6 +118,7 @@ TEST_F(FilterTest, InlineFailure) {
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+  EXPECT_EQ("jwt_authn_access_denied", filter_callbacks_.details_);
 }
 
 // This test verifies Verifier::Callback is called with OK status after verify().

@@ -14,8 +14,10 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":status",
+        "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/tracing:http_tracer_interface",
+        "//source/common/common:assert_lib",
         "//source/common/protobuf",
     ],
 )
@@ -27,6 +29,15 @@ envoy_cc_library(
         ":async_client_interface",
         "//include/envoy/stats:stats_interface",
         "@envoy_api//envoy/api/v2/core:grpc_service_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "context_interface",
+    hdrs = ["context.h"],
+    deps = [
+        "//include/envoy/http:context_interface",
+        "//include/envoy/upstream:upstream_interface",
     ],
 )
 
