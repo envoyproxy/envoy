@@ -7,6 +7,7 @@
 // porting layer for QUICHE.
 
 #include <cerrno>
+#include <cstddef>
 #include <cstring>
 #include <iostream>
 #include <sstream>
@@ -179,18 +180,19 @@ public:
 // Return the previous sink.
 QuicLogSink* SetLogSink(QuicLogSink* new_sink);
 
-} // namespace quic
-
-namespace std {
-
-// Overload ::operator<< to output a vector.
+// Overload std::operator<< to output a vector.
 template <class T> std::ostream& operator<<(std::ostream& out, const std::vector<T>& v) {
-  out << "{ ";
-  for (T item : v) {
-    out << item << " ";
+  out << "vector { ";
+  size_t i = 0;
+  for (; i < v.size() - 1; ++i) {
+    T item = v[i];
+    out << item << ", ";
   }
-  out << "}";
+  if (v.size() > 0) {
+    out << v[i];
+  }
+  out << " }";
   return out;
 }
 
-} // namespace std
+} // namespace quic
