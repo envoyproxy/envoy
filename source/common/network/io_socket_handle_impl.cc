@@ -133,6 +133,7 @@ IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& re
 
 Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cmsg,
                                                              uint32_t self_port) {
+  std::cerr << "control message: cmsg_type " << cmsg->cmsg_type << "\n";
   if (cmsg->cmsg_type == IPV6_PKTINFO) {
     struct in6_pktinfo* info = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
     sockaddr_in6 ipv6_addr;
