@@ -520,9 +520,9 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
   } else if (auto_host_rewrite_header_) {
     Http::HeaderEntry* header = headers.get(*auto_host_rewrite_header_);
     if (header != nullptr) {
-      absl::string_view headerValue = header->value().getStringView();
-      if (!headerValue.empty()) {
-        headers.Host()->value(headerValue);
+      absl::string_view header_value = header->value().getStringView();
+      if (!header_value.empty()) {
+        headers.Host()->value(header_value);
       }
     }
   }
