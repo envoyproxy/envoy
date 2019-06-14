@@ -1,8 +1,8 @@
 #include "common/http/utility.h"
 
-#include "test/common/http/common_fuzz.h"
 #include "test/common/http/utility_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/fuzz/utility.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -27,7 +27,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   case test::common::http::UtilityTestCase::kGetLastAddressFromXff: {
     const auto& get_last_address_from_xff = input.get_last_address_from_xff();
     Http::TestHeaderMapImpl headers;
-    headers.addCopy("x-forwarded-for", get_last_address_from_xff.xff());
+    headers.addCopy("x-forwarded-for", replaceInvalidCharacters(get_last_address_from_xff.xff()));
     // Take num_to_skip modulo 32 to avoid wasting time in lala land.
     Http::Utility::getLastAddressFromXFF(headers, get_last_address_from_xff.num_to_skip() % 32);
     break;

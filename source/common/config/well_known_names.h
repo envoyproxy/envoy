@@ -52,7 +52,7 @@ public:
   const std::string IP = "envoy.ip";
 };
 
-typedef ConstSingleton<AddressResolverNameValues> AddressResolverNames;
+using AddressResolverNames = ConstSingleton<AddressResolverNameValues>;
 
 /**
  * Well-known metadata filter namespaces.
@@ -63,7 +63,7 @@ public:
   const std::string ENVOY_LB = "envoy.lb";
 };
 
-typedef ConstSingleton<MetadataFilterValues> MetadataFilters;
+using MetadataFilters = ConstSingleton<MetadataFilterValues>;
 
 /**
  * Keys for MetadataFilterValues::ENVOY_LB metadata.
@@ -74,7 +74,7 @@ public:
   const std::string CANARY = "canary";
 };
 
-typedef ConstSingleton<MetadataEnvoyLbKeyValues> MetadataEnvoyLbKeys;
+using MetadataEnvoyLbKeys = ConstSingleton<MetadataEnvoyLbKeyValues>;
 
 /**
  * Well known tags values and a mapping from these names to the regexes they
@@ -163,7 +163,7 @@ private:
   std::vector<Descriptor> descriptor_vec_;
 };
 
-typedef ConstSingleton<TagNameValues> TagNames;
+using TagNames = ConstSingleton<TagNameValues>;
 
 } // namespace Config
 } // namespace Envoy

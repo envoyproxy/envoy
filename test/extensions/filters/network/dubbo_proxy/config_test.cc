@@ -24,7 +24,7 @@ namespace {
 
 DubboProxyProto parseDubboProxyFromV2Yaml(const std::string& yaml) {
   DubboProxyProto dubbo_proxy;
-  MessageUtil::loadFromYaml(yaml, dubbo_proxy);
+  TestUtility::loadFromYaml(yaml, dubbo_proxy);
   return dubbo_proxy;
 }
 

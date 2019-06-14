@@ -49,8 +49,10 @@ envoy_cc_test_library(
     hdrs = ["utility.h"],
     deps = [
         ":common_proto_cc",
+        "//source/common/common:empty_string",
         "//source/common/network:utility_lib",
         "//test/common/stream_info:test_util",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],

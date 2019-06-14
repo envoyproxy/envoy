@@ -17,7 +17,7 @@ namespace Csrf {
 struct RcDetailsValues {
   const std::string OriginMismatch = "csrf_origin_mismatch";
 };
-typedef ConstSingleton<RcDetailsValues> RcDetails;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
 bool isModifyMethod(const Http::HeaderMap& headers) {

@@ -1,14 +1,56 @@
 #pragma once
 
+#include "common/common/empty_string.h"
 #include "common/network/utility.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/fuzz/common.pb.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Fuzz {
+
+// The HeaderMap code assumes that input does not contain certain characters, and
+// this is validated by the HTTP parser. Some fuzzers will create strings with
+// these characters, however, and this creates not very interesting fuzz test
+// failures as an assertion is rapidly hit in the LowerCaseString constructor
+// before we get to anything interesting.
+//
+// This method will replace any of those characters found with spaces.
+inline std::string replaceInvalidCharacters(absl::string_view string) {
+  std::string filtered;
+  filtered.reserve(string.length());
+  for (const char& c : string) {
+    switch (c) {
+    case '\0':
+      FALLTHRU;
+    case '\r':
+      FALLTHRU;
+    case '\n':
+      filtered.push_back(' ');
+      break;
+    default:
+      filtered.push_back(c);
+    }
+  }
+  return filtered;
+}
+
+// Return a new RepeatedPtrField of HeaderValueOptions with invalid characters removed.
+inline Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> replaceInvalidHeaders(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> processed;
+  for (const auto& header : headers_to_add) {
+    auto* header_value_option = processed.Add();
+    auto* mutable_header = header_value_option->mutable_header();
+    mutable_header->set_key(replaceInvalidCharacters(header.header().key()));
+    mutable_header->set_value(replaceInvalidCharacters(header.header().value()));
+    header_value_option->mutable_append()->CopyFrom(header.append());
+  }
+  return processed;
+}
 
 // Convert from test proto Headers to TestHeaderMapImpl.
 inline Http::TestHeaderMapImpl fromHeaders(
@@ -16,21 +58,15 @@ inline Http::TestHeaderMapImpl fromHeaders(
     const std::unordered_set<std::string>& ignore_headers = std::unordered_set<std::string>()) {
   Http::TestHeaderMapImpl header_map;
   for (const auto& header : headers.headers()) {
-    // HeaderMapImpl and places such as the route lookup should never see strings with embedded NULL
-    // values, the HTTP codecs should reject them. So, don't inject any such strings into the fuzz
-    // tests.
-    const auto clean = [](const std::string& s) {
-      const auto n = s.find('\0');
-      if (n == std::string::npos) {
-        return s;
-      }
-      return s.substr(0, n);
-    };
-    // When we are injecting headers, we don't allow the key to ever be empty,
-    // since calling code is not supposed to do this.
-    const std::string key = header.key().empty() ? "not-empty" : clean(header.key());
+    // HeaderMapImpl and places such as the route lookup should never see strings with embedded
+    // {NULL, CR, LF} values, the HTTP codecs should reject them. So, don't inject any such strings
+    // into the fuzz tests and replace these invalid characters with spaces.
+    // When we are injecting headers, we don't allow the key to ever be empty, since calling code is
+    // not supposed to do this.
+    const std::string key =
+        header.key().empty() ? "not-empty" : replaceInvalidCharacters(header.key());
     if (ignore_headers.find(StringUtil::toLower(key)) != ignore_headers.end()) {
-      header_map.addCopy(key, clean(header.value()));
+      header_map.addCopy(key, replaceInvalidCharacters(header.value()));
     }
   }
   return header_map;
@@ -50,7 +86,10 @@ inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
   return fuzz_headers;
 }
 
-inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) {
+inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info,
+                                     const Ssl::MockConnectionInfo* connection_info) {
+  // Set mocks' default string return value to be an empty string.
+  testing::DefaultValue<const std::string&>::Set(EMPTY_STRING);
   TestStreamInfo test_stream_info;
   test_stream_info.metadata_ = stream_info.dynamic_metadata();
   // libc++ clocks don't track at nanosecond on macOS.
@@ -73,6 +112,10 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) 
   test_stream_info.downstream_local_address_ = address;
   test_stream_info.downstream_direct_remote_address_ = address;
   test_stream_info.downstream_remote_address_ = address;
+  test_stream_info.setDownstreamSslConnection(connection_info);
+  ON_CALL(*connection_info, subjectPeerCertificate())
+      .WillByDefault(testing::Return(
+          "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"));
   return test_stream_info;
 }
 

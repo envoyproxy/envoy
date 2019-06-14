@@ -17,7 +17,7 @@ public:
   SysCallIntResult sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t* mask) override;
 };
 
-typedef ThreadSafeSingleton<LinuxOsSysCallsImpl> LinuxOsSysCallsSingleton;
+using LinuxOsSysCallsSingleton = ThreadSafeSingleton<LinuxOsSysCallsImpl>;
 
 } // namespace Api
 } // namespace Envoy

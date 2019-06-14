@@ -49,3 +49,19 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "region_provider_interface",
+    hdrs = ["region_provider.h"],
+    external_deps = ["abseil_optional"],
+)
+
+envoy_cc_library(
+    name = "region_provider_impl_lib",
+    srcs = ["region_provider_impl.cc"],
+    hdrs = ["region_provider_impl.h"],
+    deps = [
+        ":region_provider_interface",
+        "//source/common/common:logger_lib",
+    ],
+)

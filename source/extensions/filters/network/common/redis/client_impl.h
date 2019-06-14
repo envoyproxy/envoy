@@ -30,7 +30,7 @@ struct RedirectionValues {
   const std::string MOVED = "MOVED";
 };
 
-typedef ConstSingleton<RedirectionValues> RedirectionResponse;
+using RedirectionResponse = ConstSingleton<RedirectionValues>;
 
 class ConfigImpl : public Config {
 public:

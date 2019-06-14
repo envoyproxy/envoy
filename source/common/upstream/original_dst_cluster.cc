@@ -141,7 +141,10 @@ OriginalDstCluster::OriginalDstCluster(
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })) {
-
+  // TODO(dio): Remove hosts check once the hosts field is removed.
+  if (config.has_load_assignment() || !config.hosts().empty()) {
+    throw EnvoyException("ORIGINAL_DST clusters must have no load assignment or hosts configured");
+  }
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
 
@@ -186,7 +189,8 @@ void OriginalDstCluster::cleanup() {
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
 
-ClusterImplBaseSharedPtr OriginalDstClusterFactory::createClusterImpl(
+std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+OriginalDstClusterFactory::createClusterImpl(
     const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
@@ -199,8 +203,13 @@ ClusterImplBaseSharedPtr OriginalDstClusterFactory::createClusterImpl(
         fmt::format("cluster: cluster type 'original_dst' may not be used with lb_subset_config"));
   }
 
-  return std::make_unique<OriginalDstCluster>(cluster, context.runtime(), socket_factory_context,
-                                              std::move(stats_scope), context.addedViaApi());
+  // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
+  //                     the cluster should directly supply the load balancer. This will remove
+  //                     a special case and allow this cluster to be compiled out as an extension.
+  return std::make_pair(
+      std::make_shared<OriginalDstCluster>(cluster, context.runtime(), socket_factory_context,
+                                           std::move(stats_scope), context.addedViaApi()),
+      nullptr);
 }
 
 /**

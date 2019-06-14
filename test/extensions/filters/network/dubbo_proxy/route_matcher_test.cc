@@ -7,6 +7,8 @@
 
 #include "extensions/filters/network/dubbo_proxy/router/route_matcher.h"
 
+#include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -19,7 +21,7 @@ namespace {
 envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration
 parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
   envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration route_config;
-  MessageUtil::loadFromYaml(yaml, route_config);
+  TestUtility::loadFromYaml(yaml, route_config);
   MessageUtil::validate(route_config);
   return route_config;
 }
@@ -27,7 +29,7 @@ parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
 envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy
 parseDubboProxyFromV2Yaml(const std::string& yaml) {
   envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy config;
-  MessageUtil::loadFromYaml(yaml, config);
+  TestUtility::loadFromYaml(yaml, config);
   MessageUtil::validate(config);
   return config;
 }

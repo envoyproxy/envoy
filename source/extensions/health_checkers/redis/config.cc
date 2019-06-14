@@ -15,7 +15,8 @@ Upstream::HealthCheckerSharedPtr RedisHealthCheckerFactory::createCustomHealthCh
     const envoy::api::v2::core::HealthCheck& config,
     Server::Configuration::HealthCheckerFactoryContext& context) {
   return std::make_shared<RedisHealthChecker>(
-      context.cluster(), config, getRedisHealthCheckConfig(config), context.dispatcher(),
+      context.cluster(), config,
+      getRedisHealthCheckConfig(config, context.messageValidationVisitor()), context.dispatcher(),
       context.runtime(), context.random(), context.eventLogger(),
       NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_);
 };

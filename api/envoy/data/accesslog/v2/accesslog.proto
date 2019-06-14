@@ -214,7 +214,6 @@ message ResponseFlags {
 
 // Properties of a negotiated TLS connection.
 message TLSProperties {
-  // [#not-implemented-hide:]
   enum TLSVersion {
     VERSION_UNSPECIFIED = 0;
     TLSv1 = 1;
@@ -222,11 +221,9 @@ message TLSProperties {
     TLSv1_2 = 3;
     TLSv1_3 = 4;
   }
-  // [#not-implemented-hide:]
   // Version of TLS that was negotiated.
   TLSVersion tls_version = 1;
 
-  // [#not-implemented-hide:]
   // TLS cipher suite negotiated during handshake. The value is a
   // four-digit hex code defined by the IANA TLS Cipher Suite Registry
   // (e.g. ``009C`` for ``TLS_RSA_WITH_AES_128_GCM_SHA256``).

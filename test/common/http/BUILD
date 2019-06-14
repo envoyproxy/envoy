@@ -130,11 +130,13 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "common_fuzz_lib",
-    srcs = ["common_fuzz.cc"],
-    hdrs = ["common_fuzz.h"],
+    name = "conn_manager_impl_common_lib",
+    hdrs = ["conn_manager_impl_common.h"],
     deps = [
-        "//source/common/common:macros",
+        "//include/envoy/common:time_interface",
+        "//include/envoy/config:config_provider_interface",
+        "//include/envoy/router:rds_interface",
+        "//test/mocks/router:router_mocks",
     ],
 )
 
@@ -151,6 +153,7 @@ envoy_cc_fuzz_test(
     srcs = ["conn_manager_impl_fuzz_test.cc"],
     corpus = "conn_manager_impl_corpus",
     deps = [
+        ":conn_manager_impl_common_lib",
         ":conn_manager_impl_fuzz_proto_cc",
         "//source/common/common:empty_string",
         "//source/common/http:conn_manager_lib",
@@ -176,6 +179,7 @@ envoy_cc_test(
     name = "conn_manager_impl_test",
     srcs = ["conn_manager_impl_test.cc"],
     deps = [
+        ":conn_manager_impl_common_lib",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -273,9 +277,9 @@ envoy_cc_fuzz_test(
     srcs = ["header_map_impl_fuzz_test.cc"],
     corpus = "header_map_impl_corpus",
     deps = [
-        ":common_fuzz_lib",
         ":header_map_impl_fuzz_proto_cc",
         "//source/common/http:header_map_lib",
+        "//test/fuzz:utility_lib",
     ],
 )
 
@@ -310,9 +314,9 @@ envoy_cc_fuzz_test(
     srcs = ["utility_fuzz_test.cc"],
     corpus = "utility_corpus",
     deps = [
-        ":common_fuzz_lib",
         ":utility_fuzz_proto_cc",
         "//source/common/http:utility_lib",
+        "//test/fuzz:utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

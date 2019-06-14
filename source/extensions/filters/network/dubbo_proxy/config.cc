@@ -34,7 +34,7 @@ REGISTER_FACTORY(DubboProxyFilterConfigFactory,
 class ProtocolTypeMapper {
 public:
   using ConfigProtocolType = envoy::config::filter::network::dubbo_proxy::v2alpha1::ProtocolType;
-  typedef absl::flat_hash_map<ConfigProtocolType, ProtocolType> ProtocolTypeMap;
+  using ProtocolTypeMap = absl::flat_hash_map<ConfigProtocolType, ProtocolType>;
 
   static ProtocolType lookupProtocolType(ConfigProtocolType config_type) {
     const auto& iter = protocolTypeMap().find(config_type);
@@ -54,7 +54,7 @@ class SerializationTypeMapper {
 public:
   using ConfigSerializationType =
       envoy::config::filter::network::dubbo_proxy::v2alpha1::SerializationType;
-  typedef absl::flat_hash_map<ConfigSerializationType, SerializationType> SerializationTypeMap;
+  using SerializationTypeMap = absl::flat_hash_map<ConfigSerializationType, SerializationType>;
 
   static SerializationType lookupSerializationType(ConfigSerializationType type) {
     const auto& iter = serializationTypeMap().find(type);
@@ -127,7 +127,8 @@ void ConfigImpl::registerFilter(const DubboFilterConfig& proto_config) {
           string_name);
   ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
   Envoy::Config::Utility::translateOpaqueConfig(proto_config.config(),
-                                                ProtobufWkt::Struct::default_instance(), *message);
+                                                ProtobufWkt::Struct::default_instance(),
+                                                context_.messageValidationVisitor(), *message);
   DubboFilters::FilterFactoryCb callback =
       factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
 

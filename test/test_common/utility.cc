@@ -180,19 +180,19 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
 
 std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
   if (resource.type_url() == Config::TypeUrl::get().Listener) {
-    return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
+    return TestUtility::anyConvert<envoy::api::v2::Listener>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
-    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
+    return TestUtility::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().Cluster) {
-    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
+    return TestUtility::anyConvert<envoy::api::v2::Cluster>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
-    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+    return TestUtility::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
   }
   if (resource.type_url() == Config::TypeUrl::get().VirtualHost) {
-    return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
+    return TestUtility::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
   }
   throw EnvoyException(
       fmt::format("xdsResourceName does not know about type URL {}", resource.type_url()));

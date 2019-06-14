@@ -68,7 +68,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
   envoy::api::v2::RouteConfiguration route_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
-  MessageUtil::loadFromFile(router_config_file, route_config, *api);
+  TestUtility::loadFromFile(router_config_file, route_config, *api);
 
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
@@ -91,6 +91,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
 
   bool no_failures = true;
   for (const Json::ObjectSharedPtr& check_config : loader->asObjectArray()) {
+    headers_finalized_ = false;
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
@@ -158,12 +159,13 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
   const std::string contents = api->fileSystem().fileReadToEnd(expected_routes);
-  MessageUtil::loadFromFile(expected_routes, validation_config, *api);
+  TestUtility::loadFromFile(expected_routes, validation_config, *api);
   MessageUtil::validate(validation_config);
 
   bool no_failures = true;
   for (const envoy::RouterCheckToolSchema::ValidationItem& check_config :
        validation_config.tests()) {
+    headers_finalized_ = false;
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
@@ -265,8 +267,12 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
   Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
                                                 factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
-                                                             true);
+    if (!headers_finalized_) {
+      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
+                                                               true);
+      headers_finalized_ = true;
+    }
+
     actual = tool_config.headers_->get_(Http::Headers::get().Path);
   }
   return compareResults(actual, expected, "path_rewrite");
@@ -288,8 +294,12 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
   Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
                                                 factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
-                                                             true);
+    if (!headers_finalized_) {
+      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
+                                                               true);
+      headers_finalized_ = true;
+    }
+
     actual = tool_config.headers_->get_(Http::Headers::get().Host);
   }
   return compareResults(actual, expected, "host_rewrite");

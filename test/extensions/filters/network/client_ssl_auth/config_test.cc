@@ -41,7 +41,7 @@ ip_white_list:
 )EOF" + GetParam();
 
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config;
-  MessageUtil::loadFromYamlAndValidate(yaml, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ClientSslAuthConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
@@ -58,7 +58,7 @@ ip_white_list:
 )EOF" + GetParam();
 
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config;
-  MessageUtil::loadFromYamlAndValidate(yaml, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ClientSslAuthConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
@@ -80,7 +80,7 @@ ip_white_list:
       *dynamic_cast<envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth*>(
           factory.createEmptyConfigProto().get());
 
-  MessageUtil::loadFromYamlAndValidate(yaml, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));

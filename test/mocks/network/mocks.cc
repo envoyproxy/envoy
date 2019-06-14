@@ -116,6 +116,7 @@ MockFilterChainManager::~MockFilterChainManager() {}
 
 MockFilterChainFactory::MockFilterChainFactory() {
   ON_CALL(*this, createListenerFilterChain(_)).WillByDefault(Return(true));
+  ON_CALL(*this, createUdpListenerFilterChain(_, _)).WillByDefault(Return(true));
 }
 MockFilterChainFactory::~MockFilterChainFactory() {}
 
@@ -168,6 +169,22 @@ MockTransportSocketCallbacks::MockTransportSocketCallbacks() {
   ON_CALL(*this, connection()).WillByDefault(ReturnRef(connection_));
 }
 MockTransportSocketCallbacks::~MockTransportSocketCallbacks() {}
+
+MockUdpListener::MockUdpListener() {}
+MockUdpListener::~MockUdpListener() { onDestroy(); }
+
+MockUdpReadFilterCallbacks::MockUdpReadFilterCallbacks() {
+  ON_CALL(*this, udpListener()).WillByDefault(ReturnRef(udp_listener_));
+}
+
+MockUdpReadFilterCallbacks::~MockUdpReadFilterCallbacks() {}
+
+MockUdpListenerReadFilter::MockUdpListenerReadFilter(UdpReadFilterCallbacks& callbacks)
+    : UdpListenerReadFilter(callbacks) {}
+MockUdpListenerReadFilter::~MockUdpListenerReadFilter() {}
+
+MockUdpListenerFilterManager::MockUdpListenerFilterManager() {}
+MockUdpListenerFilterManager::~MockUdpListenerFilterManager() {}
 
 } // namespace Network
 } // namespace Envoy

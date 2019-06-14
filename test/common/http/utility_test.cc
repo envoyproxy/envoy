@@ -457,6 +457,33 @@ TEST(HttpUtility, SendLocalGrpcReply) {
                           absl::nullopt, false);
 }
 
+TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
+  MockStreamDecoderFilterCallbacks callbacks;
+  bool is_reset = false;
+
+  std::string json = R"EOF(
+{
+    "error": {
+        "code": 401,
+        "message": "Unauthorized"
+    }
+}
+  )EOF";
+
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.Status()->value().getStringView(), "200");
+        EXPECT_NE(headers.GrpcStatus(), nullptr);
+        EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
+                  std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unauthenticated)));
+        EXPECT_NE(headers.GrpcMessage(), nullptr);
+        const auto& encoded = Utility::PercentEncoding::encode(json);
+        EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), encoded);
+      }));
+  Utility::sendLocalReply(true, callbacks, is_reset, Http::Code::Unauthorized, json, absl::nullopt,
+                          false);
+}
+
 TEST(HttpUtility, RateLimitedGrpcStatus) {
   MockStreamDecoderFilterCallbacks callbacks;
 
@@ -787,6 +814,33 @@ TEST(Url, ParsingTest) {
               "www.host.com:80", "/path?query=param&query2=param2#fragment");
   ValidateUrl("http://www.host.com/path?query=param&query2=param2#fragment", "http", "www.host.com",
               "/path?query=param&query2=param2#fragment");
+}
+
+void validatePercentEncodingEncodeDecode(absl::string_view source,
+                                         absl::string_view expected_encoded) {
+  EXPECT_EQ(Utility::PercentEncoding::encode(source), expected_encoded);
+  EXPECT_EQ(Utility::PercentEncoding::decode(expected_encoded), source);
+}
+
+TEST(PercentEncoding, EncodeDecode) {
+  const std::string json = R"EOF(
+{
+    "error": {
+        "code": 401,
+        "message": "Unauthorized"
+    }
+}
+  )EOF";
+  validatePercentEncodingEncodeDecode(json, "%0A{%0A    \"error\": {%0A        \"code\": 401,%0A   "
+                                            "     \"message\": \"Unauthorized\"%0A    }%0A}%0A  ");
+  validatePercentEncodingEncodeDecode("too large", "too large");
+  validatePercentEncodingEncodeDecode("_-ok-_", "_-ok-_");
+}
+
+TEST(PercentEncoding, Trailing) {
+  EXPECT_EQ(Utility::PercentEncoding::decode("too%20lar%20"), "too lar ");
+  EXPECT_EQ(Utility::PercentEncoding::decode("too%20larg%e"), "too larg%e");
+  EXPECT_EQ(Utility::PercentEncoding::decode("too%20large%"), "too large%");
 }
 
 } // namespace Http

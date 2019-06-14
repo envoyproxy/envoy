@@ -8,6 +8,8 @@
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "test/test_common/utility.h"
+
 #include "fmt/printf.h"
 
 namespace Envoy {
@@ -37,7 +39,7 @@ inline std::string defaultStaticClusterJson(const std::string& name) {
 inline envoy::config::bootstrap::v2::Bootstrap
 parseBootstrapFromV2Json(const std::string& json_string) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromJson(json_string, bootstrap);
+  TestUtility::loadFromJson(json_string, bootstrap);
   return bootstrap;
 }
 
@@ -51,13 +53,13 @@ inline envoy::api::v2::Cluster parseClusterFromJson(const std::string& json_stri
 
 inline envoy::api::v2::Cluster parseClusterFromV2Json(const std::string& json_string) {
   envoy::api::v2::Cluster cluster;
-  MessageUtil::loadFromJson(json_string, cluster);
+  TestUtility::loadFromJson(json_string, cluster);
   return cluster;
 }
 
 inline envoy::api::v2::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::Cluster cluster;
-  MessageUtil::loadFromYaml(yaml, cluster);
+  TestUtility::loadFromYaml(yaml, cluster);
   return cluster;
 }
 
@@ -117,7 +119,7 @@ makeLocalityWeights(std::initializer_list<uint32_t> locality_weights) {
 inline envoy::api::v2::core::HealthCheck
 parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
   envoy::api::v2::core::HealthCheck health_check;
-  MessageUtil::loadFromYaml(yaml_string, health_check);
+  TestUtility::loadFromYaml(yaml_string, health_check);
   return health_check;
 }
 
