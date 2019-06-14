@@ -228,13 +228,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform_bbr2_sender_impl_lib",
-    hdrs = ["quic_bbr2_sender_impl.h"],
-    visibility = ["//visibility:public"],
-    deps = ["@com_googlesource_quiche//:quic_core_congestion_control_bbr_lib"],
-)
-
-envoy_cc_library(
     name = "envoy_quic_clock_lib",
     srcs = ["envoy_quic_clock.cc"],
     hdrs = ["envoy_quic_clock.h"],
