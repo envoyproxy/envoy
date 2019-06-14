@@ -203,7 +203,7 @@ private:
 
   // Forms a trie-like structure. Requires lexically sorted Host and Route metadata.
   LbSubsetMap subsets_;
-  // Forms a trie-like structure of lexically sorted keys+optional fallback policy from subset
+  // Forms a trie-like structure of lexically sorted keys+fallback policy from subset
   // selectors configuration
   SubsetSelectorMapPtr selectors_;
 
