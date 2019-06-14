@@ -2,6 +2,8 @@ syntax = "proto3";
 
 import "envoy/data/tap/v2alpha/http.proto";
 import "envoy/data/tap/v2alpha/transport.proto";
+import "google/protobuf/struct.proto";
+import "envoy/api/v2/core/address.proto";
 
 import "validate/validate.proto";
 
@@ -13,9 +15,38 @@ option java_package = "io.envoyproxy.envoy.data.tap.v2alpha";
 
 // [#protodoc-title: Tap data wrappers]
 
+// [#not-implemented-hide:] Information about the endpoints involved in the tap.
+message Endpoints {
+  // The information on the upstream cluster \ host.
+  message Upstream {
+    // The destination cluster name
+    string cluster_name = 1;
+    // Cluster metadata that was set in the tap filter's name.
+    google.protobuf.Struct cluster_metadata = 2;
+    // Selected host address.
+    envoy.api.v2.core.Address host_address = 3;
+    // Host metadata that was set in the tap filter's name.
+    google.protobuf.Struct host_metadata = 4;
+  }
+  message Downstream {
+    // The address of the client that called us.
+    envoy.api.v2.core.Address downstream_remote_address = 6;
+  }
+  // Upstream information
+  Upstream upstream = 1;
+  // Downstream information
+  Downstream downstream = 2;
+}
+
 // Wrapper for all fully buffered and streamed tap traces that Envoy emits. This is required for
 // sending traces over gRPC APIs or more easily persisting binary messages to files.
 message TraceWrapper {
+
+  // [#not-implemented-hide:]
+  // Information on the endpoints (upstream and downstream) that are part of the request
+  // If trace is streaming, the fields in this message will appear once during the stream.
+  Endpoints endpoints = 5;
+
   oneof trace {
     option (validate.required) = true;
 

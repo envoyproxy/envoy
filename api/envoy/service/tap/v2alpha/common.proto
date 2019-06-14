@@ -1,6 +1,9 @@
 syntax = "proto3";
 
 import "envoy/api/v2/route/route.proto";
+import "envoy/api/v2/core/base.proto";
+import "envoy/api/v2/core/grpc_service.proto";
+import "envoy/type/matcher/string.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -23,6 +26,15 @@ message TapConfig {
   // The tap output configuration. If a match configuration matches a data source being tapped,
   // a tap will occur and the data will be written to the configured output.
   OutputConfig output_config = 2 [(validate.rules).message.required = true];
+
+  // [#not-implemented-hide:] Specify if TAP is enabled. The % of requests\connections for which the
+  // filter is enabled.
+  //
+  // .. note::
+  //
+  //   This field defaults to 100/:ref:`HUNDRED
+  //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+  envoy.api.v2.core.RuntimeFractionalPercent filter_enabled = 3;
 
   // [#comment:TODO(mattklein123): Rate limiting]
 }
@@ -64,7 +76,15 @@ message MatchPredicate {
 
     // HTTP response trailers match configuration.
     HttpHeadersMatch http_response_trailers_match = 8;
+
+    // The destination cluster match configuration.
+    ClusterMatch destination_cluster_match = 9;
   }
+}
+
+message ClusterMatch {
+  // Match cluster name to these patterns.
+  envoy.type.matcher.ListStringMatcher clusters = 1;
 }
 
 // HTTP headers match configuration.
@@ -158,6 +178,10 @@ message OutputSink {
 
     // Tap output will be written to a file per tap sink.
     FilePerTapSink file_per_tap = 3;
+
+    // [#not-implemented-hide:]
+    // GrpcService to send data to. format argument must be PROTO_BINARY grpc_service output stream.
+    StreamingGrpcSink streaming_grpc = 4;
   }
 }
 
@@ -171,4 +195,14 @@ message FilePerTapSink {
   // identifier distinguishing the recorded trace for stream instances (the Envoy
   // connection ID, HTTP stream ID, etc.).
   string path_prefix = 1 [(validate.rules).string.min_bytes = 1];
+}
+
+// [#not-implemented-hide:] Streaming gRPC sink configuration sends the taps to an external gRPC
+// server.
+message StreamingGrpcSink {
+  // Opaque identifier, that will be sent back to the streaming grpc server.
+  string tap_id = 1;
+
+  // GrpcService to send data to. format argument must be PROTO_BINARY grpc_service output stream.
+  envoy.api.v2.core.GrpcService grpc_service = 2 [(validate.rules).message.required = true];
 }
