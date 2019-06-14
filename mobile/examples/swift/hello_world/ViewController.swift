@@ -56,6 +56,7 @@ final class ViewController: UITableViewController {
 
     NSLog("Response:\n\(data.count) bytes\n\(body)\n\(headers)")
 
+    // Deserialize the response, which will include a `Server` header set by Envoy.
     let value = Response(body: body, serverHeader: headers["Server"] ?? "")
     DispatchQueue.main.async {
       self.responses.append(value)
