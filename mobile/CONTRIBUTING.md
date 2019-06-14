@@ -21,7 +21,44 @@ maximize the chances of your PR being merged.
 
 # Submitting a PR
 
-* TODO(mattklein123): Fill this in.
+* Fork the repo.
+* In your local repo, install the git hooks that implement various important pre-commit and
+  pre-push checks:
+
+  ```bash
+  ./envoy/support/bootstrap
+  ```
+
+  Please see [envoy/support/README.md](https://github.com/envoyproxy/envoy/tree/master/support) for
+  more information on these hooks.
+
+* Create your PR.
+* Tests will automatically run for you.
+* We will **not** merge any PR that is not passing tests.
+* PRs are expected to have 100% test coverage for added code. If your PR cannot have 100% coverage
+  for some reason please clearly explain why when you open it.
+* Any PR that changes user-facing behavior **must** have associated documentation in [docs](./docs)
+  as well as [release notes](./docs/root/intro/version_history.rst).
+* All code comments and documentation are expected to have proper English grammar and punctuation.
+  If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
+  to find some help.
+* Your PR title should be descriptive, and generally start with a subsystem name followed by a
+  colon. Examples:
+  * "docs: fix grammar error"
+  * "http conn man: add new feature"
+* Your PR description should have details on what the PR does. If it fixes an existing issue it
+  should end with "Fixes #XXX", so that the issue is closed when your PR merges.
+* When all of the tests are passing and all other conditions described herein are satisfied, a
+  maintainer will be assigned to review and merge the PR.
+* Once you submit a PR, *please do not rebase it*. It's much easier to review if subsequent commits
+  are new commits and/or merges. We squash rebase the final merged commit so the number of commits
+  you have in the PR doesn't matter.
+* We expect that once a PR is opened, it will be actively worked on until it is merged or closed.
+  Stalebot will close PRs that are not making progress. This is defined as no activity
+  for 14 days. Obviously PRs that are closed due to lack of activity can be reopened later.
+  Closing stale PRs helps us to keep on top of all of the work currently in flight.
+* Please consider joining the [envoy-mobile-dev](https://groups.google.com/forum/#!forum/envoy-mobile-dev)
+  mailing list.
 
 # PR review policy for maintainers
 
@@ -132,4 +169,14 @@ should only be done to correct a DCO mistake.
 
 ## Triggering CI re-run without making changes
 
-* TODO(mattklein123): Document when RepoKitteh is enabled.
+Sometimes tasks may get stuck in CI and won't be marked as failed, which means
+the above command won't work. Should this happen, pushing an empty commit should
+re-run all the CI tasks. Consider adding an alias into your `.gitconfig` file:
+
+```
+[alias]
+    kick-ci = !"git commit -s --allow-empty -m 'Kick CI' && git push"
+```
+
+Once you add this alias you can issue the command `git kick-ci` and the PR
+will be sent back for a retest.
