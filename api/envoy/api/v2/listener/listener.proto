@@ -26,16 +26,8 @@ option (gogoproto.equal_all) = true;
 
 message Filter {
   // The name of the filter to instantiate. The name must match a supported
-  // filter. The built-in filters are:
-  //
-  // [#comment:TODO(mattklein123): Auto generate the following list]
-  // * :ref:`envoy.client_ssl_auth<config_network_filters_client_ssl_auth>`
-  // * :ref:`envoy.echo <config_network_filters_echo>`
-  // * :ref:`envoy.http_connection_manager <config_http_conn_man>`
-  // * :ref:`envoy.mongo_proxy <config_network_filters_mongo_proxy>`
-  // * :ref:`envoy.ratelimit <config_network_filters_rate_limit>`
-  // * :ref:`envoy.redis_proxy <config_network_filters_redis_proxy>`
-  // * :ref:`envoy.tcp_proxy <config_network_filters_tcp_proxy>`
+  // filter. Refer to :ref:`HTTP filters<config_http_filters>` and
+  // :ref:`Network filters<config_network_filters>` for built-in filters.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Filter specific configuration which depends on the filter being
