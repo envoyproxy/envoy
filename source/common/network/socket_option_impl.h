@@ -1,9 +1,5 @@
 #pragma once
 
-#ifdef __APPLE__
-#define __APPLE_USE_RFC_3542
-#endif
-
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
