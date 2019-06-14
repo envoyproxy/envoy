@@ -385,6 +385,7 @@ cstring
 ctor
 ctrl
 customizations
+darwin
 dbg
 de
 dechunking
@@ -631,6 +632,7 @@ pthreads
 pton
 ptr
 ptrs
+pts
 pwd
 py
 qps
@@ -718,6 +720,7 @@ structs
 subexpr
 subdirs
 symlink
+symlinks
 symlinked
 sync
 sys
