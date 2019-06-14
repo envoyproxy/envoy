@@ -8,6 +8,7 @@ NSString* _ENDPOINT = @"http://0.0.0.0:9001/api.lyft.com/static/demo/hello_world
 
 #pragma mark - ResponseValue
 
+/// Represents a response from the server.
 @interface ResponseValue : NSObject
 @property (nonatomic, strong) NSString* body;
 @property (nonatomic, strong) NSString* serverHeader;
@@ -84,6 +85,7 @@ NSString* _ENDPOINT = @"http://0.0.0.0:9001/api.lyft.com/static/demo/hello_world
     return;
   }
 
+  // Deserialize the response, which will include a `Server` header set by Envoy.
   ResponseValue* value = [ResponseValue new];
   value.body = body;
   value.serverHeader = [[response allHeaderFields] valueForKey:@"Server"];
