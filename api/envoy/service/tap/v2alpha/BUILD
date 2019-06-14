@@ -26,8 +26,8 @@ api_proto_library_internal(
 )
 
 api_proto_library_internal(
-    name = "tds",
-    srcs = ["tds.proto"],
+    name = "tapds",
+    srcs = ["tapds.proto"],
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/api/v2:discovery",
