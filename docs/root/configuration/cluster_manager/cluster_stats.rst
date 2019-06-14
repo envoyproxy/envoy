@@ -51,6 +51,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_destroy_with_active_rq, Counter, Total connections destroyed with 1+ active request
   upstream_cx_destroy_local_with_active_rq, Counter, Total connections destroyed locally with 1+ active request
   upstream_cx_destroy_remote_with_active_rq, Counter, Total connections destroyed remotely with 1+ active request
+  upstream_cx_destroy_after_draining_rq, Counter, Total connections destroyed after being drained of active requests
   upstream_cx_close_notify, Counter, Total connections closed via HTTP/1.1 connection close header or HTTP/2 GOAWAY
   upstream_cx_rx_bytes_total, Counter, Total received connection bytes
   upstream_cx_rx_bytes_buffered, Gauge, Received connection bytes currently buffered

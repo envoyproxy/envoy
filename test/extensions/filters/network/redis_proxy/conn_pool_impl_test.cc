@@ -641,12 +641,15 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
   EXPECT_EQ(clientsToDrain().size(), 1); // Nothing happened. client1 is still active.
   EXPECT_EQ(drainTimer()->enabled(), true);
 
-  EXPECT_CALL(*client1, active()).WillOnce(Return(false));
+  EXPECT_CALL(*client1, active()).Times(2).WillRepeatedly(Return(false));
   EXPECT_CALL(*client1, close());
   drainTimer()->disableTimer();
   drainClients();
   EXPECT_EQ(clientsToDrain().size(), 0); // client1 has been drained and closed.
   EXPECT_EQ(drainTimer()->enabled(), false);
+
+  EXPECT_EQ(
+      cm_.thread_local_cluster_.info()->stats().upstream_cx_destroy_after_draining_rq_.value(), 1);
 
   tls_.shutdownThread();
 }
@@ -723,6 +726,12 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
 
   EXPECT_CALL(*client1, close());
   EXPECT_CALL(*client2, close());
+  EXPECT_CALL(*client1, active()).WillOnce(Return(true));
+  EXPECT_CALL(*client2, active()).WillOnce(Return(true));
+
+  EXPECT_EQ(
+      cm_.thread_local_cluster_.info()->stats().upstream_cx_destroy_after_draining_rq_.value(), 0);
+
   tls_.shutdownThread();
 }
 
@@ -798,11 +807,16 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
 
   EXPECT_CALL(*client1, close());
   EXPECT_CALL(*client2, close());
+  EXPECT_CALL(*client1, active()).WillOnce(Return(true));
+  EXPECT_CALL(*client2, active()).WillOnce(Return(true));
   update_callbacks_->onClusterRemoval("fake_cluster");
 
   EXPECT_EQ(hostAddressMap().size(), 0);
   EXPECT_EQ(clientMap().size(), 0);
   EXPECT_EQ(clientsToDrain().size(), 0);
+
+  EXPECT_EQ(
+      cm_.thread_local_cluster_.info()->stats().upstream_cx_destroy_after_draining_rq_.value(), 0);
 
   tls_.shutdownThread();
 }

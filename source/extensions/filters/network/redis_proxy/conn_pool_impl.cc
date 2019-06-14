@@ -163,11 +163,9 @@ void InstanceImpl::ThreadLocalPool::onHostsRemoved(
     // There is the possibility that multiple hosts with the same address
     // are registered in host_address_map_ given that hosts may be created
     // upon redirection or supplied as part of the cluster's definition.
-    try {
-      if (host_address_map_.at(host->address()->asString()) == host) {
-        host_address_map_.erase(host->address()->asString());
-      }
-    } catch (std::out_of_range&) {
+    auto it2 = host_address_map_.find(host->address()->asString());
+    if ((it2 != host_address_map_.end()) && (it2->second == host)) {
+      host_address_map_.erase(it2);
     }
   }
 }
@@ -301,6 +299,9 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
       for (auto it = parent_.clients_to_drain_.begin(); it != parent_.clients_to_drain_.end();
            it++) {
         if ((*it).get() == this) {
+          if (!redis_client_->active()) {
+            parent_.cluster_->info()->stats().upstream_cx_destroy_after_draining_rq_.inc();
+          }
           parent_.dispatcher_.deferredDelete(std::move(redis_client_));
           parent_.clients_to_drain_.erase(it);
           break;
