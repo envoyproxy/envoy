@@ -482,6 +482,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       init_manager.add(subscriptions_.back()->init_target_);
       break;
     default:
+      ENVOY_LOG(warn, "Skipping unsupported runtime layer: {}", layer.DebugString());
       break;
     }
   }
