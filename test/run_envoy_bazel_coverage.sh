@@ -22,7 +22,12 @@ echo "    VALIDATE_COVERAGE=${VALIDATE_COVERAGE}"
 
 # This is the target that will be run to generate coverage data. It can be overridden by consumer
 # projects that want to run coverage on a different/combined target.
-[[ -z "${COVERAGE_TARGET}" ]] && COVERAGE_TARGET="//test/coverage:coverage_tests"
+# Command-line arguments take precedence over ${COVERAGE_TARGET}.
+if [[ $# -gt 0 ]]; then
+  COVERAGE_TARGET=$*
+elif [[ -z "${COVERAGE_TARGET}" ]]; then
+  COVERAGE_TARGET="//test/coverage:coverage_tests"
+fi
 # This is where we are going to copy the .gcno files into.
 GCNO_ROOT=bazel-out/k8-dbg/bin/"${COVERAGE_TARGET/:/\/}".runfiles/"${WORKSPACE}"
 echo "    GCNO_ROOT=${GCNO_ROOT}"
@@ -50,7 +55,7 @@ BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
 # https://github.com/bazelbuild/bazel/issues/1118). This works today as we have
 # a single coverage test binary and do not require the "bazel coverage" support
 # for collecting multiple traces and glueing them together.
-"${BAZEL_COVERAGE}" test "${COVERAGE_TARGET}" ${BAZEL_TEST_OPTIONS} \
+"${BAZEL_COVERAGE}" test ${COVERAGE_TARGET} ${BAZEL_TEST_OPTIONS} \
   --cache_test_results=no --cxxopt="--coverage" --cxxopt="-DENVOY_CONFIG_COVERAGE=1" \
   --linkopt="--coverage" --define ENVOY_CONFIG_COVERAGE=1 --test_output=streamed \
   --strategy=Genrule=standalone --spawn_strategy=standalone --test_timeout=4000 \

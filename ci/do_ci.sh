@@ -87,7 +87,11 @@ if [[ $# -gt 1 ]]; then
   shift
   TEST_TARGETS=$*
 else
-  TEST_TARGETS=//test/...
+  if [[ "$CI_TARGET" == "bazel.coverage" ]]; then
+    TEST_TARGETS=//test/coverage:coverage_tests
+  else
+    TEST_TARGETS=//test/...
+  fi
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
@@ -234,7 +238,7 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   setup_gcc_toolchain
-  echo "bazel coverage build with tests..."
+  echo "bazel coverage build with tests ${TEST_TARGETS}"
 
   # gcovr is a pain to run with `bazel run`, so package it up into a
   # relocatable and hermetic-ish .par file.
@@ -250,7 +254,7 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   # after 0.21.
   [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=12288,4,1"
 
-  test/run_envoy_bazel_coverage.sh
+  test/run_envoy_bazel_coverage.sh ${TEST_TARGETS}
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
