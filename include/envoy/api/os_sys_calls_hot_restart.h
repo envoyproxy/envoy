@@ -13,7 +13,7 @@ namespace Api {
 
 class HotRestartOsSysCalls {
 public:
-  virtual ~HotRestartOsSysCalls() {}
+  virtual ~HotRestartOsSysCalls() = default;
 
   /**
    * @see shm_open (man 3 shm_open)
@@ -26,7 +26,7 @@ public:
   virtual SysCallIntResult shmUnlink(const char* name) PURE;
 };
 
-typedef std::unique_ptr<HotRestartOsSysCalls> HotRestartOsSysCallsPtr;
+using HotRestartOsSysCallsPtr = std::unique_ptr<HotRestartOsSysCalls>;
 
 } // namespace Api
 } // namespace Envoy

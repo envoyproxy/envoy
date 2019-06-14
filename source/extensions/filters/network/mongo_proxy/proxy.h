@@ -42,7 +42,7 @@ public:
   const std::string DrainCloseEnabled{"mongo.drain_close_enabled"};
 };
 
-typedef ConstSingleton<MongoRuntimeConfigKeys> MongoRuntimeConfig;
+using MongoRuntimeConfig = ConstSingleton<MongoRuntimeConfigKeys>;
 
 /**
  * All mongo proxy stats. @see stats_macros.h
@@ -95,7 +95,7 @@ private:
   Envoy::AccessLog::AccessLogFileSharedPtr file_;
 };
 
-typedef std::shared_ptr<AccessLog> AccessLogSharedPtr;
+using AccessLogSharedPtr = std::shared_ptr<AccessLog>;
 
 /**
  * A sniffing filter for mongo traffic. The current implementation makes a copy of read/written
@@ -156,7 +156,7 @@ private:
     MonotonicTime start_time_;
   };
 
-  typedef std::unique_ptr<ActiveQuery> ActiveQueryPtr;
+  using ActiveQueryPtr = std::unique_ptr<ActiveQuery>;
 
   MongoProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return MongoProxyStats{ALL_MONGO_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix),

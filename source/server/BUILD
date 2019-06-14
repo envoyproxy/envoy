@@ -233,12 +233,12 @@ envoy_cc_library(
     srcs = ["lds_api.cc"],
     hdrs = ["lds_api.h"],
     deps = [
+        "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/init:manager_interface",
         "//include/envoy/server:listener_manager_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/config:resources_lib",
-        "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
@@ -253,6 +253,7 @@ envoy_cc_library(
     deps = [
         ":configuration_lib",
         ":drain_manager_lib",
+        ":filter_chain_manager_lib",
         ":lds_api_lib",
         ":transport_socket_config_lib",
         "//include/envoy/server:filter_config_interface",
@@ -260,11 +261,8 @@ envoy_cc_library(
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/server:worker_interface",
         "//source/common/api:os_sys_calls_lib",
-        "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
         "//source/common/init:manager_lib",
-        "//source/common/network:cidr_range_lib",
-        "//source/common/network:lc_trie_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:socket_option_factory_lib",
@@ -277,6 +275,18 @@ envoy_cc_library(
         "//source/extensions/transport_sockets/tls:context_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2:lds_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_chain_manager_lib",
+    srcs = ["filter_chain_manager_impl.cc"],
+    hdrs = ["filter_chain_manager_impl.h"],
+    deps = [
+        "//include/envoy/server:listener_manager_interface",
+        "//source/common/common:empty_string",
+        "//source/common/network:cidr_range_lib",
+        "//source/common/network:lc_trie_lib",
     ],
 )
 
@@ -318,7 +328,10 @@ envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
-    external_deps = ["abseil_optional"],
+    external_deps = [
+        "abseil_node_hash_map",
+        "abseil_optional",
+    ],
     deps = [
         ":configuration_lib",
         ":connection_handler_lib",
@@ -348,6 +361,7 @@ envoy_cc_library(
         "//source/common/common:version_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:async_client_manager_lib",
+        "//source/common/grpc:context_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:context_lib",
         "//source/common/init:manager_lib",

@@ -22,6 +22,7 @@
 #include "common/common/cleanup.h"
 #include "common/common/logger_delegates.h"
 #include "common/grpc/async_client_manager_impl.h"
+#include "common/grpc/context_impl.h"
 #include "common/http/context_impl.h"
 #include "common/init/manager_impl.h"
 #include "common/memory/heap_shrinker.h"
@@ -39,7 +40,7 @@
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
-#include "absl/container/flat_hash_map.h"
+#include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -70,7 +71,7 @@ struct ServerStats {
  */
 class ComponentFactory {
 public:
-  virtual ~ComponentFactory() {}
+  virtual ~ComponentFactory() = default;
 
   /**
    * @return DrainManagerPtr a new drain manager for the server.
@@ -188,6 +189,7 @@ public:
   time_t startTimeCurrentEpoch() override { return start_time_; }
   time_t startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
+  Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
   ProcessContext& processContext() override { return *process_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
@@ -268,6 +270,7 @@ private:
   Upstream::HdsDelegatePtr hds_delegate_;
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
   Envoy::MutexTracer* mutex_tracer_;
+  Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   std::unique_ptr<ProcessContext> process_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
@@ -283,8 +286,8 @@ private:
         : RaiiListElement<T>(callbacks, callback) {}
   };
 
-  absl::flat_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
-  absl::flat_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
+  absl::node_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
+  absl::node_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
 };
 
 // Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could

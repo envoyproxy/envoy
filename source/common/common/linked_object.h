@@ -12,7 +12,7 @@ namespace Envoy {
  */
 template <class T> class LinkedObject {
 public:
-  typedef std::list<std::unique_ptr<T>> ListType;
+  using ListType = std::list<std::unique_ptr<T>>;
 
   /**
    * @return the list iterator for the object.

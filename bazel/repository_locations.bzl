@@ -5,10 +5,10 @@ REPOSITORY_LOCATIONS = dict(
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        sha256 = "4825306f702fa5cb76fd86c987a88c9bbb241e75f4d86dbb3714530ca73c1fb1",
-        strip_prefix = "boringssl-8cb07520451f0dc454654f2da5cdecf0b806f823",
-        # chromium-74.0.3729.131
-        urls = ["https://github.com/google/boringssl/archive/8cb07520451f0dc454654f2da5cdecf0b806f823.tar.gz"],
+        sha256 = "448773376d063b1e9a19e4fd41002d1a31a968a13be20b3b66ecd4aab9cf14a8",
+        strip_prefix = "boringssl-e534d74f5732e1aeebd514f05271d089c530c2f9",
+        # chromium-75.0.3770.80
+        urls = ["https://github.com/google/boringssl/archive/e534d74f5732e1aeebd514f05271d089c530c2f9.tar.gz"],
     ),
     boringssl_fips = dict(
         sha256 = "b12ad676ee533824f698741bd127f6fbc82c46344398a6d78d25e62c6c418c73",
@@ -16,10 +16,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-docs/fips/boringssl-66005f41fbc3529ffe8d007708756720529da20d.tar.xz"],
     ),
     com_google_absl = dict(
-        sha256 = "e35082e88b9da04f4d68094c05ba112502a5063712f3021adfa465306d238c76",
-        strip_prefix = "abseil-cpp-cc8dcd307b76a575d2e3e0958a4fe4c7193c2f68",
-        # 2018-10-31
-        urls = ["https://github.com/abseil/abseil-cpp/archive/cc8dcd307b76a575d2e3e0958a4fe4c7193c2f68.tar.gz"],
+        sha256 = "7ddf863ddced6fa5bf7304103f9c7aa619c20a2fcf84475512c8d3834b9d14fa",
+        strip_prefix = "abseil-cpp-61c9bf3e3e1c28a4aa6d7f1be4b37fd473bb5529",
+        # 2019-06-05
+        urls = ["https://github.com/abseil/abseil-cpp/archive/61c9bf3e3e1c28a4aa6d7f1be4b37fd473bb5529.tar.gz"],
     ),
     com_github_apache_thrift = dict(
         sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",
@@ -111,12 +111,6 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "defbf471facfebde6523ca1177529b63784893662d4ef2c60db074be8aef0634",
         strip_prefix = "lightstep-tracer-cpp-0.8.0",
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.8.0.tar.gz"],
-    ),
-    lightstep_vendored_googleapis = dict(
-        sha256 = "d1ef4f790eeaa805e7b364de05b91f9eed66bd6ae46f1483bbf49c33d86998e5",
-        strip_prefix = "googleapis-d6f78d948c53f3b400bb46996eb3084359914f9b",
-        # From: https://github.com/lightstep/lightstep-tracer-cpp/blob/v0.8.0/lightstep-tracer-common/third_party/googleapis/README.lightstep-tracer-common#L6
-        urls = ["https://github.com/googleapis/googleapis/archive/d6f78d948c53f3b400bb46996eb3084359914f9b.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
         sha256 = "a3d1c03e7af570fa64c01df259e6e9bb78637a6bd9c65c6bf7e8703e466dc22f",
@@ -221,10 +215,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.18.5/rules_go-0.18.5.tar.gz"],
     ),
     rules_foreign_cc = dict(
-        sha256 = "ccffb49fb24aee3f0a005fa59810dc596228fe86eacacbe0c004d59ed1881bd8",
-        strip_prefix = "rules_foreign_cc-bf99a0bf0080bcd50431aa7124ef23e5afd58325",
-        # 2019-05-17
-        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/bf99a0bf0080bcd50431aa7124ef23e5afd58325.tar.gz"],
+        sha256 = "980c1b74f5c18ea099889b0fb0479ee34b8a02845d3d302ecb16b15d73d624c8",
+        strip_prefix = "rules_foreign_cc-a0dc109915cea85909bef586e2b2a9bbdc6c8ff5",
+        # 2019-06-04
+        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/a0dc109915cea85909bef586e2b2a9bbdc6c8ff5.tar.gz"],
     ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
@@ -236,6 +230,16 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "b80297a1b8d38027a86836dbadc22f55dc3ecad56728175381aa6330705ac10f",
         strip_prefix = "subpar-2.0.0",
         urls = ["https://github.com/google/subpar/archive/2.0.0.tar.gz"],
+    ),
+    io_opencensus_cpp = dict(
+        sha256 = "d6d68704c419a9e892bd1f942e09509ebc5a318499a1abcf2c09734e5dc56e19",
+        strip_prefix = "opencensus-cpp-1145dd77ffb7a2845c71c8e6ca188ef55e4ff607",
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/1145dd77ffb7a2845c71c8e6ca188ef55e4ff607.tar.gz"],
+    ),
+    com_github_curl = dict(
+        sha256 = "821aeb78421375f70e55381c9ad2474bf279fc454b791b7e95fc83562951c690",
+        strip_prefix = "curl-7.65.1",
+        urls = ["https://github.com/curl/curl/releases/download/curl-7_65_1/curl-7.65.1.tar.gz"],
     ),
     com_googlesource_quiche = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/7bf7c3c358eb954e463bde14ea27444f4bd8ea05.tar.gz

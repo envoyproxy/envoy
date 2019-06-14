@@ -4,7 +4,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/subscription_factory.h"
+#include "common/config/subscription_factory_impl.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -35,11 +35,10 @@ public:
 
   std::unique_ptr<Subscription>
   subscriptionFromConfigSource(const envoy::api::v2::core::ConfigSource& config) {
-    return SubscriptionFactory::subscriptionFromConfigSource(
-        config, local_info_, dispatcher_, cm_, random_, stats_store_,
-        "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-        "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints",
-        Config::TypeUrl::get().ClusterLoadAssignment, validation_visitor_, *api_, callbacks_);
+    return SubscriptionFactoryImpl(local_info_, dispatcher_, cm_, random_, validation_visitor_,
+                                   *api_)
+        .subscriptionFromConfigSource(config, Config::TypeUrl::get().ClusterLoadAssignment,
+                                      stats_store_, callbacks_);
   }
 
   Upstream::MockClusterManager cm_;
@@ -124,7 +123,7 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterSingleton) {
       .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
         EXPECT_CALL(*async_client_factory, create()).WillOnce(Invoke([] {
-          return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+          return std::make_unique<Grpc::MockAsyncClient>();
         }));
         return async_client_factory;
       }));

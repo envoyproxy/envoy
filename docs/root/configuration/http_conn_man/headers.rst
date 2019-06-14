@@ -133,9 +133,10 @@ The following keys are supported:
 1. ``By`` The Subject Alternative Name (URI type) of the current proxy's certificate.
 2. ``Hash`` The SHA 256 digest of the current client certificate.
 3. ``Cert`` The entire client certificate in URL encoded PEM format.
-4. ``Subject`` The Subject field of the current client certificate. The value is always double-quoted.
-5. ``URI`` The URI type Subject Alternative Name field of the current client certificate.
-6. ``DNS`` The DNS type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple DNS type Subject Alternative Names, each will be a separate key-value pair.
+4. ``Chain`` The entire client certificate chain (including the leaf certificate) in URL encoded PEM format.
+5. ``Subject`` The Subject field of the current client certificate. The value is always double-quoted.
+6. ``URI`` The URI type Subject Alternative Name field of the current client certificate.
+7. ``DNS`` The DNS type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple DNS type Subject Alternative Names, each will be a separate key-value pair.
 
 A client certificate may contain multiple Subject Alternative Name types. For details on different Subject Alternative Name types, please refer `RFC 2459`_.
 
@@ -285,7 +286,7 @@ Example 5: Envoy as an internal proxy, receiving a request from an internal clie
     Result:
       | Trusted client address = 10.20.30.40
       | X-Envoy-External-Address remains unset
-      | X-Envoy-Internal is set to "true"
+      | X-Envoy-Internal is set to "false"
 
 Example 6: The internal Envoy from Example 5, receiving a request proxied by another Envoy
     Settings:
@@ -600,6 +601,10 @@ Supported variable names are:
     found, or if the selected value is not a supported type, then no header is emitted. The
     namespace and key(s) are specified as a JSON array of strings. Finally, percent symbols in the
     parameters **do not** need to be escaped by doubling them.
+
+%UPSTREAM_REMOTE_ADDRESS%
+    Remote address of the upstream host. If the address is an IP address it includes both address
+    and port.
 
 %PER_REQUEST_STATE(reverse.dns.data.name)%
     Populates the header with values set on the stream info filterState() object. To be

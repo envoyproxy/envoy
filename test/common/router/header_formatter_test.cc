@@ -71,6 +71,14 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressWithou
   testFormatting("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "127.0.0.2");
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemoteAddressVariable) {
+  testFormatting("UPSTREAM_REMOTE_ADDRESS", "10.0.0.1:443");
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.host_.reset();
+  testFormatting(stream_info, "UPSTREAM_REMOTE_ADDRESS", "");
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
@@ -668,6 +676,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA([\"ns\", \t \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
+      {"%UPSTREAM_REMOTE_ADDRESS%", {"10.0.0.1:443"}, {}},
       {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
 
@@ -727,6 +736,8 @@ TEST(HeaderParserTest, TestParseInternal) {
        {},
        {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
         "...]), actual format UPSTREAM_METADATA([\"ns\"])"}},
+      {"%START_TIME(%85n)%", {}, {"Invalid header configuration. Format string contains newline."}},
+
   };
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -1006,7 +1017,7 @@ request_headers_to_add:
   EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
             header_map.get_("x-request-start-range"));
 
-  typedef absl::flat_hash_map<std::string, int> CountMap;
+  using CountMap = absl::flat_hash_map<std::string, int>;
   CountMap counts;
   header_map.iterate(
       [](const Http::HeaderEntry& header, void* cb_v) -> Http::HeaderMap::Iterate {

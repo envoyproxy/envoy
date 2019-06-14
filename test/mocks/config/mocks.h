@@ -31,7 +31,6 @@ public:
   }
   template <class T> static std::string resourceName_(const T& resource) { return resource.name(); }
 
-  // TODO(fredlas) deduplicate
   MOCK_METHOD2_T(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string& version_info));
   MOCK_METHOD3_T(onConfigUpdate,
@@ -48,10 +47,25 @@ public:
   MOCK_METHOD1(updateResources, void(const std::set<std::string>& update_to_these_names));
 };
 
+class MockSubscriptionFactory : public SubscriptionFactory {
+public:
+  MockSubscriptionFactory();
+  ~MockSubscriptionFactory() override;
+
+  MOCK_METHOD4(subscriptionFromConfigSource,
+               SubscriptionPtr(const envoy::api::v2::core::ConfigSource& config,
+                               absl::string_view type_url, Stats::Scope& scope,
+                               SubscriptionCallbacks& callbacks));
+  MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
+
+  MockSubscription* subscription_{};
+  SubscriptionCallbacks* callbacks_{};
+};
+
 class MockGrpcMuxWatch : public GrpcMuxWatch {
 public:
   MockGrpcMuxWatch();
-  ~MockGrpcMuxWatch();
+  ~MockGrpcMuxWatch() override;
 
   MOCK_METHOD0(cancel, void());
 };
@@ -59,22 +73,23 @@ public:
 class MockGrpcMux : public GrpcMux {
 public:
   MockGrpcMux();
-  ~MockGrpcMux();
+  ~MockGrpcMux() override;
 
   MOCK_METHOD0(start, void());
   MOCK_METHOD3(subscribe_,
                GrpcMuxWatch*(const std::string& type_url, const std::set<std::string>& resources,
                              GrpcMuxCallbacks& callbacks));
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
-                            GrpcMuxCallbacks& callbacks);
+                            GrpcMuxCallbacks& callbacks) override;
   MOCK_METHOD1(pause, void(const std::string& type_url));
   MOCK_METHOD1(resume, void(const std::string& type_url));
+  MOCK_CONST_METHOD1(paused, bool(const std::string& type_url));
 };
 
 class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {
 public:
   MockGrpcMuxCallbacks();
-  ~MockGrpcMuxCallbacks();
+  ~MockGrpcMuxCallbacks() override;
 
   MOCK_METHOD2(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                     const std::string& version_info));
@@ -85,7 +100,7 @@ public:
 class MockGrpcStreamCallbacks : public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
 public:
   MockGrpcStreamCallbacks();
-  ~MockGrpcStreamCallbacks();
+  ~MockGrpcStreamCallbacks() override;
 
   MOCK_METHOD0(onStreamEstablished, void());
   MOCK_METHOD0(onEstablishmentFailure, void());

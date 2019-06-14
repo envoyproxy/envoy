@@ -1,7 +1,5 @@
 #include "extensions/transport_sockets/raw_buffer/config.h"
 
-#include "envoy/registry/registry.h"
-
 #include "common/network/raw_buffer_socket.h"
 
 namespace Envoy {

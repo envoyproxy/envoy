@@ -20,6 +20,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread/thread.h"
 
+#include "common/grpc/context_impl.h"
 #include "common/http/context_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/stats/fake_symbol_table_impl.h"
@@ -369,6 +370,7 @@ public:
   MOCK_METHOD0(startTimeCurrentEpoch, time_t());
   MOCK_METHOD0(startTimeFirstEpoch, time_t());
   MOCK_METHOD0(stats, Stats::Store&());
+  MOCK_METHOD0(grpcContext, Grpc::Context&());
   MOCK_METHOD0(httpContext, Http::Context&());
   MOCK_METHOD0(processContext, ProcessContext&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
@@ -402,6 +404,7 @@ public:
   testing::NiceMock<MockListenerManager> listener_manager_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Singleton::ManagerPtr singleton_manager_;
+  Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
 };
 
@@ -453,6 +456,7 @@ public:
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
+  Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
   MOCK_METHOD0(processContext, ProcessContext&());
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
@@ -475,6 +479,7 @@ public:
   Stats::IsolatedStoreImpl listener_scope_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
+  Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   testing::NiceMock<Api::MockApi> api_;
 };
@@ -501,6 +506,7 @@ public:
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   MOCK_METHOD0(api, Api::Api&());
 
+  testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<Api::MockApi> api_;
 };

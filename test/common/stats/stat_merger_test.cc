@@ -207,7 +207,6 @@ TEST_F(StatMergerThreadLocalTest, newStatFromParent) {
   {
     StatMerger stat_merger(store_);
 
-    Protobuf::Map<std::string, uint64_t> counter_values;
     Protobuf::Map<std::string, uint64_t> counter_deltas;
     Protobuf::Map<std::string, uint64_t> gauges;
     counter_deltas["newcounter0"] = 0;
@@ -229,6 +228,25 @@ TEST_F(StatMergerThreadLocalTest, newStatFromParent) {
   EXPECT_FALSE(TestUtility::findCounter(store_, "newcounter2"));
   EXPECT_TRUE(TestUtility::findGauge(store_, "newgauge1"));
   EXPECT_FALSE(TestUtility::findGauge(store_, "newgauge2"));
+}
+
+// Verify that if we create a stat in the child process which then gets merged
+// from the parent, that we retain the import-mode, accumulating the updated
+// value. https://github.com/envoyproxy/envoy/issues/7227
+TEST_F(StatMergerThreadLocalTest, retainImportModeAfterMerge) {
+  Gauge& gauge = store_.gauge("mygauge", Gauge::ImportMode::Accumulate);
+  gauge.set(42);
+  EXPECT_EQ(Gauge::ImportMode::Accumulate, gauge.importMode());
+  EXPECT_EQ(42, gauge.value());
+  {
+    StatMerger stat_merger(store_);
+    Protobuf::Map<std::string, uint64_t> counter_deltas;
+    Protobuf::Map<std::string, uint64_t> gauges;
+    gauges["mygauge"] = 789;
+    stat_merger.mergeStats(counter_deltas, gauges);
+  }
+  EXPECT_EQ(Gauge::ImportMode::Accumulate, gauge.importMode());
+  EXPECT_EQ(789 + 42, gauge.value());
 }
 
 } // namespace

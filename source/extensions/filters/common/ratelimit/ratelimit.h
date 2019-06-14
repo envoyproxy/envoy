@@ -36,7 +36,7 @@ enum class LimitStatus {
  */
 class RequestCallbacks {
 public:
-  virtual ~RequestCallbacks() {}
+  virtual ~RequestCallbacks() = default;
 
   /**
    * Called when a limit request is complete. The resulting status and
@@ -50,7 +50,7 @@ public:
  */
 class Client {
 public:
-  virtual ~Client() {}
+  virtual ~Client() = default;
 
   /**
    * Cancel an inflight limit request.
@@ -74,7 +74,7 @@ public:
                      Tracing::Span& parent_span) PURE;
 };
 
-typedef std::unique_ptr<Client> ClientPtr;
+using ClientPtr = std::unique_ptr<Client>;
 
 } // namespace RateLimit
 } // namespace Common
