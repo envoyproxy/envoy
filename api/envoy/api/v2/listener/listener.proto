@@ -25,7 +25,7 @@ option (gogoproto.equal_all) = true;
 // Listener :ref:`configuration overview <config_listeners>`
 
 message Filter {
-  // The name of the filter to instantiate. The name must match a 
+  // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_network_filters>`.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
@@ -190,7 +190,7 @@ message FilterChain {
 }
 
 message ListenerFilter {
-  // The name of the filter to instantiate. The name must match a 
+  // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_listener_filters>`.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 

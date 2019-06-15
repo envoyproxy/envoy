@@ -552,7 +552,7 @@ message ScopedRds {
 }
 
 message HttpFilter {
-  // The name of the filter to instantiate. The name must match a 
+  // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_http_filters>`.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
