@@ -62,14 +62,6 @@ grpc::ByteBuffer GoogleGrpcUtils::makeByteBuffer(Buffer::InstancePtr&& buffer_in
   return {&slices[0], slices.size()};
 }
 
-struct ByteBufferContainer {
-  ByteBufferContainer(int ref_count) : ref_count_(ref_count) {}
-  ~ByteBufferContainer() { ::free(fragments_); }
-  uint32_t ref_count_;
-  Buffer::BufferFragmentImpl* fragments_ = nullptr;
-  std::vector<grpc::Slice> slices_;
-};
-
 Buffer::InstancePtr GoogleGrpcUtils::makeBufferInstance(const grpc::ByteBuffer& byte_buffer) {
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
   if (byte_buffer.Length() == 0) {
@@ -81,28 +73,16 @@ Buffer::InstancePtr GoogleGrpcUtils::makeBufferInstance(const grpc::ByteBuffer& 
   if (!byte_buffer.Dump(&slices).ok()) {
     return nullptr;
   }
-  auto* container = new ByteBufferContainer(static_cast<int>(slices.size()));
-  std::function<void(const void*, size_t, const Buffer::BufferFragmentImpl*)> releaser =
-      [container](const void*, size_t, const Buffer::BufferFragmentImpl*) {
-        container->ref_count_--;
-        if (container->ref_count_ <= 0) {
-          delete container;
-        }
-      };
-  // NB: addBufferFragment takes a pointer alias to the BufferFragmentImpl which is passed in so we
-  // need to ensure that the lifetime of those objects exceeds that of the Buffer::Instance.
-  RELEASE_ASSERT(!::posix_memalign(reinterpret_cast<void**>(&container->fragments_),
-                                   alignof(Buffer::BufferFragmentImpl),
-                                   sizeof(Buffer::BufferFragmentImpl) * slices.size()),
-                 "posix_memalign failure");
+
   for (size_t i = 0; i < slices.size(); i++) {
-    new (&container->fragments_[i])
-        Buffer::BufferFragmentImpl(slices[i].begin(), slices[i].size(), releaser);
+    auto* slice = new grpc::Slice(std::move(slices[i]));
+    buffer->addBufferFragment(*new Buffer::BufferFragmentImpl(
+        slice->begin(), slice->size(),
+        [slice](const void*, size_t, const Buffer::BufferFragmentImpl* frag) {
+          delete slice;
+          delete frag;
+        }));
   }
-  for (size_t i = 0; i < slices.size(); i++) {
-    buffer->addBufferFragment(container->fragments_[i]);
-  }
-  container->slices_ = std::move(slices);
   return buffer;
 }
 
