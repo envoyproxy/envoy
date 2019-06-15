@@ -94,7 +94,8 @@ if [[ "$1" == "bazel.release" ]]; then
   setup_clang_toolchain
   echo "bazel release build with tests..."
   bazel_binary_build release
-  BAZEL_TEST_RELEASE_OPTIONS="test ${BAZEL_TEST_OPTIONS} -c opt ${MEMORY_TEST_EXACT_ARGS}"
+  RELEASE_OPTIONS="-c opt ${MEMORY_TEST_EXACT_ARGS}"
+  BAZEL_TEST_RELEASE_OPTIONS="test ${BAZEL_TEST_OPTIONS} ${RELEASE_OPTIONS}"
 
   if [[ $# -gt 1 ]]; then
     shift
@@ -107,7 +108,7 @@ if [[ "$1" == "bazel.release" ]]; then
     # We have various test binaries in the test directory such as tools, benchmarks, etc. We
     # run a build pass to make sure they compile.
 
-    bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
+    bazel build ${BAZEL_BUILD_OPTIONS} ${RELEASE_OPTIONS} //include/... //source/... //test/...
     # Now run all of the tests which should already be compiled.
     bazel_with_collection $BAZEL_TEST_RELEASE_OPTIONS //test/...
   fi
