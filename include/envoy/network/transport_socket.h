@@ -20,7 +20,9 @@ enum class PostIoAction {
   // Close the connection.
   Close,
   // Keep the connection open.
-  KeepOpen
+  KeepOpen,
+  // Close current connection and create an new connection.
+  Reconnect
 };
 
 /**

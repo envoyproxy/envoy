@@ -18,6 +18,7 @@ public:
   const std::string Tap = "envoy.transport_sockets.tap";
   const std::string RawBuffer = "raw_buffer";
   const std::string Tls = "tls";
+  const std::string Permissive = "envoy.transport_sockets.permissive";
 };
 
 using TransportSocketNames = ConstSingleton<TransportSocketNameValues>;
