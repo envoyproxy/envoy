@@ -30,13 +30,41 @@ struct CsrfStats {
   ALL_CSRF_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+class OriginMatcher {
+public:
+  OriginMatcher(const envoy::config::filter::http::csrf::v2::OriginMatcher& matcher) {
+    const envoy::config::filter::http::csrf::v2::OriginMatcher::OriginType type = matcher.type();
+    if (type == envoy::config::filter::http::csrf::v2::OriginMatcher::REGEX) {
+      regex_origin_ = RegexUtil::parseRegex(matcher.origin());
+    }
+    else if (type == envoy::config::filter::http::csrf::v2::OriginMatcher::EXACT) {
+      exact_origin_ = matcher.origin();
+    }
+  }
+
+  bool matches(const absl::string_view source_origin) const {
+    if (exact_origin_ != "") {
+      return source_origin == exact_origin_;
+    }
+    return std::regex_match(source_origin.begin(), source_origin.end(), regex_origin_);
+  }
+
+private:
+  std::string exact_origin_;
+  std::regex regex_origin_;
+};
+
 /**
  * Configuration for CSRF policy.
  */
 class CsrfPolicy : public Router::RouteSpecificFilterConfig {
 public:
   CsrfPolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
-             Runtime::Loader& runtime) : policy_(policy), runtime_(runtime) {}
+             Runtime::Loader& runtime) : policy_(policy), runtime_(runtime) {
+    for (const auto& additional_origin : policy.additional_origins()) {
+      additional_origins_.push_back(OriginMatcher(additional_origin));
+    }
+  }
 
   bool enabled() const {
     const envoy::api::v2::core::RuntimeFractionalPercent& filter_enabled = policy_.filter_enabled();
@@ -53,9 +81,13 @@ public:
                                               shadow_enabled.default_value());
   }
 
+  const std::list<OriginMatcher>& additional_origins() const { return additional_origins_; };
+
 private:
   const envoy::config::filter::http::csrf::v2::CsrfPolicy policy_;
+  std::list<OriginMatcher> additional_origins_;
   Runtime::Loader& runtime_;
+
 };
 
 /**
@@ -97,6 +129,7 @@ public:
 
 private:
   void determinePolicy();
+  bool isValid(const absl::string_view source_origin, Http::HeaderMap& headers);
 
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   CsrfFilterConfigSharedPtr config_;

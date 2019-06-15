@@ -67,6 +67,19 @@ static_resources:
                         numerator: 100
                         denominator: HUNDRED
               - match:
+                  prefix: "/csrf/additional_origin"
+                route:
+                  cluster: generic_service
+                per_filter_config:
+                  envoy.csrf:
+                    filter_enabled:
+                      default_value:
+                        numerator: 100
+                        denominator: HUNDRED
+                    additional_origins:
+                    - origin: .*
+                      type: REGEX
+              - match:
                   prefix: "/"
                 route:
                   cluster: generic_service

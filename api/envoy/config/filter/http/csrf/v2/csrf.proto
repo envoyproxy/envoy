@@ -15,9 +15,27 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: CSRF]
 // Cross-Site Request Forgery :ref:`configuration overview <config_http_filters_csrf>`.
 
+// Origin Matcher for CSRF policy configuration.
+message OriginMatcher {
+  // A string containing either an exact origin or regex pattern.
+  string origin = 1 [(validate.rules).string.min_bytes = 1];
+
+  // Origin matchers support both exact matches and regex patterns.
+  enum OriginType {
+    // The origin value will be evaluated exactly as is.
+    EXACT = 0;
+
+    // The origin value will be evaluated as regex.
+    REGEX = 1;
+  }
+
+  // The type of the the origin string.
+  OriginType type = 2 [(validate.rules).enum.defined_only = true];
+}
+
 // CSRF filter config.
 message CsrfPolicy {
-  // Specify if CSRF is enabled.
+  // Specifies if CSRF is enabled.
   //
   // More information on how this can be controlled via runtime can be found
   // :ref:`here <csrf-runtime>`.
@@ -40,4 +58,11 @@ message CsrfPolicy {
   //   This field defaults to 100/:ref:`HUNDRED
   //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
   envoy.api.v2.core.RuntimeFractionalPercent shadow_enabled = 2;
+
+  // Specifies additional source origins that will be allowed in addition to
+  // the destination origin.
+  //
+  // More information on how this can be configured via runtime can be found
+  // :ref:`here <csrf-configuration>`.
+  repeated OriginMatcher additional_origins = 3;
 }
