@@ -15,5 +15,5 @@ routing PRs, questions, etc. to the right place.
   * iOS
 * Mike Schore ([goaway](https://github.com/goaway)) (mschore@lyft.com)
   * Envoy mobile core
-* Keith Smiley ([keith](https://github.com/keith)) (ksmiley@lyft.com)
+* Keith Smiley ([keith](https://github.com/keith)) (keithbsmiley@gmail.com)
   * Bazel build magician
