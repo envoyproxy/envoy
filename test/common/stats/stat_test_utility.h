@@ -56,6 +56,14 @@ public:
   static Mode mode();
 
   size_t consumedBytes() const {
+    // Note that this subtraction of two unsigned numbers will yield a very
+    // large number if memory has actually shrunk since construction. In that
+    // case, the EXPECT_MEMORY_EQ and EXPECT_MEMORY_LE macros will both report
+    // failures, as desired, though the failure log may look confusing.
+    //
+    // Note also that tools like ubsan may report this as an unsigned integer
+    // underflow, if run with -fsanitize=unsigned-integer-overflow, though
+    // strictly speaking this is legal and well-defined for unsigned integers.
     return Memory::Stats::totalCurrentlyAllocated() - memory_at_construction_;
   }
 
