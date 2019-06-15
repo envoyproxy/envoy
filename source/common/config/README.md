@@ -1,4 +1,4 @@
-xDS
+# xDS
 
 xDS stands for [fill in the blank] Discovery Service. It provides dynamic config discovery/updates.
 
@@ -16,7 +16,7 @@ subscription logic will maintain a subscription to the union: X Y and Z. Updates
 to X will be delivered to the first object, Y to both, Z to the second. This
 logic is implemented by WatchMap.
 
-If you are working on Envoy's gRPC xDS client logic itself, read on.
+### If you are working on Envoy's gRPC xDS client logic itself, read on.
 
 When using gRPC, xDS has two pairs of options: aggregated/non-aggregated, and
 delta/state-of-the-world updates. All four combinations of these are usable.
@@ -25,7 +25,7 @@ delta/state-of-the-world updates. All four combinations of these are usable.
 For Envoy's implementation of xDS client logic, there is effectively no difference
 between aggregated xDS and non-aggregated: they both use the same request/response protos. The
 non-aggregated case is handled by running the aggregated logic, and just happening to only have 1
-xDS subscription type to "aggregate", i.e., GrpcDeltaXdsContext only has one
+xDS subscription type to "aggregate", i.e., NewGrpcMuxImpl only has one
 DeltaSubscriptionState entry in its map.
 
 However, to the config server, there is a huge difference: when using ADS (caused
@@ -36,8 +36,8 @@ and having identical client code, they're actually different gRPC services.
 
 Delta vs state-of-the-world is a question of wire format: the protos in question are named
 [Delta]Discovery{Request,Response}. That is what the GrpcMux interface is useful for: its
-GrpcDeltaXdsContext (TODO may be renamed) implementation works with DeltaDiscovery{Request,Response} and has
-delta-specific logic; its GrpxMuxImpl implementation (TODO will be merged into GrpcDeltaXdsContext) works with Discovery{Request,Response}
+NewGrpcMuxImpl (TODO may be renamed) implementation works with DeltaDiscovery{Request,Response} and has
+delta-specific logic; its GrpxMuxImpl implementation (TODO will be merged into NewGrpcMuxImpl) works with Discovery{Request,Response}
 and has SotW-specific logic. Both the delta and SotW Subscription implementations (TODO will be merged) hold a shared_ptr<GrpcMux>.
 The shared_ptr allows for both non- and aggregated: if non-aggregated, you'll be the only holder of that shared_ptr.
 

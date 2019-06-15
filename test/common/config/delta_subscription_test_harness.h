@@ -34,7 +34,7 @@ public:
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_));
-    xds_context_ = std::make_shared<GrpcDeltaXdsContext>(
+    xds_context_ = std::make_shared<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
         random_, stats_store_, rate_limit_settings_, local_info_);
     subscription_ = std::make_unique<DeltaSubscriptionImpl>(
@@ -146,7 +146,7 @@ public:
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
       expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Internal, "bad config", {});
     }
-    static_cast<GrpcDeltaXdsContext*>(subscription_->getContextForTest().get())
+    static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
         ->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
@@ -187,7 +187,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
-  std::shared_ptr<GrpcDeltaXdsContext> xds_context_;
+  std::shared_ptr<NewGrpcMuxImpl> xds_context_;
   std::unique_ptr<DeltaSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;

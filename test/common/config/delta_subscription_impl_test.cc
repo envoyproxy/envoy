@@ -11,7 +11,7 @@ protected:
   DeltaSubscriptionImplTest() : DeltaSubscriptionTestHarness() {}
 
   // We need to destroy the subscription before the test's destruction, because the subscription's
-  // destructor removes its watch from the GrpcDeltaXdsContext, and that removal process involves
+  // destructor removes its watch from the NewGrpcMuxImpl, and that removal process involves
   // some things held by the test fixture.
   void TearDown() override {
     //  if (subscription_started_) {
@@ -77,7 +77,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    static_cast<GrpcDeltaXdsContext*>(subscription_->getContextForTest().get())
+    static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
         ->onDiscoveryResponse(std::move(message));
   }
   // The server gives us our first version of resource name2.
@@ -91,7 +91,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    static_cast<GrpcDeltaXdsContext*>(subscription_->getContextForTest().get())
+    static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
         ->onDiscoveryResponse(std::move(message));
   }
   // The server gives us an updated version of resource name1.
@@ -105,7 +105,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    static_cast<GrpcDeltaXdsContext*>(subscription_->getContextForTest().get())
+    static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
         ->onDiscoveryResponse(std::move(message));
   }
   // All ACK sendMessage()s will happen upon calling resume().
@@ -141,7 +141,7 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
   const Protobuf::MethodDescriptor* method_descriptor =
       Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
-  std::shared_ptr<GrpcDeltaXdsContext> xds_context = std::make_shared<GrpcDeltaXdsContext>(
+  std::shared_ptr<NewGrpcMuxImpl> xds_context = std::make_shared<NewGrpcMuxImpl>(
       std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor, random,
       stats_store, rate_limit_settings, local_info);
 

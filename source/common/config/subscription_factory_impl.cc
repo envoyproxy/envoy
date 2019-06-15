@@ -2,10 +2,10 @@
 
 #include "common/config/delta_subscription_impl.h"
 #include "common/config/filesystem_subscription_impl.h"
-#include "common/config/grpc_delta_xds_context.h"
 #include "common/config/grpc_mux_subscription_impl.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
+#include "common/config/new_grpc_mux_impl.h"
 #include "common/config/type_to_endpoint.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
@@ -62,7 +62,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.clusters(), api_config_source);
       result = std::make_unique<DeltaSubscriptionImpl>(
-          std::make_shared<Config::GrpcDeltaXdsContext>(
+          std::make_shared<Config::NewGrpcMuxImpl>(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                              api_config_source, scope)
                   ->create(),

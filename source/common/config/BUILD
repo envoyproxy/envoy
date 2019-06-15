@@ -83,8 +83,8 @@ envoy_cc_library(
     srcs = ["delta_subscription_impl.cc"],
     hdrs = ["delta_subscription_impl.h"],
     deps = [
-        ":grpc_delta_xds_context_lib",
         ":grpc_stream_lib",
+        ":new_grpc_mux_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/grpc:async_client_interface",
@@ -214,10 +214,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "grpc_delta_xds_context_lib",
-    hdrs = ["grpc_delta_xds_context.h"],
+    name = "new_grpc_mux_lib",
+    srcs = ["new_grpc_mux_impl.cc"],
+    hdrs = ["new_grpc_mux_impl.h"],
     deps = [
         ":delta_subscription_state_lib",
+        ":grpc_stream_lib",
         ":pausable_ack_queue_lib",
         ":watch_map_lib",
         "//include/envoy/event:dispatcher_interface",

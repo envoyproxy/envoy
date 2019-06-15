@@ -19,7 +19,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/cds_json.h"
-#include "common/config/grpc_delta_xds_context.h"
+#include "common/config/new_grpc_mux_impl.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/grpc/async_client_manager_impl.h"
@@ -256,7 +256,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       auto& api_config_source = dyn_resources.has_ads_config()
                                     ? dyn_resources.ads_config()
                                     : dyn_resources.cds_config().api_config_source();
-      ads_mux_ = std::make_shared<Config::GrpcDeltaXdsContext>(
+      ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, api_config_source,
                                                          stats)
               ->create(),

@@ -2,7 +2,7 @@
 
 #include "envoy/config/subscription.h"
 
-#include "common/config/grpc_delta_xds_context.h"
+#include "common/config/new_grpc_mux_impl.h"
 #include "common/config/utility.h"
 
 namespace Envoy {
@@ -10,16 +10,16 @@ namespace Config {
 
 // DeltaSubscriptionImpl provides a top-level interface to the Envoy's communication with an xDS
 // server, for use by the various xDS users within Envoy. It is built around a (shared)
-// GrpcDeltaXdsContext, and the further machinery underlying that. An xDS user indicates interest in
+// NewGrpcMuxImpl, and the further machinery underlying that. An xDS user indicates interest in
 // various resources via start() and updateResourceInterest(). It receives updates to those
 // resources via the SubscriptionCallbacks it provides. Multiple users can each have their own
-// Subscription object for the same type_url; GrpcDeltaXdsContext maintains a subscription to the
+// Subscription object for the same type_url; NewGrpcMuxImpl maintains a subscription to the
 // union of interested resources, and delivers to the users just the resource updates that they are
 // "watching" for.
 //
-// DeltaSubscriptionImpl and GrpcDeltaXdsContext are both built to provide both regular xDS and ADS,
+// DeltaSubscriptionImpl and NewGrpcMuxImpl are both built to provide both regular xDS and ADS,
 // distinguished by whether multiple DeltaSubscriptionImpls are sharing a single
-// GrpcDeltaXdsContext. (And by the gRPC method string, but that's taken care of over in
+// NewGrpcMuxImpl. (And by the gRPC method string, but that's taken care of over in
 // SubscriptionFactory).
 //
 // Why does DeltaSubscriptionImpl itself implement the SubscriptionCallbacks interface? So that it
