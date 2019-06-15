@@ -25,9 +25,8 @@ option (gogoproto.equal_all) = true;
 // Listener :ref:`configuration overview <config_listeners>`
 
 message Filter {
-  // The name of the filter to instantiate. The name must match a supported
-  // filter. Refer to :ref:`HTTP filters<config_http_filters>` and
-  // :ref:`Network filters<config_network_filters>` for built-in filters.
+  // The name of the filter to instantiate. The name must match a 
+  // :ref:`supported filter <config_network_filters>`.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Filter specific configuration which depends on the filter being
@@ -191,12 +190,8 @@ message FilterChain {
 }
 
 message ListenerFilter {
-  // The name of the filter to instantiate. The name must match a supported
-  // filter. The built-in filters are:
-  //
-  // [#comment:TODO(mattklein123): Auto generate the following list]
-  // * :ref:`envoy.listener.original_dst <config_listener_filters_original_dst>`
-  // * :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
+  // The name of the filter to instantiate. The name must match a 
+  // :ref:`supported filter <config_listener_filters>`.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Filter specific configuration which depends on the filter being instantiated.
