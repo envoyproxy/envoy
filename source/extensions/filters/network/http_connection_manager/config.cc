@@ -30,8 +30,8 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 namespace {
 
-typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
-typedef std::map<std::string, HttpConnectionManagerConfig::FilterConfig> FilterFactoryMap;
+using FilterFactoriesList = std::list<Http::FilterFactoryCb>;
+using FilterFactoryMap = std::map<std::string, HttpConnectionManagerConfig::FilterConfig>;
 
 HttpConnectionManagerConfig::UpgradeMap::const_iterator
 findUpgradeBoolCaseInsensitive(const HttpConnectionManagerConfig::UpgradeMap& upgrade_map,
@@ -155,6 +155,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
+      preserve_external_request_id_(config.preserve_external_request_id()),
       date_provider_(date_provider),
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
@@ -220,6 +221,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   const auto& set_current_client_cert_details = config.set_current_client_cert_details();
   if (set_current_client_cert_details.cert()) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Cert);
+  }
+  if (set_current_client_cert_details.chain()) {
+    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Chain);
   }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, subject, false)) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);

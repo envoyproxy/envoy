@@ -47,7 +47,13 @@ void PausableAckQueue::resume(const std::string& type_url) {
   ASSERT(pause_entry);
   pause_entry = false;
 }
-bool PausableAckQueue::paused(const std::string& type_url) { return paused_[type_url]; }
+bool PausableAckQueue::paused(const std::string& type_url) const {
+  auto entry = paused_.find(type_url);
+  if (entry == paused_.end()) {
+    return false;
+  }
+  return entry->second;
+}
 
 } // namespace Config
 } // namespace Envoy

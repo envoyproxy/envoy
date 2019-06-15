@@ -39,7 +39,7 @@ public:
   const RequestHeader request_header_;
 };
 
-typedef std::shared_ptr<RequestParseFailure> RequestParseFailureSharedPtr;
+using RequestParseFailureSharedPtr = std::shared_ptr<RequestParseFailure>;
 
 /**
  * Abstract Kafka request.
@@ -74,7 +74,7 @@ public:
   const RequestHeader request_header_;
 };
 
-typedef std::shared_ptr<AbstractRequest> AbstractRequestSharedPtr;
+using AbstractRequestSharedPtr = std::shared_ptr<AbstractRequest>;
 
 /**
  * Concrete request that carries data particular to given request type.

@@ -12,17 +12,17 @@ namespace Thread {
 
 class ThreadId {
 public:
-  virtual ~ThreadId() {}
+  virtual ~ThreadId() = default;
 
   virtual std::string debugString() const PURE;
   virtual bool isCurrentThreadId() const PURE;
 };
 
-typedef std::unique_ptr<ThreadId> ThreadIdPtr;
+using ThreadIdPtr = std::unique_ptr<ThreadId>;
 
 class Thread {
 public:
-  virtual ~Thread() {}
+  virtual ~Thread() = default;
 
   /**
    * Join on thread exit.
@@ -30,14 +30,14 @@ public:
   virtual void join() PURE;
 };
 
-typedef std::unique_ptr<Thread> ThreadPtr;
+using ThreadPtr = std::unique_ptr<Thread>;
 
 /**
  * Interface providing a mechanism for creating threads.
  */
 class ThreadFactory {
 public:
-  virtual ~ThreadFactory() {}
+  virtual ~ThreadFactory() = default;
 
   /**
    * Create a thread.
@@ -57,7 +57,7 @@ public:
  */
 class LOCKABLE BasicLockable {
 public:
-  virtual ~BasicLockable() {}
+  virtual ~BasicLockable() = default;
 
   virtual void lock() EXCLUSIVE_LOCK_FUNCTION() PURE;
   virtual bool tryLock() EXCLUSIVE_TRYLOCK_FUNCTION(true) PURE;

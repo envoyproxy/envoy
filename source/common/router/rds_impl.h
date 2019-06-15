@@ -23,7 +23,6 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
-#include "common/config/subscription_factory.h"
 #include "common/init/target_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/route_config_update_receiver_impl.h"
@@ -108,6 +107,7 @@ public:
   }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
 
+private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
@@ -121,7 +121,6 @@ public:
         .name();
   }
 
-private:
   RdsRouteConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,

@@ -38,6 +38,12 @@ bool FilterManagerImpl::initializeReadFilters() {
 
 void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
                                           ReadBufferSource& buffer_source) {
+  // Filter could return status == FilterStatus::StopIteration immediately, close the connection and
+  // use callback to call this function.
+  if (connection_.state() != Connection::State::Open) {
+    return;
+  }
+
   std::list<ActiveReadFilterPtr>::iterator entry;
   if (!filter) {
     entry = upstream_filters_.begin();
@@ -49,7 +55,7 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
     if (!(*entry)->initialized_) {
       (*entry)->initialized_ = true;
       FilterStatus status = (*entry)->filter_->onNewConnection();
-      if (status == FilterStatus::StopIteration) {
+      if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
         return;
       }
     }
@@ -57,7 +63,7 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
     StreamBuffer read_buffer = buffer_source.getReadBuffer();
     if (read_buffer.buffer.length() > 0 || read_buffer.end_stream) {
       FilterStatus status = (*entry)->filter_->onData(read_buffer.buffer, read_buffer.end_stream);
-      if (status == FilterStatus::StopIteration) {
+      if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
         return;
       }
     }
@@ -73,6 +79,12 @@ FilterStatus FilterManagerImpl::onWrite() { return onWrite(nullptr, connection_)
 
 FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
                                         WriteBufferSource& buffer_source) {
+  // Filter could return status == FilterStatus::StopIteration immediately, close the connection and
+  // use callback to call this function.
+  if (connection_.state() != Connection::State::Open) {
+    return FilterStatus::StopIteration;
+  }
+
   std::list<ActiveWriteFilterPtr>::iterator entry;
   if (!filter) {
     entry = downstream_filters_.begin();
@@ -83,8 +95,8 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
   for (; entry != downstream_filters_.end(); entry++) {
     StreamBuffer write_buffer = buffer_source.getWriteBuffer();
     FilterStatus status = (*entry)->filter_->onWrite(write_buffer.buffer, write_buffer.end_stream);
-    if (status == FilterStatus::StopIteration) {
-      return status;
+    if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
+      return FilterStatus::StopIteration;
     }
   }
 

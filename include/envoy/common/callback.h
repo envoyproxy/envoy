@@ -11,7 +11,7 @@ namespace Common {
  */
 class CallbackHandle {
 public:
-  virtual ~CallbackHandle() {}
+  virtual ~CallbackHandle() = default;
 
   /**
    * Remove the callback. After this routine returns the callback will no longer be called.

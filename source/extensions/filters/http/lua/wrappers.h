@@ -37,7 +37,7 @@ private:
  */
 class HeaderMapWrapper : public Filters::Common::Lua::BaseLuaObject<HeaderMapWrapper> {
 public:
-  typedef std::function<bool()> CheckModifiableCb;
+  using CheckModifiableCb = std::function<bool()>;
 
   HeaderMapWrapper(Http::HeaderMap& headers, CheckModifiableCb cb) : headers_(headers), cb_(cb) {}
 

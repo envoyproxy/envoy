@@ -18,7 +18,7 @@ public:
   const std::string RedisHealthChecker = "envoy.health_checkers.redis";
 };
 
-typedef ConstSingleton<HealthCheckerNameValues> HealthCheckerNames;
+using HealthCheckerNames = ConstSingleton<HealthCheckerNameValues>;
 
 } // namespace HealthCheckers
 } // namespace Extensions

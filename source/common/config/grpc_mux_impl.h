@@ -38,6 +38,7 @@ public:
   // GrpcMux
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
+  bool paused(const std::string& type_url) const override;
 
   void addOrUpdateWatch(const std::string&, WatchPtr&, const std::set<std::string>&,
                         SubscriptionCallbacks&, std::chrono::milliseconds) override {
@@ -131,6 +132,7 @@ public:
   }
   void pause(const std::string&) override {}
   void resume(const std::string&) override {}
+  bool paused(const std::string&) const override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
   void addOrUpdateWatch(const std::string&, WatchPtr&, const std::set<std::string>&,
                         SubscriptionCallbacks&, std::chrono::milliseconds) override {

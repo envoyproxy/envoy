@@ -40,8 +40,7 @@ RedisCluster::RedisCluster(
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& host = lb_endpoint.endpoint().address();
       dns_discovery_resolve_targets_.emplace_back(new DnsDiscoveryResolveTarget(
-          *this, host.socket_address().address(), host.socket_address().port_value(),
-          locality_lb_endpoint, lb_endpoint));
+          *this, host.socket_address().address(), host.socket_address().port_value()));
     }
   }
 
@@ -113,12 +112,10 @@ void RedisCluster::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots) {
 }
 
 // DnsDiscoveryResolveTarget
-RedisCluster::DnsDiscoveryResolveTarget::DnsDiscoveryResolveTarget(
-    RedisCluster& parent, const std::string& dns_address, const uint32_t port,
-    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint)
-    : parent_(parent), dns_address_(dns_address), port_(port),
-      locality_lb_endpoint_(locality_lb_endpoint), lb_endpoint_(lb_endpoint) {}
+RedisCluster::DnsDiscoveryResolveTarget::DnsDiscoveryResolveTarget(RedisCluster& parent,
+                                                                   const std::string& dns_address,
+                                                                   const uint32_t port)
+    : parent_(parent), dns_address_(dns_address), port_(port) {}
 
 RedisCluster::DnsDiscoveryResolveTarget::~DnsDiscoveryResolveTarget() {
   if (active_query_) {

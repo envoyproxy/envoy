@@ -159,14 +159,16 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
-  NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Init::MockManager> init_manager;
-  EXPECT_CALL(secret_context, localInfo()).WillOnce(ReturnRef(local_info));
-  EXPECT_CALL(secret_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
-  EXPECT_CALL(secret_context, random()).WillOnce(ReturnRef(random));
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(init_manager, add(_))
+      .WillOnce(Invoke([&init_target_handle](const Init::Target& target) {
+        init_target_handle = target.createHandle("test");
+      }));
   EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
-  EXPECT_CALL(secret_context, clusterManager()).WillOnce(ReturnRef(cluster_manager));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, localInfo()).WillOnce(ReturnRef(local_info));
 
   auto secret_provider =
       secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
@@ -183,7 +185,9 @@ tls_certificate:
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
   secret_resources.Add()->PackFrom(typed_secret);
-  dynamic_cast<TlsCertificateSdsApi&>(*secret_provider).onConfigUpdate(secret_resources, "");
+  init_target_handle->initialize(init_watcher);
+  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(secret_resources,
+                                                                                   "");
   Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), *api_);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";

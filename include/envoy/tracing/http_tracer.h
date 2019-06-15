@@ -42,7 +42,7 @@ struct Decision {
  */
 class Config {
 public:
-  virtual ~Config() {}
+  virtual ~Config() = default;
 
   /**
    * @return operation name for tracing, e.g., ingress.
@@ -61,14 +61,14 @@ public:
 };
 
 class Span;
-typedef std::unique_ptr<Span> SpanPtr;
+using SpanPtr = std::unique_ptr<Span>;
 
 /**
  * Basic abstraction for span.
  */
 class Span {
 public:
-  virtual ~Span() {}
+  virtual ~Span() = default;
 
   /**
    * Set the operation name.
@@ -126,7 +126,7 @@ public:
  */
 class Driver {
 public:
-  virtual ~Driver() {}
+  virtual ~Driver() = default;
 
   /**
    * Start driver specific span.
@@ -136,7 +136,7 @@ public:
                             const Tracing::Decision tracing_decision) PURE;
 };
 
-typedef std::unique_ptr<Driver> DriverPtr;
+using DriverPtr = std::unique_ptr<Driver>;
 
 /**
  * HttpTracer is responsible for handling traces and delegate actions to the
@@ -144,14 +144,14 @@ typedef std::unique_ptr<Driver> DriverPtr;
  */
 class HttpTracer {
 public:
-  virtual ~HttpTracer() {}
+  virtual ~HttpTracer() = default;
 
   virtual SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                             const StreamInfo::StreamInfo& stream_info,
                             const Tracing::Decision tracing_decision) PURE;
 };
 
-typedef std::unique_ptr<HttpTracer> HttpTracerPtr;
+using HttpTracerPtr = std::unique_ptr<HttpTracer>;
 
 } // namespace Tracing
 } // namespace Envoy

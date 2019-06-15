@@ -57,6 +57,10 @@ public:
     trySendDiscoveryRequests();
   }
 
+  bool paused(const std::string& type_url) const override {
+    return pausable_ack_queue_.paused(type_url);
+  }
+
   void
   onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override {
     ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),

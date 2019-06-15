@@ -21,8 +21,7 @@ namespace Router {
 VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                    Server::Configuration::FactoryContext& factory_context,
                                    const std::string& stat_prefix,
-                                   std::unordered_set<RouteConfigProvider*>& route_config_providers,
-                                   SubscriptionFactoryFunction factory_function)
+                                   std::unordered_set<RouteConfigProvider*>& route_config_providers)
     : config_update_info_(config_update_info),
       scope_(factory_context.scope().createScope(stat_prefix + "vhds." +
                                                  config_update_info_->routeConfigName() + ".")),
@@ -31,7 +30,6 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                    [this]() { subscription_->start({}); }),
       route_config_providers_(route_config_providers),
       validation_visitor_(factory_context.messageValidationVisitor()) {
-  Envoy::Config::Utility::checkLocalInfo("vhds", factory_context.localInfo());
   const auto& config_source = config_update_info_->routeConfiguration()
                                   .vhds()
                                   .config_source()
@@ -41,12 +39,11 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
     throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
   }
 
-  subscription_ = factory_function(
-      config_update_info_->routeConfiguration().vhds().config_source(), factory_context.localInfo(),
-      factory_context.dispatcher(), factory_context.clusterManager(), factory_context.random(),
-      *scope_,
-      Grpc::Common::typeUrl(envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()),
-      factory_context.messageValidationVisitor(), factory_context.api(), *this, /*is_delta=*/true);
+  subscription_ =
+      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+          config_update_info_->routeConfiguration().vhds().config_source(),
+          Grpc::Common::typeUrl(envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()),
+          *scope_, *this, /*is_delta=*/true);
 }
 
 void VhdsSubscription::onConfigUpdateFailed(const EnvoyException*) {

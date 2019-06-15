@@ -9,6 +9,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Eq;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
@@ -145,7 +146,8 @@ MockClusterManager::MockClusterManager() {
 
   // Matches are LIFO so "" will match first.
   ON_CALL(*this, get(_)).WillByDefault(Return(&thread_local_cluster_));
-  ON_CALL(*this, get("")).WillByDefault(Return(nullptr));
+  ON_CALL(*this, get(Eq(""))).WillByDefault(Return(nullptr));
+  ON_CALL(*this, subscriptionFactory()).WillByDefault(ReturnRef(subscription_factory_));
 }
 
 MockClusterManager::~MockClusterManager() = default;
