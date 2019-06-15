@@ -3,9 +3,13 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/subscription.h"
 
 #include "common/protobuf/protobuf.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Config {
@@ -20,42 +24,41 @@ struct UpdateAck {
 
 class SubscriptionState {
 public:
-  virtual ~SubscriptionState() {}
+  virtual ~SubscriptionState() = default;
 
-  void setInitFetchTimeout(Event::Dispatcher& dispatcher) PURE;
-
-  void pause() PURE;
-  void resume() PURE;
-  bool paused() const PURE;
+  virtual void pause() PURE;
+  virtual void resume() PURE;
+  virtual bool paused() const PURE;
 
   // Update which resources we're interested in subscribing to.
-  void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
+  virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
 
   // Whether there was a change in our subscription interest we have yet to inform the server of.
-  bool subscriptionUpdatePending() const PURE;
+  virtual bool subscriptionUpdatePending() const PURE;
 
-  void markStreamFresh() PURE;
+  virtual void markStreamFresh() PURE;
 
   // Argument should have been static_cast from GrpcStream's ResponseProto type.
-  UpdateAck handleResponse(const Protobuf::Message& message) PURE;
+  virtual UpdateAck handleResponse(const Protobuf::Message& message) PURE;
 
-  void handleEstablishmentFailure() PURE;
+  virtual void handleEstablishmentFailure() PURE;
 
   // Will have been static_cast from GrpcStream's RequestProto type, and should be static_cast back
   // before handing to GrpcStream::sendMessage.
-  Protobuf::Message getNextRequestAckless() PURE;
+  virtual Protobuf::Message getNextRequestAckless() PURE;
   // Will have been static_cast from GrpcStream's RequestProto type, and should be static_cast back
   // before handing to GrpcStream::sendMessage.
-  Protobuf::Message getNextRequestWithAck(const UpdateAck& ack) PURE;
+  virtual Protobuf::Message getNextRequestWithAck(const UpdateAck& ack) PURE;
 };
 
 class SubscriptionStateFactory {
 public:
-  SubscriptionState makeSubscriptionState(const std::string& type_url,
-                                          const std::set<std::string>& resource_names,
-                                          SubscriptionCallbacks& callbacks,
-                                          std::chrono::milliseconds init_fetch_timeout,
-                                          SubscriptionStats& stats) PURE;
+  virtual ~SubscriptionStateFactory() = default;
+  virtual SubscriptionState makeSubscriptionState(const std::string& type_url,
+                                                  const std::set<std::string>& resource_names,
+                                                  SubscriptionCallbacks& callbacks,
+                                                  std::chrono::milliseconds init_fetch_timeout,
+                                                  SubscriptionStats& stats) PURE;
 };
 
 } // namespace Config

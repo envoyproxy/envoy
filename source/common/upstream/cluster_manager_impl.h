@@ -207,8 +207,7 @@ public:
   void shutdown() override {
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
-    ads_mux_.reset(); // TODO TODO doesn't have the effect of actually destroying this
-                      // thing now that it's a shared_ptr; check if that's ok
+    ads_mux_.reset();
     active_clusters_.clear();
     warming_clusters_.clear();
     updateGauges();
@@ -467,7 +466,7 @@ private:
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
-  bool xds_is_delta_;
+  bool xds_is_delta_{};
 };
 
 } // namespace Upstream

@@ -30,7 +30,7 @@ public:
    * Update cluster names to be delivered via EDS.
    * @param cluster_names cluster names.
    */
-  virtual void updateResources(const std::set<std::string>& cluster_names) PURE;
+  virtual void updateResourceInterest(const std::set<std::string>& cluster_names) PURE;
 
   /**
    * Expect that an update request is sent by the Subscription implementation.

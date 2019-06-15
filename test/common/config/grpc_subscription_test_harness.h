@@ -113,7 +113,7 @@ public:
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
-  void updateResources(const std::set<std::string>& cluster_names) override {
+  void updateResourceInterest(const std::set<std::string>& cluster_names) override {
     // The "watch" mechanism means that updates that lose interest in a resource
     // will first generate a request for [still watched resources, i.e. without newly unwatched
     // ones] before generating the request for all of cluster_names.
@@ -127,7 +127,7 @@ public:
     }
     expectSendMessage(both, version_);
     expectSendMessage(cluster_names, version_);
-    subscription_->updateResources(cluster_names);
+    subscription_->updateResourceInterest(cluster_names);
     last_cluster_names_ = cluster_names;
   }
 

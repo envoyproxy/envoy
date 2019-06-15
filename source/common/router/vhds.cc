@@ -24,11 +24,11 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                    std::unordered_set<RouteConfigProvider*>& route_config_providers,
                                    SubscriptionFactoryFunction factory_function)
     : config_update_info_(config_update_info),
-      init_target_(fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
-                   [this]() { subscription_->start({}); }),
       scope_(factory_context.scope().createScope(stat_prefix + "vhds." +
                                                  config_update_info_->routeConfigName() + ".")),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
+      init_target_(fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
+                   [this]() { subscription_->start({}); }),
       route_config_providers_(route_config_providers),
       validation_visitor_(factory_context.messageValidationVisitor()) {
   Envoy::Config::Utility::checkLocalInfo("vhds", factory_context.localInfo());

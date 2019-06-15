@@ -71,10 +71,10 @@ public:
   void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
 
   RouteConfigUpdatePtr& config_update_info_;
-  std::unique_ptr<Envoy::Config::Subscription> subscription_;
-  Init::TargetImpl init_target_;
   Stats::ScopePtr scope_;
   VhdsStats stats_;
+  std::unique_ptr<Envoy::Config::Subscription> subscription_;
+  Init::TargetImpl init_target_;
   std::unordered_set<RouteConfigProvider*>& route_config_providers_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };

@@ -39,7 +39,7 @@ public:
         random_, stats_store_, rate_limit_settings_, local_info_);
     subscription_ = std::make_unique<DeltaSubscriptionImpl>(
         xds_context_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
-        init_fetch_timeout);
+        init_fetch_timeout, false);
     EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
   }
 
@@ -70,7 +70,6 @@ public:
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "");
     subscription_->start(cluster_names);
-    xds_context_->start();
   }
 
   void expectSendMessage(const std::set<std::string>& cluster_names,
@@ -152,7 +151,7 @@ public:
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
-  void updateResources(const std::set<std::string>& cluster_names) override {
+  void updateResourceInterest(const std::set<std::string>& cluster_names) override {
     std::set<std::string> sub;
     std::set<std::string> unsub;
 
@@ -163,7 +162,7 @@ public:
                         std::inserter(unsub, unsub.begin()));
 
     expectSendMessage(sub, unsub, Grpc::Status::GrpcStatus::Ok, "", {});
-    subscription_->updateResources(cluster_names);
+    subscription_->updateResourceInterest(cluster_names);
     last_cluster_names_ = cluster_names;
   }
 

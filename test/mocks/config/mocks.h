@@ -43,7 +43,7 @@ public:
 class MockSubscription : public Subscription {
 public:
   MOCK_METHOD1(start, void(const std::set<std::string>& resources));
-  MOCK_METHOD1(updateResources, void(const std::set<std::string>& update_to_these_names));
+  MOCK_METHOD1(updateResourceInterest, void(const std::set<std::string>& update_to_these_names));
 };
 
 class MockGrpcMuxWatch : public GrpcMuxWatch {
@@ -71,15 +71,13 @@ public:
                void(const std::set<std::string>& resources, const std::string& type_url,
                     SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
                     std::chrono::milliseconds init_fetch_timeout));
-  MOCK_METHOD2(updateResources,
+  MOCK_METHOD2(updateResourceInterest,
                void(const std::set<std::string>& resources, const std::string& type_url));
 
-  MOCK_METHOD4(addWatch, WatchPtr(const std::string&, const std::set<std::string>&,
-                                  SubscriptionCallbacks&, std::chrono::milliseconds));
-  MOCK_METHOD2(removeWatch, void(const std::string&, Watch*));
-  MOCK_METHOD3(updateWatch, void(const std::string&, Watch*, const std::set<std::string>&));
-
-  MOCK_METHOD1(removeSubscription, void(const std::string& type_url));
+  MOCK_METHOD5(addOrUpdateWatch,
+               void(const std::string& type_url, WatchPtr& watch,
+                    const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
+                    std::chrono::milliseconds init_fetch_timeout));
 };
 
 class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {

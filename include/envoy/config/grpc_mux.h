@@ -111,12 +111,10 @@ public:
   virtual void resume(const std::string& type_url) PURE;
 
   // For delta
-  virtual WatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                            SubscriptionCallbacks& callbacks,
-                            std::chrono::milliseconds init_fetch_timeout) PURE;
-  // TODO TODO TRIM?  virtual void removeWatch(const std::string& type_url, Watch* watch) PURE;
-  virtual void updateWatch(const std::string& type_url, Watch* watch,
-                           const std::set<std::string>& resources) PURE;
+  virtual void addOrUpdateWatch(const std::string& type_url, WatchPtr& watch,
+                                const std::set<std::string>& resources,
+                                SubscriptionCallbacks& callbacks,
+                                std::chrono::milliseconds init_fetch_timeout) PURE;
 };
 
 typedef std::unique_ptr<GrpcMux> GrpcMuxPtr;

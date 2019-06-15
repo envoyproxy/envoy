@@ -45,8 +45,8 @@ public:
     test_harness_->startSubscription(cluster_names);
   }
 
-  void updateResources(const std::set<std::string>& cluster_names) {
-    test_harness_->updateResources(cluster_names);
+  void updateResourceInterest(const std::set<std::string>& cluster_names) {
+    test_harness_->updateResourceInterest(cluster_names);
   }
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version) {
@@ -139,7 +139,7 @@ TEST_P(SubscriptionImplTest, UpdateResources) {
   verifyStats(1, 0, 0, 0, 0);
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
   verifyStats(2, 1, 0, 0, 7148434200721666028);
-  updateResources({"cluster2"});
+  updateResourceInterest({"cluster2"});
   verifyStats(3, 1, 0, 0, 7148434200721666028);
 }
 

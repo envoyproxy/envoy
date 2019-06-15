@@ -63,7 +63,7 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
                   ->create(),
               dispatcher, deltaGrpcMethod(type_url), random, scope,
               Utility::parseRateLimitSettings(api_config_source), local_info),
-          type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config));
+          type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config), false);
       break;
     }
     default:
@@ -73,12 +73,10 @@ std::unique_ptr<Subscription> SubscriptionFactory::subscriptionFromConfigSource(
   }
   case envoy::api::v2::core::ConfigSource::kAds: {
     if (is_delta) {
-      std::cerr << "making a delta " << type_url << std::endl;
-      result =
-          std::make_unique<DeltaSubscriptionImpl>(cm.adsMux(), type_url, callbacks, stats,
-                                                  Utility::configSourceInitialFetchTimeout(config));
+      result = std::make_unique<DeltaSubscriptionImpl>(
+          cm.adsMux(), type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config),
+          true);
     } else {
-      std::cerr << "making a sotw" << type_url << std::endl;
       result = std::make_unique<GrpcMuxSubscriptionImpl>(
           cm.adsMux(), callbacks, stats, type_url, dispatcher,
           Utility::configSourceInitialFetchTimeout(config));

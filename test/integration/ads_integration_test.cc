@@ -324,10 +324,8 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
 
-  EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().Cluster, "", {}, {}, {}, Grpc::Status::GrpcStatus::Internal,
-      fmt::format("{} does not match {}", Config::TypeUrl::get().ClusterLoadAssignment,
-                  Config::TypeUrl::get().Cluster)));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {},
+                                      Grpc::Status::GrpcStatus::Internal, "does not match"));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")},
                                                  {buildCluster("cluster_0")}, {}, "1");
@@ -339,11 +337,9 @@ TEST_P(AdsIntegrationTest, Failure) {
                                                  {buildCluster("cluster_0")}, {}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
-  EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}, {},
-                              {}, Grpc::Status::GrpcStatus::Internal,
-                              fmt::format("{} does not match {}", Config::TypeUrl::get().Cluster,
-                                          Config::TypeUrl::get().ClusterLoadAssignment)));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                      {"cluster_0"}, {}, {}, Grpc::Status::GrpcStatus::Internal,
+                                      "does not match"));
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "1");
@@ -354,10 +350,8 @@ TEST_P(AdsIntegrationTest, Failure) {
       Config::TypeUrl::get().Listener, {buildRouteConfig("listener_0", "route_config_0")},
       {buildRouteConfig("listener_0", "route_config_0")}, {}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().Listener, "", {}, {}, {}, Grpc::Status::GrpcStatus::Internal,
-      fmt::format("{} does not match {}", Config::TypeUrl::get().RouteConfiguration,
-                  Config::TypeUrl::get().Listener)));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {},
+                                      Grpc::Status::GrpcStatus::Internal, "does not match"));
   sendDiscoveryResponse<envoy::api::v2::Listener>(
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {}, "1");
@@ -369,11 +363,9 @@ TEST_P(AdsIntegrationTest, Failure) {
       {buildListener("route_config_0", "cluster_0")}, {}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
-  EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}, {},
-                              {}, Grpc::Status::GrpcStatus::Internal,
-                              fmt::format("{} does not match {}", Config::TypeUrl::get().Listener,
-                                          Config::TypeUrl::get().RouteConfiguration)));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+                                      {"route_config_0"}, {}, {},
+                                      Grpc::Status::GrpcStatus::Internal, "does not match"));
   sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
       {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
@@ -382,6 +374,7 @@ TEST_P(AdsIntegrationTest, Failure) {
                                       {"route_config_0"}, {}, {}));
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
   makeSingleRequest();
 }
 
@@ -492,7 +485,7 @@ TEST_P(AdsIntegrationTest, DuplicateWarmingClusters) {
       {buildListener("listener_0", "route_config_0")}, {}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-                                      {"cluster_0"}, {"cluster_0"}, {}));
+                                      {"cluster_0"}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
                                       {"route_config_0"}, {"route_config_0"}, {}));
   sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
@@ -555,17 +548,19 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
   sendDiscoveryResponse<envoy::api::v2::Cluster>(
       Config::TypeUrl::get().Cluster, {buildCluster("warming_cluster_1")},
       {buildCluster("warming_cluster_1")}, {"cluster_0"}, "2");
+
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
                                       {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"}));
 
   // Send the second warming cluster.
-  sendDiscoveryResponse<envoy::api::v2::Cluster>(
-      Config::TypeUrl::get().Cluster, {buildCluster("warming_cluster_2")},
-      {buildCluster("warming_cluster_2")}, {"warming_cluster_1"}, "3");
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("warming_cluster_2")},
+                                                 {buildCluster("warming_cluster_2")}, {}, "3");
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
   // We would've got a Cluster discovery request with version 2 here, had the CDS not been paused.
+
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
                                       {"warming_cluster_2", "warming_cluster_1"},
                                       {"warming_cluster_2"}, {}));
@@ -583,6 +578,13 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 
   // CDS is resumed and EDS response was acknowledged.
+  if (sotwOrDelta() == Grpc::SotwOrDelta::Delta) {
+    // The delta implementation sends a separate ACK for every cluster it got while paused, whereas
+    // SotW just ACKs the most recent.
+    // TODO(fredlas) when the implementations are unified, this if can become if(true).
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {},
+                                             Grpc::Status::GrpcStatus::Ok, ""));
+  }
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "2",
                                       {"warming_cluster_2", "warming_cluster_1"}, {}, {}));
@@ -635,9 +637,9 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
                                       {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"}));
 
   // Send the second warming cluster.
-  sendDiscoveryResponse<envoy::api::v2::Cluster>(
-      Config::TypeUrl::get().Cluster, {buildCluster("warming_cluster_2")},
-      {buildCluster("warming_cluster_2")}, {"warming_cluster_1"}, "3");
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("warming_cluster_2")},
+                                                 {buildCluster("warming_cluster_2")}, {}, "3");
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
@@ -648,7 +650,7 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment,
       {buildClusterLoadAssignment("warming_cluster_1")},
-      {buildClusterLoadAssignment("warming_cluster_1")}, {"cluster_0"}, "2");
+      {buildClusterLoadAssignment("warming_cluster_1")}, {}, "2");
 
   // Envoy will not finish warming of the second cluster because of the missing load assignments
   // i,e. no named EDS response.
@@ -658,7 +660,7 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment,
       {buildClusterLoadAssignment("warming_cluster_2")},
-      {buildClusterLoadAssignment("warming_cluster_2")}, {"warming_cluster_1"}, "3");
+      {buildClusterLoadAssignment("warming_cluster_2")}, {}, "3");
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }

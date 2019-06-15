@@ -2,6 +2,7 @@
 
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/subscription_state.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/local_info/local_info.h"
@@ -11,14 +12,6 @@
 
 namespace Envoy {
 namespace Config {
-
-struct UpdateAck {
-  UpdateAck(absl::string_view nonce, absl::string_view type_url)
-      : nonce_(nonce), type_url_(type_url) {}
-  std::string nonce_;
-  std::string type_url_;
-  ::google::rpc::Status error_detail_;
-};
 
 // Tracks the xDS protocol state of an individual ongoing delta xDS session, i.e. a single type_url.
 // There can be multiple DeltaSubscriptionStates active. They will always all be
@@ -30,8 +23,6 @@ public:
                          const LocalInfo::LocalInfo& local_info,
                          std::chrono::milliseconds init_fetch_timeout,
                          Event::Dispatcher& dispatcher);
-
-  void setInitFetchTimeout(Event::Dispatcher& dispatcher);
 
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const std::set<std::string>& cur_added,

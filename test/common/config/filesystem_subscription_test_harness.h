@@ -44,8 +44,8 @@ public:
     subscription_.start(cluster_names);
   }
 
-  void updateResources(const std::set<std::string>& cluster_names) override {
-    subscription_.updateResources(cluster_names);
+  void updateResourceInterest(const std::set<std::string>& cluster_names) override {
+    subscription_.updateResourceInterest(cluster_names);
   }
 
   void updateFile(const std::string json, bool run_dispatcher = true) {

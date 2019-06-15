@@ -258,6 +258,8 @@ public:
     for (const auto& message : messages) {
       discovery_response.add_resources()->PackFrom(message);
     }
+    static int next_nonce_counter = 0;
+    discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
     xds_stream_->sendGrpcMessage(discovery_response);
   }
 
@@ -284,8 +286,8 @@ public:
       resource->mutable_resource()->PackFrom(message);
     }
     *response.mutable_removed_resources() = {removed.begin(), removed.end()};
-    response.set_nonce("noncense");
-    response.set_type_url(Grpc::Common::typeUrl(T().GetDescriptor()->full_name()));
+    static int next_nonce_counter = 0;
+    response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
     stream->sendGrpcMessage(response);
   }
 

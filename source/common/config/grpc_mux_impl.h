@@ -39,11 +39,8 @@ public:
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
 
-  WatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
-                    std::chrono::milliseconds) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-  virtual void updateWatch(const std::string&, Watch*, const std::set<std::string>&) override {
+  void addOrUpdateWatch(const std::string&, WatchPtr&, const std::set<std::string>&,
+                        SubscriptionCallbacks&, std::chrono::milliseconds) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
@@ -135,11 +132,8 @@ public:
   void pause(const std::string&) override {}
   void resume(const std::string&) override {}
 
-  WatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
-                    std::chrono::milliseconds) override {
-    throw EnvoyException("ADS must be configured to support an ADS config source");
-  }
-  virtual void updateWatch(const std::string&, Watch*, const std::set<std::string>&) override {
+  void addOrUpdateWatch(const std::string&, WatchPtr&, const std::set<std::string>&,
+                        SubscriptionCallbacks&, std::chrono::milliseconds) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
 

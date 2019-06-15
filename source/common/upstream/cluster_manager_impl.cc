@@ -204,6 +204,33 @@ ClusterManagerImpl::ClusterManagerImpl(
     }
   }
 
+  // TODO(fredlas) HACK to support
+  // loadCluster->clusterFromProto->ClusterFactoryImplBase::create->EdsClusterFactory::createClusterImpl(),
+  // which wants to call xdsIsDelta() on us. So, we need to get our xds_is_delta_ defined before
+  // then. Once SotW and delta are unified, that is_delta bool will be gone from everywhere, and the
+  // xds_is_delta_ variable can be removed.
+  const auto& dyn_resources = bootstrap.dynamic_resources();
+  if (dyn_resources.has_ads_config()) {
+    xds_is_delta_ =
+        dyn_resources.ads_config().api_type() == envoy::api::v2::core::ApiConfigSource::DELTA_GRPC;
+  } else if (dyn_resources.has_cds_config()) {
+    const auto& cds_config = dyn_resources.cds_config();
+    xds_is_delta_ =
+        cds_config.api_config_source().api_type() ==
+            envoy::api::v2::core::ApiConfigSource::DELTA_GRPC ||
+        (dyn_resources.has_ads_config() && dyn_resources.ads_config().api_type() ==
+                                               envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
+  } else if (dyn_resources.has_lds_config()) {
+    const auto& lds_config = dyn_resources.lds_config();
+    xds_is_delta_ =
+        lds_config.api_config_source().api_type() ==
+            envoy::api::v2::core::ApiConfigSource::DELTA_GRPC ||
+        (dyn_resources.has_ads_config() && dyn_resources.ads_config().api_type() ==
+                                               envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
+  } else {
+    xds_is_delta_ = false;
+  }
+
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
   // the secondary clusters are loaded. As it currently stands all non-EDS clusters are primary and
   // only EDS clusters are secondary. This two phase loading is done because in v2 configuration
@@ -220,14 +247,12 @@ ClusterManagerImpl::ClusterManagerImpl(
   // This is the only point where distinction between delta ADS and state-of-the-world ADS is made.
   // After here, we just have a GrpcMux interface held in ads_mux_, which hides
   // whether the backing implementation is delta or SotW.
-  if (bootstrap.dynamic_resources().has_ads_config()) {
-    if (bootstrap.dynamic_resources().ads_config().api_type() ==
+  if (dyn_resources.has_ads_config()) {
+    if (dyn_resources.ads_config().api_type() ==
         envoy::api::v2::core::ApiConfigSource::DELTA_GRPC) {
-      auto& api_config_source =
-          bootstrap.dynamic_resources().has_ads_config()
-              ? bootstrap.dynamic_resources().ads_config()
-              : bootstrap.dynamic_resources().cds_config().api_config_source();
-      std::cerr << "MAKING DELTA ADS" << std::endl;
+      auto& api_config_source = dyn_resources.has_ads_config()
+                                    ? dyn_resources.ads_config()
+                                    : dyn_resources.cds_config().api_config_source();
       ads_mux_ = std::make_shared<Config::GrpcDeltaXdsContext>(
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, api_config_source,
                                                          stats)
@@ -236,25 +261,20 @@ ClusterManagerImpl::ClusterManagerImpl(
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.DeltaAggregatedResources"),
           random_, stats_,
-          Envoy::Config::Utility::parseRateLimitSettings(
-              bootstrap.dynamic_resources().ads_config()),
-          local_info);
+          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
     } else {
-      std::cerr << "MAKING SOTW ADS" << std::endl;
       ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info,
-          Config::Utility::factoryForGrpcApiConfigSource(
-              *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
+          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                         dyn_resources.ads_config(), stats)
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, stats_,
-          Envoy::Config::Utility::parseRateLimitSettings(
-              bootstrap.dynamic_resources().ads_config()));
+          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()));
     }
   } else {
-    std::cerr << "MAKING NULLLLLLLLLL ADS" << std::endl;
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
   }
 
@@ -287,15 +307,8 @@ ClusterManagerImpl::ClusterManagerImpl(
   });
 
   // We can now potentially create the CDS API once the backing cluster exists.
-  const auto& dyn_resources = bootstrap.dynamic_resources();
   if (dyn_resources.has_cds_config()) {
-    const auto& cds_config = dyn_resources.cds_config();
-    xds_is_delta_ =
-        cds_config.api_config_source().api_type() ==
-            envoy::api::v2::core::ApiConfigSource::DELTA_GRPC ||
-        (dyn_resources.has_ads_config() && dyn_resources.ads_config().api_type() ==
-                                               envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
-    cds_api_ = factory_.createCds(cds_config, xds_is_delta_, *this);
+    cds_api_ = factory_.createCds(dyn_resources.cds_config(), xds_is_delta_, *this);
     init_helper_.setCds(cds_api_.get());
   } else {
     init_helper_.setCds(nullptr);

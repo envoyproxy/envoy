@@ -13,10 +13,6 @@ DeltaSubscriptionState::DeltaSubscriptionState(const std::string& type_url,
                                                Event::Dispatcher& dispatcher)
     : type_url_(type_url), callbacks_(callbacks), local_info_(local_info),
       init_fetch_timeout_(init_fetch_timeout) {
-  setInitFetchTimeout(dispatcher);
-}
-
-void DeltaSubscriptionState::setInitFetchTimeout(Event::Dispatcher& dispatcher) {
   if (init_fetch_timeout_.count() > 0 && !init_fetch_timeout_timer_) {
     init_fetch_timeout_timer_ = dispatcher.createTimer([this]() -> void {
       ENVOY_LOG(warn, "delta config: initial fetch timed out for {}", type_url_);
@@ -76,6 +72,12 @@ void DeltaSubscriptionState::handleGoodResponse(
     if (!names_added_removed.insert(resource.name()).second) {
       throw EnvoyException(
           fmt::format("duplicate name {} found among added/updated resources", resource.name()));
+    }
+    if (message.type_url() != resource.resource().type_url()) {
+      throw EnvoyException(fmt::format("type URL {} embedded in an individual Any does not match "
+                                       "the message-wide type URL {} in DeltaDiscoveryResponse {}",
+                                       resource.resource().type_url(), message.type_url(),
+                                       message.DebugString()));
     }
   }
   for (const auto& name : message.removed_resources()) {

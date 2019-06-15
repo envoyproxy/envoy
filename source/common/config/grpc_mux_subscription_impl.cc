@@ -35,7 +35,8 @@ void GrpcMuxSubscriptionImpl::start(const std::set<std::string>& resources) {
   stats_.update_attempt_.inc();
 }
 
-void GrpcMuxSubscriptionImpl::updateResources(const std::set<std::string>& update_to_these_names) {
+void GrpcMuxSubscriptionImpl::updateResourceInterest(
+    const std::set<std::string>& update_to_these_names) {
   // First destroy the watch, so that this subscribe doesn't send a request for both the
   // previously watched resources and the new ones (we may have lost interest in some of the
   // previously watched ones).

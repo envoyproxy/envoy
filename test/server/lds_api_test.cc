@@ -64,7 +64,7 @@ api_config_source:
     EXPECT_CALL(init_manager_, add(_));
     lds_ = std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, dispatcher_, random_,
                                         init_manager_, local_info_, store_, listener_manager_,
-                                        validation_visitor_, *api_);
+                                        validation_visitor_, *api_, false);
 
     expectRequest();
     init_target_handle_->initialize(init_watcher_);
@@ -185,7 +185,7 @@ api_config_source:
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
       LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_manager_, local_info_,
-                 store_, listener_manager_, validation_visitor_, *api_),
+                 store_, listener_manager_, validation_visitor_, *api_, false),
       EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS "
       "cluster: 'foo_cluster' does not exist, was added via api, or is an "
@@ -312,7 +312,7 @@ api_config_source:
   ON_CALL(local_info_, clusterName()).WillByDefault(ReturnRef(EMPTY_STRING));
   EXPECT_THROW_WITH_MESSAGE(
       LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_manager_, local_info_,
-                 store_, listener_manager_, validation_visitor_, *api_),
+                 store_, listener_manager_, validation_visitor_, *api_, false),
       EnvoyException,
       "lds: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");

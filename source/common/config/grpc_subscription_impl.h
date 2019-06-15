@@ -34,8 +34,8 @@ public:
     grpc_mux_->start();
   }
 
-  void updateResources(const std::set<std::string>& update_to_these_names) override {
-    grpc_mux_subscription_.updateResources(update_to_these_names);
+  void updateResourceInterest(const std::set<std::string>& update_to_these_names) override {
+    grpc_mux_subscription_.updateResourceInterest(update_to_these_names);
   }
 
   std::shared_ptr<Config::GrpcMuxImpl> grpcMux() { return grpc_mux_; }
