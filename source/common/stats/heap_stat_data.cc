@@ -2,19 +2,18 @@
 
 #include <cstdint>
 
+#include "envoy/stats/stats.h"
+#include "envoy/stats/symbol_table.h"
+
 #include "common/common/hash.h"
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"
-#include "common/common/thread.h"
 #include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
 #include "common/common/utility.h"
 #include "common/stats/metric_impl.h"
 #include "common/stats/stat_merger.h"
 #include "common/stats/symbol_table_impl.h"
-
-#include "envoy/stats/stats.h"
-#include "envoy/stats/symbol_table.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -35,8 +34,8 @@ void HeapStatDataAllocator::debugPrint() {
 class CounterImpl : public Counter, public MetricImpl /*, public InlineStorage*/ {
 public:
   static CounterImpl* create(StatName stat_name, HeapStatDataAllocator& alloc,
-                            absl::string_view tag_extracted_name, const std::vector<Tag>& tags) {
-    //return new (stat_name.size() + sizeof(CounterImpl)) CounterImpl(
+                             absl::string_view tag_extracted_name, const std::vector<Tag>& tags) {
+    // return new (stat_name.size() + sizeof(CounterImpl)) CounterImpl(
     //    stat_name, alloc, tag_extracted_name, tags);
     return new CounterImpl(stat_name, alloc, tag_extracted_name, tags);
   }
@@ -64,7 +63,7 @@ public:
   uint64_t value() const override { return value_; }
 
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
-  //StatName statName() const override { return StatName(symbol_storage_); }
+  // StatName statName() const override { return StatName(symbol_storage_); }
   StatName statName() const override { return symbol_storage_.statName(); }
 
 private:
@@ -72,19 +71,19 @@ private:
               absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
       : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), alloc_(alloc),
         symbol_storage_(stat_name, alloc.symbolTable()) {
-    //stat_name.copyToStorage(symbol_storage_);
+    // stat_name.copyToStorage(symbol_storage_);
   }
 
   std::atomic<uint64_t> value_{0};
-  std::atomic<uint64_t> pending_increment_{0};  // mklein: Can this be a uint32_t?
+  std::atomic<uint64_t> pending_increment_{0}; // mklein: Can this be a uint32_t?
   std::atomic<bool> used_{false};
 
   HeapStatDataAllocator& alloc_;
 
-
   // TODO(jmarantz): it does not work to use a variable-length array here because
   // of the virtual inheritance in parent class 'Metric'. We get error:
-  //    error: flexible array member 'symbol_storage_' not allowed in class which has a virtual base class
+  //    error: flexible array member 'symbol_storage_' not allowed in class which has a virtual base
+  //    class
   // This should be resolved to try to inline the memory, possibly by using
   // delegation instead of virtual inheritance.
   // SymbolTable::Storage symbol_storage_; // This is a 'using' nickname for uint8_t[].
@@ -94,9 +93,9 @@ private:
 class GaugeImpl : public Gauge, public MetricImpl /*, public InlineStorage */ {
 public:
   static GaugeImpl* create(StatName stat_name, HeapStatDataAllocator& alloc,
-                          absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
+                           absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
                            ImportMode import_mode) {
-    //return new (stat_name.size() + sizeof GaugeImpl) GaugeImpl(
+    // return new (stat_name.size() + sizeof GaugeImpl) GaugeImpl(
     //    stat_name, alloc, tag_extracted_named, tags, import_mode);
     return new GaugeImpl(stat_name, alloc, tag_extracted_name, tags, import_mode);
   }
@@ -107,7 +106,7 @@ public:
     // alternative would be to store the SymbolTable reference in the
     // MetricImpl, costing 8 bytes per stat.
     MetricImpl::clear();
-    //symbolTable().free(statName());
+    // symbolTable().free(statName());
     symbol_storage_.free(symbolTable());
   }
 
@@ -165,14 +164,13 @@ public:
   // StatName statName() const { return StatName(symbol_storage_); }
   StatName statName() const override { return symbol_storage_.statName(); }
 
- private:
-  GaugeImpl(StatName stat_name, HeapStatDataAllocator& alloc,
-            absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
-            ImportMode import_mode)
+private:
+  GaugeImpl(StatName stat_name, HeapStatDataAllocator& alloc, absl::string_view tag_extracted_name,
+            const std::vector<Tag>& tags, ImportMode import_mode)
       : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), alloc_(alloc),
         symbol_storage_(stat_name, alloc.symbolTable()) {
     import_mode_ = static_cast<uint8_t>(import_mode);
-    //stat_name.copyToStorage(symbol_storage_);
+    // stat_name.copyToStorage(symbol_storage_);
   }
 
   std::atomic<uint64_t> value_{0};
@@ -180,12 +178,13 @@ public:
   std::atomic<bool> used_{false};
 
   HeapStatDataAllocator& alloc_;
-  //SymbolTable::Storage symbol_storage_; // This is a 'using' nickname for uint8_t[].
+  // SymbolTable::Storage symbol_storage_; // This is a 'using' nickname for uint8_t[].
   StatNameStorage symbol_storage_;
 };
 
-CounterSharedPtr HeapStatDataAllocator::makeCounter(
-    StatName name, absl::string_view tag_extracted_name, const std::vector<Tag>& tags) {
+CounterSharedPtr HeapStatDataAllocator::makeCounter(StatName name,
+                                                    absl::string_view tag_extracted_name,
+                                                    const std::vector<Tag>& tags) {
   Thread::LockGuard lock(mutex_);
   auto iter = counters_.find(name);
   CounterSharedPtr counter;
@@ -198,9 +197,9 @@ CounterSharedPtr HeapStatDataAllocator::makeCounter(
   return counter;
 }
 
-GaugeSharedPtr HeapStatDataAllocator::makeGauge(
-    StatName name, absl::string_view tag_extracted_name, const std::vector<Tag>& tags
-    , Gauge::ImportMode import_mode) {
+GaugeSharedPtr HeapStatDataAllocator::makeGauge(StatName name, absl::string_view tag_extracted_name,
+                                                const std::vector<Tag>& tags,
+                                                Gauge::ImportMode import_mode) {
   Thread::LockGuard lock(mutex_);
   auto iter = gauges_.find(name);
   GaugeSharedPtr gauge;

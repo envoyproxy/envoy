@@ -216,10 +216,10 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 
   EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
-  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
-  EXPECT_EQ(2L, store_->gauges().front().use_count());
+  EXPECT_EQ(3L, store_->gauges().front().use_count());
 
   store_->shutdownThreading();
 }
@@ -259,20 +259,20 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
 
   EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
-  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(4L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
-  EXPECT_EQ(3L, store_->gauges().front().use_count());
+  EXPECT_EQ(4L, store_->gauges().front().use_count());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
 
   EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
-  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
-  EXPECT_EQ(2L, store_->gauges().front().use_count());
+  EXPECT_EQ(3L, store_->gauges().front().use_count());
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {
@@ -366,7 +366,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   scope1.reset();
   EXPECT_EQ(0UL, store_->counters().size());
 
-  EXPECT_EQ(1L, c1.use_count());
+  EXPECT_EQ(2L, c1.use_count());
   c1.reset();
 
   store_->shutdownThreading();
@@ -387,7 +387,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
 
   ScopePtr scope2 = scope1->createScope("foo.");
   Counter& c2 = scope2->counter("bar");
-  EXPECT_NE(&c1, &c2);
+  EXPECT_EQ(&c1, &c2);
   EXPECT_EQ("scope1.foo.bar", c2.name());
   StatNameManagedStorage c2_name("scope1.foo.bar", symbol_table_);
   auto found_counter2 = store_->findCounter(c2_name.statName());
@@ -417,7 +417,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   // We will call alloc twice, but they should point to the same backing storage.
   Counter& c1 = scope1->counter("c");
   Counter& c2 = scope2->counter("c");
-  EXPECT_NE(&c1, &c2);
+  EXPECT_EQ(&c1, &c2);
   c1.inc();
   EXPECT_EQ(1UL, c1.value());
   EXPECT_EQ(1UL, c2.value());
@@ -431,7 +431,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   // Gauges should work the same way.
   Gauge& g1 = scope1->gauge("g", Gauge::ImportMode::Accumulate);
   Gauge& g2 = scope2->gauge("g", Gauge::ImportMode::Accumulate);
-  EXPECT_NE(&g1, &g2);
+  EXPECT_EQ(&g1, &g2);
   g1.set(5);
   EXPECT_EQ(5UL, g1.value());
   EXPECT_EQ(5UL, g2.value());
@@ -871,7 +871,7 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
   const size_t million = 1000 * 1000;
-  EXPECT_LT(end_mem - start_mem, 20 * million); // actual value: 19601552 as of March 14, 2019
+  EXPECT_LT(end_mem - start_mem, 22 * million); // actual value: 21124512 as of March 14, 2019
 }
 
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
@@ -899,7 +899,7 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
   const size_t million = 1000 * 1000;
-  EXPECT_LT(end_mem - start_mem, 23 * million); // actual value: 22880912 as of March 14, 2019
+  EXPECT_LT(end_mem - start_mem, 25 * million); // actual value: 24401600 as of March 14, 2019
   store->shutdownThreading();
   tls.shutdownThread();
 }
@@ -915,10 +915,10 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   store_->gauge("g2", Gauge::ImportMode::Accumulate);
 
   // c1, g1 should have a thread local ref, but c2, g2 should not.
-  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
-  EXPECT_EQ(3L, TestUtility::findGauge(*store_, "g1").use_count());
-  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c2").use_count());
-  EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g2").use_count());
+  EXPECT_EQ(4L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(4L, TestUtility::findGauge(*store_, "g1").use_count());
+  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c2").use_count());
+  EXPECT_EQ(3L, TestUtility::findGauge(*store_, "g2").use_count());
 
   store_->shutdownThreading();
   tls_.shutdownThread();

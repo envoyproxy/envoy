@@ -35,8 +35,7 @@ public:
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
 private:
-  template<class StatType>
-  struct Hash {
+  template <class StatType> struct Hash {
     // See description for HeterogeneousStatNameHash::is_transparent.
     using is_transparent = void;
 
@@ -44,8 +43,7 @@ private:
     size_t operator()(const std::shared_ptr<StatType>& a) const { return a->statName().hash(); }
   };
 
-  template<class StatType>
-  struct Compare {
+  template <class StatType> struct Compare {
     // See description for HeterogeneousStatNameHash::is_transparent.
     using is_transparent = void;
 
@@ -61,8 +59,8 @@ private:
   // An unordered set of HeapStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher, which key off of the
   // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
-  template<class StatType> using StatSet =
-      absl::flat_hash_set<std::shared_ptr<StatType>, Hash<StatType>, Compare<StatType>>;
+  template <class StatType>
+  using StatSet = absl::flat_hash_set<std::shared_ptr<StatType>, Hash<StatType>, Compare<StatType>>;
   StatSet<Counter> counters_ GUARDED_BY(mutex_);
   StatSet<Gauge> gauges_ GUARDED_BY(mutex_);
 
