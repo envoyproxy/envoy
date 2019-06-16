@@ -45,7 +45,7 @@ For more information on CSRF please refer to the pages below.
 
     This filter should be configured with the name *envoy.csrf*.
 
-.. _csrf-configuration
+.. _csrf-configuration:
 
 Configuration
 -------------
