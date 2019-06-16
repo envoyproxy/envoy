@@ -23,5 +23,11 @@ BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_output=all --flaky_test_attemp
 # is somewhat more deterministic (rather than interleaving the build
 # and test steps).
 
-bazel build ${BAZEL_BUILD_OPTIONS} //source/... //test/...
-bazel test ${BAZEL_TEST_OPTIONS} //test/...
+if [[ $# -gt 0 ]]; then
+  TEST_TARGETS=$*
+else
+  TEST_TARGETS=//test/...
+fi
+
+bazel build ${BAZEL_BUILD_OPTIONS} //source/... ${TEST_TARGETS}
+bazel test ${BAZEL_TEST_OPTIONS} ${TEST_TARGETS}
