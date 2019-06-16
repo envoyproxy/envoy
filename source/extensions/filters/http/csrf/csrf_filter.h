@@ -43,7 +43,7 @@ public:
   }
 
   bool matches(const absl::string_view source_origin) const {
-    if (exact_origin_ != "") {
+    if (!exact_origin_.empty()) {
       return source_origin == exact_origin_;
     }
     return std::regex_match(source_origin.begin(), source_origin.end(), regex_origin_);
@@ -62,7 +62,7 @@ public:
   CsrfPolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
              Runtime::Loader& runtime) : policy_(policy), runtime_(runtime) {
     for (const auto& additional_origin : policy.additional_origins()) {
-      additional_origins_.push_back(OriginMatcher(additional_origin));
+      additional_origins_.emplace_back(OriginMatcher(additional_origin));
     }
   }
 

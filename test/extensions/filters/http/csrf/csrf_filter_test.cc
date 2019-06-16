@@ -45,7 +45,7 @@ public:
     add_exact_origin->set_type(envoy::config::filter::http::csrf::v2::OriginMatcher::EXACT);
 
     const auto& add_regex_origin = policy.mutable_additional_origins()->Add();
-    add_regex_origin->set_origin("www\\-[0-9]\\.allow\\.com");
+    add_regex_origin->set_origin(R"(www\-[0-9]\.allow\.com)");
     add_regex_origin->set_type(envoy::config::filter::http::csrf::v2::OriginMatcher::REGEX);
 
     return std::make_shared<CsrfFilterConfig>(policy, "test", stats_, runtime_);
