@@ -13,10 +13,36 @@
 #include "common/stats/metric_impl.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Stats {
+
+/**
+ * This structure holds backing store for both CounterImpl and GaugeImpl,
+ * counters and gauges allocated with the same name from different scopes
+ * to share the same value.
+ */
+struct HeapStatData : public InlineStorage {
+private:
+  explicit HeapStatData(StatName stat_name) { stat_name.copyToStorage(symbol_storage_); }
+
+public:
+  static HeapStatData* alloc(StatName stat_name, SymbolTable& symbol_table);
+
+  void free(SymbolTable& symbol_table);
+  StatName statName() const { return StatName(symbol_storage_); }
+
+  bool operator==(const HeapStatData& rhs) const { return statName() == rhs.statName(); }
+  uint64_t hash() const { return statName().hash(); }
+
+  std::atomic<uint64_t> value_{0};
+  std::atomic<uint64_t> pending_increment_{0};
+  std::atomic<uint16_t> flags_{0};
+  std::atomic<uint16_t> ref_count_{1};
+  SymbolTable::Storage symbol_storage_; // This is a 'using' nickname for uint8_t[].
+};
 
 class HeapStatDataAllocator : public StatDataAllocator {
 public:
@@ -37,38 +63,59 @@ public:
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
 private:
+  struct HeapStatHash {
+    size_t operator()(const HeapStatData* a) const { return a->hash(); }
+  };
+  struct HeapStatCompare {
+    bool operator()(const HeapStatData* a, const HeapStatData* b) const { return *a == *b; }
+  };
+
+  HeapStatData& alloc(StatName name);
+  void free(HeapStatData& data);
+
+  // An unordered set of HeapStatData pointers which keys off the key()
+  // field in each object. This necessitates a custom comparator and hasher, which key off of the
+  // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
+  using StatSet = absl::flat_hash_set<HeapStatData*, HeapStatHash, HeapStatCompare>;
+  StatSet stats_ GUARDED_BY(mutex_);
+
   friend class CounterImpl;
   friend class GaugeImpl;
 
+  /*
   void freeCounter(StatName stat_name);
   void freeGauge(StatName stat_name);
 
-  struct StorageHash {
+  template<class StatType> struct StatHash {
     // See description for HeterogeneousStatNameHash::is_transparent.
     using is_transparent = void;
+    using WeakStat = std::weak_ptr<StatType>;
 
-    size_t operator()(uint8_t* a) const { return StatName(a).hash(); }
+    size_t operator()(const WeakStat& a) const { return a.lock()->statName().hash(); }
     size_t operator()(StatName a) const { return a.hash(); }
   };
 
-  struct StorageCompare {
+  template<class StatType> struct StatCompare {
     // See description for HeterogeneousStatNameHash::is_transparent.
     using is_transparent = void;
+    using WeakStat = std::weak_ptr<StatType>;
 
-    size_t operator()(uint8_t* a, uint8_t* b) const { return StatName(a) == StatName(b); }
-    size_t operator()(StatName a, uint8_t* b) const { return a == StatName(b); }
-    size_t operator()(uint8_t* a, StatName b) const { return StatName(a) == b; }
+    size_t operator()(const WeakStat& a, const WeakStat& b) const {
+      return a.lock()->statName() == b.lock()->statName();
+    }
+    size_t operator()(StatName a, const WeakStat& b) const { return a == b.lock()->statName(); }
+    size_t operator()(const WeakStat& a, StatName b) const { return a.lock()->statName() == b; }
   };
 
-  template <class StatType>
-  using StatNameMap =
-      absl::flat_hash_map<uint8_t*, std::weak_ptr<StatType>, StorageHash, StorageCompare>;
+  template <class StatType> using StatSet = absl::flat_hash_set<
+      std::weak_ptr<StatType>, StatHash<StatType>, StatCompare<StatType>>;
 
   // An unordered map of StatNameStorage to shared pointers to metrics.
   // field in each object. This necessitates a custom comparator and hasher, which key off of the
   // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
-  StatNameMap<Counter> counters_ GUARDED_BY(mutex_);
-  StatNameMap<Gauge> gauges_ GUARDED_BY(mutex_);
+  StatSet<Counter> counters_ GUARDED_BY(mutex_);
+  StatSet<Gauge> gauges_ GUARDED_BY(mutex_);
+  */
 
   SymbolTable& symbol_table_;
 

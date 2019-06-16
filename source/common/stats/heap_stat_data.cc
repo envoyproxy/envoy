@@ -20,24 +20,70 @@
 namespace Envoy {
 namespace Stats {
 
+HeapStatDataAllocator::~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
+/*HeapStatDataAllocator::~HeapStatDataAllocator() {
+  ASSERT(counters_.empty());
+  ASSERT(gauges_.empty());
+  }*/
+
+HeapStatData* HeapStatData::alloc(StatName stat_name, SymbolTable& symbol_table) {
+  symbol_table.incRefCount(stat_name);
+  return new (stat_name.size()) HeapStatData(stat_name);
+}
+
+void HeapStatData::free(SymbolTable& symbol_table) {
+  symbol_table.free(statName());
+  delete this;
+}
+
+HeapStatData& HeapStatDataAllocator::alloc(StatName name) {
+  using HeapStatDataFreeFn = std::function<void(HeapStatData * d)>;
+  std::unique_ptr<HeapStatData, HeapStatDataFreeFn> data_ptr(
+      HeapStatData::alloc(name, symbolTable()),
+      [this](HeapStatData* d) { d->free(symbolTable()); });
+  Thread::ReleasableLockGuard lock(mutex_);
+  auto ret = stats_.insert(data_ptr.get());
+  HeapStatData* existing_data = *ret.first;
+  lock.release();
+
+  if (ret.second) {
+    return *data_ptr.release();
+  }
+  ++existing_data->ref_count_;
+  return *existing_data;
+}
+
+void HeapStatDataAllocator::free(HeapStatData& data) {
+  ASSERT(data.ref_count_ > 0);
+  if (--data.ref_count_ > 0) {
+    return;
+  }
+
+  {
+    Thread::LockGuard lock(mutex_);
+    size_t key_removed = stats_.erase(&data);
+    ASSERT(key_removed == 1);
+  }
+
+  data.free(symbolTable());
+}
+
 #ifndef ENVOY_CONFIG_COVERAGE
 void HeapStatDataAllocator::debugPrint() {
-  /*
   Thread::LockGuard lock(mutex_);
   for (HeapStatData* heap_stat_data : stats_) {
     ENVOY_LOG_MISC(info, "{}", symbolTable().toString(heap_stat_data->statName()));
   }
-  */
 }
 #endif
 
 class CounterImpl : public Counter, public MetricImpl /*, public InlineStorage*/ {
 public:
-  static CounterImpl* create(StatName stat_name, HeapStatDataAllocator& alloc,
-                             absl::string_view tag_extracted_name, const std::vector<Tag>& tags) {
-    // return new (stat_name.size() + sizeof(CounterImpl)) CounterImpl(
-    //    stat_name, alloc, tag_extracted_name, tags);
-    return new CounterImpl(stat_name, alloc, tag_extracted_name, tags);
+  CounterImpl(HeapStatData& data, HeapStatDataAllocator& alloc,
+              absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
+      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {
+    // symbol_storage_(stat_name, alloc.symbolTable()) {
+    // stat_name.copyToStorage(symbol_storage_);
   }
 
   ~CounterImpl() override {
@@ -47,59 +93,54 @@ public:
     // MetricImpl, costing 8 bytes per stat.
     MetricImpl::clear();
     // symbolTable().free(statName());
+    // alloc_.freeCounter(statName());
     // symbol_storage_.free(symbolTable());
-    alloc_.freeCounter(stat_name_);
+    alloc_.free(data_);
   }
 
   // Stats::Counter
   void add(uint64_t amount) override {
-    value_ += amount;
-    pending_increment_ += amount;
-    used_ = true;
+    data_.value_ += amount;
+    data_.pending_increment_ += amount;
+    data_.flags_ |= Flags::Used;
   }
   void inc() override { add(1); }
-  uint64_t latch() override { return pending_increment_.exchange(0); }
-  void reset() override { value_ = 0; }
-  bool used() const override { return used_; }
-  uint64_t value() const override { return value_; }
+  uint64_t latch() override { return data_.pending_increment_.exchange(0); }
+  void reset() override { data_.value_ = 0; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
+  uint64_t value() const override { return data_.value_; }
 
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   // StatName statName() const override { return StatName(symbol_storage_); }
-  StatName statName() const override { return stat_name_; }
+  StatName statName() const override { return data_.statName(); }
 
 private:
-  CounterImpl(StatName stat_name, HeapStatDataAllocator& alloc,
-              absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
-      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), alloc_(alloc),
-        stat_name_(stat_name) {
-    // stat_name.copyToStorage(symbol_storage_);
-  }
-
-  std::atomic<uint64_t> value_{0};
-  std::atomic<uint64_t> pending_increment_{0}; // Can this be a uint32_t?
-  std::atomic<bool> used_{false};
-
+  HeapStatData& data_;
   HeapStatDataAllocator& alloc_;
-
-  // TODO(jmarantz): it does not work to use a variable-length array here because
-  // of the virtual inheritance in parent class 'Metric'. We get error:
-  //    error: flexible array member 'symbol_storage_' not allowed in class which has a virtual base
-  //    class
-  // This should be resolved to try to inline the memory, possibly by using
-  // delegation instead of virtual inheritance.
-  // SymbolTable::Storage symbol_storage_; // This is a 'using' nickname for uint8_t[].
-  // StatNameStorage symbol_storage_;
-  StatName stat_name_;
 };
 
 class GaugeImpl : public Gauge, public MetricImpl /*, public InlineStorage */ {
 public:
-  static GaugeImpl* create(StatName stat_name, HeapStatDataAllocator& alloc,
-                           absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
-                           ImportMode import_mode) {
-    // return new (stat_name.size() + sizeof GaugeImpl) GaugeImpl(
-    //    stat_name, alloc, tag_extracted_named, tags, import_mode);
-    return new GaugeImpl(stat_name, alloc, tag_extracted_name, tags, import_mode);
+  GaugeImpl(HeapStatData& data, HeapStatDataAllocator& alloc, absl::string_view tag_extracted_name,
+            const std::vector<Tag>& tags, ImportMode import_mode)
+      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {
+    // symbol_storage_(stat_name, alloc.symbolTable()) {
+    // import_mode_ = static_cast<uint8_t>(import_mode);
+    // stat_name.copyToStorage(symbol_storage_);
+    switch (import_mode) {
+    case ImportMode::Accumulate:
+      data_.flags_ |= Flags::LogicAccumulate;
+      break;
+    case ImportMode::NeverImport:
+      data_.flags_ |= Flags::NeverImport;
+      break;
+    case ImportMode::Uninitialized:
+      // Note that we don't clear any flag bits for import_mode==Uninitialized,
+      // as we may have an established import_mode when this stat was created in
+      // an alternate scope. See
+      // https://github.com/envoyproxy/envoy/issues/7227.
+      break;
+    }
   }
 
   ~GaugeImpl() override {
@@ -109,31 +150,37 @@ public:
     // MetricImpl, costing 8 bytes per stat.
     MetricImpl::clear();
     // symbolTable().free(statName());
+    // alloc_.freeGauge(statName());
     // symbol_storage_.free(symbolTable());
-    alloc_.freeGauge(stat_name_);
+    alloc_.free(data_);
   }
 
   // Stats::Gauge
   void add(uint64_t amount) override {
-    value_ += amount;
-    used_ = true;
+    data_.value_ += amount;
+    data_.flags_ |= Flags::Used;
   }
   void dec() override { sub(1); }
   void inc() override { add(1); }
   void set(uint64_t value) override {
-    value_ = value;
-    used_ = true;
+    data_.value_ = value;
+    data_.flags_ |= Flags::Used;
   }
   void sub(uint64_t amount) override {
-    ASSERT(value_ >= amount);
+    ASSERT(data_.value_ >= amount);
     ASSERT(used() || amount == 0);
-    value_ -= amount;
+    data_.value_ -= amount;
   }
-  uint64_t value() const override { return value_; }
-  bool used() const override { return used_; }
+  uint64_t value() const override { return data_.value_; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
 
   ImportMode importMode() const override {
-    return static_cast<ImportMode>(static_cast<uint8_t>(import_mode_));
+    if (data_.flags_ & Flags::NeverImport) {
+      return ImportMode::NeverImport;
+    } else if (data_.flags_ & Flags::LogicAccumulate) {
+      return ImportMode::Accumulate;
+    }
+    return ImportMode::Uninitialized;
   }
 
   void mergeImportMode(ImportMode import_mode) override {
@@ -149,88 +196,75 @@ public:
       break;
     case ImportMode::Accumulate:
       ASSERT(current == ImportMode::Uninitialized);
-      import_mode_ = static_cast<uint8_t>(ImportMode::Accumulate);
+      data_.flags_ |= Flags::LogicAccumulate;
       break;
     case ImportMode::NeverImport:
       ASSERT(current == ImportMode::Uninitialized);
       // A previous revision of Envoy may have transferred a gauge that it
       // thought was Accumulate. But the new version thinks it's NeverImport, so
       // we clear the accumulated value.
-      value_ = 0;
-      used_ = false;
-      import_mode_ = static_cast<uint8_t>(ImportMode::NeverImport);
+      data_.value_ = 0;
+      data_.flags_ &= ~Flags::Used;
+      data_.flags_ |= Flags::NeverImport;
       break;
     }
   }
 
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
-  // StatName statName() const { return StatName(symbol_storage_); }
-  StatName statName() const override { return stat_name_; }
+  StatName statName() const override { return data_.statName(); }
+  // StatName statName() const override { return symbol_storage_.statName(); }
 
 private:
-  GaugeImpl(StatName stat_name, HeapStatDataAllocator& alloc, absl::string_view tag_extracted_name,
-            const std::vector<Tag>& tags, ImportMode import_mode)
-      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), alloc_(alloc),
-        stat_name_(stat_name) {
-    import_mode_ = static_cast<uint8_t>(import_mode);
-    // stat_name.copyToStorage(symbol_storage_);
-  }
-
-  std::atomic<uint64_t> value_{0};
-  std::atomic<uint8_t> import_mode_{static_cast<uint8_t>(ImportMode::Uninitialized)};
-  std::atomic<bool> used_{false};
-
+  HeapStatData& data_;
   HeapStatDataAllocator& alloc_;
-  // SymbolTable::Storage symbol_storage_; // This is a 'using' nickname for uint8_t[].
-  StatName stat_name_;
 };
-
-HeapStatDataAllocator::~HeapStatDataAllocator() {
-  ASSERT(counters_.empty());
-  ASSERT(gauges_.empty());
-}
 
 CounterSharedPtr HeapStatDataAllocator::makeCounter(StatName name,
                                                     absl::string_view tag_extracted_name,
                                                     const std::vector<Tag>& tags) {
+  return std::make_shared<CounterImpl>(alloc(name), *this, tag_extracted_name, tags);
+#if 0
   Thread::LockGuard lock(mutex_);
   CounterSharedPtr counter;
   ASSERT(gauges_.find(name) == gauges_.end());
   auto iter = counters_.find(name);
   if (iter != counters_.end()) {
-    counter = iter->second.lock();
+    counter = (*iter).lock();
+    ASSERT(counter != nullptr);
   }
   if (counter == nullptr) {
-    uint8_t* storage = new uint8_t[name.size()];
-    name.copyToStorage(storage);
-    std::weak_ptr<Counter>& weak_ref = counters_[storage];
-    counter.reset(CounterImpl::create(StatName(storage), *this, tag_extracted_name, tags));
-    weak_ref = counter;
+    counter = std::make_shared<CounterImpl>(alloc(name), *this, tag_extracted_name, tags);
+    counters_.insert(counter);
   }
   return counter;
+#endif
 }
 
 GaugeSharedPtr HeapStatDataAllocator::makeGauge(StatName name, absl::string_view tag_extracted_name,
                                                 const std::vector<Tag>& tags,
                                                 Gauge::ImportMode import_mode) {
+  return std::make_shared<GaugeImpl>(alloc(name), *this, tag_extracted_name, tags, import_mode);
+#if 0
   Thread::LockGuard lock(mutex_);
   GaugeSharedPtr gauge;
   ASSERT(counters_.find(name) == counters_.end());
   auto iter = gauges_.find(name);
   if (iter != gauges_.end()) {
-    gauge = iter->second.lock();
+    gauge = (*iter).lock();
+    ASSERT(gauge != nullptr);
   }
   if (gauge == nullptr) {
-    uint8_t* storage = new uint8_t[name.size()];
-    name.copyToStorage(storage);
-    std::weak_ptr<Gauge>& weak_ref = gauges_[storage];
-    gauge.reset(GaugeImpl::create(StatName(storage), *this, tag_extracted_name, tags, import_mode));
-    weak_ref = gauge;
+    gauge = std::make_shared<GaugeImpl>(name, *this, tag_extracted_name, tags, import_mode);
+    gauges_.insert(gauge);
   }
   return gauge;
+#endif
 }
 
+#if 0
 void HeapStatDataAllocator::freeCounter(StatName stat_name) {
+  Thread::LockGuard lock(mutex_);
+  counters_.erase(stat_name);
   uint8_t* bytes;
   {
     Thread::LockGuard lock(mutex_);
@@ -244,6 +278,9 @@ void HeapStatDataAllocator::freeCounter(StatName stat_name) {
 }
 
 void HeapStatDataAllocator::freeGauge(StatName stat_name) {
+  Thread::LockGuard lock(mutex_);
+  gauges_.erase(stat_name);
+  /*
   uint8_t* bytes;
   {
     Thread::LockGuard lock(mutex_);
@@ -254,7 +291,9 @@ void HeapStatDataAllocator::freeGauge(StatName stat_name) {
   }
   symbol_table_.free(stat_name);
   delete[] bytes;
+  */
 }
+#endif
 
 } // namespace Stats
 } // namespace Envoy
