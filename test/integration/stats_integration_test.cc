@@ -215,7 +215,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/05/31  6866     50157               libstdc++ upgrade in CI
   // 2019/06/03  7199     49393               absl update
   // 2019/06/06  7208     49650               make memory targets approximate
-  // 2019/06/14  7104     49826               upstream_cx_destroy_after_draining_rq
+  // 2019/06/14  7104     49826               upstream connection draining
 
   EXPECT_LE(m_per_cluster, 49826);
 }
