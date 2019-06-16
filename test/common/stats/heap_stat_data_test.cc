@@ -33,14 +33,14 @@ protected:
 };
 
 // No truncation occurs in the implementation of HeapStatData.
-TEST_F(HeapStatDataTest, HeapNoTruncate) {
+/*TEST_F(HeapStatDataTest, HeapNoTruncate) {
   const std::string long_string(128, 'A');
   StatName stat_name = makeStat(long_string);
   HeapStatData* stat{};
   EXPECT_NO_LOGS(stat = &alloc_.alloc(stat_name));
   EXPECT_EQ(stat->statName(), stat_name);
   alloc_.free(*stat);
-};
+  };*/
 
 TEST_F(HeapStatDataTest, HeapAlloc) {
   HeapStatData* stat_1 = &alloc_.alloc(makeStat("ref_name"));

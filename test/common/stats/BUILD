@@ -11,16 +11,6 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "heap_stat_data_test",
-    srcs = ["heap_stat_data_test.cc"],
-    deps = [
-        "//source/common/stats:fake_symbol_table_lib",
-        "//source/common/stats:heap_stat_data_lib",
-        "//test/test_common:logging_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "isolated_store_impl_test",
     srcs = ["isolated_store_impl_test.cc"],
     deps = [
