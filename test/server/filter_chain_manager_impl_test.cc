@@ -133,15 +133,13 @@ public:
 };
 
 TEST_F(FilterChainManagerImplTest, FilterChainMatchNothing) {
-  auto filter_chain =
-      findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 }
 
 TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
   addSingleFilterChainHelper(filter_chain_template_);
-  auto* filter_chain =
-      findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
 }
 } // namespace Server
