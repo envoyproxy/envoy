@@ -216,10 +216,10 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 
   EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
-  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
-  EXPECT_EQ(3L, store_->gauges().front().use_count());
+  EXPECT_EQ(2L, store_->gauges().front().use_count());
 
   store_->shutdownThreading();
 }
@@ -259,20 +259,20 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
 
   EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
-  EXPECT_EQ(4L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
-  EXPECT_EQ(4L, store_->gauges().front().use_count());
+  EXPECT_EQ(3L, store_->gauges().front().use_count());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
 
   EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
-  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
-  EXPECT_EQ(3L, store_->gauges().front().use_count());
+  EXPECT_EQ(2L, store_->gauges().front().use_count());
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {
@@ -366,7 +366,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   scope1.reset();
   EXPECT_EQ(0UL, store_->counters().size());
 
-  EXPECT_EQ(2L, c1.use_count());
+  EXPECT_EQ(1L, c1.use_count());
   c1.reset();
 
   store_->shutdownThreading();
@@ -871,7 +871,7 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
   const size_t million = 1000 * 1000;
-  EXPECT_LT(end_mem - start_mem, 22 * million); // actual value: 21124512 as of March 14, 2019
+  EXPECT_LT(end_mem - start_mem, 23 * million); // actual value: 22173088 as of June 16, 2019
 }
 
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
@@ -899,7 +899,7 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
   const size_t million = 1000 * 1000;
-  EXPECT_LT(end_mem - start_mem, 25 * million); // actual value: 24401600 as of March 14, 2019
+  EXPECT_LT(end_mem - start_mem, 26 * million); // actual value: 25450176 as of June 16, 2019
   store->shutdownThreading();
   tls.shutdownThread();
 }
@@ -915,10 +915,10 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   store_->gauge("g2", Gauge::ImportMode::Accumulate);
 
   // c1, g1 should have a thread local ref, but c2, g2 should not.
-  EXPECT_EQ(4L, TestUtility::findCounter(*store_, "c1").use_count());
-  EXPECT_EQ(4L, TestUtility::findGauge(*store_, "g1").use_count());
-  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c2").use_count());
-  EXPECT_EQ(3L, TestUtility::findGauge(*store_, "g2").use_count());
+  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(3L, TestUtility::findGauge(*store_, "g1").use_count());
+  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c2").use_count());
+  EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g2").use_count());
 
   store_->shutdownThreading();
   tls_.shutdownThread();

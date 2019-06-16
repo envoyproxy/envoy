@@ -12,6 +12,7 @@
 #include "common/common/assert.h"
 #include "common/stats/metric_impl.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -20,6 +21,7 @@ namespace Stats {
 class HeapStatDataAllocator : public StatDataAllocator {
 public:
   HeapStatDataAllocator(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+  ~HeapStatDataAllocator() override;
 
   // StatDataAllocator
   CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
@@ -35,34 +37,38 @@ public:
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
 private:
-  template <class StatType> struct Hash {
+  friend class CounterImpl;
+  friend class GaugeImpl;
+
+  void freeCounter(StatName stat_name);
+  void freeGauge(StatName stat_name);
+
+  struct StorageHash {
     // See description for HeterogeneousStatNameHash::is_transparent.
     using is_transparent = void;
 
+    size_t operator()(uint8_t* a) const { return StatName(a).hash(); }
     size_t operator()(StatName a) const { return a.hash(); }
-    size_t operator()(const std::shared_ptr<StatType>& a) const { return a->statName().hash(); }
   };
 
-  template <class StatType> struct Compare {
+  struct StorageCompare {
     // See description for HeterogeneousStatNameHash::is_transparent.
     using is_transparent = void;
 
-    using SharedPtr = std::shared_ptr<StatType>;
-
-    size_t operator()(const SharedPtr& a, const SharedPtr& b) const {
-      return a->statName() == b->statName();
-    }
-    size_t operator()(StatName a, const SharedPtr& b) const { return a == b->statName(); }
-    size_t operator()(const SharedPtr& a, StatName b) const { return a->statName() == b; }
+    size_t operator()(uint8_t* a, uint8_t* b) const { return StatName(a) == StatName(b); }
+    size_t operator()(StatName a, uint8_t* b) const { return a == StatName(b); }
+    size_t operator()(uint8_t* a, StatName b) const { return StatName(a) == b; }
   };
 
-  // An unordered set of HeapStatData pointers which keys off the key()
+  template <class StatType>
+  using StatNameMap =
+      absl::flat_hash_map<uint8_t*, std::weak_ptr<StatType>, StorageHash, StorageCompare>;
+
+  // An unordered map of StatNameStorage to shared pointers to metrics.
   // field in each object. This necessitates a custom comparator and hasher, which key off of the
   // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
-  template <class StatType>
-  using StatSet = absl::flat_hash_set<std::shared_ptr<StatType>, Hash<StatType>, Compare<StatType>>;
-  StatSet<Counter> counters_ GUARDED_BY(mutex_);
-  StatSet<Gauge> gauges_ GUARDED_BY(mutex_);
+  StatNameMap<Counter> counters_ GUARDED_BY(mutex_);
+  StatNameMap<Gauge> gauges_ GUARDED_BY(mutex_);
 
   SymbolTable& symbol_table_;
 

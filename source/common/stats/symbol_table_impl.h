@@ -630,5 +630,67 @@ private:
   HashSet hash_set_;
 };
 
+#if 0
+// Encapsulates a map<StatNameStorage, ValueType>. This is identical to
+// StatNameStorageSet above, except it's a templatized map, and adds
+// support for erase().
+template<class ValueType>
+class StatNameStorageMap {
+public:
+  using HashMap =
+      absl::flat_hash_map<StatNameStorage, ValueType, HeterogeneousStatNameHash, HeterogeneousStatNameEqual>;
+  using iterator = typename HashMap::iterator;
+
+  ~StatNameStorageMap() {
+    // free() must be called before destructing StatNameStorageMap to decrement
+    // references to all symbols.
+    ASSERT(hash_map_.empty());
+  }
+
+  /**
+   * Releases all symbols held in this map. Must be called prior to destruction.
+   *
+   * @param symbol_table The symbol table that owns the symbols.
+   */
+  void free(SymbolTable& symbol_table) {
+    while (!hash_map_.empty()) {
+      auto storage = hash_map_.extract(hash_map_.begin());
+      storage.value().free(symbol_table);
+    }
+  }
+
+  /**
+   * @param storage The StatNameStorage to add to the map.
+   */
+  std::pair<iterator, bool> insert(StatNameStorage&& storage) {
+    return hash_map_.insert(std::make_pair<std::move(storage));
+  }
+
+  /**
+   * @param stat_name The stat_name to find.
+   * @return the iterator pointing to the stat_name, or end() if not found.
+   */
+  iterator find(StatName stat_name) { return hash_map_.find(stat_name); }
+
+  /**
+   * @return the end-marker.
+   */
+  iterator end() { return hash_map_.end(); }
+
+  /**
+   * @param iter The element to erase.
+   */
+  void erase(iterator iter) { return hash_map_.erase(iter); }
+
+  /**
+   * @return the number of elements in the map.
+   */
+  size_t size() const { return hash_map_.size(); }
+
+private:
+  HashMap hash_map_;
+};
+#endif
+
 } // namespace Stats
 } // namespace Envoy

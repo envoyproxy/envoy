@@ -143,7 +143,7 @@ public:
                                   const std::function<void(absl::string_view)>& fn) const PURE;
 
 private:
-  friend struct HeapStatData;
+  friend class HeapStatDataAllocator;
   friend class StatNameStorage;
   friend class StatNameList;
 

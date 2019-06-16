@@ -90,16 +90,6 @@ public:
    */
   virtual bool used() const PURE;
 
-  /**
-   * Flags:
-   * Used: used by all stats types to figure out whether they have been used.
-   * Logic...: used by gauges to cache how they should be combined with a parent's value.
-   */
-  struct Flags {
-    static const uint8_t Used = 0x01;
-    static const uint8_t LogicAccumulate = 0x02;
-    static const uint8_t NeverImport = 0x04;
-  };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;
 };

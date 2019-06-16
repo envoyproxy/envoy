@@ -47,7 +47,8 @@ public:
     // MetricImpl, costing 8 bytes per stat.
     MetricImpl::clear();
     // symbolTable().free(statName());
-    symbol_storage_.free(symbolTable());
+    // symbol_storage_.free(symbolTable());
+    alloc_.freeCounter(stat_name_);
   }
 
   // Stats::Counter
@@ -64,18 +65,18 @@ public:
 
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   // StatName statName() const override { return StatName(symbol_storage_); }
-  StatName statName() const override { return symbol_storage_.statName(); }
+  StatName statName() const override { return stat_name_; }
 
 private:
   CounterImpl(StatName stat_name, HeapStatDataAllocator& alloc,
               absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
       : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), alloc_(alloc),
-        symbol_storage_(stat_name, alloc.symbolTable()) {
+        stat_name_(stat_name) {
     // stat_name.copyToStorage(symbol_storage_);
   }
 
   std::atomic<uint64_t> value_{0};
-  std::atomic<uint64_t> pending_increment_{0}; // mklein: Can this be a uint32_t?
+  std::atomic<uint64_t> pending_increment_{0}; // Can this be a uint32_t?
   std::atomic<bool> used_{false};
 
   HeapStatDataAllocator& alloc_;
@@ -87,7 +88,8 @@ private:
   // This should be resolved to try to inline the memory, possibly by using
   // delegation instead of virtual inheritance.
   // SymbolTable::Storage symbol_storage_; // This is a 'using' nickname for uint8_t[].
-  StatNameStorage symbol_storage_;
+  // StatNameStorage symbol_storage_;
+  StatName stat_name_;
 };
 
 class GaugeImpl : public Gauge, public MetricImpl /*, public InlineStorage */ {
@@ -107,7 +109,8 @@ public:
     // MetricImpl, costing 8 bytes per stat.
     MetricImpl::clear();
     // symbolTable().free(statName());
-    symbol_storage_.free(symbolTable());
+    // symbol_storage_.free(symbolTable());
+    alloc_.freeGauge(stat_name_);
   }
 
   // Stats::Gauge
@@ -162,13 +165,13 @@ public:
 
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   // StatName statName() const { return StatName(symbol_storage_); }
-  StatName statName() const override { return symbol_storage_.statName(); }
+  StatName statName() const override { return stat_name_; }
 
 private:
   GaugeImpl(StatName stat_name, HeapStatDataAllocator& alloc, absl::string_view tag_extracted_name,
             const std::vector<Tag>& tags, ImportMode import_mode)
       : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), alloc_(alloc),
-        symbol_storage_(stat_name, alloc.symbolTable()) {
+        stat_name_(stat_name) {
     import_mode_ = static_cast<uint8_t>(import_mode);
     // stat_name.copyToStorage(symbol_storage_);
   }
@@ -179,20 +182,30 @@ private:
 
   HeapStatDataAllocator& alloc_;
   // SymbolTable::Storage symbol_storage_; // This is a 'using' nickname for uint8_t[].
-  StatNameStorage symbol_storage_;
+  StatName stat_name_;
 };
+
+HeapStatDataAllocator::~HeapStatDataAllocator() {
+  ASSERT(counters_.empty());
+  ASSERT(gauges_.empty());
+}
 
 CounterSharedPtr HeapStatDataAllocator::makeCounter(StatName name,
                                                     absl::string_view tag_extracted_name,
                                                     const std::vector<Tag>& tags) {
   Thread::LockGuard lock(mutex_);
-  auto iter = counters_.find(name);
   CounterSharedPtr counter;
-  if (iter == counters_.end()) {
-    counter.reset(CounterImpl::create(name, *this, tag_extracted_name, tags));
-    counters_.insert(counter);
-  } else {
-    counter = *iter;
+  ASSERT(gauges_.find(name) == gauges_.end());
+  auto iter = counters_.find(name);
+  if (iter != counters_.end()) {
+    counter = iter->second.lock();
+  }
+  if (counter == nullptr) {
+    uint8_t* storage = new uint8_t[name.size()];
+    name.copyToStorage(storage);
+    std::weak_ptr<Counter>& weak_ref = counters_[storage];
+    counter.reset(CounterImpl::create(StatName(storage), *this, tag_extracted_name, tags));
+    weak_ref = counter;
   }
   return counter;
 }
@@ -201,15 +214,46 @@ GaugeSharedPtr HeapStatDataAllocator::makeGauge(StatName name, absl::string_view
                                                 const std::vector<Tag>& tags,
                                                 Gauge::ImportMode import_mode) {
   Thread::LockGuard lock(mutex_);
-  auto iter = gauges_.find(name);
   GaugeSharedPtr gauge;
-  if (iter == gauges_.end()) {
-    gauge.reset(GaugeImpl::create(name, *this, tag_extracted_name, tags, import_mode));
-    gauges_.insert(gauge);
-  } else {
-    gauge = *iter;
+  ASSERT(counters_.find(name) == counters_.end());
+  auto iter = gauges_.find(name);
+  if (iter != gauges_.end()) {
+    gauge = iter->second.lock();
+  }
+  if (gauge == nullptr) {
+    uint8_t* storage = new uint8_t[name.size()];
+    name.copyToStorage(storage);
+    std::weak_ptr<Gauge>& weak_ref = gauges_[storage];
+    gauge.reset(GaugeImpl::create(StatName(storage), *this, tag_extracted_name, tags, import_mode));
+    weak_ref = gauge;
   }
   return gauge;
+}
+
+void HeapStatDataAllocator::freeCounter(StatName stat_name) {
+  uint8_t* bytes;
+  {
+    Thread::LockGuard lock(mutex_);
+    auto iter = counters_.find(stat_name);
+    ASSERT(iter != counters_.end());
+    bytes = iter->first;
+    counters_.erase(stat_name);
+  }
+  symbol_table_.free(stat_name);
+  delete[] bytes;
+}
+
+void HeapStatDataAllocator::freeGauge(StatName stat_name) {
+  uint8_t* bytes;
+  {
+    Thread::LockGuard lock(mutex_);
+    auto iter = gauges_.find(stat_name);
+    ASSERT(iter != gauges_.end());
+    bytes = iter->first;
+    gauges_.erase(stat_name);
+  }
+  symbol_table_.free(stat_name);
+  delete[] bytes;
 }
 
 } // namespace Stats
