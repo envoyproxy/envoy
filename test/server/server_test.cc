@@ -134,6 +134,93 @@ TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
   target.ready();
 }
 
+class InitializingInitManager : public Init::ManagerImpl {
+public:
+  InitializingInitManager(absl::string_view name) : Init::ManagerImpl(name) {}
+
+  State state() const override { return State::Initializing; }
+};
+
+class InitializingInstanceImpl : public InstanceImpl {
+private:
+  InitializingInitManager init_manager_{"Server"};
+
+public:
+  InitializingInstanceImpl(const Options& options, Event::TimeSystem& time_system,
+                           Network::Address::InstanceConstSharedPtr local_address,
+                           ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
+                           Thread::BasicLockable& access_log_lock,
+                           ComponentFactory& component_factory,
+                           Runtime::RandomGeneratorPtr&& random_generator,
+                           ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
+                           Filesystem::Instance& file_system,
+                           std::unique_ptr<ProcessContext> process_context)
+      : InstanceImpl(options, time_system, local_address, hooks, restarter, store, access_log_lock,
+                     component_factory, std::move(random_generator), tls, thread_factory,
+                     file_system, std::move(process_context)) {}
+
+  Init::Manager& initManager() override { return init_manager_; }
+};
+
+// Class creates minimally viable server instance for testing and the initManager managed by it is
+// stuck in Initializing.
+class InitializingServerInstanceImplTest
+    : public testing::TestWithParam<Network::Address::IpVersion> {
+protected:
+  InitializingServerInstanceImplTest() : version_(GetParam()) {}
+
+  void initialize(const std::string& bootstrap_path) {
+    if (bootstrap_path.empty()) {
+      options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
+          "test/config/integration/server.json", {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
+    } else {
+      options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
+          bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
+    }
+    thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+    if (process_object_ != nullptr) {
+      process_context_ = std::make_unique<ProcessContextImpl>(*process_object_);
+    }
+    server_ = std::make_unique<InitializingInstanceImpl>(
+        options_, test_time_.timeSystem(),
+        Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+        hooks_, restart_, stats_store_, fakelock_, component_factory_,
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
+        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+        std::move(process_context_));
+
+    EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
+  }
+  Network::Address::IpVersion version_;
+  testing::NiceMock<MockOptions> options_;
+  DefaultListenerHooks hooks_;
+  testing::NiceMock<MockHotRestart> restart_;
+  std::unique_ptr<ThreadLocal::InstanceImpl> thread_local_;
+  Stats::TestIsolatedStoreImpl stats_store_;
+  Thread::MutexBasicLockable fakelock_;
+  TestComponentFactory component_factory_;
+  DangerousDeprecatedTestTime test_time_;
+  ProcessObject* process_object_ = nullptr;
+  std::unique_ptr<ProcessContextImpl> process_context_;
+  std::unique_ptr<InstanceImpl> server_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, InitializingServerInstanceImplTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Validates that server stats are created even if the server is stuck with initialization.
+TEST_P(InitializingServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
+  options_.hot_restart_epoch_ = 3;
+
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+
+  // Validate that server is still in initializing state but stats are created and flushed.
+  EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
+  EXPECT_EQ(1L, TestUtility::findGauge(stats_store_, "server.live")->value());
+  EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
+}
+
 // Class creates minimally viable server instance for testing.
 class ServerInstanceImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
