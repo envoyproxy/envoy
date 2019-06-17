@@ -44,8 +44,13 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
         virtual_host = replaceInvalidHeaders<envoy::api::v2::route::VirtualHost>(virtual_host);
         std::for_each(virtual_host.mutable_routes()->begin(), virtual_host.mutable_routes()->end(),
                       [](envoy::api::v2::route::Route& route) {
-                        route.mutable_route()->set_cluster_header(
-                            Fuzz::replaceInvalidCharacters(route.route().cluster_header()));
+                        if (route.has_route()) {
+                          route.mutable_route()->set_cluster_header(
+                              Fuzz::replaceInvalidCharacters(route.route().cluster_header()));
+                          if (route.route().cluster_header().empty()) {
+                            route.mutable_route()->set_cluster_header("not-empty");
+                          }
+                        }
                       });
       });
 
