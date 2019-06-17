@@ -7,7 +7,6 @@
 // porting layer for QUICHE.
 
 #include <cerrno>
-#include <cstddef>
 #include <cstring>
 #include <iostream>
 #include <sstream>
@@ -16,7 +15,6 @@
 #include "common/common/logger.h"
 
 #include "absl/base/optimization.h"
-#include "absl/strings/str_join.h"
 #include "absl/synchronization/mutex.h"
 
 // This implementation is only used by Quiche code, use macros provided by
