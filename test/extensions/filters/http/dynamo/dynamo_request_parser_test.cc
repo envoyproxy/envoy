@@ -84,7 +84,7 @@ TEST(DynamoRequestParser, parseTableNameTransactOperation) {
         { "Update": { "TableName": "Pets", "Key": { "Name": {"S": "Maxine"} }, "AnimalType": {"S": "Dog"} } },
         { "Put": { "TableName": "Pets", "Key": { "Name": {"S": "Max"} }, "AnimalType": {"S": "Puppy"} } },
         { "Put": { "TableName": "Pets", "Key": { "Name": {"S": "Oscar"} }, "AnimalType": {"S": "Puppy"} } },
-        { "Put": { "TableName": "Pets", "Key": { "Name": {"S": "Chloe"} }, "AnimalType": {"S": "Puppy"} } },
+        { "Put": { "TableName": "Pets", "Key": { "Name": {"S": "Chloe"} }, "AnimalType": {"S": "Puppy"} } }
       ]
     }
     )EOF";

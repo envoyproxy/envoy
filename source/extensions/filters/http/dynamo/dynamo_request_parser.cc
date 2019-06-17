@@ -103,18 +103,18 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
              TRANSACT_OPERATIONS.end()) {
     std::vector<Json::ObjectSharedPtr> transact_items =
         json_data.getObjectArray("TransactItems", true);
-    std::string table_name = "";
+    std::string next_table_name = "";
     for (const Json::ObjectSharedPtr& transact_item : transact_items) {
-      table_name = getTableNameFromTransactItem(*transact_item);
-      if (table_name == "") {
+      next_table_name = getTableNameFromTransactItem(*transact_item);
+      if (next_table_name.empty()) {
         // if an operation is missing a table name, we want to throw the normal set of errors
         table.table_name = "";
         table.is_single_table = true;
         break;
       }
       if (table.table_name.empty()) {
-        table.table_name = table_name;
-      } else if (table.table_name != table_name) {
+        table.table_name = next_table_name;
+      } else if (table.table_name != next_table_name) {
         table.table_name = "";
         table.is_single_table = false;
         break;
@@ -129,7 +129,7 @@ std::string RequestParser::getTableNameFromTransactItem(const Json::Object& tran
   for (const std::string& operation : TRANSACT_ITEM_OPERATIONS) {
     Json::ObjectSharedPtr item = transact_item.getObject(operation, true);
     table_name = item->getString("TableName", "");
-    if (table_name != "") {
+    if (!table_name.empty()) {
       return table_name;
     }
   }
