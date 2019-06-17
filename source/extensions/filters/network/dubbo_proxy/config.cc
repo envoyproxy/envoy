@@ -76,7 +76,7 @@ private:
 class RouteMatcherTypeMapper {
 public:
   using ConfigProtocolType = envoy::config::filter::network::dubbo_proxy::v2alpha1::ProtocolType;
-  typedef absl::flat_hash_map<ConfigProtocolType, Router::RouteMatcherType> RouteMatcherTypeMap;
+  using RouteMatcherTypeMap = absl::flat_hash_map<ConfigProtocolType, Router::RouteMatcherType>;
 
   static Router::RouteMatcherType lookupRouteMatcherType(ConfigProtocolType type) {
     const auto& iter = routeMatcherTypeMap().find(type);

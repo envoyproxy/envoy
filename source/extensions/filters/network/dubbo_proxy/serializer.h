@@ -39,7 +39,9 @@ public:
    * If successful, the RpcInvocation removed from the buffer
    *
    * @param buffer the currently buffered dubbo data
-   * @body_size the complete RpcInvocation size
+   * @param context context information for RPC messages
+   * @return a pair containing the deserialized result of the message and the deserialized
+   *         invocation information.
    * @throws EnvoyException if the data is not valid for this serialization
    */
   virtual std::pair<RpcInvocationSharedPtr, bool>
@@ -47,10 +49,11 @@ public:
 
   /**
    * deserialize result of an rpc call
-   * If successful, the RpcResult removed from the buffer
    *
    * @param buffer the currently buffered dubbo data
-   * @body_size the complete RpcResult size
+   * @param context context information for RPC messages
+   * @return a pair containing the deserialized result of the message and the deserialized
+   *         result information.
    * @throws EnvoyException if the data is not valid for this serialization
    */
   virtual std::pair<RpcResultSharedPtr, bool> deserializeRpcResult(Buffer::Instance& buffer,
@@ -69,7 +72,7 @@ public:
                                     RpcResponseType type) PURE;
 };
 
-typedef std::unique_ptr<Serializer> SerializerPtr;
+using SerializerPtr = std::unique_ptr<Serializer>;
 
 /**
  * Implemented by each Dubbo serialize and registered via Registry::registerFactory or the

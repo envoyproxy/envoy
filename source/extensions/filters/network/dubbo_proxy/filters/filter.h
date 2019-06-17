@@ -219,14 +219,14 @@ public:
   virtual void setEncoderFilterCallbacks(EncoderFilterCallbacks& callbacks) PURE;
 };
 
-typedef std::shared_ptr<EncoderFilter> EncoderFilterSharedPtr;
+using EncoderFilterSharedPtr = std::shared_ptr<EncoderFilter>;
 
 /**
  * A filter that handles both encoding and decoding.
  */
 class CodecFilter : public virtual DecoderFilter, public virtual EncoderFilter {};
 
-typedef std::shared_ptr<CodecFilter> CodecFilterSharedPtr;
+using CodecFilterSharedPtr = std::shared_ptr<CodecFilter>;
 
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can

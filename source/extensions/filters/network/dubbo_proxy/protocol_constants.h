@@ -22,7 +22,7 @@ public:
     template <typename T> std::size_t operator()(T t) const { return static_cast<std::size_t>(t); }
   };
 
-  typedef std::unordered_map<ProtocolType, std::string, ProtocolTypeHash> ProtocolTypeNameMap;
+  using ProtocolTypeNameMap = std::unordered_map<ProtocolType, std::string, ProtocolTypeHash>;
 
   const ProtocolTypeNameMap protocolTypeNameMap = {
       {ProtocolType::Dubbo, "dubbo"},
@@ -38,7 +38,7 @@ public:
   }
 };
 
-typedef ConstSingleton<ProtocolNameValues> ProtocolNames;
+using ProtocolNames = ConstSingleton<ProtocolNameValues>;
 
 /**
  * Names of available serializer implementations.
@@ -49,8 +49,8 @@ public:
     template <typename T> std::size_t operator()(T t) const { return static_cast<std::size_t>(t); }
   };
 
-  typedef std::unordered_map<SerializationType, std::string, SerializationTypeHash>
-      SerializerTypeNameMap;
+  using SerializerTypeNameMap =
+      std::unordered_map<SerializationType, std::string, SerializationTypeHash>;
 
   const SerializerTypeNameMap serializerTypeNameMap = {
       {SerializationType::Hessian2, "hessian2"},
@@ -66,7 +66,7 @@ public:
   }
 };
 
-typedef ConstSingleton<SerializerNameValues> SerializerNames;
+using SerializerNames = ConstSingleton<SerializerNameValues>;
 
 class ProtocolSerializerNameValues {
 public:
@@ -83,7 +83,7 @@ public:
 
 #define GENERATE_PAIR(X, Y) generateKey(X, Y), generateValue(X, Y)
 
-  typedef std::unordered_map<uint8_t, std::string> ProtocolSerializerTypeNameMap;
+  using ProtocolSerializerTypeNameMap = std::unordered_map<uint8_t, std::string>;
 
   const ProtocolSerializerTypeNameMap protocolSerializerTypeNameMap = {
       {GENERATE_PAIR(ProtocolType::Dubbo, SerializationType::Hessian2)},
@@ -99,7 +99,7 @@ public:
   }
 };
 
-typedef ConstSingleton<ProtocolSerializerNameValues> ProtocolSerializerNames;
+using ProtocolSerializerNames = ConstSingleton<ProtocolSerializerNameValues>;
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

@@ -59,7 +59,7 @@ struct ActiveStream {
   ContextSharedPtr context_;
 };
 
-typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
+using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
 
 class DecoderStateMachine : public Logger::Loggable<Logger::Id::dubbo> {
 public:

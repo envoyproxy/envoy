@@ -203,6 +203,54 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
+class MockEncoderFilter : public EncoderFilter {
+public:
+  MockEncoderFilter();
+  ~MockEncoderFilter();
+
+  // DubboProxy::DubboFilters::EncoderFilter
+  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD1(setEncoderFilterCallbacks, void(EncoderFilterCallbacks& callbacks));
+  MOCK_METHOD2(onMessageEncoded, FilterStatus(MessageMetadataSharedPtr, ContextSharedPtr));
+};
+
+class MockEncoderFilterCallbacks : public EncoderFilterCallbacks {
+public:
+  MockEncoderFilterCallbacks();
+  ~MockEncoderFilterCallbacks();
+
+  // DubboProxy::DubboFilters::MockEncoderFilterCallbacks
+  MOCK_CONST_METHOD0(requestId, uint64_t());
+  MOCK_CONST_METHOD0(streamId, uint64_t());
+  MOCK_CONST_METHOD0(connection, const Network::Connection*());
+  MOCK_METHOD0(route, Router::RouteConstSharedPtr());
+  MOCK_CONST_METHOD0(serializationType, SerializationType());
+  MOCK_CONST_METHOD0(protocolType, ProtocolType());
+  MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
+  MOCK_METHOD0(resetStream, void());
+  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
+  MOCK_METHOD0(continueEncoding, void());
+  MOCK_METHOD0(continueDecoding, void());
+
+  uint64_t stream_id_{1};
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  std::shared_ptr<Router::MockRoute> route_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+};
+
+class MockCodecFilter : public CodecFilter {
+public:
+  MockCodecFilter();
+  ~MockCodecFilter();
+
+  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD1(setEncoderFilterCallbacks, void(EncoderFilterCallbacks& callbacks));
+  MOCK_METHOD2(onMessageEncoded, FilterStatus(MessageMetadataSharedPtr, ContextSharedPtr));
+  MOCK_METHOD1(setDecoderFilterCallbacks, void(DecoderFilterCallbacks& callbacks));
+  MOCK_METHOD2(onMessageDecoded, FilterStatus(MessageMetadataSharedPtr, ContextSharedPtr));
+};
+
 class MockDirectResponse : public DirectResponse {
 public:
   MockDirectResponse() = default;

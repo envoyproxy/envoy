@@ -31,6 +31,21 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
 
   if (end_stream) {
     ENVOY_CONN_LOG(trace, "downstream half-closed", read_callbacks_->connection());
+
+    // Downstream has closed. Unless we're waiting for an upstream connection to complete a oneway
+    // request, close. The special case for oneway requests allows them to complete before the
+    // ConnectionManager is destroyed.
+    if (stopped_) {
+      ASSERT(!active_message_list_.empty());
+      auto metadata = (*active_message_list_.begin())->metadata();
+      if (metadata && metadata->message_type() == MessageType::Oneway) {
+        ENVOY_CONN_LOG(trace, "waiting for one-way completion", read_callbacks_->connection());
+        half_closed_ = true;
+        return Network::FilterStatus::StopIteration;
+      }
+    }
+
+    ENVOY_LOG(debug, "dubbo: end data processing");
     resetAllMessages(false);
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }

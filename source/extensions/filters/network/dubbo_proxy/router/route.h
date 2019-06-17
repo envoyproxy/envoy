@@ -35,8 +35,8 @@ public:
     template <typename T> std::size_t operator()(T t) const { return static_cast<std::size_t>(t); }
   };
 
-  typedef std::unordered_map<RouteMatcherType, std::string, RouteMatcherTypeHash>
-      RouteMatcherNameMap;
+  using RouteMatcherNameMap =
+      std::unordered_map<RouteMatcherType, std::string, RouteMatcherTypeHash>;
 
   const RouteMatcherNameMap routeMatcherNameMap = {
       {RouteMatcherType::Default, "default"},
@@ -52,7 +52,7 @@ public:
   }
 };
 
-typedef ConstSingleton<RouteMatcherNameValues> RouteMatcherNames;
+using RouteMatcherNames = ConstSingleton<RouteMatcherNameValues>;
 
 class RouteMatcher {
 public:
@@ -62,8 +62,8 @@ public:
                                     uint64_t random_value) const PURE;
 };
 
-typedef std::unique_ptr<RouteMatcher> RouteMatcherPtr;
-typedef std::shared_ptr<const RouteMatcher> RouteMatcherConstSharedPtr;
+using RouteMatcherPtr = std::unique_ptr<RouteMatcher>;
+using RouteMatcherConstSharedPtr = std::shared_ptr<const RouteMatcher>;
 
 /**
  * Implemented by each Dubbo protocol and registered via Registry::registerFactory or the

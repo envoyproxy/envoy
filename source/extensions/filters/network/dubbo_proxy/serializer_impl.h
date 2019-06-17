@@ -11,10 +11,10 @@ namespace DubboProxy {
 class RpcInvocationImpl : public RpcInvocationBase {
 public:
   // TODO(gengleilei) Add parameter data types and implement Dubbo data type mapping.
-  typedef std::unordered_map<uint32_t, std::string> ParameterValueMap;
-  typedef std::unique_ptr<ParameterValueMap> ParameterValueMapPtr;
+  using ParameterValueMap = std::unordered_map<uint32_t, std::string>;
+  using ParameterValueMapPtr = std::unique_ptr<ParameterValueMap>;
 
-  typedef std::unique_ptr<Http::HeaderMapImpl> HeaderMapPtr;
+  using HeaderMapPtr = std::unique_ptr<Http::HeaderMapImpl>;
 
   RpcInvocationImpl() = default;
   ~RpcInvocationImpl() override = default;

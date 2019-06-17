@@ -39,7 +39,7 @@ public:
                                         ContextSharedPtr ctx) PURE;
 };
 
-typedef std::shared_ptr<StreamDecoder> StreamDecoderSharedPtr;
+using StreamDecoderSharedPtr = std::shared_ptr<StreamDecoder>;
 
 class StreamEncoder {
 public:
@@ -55,7 +55,7 @@ public:
                                         ContextSharedPtr ctx) PURE;
 };
 
-typedef std::shared_ptr<StreamEncoder> StreamEncoderSharedPtr;
+using StreamEncoderSharedPtr = std::shared_ptr<StreamEncoder>;
 
 class StreamHandler {
 public:
@@ -70,7 +70,7 @@ public:
   virtual void onStreamDecoded(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) PURE;
 };
 
-typedef std::shared_ptr<StreamDecoder> StreamDecoderSharedPtr;
+using StreamDecoderSharedPtr = std::shared_ptr<StreamDecoder>;
 
 class DecoderCallbacksBase {
 public:

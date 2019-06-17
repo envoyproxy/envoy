@@ -47,7 +47,18 @@ public:
     if (custom_filter_) {
       callbacks.addDecoderFilter(custom_filter_);
     }
-    callbacks.addDecoderFilter(decoder_filter_);
+
+    if (encoder_filter_) {
+      callbacks.addEncoderFilter(encoder_filter_);
+    }
+
+    if (decoder_filter_) {
+      callbacks.addDecoderFilter(decoder_filter_);
+    }
+
+    if (codec_filter_) {
+      callbacks.addFilter(codec_filter_);
+    }
   }
 
   ProtocolPtr createProtocol() override {
@@ -67,6 +78,8 @@ public:
 
   DubboFilters::DecoderFilterSharedPtr custom_filter_;
   DubboFilters::DecoderFilterSharedPtr decoder_filter_;
+  DubboFilters::EncoderFilterSharedPtr encoder_filter_;
+  DubboFilters::CodecFilterSharedPtr codec_filter_;
   DubboFilterStats& stats_;
   MockSerializer* serializer_{};
   MockProtocol* protocol_{};
@@ -1154,6 +1167,105 @@ TEST_F(ConnectionManagerTest, SendLocalReplyInMessageDecoded) {
 
   // The finalizeRequest should be called.
   EXPECT_EQ(1U, store_.counter("test.request").value());
+}
+
+TEST_F(ConnectionManagerTest, HandleResponseWithEncoderFilter) {
+  uint64_t request_id = 100;
+  initializeFilter();
+  config_->encoder_filter_ = std::make_unique<DubboFilters::MockEncoderFilter>();
+  auto mock_encoder_filter =
+      static_cast<DubboFilters::MockEncoderFilter*>(config_->encoder_filter_.get());
+
+  writeHessianRequestMessage(buffer_, false, false, request_id);
+
+  DubboFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_CALL(*mock_encoder_filter, setEncoderFilterCallbacks(_)).Times(1);
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
+
+  writeHessianResponseMessage(write_buffer_, false, request_id);
+
+  callbacks->startUpstreamResponse();
+
+  EXPECT_EQ(callbacks->requestId(), request_id);
+  EXPECT_EQ(callbacks->connection(), &(filter_callbacks_.connection_));
+  EXPECT_GE(callbacks->streamId(), 0);
+
+  size_t expect_response_length = write_buffer_.length();
+  EXPECT_CALL(*mock_encoder_filter, onMessageEncoded(_, _))
+      .WillOnce(
+          Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) -> FilterStatus {
+            EXPECT_EQ(metadata->request_id(), request_id);
+            EXPECT_EQ(ctx->message_size(), expect_response_length);
+            return FilterStatus::Continue;
+          }));
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_EQ(DubboFilters::UpstreamResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.response_success").value());
+}
+
+TEST_F(ConnectionManagerTest, HandleResponseWithCodecFilter) {
+  uint64_t request_id = 100;
+  initializeFilter();
+  config_->codec_filter_ = std::make_unique<DubboFilters::MockCodecFilter>();
+  auto mock_codec_filter =
+      static_cast<DubboFilters::MockCodecFilter*>(config_->codec_filter_.get());
+  config_->decoder_filter_.reset();
+  decoder_filter_.reset();
+  EXPECT_EQ(config_->decoder_filter_.get(), nullptr);
+
+  writeHessianRequestMessage(buffer_, false, false, request_id);
+
+  DubboFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*mock_codec_filter, setDecoderFilterCallbacks(_))
+      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+  EXPECT_CALL(*mock_codec_filter, onMessageDecoded(_, _))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr) -> FilterStatus {
+        EXPECT_EQ(metadata->request_id(), request_id);
+        return FilterStatus::Continue;
+      }));
+
+  EXPECT_CALL(*mock_codec_filter, setEncoderFilterCallbacks(_)).Times(1);
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
+
+  writeHessianResponseMessage(write_buffer_, false, request_id);
+
+  callbacks->startUpstreamResponse();
+
+  EXPECT_EQ(callbacks->requestId(), request_id);
+  EXPECT_EQ(callbacks->connection(), &(filter_callbacks_.connection_));
+  EXPECT_GE(callbacks->streamId(), 0);
+
+  size_t expect_response_length = write_buffer_.length();
+  EXPECT_CALL(*mock_codec_filter, onMessageEncoded(_, _))
+      .WillOnce(
+          Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) -> FilterStatus {
+            EXPECT_EQ(metadata->request_id(), request_id);
+            EXPECT_EQ(ctx->message_size(), expect_response_length);
+            return FilterStatus::Continue;
+          }));
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_EQ(DubboFilters::UpstreamResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
+  EXPECT_CALL(*mock_codec_filter, onDestroy()).Times(1);
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.response_success").value());
 }
 
 } // namespace DubboProxy
