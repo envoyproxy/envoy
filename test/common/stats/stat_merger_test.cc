@@ -249,6 +249,25 @@ TEST_F(StatMergerThreadLocalTest, retainImportModeAfterMerge) {
   EXPECT_EQ(789 + 42, gauge.value());
 }
 
+// Verify that if we create a never import stat in the child process which then gets merged
+// from the parent, that we retain the import-mode, and don't accumulate the updated
+// value. https://github.com/envoyproxy/envoy/issues/7227
+TEST_F(StatMergerThreadLocalTest, retainNeverImportModeAfterMerge) {
+  Gauge& gauge = store_.gauge("mygauge", Gauge::ImportMode::NeverImport);
+  gauge.set(42);
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, gauge.importMode());
+  EXPECT_EQ(42, gauge.value());
+  {
+    StatMerger stat_merger(store_);
+    Protobuf::Map<std::string, uint64_t> counter_deltas;
+    Protobuf::Map<std::string, uint64_t> gauges;
+    gauges["mygauge"] = 789;
+    stat_merger.mergeStats(counter_deltas, gauges);
+  }
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, gauge.importMode());
+  EXPECT_EQ(42, gauge.value());
+}
+
 } // namespace
 } // namespace Stats
 } // namespace Envoy
