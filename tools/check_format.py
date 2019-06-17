@@ -733,8 +733,10 @@ def checkFormatVisitor(arg, dir_name, names):
 
   # Sanity check CODEOWNERS.  This doesn't need to be done in a multi-threaded
   # manner as it is a small and limited list.
-  if dir_name.startswith('./source/extensions/') and '/' in dir_name[20:]:
-    checkOwners(dir_name[9:], owned_directories, error_messages)
+  source_prefix =  './source/';
+  full_prefix = './source/extensions/';
+  if dir_name.startswith(full_prefix) and '/' in dir_name[len(full_prefix):]:
+    checkOwners(dir_name[len(source_prefix):], owned_directories, error_messages)
 
   for file_name in names:
     result = pool.apply_async(checkFormatReturnTraceOnError, args=(dir_name + "/" + file_name,))
@@ -809,8 +811,10 @@ if __name__ == "__main__":
   def ownedDirectories():
     owned = []
     try:
-      with open("./CODEOWNERS") as f:
+      with open('./CODEOWNERS') as f:
         for line in f:
+          # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
+          # name and store it in the list of directories with documented owners.
           m = re.search(r'..*(extensions[^@]* )@.*@.*', line)
           if m is not None:
             owned.append(m.group(1).strip())
