@@ -103,10 +103,17 @@ public:
   /**
    * Resume discovery requests for a given API type. This will send a discovery request if one would
    * have been sent during the pause.
-   * @param type_url type URL corresponding to xDS API,
-   * e.g.type.googleapis.com/envoy.api.v2.Cluster.
+   * @param type_url type URL corresponding to xDS API e.g. type.googleapis.com/envoy.api.v2.Cluster
    */
   virtual void resume(const std::string& type_url) PURE;
+
+  /**
+   * Retrieves the current pause state as set by pause()/resume().
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.api.v2.Cluster
+   * @return bool whether the API is paused.
+   */
+  virtual bool paused(const std::string& type_url) const PURE;
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;
