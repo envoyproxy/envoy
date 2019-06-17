@@ -1,0 +1,15 @@
+# We build upon the default config provided by https://github.com/arturbosch/detekt/blob/master/detekt-cli/src/main/resources/default-detekt-config.yml
+build:
+  maxIssues: 0
+
+processors:
+  active: true
+  exclude:
+
+console-reports:
+  active: true
+  exclude:
+
+style:
+  MagicNumber:
+    active: false

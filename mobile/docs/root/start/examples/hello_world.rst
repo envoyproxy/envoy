@@ -51,7 +51,7 @@ First, build the :ref:`android_aar` artifact (or download it from one of the rec
 Next, run the :repo:`sample app <examples/kotlin/hello_world>` using the following Bazel build rule.
 Make sure you have an Android simulator running already:
 
-``bazel mobile-install //examples/kotlin/hello_world:hello_envoy_kotlin --fat_apk_cpu=x86``
+``bazel mobile-install //examples/kotlin/hello_world:hello_envoy_kt --fat_apk_cpu=x86``
 
 You should see a new app installed on your simulator called ``Hello Envoy Kotlin``.
 Open it up, and requests will start flowing!
