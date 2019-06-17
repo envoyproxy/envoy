@@ -31,3 +31,23 @@ envoy_cc_library(
         "@com_googlesource_quiche//:quic_core_one_block_arena_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "envoy_quic_proof_source_lib",
+    hdrs = ["envoy_quic_fake_proof_source.h"],
+    external_deps = ["quiche_quic_platform"],
+    deps = [
+        "@com_googlesource_quiche//:quic_core_crypto_proof_source_lib",
+        "@com_googlesource_quiche//:quic_core_versions_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_quic_proof_verifier_lib",
+    hdrs = ["envoy_quic_fake_proof_verifier.h"],
+    external_deps = ["quiche_quic_platform"],
+    deps = [
+        "@com_googlesource_quiche//:quic_core_crypto_proof_verifier_lib",
+        "@com_googlesource_quiche//:quic_core_versions_lib",
+    ],
+)

@@ -23,3 +23,14 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "envoy_quic_proof_source_test",
+    srcs = ["envoy_quic_proof_source_test.cc"],
+    external_deps = ["quiche_quic_platform"],
+    deps = [
+        "//source/extensions/quic_listeners/quiche:envoy_quic_proof_source_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_proof_verifier_lib",
+        "@com_googlesource_quiche//:quic_core_versions_lib",
+    ],
+)

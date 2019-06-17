@@ -314,15 +314,36 @@ envoy_cc_test_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform_base",
-    srcs = [
-        "quiche/quic/platform/api/quic_ip_address.cc",
-        "quiche/quic/platform/api/quic_socket_address.cc",
+    name = "quic_platform_ip_address",
+    srcs = ["quiche/quic/platform/api/quic_ip_address.cc"],
+    hdrs = ["quiche/quic/platform/api/quic_ip_address.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_export",
+        ":quic_platform_ip_address_family",
+        ":quic_platform_logging",
     ],
+)
+
+envoy_cc_library(
+    name = "quic_platform_logging",
+    hdrs = [
+        "quiche/quic/platform/api/quic_bug_tracker.h",
+        "quiche/quic/platform/api/quic_logging.h",
+    ],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_logging_impl_lib"],
+)
+
+envoy_cc_library(
+    name = "quic_platform_base",
+    srcs = ["quiche/quic/platform/api/quic_socket_address.cc"],
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",
         "quiche/quic/platform/api/quic_arraysize.h",
-        "quiche/quic/platform/api/quic_bug_tracker.h",
         "quiche/quic/platform/api/quic_client_stats.h",
         "quiche/quic/platform/api/quic_containers.h",
         "quiche/quic/platform/api/quic_endian.h",
@@ -332,7 +353,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_flags.h",
         "quiche/quic/platform/api/quic_iovec.h",
-        "quiche/quic/platform/api/quic_ip_address.h",
         "quiche/quic/platform/api/quic_logging.h",
         "quiche/quic/platform/api/quic_map_util.h",
         "quiche/quic/platform/api/quic_mem_slice.h",
@@ -356,6 +376,8 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_export",
+        ":quic_platform_ip_address",
+        ":quic_platform_logging",
         ":quiche_common_lib",
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_logging_impl_lib",
@@ -458,6 +480,39 @@ envoy_cc_library(
         ":quic_core_error_codes_lib",
         ":quic_core_time_lib",
         ":quic_platform_base",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_core_crypto_proof_source_lib",
+    srcs = [
+        "quiche/quic/core/crypto/proof_source.cc",
+        "quiche/quic/core/crypto/quic_crypto_proof.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/crypto/proof_source.h",
+        "quiche/quic/core/crypto/quic_crypto_proof.h",
+    ],
+    copts = quiche_copt,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_versions_lib",
+        ":quic_platform_base",
+        ":quic_platform_export",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_core_crypto_proof_verifier_lib",
+    hdrs = ["quiche/quic/core/crypto/proof_verifier.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_versions_lib",
+        ":quic_platform_base",
+        ":quic_platform_export",
     ],
 )
 
