@@ -125,11 +125,10 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
 }
 
 std::string RequestParser::getTableNameFromTransactItem(const Json::Object& transact_item) {
-  Json::Object item{};
   std::string table_name = "";
   for (const std::string& operation : TRANSACT_ITEM_OPERATIONS) {
-    item = *transact_item.getObject(operation, true);
-    table_name = item.getString("TableName", "");
+    Json::ObjectSharedPtr item = transact_item.getObject(operation, true);
+    table_name = item->getString("TableName", "");
     if (table_name != "") {
       return table_name;
     }
