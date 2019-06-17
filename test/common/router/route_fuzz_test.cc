@@ -36,13 +36,19 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
   auto internal_only_headers = clean_config.mutable_internal_only_headers();
   std::for_each(internal_only_headers->begin(), internal_only_headers->end(),
                 [](std::string& n) { n = Fuzz::replaceInvalidCharacters(n); });
-  // Remove invalid characters in each virtual host.
+  // Remove invalid characters in each virtual host and in their routes' cluster header names.
   auto virtual_hosts = clean_config.mutable_virtual_hosts();
-  std::for_each(virtual_hosts->begin(), virtual_hosts->end(),
-                [](envoy::api::v2::route::VirtualHost& virtual_host) {
-                  virtual_host =
-                      replaceInvalidHeaders<envoy::api::v2::route::VirtualHost>(virtual_host);
-                });
+  std::for_each(
+      virtual_hosts->begin(), virtual_hosts->end(),
+      [](envoy::api::v2::route::VirtualHost& virtual_host) {
+        virtual_host = replaceInvalidHeaders<envoy::api::v2::route::VirtualHost>(virtual_host);
+        std::for_each(virtual_host.mutable_routes()->begin(), virtual_host.mutable_routes()->end(),
+                      [](envoy::api::v2::route::Route& route) {
+                        route.mutable_route()->set_cluster_header(
+                            Fuzz::replaceInvalidCharacters(route.route().cluster_header()));
+                      });
+      });
+
   return clean_config;
 }
 
