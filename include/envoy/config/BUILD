@@ -60,16 +60,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "subscription_state_interface",
-    hdrs = ["subscription_state.h"],
-    deps = [
-        ":subscription_interface",
-        "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:discovery_cc",
-    ],
-)
-
-envoy_cc_library(
     name = "typed_metadata_interface",
     hdrs = ["typed_metadata.h"],
     deps = [

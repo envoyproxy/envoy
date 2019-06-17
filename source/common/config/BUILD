@@ -102,8 +102,8 @@ envoy_cc_library(
     srcs = ["delta_subscription_state.cc"],
     hdrs = ["delta_subscription_state.h"],
     deps = [
+        ":pausable_ack_queue_lib",
         "//include/envoy/config:subscription_interface",
-        "//include/envoy/config:subscription_state_interface",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:backoff_lib",
@@ -276,8 +276,8 @@ envoy_cc_library(
     srcs = ["pausable_ack_queue.cc"],
     hdrs = ["pausable_ack_queue.h"],
     deps = [
-        "//include/envoy/config:subscription_state_interface",
         "//source/common/common:assert_lib",
+        "@envoy_api//envoy/api/v2:discovery_cc",
     ],
 )
 

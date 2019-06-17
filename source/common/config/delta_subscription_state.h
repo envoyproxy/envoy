@@ -2,13 +2,13 @@
 
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/subscription.h"
-#include "envoy/config/subscription_state.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/local_info/local_info.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/config/pausable_ack_queue.h"
 
 namespace Envoy {
 namespace Config {
