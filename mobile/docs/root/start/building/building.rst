@@ -17,6 +17,14 @@ Ensure that the ``envoy`` **submodule** is initialized when cloning by using ``-
 If the repo was not initially cloned recursively, initialize the Envoy
 submodule with ``git submodule update --init``.
 
+------------------
+Bazel requirements
+------------------
+
+Envoy-Mobile is compiled using Bazel 0.26.1.
+Take a look at our CI set up for :repo:`mac <ci/mac_ci_setup.sh>` and :repo:`linux <ci/linux_ci_setup.sh>`,
+in order to see how to install a specific Bazel version in your environment.
+
 --------------------
 Android requirements
 --------------------
@@ -26,7 +34,6 @@ Android requirements
    We are working to resolve this ASAP.
    More information in `this issue <https://github.com/lyft/envoy-mobile/issues/72>`_.
 
-- Bazel 0.26.0
 - Android SDK Platform 28
 - Android NDK 19.2.5345600
 
@@ -34,7 +41,6 @@ Android requirements
 iOS requirements
 ----------------
 
-- Bazel 0.26.0
 - Xcode 10.2.1
 - iOS 12.2 / Swift 5.0
 - Note: Requirements are listed in the :repo:`.bazelrc file <.bazelrc>`
