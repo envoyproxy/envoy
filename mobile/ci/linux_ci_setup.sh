@@ -24,9 +24,3 @@ sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-8 1
 wget -c https://github.com/bazelbuild/bazel/releases/download/0.26.1/bazel-0.26.1-installer-linux-x86_64.sh
 chmod +x bazel-0.26.1-installer-linux-x86_64.sh
 sudo ./bazel-0.26.1-installer-linux-x86_64.sh
-
-# ndk 20
-# wget -c https://dl.google.com/android/repository/android-ndk-r20-linux-x86_64.zip
-# unzip android-ndk-r20-linux-x86_64.zip
-# sudo rm -rf /usr/local/lib/android/sdk/ndk-bundle
-# sudo mv android-ndk-r20 /usr/local/lib/android/sdk/ndk-bundle
