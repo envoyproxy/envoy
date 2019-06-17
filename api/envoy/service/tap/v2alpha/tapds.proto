@@ -35,7 +35,7 @@ service TapDiscoveryService {
 // The filter TapDS config references this name.
 message TapResource {
   // The name of the tap configuration.
-  string name = 1;
+  string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Tap config to apply
   TapConfig config = 2;

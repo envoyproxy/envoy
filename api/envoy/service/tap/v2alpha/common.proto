@@ -27,14 +27,15 @@ message TapConfig {
   // a tap will occur and the data will be written to the configured output.
   OutputConfig output_config = 2 [(validate.rules).message.required = true];
 
-  // [#not-implemented-hide:] Specify if TAP is enabled. The % of requests\connections for which the
-  // filter is enabled.
+  // [#not-implemented-hide:] Specify if Tap matching is enabled. The % of requests\connections for
+  // which the tap matching is enabled. When not enabled, the request\connection will not be
+  // recorded.
   //
   // .. note::
   //
   //   This field defaults to 100/:ref:`HUNDRED
   //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
-  envoy.api.v2.core.RuntimeFractionalPercent filter_enabled = 3;
+  envoy.api.v2.core.RuntimeFractionalPercent tap_enabled = 3;
 
   // [#comment:TODO(mattklein123): Rate limiting]
 }
@@ -76,15 +77,7 @@ message MatchPredicate {
 
     // HTTP response trailers match configuration.
     HttpHeadersMatch http_response_trailers_match = 8;
-
-    // The destination cluster match configuration.
-    ClusterMatch destination_cluster_match = 9;
   }
-}
-
-message ClusterMatch {
-  // Match cluster name to these patterns.
-  envoy.type.matcher.ListStringMatcher clusters = 1;
 }
 
 // HTTP headers match configuration.

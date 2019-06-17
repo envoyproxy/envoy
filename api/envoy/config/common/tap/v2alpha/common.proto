@@ -18,11 +18,11 @@ message CommonExtensionConfig {
 
   // [#not-implemented-hide:]
   message TapDSConfig {
-    // Configuration for the source of EDS updates for this Cluster.
+    // Configuration for the source of TapDS updates for this Cluster.
     envoy.api.v2.core.ConfigSource config_source = 1;
 
     // Tap config to request from XDS server.
-    string name = 2;
+    string name = 2 [(validate.rules).string.min_bytes = 1];
   }
 
   oneof config_type {
