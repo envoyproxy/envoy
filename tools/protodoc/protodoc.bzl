@@ -67,7 +67,7 @@ def _proto_doc_aspect_impl(target, ctx):
     ctx.actions.run(
         executable = ctx.executable._protoc,
         arguments = args,
-        inputs = target[ProtoInfo].transitive_sources.to_list(),
+        inputs = target[ProtoInfo].transitive_sources,
         tools = [ctx.executable._protodoc],
         outputs = outputs,
         mnemonic = "ProtoDoc",
