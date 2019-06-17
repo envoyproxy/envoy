@@ -205,6 +205,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/04/27  6733     50213               Use SymbolTable API for HTTP codes
   // 2019/05/31  6866     50157               libstdc++ upgrade in CI
   // 2019/06/03  7199     49393               absl update
+  // 2019/06/06  7208     49650               make memory targets approximate
   // 2019/06/03  7243     49412       49700   macros for exact/upper-bound memory checks
 
   EXPECT_MEMORY_EQ(m_per_cluster, 49412);
