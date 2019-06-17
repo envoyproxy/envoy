@@ -62,6 +62,12 @@ origin as the target but there are use cases where that may not be possible.
 For example, if you are hosting a static site on a third-party vendor but need
 to make requests for tracking purposes.
 
+.. warning::
+
+  Additional origins can be either an exact string, regex pattern, prefix string,
+  or suffix string. It's advised to be cautious when adding regex, prefix, or suffix
+  origins since an ambiguous origin can pose a security vulnerability.
+
 .. _csrf-runtime:
 
 Runtime
