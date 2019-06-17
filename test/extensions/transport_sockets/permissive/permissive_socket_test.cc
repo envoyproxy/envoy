@@ -9,6 +9,8 @@
 #include "test/mocks/network/mocks.h"
 
 using testing::_;
+using ::testing::InSequence;
+using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
@@ -72,8 +74,8 @@ public:
 class PermissiveSocketTest : public testing::Test {
 protected:
   PermissiveSocketTest()
-      : raw_buffer_transport_socket_(new MockRawBufferTransportSocket),
-        ssl_transport_socket_(new MockSslTransportSocket) {
+      : raw_buffer_transport_socket_(new NiceMock<MockRawBufferTransportSocket>),
+        ssl_transport_socket_(new NiceMock<MockSslTransportSocket>) {
     auto unique_raw_buffer_transport_socket =
         std::unique_ptr<MockRawBufferTransportSocket>(raw_buffer_transport_socket_);
     auto unique_ssl_transport_socket =
@@ -100,6 +102,8 @@ protected:
 };
 
 TEST_F(PermissiveSocketTest, DowngradeOnWrite) {
+  InSequence s;
+
   EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
 
   Network::IoResult io_result = {Network::PostIoAction::Close, 0, false};
@@ -115,6 +119,8 @@ TEST_F(PermissiveSocketTest, DowngradeOnWrite) {
 }
 
 TEST_F(PermissiveSocketTest, DowngradeOnRead) {
+  InSequence s;
+
   EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
 
   Network::IoResult io_result = {Network::PostIoAction::Close, 0, false};
@@ -128,6 +134,8 @@ TEST_F(PermissiveSocketTest, DowngradeOnRead) {
 }
 
 TEST_F(PermissiveSocketTest, DoNotDowngradeWhenHandShakeNotCompleteSocketKeepOpen) {
+  InSequence s;
+
   EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
 
   Network::IoResult io_result = {Network::PostIoAction::KeepOpen, 0, false};
@@ -142,6 +150,8 @@ TEST_F(PermissiveSocketTest, DoNotDowngradeWhenHandShakeNotCompleteSocketKeepOpe
 }
 
 TEST_F(PermissiveSocketTest, DoNotDowngradeWhenHandShakeCompleteSocketClosed) {
+  InSequence s;
+
   EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
 
   Network::IoResult io_result = {Network::PostIoAction::Close, 0, false};
@@ -156,6 +166,8 @@ TEST_F(PermissiveSocketTest, DoNotDowngradeWhenHandShakeCompleteSocketClosed) {
 }
 
 TEST_F(PermissiveSocketTest, ProtocolBeforeAndAfterDowngrade) {
+  InSequence s;
+
   EXPECT_CALL(*ssl_transport_socket_, protocol()).WillOnce(Return("h2"));
   EXPECT_EQ("h2", permissive_transport_socket_->protocol());
 
@@ -165,6 +177,8 @@ TEST_F(PermissiveSocketTest, ProtocolBeforeAndAfterDowngrade) {
 }
 
 TEST_F(PermissiveSocketTest, FailureReasonBeforeAndAfterDowngrade) {
+  InSequence s;
+
   std::string reason = "connection failure";
   EXPECT_CALL(*ssl_transport_socket_, failureReason()).WillOnce(Return(reason));
   EXPECT_EQ(reason, permissive_transport_socket_->failureReason());
@@ -176,6 +190,8 @@ TEST_F(PermissiveSocketTest, FailureReasonBeforeAndAfterDowngrade) {
 }
 
 TEST_F(PermissiveSocketTest, OnConnectedBeforeAndAfterDowngrade) {
+  InSequence s;
+
   EXPECT_CALL(*ssl_transport_socket_, onConnected()).Times(1);
   permissive_transport_socket_->onConnected();
 
@@ -186,6 +202,8 @@ TEST_F(PermissiveSocketTest, OnConnectedBeforeAndAfterDowngrade) {
 }
 
 TEST_F(PermissiveSocketTest, CanFlushCloseBeforeAndAfterDowngrade) {
+  InSequence s;
+
   EXPECT_CALL(*ssl_transport_socket_, canFlushClose()).Times(1);
   permissive_transport_socket_->canFlushClose();
 
@@ -196,6 +214,8 @@ TEST_F(PermissiveSocketTest, CanFlushCloseBeforeAndAfterDowngrade) {
 }
 
 TEST_F(PermissiveSocketTest, CloseSocketBeforeAndAfterDowngrade) {
+  InSequence s;
+
   EXPECT_CALL(*ssl_transport_socket_, closeSocket(Network::ConnectionEvent::LocalClose)).Times(1);
   permissive_transport_socket_->closeSocket(Network::ConnectionEvent::LocalClose);
 
@@ -207,6 +227,8 @@ TEST_F(PermissiveSocketTest, CloseSocketBeforeAndAfterDowngrade) {
 }
 
 TEST_F(PermissiveSocketTest, CheckSslBeforeAndAfterDowngrade) {
+  InSequence s;
+
   EXPECT_CALL(*ssl_transport_socket_, ssl()).WillOnce(Return(ssl_transport_socket_));
   EXPECT_NE(nullptr, permissive_transport_socket_->ssl());
 
