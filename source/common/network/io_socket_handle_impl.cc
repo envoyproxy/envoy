@@ -159,7 +159,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cms
 #ifndef IP_RECVDSTADDR
         info->ipi_addr;
 #else
-        addr;
+        *addr;
 #endif
     ipv4_addr.sin_port = htons(self_port);
     return Address::addressFromSockAddr(reinterpret_cast<sockaddr_storage&>(ipv4_addr),
