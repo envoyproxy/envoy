@@ -70,6 +70,7 @@ envoy_cc_library(
     name = "null_counter_lib",
     hdrs = ["null_counter.h"],
     deps = [
+        ":metric_impl_lib",
         ":symbol_table_lib",
         "//include/envoy/stats:stats_interface",
     ],
@@ -79,6 +80,7 @@ envoy_cc_library(
     name = "null_gauge_lib",
     hdrs = ["null_gauge.h"],
     deps = [
+        ":metric_impl_lib",
         ":symbol_table_lib",
         "//include/envoy/stats:stats_interface",
     ],
