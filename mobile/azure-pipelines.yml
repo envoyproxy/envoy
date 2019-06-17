@@ -36,7 +36,7 @@ jobs:
     steps:
       - checkout: self
         submodules: true
-      - script: ./envoy/ci/mac_ci_setup.sh
+      - script: ./ci/mac_ci_setup.sh
         displayName: 'Install dependencies'
       - script: bazel build --config=ios //:ios_dist
         displayName: 'Build Envoy.framework distributable'
@@ -53,7 +53,7 @@ jobs:
     steps:
       - checkout: self
         submodules: true
-      - script: ./envoy/ci/mac_ci_setup.sh
+      - script: ./ci/mac_ci_setup.sh
         displayName: 'Install dependencies'
       - script: mkdir -p dist/Envoy.framework
         displayName: 'Create directory for distributable'
@@ -72,7 +72,7 @@ jobs:
     steps:
       - checkout: self
         submodules: true
-      - script: ./envoy/ci/mac_ci_setup.sh
+      - script: ./ci/mac_ci_setup.sh
         displayName: 'Install dependencies'
       - script: mkdir -p dist/Envoy.framework
         displayName: 'Create directory for distributable'
