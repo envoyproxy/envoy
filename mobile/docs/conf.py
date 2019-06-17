@@ -72,7 +72,7 @@ extlinks = {
     'repo': ('https://github.com/lyft/envoy-mobile/blob/{}/%s'.format(blob_sha), ''),
 }
 
-# Setup global substitutions
+# Set up global substitutions
 # substitutions = []
 
 # Add any paths that contain templates here, relative to this directory.

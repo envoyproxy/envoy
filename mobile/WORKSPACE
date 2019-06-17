@@ -96,7 +96,7 @@ git_repository(
 # https://github.com/keith/rules_kotlin/blob/master/LICENSE
 git_repository(
     name = "io_bazel_rules_kotlin",
-    commit = "af3dea0853f2821e7ece6e028fad57bcd6ce2831", # from branch ks/bazel-fixups
+    commit = "af3dea0853f2821e7ece6e028fad57bcd6ce2831",  # from branch ks/bazel-fixups
     remote = "https://github.com/keith/rules_kotlin.git",
     shallow_since = "1544305265 -0800",
 )
