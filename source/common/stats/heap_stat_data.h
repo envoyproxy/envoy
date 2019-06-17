@@ -2,17 +2,14 @@
 
 #pragma once
 
-#include <string>
 #include <vector>
 
 #include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/symbol_table.h"
 
-#include "common/common/assert.h"
 #include "common/stats/metric_impl.h"
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 
@@ -20,9 +17,9 @@ namespace Envoy {
 namespace Stats {
 
 /**
- * This structure holds backing store for both CounterImpl and GaugeImpl,
- * counters and gauges allocated with the same name from different scopes
- * to share the same value.
+ * Holds backing store for both CounterImpl and GaugeImpl. This provides a level
+ * of indirection needed to enable stats created with the same name from
+ * different scopes to share the same value.
  */
 struct HeapStatData : public InlineStorage {
 private:
@@ -54,13 +51,15 @@ public:
                                const std::vector<Tag>& tags) override;
   GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
                            const std::vector<Tag>& tags, Gauge::ImportMode import_mode) override;
+  SymbolTable& symbolTable() override { return symbol_table_; }
+  const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
 #endif
 
-  SymbolTable& symbolTable() override { return symbol_table_; }
-  const SymbolTable& constSymbolTable() const override { return symbol_table_; }
+  HeapStatData& alloc(StatName name);
+  void free(HeapStatData& data);
 
 private:
   struct HeapStatHash {
@@ -70,52 +69,11 @@ private:
     bool operator()(const HeapStatData* a, const HeapStatData* b) const { return *a == *b; }
   };
 
-  HeapStatData& alloc(StatName name);
-  void free(HeapStatData& data);
-
   // An unordered set of HeapStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher, which key off of the
   // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
   using StatSet = absl::flat_hash_set<HeapStatData*, HeapStatHash, HeapStatCompare>;
   StatSet stats_ GUARDED_BY(mutex_);
-
-  friend class CounterImpl;
-  friend class GaugeImpl;
-
-  /*
-  void freeCounter(StatName stat_name);
-  void freeGauge(StatName stat_name);
-
-  template<class StatType> struct StatHash {
-    // See description for HeterogeneousStatNameHash::is_transparent.
-    using is_transparent = void;
-    using WeakStat = std::weak_ptr<StatType>;
-
-    size_t operator()(const WeakStat& a) const { return a.lock()->statName().hash(); }
-    size_t operator()(StatName a) const { return a.hash(); }
-  };
-
-  template<class StatType> struct StatCompare {
-    // See description for HeterogeneousStatNameHash::is_transparent.
-    using is_transparent = void;
-    using WeakStat = std::weak_ptr<StatType>;
-
-    size_t operator()(const WeakStat& a, const WeakStat& b) const {
-      return a.lock()->statName() == b.lock()->statName();
-    }
-    size_t operator()(StatName a, const WeakStat& b) const { return a == b.lock()->statName(); }
-    size_t operator()(const WeakStat& a, StatName b) const { return a.lock()->statName() == b; }
-  };
-
-  template <class StatType> using StatSet = absl::flat_hash_set<
-      std::weak_ptr<StatType>, StatHash<StatType>, StatCompare<StatType>>;
-
-  // An unordered map of StatNameStorage to shared pointers to metrics.
-  // field in each object. This necessitates a custom comparator and hasher, which key off of the
-  // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
-  StatSet<Counter> counters_ GUARDED_BY(mutex_);
-  StatSet<Gauge> gauges_ GUARDED_BY(mutex_);
-  */
 
   SymbolTable& symbol_table_;
 
