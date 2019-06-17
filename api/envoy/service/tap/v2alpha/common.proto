@@ -173,7 +173,7 @@ message OutputSink {
     FilePerTapSink file_per_tap = 3;
 
     // [#not-implemented-hide:]
-    // GrpcService to send data to. format argument must be PROTO_BINARY grpc_service output stream.
+    // GrpcService to stream data to. format argument must be PROTO_BINARY.
     StreamingGrpcSink streaming_grpc = 4;
   }
 }
@@ -196,6 +196,6 @@ message StreamingGrpcSink {
   // Opaque identifier, that will be sent back to the streaming grpc server.
   string tap_id = 1;
 
-  // GrpcService to send data to. format argument must be PROTO_BINARY grpc_service output stream.
+  // The gRPC server that hosts the Tap Sink Service.
   envoy.api.v2.core.GrpcService grpc_service = 2 [(validate.rules).message.required = true];
 }
