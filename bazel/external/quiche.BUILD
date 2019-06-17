@@ -321,31 +321,31 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
+        ":quic_platform_base",
         ":quic_platform_export",
         ":quic_platform_ip_address_family",
-        ":quic_platform_logging",
     ],
 )
 
 envoy_cc_library(
-    name = "quic_platform_logging",
-    hdrs = [
-        "quiche/quic/platform/api/quic_bug_tracker.h",
-        "quiche/quic/platform/api/quic_logging.h",
-    ],
+    name = "quic_platform_socket_address",
+    srcs = ["quiche/quic/platform/api/quic_socket_address.cc"],
+    hdrs = ["quiche/quic/platform/api/quic_socket_address.h"],
+    copts = quiche_copt,
     repository = "@envoy",
     visibility = ["//visibility:public"],
-    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_logging_impl_lib"],
+    deps = [
+        ":quic_platform_export",
+        ":quic_platform_ip_address",
+    ],
 )
 
 envoy_cc_library(
     name = "quic_platform_base",
-    srcs = [
-        "quiche/quic/platform/api/quic_socket_address.cc",
-    ],
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",
         "quiche/quic/platform/api/quic_arraysize.h",
+        "quiche/quic/platform/api/quic_bug_tracker.h",
         "quiche/quic/platform/api/quic_client_stats.h",
         "quiche/quic/platform/api/quic_containers.h",
         "quiche/quic/platform/api/quic_endian.h",
@@ -356,6 +356,7 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_flags.h",
         "quiche/quic/platform/api/quic_iovec.h",
+        "quiche/quic/platform/api/quic_logging.h",
         "quiche/quic/platform/api/quic_macros.h",
         "quiche/quic/platform/api/quic_map_util.h",
         "quiche/quic/platform/api/quic_mem_slice.h",
@@ -364,7 +365,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_ptr_util.h",
         "quiche/quic/platform/api/quic_reference_counted.h",
         "quiche/quic/platform/api/quic_server_stats.h",
-        "quiche/quic/platform/api/quic_socket_address.h",
         "quiche/quic/platform/api/quic_stack_trace.h",
         "quiche/quic/platform/api/quic_str_cat.h",
         "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
@@ -380,8 +380,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_export",
-        ":quic_platform_ip_address",
-        ":quic_platform_logging",
         ":quiche_common_lib",
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_logging_impl_lib",
@@ -684,6 +682,7 @@ envoy_cc_library(
         ":quic_core_types_lib",
         ":quic_core_versions_lib",
         ":quic_platform_base",
+        ":quic_platform_socket_address",
     ],
 )
 

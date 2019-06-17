@@ -356,8 +356,10 @@ TEST_F(QuicPlatformTest, QuicLog) {
 }
 
 TEST_F(QuicPlatformTest, QuicLogVector) {
+  ASSERT_EQ(ERROR, GetLogger().level());
+
   std::vector<int32_t> v = {1, 2, 3, 4, 5};
-  EXPECT_LOG_CONTAINS("info", "vector { 1, 2, 3, 4, 5 }", QUIC_LOG(INFO) << v);
+  EXPECT_LOG_CONTAINS("error", "vector { 1, 2, 3, 4, 5 }", QUIC_LOG(ERROR) << v);
 }
 
 #ifdef NDEBUG

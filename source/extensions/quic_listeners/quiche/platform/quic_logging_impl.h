@@ -16,6 +16,7 @@
 #include "common/common/logger.h"
 
 #include "absl/base/optimization.h"
+#include "absl/strings/str_join.h"
 #include "absl/synchronization/mutex.h"
 
 // This implementation is only used by Quiche code, use macros provided by
@@ -182,16 +183,7 @@ QuicLogSink* SetLogSink(QuicLogSink* new_sink);
 
 // Overload std::operator<< to output a vector.
 template <class T> std::ostream& operator<<(std::ostream& out, const std::vector<T>& v) {
-  out << "vector { ";
-  size_t i = 0;
-  for (; i < v.size() - 1; ++i) {
-    T item = v[i];
-    out << item << ", ";
-  }
-  if (v.size() > 0) {
-    out << v[i];
-  }
-  out << " }";
+  out << "vector { " << absl::StrJoin(v, ", ", absl::StreamFormatter()) << " }";
   return out;
 }
 
