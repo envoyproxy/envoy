@@ -68,8 +68,8 @@ public:
    * @param srv_records supplies the list of resolved SRV records. The list will be empty if the
    *        resolution failed.
    */
-  typedef std::function<void(const std::list<Address::SrvInstanceConstSharedPtr>&& srv_records)>
-      ResolveSrvCb;
+  using ResolveSrvCb =
+      std::function<void(const std::list<Address::SrvInstanceConstSharedPtr>&& srv_records)>;
 
   /**
    * Initiate an async DNS resolution for an SRV record.
