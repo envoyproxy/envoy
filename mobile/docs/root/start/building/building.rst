@@ -20,6 +20,11 @@ submodule with ``git submodule update --init``.
 Android requirements
 --------------------
 
+.. attention::
+   Android currently fails to build on macOS.
+   We are working to resolve this ASAP.
+   More information in `this issue <https://github.com/lyft/envoy-mobile/issues/72>`_.
+
 - Bazel 0.26.0
 - Android SDK Platform 28
 - Android NDK 19.2.5345600
