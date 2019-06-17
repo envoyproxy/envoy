@@ -40,10 +40,10 @@ public:
         envoy::type::FractionalPercent::HUNDRED);
     shadow_enabled->set_runtime_key("csrf.shadow_enabled");
 
-    const auto& add_exact_origin = policy.mutable_additional_origins()->add_patterns();
+    const auto& add_exact_origin = policy.mutable_additional_origins()->Add();
     add_exact_origin->set_exact("additionalhost");
 
-    const auto& add_regex_origin = policy.mutable_additional_origins()->add_patterns();
+    const auto& add_regex_origin = policy.mutable_additional_origins()->Add();
     add_regex_origin->set_regex(R"(www\-[0-9]\.allow\.com)");
 
     return std::make_shared<CsrfFilterConfig>(policy, "test", stats_, runtime_);

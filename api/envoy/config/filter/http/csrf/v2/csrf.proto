@@ -47,5 +47,5 @@ message CsrfPolicy {
   //
   // More information on how this can be configured via runtime can be found
   // :ref:`here <csrf-configuration>`.
-  envoy.type.matcher.ListStringMatcher additional_origins = 3;
+  repeated envoy.type.matcher.StringMatcher additional_origins = 3;
 }

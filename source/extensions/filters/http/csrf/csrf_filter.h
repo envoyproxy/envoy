@@ -38,7 +38,7 @@ class CsrfPolicy : public Router::RouteSpecificFilterConfig {
 public:
   CsrfPolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
              Runtime::Loader& runtime) : policy_(policy), runtime_(runtime) {
-    for (const auto& additional_origin : policy.additional_origins().patterns()) {
+    for (const auto& additional_origin : policy.additional_origins()) {
       additional_origins_.emplace_back(Matchers::StringMatcher(additional_origin));
     }
   }

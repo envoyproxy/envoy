@@ -77,8 +77,7 @@ static_resources:
                         numerator: 100
                         denominator: HUNDRED
                     additional_origins:
-                    - origin: .*
-                      type: REGEX
+                    - regex: .*
               - match:
                   prefix: "/"
                 route:
