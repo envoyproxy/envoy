@@ -358,6 +358,8 @@ An example minimal ``bootstrap.yaml`` fragment for ADS configuration is:
     admin:
       ...
 
+.. _xds_protocol_delta:
+
 Incremental xDS
 ~~~~~~~~~~~~~~~
 
