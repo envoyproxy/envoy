@@ -6,8 +6,9 @@ Building
 .. _building_requirements:
 
 In order to compile the artifacts used by the Envoy Mobile library,
-your system must also meet
-`these requirements for building Envoy <https://github.com/envoyproxy/envoy/tree/master/bazel>`_.
+your system must also be set up for building Envoy. To get started, you can use
+`this quick start guide
+<https://github.com/envoyproxy/envoy/tree/master/bazel#quick-start-bazel-build-for-developers>`_.
 
 Ensure that the ``envoy`` **submodule** is initialized when cloning by using ``--recursive``:
 
