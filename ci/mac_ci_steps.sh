@@ -14,7 +14,7 @@ df -h
 . "$(dirname "$0")"/setup_cache.sh
 
 BAZEL_BUILD_OPTIONS="--curses=no --show_task_finish --verbose_failures ${BAZEL_BUILD_EXTRA_OPTIONS} \
-  --action_env=PATH=/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
+  --action_env=PATH=/usr/local/bin:/opt/local/bin:/usr/bin:/bin --host_force_python=PY2"
 # TODO(zuercher): remove --flaky_test_attempts when https://github.com/envoyproxy/envoy/issues/2428
 # is resolved.
 BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_output=all --flaky_test_attempts=integration@2"
