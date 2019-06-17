@@ -284,7 +284,6 @@ WS
 Welford's
 Werror
 XDS
-iter
 sendto
 vip
 xDSes

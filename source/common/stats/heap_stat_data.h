@@ -46,6 +46,9 @@ public:
   HeapStatDataAllocator(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   ~HeapStatDataAllocator() override;
 
+  HeapStatData& alloc(StatName name);
+  void free(HeapStatData& data);
+
   // StatDataAllocator
   CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
                                const std::vector<Tag>& tags) override;
@@ -57,9 +60,6 @@ public:
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
 #endif
-
-  HeapStatData& alloc(StatName name);
-  void free(HeapStatData& data);
 
 private:
   struct HeapStatHash {

@@ -216,7 +216,6 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/06/03  7199     49393               absl update
   // 2019/06/06  7208     49650               make memory targets approximate
 
-  // EXPECT_LE(m_per_cluster, 54000);
   EXPECT_LE(m_per_cluster, 49650);
 }
 
