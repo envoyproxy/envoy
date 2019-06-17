@@ -181,10 +181,4 @@ public:
 // Return the previous sink.
 QuicLogSink* SetLogSink(QuicLogSink* new_sink);
 
-// Overload std::operator<< to output a vector.
-template <class T> std::ostream& operator<<(std::ostream& out, const std::vector<T>& v) {
-  out << "vector { " << absl::StrJoin(v, ", ", absl::StreamFormatter()) << " }";
-  return out;
-}
-
 } // namespace quic

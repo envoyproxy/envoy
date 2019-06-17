@@ -355,13 +355,6 @@ TEST_F(QuicPlatformTest, QuicLog) {
   EXPECT_EQ(3, i);
 }
 
-TEST_F(QuicPlatformTest, QuicLogVector) {
-  ASSERT_EQ(ERROR, GetLogger().level());
-
-  std::vector<int32_t> v = {1, 2, 3, 4, 5};
-  EXPECT_LOG_CONTAINS("error", "vector { 1, 2, 3, 4, 5 }", QUIC_LOG(ERROR) << v);
-}
-
 #ifdef NDEBUG
 #define VALUE_BY_COMPILE_MODE(debug_mode_value, release_mode_value) release_mode_value
 #else
