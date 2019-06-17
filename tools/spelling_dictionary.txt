@@ -300,6 +300,7 @@ abcd
 absl
 accessor
 accessors
+acks
 acls
 addr
 agg
@@ -604,6 +605,7 @@ params
 paren
 parentid
 parsers
+pausable
 pcall
 pcap
 pclose

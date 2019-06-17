@@ -93,9 +93,6 @@ void NewGrpcMuxImpl::kickOffAck(UpdateAck ack) {
 // TODO TODO but yeah this should just be gone!!!!!!!!!
 GrpcMuxWatchPtr NewGrpcMuxImpl::subscribe(const std::string&, const std::set<std::string>&,
                                           GrpcMuxCallbacks&) {
-  // not sure what GrpcMuxCallbacks is for, but we need a SubscriptionCallbacks here, so......
-  //   return std::make_unique<TokenizedGrpcMuxWatch>(*this, addWatch(type_url, resources,
-  //   callbacks));
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
