@@ -4,7 +4,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/watch_map.h"
+#include "common/config/watch_map_impl.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/test_common/utility.h"
@@ -93,7 +93,7 @@ wrapInResource(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& anys,
 
 // Similar to expectDeltaAndSotwUpdate(), but making the onConfigUpdate() happen, rather than
 // EXPECTing it.
-void doDeltaAndSotwUpdate(WatchMap& watch_map,
+void doDeltaAndSotwUpdate(WatchMapImpl& watch_map,
                           Protobuf::RepeatedPtrField<ProtobufWkt::Any> sotw_resources,
                           std::vector<std::string> removed_names, std::string version) {
   watch_map.onConfigUpdate(sotw_resources, version);
@@ -110,9 +110,9 @@ void doDeltaAndSotwUpdate(WatchMap& watch_map,
 // Tests the simple case of a single watch. Checks that the watch will not be told of updates to
 // resources it doesn't care about. Checks that the watch can later decide it does care about them,
 // and then receive subsequent updates to them.
-TEST(WatchMapTest, Basic) {
+TEST(WatchMapImplTest, Basic) {
   NamedMockSubscriptionCallbacks callbacks;
-  WatchMap watch_map;
+  WatchMapImpl watch_map;
   WatchPtr watch = watch_map.addWatch(callbacks);
 
   {
@@ -175,10 +175,10 @@ TEST(WatchMapTest, Basic) {
 // Second watch also loses interest ==> "remove it from subscription"
 // NOTE: we need the resource name "dummy" to keep either watch from ever having no names watched,
 // which is treated as interest in all names.
-TEST(WatchMapTest, Overlap) {
+TEST(WatchMapImplTest, Overlap) {
   NamedMockSubscriptionCallbacks callbacks1;
   NamedMockSubscriptionCallbacks callbacks2;
-  WatchMap watch_map;
+  WatchMapImpl watch_map;
   WatchPtr watch1 = watch_map.addWatch(callbacks1);
   WatchPtr watch2 = watch_map.addWatch(callbacks2);
 
@@ -237,10 +237,10 @@ TEST(WatchMapTest, Overlap) {
 // Second watch on that name ==> "add it to subscription"
 // NOTE: we need the resource name "dummy" to keep either watch from ever having no names watched,
 // which is treated as interest in all names.
-TEST(WatchMapTest, AddRemoveAdd) {
+TEST(WatchMapImplTest, AddRemoveAdd) {
   NamedMockSubscriptionCallbacks callbacks1;
   NamedMockSubscriptionCallbacks callbacks2;
-  WatchMap watch_map;
+  WatchMapImpl watch_map;
   WatchPtr watch1 = watch_map.addWatch(callbacks1);
   WatchPtr watch2 = watch_map.addWatch(callbacks2);
 
@@ -286,9 +286,9 @@ TEST(WatchMapTest, AddRemoveAdd) {
 }
 
 // Tests that nothing breaks if an update arrives that we entirely do not care about.
-TEST(WatchMapTest, UninterestingUpdate) {
+TEST(WatchMapImplTest, UninterestingUpdate) {
   NamedMockSubscriptionCallbacks callbacks;
-  WatchMap watch_map;
+  WatchMapImpl watch_map;
   WatchPtr watch = watch_map.addWatch(callbacks);
   watch_map.updateWatchInterest(watch.get(), {"alice"});
 
@@ -318,10 +318,10 @@ TEST(WatchMapTest, UninterestingUpdate) {
 
 // Tests that a watch that specifies no particular resource interest is treated as interested in
 // everything.
-TEST(WatchMapTest, WatchingEverything) {
+TEST(WatchMapImplTest, WatchingEverything) {
   NamedMockSubscriptionCallbacks callbacks1;
   NamedMockSubscriptionCallbacks callbacks2;
-  WatchMap watch_map;
+  WatchMapImpl watch_map;
   WatchPtr watch1 = watch_map.addWatch(callbacks1);
   WatchPtr watch2 = watch_map.addWatch(callbacks2);
   // watch1 never specifies any names, and so is treated as interested in everything.
@@ -351,11 +351,11 @@ TEST(WatchMapTest, WatchingEverything) {
 // exercise those cases. Also, the removal-only case tests that SotW does call a watch's
 // onConfigUpdate even if none of the watch's interested resources are among the updated resources.
 // (Which ensures we deliver empty config updates when a resource is dropped.)
-TEST(WatchMapTest, DeltaOnConfigUpdate) {
+TEST(WatchMapImplTest, DeltaOnConfigUpdate) {
   NamedMockSubscriptionCallbacks callbacks1;
   NamedMockSubscriptionCallbacks callbacks2;
   NamedMockSubscriptionCallbacks callbacks3;
-  WatchMap watch_map;
+  WatchMapImpl watch_map;
   WatchPtr watch1 = watch_map.addWatch(callbacks1);
   WatchPtr watch2 = watch_map.addWatch(callbacks2);
   WatchPtr watch3 = watch_map.addWatch(callbacks3);
