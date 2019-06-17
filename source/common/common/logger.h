@@ -20,8 +20,10 @@ namespace Envoy {
 namespace Logger {
 
 // clang-format off
+// TODO: find out a way for extensions to register new logger IDs
 #define ALL_LOGGER_IDS(FUNCTION) \
   FUNCTION(admin)                \
+  FUNCTION(aws)                  \
   FUNCTION(assert)               \
   FUNCTION(backtrace)            \
   FUNCTION(client)               \

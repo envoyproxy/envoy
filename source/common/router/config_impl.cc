@@ -366,6 +366,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       prefix_rewrite_(route.route().prefix_rewrite()), host_rewrite_(route.route().host_rewrite()),
       vhost_(vhost),
       auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
+      auto_host_rewrite_header_(!route.route().auto_host_rewrite_header().empty()
+                                    ? absl::optional<Http::LowerCaseString>(Http::LowerCaseString(
+                                          route.route().auto_host_rewrite_header()))
+                                    : absl::nullopt),
       cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
@@ -513,6 +517,14 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
   vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, stream_info);
   if (!host_rewrite_.empty()) {
     headers.Host()->value(host_rewrite_);
+  } else if (auto_host_rewrite_header_) {
+    Http::HeaderEntry* header = headers.get(*auto_host_rewrite_header_);
+    if (header != nullptr) {
+      absl::string_view header_value = header->value().getStringView();
+      if (!header_value.empty()) {
+        headers.Host()->value(header_value);
+      }
+    }
   }
 
   // Handle path rewrite
