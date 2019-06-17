@@ -93,7 +93,7 @@ wrapInResource(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& anys,
 
 // Similar to expectDeltaAndSotwUpdate(), but making the onConfigUpdate() happen, rather than
 // EXPECTing it.
-void doDeltaAndSotwUpdate(WatchMapImpl& watch_map,
+void doDeltaAndSotwUpdate(SubscriptionCallbacks& watch_map,
                           Protobuf::RepeatedPtrField<ProtobufWkt::Any> sotw_resources,
                           std::vector<std::string> removed_names, std::string version) {
   watch_map.onConfigUpdate(sotw_resources, version);

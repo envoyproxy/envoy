@@ -57,6 +57,7 @@ public:
   // updateWatchInterest().
   void removeWatch(Watch* watch) override;
 
+private:
   // SubscriptionCallbacks
   virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                               const std::string& version_info) override;
@@ -71,7 +72,6 @@ public:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
-private:
   // Given a list of names that are new to an individual watch, returns those names that are in fact
   // new to the entire subscription.
   std::set<std::string> findAdditions(const std::vector<std::string>& newly_added_to_watch,
