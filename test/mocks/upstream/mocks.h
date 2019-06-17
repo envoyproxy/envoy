@@ -304,7 +304,7 @@ public:
                     ClusterWarmingCallback cluster_warming_cb));
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_METHOD0(clusters, ClusterInfoMap());
-  MOCK_METHOD1(get, ThreadLocalCluster*(const std::string& cluster));
+  MOCK_METHOD1(get, ThreadLocalCluster*(absl::string_view cluster));
   MOCK_METHOD4(httpConnPoolForCluster,
                Http::ConnectionPool::Instance*(const std::string& cluster,
                                                ResourcePriority priority, Http::Protocol protocol,
@@ -328,6 +328,7 @@ public:
   MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks_,
                ClusterUpdateCallbacksHandle*(ClusterUpdateCallbacks& callbacks));
   MOCK_CONST_METHOD0(warmingClusterCount, std::size_t());
+  MOCK_METHOD0(subscriptionFactory, Config::SubscriptionFactory&());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
@@ -338,6 +339,7 @@ public:
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   std::string local_cluster_name_;
   NiceMock<MockClusterManagerFactory> cluster_manager_factory_;
+  NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
 };
 
 class MockHealthChecker : public HealthChecker {

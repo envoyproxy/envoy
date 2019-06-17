@@ -1,0 +1,6 @@
+headers_to_add {
+  header {
+    key: "m"
+    value: "%DOWNSTREAM_PEER_SUBJECT%"
+  }
+}

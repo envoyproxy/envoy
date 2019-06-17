@@ -7,6 +7,7 @@
 
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
+#include "test/test_common/global.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -14,7 +15,7 @@
 namespace Envoy {
 namespace Grpc {
 
-TEST(GrpcCommonTest, GetGrpcStatus) {
+TEST(GrpcContextTest, GetGrpcStatus) {
   Http::TestHeaderMapImpl ok_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Status::Ok, Common::getGrpcStatus(ok_trailers).value());
 
@@ -31,7 +32,7 @@ TEST(GrpcCommonTest, GetGrpcStatus) {
   EXPECT_EQ(Status::InvalidCode, Common::getGrpcStatus(invalid_trailers).value());
 }
 
-TEST(GrpcCommonTest, GetGrpcMessage) {
+TEST(GrpcContextTest, GetGrpcMessage) {
   Http::TestHeaderMapImpl empty_trailers;
   EXPECT_EQ("", Common::getGrpcMessage(empty_trailers));
 
@@ -42,7 +43,7 @@ TEST(GrpcCommonTest, GetGrpcMessage) {
   EXPECT_EQ("", Common::getGrpcMessage(empty_error_trailers));
 }
 
-TEST(GrpcCommonTest, GetGrpcTimeout) {
+TEST(GrpcContextTest, GetGrpcTimeout) {
   Http::TestHeaderMapImpl empty_headers;
   EXPECT_EQ(std::chrono::milliseconds(0), Common::getGrpcTimeout(empty_headers));
 
@@ -77,7 +78,7 @@ TEST(GrpcCommonTest, GetGrpcTimeout) {
   // so we don't test for them.
 }
 
-TEST(GrpcCommonTest, ToGrpcTimeout) {
+TEST(GrpcContextTest, ToGrpcTimeout) {
   Http::HeaderString value;
 
   Common::toGrpcTimeout(std::chrono::milliseconds(0UL), value);
@@ -102,37 +103,7 @@ TEST(GrpcCommonTest, ToGrpcTimeout) {
   EXPECT_EQ("99999999H", value.getStringView());
 }
 
-TEST(GrpcCommonTest, ChargeStats) {
-  NiceMock<Upstream::MockClusterInfo> cluster;
-  Common::chargeStat(cluster, "service", "method", true);
-  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.success").value());
-  EXPECT_EQ(0U, cluster.stats_store_.counter("grpc.service.method.failure").value());
-  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.total").value());
-
-  Common::chargeStat(cluster, "service", "method", false);
-  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.success").value());
-  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.failure").value());
-  EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.total").value());
-
-  Http::TestHeaderMapImpl trailers;
-  Http::HeaderEntry& status = trailers.insertGrpcStatus();
-  status.value("0", 1);
-  Common::chargeStat(cluster, "grpc", "service", "method", &status);
-  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.0").value());
-  EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.success").value());
-  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.failure").value());
-  EXPECT_EQ(3U, cluster.stats_store_.counter("grpc.service.method.total").value());
-
-  status.value("1", 1);
-  Common::chargeStat(cluster, "grpc", "service", "method", &status);
-  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.0").value());
-  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.1").value());
-  EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.success").value());
-  EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.failure").value());
-  EXPECT_EQ(4U, cluster.stats_store_.counter("grpc.service.method.total").value());
-}
-
-TEST(GrpcCommonTest, PrepareHeaders) {
+TEST(GrpcContextTest, PrepareHeaders) {
   {
     Http::MessagePtr message =
         Common::prepareHeaders("cluster", "service_name", "method_name", absl::nullopt);
@@ -205,28 +176,7 @@ TEST(GrpcCommonTest, PrepareHeaders) {
   }
 }
 
-TEST(GrpcCommonTest, ResolveServiceAndMethod) {
-  std::string service;
-  std::string method;
-  Http::HeaderMapImpl headers;
-  Http::HeaderEntry& path = headers.insertPath();
-  path.value(std::string("/service_name/method_name"));
-  EXPECT_TRUE(Common::resolveServiceAndMethod(&path, &service, &method));
-  EXPECT_EQ("service_name", service);
-  EXPECT_EQ("method_name", method);
-  path.value(std::string(""));
-  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
-  path.value(std::string("/"));
-  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
-  path.value(std::string("//"));
-  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
-  path.value(std::string("/service_name"));
-  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
-  path.value(std::string("/service_name/"));
-  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
-}
-
-TEST(GrpcCommonTest, GrpcToHttpStatus) {
+TEST(GrpcContextTest, GrpcToHttpStatus) {
   const std::vector<std::pair<Status::GrpcStatus, uint64_t>> test_set = {
       {Status::GrpcStatus::Ok, 200},
       {Status::GrpcStatus::Canceled, 499},
@@ -252,7 +202,7 @@ TEST(GrpcCommonTest, GrpcToHttpStatus) {
   }
 }
 
-TEST(GrpcCommonTest, HttpToGrpcStatus) {
+TEST(GrpcContextTest, HttpToGrpcStatus) {
   const std::vector<std::pair<uint64_t, Status::GrpcStatus>> test_set = {
       {400, Status::GrpcStatus::Internal},         {401, Status::GrpcStatus::Unauthenticated},
       {403, Status::GrpcStatus::PermissionDenied}, {404, Status::GrpcStatus::Unimplemented},
@@ -265,7 +215,7 @@ TEST(GrpcCommonTest, HttpToGrpcStatus) {
   }
 }
 
-TEST(GrpcCommonTest, HasGrpcContentType) {
+TEST(GrpcContextTest, HasGrpcContentType) {
   {
     Http::TestHeaderMapImpl headers{};
     EXPECT_FALSE(Common::hasGrpcContentType(headers));
@@ -284,7 +234,7 @@ TEST(GrpcCommonTest, HasGrpcContentType) {
   EXPECT_FALSE(isGrpcContentType("application/grpc-web+foo"));
 }
 
-TEST(GrpcCommonTest, IsGrpcResponseHeader) {
+TEST(GrpcContextTest, IsGrpcResponseHeader) {
   Http::TestHeaderMapImpl grpc_status_only{{":status", "500"}, {"grpc-status", "14"}};
   EXPECT_TRUE(Common::isGrpcResponseHeader(grpc_status_only, true));
   EXPECT_FALSE(Common::isGrpcResponseHeader(grpc_status_only, false));
@@ -300,7 +250,7 @@ TEST(GrpcCommonTest, IsGrpcResponseHeader) {
   EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, false));
 }
 
-TEST(GrpcCommonTest, ValidateResponse) {
+TEST(GrpcContextTest, ValidateResponse) {
   {
     Http::ResponseMessageImpl response(
         Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
@@ -352,7 +302,7 @@ TEST(GrpcCommonTest, ValidateResponse) {
 }
 
 // Ensure that the correct gPRC header is constructed for a Buffer::Instance.
-TEST(GrpcCommonTest, PrependGrpcFrameHeader) {
+TEST(GrpcContextTest, PrependGrpcFrameHeader) {
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
   buffer->add("test", 4);
   std::array<char, 5> expected_header;

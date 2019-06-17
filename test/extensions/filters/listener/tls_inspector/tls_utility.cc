@@ -31,7 +31,7 @@ std::vector<uint8_t> generateClientHello(const std::string& sni_name, const std:
     SSL_set_alpn_protos(ssl.get(), reinterpret_cast<const uint8_t*>(alpn.data()), alpn.size());
   }
   SSL_do_handshake(ssl.get());
-  const uint8_t* data = NULL;
+  const uint8_t* data = nullptr;
   size_t data_len = 0;
   BIO_mem_contents(out, &data, &data_len);
   ASSERT(data_len > 0);

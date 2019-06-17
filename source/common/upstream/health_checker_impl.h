@@ -29,13 +29,15 @@ public:
    * @param random supplies the random generator.
    * @param dispatcher supplies the dispatcher.
    * @param event_logger supplies the event_logger.
+   * @param validation_visitor message validation visitor instance.
    * @return a health checker.
    */
   static HealthCheckerSharedPtr create(const envoy::api::v2::core::HealthCheck& health_check_config,
                                        Upstream::Cluster& cluster, Runtime::Loader& runtime,
                                        Runtime::RandomGenerator& random,
                                        Event::Dispatcher& dispatcher,
-                                       AccessLog::AccessLogManager& log_manager);
+                                       AccessLog::AccessLogManager& log_manager,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
 /**

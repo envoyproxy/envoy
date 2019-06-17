@@ -6,17 +6,14 @@
 #include "envoy/admin/v2alpha/config_dump.pb.validate.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/filter_json.h"
 #include "common/config/utility.h"
-#include "common/http/message_impl.h"
-#include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 #include "common/router/rds_impl.h"
 
 #include "server/http/admin.h"
 
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/init/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -41,14 +38,6 @@ namespace {
 class VhdsTest : public testing::Test {
 public:
   void SetUp() override {
-    factory_function_ = {[](const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&,
-                            Event::Dispatcher&, Upstream::ClusterManager&,
-                            Envoy::Runtime::RandomGenerator&, Stats::Scope&, const std::string&,
-                            const std::string&, absl::string_view,
-                            Api::Api&) -> std::unique_ptr<Envoy::Config::Subscription> {
-      return std::unique_ptr<Envoy::Config::MockSubscription>();
-    }};
-
     default_vhds_config_ = R"EOF(
 name: my_route
 vhds:
@@ -92,8 +81,8 @@ vhds:
     return Protobuf::RepeatedPtrField<std::string>{removed.begin(), removed.end()};
   }
   RouteConfigUpdatePtr makeRouteConfigUpdate(const envoy::api::v2::RouteConfiguration& rc) {
-    RouteConfigUpdatePtr config_update_info =
-        std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context_.timeSource());
+    RouteConfigUpdatePtr config_update_info = std::make_unique<RouteConfigUpdateReceiverImpl>(
+        factory_context_.timeSource(), factory_context_.messageValidationVisitor());
     config_update_info->onRdsUpdate(rc, "1");
     return config_update_info;
   }
@@ -101,11 +90,11 @@ vhds:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
-  Envoy::Router::SubscriptionFactoryFunction factory_function_;
   const std::string context_ = "vhds_test";
   std::unordered_set<Envoy::Router::RouteConfigProvider*> providers_;
   Protobuf::util::MessageDifferencer messageDifferencer_;
   std::string default_vhds_config_;
+  NiceMock<Envoy::Config::MockSubscriptionFactory> subscription_factory_;
 };
 
 // verify that api_type: DELTA_GRPC passes validation
@@ -114,8 +103,7 @@ TEST_F(VhdsTest, VhdsInstantiationShouldSucceedWithDELTA_GRPC) {
       TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  EXPECT_NO_THROW(VhdsSubscription(config_update_info, factory_context_, context_, providers_,
-                                   factory_function_));
+  EXPECT_NO_THROW(VhdsSubscription(config_update_info, factory_context_, context_, providers_));
 }
 
 // verify that api_type: GRPC fails validation
@@ -132,8 +120,7 @@ vhds:
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  EXPECT_THROW(VhdsSubscription(config_update_info, factory_context_, context_, providers_,
-                                factory_function_),
+  EXPECT_THROW(VhdsSubscription(config_update_info, factory_context_, context_, providers_),
                EnvoyException);
 }
 
@@ -143,14 +130,14 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
       TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_,
-                                factory_function_);
+  VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_);
   EXPECT_EQ(0UL, config_update_info->routeConfiguration().virtual_hosts_size());
 
   auto vhost = buildVirtualHost("vhost1", "vhost.first");
   const auto& added_resources = buildAddedResources({vhost});
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  subscription.onConfigUpdate(added_resources, removed_resources, "1");
+  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      added_resources, removed_resources, "1");
 
   EXPECT_EQ(1UL, config_update_info->routeConfiguration().virtual_hosts_size());
   EXPECT_TRUE(
@@ -177,15 +164,15 @@ vhds:
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_,
-                                factory_function_);
+  VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_);
   EXPECT_EQ(1UL, config_update_info->routeConfiguration().virtual_hosts_size());
   EXPECT_EQ("vhost_rds1", config_update_info->routeConfiguration().virtual_hosts(0).name());
 
   auto vhost = buildVirtualHost("vhost1", "vhost.first");
   const auto& added_resources = buildAddedResources({vhost});
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  subscription.onConfigUpdate(added_resources, removed_resources, "1");
+  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      added_resources, removed_resources, "1");
 
   EXPECT_EQ(2UL, config_update_info->routeConfiguration().virtual_hosts_size());
   auto actual_vhost_0 = config_update_info->routeConfiguration().virtual_hosts(0);
@@ -214,14 +201,14 @@ vhds:
           cluster_name: xds_cluster
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
-  VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_,
-                                factory_function_);
+  VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_);
   EXPECT_EQ(1UL, config_update_info->routeConfiguration().virtual_hosts_size());
   EXPECT_EQ("vhost_rds1", config_update_info->routeConfiguration().virtual_hosts(0).name());
 
   const Protobuf::RepeatedPtrField<envoy::api::v2::Resource> added_resources;
   const auto removed_resources = buildRemovedResources({"vhost_rds1"});
-  subscription.onConfigUpdate(added_resources, removed_resources, "1");
+  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      added_resources, removed_resources, "1");
 
   EXPECT_EQ(0UL, config_update_info->routeConfiguration().virtual_hosts_size());
 }
@@ -246,15 +233,15 @@ vhds:
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_,
-                                factory_function_);
+  VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_);
   EXPECT_EQ(1UL, config_update_info->routeConfiguration().virtual_hosts_size());
   EXPECT_EQ("vhost_rds1", config_update_info->routeConfiguration().virtual_hosts(0).name());
 
   auto vhost = buildVirtualHost("vhost_rds1", "vhost.rds.first.mk2");
   const auto& added_resources = buildAddedResources({vhost});
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  subscription.onConfigUpdate(added_resources, removed_resources, "1");
+  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      added_resources, removed_resources, "1");
 
   EXPECT_EQ(1UL, config_update_info->routeConfiguration().virtual_hosts_size());
   EXPECT_TRUE(
@@ -267,8 +254,7 @@ TEST_F(VhdsTest, VhdsValidatesAddedVirtualHosts) {
       TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_,
-                                factory_function_);
+  VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_);
 
   auto vhost = TestUtility::parseYaml<envoy::api::v2::route::VirtualHost>(R"EOF(
         name: invalid_vhost
@@ -281,7 +267,8 @@ TEST_F(VhdsTest, VhdsValidatesAddedVirtualHosts) {
   const auto& added_resources = buildAddedResources({vhost});
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
 
-  EXPECT_THROW(subscription.onConfigUpdate(added_resources, removed_resources, "1"),
+  EXPECT_THROW(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+                   added_resources, removed_resources, "1"),
                ProtoValidationException);
 }
 

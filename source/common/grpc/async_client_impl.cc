@@ -22,12 +22,13 @@ AsyncClientImpl::~AsyncClientImpl() {
   }
 }
 
-AsyncRequest* AsyncClientImpl::send(const Protobuf::MethodDescriptor& service_method,
-                                    const Protobuf::Message& request,
-                                    AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
-                                    const absl::optional<std::chrono::milliseconds>& timeout) {
-  auto* const async_request =
-      new AsyncRequestImpl(*this, service_method, request, callbacks, parent_span, timeout);
+AsyncRequest* AsyncClientImpl::sendRaw(absl::string_view service_full_name,
+                                       absl::string_view method_name, Buffer::InstancePtr&& request,
+                                       RawAsyncRequestCallbacks& callbacks,
+                                       Tracing::Span& parent_span,
+                                       const absl::optional<std::chrono::milliseconds>& timeout) {
+  auto* const async_request = new AsyncRequestImpl(
+      *this, service_full_name, method_name, std::move(request), callbacks, parent_span, timeout);
   std::unique_ptr<AsyncStreamImpl> grpc_stream{async_request};
 
   grpc_stream->initialize(true);
@@ -39,11 +40,12 @@ AsyncRequest* AsyncClientImpl::send(const Protobuf::MethodDescriptor& service_me
   return async_request;
 }
 
-AsyncStream* AsyncClientImpl::start(const Protobuf::MethodDescriptor& service_method,
-                                    AsyncStreamCallbacks& callbacks) {
+RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
+                                          absl::string_view method_name,
+                                          RawAsyncStreamCallbacks& callbacks) {
   const absl::optional<std::chrono::milliseconds> no_timeout;
-  auto grpc_stream =
-      std::make_unique<AsyncStreamImpl>(*this, service_method, callbacks, no_timeout);
+  auto grpc_stream = std::make_unique<AsyncStreamImpl>(*this, service_full_name, method_name,
+                                                       callbacks, no_timeout);
 
   grpc_stream->initialize(false);
   if (grpc_stream->hasResetStream()) {
@@ -54,11 +56,11 @@ AsyncStream* AsyncClientImpl::start(const Protobuf::MethodDescriptor& service_me
   return active_streams_.front().get();
 }
 
-AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent,
-                                 const Protobuf::MethodDescriptor& service_method,
-                                 AsyncStreamCallbacks& callbacks,
+AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
+                                 absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
                                  const absl::optional<std::chrono::milliseconds>& timeout)
-    : parent_(parent), service_method_(service_method), callbacks_(callbacks), timeout_(timeout) {}
+    : parent_(parent), service_full_name_(service_full_name), method_name_(method_name),
+      callbacks_(callbacks), timeout_(timeout) {}
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   if (parent_.cm_.get(parent_.remote_cluster_name_) == nullptr) {
@@ -81,9 +83,9 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 
   // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
   // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
-  headers_message_ = Common::prepareHeaders(
-      parent_.remote_cluster_name_, service_method_.service()->full_name(), service_method_.name(),
-      absl::optional<std::chrono::milliseconds>(timeout_));
+  headers_message_ =
+      Common::prepareHeaders(parent_.remote_cluster_name_, service_full_name_, method_name_,
+                             absl::optional<std::chrono::milliseconds>(timeout_));
   // Fill service-wide initial metadata.
   for (const auto& header_value : parent_.initial_metadata_) {
     headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
@@ -129,21 +131,18 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
   }
 
   for (auto& frame : decoded_frames_) {
-    ProtobufTypes::MessagePtr response = callbacks_.createEmptyResponse();
-    // TODO(htuch): Need to add support for compressed responses as well here.
-    if (frame.length_ > 0) {
-      Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
-
-      if (frame.flags_ != GRPC_FH_DEFAULT || !response->ParseFromZeroCopyStream(&stream)) {
-        streamError(Status::GrpcStatus::Internal);
-        return;
-      }
+    if (frame.length_ > 0 && frame.flags_ != GRPC_FH_DEFAULT) {
+      streamError(Status::GrpcStatus::Internal);
+      return;
     }
-    callbacks_.onReceiveMessageUntyped(std::move(response));
+    if (!callbacks_.onReceiveMessageRaw(frame.data_ ? std::move(frame.data_)
+                                                    : std::make_unique<Buffer::OwnedImpl>())) {
+      streamError(Status::GrpcStatus::Internal);
+      return;
+    }
   }
 
   if (end_stream) {
-    Http::HeaderMapPtr empty_trailers = std::make_unique<Http::HeaderMapImpl>();
     streamError(Status::GrpcStatus::Unknown);
   }
 }
@@ -180,6 +179,11 @@ void AsyncStreamImpl::sendMessage(const Protobuf::Message& request, bool end_str
   stream_->sendData(*Common::serializeToGrpcFrame(request), end_stream);
 }
 
+void AsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& buffer, bool end_stream) {
+  Common::prependGrpcFrameHeader(*buffer);
+  stream_->sendData(*buffer, end_stream);
+}
+
 void AsyncStreamImpl::closeStream() {
   Buffer::OwnedImpl empty_buffer;
   stream_->sendData(empty_buffer, true);
@@ -201,13 +205,12 @@ void AsyncStreamImpl::cleanup() {
   }
 }
 
-AsyncRequestImpl::AsyncRequestImpl(AsyncClientImpl& parent,
-                                   const Protobuf::MethodDescriptor& service_method,
-                                   const Protobuf::Message& request,
-                                   AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
+AsyncRequestImpl::AsyncRequestImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
+                                   absl::string_view method_name, Buffer::InstancePtr&& request,
+                                   RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
                                    const absl::optional<std::chrono::milliseconds>& timeout)
-    : AsyncStreamImpl(parent, service_method, *this, timeout), request_(request),
-      callbacks_(callbacks) {
+    : AsyncStreamImpl(parent, service_full_name, method_name, *this, timeout),
+      request_(std::move(request)), callbacks_(callbacks) {
 
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
                                          "async " + parent.remote_cluster_name_ + " egress",
@@ -221,17 +224,13 @@ void AsyncRequestImpl::initialize(bool buffer_body_for_retry) {
   if (this->hasResetStream()) {
     return;
   }
-  this->sendMessage(request_, true);
+  this->sendMessageRaw(std::move(request_), true);
 }
 
 void AsyncRequestImpl::cancel() {
   current_span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
   current_span_->finishSpan();
   this->resetStream();
-}
-
-ProtobufTypes::MessagePtr AsyncRequestImpl::createEmptyResponse() {
-  return callbacks_.createEmptyResponse();
 }
 
 void AsyncRequestImpl::onCreateInitialMetadata(Http::HeaderMap& metadata) {
@@ -241,8 +240,9 @@ void AsyncRequestImpl::onCreateInitialMetadata(Http::HeaderMap& metadata) {
 
 void AsyncRequestImpl::onReceiveInitialMetadata(Http::HeaderMapPtr&&) {}
 
-void AsyncRequestImpl::onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& message) {
-  response_ = std::move(message);
+bool AsyncRequestImpl::onReceiveMessageRaw(Buffer::InstancePtr&& response) {
+  response_ = std::move(response);
+  return true;
 }
 
 void AsyncRequestImpl::onReceiveTrailingMetadata(Http::HeaderMapPtr&&) {}
@@ -257,7 +257,7 @@ void AsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std:
     current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     callbacks_.onFailure(Status::Internal, EMPTY_STRING, *current_span_);
   } else {
-    callbacks_.onSuccessUntyped(std::move(response_), *current_span_);
+    callbacks_.onSuccessRaw(std::move(response_), *current_span_);
   }
 
   current_span_->finishSpan();

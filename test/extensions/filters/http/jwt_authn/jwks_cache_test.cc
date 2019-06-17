@@ -23,7 +23,7 @@ class JwksCacheTest : public testing::Test {
 protected:
   JwksCacheTest() : api_(Api::createApiForTest()) {}
   void SetUp() override {
-    MessageUtil::loadFromYaml(ExampleConfig, config_);
+    TestUtility::loadFromYaml(ExampleConfig, config_);
     cache_ = JwksCache::create(config_, time_system_, *api_);
     jwks_ = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
   }

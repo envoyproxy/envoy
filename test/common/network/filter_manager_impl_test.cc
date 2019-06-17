@@ -2,7 +2,6 @@
 #include <vector>
 
 #include "common/buffer/buffer_impl.h"
-#include "common/config/filter_json.h"
 #include "common/network/filter_manager_impl.h"
 #include "common/tcp_proxy/tcp_proxy.h"
 #include "common/upstream/upstream_impl.h"
@@ -20,6 +19,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -164,14 +164,13 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool;
   FilterManagerImpl manager(connection_);
 
-  std::string rl_json = R"EOF(
-    {
-      "domain": "foo",
-      "descriptors": [
-         [{"key": "hello", "value": "world"}]
-       ],
-       "stat_prefix": "name"
-    }
+  std::string rl_yaml = R"EOF(
+domain: foo
+descriptors:
+- entries:
+  - key: hello
+    value: world
+stat_prefix: name
     )EOF";
 
   ON_CALL(factory_context.runtime_loader_.snapshot_,
@@ -181,9 +180,8 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
           featureEnabled("ratelimit.tcp_filter_enforcing", 100))
       .WillByDefault(Return(true));
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(rl_json);
   envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
-  Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config);
+  TestUtility::loadFromYaml(rl_yaml, proto_config);
 
   Extensions::NetworkFilters::RateLimitFilter::ConfigSharedPtr rl_config(
       new Extensions::NetworkFilters::RateLimitFilter::Config(proto_config, factory_context.scope_,

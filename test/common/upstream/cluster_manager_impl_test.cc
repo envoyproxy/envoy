@@ -26,6 +26,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -68,7 +69,7 @@ public:
               auto result = ClusterFactoryImplBase::create(
                   cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
                   dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-                  outlier_event_logger, added_via_api, *api_);
+                  outlier_event_logger, added_via_api, validation_visitor_, *api_);
               // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
               return std::make_pair(result.first, result.second.release());
             }));
@@ -132,6 +133,7 @@ public:
   NiceMock<Secret::MockSecretManager> secret_manager_;
   NiceMock<AccessLog::MockAccessLogManager> log_manager_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
 };
 
@@ -153,6 +155,16 @@ class TestClusterManagerImpl : public ClusterManagerImpl {
 public:
   using ClusterManagerImpl::ClusterManagerImpl;
 
+  TestClusterManagerImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                         ClusterManagerFactory& factory, Stats::Store& stats,
+                         ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                         Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                         AccessLog::AccessLogManager& log_manager,
+                         Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                         Api::Api& api, Http::Context& http_context)
+      : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
+                           main_thread_dispatcher, admin, validation_visitor_, api, http_context) {}
+
   std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
     std::map<std::string, std::reference_wrapper<Cluster>> clusters;
     for (auto& cluster : active_clusters_) {
@@ -160,6 +172,8 @@ public:
     }
     return clusters;
   }
+
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
 // Override postThreadLocalClusterUpdate so we can test that merged updates calls
@@ -194,7 +208,7 @@ protected:
 
 envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromYaml(yaml, bootstrap);
+  TestUtility::loadFromYaml(yaml, bootstrap);
   return bootstrap;
 }
 
@@ -255,8 +269,14 @@ public:
     EXPECT_EQ(added, factory_.stats_.counter("cluster_manager.cluster_added").value());
     EXPECT_EQ(modified, factory_.stats_.counter("cluster_manager.cluster_modified").value());
     EXPECT_EQ(removed, factory_.stats_.counter("cluster_manager.cluster_removed").value());
-    EXPECT_EQ(active, factory_.stats_.gauge("cluster_manager.active_clusters").value());
-    EXPECT_EQ(warming, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
+    EXPECT_EQ(active,
+              factory_.stats_
+                  .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
+                  .value());
+    EXPECT_EQ(warming,
+              factory_.stats_
+                  .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::NeverImport)
+                  .value());
   }
 
   void checkConfigDump(const std::string& expected_dump_yaml) {
@@ -265,7 +285,7 @@ public:
         dynamic_cast<const envoy::admin::v2alpha::ClustersConfigDump&>(*message_ptr);
 
     envoy::admin::v2alpha::ClustersConfigDump expected_clusters_config_dump;
-    MessageUtil::loadFromYaml(expected_dump_yaml, expected_clusters_config_dump);
+    TestUtility::loadFromYaml(expected_dump_yaml, expected_clusters_config_dump);
     EXPECT_EQ(expected_clusters_config_dump.DebugString(), clusters_config_dump.DebugString());
   }
 
@@ -2588,22 +2608,34 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   )EOF";
 
   // Add the updated cluster.
-  EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
+  EXPECT_EQ(2, factory_.stats_
+                   .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_modified").value());
-  EXPECT_EQ(0, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
+  EXPECT_EQ(0, factory_.stats_
+                   .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml_updated), "version2",
                                                    dummyWarmingCb));
-  EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
+  EXPECT_EQ(2, factory_.stats_
+                   .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_modified").value());
-  EXPECT_EQ(1, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
+  EXPECT_EQ(1, factory_.stats_
+                   .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
 
   // Promote the updated cluster from warming to active & assert the old timer was disabled
   // and it won't be called on version1 of new_cluster.
   EXPECT_CALL(*timer, disableTimer());
   updated->initialize_callback_();
 
-  EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
-  EXPECT_EQ(0, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
+  EXPECT_EQ(2, factory_.stats_
+                   .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+  EXPECT_EQ(0, factory_.stats_
+                   .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {

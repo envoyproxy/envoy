@@ -20,6 +20,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
@@ -63,11 +64,12 @@ TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 
-  EXPECT_THROW_WITH_MESSAGE(HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster,
-                                                         runtime, random, dispatcher, log_manager),
-                            EnvoyException,
-                            "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
+  EXPECT_THROW_WITH_MESSAGE(
+      HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime, random,
+                                   dispatcher, log_manager, validation_visitor),
+      EnvoyException, "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
 }
 
 TEST(HealthCheckerFactoryTest, CreateGrpc) {
@@ -80,11 +82,13 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 
-  EXPECT_NE(nullptr, dynamic_cast<GrpcHealthCheckerImpl*>(
-                         HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster,
-                                                      runtime, random, dispatcher, log_manager)
-                             .get()));
+  EXPECT_NE(nullptr,
+            dynamic_cast<GrpcHealthCheckerImpl*>(
+                HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime,
+                                             random, dispatcher, log_manager, validation_visitor)
+                    .get()));
 }
 
 class TestHttpHealthCheckerImpl : public HttpHealthCheckerImpl {

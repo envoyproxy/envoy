@@ -148,10 +148,12 @@ public:
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
-  Gauge& gaugeFromStatName(StatName name) override {
-    return default_scope_->gaugeFromStatName(name);
+  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
+    return default_scope_->gaugeFromStatName(name, import_mode);
   }
-  Gauge& gauge(const std::string& name) override { return default_scope_->gauge(name); }
+  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
+    return default_scope_->gauge(name, import_mode);
+  }
   Histogram& histogramFromStatName(StatName name) override {
     return default_scope_->histogramFromStatName(name);
   }
@@ -242,7 +244,7 @@ private:
     // Stats::Scope
     Counter& counterFromStatName(StatName name) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
-    Gauge& gaugeFromStatName(StatName name) override;
+    Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
     Histogram& histogramFromStatName(StatName name) override;
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     ScopePtr createScope(const std::string& name) override {
@@ -255,9 +257,9 @@ private:
       StatNameManagedStorage storage(name, symbolTable());
       return counterFromStatName(storage.statName());
     }
-    Gauge& gauge(const std::string& name) override {
+    Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
       StatNameManagedStorage storage(name, symbolTable());
-      return gaugeFromStatName(storage.statName());
+      return gaugeFromStatName(storage.statName(), import_mode);
     }
     Histogram& histogram(const std::string& name) override {
       StatNameManagedStorage storage(name, symbolTable());

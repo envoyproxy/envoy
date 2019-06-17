@@ -1,5 +1,5 @@
 load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
-load("@com_lyft_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
+load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_grpc_library", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
 
@@ -30,7 +30,7 @@ def api_py_proto_library(name, srcs = [], deps = [], has_services = 0):
         default_runtime = "@com_google_protobuf//:protobuf_python",
         protoc = "@com_google_protobuf//:protoc",
         deps = [_LibrarySuffix(d, _PY_SUFFIX) for d in deps] + [
-            "@com_lyft_protoc_gen_validate//validate:validate_py",
+            "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
             "@googleapis//:api_httpbody_protos_py",
             "@googleapis//:http_api_protos_py",
             "@googleapis//:rpc_status_protos_py",
@@ -52,7 +52,7 @@ def api_go_proto_library(name, proto, deps = []):
             "@io_bazel_rules_go//proto/wkt:struct_go_proto",
             "@io_bazel_rules_go//proto/wkt:timestamp_go_proto",
             "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
-            "@com_lyft_protoc_gen_validate//validate:go_default_library",
+            "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
             "@googleapis//:rpc_status_go_proto",
         ],
     )
@@ -69,7 +69,7 @@ def api_go_grpc_library(name, proto, deps = []):
             "@io_bazel_rules_go//proto/wkt:duration_go_proto",
             "@io_bazel_rules_go//proto/wkt:struct_go_proto",
             "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
-            "@com_lyft_protoc_gen_validate//validate:go_default_library",
+            "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
             "@googleapis//:http_api_go_proto",
         ],
     )
@@ -112,7 +112,7 @@ def api_proto_library(
             "@googleapis//:http_api_protos_proto",
             "@googleapis//:rpc_status_protos_lib",
             "@com_github_gogo_protobuf//:gogo_proto",
-            "@com_lyft_protoc_gen_validate//validate:validate_proto",
+            "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
         ],
         visibility = visibility,
     )

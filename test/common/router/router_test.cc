@@ -10,6 +10,7 @@
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
+#include "common/router/debug_config.h"
 #include "common/router/router.h"
 #include "common/tracing/http_tracer_impl.h"
 #include "common/upstream/upstream_impl.h"
@@ -219,6 +220,11 @@ public:
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_denominator(
         envoy::type::FractionalPercent::HUNDRED);
   }
+
+  void testAppendCluster(absl::optional<Http::LowerCaseString> cluster_header_name);
+  void testAppendUpstreamHost(absl::optional<Http::LowerCaseString> hostname_header_name,
+                              absl::optional<Http::LowerCaseString> host_address_header_name);
+  void testDoNotForward(absl::optional<Http::LowerCaseString> not_forwarded_header_name);
 
   Event::SimulatedTimeSystem test_time_;
   std::string upstream_zone_{"to_az"};
@@ -805,6 +811,187 @@ TEST_F(RouterTest, EnvoyUpstreamServiceTime) {
       }));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
+// Validate that the cluster is appended to the response when configured.
+void RouterTestBase::testAppendCluster(absl::optional<Http::LowerCaseString> cluster_header_name) {
+  auto debug_config = std::make_unique<DebugConfig>(
+      /* append_cluster */ true,
+      /* cluster_header */ cluster_header_name,
+      /* append_upstream_host */ false,
+      /* hostname_header */ absl::nullopt,
+      /* host_address_header */ absl::nullopt,
+      /* do_not_forward */ false,
+      /* not_forwarded_header */ absl::nullopt);
+  callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
+                                                StreamInfo::FilterState::StateType::ReadOnly);
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&cluster_header_name](Http::HeaderMap& headers, bool) {
+        const Http::HeaderEntry* cluster_header =
+            headers.get(cluster_header_name.value_or(Http::Headers::get().EnvoyCluster));
+        EXPECT_NE(nullptr, cluster_header);
+        EXPECT_EQ("fake_cluster", cluster_header->value().getStringView());
+      }));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
+// Append cluster with default header name.
+TEST_F(RouterTest, AppendCluster0) { testAppendCluster(absl::nullopt); }
+
+// Append cluster with custom header name.
+TEST_F(RouterTest, AppendCluster1) {
+  testAppendCluster(absl::make_optional(Http::LowerCaseString("x-custom-cluster")));
+}
+
+// Validate that the upstream hostname and address are appended to the response when configured.
+void RouterTestBase::testAppendUpstreamHost(
+    absl::optional<Http::LowerCaseString> hostname_header_name,
+    absl::optional<Http::LowerCaseString> host_address_header_name) {
+  auto debug_config = std::make_unique<DebugConfig>(
+      /* append_cluster */ false,
+      /* cluster_header */ absl::nullopt,
+      /* append_upstream_host */ true,
+      /* hostname_header */ hostname_header_name,
+      /* host_address_header */ host_address_header_name,
+      /* do_not_forward */ false,
+      /* not_forwarded_header */ absl::nullopt);
+  callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
+                                                StreamInfo::FilterState::StateType::ReadOnly);
+  cm_.conn_pool_.host_->hostname_ = "scooby.doo";
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&hostname_header_name, &host_address_header_name](Http::HeaderMap& headers,
+                                                                          bool) {
+        const Http::HeaderEntry* hostname_header =
+            headers.get(hostname_header_name.value_or(Http::Headers::get().EnvoyUpstreamHostname));
+        EXPECT_NE(nullptr, hostname_header);
+        EXPECT_EQ("scooby.doo", hostname_header->value().getStringView());
+
+        const Http::HeaderEntry* host_address_header = headers.get(
+            host_address_header_name.value_or(Http::Headers::get().EnvoyUpstreamHostAddress));
+        EXPECT_NE(nullptr, host_address_header);
+        EXPECT_EQ("10.0.0.5:9211", host_address_header->value().getStringView());
+      }));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
+// Append hostname and address with default header names.
+TEST_F(RouterTest, AppendUpstreamHost00) { testAppendUpstreamHost(absl::nullopt, absl::nullopt); }
+
+// Append hostname and address with custom host address header name.
+TEST_F(RouterTest, AppendUpstreamHost01) {
+  testAppendUpstreamHost(
+      absl::nullopt, absl::make_optional(Http::LowerCaseString("x-custom-upstream-host-address")));
+}
+
+// Append hostname and address with custom hostname header name.
+TEST_F(RouterTest, AppendUpstreamHost10) {
+  testAppendUpstreamHost(absl::make_optional(Http::LowerCaseString("x-custom-upstream-hostname")),
+                         absl::nullopt);
+}
+
+// Append hostname and address with custom header names.
+TEST_F(RouterTest, AppendUpstreamHost11) {
+  testAppendUpstreamHost(
+      absl::make_optional(Http::LowerCaseString("x-custom-upstream-hostname")),
+      absl::make_optional(Http::LowerCaseString("x-custom-upstream-host-address")));
+}
+
+// Validate that the request is not forwarded upstream when configured.
+void RouterTestBase::testDoNotForward(
+    absl::optional<Http::LowerCaseString> not_forwarded_header_name) {
+  auto debug_config = std::make_unique<DebugConfig>(
+      /* append_cluster */ false,
+      /* cluster_header */ absl::nullopt,
+      /* append_upstream_host */ false,
+      /* hostname_header */ absl::nullopt,
+      /* host_address_header */ absl::nullopt,
+      /* do_not_forward */ true,
+      /* not_forwarded_header */ not_forwarded_header_name);
+  callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
+                                                StreamInfo::FilterState::StateType::ReadOnly);
+
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "204"},
+      {not_forwarded_header_name.value_or(Http::Headers::get().EnvoyNotForwarded).get(), "true"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+// Do not forward, with default not-forwarded header name
+TEST_F(RouterTest, DoNotForward0) { testDoNotForward(absl::nullopt); }
+
+// Do not forward, with custom not-forwarded header name
+TEST_F(RouterTest, DoNotForward1) {
+  testDoNotForward(absl::make_optional(Http::LowerCaseString("x-custom-not-forwarded")));
+}
+
+// Validate that all DebugConfig options play nicely with each other.
+TEST_F(RouterTest, AllDebugConfig) {
+  auto debug_config = std::make_unique<DebugConfig>(
+      /* append_cluster */ true,
+      /* cluster_header */ absl::nullopt,
+      /* append_upstream_host */ true,
+      /* hostname_header */ absl::nullopt,
+      /* host_address_header */ absl::nullopt,
+      /* do_not_forward */ true,
+      /* not_forwarded_header */ absl::nullopt);
+  callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
+                                                StreamInfo::FilterState::StateType::ReadOnly);
+  cm_.conn_pool_.host_->hostname_ = "scooby.doo";
+
+  Http::TestHeaderMapImpl response_headers{{":status", "204"},
+                                           {"x-envoy-cluster", "fake_cluster"},
+                                           {"x-envoy-upstream-hostname", "scooby.doo"},
+                                           {"x-envoy-upstream-host-address", "10.0.0.5:9211"},
+                                           {"x-envoy-not-forwarded", "true"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
 // Validate that x-envoy-upstream-service-time is not added when Envoy header

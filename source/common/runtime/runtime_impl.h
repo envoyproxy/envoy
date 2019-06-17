@@ -45,17 +45,15 @@ public:
 /**
  * All runtime stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_RUNTIME_STATS(COUNTER, GAUGE)                                                          \
-  GAUGE  (admin_overrides_active)                                                                  \
   COUNTER(deprecated_feature_use)                                                                  \
   COUNTER(load_error)                                                                              \
   COUNTER(load_success)                                                                            \
-  GAUGE  (num_keys)                                                                                \
-  GAUGE  (num_layers)                                                                              \
   COUNTER(override_dir_exists)                                                                     \
-  COUNTER(override_dir_not_exists)
-// clang-format on
+  COUNTER(override_dir_not_exists)                                                                 \
+  GAUGE(admin_overrides_active, NeverImport)                                                       \
+  GAUGE(num_keys, NeverImport)                                                                     \
+  GAUGE(num_layers, NeverImport)
 
 /**
  * Struct definition for all runtime stats. @see stats_macros.h
@@ -202,7 +200,6 @@ public:
   Snapshot& snapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
 
-private:
   // Create a new Snapshot
   virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
   // Load a new Snapshot into TLS

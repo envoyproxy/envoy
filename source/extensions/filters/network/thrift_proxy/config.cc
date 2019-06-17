@@ -169,8 +169,8 @@ void ConfigImpl::processFilter(
       Envoy::Config::Utility::getAndCheckFactory<ThriftFilters::NamedThriftFilterConfigFactory>(
           string_name);
 
-  ProtobufTypes::MessagePtr message =
-      Envoy::Config::Utility::translateToFactoryConfig(proto_config, factory);
+  ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
+      proto_config, context_.messageValidationVisitor(), factory);
   ThriftFilters::FilterFactoryCb callback =
       factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
 

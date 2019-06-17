@@ -34,13 +34,9 @@ def is_cpp_flag(arg):
                 ] or arg.startswith("-std=c++") or arg.startswith("-std=gnu++")
 
 
-def main():
-  # Append CXXFLAGS to correctly detect include paths for either libstdc++ or libc++.
-  if sys.argv[1:5] == ["-E", "-xc++", "-", "-v"]:
-    os.execv(envoy_real_cxx, [envoy_real_cxx] + sys.argv[1:] + shlex.split(envoy_cxxflags))
-
+def modify_driver_args(input_driver_flags):
   # Detect if we're building for C++ or vanilla C.
-  if any(map(is_cpp_flag, sys.argv[1:])):
+  if any(map(is_cpp_flag, input_driver_flags)):
     compiler = envoy_real_cxx
     # Append CXXFLAGS to all C++ targets (this is mostly for dependencies).
     argv = shlex.split(envoy_cxxflags)
@@ -52,8 +48,8 @@ def main():
   # Either:
   # a) remove all occurrences of -lstdc++ (when statically linking against libstdc++),
   # b) replace all occurrences of -lstdc++ with -lc++ (when linking against libc++).
-  if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in envoy_cxxflags:
-    for arg in sys.argv[1:]:
+  if "-static-libstdc++" in input_driver_flags or "-stdlib=libc++" in envoy_cxxflags:
+    for arg in input_driver_flags:
       if arg == "-lstdc++":
         if "-stdlib=libc++" in envoy_cxxflags:
           argv.append("-lc++")
@@ -69,7 +65,7 @@ def main():
       else:
         argv.append(arg)
   else:
-    argv += sys.argv[1:]
+    argv += input_driver_flags
 
   # Bazel will add -fuse-ld=gold in some cases, gcc/clang will take the last -fuse-ld argument,
   # so whenever we see lld once, add it to the end.
@@ -91,7 +87,38 @@ def main():
     # See https://github.com/envoyproxy/envoy/issues/2987
     argv.append("-Wno-maybe-uninitialized")
 
-  os.execv(compiler, [compiler] + argv)
+  return compiler, argv
+
+
+def main():
+  # Append CXXFLAGS to correctly detect include paths for either libstdc++ or libc++.
+  if sys.argv[1:5] == ["-E", "-xc++", "-", "-v"]:
+    os.execv(envoy_real_cxx, [envoy_real_cxx] + sys.argv[1:] + shlex.split(envoy_cxxflags))
+
+  if sys.argv[1].startswith("@"):
+    # Read flags from file
+    flagfile_path = sys.argv[1][1:]
+    with open(flagfile_path, "r") as fd:
+      input_driver_flags = fd.read().splitlines()
+
+    # Compute new args
+    compiler, new_driver_args = modify_driver_args(input_driver_flags)
+
+    # Write args to temp file
+    (new_flagfile_fd, new_flagfile_path) = tempfile.mkstemp(dir="./", suffix=".linker-params")
+
+    with closing_fd(new_flagfile_fd):
+      for arg in new_driver_args:
+        os.write(new_flagfile_fd, arg + "\n")
+
+    # Provide new arguments using the temp file containing the args
+    new_args = ["@" + new_flagfile_path]
+  else:
+    # TODO(https://github.com/bazelbuild/bazel/issues/7687): Remove this branch
+    # when Bazel 0.27 is released.
+    compiler, new_args = modify_driver_args(sys.argv[1:])
+
+  os.execv(compiler, [compiler] + new_args)
 
 
 if __name__ == "__main__":

@@ -40,7 +40,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   Stats::IsolatedStoreImpl store;
   Stats::Counter& c = store.counter("hello");
   c.inc();
-  store.gauge("world").set(5);
+  store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
   store.histogram("histogram");
 
   std::list<Stats::SinkPtr> sinks;
@@ -200,6 +200,27 @@ protected:
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
+  absl::Notification started;
+
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    initialize("test/server/node_bootstrap.yaml");
+    auto startup_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
+                                                    [&] { started.Notify(); });
+    auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                                                     [&](Event::PostCb) { FAIL(); });
+    shutdown_handle = nullptr; // unregister callback
+    server_->run();
+    startup_handle = nullptr;
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  started.WaitForNotification();
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   bool startup = false, shutdown = false, shutdown_with_completion = false;

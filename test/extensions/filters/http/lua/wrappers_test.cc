@@ -249,7 +249,7 @@ protected:
 
   envoy::api::v2::core::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
     envoy::api::v2::core::Metadata metadata;
-    MessageUtil::loadFromYaml(yaml_string, metadata);
+    TestUtility::loadFromYaml(yaml_string, metadata);
     return metadata;
   }
 

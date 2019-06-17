@@ -24,16 +24,14 @@
 namespace Envoy {
 namespace Server {
 
-// clang-format off
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, HISTOGRAM)                                              \
-  COUNTER  (downstream_cx_total)                                                                   \
-  COUNTER  (downstream_cx_destroy)                                                                 \
-  GAUGE    (downstream_cx_active)                                                                  \
-  HISTOGRAM(downstream_cx_length_ms)                                                               \
-  COUNTER  (downstream_pre_cx_timeout)                                                             \
-  GAUGE    (downstream_pre_cx_active)                                                              \
-  COUNTER  (no_filter_chain_match)
-// clang-format on
+  COUNTER(downstream_cx_destroy)                                                                   \
+  COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_pre_cx_timeout)                                                               \
+  COUNTER(no_filter_chain_match)                                                                   \
+  GAUGE(downstream_cx_active, Accumulate)                                                          \
+  GAUGE(downstream_pre_cx_active, Accumulate)                                                      \
+  HISTOGRAM(downstream_cx_length_ms)
 
 /**
  * Wrapper struct for listener stats. @see stats_macros.h

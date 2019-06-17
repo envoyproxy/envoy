@@ -13,6 +13,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/filesystem/directory.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -325,7 +326,8 @@ bool SnapshotImpl::parseEntryUintValue(Entry& entry) {
 void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
   envoy::type::FractionalPercent converted_fractional_percent;
   try {
-    MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent);
+    MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent,
+                                         ProtobufMessage::getStrictValidationVisitor());
   } catch (const ProtoValidationException& ex) {
     ENVOY_LOG(error, "unable to validate fraction percent runtime proto: {}", ex.what());
     return;

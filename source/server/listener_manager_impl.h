@@ -16,6 +16,7 @@
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
 
+#include "server/filter_chain_manager_impl.h"
 #include "server/lds_api.h"
 
 namespace Envoy {
@@ -53,10 +54,9 @@ public:
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
-    return std::make_unique<LdsApiImpl>(lds_config, server_.clusterManager(), server_.dispatcher(),
-                                        server_.random(), server_.initManager(),
-                                        server_.localInfo(), server_.stats(),
-                                        server_.listenerManager(), server_.api());
+    return std::make_unique<LdsApiImpl>(lds_config, server_.clusterManager(), server_.initManager(),
+                                        server_.stats(), server_.listenerManager(),
+                                        server_.messageValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -91,17 +91,15 @@ typedef std::unique_ptr<ListenerImpl> ListenerImplPtr;
 /**
  * All listener manager stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_LISTENER_MANAGER_STATS(COUNTER, GAUGE)                                                 \
   COUNTER(listener_added)                                                                          \
+  COUNTER(listener_create_failure)                                                                 \
+  COUNTER(listener_create_success)                                                                 \
   COUNTER(listener_modified)                                                                       \
   COUNTER(listener_removed)                                                                        \
-  COUNTER(listener_create_success)                                                                 \
-  COUNTER(listener_create_failure)                                                                 \
-  GAUGE  (total_listeners_warming)                                                                 \
-  GAUGE  (total_listeners_active)                                                                  \
-  GAUGE  (total_listeners_draining)
-// clang-format on
+  GAUGE(total_listeners_active, NeverImport)                                                       \
+  GAUGE(total_listeners_draining, NeverImport)                                                     \
+  GAUGE(total_listeners_warming, NeverImport)
 
 /**
  * Struct definition for all listener manager stats. @see stats_macros.h
@@ -205,7 +203,6 @@ private:
 class ListenerImpl : public Network::ListenerConfig,
                      public Configuration::ListenerFactoryContext,
                      public Network::DrainDecision,
-                     public Network::FilterChainManager,
                      public Network::FilterChainFactory,
                      Logger::Loggable<Logger::Id::config> {
 public:
@@ -254,7 +251,7 @@ public:
   const std::string& versionInfo() { return version_info_; }
 
   // Network::ListenerConfig
-  Network::FilterChainManager& filterChainManager() override { return *this; }
+  Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::Socket& socket() override { return *socket_; }
   const Network::Socket& socket() const override { return *socket_; }
@@ -279,6 +276,7 @@ public:
   Upstream::ClusterManager& clusterManager() override { return parent_.server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return parent_.server_.dispatcher(); }
   Network::DrainDecision& drainDecision() override { return *this; }
+  Grpc::Context& grpcContext() override { return parent_.server_.grpcContext(); }
   bool healthCheckFailed() override { return parent_.server_.healthCheckFailed(); }
   Tracing::HttpTracer& httpTracer() override { return httpContext().tracer(); }
   Http::Context& httpContext() override { return parent_.server_.httpContext(); }
@@ -310,6 +308,9 @@ public:
     Network::Socket::appendOptions(listen_socket_options_, options);
   }
   const Network::ListenerConfig& listenerConfig() const override { return *this; }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return parent_.server_.messageValidationVisitor();
+  }
   Api::Api& api() override { return parent_.server_.api(); }
   ServerLifecycleNotifier& lifecycleNotifier() override {
     return parent_.server_.lifecycleNotifier();
@@ -318,10 +319,6 @@ public:
 
   // Network::DrainDecision
   bool drainClose() const override;
-
-  // Network::FilterChainManager
-  const Network::FilterChain*
-  findFilterChain(const Network::ConnectionSocket& socket) const override;
 
   // Network::FilterChainFactory
   bool createNetworkFilterChain(Network::Connection& connection,
@@ -333,80 +330,8 @@ public:
   SystemTime last_updated_;
 
 private:
-  typedef std::array<Network::FilterChainSharedPtr, 3> SourceTypesArray;
-  typedef std::unordered_map<std::string, SourceTypesArray> ApplicationProtocolsMap;
-  typedef std::unordered_map<std::string, ApplicationProtocolsMap> TransportProtocolsMap;
-  // Both exact server names and wildcard domains are part of the same map, in which wildcard
-  // domains are prefixed with "." (i.e. ".example.com" for "*.example.com") to differentiate
-  // between exact and wildcard entries.
-  typedef std::unordered_map<std::string, TransportProtocolsMap> ServerNamesMap;
-  typedef std::unordered_map<std::string, ServerNamesMap> DestinationIPsMap;
-  typedef std::shared_ptr<ServerNamesMap> ServerNamesMapSharedPtr;
-  typedef Network::LcTrie::LcTrie<ServerNamesMapSharedPtr> DestinationIPsTrie;
-  typedef std::unique_ptr<DestinationIPsTrie> DestinationIPsTriePtr;
-  typedef std::unordered_map<uint16_t, std::pair<DestinationIPsMap, DestinationIPsTriePtr>>
-      DestinationPortsMap;
-
-  void
-  addFilterChain(uint16_t destination_port, const std::vector<std::string>& destination_ips,
-                 const std::vector<std::string>& server_names,
-                 const std::string& transport_protocol,
-                 const std::vector<std::string>& application_protocols,
-                 const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
-                 Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                 std::vector<Network::FilterFactoryCb> filters_factory);
-  void addFilterChainForDestinationPorts(
-      DestinationPortsMap& destination_ports_map, uint16_t destination_port,
-      const std::vector<std::string>& destination_ips, const std::vector<std::string>& server_names,
-      const std::string& transport_protocol, const std::vector<std::string>& application_protocols,
-      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
-      const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForDestinationIPs(
-      DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
-      const std::vector<std::string>& server_names, const std::string& transport_protocol,
-      const std::vector<std::string>& application_protocols,
-      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
-      const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForServerNames(
-      ServerNamesMap& server_names_map, const std::vector<std::string>& server_names,
-      const std::string& transport_protocol, const std::vector<std::string>& application_protocols,
-      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
-      const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForApplicationProtocols(
-      ApplicationProtocolsMap& application_protocol_map,
-      const std::vector<std::string>& application_protocols,
-      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
-      const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForSourceTypes(
-      SourceTypesArray& source_types_array,
-      const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
-      const Network::FilterChainSharedPtr& filter_chain);
-
-  void convertDestinationIPsMapToTrie();
-
-  const Network::FilterChain*
-  findFilterChainForDestinationIP(const DestinationIPsTrie& destination_ips_trie,
-                                  const Network::ConnectionSocket& socket) const;
-  const Network::FilterChain*
-  findFilterChainForServerName(const ServerNamesMap& server_names_map,
-                               const Network::ConnectionSocket& socket) const;
-  const Network::FilterChain*
-  findFilterChainForTransportProtocol(const TransportProtocolsMap& transport_protocols_map,
-                                      const Network::ConnectionSocket& socket) const;
-  const Network::FilterChain*
-  findFilterChainForApplicationProtocols(const ApplicationProtocolsMap& application_protocols_map,
-                                         const Network::ConnectionSocket& socket) const;
-  const Network::FilterChain*
-  findFilterChainForSourceTypes(const SourceTypesArray& source_types,
-                                const Network::ConnectionSocket& socket) const;
-
-  static bool isWildcardServerName(const std::string& name);
-
-  // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
-  // and application protocols, using structures defined above.
-  DestinationPortsMap destination_ports_map_;
-
   ListenerManagerImpl& parent_;
+  FilterChainManagerImpl filter_chain_manager_;
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::SocketType socket_type_;
   Network::SocketSharedPtr socket_;
@@ -436,27 +361,6 @@ private:
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
-};
-
-class FilterChainImpl : public Network::FilterChain {
-public:
-  FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                  std::vector<Network::FilterFactoryCb> filters_factory)
-      : transport_socket_factory_(std::move(transport_socket_factory)),
-        filters_factory_(std::move(filters_factory)) {}
-
-  // Network::FilterChain
-  const Network::TransportSocketFactory& transportSocketFactory() const override {
-    return *transport_socket_factory_;
-  }
-
-  const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
-    return filters_factory_;
-  }
-
-private:
-  const Network::TransportSocketFactoryPtr transport_socket_factory_;
-  const std::vector<Network::FilterFactoryCb> filters_factory_;
 };
 
 } // namespace Server

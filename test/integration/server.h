@@ -81,9 +81,9 @@ public:
     return wrapped_scope_->counterFromStatName(name);
   }
 
-  Gauge& gaugeFromStatName(StatName name) override {
+  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->gaugeFromStatName(name);
+    return wrapped_scope_->gaugeFromStatName(name, import_mode);
   }
 
   Histogram& histogramFromStatName(StatName name) override {
@@ -98,9 +98,9 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return counterFromStatName(storage.statName());
   }
-  Gauge& gauge(const std::string& name) override {
+  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return gaugeFromStatName(storage.statName());
+    return gaugeFromStatName(storage.statName(), import_mode);
   }
   Histogram& histogram(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
@@ -151,13 +151,13 @@ public:
     return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugeFromStatName(StatName name) override {
+  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return store_.gaugeFromStatName(name);
+    return store_.gaugeFromStatName(name, import_mode);
   }
-  Gauge& gauge(const std::string& name) override {
+  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return store_.gauge(name);
+    return store_.gauge(name, import_mode);
   }
   Histogram& histogramFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);

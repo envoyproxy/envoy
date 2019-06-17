@@ -65,7 +65,8 @@ HedgePolicyImpl::HedgePolicyImpl(const envoy::api::v2::route::HedgePolicy& hedge
 HedgePolicyImpl::HedgePolicyImpl()
     : initial_requests_(1), additional_request_chance_({}), hedge_on_per_try_timeout_(false) {}
 
-RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy) {
+RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy,
+                                 ProtobufMessage::ValidationVisitor& validation_visitor) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
@@ -75,7 +76,8 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
   for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
         host_predicate.name());
-    auto config = Envoy::Config::Utility::translateToFactoryConfig(host_predicate, factory);
+    auto config = Envoy::Config::Utility::translateToFactoryConfig(host_predicate,
+                                                                   validation_visitor, factory);
     retry_host_predicate_configs_.emplace_back(host_predicate.name(), std::move(config));
   }
 
@@ -84,8 +86,8 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
         retry_priority.name());
     retry_priority_config_ =
-        std::make_pair(retry_priority.name(),
-                       Envoy::Config::Utility::translateToFactoryConfig(retry_priority, factory));
+        std::make_pair(retry_priority.name(), Envoy::Config::Utility::translateToFactoryConfig(
+                                                  retry_priority, validation_visitor, factory));
   }
 
   auto host_selection_attempts = retry_policy.host_selection_retry_max_attempts();
@@ -382,7 +384,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
       strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
-      retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route())),
+      retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route(),
+                                     factory_context.messageValidationVisitor())),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       total_cluster_weight_(
@@ -677,15 +680,16 @@ HedgePolicyImpl RouteEntryImplBase::buildHedgePolicy(
 
 RetryPolicyImpl RouteEntryImplBase::buildRetryPolicy(
     const absl::optional<envoy::api::v2::route::RetryPolicy>& vhost_retry_policy,
-    const envoy::api::v2::route::RouteAction& route_config) const {
+    const envoy::api::v2::route::RouteAction& route_config,
+    ProtobufMessage::ValidationVisitor& validation_visitor) const {
   // Route specific policy wins, if available.
   if (route_config.has_retry_policy()) {
-    return RetryPolicyImpl(route_config.retry_policy());
+    return RetryPolicyImpl(route_config.retry_policy(), validation_visitor);
   }
 
   // If not, we fallback to the virtual host policy if there is one.
   if (vhost_retry_policy) {
-    return RetryPolicyImpl(vhost_retry_policy.value());
+    return RetryPolicyImpl(vhost_retry_policy.value(), validation_visitor);
   }
 
   // Otherwise, an empty policy will do.
@@ -1182,7 +1186,8 @@ createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any&
   auto& factory = Envoy::Config::Utility::getAndCheckFactory<
       Server::Configuration::NamedHttpFilterConfigFactory>(name);
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, *proto_config);
+  Envoy::Config::Utility::translateOpaqueConfig(
+      typed_config, config, factory_context.messageValidationVisitor(), *proto_config);
   return factory.createRouteSpecificFilterConfig(*proto_config, factory_context);
 }
 

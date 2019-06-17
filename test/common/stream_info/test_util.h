@@ -207,7 +207,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
-  const Ssl::ConnectionInfo* downstream_connection_info_;
+  const Ssl::ConnectionInfo* downstream_connection_info_{};
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
   Envoy::StreamInfo::FilterStateImpl filter_state_{};

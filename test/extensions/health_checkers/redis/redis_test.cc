@@ -47,7 +47,8 @@ public:
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisHealthCheckConfig(health_check_config);
+    const auto& redis_config = getRedisHealthCheckConfig(
+        health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_.reset(
         new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
@@ -69,7 +70,8 @@ public:
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisHealthCheckConfig(health_check_config);
+    const auto& redis_config = getRedisHealthCheckConfig(
+        health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_.reset(
         new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
@@ -91,7 +93,8 @@ public:
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisHealthCheckConfig(health_check_config);
+    const auto& redis_config = getRedisHealthCheckConfig(
+        health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_.reset(
         new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
@@ -113,7 +116,8 @@ public:
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisHealthCheckConfig(health_check_config);
+    const auto& redis_config = getRedisHealthCheckConfig(
+        health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_.reset(
         new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,

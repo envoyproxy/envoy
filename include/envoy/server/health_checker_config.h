@@ -37,6 +37,12 @@ public:
    * created health checkers. This function may not be idempotent.
    */
   virtual Upstream::HealthCheckEventLoggerPtr eventLogger() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for health checker configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
 /**

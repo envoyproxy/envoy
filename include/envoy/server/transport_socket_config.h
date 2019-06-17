@@ -95,6 +95,12 @@ public:
   virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
 
   /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
    * @return reference to the Api object
    */
   virtual Api::Api& api() PURE;

@@ -1,0 +1,11 @@
+--- BUILD	2019-06-03 18:30:58.511651926 -0700
++++ opencensus/exporters/trace/stackdriver/BUILD	2019-06-03 18:32:38.107571186 -0700
+@@ -28,7 +28,7 @@
+     copts = DEFAULT_COPTS,
+     visibility = ["//visibility:public"],
+     deps = [
+-        "//google/devtools/cloudtrace/v2:tracing_proto",
++        "@googleapis//:tracing_proto",
+         "//opencensus/common:version",
+         "//opencensus/common/internal/grpc:status",
+         "//opencensus/common/internal/grpc:with_user_agent",

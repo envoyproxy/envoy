@@ -15,7 +15,7 @@ balancer types except the Original DST load balancer may be used for subset load
 The SLB can be configured with one of three fallback policies. If no subset matching the
 `LoadBalancerContext` is found:
 
-1. `NO_ENDPOINT` specifies that `chooseHost` returns `nullptr` and load balancing fails.
+1. `NO_FALLBACK` specifies that `chooseHost` returns `nullptr` and load balancing fails.
 2. `ANY_ENDPOINT` specifies that load balancing occurs over the entire set of upstream hosts.
 3. `DEFAULT_SUBSET` specifies that load balancing occurs over a specific subset of upstream
    hosts. If the default subset is empty, `chooseHost` returns `nullptr` and load balancing fails.

@@ -597,12 +597,14 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
   EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000)));
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket}, true);
-  EXPECT_EQ(1UL, stats_store_.gauge("downstream_pre_cx_active").value());
+  Stats::Gauge& downstream_pre_cx_active =
+      stats_store_.gauge("downstream_pre_cx_active", Stats::Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(1UL, downstream_pre_cx_active.value());
 
   EXPECT_CALL(*timeout, disableTimer());
   timeout->callback_();
   dispatcher_.clearDeferredDeleteList();
-  EXPECT_EQ(0UL, stats_store_.gauge("downstream_pre_cx_active").value());
+  EXPECT_EQ(0UL, downstream_pre_cx_active.value());
   EXPECT_EQ(1UL, stats_store_.counter("downstream_pre_cx_timeout").value());
 
   EXPECT_CALL(*listener, onDestroy());
