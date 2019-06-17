@@ -1,6 +1,7 @@
 #include "common/network/io_socket_handle_impl.h"
 
 #include <errno.h>
+
 #include <iostream>
 
 #include "envoy/buffer/buffer.h"
@@ -134,7 +135,6 @@ IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& re
 
 Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cmsg,
                                                              uint32_t self_port) {
-  std::cerr << "control message: cmsg_type " << cmsg->cmsg_type << "\n";
   if (cmsg->cmsg_type == IPV6_PKTINFO) {
     struct in6_pktinfo* info = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
     sockaddr_in6 ipv6_addr;
@@ -145,7 +145,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cms
     return Address::addressFromSockAddr(reinterpret_cast<sockaddr_storage&>(ipv6_addr),
                                         sizeof(sockaddr_in6), /*v6only=*/false);
   }
-#if defined(IP_PKTINFO)
+#ifndef IP_RECVDSTADDR
   if (cmsg->cmsg_type == IP_PKTINFO) {
     struct in_pktinfo* info = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
 #else
@@ -156,7 +156,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cms
     memset(&ipv4_addr, 0, sizeof(sockaddr_in));
     ipv4_addr.sin_family = AF_INET;
     ipv4_addr.sin_addr =
-#if defined(IP_PKTINFO)
+#ifndef IP_RECVDSTADDR
         info->ipi_addr;
 #else
         addr;
