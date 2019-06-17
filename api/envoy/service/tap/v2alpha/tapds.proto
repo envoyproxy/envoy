@@ -2,6 +2,7 @@ syntax = "proto3";
 
 import "envoy/api/v2/discovery.proto";
 import "envoy/service/tap/v2alpha/common.proto";
+import "validate/validate.proto";
 
 package envoy.service.tap.v2alpha;
 
