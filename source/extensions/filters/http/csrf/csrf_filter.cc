@@ -128,7 +128,7 @@ bool CsrfFilter::isValid(const absl::string_view source_origin, Http::HeaderMap&
   }
 
   for (const auto& additional_origin : policy_->additional_origins()) {
-    if (additional_origin.matches(source_origin)) {
+    if (additional_origin.match(source_origin)) {
       return true;
     }
   }

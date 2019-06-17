@@ -8,30 +8,13 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.csrf.v2";
 option go_package = "v2";
 
 import "envoy/api/v2/core/base.proto";
+import "envoy/type/matcher/string.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
 // [#protodoc-title: CSRF]
 // Cross-Site Request Forgery :ref:`configuration overview <config_http_filters_csrf>`.
-
-// Origin Matcher for CSRF policy configuration.
-message OriginMatcher {
-  // A string containing either an exact origin or regex pattern.
-  string origin = 1 [(validate.rules).string.min_bytes = 1];
-
-  // Origin matchers support both exact matches and regex patterns.
-  enum OriginType {
-    // The origin value will be evaluated exactly as is.
-    EXACT = 0;
-
-    // The origin value will be evaluated as regex.
-    REGEX = 1;
-  }
-
-  // The type of the the origin string.
-  OriginType type = 2 [(validate.rules).enum.defined_only = true];
-}
 
 // CSRF filter config.
 message CsrfPolicy {
@@ -64,5 +47,5 @@ message CsrfPolicy {
   //
   // More information on how this can be configured via runtime can be found
   // :ref:`here <csrf-configuration>`.
-  repeated OriginMatcher additional_origins = 3;
+  envoy.type.matcher.ListStringMatcher additional_origins = 3;
 }
