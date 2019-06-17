@@ -733,8 +733,11 @@ def checkFormatVisitor(arg, dir_name, names):
 
   # Sanity check CODEOWNERS.  This doesn't need to be done in a multi-threaded
   # manner as it is a small and limited list.
-  source_prefix =  './source/';
-  full_prefix = './source/extensions/';
+  source_prefix = './source/'
+  full_prefix = './source/extensions/'
+  # Check to see if this directory is a subdir under /source/extensions
+  # Also ignore top level directories under /source/extensions since we don't
+  # need owners for source/extensions/access_loggers etc, just the subdirectories.
   if dir_name.startswith(full_prefix) and '/' in dir_name[len(full_prefix):]:
     checkOwners(dir_name[len(source_prefix):], owned_directories, error_messages)
 
