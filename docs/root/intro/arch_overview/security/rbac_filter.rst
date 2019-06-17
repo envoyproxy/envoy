@@ -29,7 +29,7 @@ certificate. A policy is matched if its permissions and principals are matched a
 Shadow Policy
 -------------
 
-The filter can be configured with
+The filter can be configured with a
 :ref:`shadow policy <envoy_api_field_config.filter.http.rbac.v2.RBAC.shadow_rules>` that doesn't
 have any effect (i.e. not deny the request) but only emit stats and log the result. This is useful
 for testing a rule before applying in production.
