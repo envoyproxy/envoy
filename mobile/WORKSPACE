@@ -1,14 +1,16 @@
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-# TODO remove once https://github.com/bazelbuild/rules_foreign_cc/pull/253 is resolved
-# NOTE: this version should be kept up to date with https://github.com/lyft/envoy-edge-fork/blob/3573b07af1ab5c4cf687ced0f80e2ccc0a0b7ec2/bazel/repository_locations.bzl#L225-L230 until this is removed
+# NOTE: this version should be kept up to date with Envoy upstream:
+# https://github.com/envoyproxy/envoy/blob/master/bazel/repository_locations.bzl#L217
+# It currently diverges due to known issues with the android NDK and libevent.
+# https://github.com/lyft/envoy-mobile/issues/116
 http_archive(
     name = "rules_foreign_cc",
-    patches = ["//bazel:ranlib.patch"],
-    sha256 = "e1b67e1fda647c7713baac11752573bfd4c2d45ef09afb4d4de9eb9bd4e5ac76",
-    strip_prefix = "rules_foreign_cc-8648b0446092ef2a34d45b02c8dc4c35c3a8df79",
-    urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/8648b0446092ef2a34d45b02c8dc4c35c3a8df79.tar.gz"],
+    sha256 = "c95ef9c19b713fc25fc0851f81c486e0d55ab90ead67363958327c053d2b108b",
+    strip_prefix = "rules_foreign_cc-2b40a0098d4016f620c2ee4c10da0f46f5c90d57",
+    # 2019-06-17
+    urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/2b40a0098d4016f620c2ee4c10da0f46f5c90d57.tar.gz"],
 )
 
 load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependencies")
