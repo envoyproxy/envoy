@@ -149,7 +149,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cms
   if (cmsg->cmsg_type == IP_PKTINFO) {
     struct in_pktinfo* info = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
 #else
-  if (cmsgptr->cmsg_type == IP_RECVDSTADDR) {
+  if (cmsg->cmsg_type == IP_RECVDSTADDR) {
     struct in_addr* addr = reinterpret_cast<in_addr*>(CMSG_DATA(cmsg));
 #endif
     sockaddr_in ipv4_addr;
