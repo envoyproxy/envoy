@@ -50,19 +50,21 @@ class PermissiveSocketTest : public testing::Test {
 protected:
   PermissiveSocketTest()
       : raw_buffer_transport_socket_(new NiceMock<Network::MockTransportSocket>),
-        ssl_transport_socket_(new NiceMock<MockSslTransportSocket>) {
+        ssl_transport_socket_(new NiceMock<MockSslTransportSocket>) {}
+
+  void initialize() {
     auto unique_raw_buffer_transport_socket =
         std::unique_ptr<Network::MockTransportSocket>(raw_buffer_transport_socket_);
     auto unique_ssl_transport_socket =
         std::unique_ptr<MockSslTransportSocket>(ssl_transport_socket_);
     permissive_transport_socket_ = std::make_unique<PermissiveSocket>(
         std::move(unique_ssl_transport_socket), std::move(unique_raw_buffer_transport_socket));
+
+    EXPECT_CALL(*ssl_transport_socket_, setTransportSocketCallbacks(_)).Times(1);
+    permissive_transport_socket_->setTransportSocketCallbacks(callbacks_);
   }
 
   void downgrade() {
-    EXPECT_CALL(*ssl_transport_socket_, setTransportSocketCallbacks(_)).Times(1);
-    permissive_transport_socket_->setTransportSocketCallbacks(callbacks_);
-
     EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
     Network::IoResult io_result = {Network::PostIoAction::Close, 0, false};
     EXPECT_CALL(*ssl_transport_socket_, doRead(_)).WillOnce(Return(io_result));
@@ -85,8 +87,7 @@ protected:
 TEST_F(PermissiveSocketTest, DowngradeOnWrite) {
   InSequence s;
 
-  EXPECT_CALL(*ssl_transport_socket_, setTransportSocketCallbacks(_)).Times(1);
-  permissive_transport_socket_->setTransportSocketCallbacks(callbacks_);
+  initialize();
 
   EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
 
@@ -107,8 +108,7 @@ TEST_F(PermissiveSocketTest, DowngradeOnWrite) {
 TEST_F(PermissiveSocketTest, DowngradeOnRead) {
   InSequence s;
 
-  EXPECT_CALL(*ssl_transport_socket_, setTransportSocketCallbacks(_)).Times(1);
-  permissive_transport_socket_->setTransportSocketCallbacks(callbacks_);
+  initialize();
 
   EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
 
@@ -126,8 +126,7 @@ TEST_F(PermissiveSocketTest, DowngradeOnRead) {
 TEST_F(PermissiveSocketTest, DoNotDowngradeWhenHandShakeNotCompleteSocketKeepOpen) {
   InSequence s;
 
-  EXPECT_CALL(*ssl_transport_socket_, setTransportSocketCallbacks(_)).Times(1);
-  permissive_transport_socket_->setTransportSocketCallbacks(callbacks_);
+  initialize();
 
   EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
 
@@ -146,8 +145,7 @@ TEST_F(PermissiveSocketTest, DoNotDowngradeWhenHandShakeNotCompleteSocketKeepOpe
 TEST_F(PermissiveSocketTest, DoNotDowngradeWhenHandShakeCompleteSocketClosed) {
   InSequence s;
 
-  EXPECT_CALL(*ssl_transport_socket_, setTransportSocketCallbacks(_)).Times(1);
-  permissive_transport_socket_->setTransportSocketCallbacks(callbacks_);
+  initialize();
 
   EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
 
@@ -166,6 +164,8 @@ TEST_F(PermissiveSocketTest, DoNotDowngradeWhenHandShakeCompleteSocketClosed) {
 TEST_F(PermissiveSocketTest, ProtocolBeforeAndAfterDowngrade) {
   InSequence s;
 
+  initialize();
+
   EXPECT_CALL(*ssl_transport_socket_, protocol()).WillOnce(Return("h2"));
   EXPECT_EQ("h2", permissive_transport_socket_->protocol());
 
@@ -176,6 +176,8 @@ TEST_F(PermissiveSocketTest, ProtocolBeforeAndAfterDowngrade) {
 
 TEST_F(PermissiveSocketTest, FailureReasonBeforeAndAfterDowngrade) {
   InSequence s;
+
+  initialize();
 
   std::string reason = "connection failure";
   EXPECT_CALL(*ssl_transport_socket_, failureReason()).WillOnce(Return(reason));
@@ -190,6 +192,8 @@ TEST_F(PermissiveSocketTest, FailureReasonBeforeAndAfterDowngrade) {
 TEST_F(PermissiveSocketTest, OnConnectedBeforeAndAfterDowngrade) {
   InSequence s;
 
+  initialize();
+
   EXPECT_CALL(*ssl_transport_socket_, onConnected()).Times(1);
   permissive_transport_socket_->onConnected();
 
@@ -201,6 +205,8 @@ TEST_F(PermissiveSocketTest, OnConnectedBeforeAndAfterDowngrade) {
 
 TEST_F(PermissiveSocketTest, CanFlushCloseBeforeAndAfterDowngrade) {
   InSequence s;
+
+  initialize();
 
   EXPECT_CALL(*ssl_transport_socket_, canFlushClose()).Times(1);
   permissive_transport_socket_->canFlushClose();
@@ -214,6 +220,8 @@ TEST_F(PermissiveSocketTest, CanFlushCloseBeforeAndAfterDowngrade) {
 TEST_F(PermissiveSocketTest, CloseSocketBeforeAndAfterDowngrade) {
   InSequence s;
 
+  initialize();
+
   EXPECT_CALL(*ssl_transport_socket_, closeSocket(Network::ConnectionEvent::LocalClose)).Times(1);
   permissive_transport_socket_->closeSocket(Network::ConnectionEvent::LocalClose);
 
@@ -226,6 +234,8 @@ TEST_F(PermissiveSocketTest, CloseSocketBeforeAndAfterDowngrade) {
 
 TEST_F(PermissiveSocketTest, CheckSslBeforeAndAfterDowngrade) {
   InSequence s;
+
+  initialize();
 
   EXPECT_CALL(*ssl_transport_socket_, ssl()).WillOnce(Return(ssl_transport_socket_));
   EXPECT_NE(nullptr, permissive_transport_socket_->ssl());
