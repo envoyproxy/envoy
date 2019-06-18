@@ -13,7 +13,8 @@ http_archive(
     urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/2b40a0098d4016f620c2ee4c10da0f46f5c90d57.tar.gz"],
 )
 
-# Here instead of in upstream envoy to work around https://github.com/abseil/abseil-cpp/issues/326
+# Workaround for https://github.com/abseil/abseil-cpp/issues/326.
+# Should be removed in https://github.com/lyft/envoy-mobile/issues/136 once resolved.
 http_archive(
     name = "com_google_absl",
     sha256 = "e35082e88b9da04f4d68094c05ba112502a5063712f3021adfa465306d238c76",
