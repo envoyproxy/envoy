@@ -37,4 +37,4 @@ extensions/filters/common/original_src @snowp @klarose
 # redis cluster extension
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
 # permissive transport socket extension
-/*/extensions/transport_sockets/permissive @crazyxy
+/*/extensions/transport_sockets/permissive @lizan @crazyxy
