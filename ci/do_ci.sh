@@ -55,10 +55,19 @@ function cp_binary_for_image_build() {
   strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_"$1"_stripped/envoy
 }
 
+# When testing memory consumption, we want to test against exact byte-counts
+# where possible. As these differ between platforms and compile options, we
+# define the 'release' builds as canonical and test them only in CI, so the
+# toolchain is kept consistent. This ifdef is checked in
+# test/common/stats/stat_test_utility.cc when computing
+# Stats::TestUtil::MemoryTest::mode().
+MEMORY_TEST_EXACT_ARGS="--cxxopt=-DMEMORY_TEST_EXACT=1"
+
 function bazel_binary_build() {
   BINARY_TYPE="$1"
   if [[ "${BINARY_TYPE}" == "release" ]]; then
     COMPILE_TYPE="opt"
+    CONFIG_ARGS="$MEMORY_TEST_EXACT_ARGS"
   elif [[ "${BINARY_TYPE}" == "debug" ]]; then
     COMPILE_TYPE="dbg"
   elif [[ "${BINARY_TYPE}" == "sizeopt" ]]; then
@@ -85,21 +94,23 @@ if [[ "$1" == "bazel.release" ]]; then
   setup_clang_toolchain
   echo "bazel release build with tests..."
   bazel_binary_build release
+  RELEASE_OPTIONS="-c opt ${MEMORY_TEST_EXACT_ARGS}"
+  BAZEL_TEST_RELEASE_OPTIONS="test ${BAZEL_TEST_OPTIONS} ${RELEASE_OPTIONS}"
 
   if [[ $# -gt 1 ]]; then
     shift
     echo "Testing $* ..."
     # Run only specified tests. Argument can be a single test
     # (e.g. '//test/common/common:assert_test') or a test group (e.g. '//test/common/...')
-    bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c opt $*
+    bazel_with_collection $BAZEL_TEST_RELEASE_OPTIONS $*
   else
     echo "Testing..."
     # We have various test binaries in the test directory such as tools, benchmarks, etc. We
     # run a build pass to make sure they compile.
 
-    bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
+    bazel build ${BAZEL_BUILD_OPTIONS} ${RELEASE_OPTIONS} //include/... //source/... //test/...
     # Now run all of the tests which should already be compiled.
-    bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c opt //test/...
+    bazel_with_collection $BAZEL_TEST_RELEASE_OPTIONS //test/...
   fi
   exit 0
 elif [[ "$1" == "bazel.release.server_only" ]]; then

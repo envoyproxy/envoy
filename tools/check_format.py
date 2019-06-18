@@ -78,6 +78,81 @@ PROTOBUF_TYPE_ERRORS = {
 LIBCXX_REPLACEMENTS = {
     "absl::make_unique<": "std::make_unique<",
 }
+
+UNOWNED_EXTENSIONS = {
+  "extensions/filters/http/ratelimit",
+  "extensions/filters/http/buffer",
+  "extensions/filters/http/grpc_http1_bridge",
+  "extensions/filters/http/grpc_http1_reverse_bridge",
+  "extensions/filters/http/rbac",
+  "extensions/filters/http/gzip",
+  "extensions/filters/http/ip_tagging",
+  "extensions/filters/http/tap",
+  "extensions/filters/http/fault",
+  "extensions/filters/http/grpc_json_transcoder",
+  "extensions/filters/http/health_check",
+  "extensions/filters/http/router",
+  "extensions/filters/http/cors",
+  "extensions/filters/http/ext_authz",
+  "extensions/filters/http/dynamo",
+  "extensions/filters/http/lua",
+  "extensions/filters/http/grpc_web",
+  "extensions/filters/http/common",
+  "extensions/filters/http/common/aws",
+  "extensions/filters/http/squash",
+  "extensions/filters/common",
+  "extensions/filters/common/ratelimit",
+  "extensions/filters/common/rbac",
+  "extensions/filters/common/fault",
+  "extensions/filters/common/ext_authz",
+  "extensions/filters/common/lua",
+  "extensions/filters/common/original_src",
+  "extensions/filters/listener/original_dst",
+  "extensions/filters/listener/proxy_protocol",
+  "extensions/filters/listener/tls_inspector",
+  "extensions/grpc_credentials/example",
+  "extensions/grpc_credentials/file_based_metadata",
+  "extensions/stat_sinks/dog_statsd",
+  "extensions/stat_sinks/hystrix",
+  "extensions/stat_sinks/metrics_service",
+  "extensions/stat_sinks/statsd",
+  "extensions/stat_sinks/common",
+  "extensions/stat_sinks/common/statsd",
+  "extensions/health_checkers/redis",
+  "extensions/access_loggers/http_grpc",
+  "extensions/access_loggers/file",
+  "extensions/common/tap",
+  "extensions/transport_sockets/raw_buffer",
+  "extensions/transport_sockets/tap",
+  "extensions/transport_sockets/tls",
+  "extensions/tracers/zipkin",
+  "extensions/tracers/dynamic_ot",
+  "extensions/tracers/opencensus",
+  "extensions/tracers/lightstep",
+  "extensions/tracers/common",
+  "extensions/tracers/common/ot",
+  "extensions/resource_monitors/injected_resource",
+  "extensions/resource_monitors/fixed_heap",
+  "extensions/resource_monitors/common",
+  "extensions/retry/priority",
+  "extensions/retry/priority/previous_priorities",
+  "extensions/retry/host",
+  "extensions/retry/host/previous_hosts",
+  "extensions/filters/network/ratelimit",
+  "extensions/filters/network/client_ssl_auth",
+  "extensions/filters/network/http_connection_manager",
+  "extensions/filters/network/rbac",
+  "extensions/filters/network/tcp_proxy",
+  "extensions/filters/network/echo",
+  "extensions/filters/network/ext_authz",
+  "extensions/filters/network/redis_proxy",
+  "extensions/filters/network/kafka",
+  "extensions/filters/network/kafka/protocol_code_generator",
+  "extensions/filters/network/kafka/serialization_code_generator",
+  "extensions/filters/network/mongo_proxy",
+  "extensions/filters/network/common",
+  "extensions/filters/network/common/redis",
+}
 # yapf: enable
 
 
@@ -622,11 +697,30 @@ def checkFormatReturnTraceOnError(file_path):
     return traceback.format_exc().split("\n")
 
 
+def checkOwners(dir_name, owned_directories, error_messages):
+  """Checks to make sure a given directory is present either in CODEOWNERS or OWNED_EXTENSIONS
+
+  Args:
+    dir_name: the directory being checked.
+    owned_directories: directories currently listed in CODEOWNERS.
+    error_messages: where to put an error message for new unowned directories.
+  """
+  found = False
+  for owned in owned_directories:
+    if owned.startswith(dir_name) or dir_name.startswith(owned):
+      found = True
+  if not found and dir_name not in UNOWNED_EXTENSIONS:
+    error_messages.append("New directory %s appears to not have owners in CODEOWNERS" % dir_name)
+
+
 def checkFormatVisitor(arg, dir_name, names):
   """Run checkFormat in parallel for the given files.
 
   Args:
-    arg: a tuple (pool, result_list) for starting tasks asynchronously.
+    arg: a tuple (pool, result_list, owned_directories, error_messages)
+      pool and result_list are for starting tasks asynchronously.
+      owned_directories tracks directories listed in the CODEOWNERS file.
+      error_messages is a list of string format errors.
     dir_name: the parent directory of the given files.
     names: a list of file names.
   """
@@ -635,7 +729,18 @@ def checkFormatVisitor(arg, dir_name, names):
   # python lists are passed as references, this is used to collect the list of
   # async results (futures) from running checkFormat and passing them back to
   # the caller.
-  pool, result_list = arg
+  pool, result_list, owned_directories, error_messags = arg
+
+  # Sanity check CODEOWNERS.  This doesn't need to be done in a multi-threaded
+  # manner as it is a small and limited list.
+  source_prefix = './source/'
+  full_prefix = './source/extensions/'
+  # Check to see if this directory is a subdir under /source/extensions
+  # Also ignore top level directories under /source/extensions since we don't
+  # need owners for source/extensions/access_loggers etc, just the subdirectories.
+  if dir_name.startswith(full_prefix) and '/' in dir_name[len(full_prefix):]:
+    checkOwners(dir_name[len(source_prefix):], owned_directories, error_messages)
+
   for file_name in names:
     result = pool.apply_async(checkFormatReturnTraceOnError, args=(dir_name + "/" + file_name,))
     result_list.append(result)
@@ -705,6 +810,24 @@ if __name__ == "__main__":
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
 
+  # Returns the list of directories with owners listed in CODEOWNERS
+  def ownedDirectories():
+    owned = []
+    try:
+      with open('./CODEOWNERS') as f:
+        for line in f:
+          # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
+          # name and store it in the list of directories with documented owners.
+          m = re.search(r'..*(extensions[^@]* )@.*@.*', line)
+          if m is not None:
+            owned.append(m.group(1).strip())
+      return owned
+    except IOError:
+      return []  # for the check format tests.
+
+  # Calculate the list of owned directories once per run.
+  owned_directories = ownedDirectories()
+
   # Check whether all needed external tools are available.
   ct_error_messages = checkTools()
   if checkErrorMessages(ct_error_messages):
@@ -715,15 +838,17 @@ if __name__ == "__main__":
   else:
     pool = multiprocessing.Pool(processes=args.num_workers)
     results = []
+    error_messages = []
     # For each file in target_path, start a new task in the pool and collect the
     # results (results is passed by reference, and is used as an output).
-    os.path.walk(target_path, checkFormatVisitor, (pool, results))
+    os.path.walk(target_path, checkFormatVisitor,
+                 (pool, results, owned_directories, error_messages))
 
     # Close the pool to new tasks, wait for all of the running tasks to finish,
     # then collect the error messages.
     pool.close()
     pool.join()
-    error_messages = sum((r.get() for r in results), [])
+    error_messages += sum((r.get() for r in results), [])
 
   if checkErrorMessages(error_messages):
     print("ERROR: check format failed. run 'tools/check_format.py fix'")
