@@ -35,7 +35,8 @@ namespace {
 class ExtAuthzHttpClientTest : public testing::Test {
 public:
   ExtAuthzHttpClientTest()
-      : async_request_{&async_client_}, config_{createConfig()}, client_{cm_, config_} {
+      : async_request_{&async_client_}, config_{createConfig()}, realtime_{}, client_{cm_, config_,
+                                                                                      realtime_} {
     ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
         .WillByDefault(ReturnRef(async_client_));
   }
@@ -120,6 +121,7 @@ public:
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<Http::MockAsyncClientRequest> async_request_;
   ClientConfigSharedPtr config_;
+  RealTimeSource realtime_;
   RawHttpClientImpl client_;
   MockRequestCallbacks request_callbacks_;
   Tracing::MockSpan active_span_;

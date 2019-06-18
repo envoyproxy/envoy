@@ -146,8 +146,9 @@ Http::LowerCaseStrPairVector ClientConfig::toHeadersAdd(
   return header_vec;
 }
 
-RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config)
-    : cm_(cm), config_(config), real_time_() {}
+RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
+                                     TimeSource& time_source)
+    : cm_(cm), config_(config), time_source_(time_source) {}
 
 RawHttpClientImpl::~RawHttpClientImpl() { ASSERT(!callbacks_); }
 
@@ -169,7 +170,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   callbacks_ = &callbacks;
 
   span_ = parent_span.spawnChild(Tracing::EgressConfig::get(), config_->tracingName(),
-                                 real_time_.systemTime());
+                                 time_source_.systemTime());
   span_->setTag(Tracing::Tags::get().UpstreamCluster, config_->cluster());
 
   Http::HeaderMapPtr headers;

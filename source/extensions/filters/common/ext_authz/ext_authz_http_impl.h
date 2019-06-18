@@ -135,7 +135,8 @@ class RawHttpClientImpl : public Client,
                           public Http::AsyncClient::Callbacks,
                           Logger::Loggable<Logger::Id::config> {
 public:
-  explicit RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config);
+  explicit RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
+                             TimeSource& time_source);
   ~RawHttpClientImpl();
 
   // ExtAuthz::Client
@@ -153,7 +154,7 @@ private:
   ClientConfigSharedPtr config_;
   Http::AsyncClient::Request* request_{};
   RequestCallbacks* callbacks_{};
-  RealTimeSource real_time_;
+  TimeSource& time_source_;
   Tracing::SpanPtr span_;
 };
 
