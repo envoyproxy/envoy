@@ -97,11 +97,8 @@ public:
    */
   struct Flags {
     static const uint8_t Used = 0x01;
-    // TODO(fredlas) these logic flags should be removed if we move to indicating combine logic in
-    // the stat declaration macros themselves. (Now that stats no longer use shared memory, it's
-    // safe to mess with what these flag bits mean whenever we want).
     static const uint8_t LogicAccumulate = 0x02;
-    static const uint8_t ImportModeUninitialized = 0x04; // Stat was discovered during import.
+    static const uint8_t NeverImport = 0x04;
   };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;

@@ -70,39 +70,10 @@ void CdsApiImpl::onConfigUpdate(
                                                                  validation_visitor_);
       MessageUtil::validate(cluster);
       if (!cluster_names.insert(cluster.name()).second) {
-        // NOTE: at this point, the first of these duplicates has already been successfully
-        // applied.
+        // NOTE: at this point, the first of these duplicates has already been successfully applied.
         throw EnvoyException(fmt::format("duplicate cluster {} found", cluster.name()));
       }
-      if (cm_.addOrUpdateCluster(
-              cluster, resource.version(),
-              [this](const std::string&, ClusterManager::ClusterWarmingState state) {
-                // Following if/else block implements a control flow mechanism that can be used
-                // by an ADS implementation to properly sequence CDS and RDS update. It is not
-                // enforcing on ADS. ADS can use it to detect when a previously sent cluster
-                // becomes warm before sending routes that depend on it. This can improve
-                // incidence of HTTP 503 responses from Envoy when a route is used before it's
-                // supporting cluster is ready.
-                //
-                // We achieve that by leaving CDS in the paused state as long as there is at
-                // least one cluster in the warming state. This prevents CDS ACK from being sent
-                // to ADS. Once cluster is warmed up, CDS is resumed, and ACK is sent to ADS,
-                // providing a signal to ADS to proceed with RDS updates.
-                //
-                // Major concern with this approach is CDS being left in the paused state
-                // forever. As long as ClusterManager::removeCluster() is not called on a
-                // warming cluster this is not an issue. CdsApiImpl takes care of doing this
-                // properly, and there is no other component removing clusters from the
-                // ClusterManagerImpl. If this ever changes, we would need to correct the
-                // following logic.
-                if (state == ClusterManager::ClusterWarmingState::Starting &&
-                    cm_.warmingClusterCount() == 1) {
-                  cm_.adsMux().pause(Config::TypeUrl::get().Cluster);
-                } else if (state == ClusterManager::ClusterWarmingState::Finished &&
-                           cm_.warmingClusterCount() == 0) {
-                  cm_.adsMux().resume(Config::TypeUrl::get().Cluster);
-                }
-              })) {
+      if (cm_.addOrUpdateCluster(cluster, resource.version())) {
         any_applied = true;
         ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster.name());
       }

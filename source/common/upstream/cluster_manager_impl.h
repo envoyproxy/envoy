@@ -177,8 +177,8 @@ public:
                      Http::Context& http_context);
 
   // Upstream::ClusterManager
-  bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster, const std::string& version_info,
-                          ClusterWarmingCallback cluster_warming_cb) override;
+  bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
+                          const std::string& version_info) override;
   void setInitializedCb(std::function<void()> callback) override {
     init_helper_.setInitializedCb(callback);
   }
@@ -212,7 +212,7 @@ public:
     ads_mux_.reset();
     active_clusters_.clear();
     warming_clusters_.clear();
-    updateGauges();
+    updateClusterCounts();
   }
 
   const envoy::api::v2::core::BindConfig& bindConfig() const override { return bind_config_; }
@@ -424,6 +424,7 @@ private:
     // (the expected behavior).
     MonotonicTime last_updated_;
   };
+
   using PendingUpdatesPtr = std::unique_ptr<PendingUpdates>;
   using PendingUpdatesByPriorityMap = std::unordered_map<uint32_t, PendingUpdatesPtr>;
   using PendingUpdatesByPriorityMapPtr = std::unique_ptr<PendingUpdatesByPriorityMap>;
@@ -439,7 +440,7 @@ private:
                    bool added_via_api, ClusterMap& cluster_map);
   void onClusterInit(Cluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
-  void updateGauges();
+  void updateClusterCounts();
 
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;

@@ -77,25 +77,6 @@ public:
   virtual ~ClusterManager() = default;
 
   /**
-   * Warming state a cluster is currently in. Used as an argument for the ClusterWarmingCallback.
-   */
-  enum class ClusterWarmingState {
-    // Sent after cluster warming has finished.
-    Finished = 0,
-    // Sent just before cluster warming is about to start.
-    Starting = 1,
-  };
-
-  /**
-   * Called by the ClusterManager when cluster's warming state changes
-   *
-   * @param cluster_name name of the cluster.
-   * @param warming_state state the cluster transitioned to.
-   */
-  using ClusterWarmingCallback =
-      std::function<void(const std::string& cluster_name, ClusterWarmingState warming_state)>;
-
-  /**
    * Add or update a cluster via API. The semantics of this API are:
    * 1) The hash of the config is used to determine if an already existing cluster has changed.
    *    Nothing is done if the hash matches the previously running configuration.
@@ -106,8 +87,7 @@ public:
    * @return true if the action results in an add/update of a cluster.
    */
   virtual bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
-                                  const std::string& version_info,
-                                  ClusterWarmingCallback cluster_warming_cb) PURE;
+                                  const std::string& version_info) PURE;
 
   /**
    * Set a callback that will be invoked when all owned clusters have been initialized.
