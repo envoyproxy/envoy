@@ -429,7 +429,7 @@ message HttpConnectionManager {
   // header, returning a 400 response if any of the headers contain an invalid
   // value. See `Header Fields `<https://tools.ietf.org/html/rfc7230#section-3.2>`_
   // for details.
-  google.protobuf.BoolValue validate_headers = 33;
+  bool validate_headers = 33;
 }
 
 message Rds {
