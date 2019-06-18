@@ -25,7 +25,7 @@ namespace Configuration {
  */
 class TransportSocketFactoryContext {
 public:
-  virtual ~TransportSocketFactoryContext() {}
+  virtual ~TransportSocketFactoryContext() = default;
 
   /**
    * @return Server::Admin& the server's admin interface.
@@ -108,7 +108,7 @@ public:
 
 class TransportSocketConfigFactory {
 public:
-  virtual ~TransportSocketConfigFactory() {}
+  virtual ~TransportSocketConfigFactory() = default;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message. The transport socket

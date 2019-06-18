@@ -21,7 +21,7 @@ struct RcDetailsValues {
   // The gRPC HTTP/1 bridge encountered an unsupported content type.
   const std::string GrpcBridgeFailedContentType = "grpc_bridge_content_type_wrong";
 };
-typedef ConstSingleton<RcDetailsValues> RcDetails;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
 Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::HeaderMap& headers) {

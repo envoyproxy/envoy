@@ -13,7 +13,7 @@ namespace Envoy {
  */
 class MutexTracer {
 public:
-  virtual ~MutexTracer() {}
+  virtual ~MutexTracer() = default;
 
   /**
    * @return resets the captured statistics.

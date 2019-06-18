@@ -83,7 +83,7 @@ protected:
 
 // Tests for ProtocolIntegrationTest will be run with the full mesh of H1/H2
 // downstream and H1/H2 upstreams.
-typedef HttpProtocolIntegrationTest ProtocolIntegrationTest;
+using ProtocolIntegrationTest = HttpProtocolIntegrationTest;
 
 TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   auto response = makeHeaderOnlyRequest(nullptr, 0);

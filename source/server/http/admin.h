@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/admin/v2alpha/clusters.pb.h"
+#include "envoy/admin/v2alpha/listeners.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -103,6 +104,7 @@ public:
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return false; }
+  bool preserveExternalRequestId() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
@@ -209,6 +211,12 @@ private:
                       Buffer::Instance& response);
   void writeClustersAsJson(Buffer::Instance& response);
   void writeClustersAsText(Buffer::Instance& response);
+
+  /**
+   * Helper methods for the /listeners url handler.
+   */
+  void writeListenersAsJson(Buffer::Instance& response);
+  void writeListenersAsText(Buffer::Instance& response);
 
   static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {

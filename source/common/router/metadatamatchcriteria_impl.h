@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Router {
 
 class MetadataMatchCriteriaImpl;
-typedef std::unique_ptr<const MetadataMatchCriteriaImpl> MetadataMatchCriteriaImplConstPtr;
+using MetadataMatchCriteriaImplConstPtr = std::unique_ptr<const MetadataMatchCriteriaImpl>;
 
 class MetadataMatchCriteriaImpl : public MetadataMatchCriteria {
 public:

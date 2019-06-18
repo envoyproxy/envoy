@@ -25,7 +25,7 @@ public:
   DecoderStateMachineTestBase() : metadata_(std::make_shared<MessageMetadata>()) {
     context_.header_size_ = 16;
   }
-  virtual ~DecoderStateMachineTestBase() {}
+  virtual ~DecoderStateMachineTestBase() = default;
 
   void initHandler() {
     EXPECT_CALL(decoder_callback_, newDecoderEventHandler())

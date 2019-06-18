@@ -82,7 +82,7 @@ private:
   Http::Context& http_context_;
 };
 
-typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 /**
  * HTTP rate limit filter. Depending on the route configuration, this filter calls the global

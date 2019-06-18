@@ -21,7 +21,7 @@ namespace Grpc {
  */
 class AsyncRequest {
 public:
-  virtual ~AsyncRequest() {}
+  virtual ~AsyncRequest() = default;
 
   /**
    * Signals that the request should be cancelled. No further callbacks will be invoked.
@@ -34,7 +34,7 @@ public:
  */
 class RawAsyncStream {
 public:
-  virtual ~RawAsyncStream() {}
+  virtual ~RawAsyncStream() = default;
 
   /**
    * Send request message to the stream.
@@ -61,7 +61,7 @@ public:
 
 class RawAsyncRequestCallbacks {
 public:
-  virtual ~RawAsyncRequestCallbacks() {}
+  virtual ~RawAsyncRequestCallbacks() = default;
 
   /**
    * Called when populating the headers to send with initial metadata.
@@ -95,7 +95,7 @@ public:
  */
 class RawAsyncStreamCallbacks {
 public:
-  virtual ~RawAsyncStreamCallbacks() {}
+  virtual ~RawAsyncStreamCallbacks() = default;
 
   /**
    * Called when populating the headers to send with initial metadata.
@@ -141,7 +141,7 @@ public:
  */
 class RawAsyncClient {
 public:
-  virtual ~RawAsyncClient() {}
+  virtual ~RawAsyncClient() = default;
 
   /**
    * Start a gRPC unary RPC asynchronously.
@@ -177,7 +177,7 @@ public:
                                    RawAsyncStreamCallbacks& callbacks) PURE;
 };
 
-typedef std::unique_ptr<RawAsyncClient> RawAsyncClientPtr;
+using RawAsyncClientPtr = std::unique_ptr<RawAsyncClient>;
 
 } // namespace Grpc
 } // namespace Envoy

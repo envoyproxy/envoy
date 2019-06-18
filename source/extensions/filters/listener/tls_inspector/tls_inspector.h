@@ -55,7 +55,7 @@ private:
   const uint32_t max_client_hello_size_;
 };
 
-typedef std::shared_ptr<Config> ConfigSharedPtr;
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
  * TLS inspector listener filter.

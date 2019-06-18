@@ -28,7 +28,7 @@ public:
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };
-  virtual ~IoError() {}
+  virtual ~IoError() = default;
 
   virtual IoErrorCode getErrorCode() const PURE;
   virtual std::string getErrorDetails() const PURE;
@@ -47,12 +47,12 @@ using IoErrorPtr = std::unique_ptr<IoError, IoErrorDeleterType>;
 template <typename ReturnValue> struct IoCallResult {
   IoCallResult(ReturnValue rc, IoErrorPtr err) : rc_(rc), err_(std::move(err)) {}
 
-  IoCallResult(IoCallResult<ReturnValue>&& result)
+  IoCallResult(IoCallResult<ReturnValue>&& result) noexcept
       : rc_(result.rc_), err_(std::move(result.err_)) {}
 
-  virtual ~IoCallResult() {}
+  virtual ~IoCallResult() = default;
 
-  IoCallResult& operator=(IoCallResult&& result) {
+  IoCallResult& operator=(IoCallResult&& result) noexcept {
     rc_ = result.rc_;
     err_ = std::move(result.err_);
     return *this;

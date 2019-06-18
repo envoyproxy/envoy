@@ -14,7 +14,7 @@ namespace HealthCheckers {
 namespace RedisHealthChecker {
 namespace {
 
-typedef Extensions::HealthCheckers::RedisHealthChecker::RedisHealthChecker CustomRedisHealthChecker;
+using CustomRedisHealthChecker = Extensions::HealthCheckers::RedisHealthChecker::RedisHealthChecker;
 
 TEST(HealthCheckerFactoryTest, CreateRedis) {
   const std::string yaml = R"EOF(
