@@ -10,151 +10,162 @@ resources:
 trigger:
 - master
 
-jobs:
-  - job: all_format
-    timeoutInMinutes: 60
-    pool:
-      vmImage: 'Ubuntu 16.04'
-    container: envoy-container
-    steps:
-      - checkout: self
-        submodules: true
-      - script: ./tools/check_format.sh
-        displayName: 'Run formatters'
-  - job: ios_swift_lint
-    timeoutInMinutes: 60
-    pool:
-      vmImage: 'Ubuntu 16.04'
-    container: swiftlint-container
-    steps:
-      - checkout: self
-      - script: swiftlint lint --strict
-        displayName: 'Run SwiftLint'
-  - job: kotlin_lint
-    timeoutInMinutes: 60
-    pool:
-      vmImage: 'Ubuntu 16.04'
-    container: jdk8
-    steps:
-      - checkout: self
-      - script: ./ci/kotlin_lint.sh
-        displayName: 'Run Kotlin lint'
-  - job: android_dist
-    pool:
-      vmImage: 'Ubuntu 16.04'
-    variables:
-      android_ndk_home: /usr/local/lib/android/sdk/ndk-bundle
-    steps:
-      - checkout: self
-        submodules: true
-      - script: ./ci/linux_ci_setup.sh
-        displayName: 'Install dependencies'
-      - script: |
-          export PATH=/usr/lib/llvm-8/bin:$PATH
-          export CC=clang
-          export CXX=clang++
-        displayName: 'Set up clang toolchain'
-      - script: |
-          bazel build --fat_apk_cpu=x86 //:android_dist
-        displayName: 'Build envoy.aar distributable'
-      - task: PublishPipelineArtifact@0
-        displayName: 'Publish envoy.aar distributable'
-        inputs:
-          artifactName: 'envoy.aar'
-          targetPath: 'dist/envoy.aar'
-  - job: android_java_helloworld
-    dependsOn: android_dist
-    timeoutInMinutes: 360
-    pool:
-      vmImage: 'Ubuntu 16.04'
-    variables:
-      android_ndk_home: /usr/local/lib/android/sdk/ndk-bundle
-    steps:
-      - checkout: self
-        submodules: true
-      - script: ./ci/linux_ci_setup.sh
-        displayName: 'Install dependencies'
-      - script: mkdir -p dist/
-        displayName: 'Create directory for distributable'
-      - task: DownloadPipelineArtifact@0
-        displayName: 'Download envoy.aar distributable'
-        inputs:
-          artifactName: 'envoy.aar'
-          targetPath: dist
-      - script: bazel build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
-        displayName: 'Build java app'
-  - job: android_kotlin_helloworld
-    dependsOn: android_dist
-    timeoutInMinutes: 360
-    pool:
-      vmImage: 'Ubuntu 16.04'
-    variables:
-      android_ndk_home: /usr/local/lib/android/sdk/ndk-bundle
-    steps:
-      - checkout: self
-        submodules: true
-      - script: ./ci/linux_ci_setup.sh
-        displayName: 'Install dependencies'
-      - script: mkdir -p dist/
-        displayName: 'Create directory for distributable'
-      - task: DownloadPipelineArtifact@0
-        displayName: 'Download envoy.aar distributable'
-        inputs:
-          artifactName: 'envoy.aar'
-          targetPath: dist
-      - script: bazel build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
-        displayName: 'Build kotlin app'
-  - job: iOS_dist
-    timeoutInMinutes: 360
-    pool:
-      vmImage: 'macos-10.14'
-    steps:
-      - checkout: self
-        submodules: true
-      - script: ./ci/mac_ci_setup.sh
-        displayName: 'Install dependencies'
-      - script: bazel build --config=ios //:ios_dist
-        displayName: 'Build Envoy.framework distributable'
-      - task: PublishPipelineArtifact@0
-        displayName: 'Publish Envoy.framework distributable'
-        inputs:
-          artifactName: 'Envoy.framework'
-          targetPath: 'dist/Envoy.framework'
-  - job: iOS_objc
-    dependsOn: iOS_dist
-    timeoutInMinutes: 360
-    pool:
-      vmImage: 'macos-10.14'
-    steps:
-      - checkout: self
-        submodules: true
-      - script: ./ci/mac_ci_setup.sh
-        displayName: 'Install dependencies'
-      - script: mkdir -p dist/Envoy.framework
-        displayName: 'Create directory for distributable'
-      - task: DownloadPipelineArtifact@0
-        displayName: 'Download Envoy.framework distributable'
-        inputs:
-          artifactName: Envoy.framework
-          targetPath: dist/Envoy.framework
-      - script: bazel build --config=ios //examples/objective-c/hello_world:app
-        displayName: 'Build objective-c app'
-  - job: iOS_swift
-    dependsOn: iOS_dist
-    timeoutInMinutes: 360
-    pool:
-      vmImage: 'macos-10.14'
-    steps:
-      - checkout: self
-        submodules: true
-      - script: ./ci/mac_ci_setup.sh
-        displayName: 'Install dependencies'
-      - script: mkdir -p dist/Envoy.framework
-        displayName: 'Create directory for distributable'
-      - task: DownloadPipelineArtifact@0
-        displayName: 'Download Envoy.framework distributable'
-        inputs:
-          artifactName: Envoy.framework
-          targetPath: dist/Envoy.framework
-      - script: bazel build --config=ios //examples/swift/hello_world:app
-        displayName: 'Build swift app'
+stages:
+  - stage: format
+    dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    jobs:
+      - job: all_lint
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'Ubuntu 16.04'
+        container: envoy-container
+        steps:
+          - checkout: self
+            submodules: true
+          - script: ./tools/check_format.sh
+            displayName: 'Run formatters'
+      - job: swift_lint
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'Ubuntu 16.04'
+        container: swiftlint-container
+        steps:
+          - checkout: self
+            submodules: true
+          - script: swiftlint lint --strict
+            displayName: 'Run SwiftLint'
+      - job: kotlin_lint
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'Ubuntu 16.04'
+        container: jdk8
+        steps:
+          - checkout: self
+          - script: ./ci/kotlin_lint.sh
+            displayName: 'Run Kotlin lint'
+  - stage: android
+    dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    jobs:
+      - job: linux_dist
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'Ubuntu 16.04'
+        variables:
+          android_ndk_home: /usr/local/lib/android/sdk/ndk-bundle
+        steps:
+          - checkout: self
+            submodules: true
+          - script: ./ci/linux_ci_setup.sh
+            displayName: 'Install dependencies'
+          - script: |
+              export PATH=/usr/lib/llvm-8/bin:$PATH
+              export CC=clang
+              export CXX=clang++
+            displayName: 'Set up clang toolchain'
+          - script: |
+              bazel build --fat_apk_cpu=x86 //:android_dist
+            displayName: 'Build envoy.aar distributable'
+          - task: PublishPipelineArtifact@0
+            displayName: 'Publish envoy.aar distributable'
+            inputs:
+              artifactName: 'envoy.aar'
+              targetPath: 'dist/envoy.aar'
+      - job: linux_java_helloworld
+        dependsOn: linux_dist
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'Ubuntu 16.04'
+        variables:
+          android_ndk_home: /usr/local/lib/android/sdk/ndk-bundle
+        steps:
+          - checkout: self
+            submodules: true
+          - script: ./ci/linux_ci_setup.sh
+            displayName: 'Install dependencies'
+          - script: mkdir -p dist/
+            displayName: 'Create directory for distributable'
+          - task: DownloadPipelineArtifact@0
+            displayName: 'Download envoy.aar distributable'
+            inputs:
+              artifactName: 'envoy.aar'
+              targetPath: dist
+          - script: bazel build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
+            displayName: 'Build java app'
+      - job: linux_kotlin_helloworld
+        dependsOn: linux_dist
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'Ubuntu 16.04'
+        variables:
+          android_ndk_home: /usr/local/lib/android/sdk/ndk-bundle
+        steps:
+          - checkout: self
+            submodules: true
+          - script: ./ci/linux_ci_setup.sh
+            displayName: 'Install dependencies'
+          - script: mkdir -p dist/
+            displayName: 'Create directory for distributable'
+          - task: DownloadPipelineArtifact@0
+            displayName: 'Download envoy.aar distributable'
+            inputs:
+              artifactName: 'envoy.aar'
+              targetPath: dist
+          - script: bazel build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
+            displayName: 'Build kotlin app'
+  - stage: ios
+    dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    jobs:
+      - job: mac_dist
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'macos-10.14'
+        steps:
+          - checkout: self
+            submodules: true
+          - script: ./ci/mac_ci_setup.sh
+            displayName: 'Install dependencies'
+          - script: bazel build --config=ios //:ios_dist
+            displayName: 'Build Envoy.framework distributable'
+          - task: PublishPipelineArtifact@0
+            displayName: 'Publish Envoy.framework distributable'
+            inputs:
+              artifactName: 'Envoy.framework'
+              targetPath: 'dist/Envoy.framework'
+      - job: mac_objc_helloworld
+        dependsOn: mac_dist
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'macos-10.14'
+        steps:
+          - checkout: self
+            submodules: true
+          - script: ./ci/mac_ci_setup.sh
+            displayName: 'Install dependencies'
+          - script: mkdir -p dist/Envoy.framework
+            displayName: 'Create directory for distributable'
+          - task: DownloadPipelineArtifact@0
+            displayName: 'Download Envoy.framework distributable'
+            inputs:
+              artifactName: Envoy.framework
+              targetPath: dist/Envoy.framework
+          - script: bazel build --config=ios //examples/objective-c/hello_world:app
+            displayName: 'Build objective-c app'
+      - job: mac_swift_helloworld
+        dependsOn: mac_dist
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'macos-10.14'
+        steps:
+          - checkout: self
+            submodules: true
+          - script: ./ci/mac_ci_setup.sh
+            displayName: 'Install dependencies'
+          - script: mkdir -p dist/Envoy.framework
+            displayName: 'Create directory for distributable'
+          - task: DownloadPipelineArtifact@0
+            displayName: 'Download Envoy.framework distributable'
+            inputs:
+              artifactName: Envoy.framework
+              targetPath: dist/Envoy.framework
+          - script: bazel build --config=ios //examples/swift/hello_world:app
+            displayName: 'Build swift app'
