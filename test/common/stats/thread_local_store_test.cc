@@ -847,60 +847,43 @@ TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
 
 // Tests how much memory is consumed allocating 100k stats.
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
-  if (!TestUtil::hasDeterministicMallocStats()) {
-    return;
-  }
-
   MockSink sink;
   Stats::FakeSymbolTableImpl symbol_table;
   HeapStatDataAllocator alloc(symbol_table);
-  auto store = std::make_unique<ThreadLocalStoreImpl>(alloc);
-  store->addSink(sink);
+  ThreadLocalStoreImpl store(alloc);
+  store.addSink(sink);
 
   // Use a tag producer that will produce tags.
   envoy::config::metrics::v2::StatsConfig stats_config;
-  store->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+  store.setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
 
-  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
-  if (start_mem == 0) {
-    // Skip this test for platforms where we can't measure memory.
-    return;
-  }
+  TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      1000, [&store](absl::string_view name) { store->counter(std::string(name)); });
-  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
-  EXPECT_LT(start_mem, end_mem);
+      1000, [&store](absl::string_view name) { store.counter(std::string(name)); });
   const size_t million = 1000 * 1000;
-  EXPECT_LT(end_mem - start_mem, 20 * million); // actual value: 19601552 as of March 14, 2019
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 19602128); // June 13, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 20 * million);
 }
 
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
-  if (!TestUtil::hasDeterministicMallocStats()) {
-    return;
-  }
   Stats::FakeSymbolTableImpl symbol_table;
   HeapStatDataAllocator alloc(symbol_table);
-  auto store = std::make_unique<ThreadLocalStoreImpl>(alloc);
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  ThreadLocalStoreImpl store(alloc);
 
   // Use a tag producer that will produce tags.
   envoy::config::metrics::v2::StatsConfig stats_config;
-  store->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+  store.setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
 
-  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
-  NiceMock<ThreadLocal::MockInstance> tls;
-  store->initializeThreading(main_thread_dispatcher, tls);
-  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
-  if (start_mem == 0) {
-    // Skip this test for platforms where we can't measure memory.
-    return;
-  }
+  store.initializeThreading(main_thread_dispatcher, tls);
+  TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      1000, [&store](absl::string_view name) { store->counter(std::string(name)); });
-  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
-  EXPECT_LT(start_mem, end_mem);
+      1000, [&store](absl::string_view name) { store.counter(std::string(name)); });
   const size_t million = 1000 * 1000;
-  EXPECT_LT(end_mem - start_mem, 23 * million); // actual value: 22880912 as of March 14, 2019
-  store->shutdownThreading();
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 22879216);
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 23 * million);
+  store.shutdownThreading();
   tls.shutdownThread();
 }
 
