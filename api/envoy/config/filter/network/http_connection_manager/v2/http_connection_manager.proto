@@ -427,8 +427,8 @@ message HttpConnectionManager {
 
   // If present and set to true, the connection manager will validate the values of each HTTP
   // header, returning a 400 response if any of the headers contain an invalid
-  // value. See `Header Fields `<https://tools.ietf.org/html/rfc7230#section-3.2>`_
-  // for details.
+  // value. See `Header Fields <https://tools.ietf.org/html/rfc7230#section-3.2>`
+  // for more details regarding the validity of HTTP headers.
   bool validate_headers = 33;
 }
 
