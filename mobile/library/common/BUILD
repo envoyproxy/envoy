@@ -15,5 +15,10 @@ envoy_cc_library(
 cc_library(
     name = "envoy_jni_interface_lib",
     srcs = ["jni_interface.cc"],
+    copts = ["-std=c++14"],
+    linkopts = [
+        "-lm",
+        "-llog",
+    ],
     deps = [":envoy_main_interface_lib"],
 )
