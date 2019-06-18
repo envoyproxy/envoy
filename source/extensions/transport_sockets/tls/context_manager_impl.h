@@ -37,14 +37,14 @@ public:
   size_t daysUntilFirstCertExpires() const override;
   void iterateContexts(std::function<void(const Envoy::Ssl::Context&)> callback) override;
   Ssl::PrivateKeyMethodManager& privateKeyMethodManager() override {
-    return private_key_operations_manager_;
+    return private_key_method_manager_;
   };
 
 private:
   void removeEmptyContexts();
   TimeSource& time_source_;
   std::list<std::weak_ptr<Envoy::Ssl::Context>> contexts_;
-  PrivateKeyMethodManagerImpl private_key_operations_manager_{};
+  PrivateKeyMethodManagerImpl private_key_method_manager_{};
 };
 
 } // namespace Tls
