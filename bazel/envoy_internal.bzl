@@ -53,6 +53,7 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:enable_log_debug_assert_in_release": ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
                "//conditions:default": [],
            }) + select({
+               # APPLE_USE_RFC_3542 is needed to support IPV6_PKTINFO in MAC OS.
                repository + "//bazel:apple": ["-D__APPLE_USE_RFC_3542"],
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \

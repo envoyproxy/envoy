@@ -19,10 +19,6 @@ envoy_cc_library(
         "address_impl.h",
         "io_socket_handle_impl.h",
     ],
-    copts = select({
-        "//bazel:apple": ["-D__APPLE_USE_RFC_3542"],
-        "//conditions:default": [],
-    }),
     deps = [
         ":io_socket_error_lib",
         "//include/envoy/buffer:buffer_interface",
@@ -210,10 +206,6 @@ envoy_cc_library(
     name = "socket_option_lib",
     srcs = ["socket_option_impl.cc"],
     hdrs = ["socket_option_impl.h"],
-    copts = select({
-        "//bazel:apple": ["-D__APPLE_USE_RFC_3542"],
-        "//conditions:default": [],
-    }),
     external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
