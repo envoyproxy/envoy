@@ -173,7 +173,7 @@ message OutputSink {
     FilePerTapSink file_per_tap = 3;
 
     // [#not-implemented-hide:]
-    // GrpcService to stream data to. format argument must be PROTO_BINARY.
+    // GrpcService to stream data to. The format argument must be PROTO_BINARY.
     StreamingGrpcSink streaming_grpc = 4;
   }
 }
