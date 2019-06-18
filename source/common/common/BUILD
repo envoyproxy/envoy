@@ -109,6 +109,12 @@ envoy_cc_library(
     deps = [":assert_lib"],
 )
 
+# Contains macros and helpers for logState utilities
+envoy_cc_library(
+    name = "log_state_utils",
+    hdrs = ["log_state_utils.h"],
+)
+
 # Contains minimal code for logging to stderr.
 envoy_cc_library(
     name = "minimal_logger_lib",
@@ -140,6 +146,7 @@ envoy_cc_library(
     srcs = ["logger_delegates.cc"],
     hdrs = ["logger_delegates.h"],
     deps = [
+        ":log_state_utils",
         ":macros",
         ":minimal_logger_lib",
         "//include/envoy/access_log:access_log_interface",

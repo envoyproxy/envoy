@@ -13,6 +13,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/common/log_state_utils.h"
 #include "common/common/macros.h"
 
 #include "absl/strings/string_view.h"
@@ -525,19 +526,27 @@ public:
    */
   virtual bool empty() const PURE;
 
+  void logState(std::ostream& os, int indent_level = 0) const {
+    typedef std::pair<std::ostream*, const char*> IterateData;
+    const char* spaces = spacesForLevel(indent_level);
+    IterateData iterate_data = std::make_pair(&os, spaces);
+    iterate(
+        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+          IterateData* data = static_cast<IterateData*>(context);
+          *data->first << data->second << "'" << header.key().getStringView() << "', '"
+                       << header.value().getStringView() << "'\n";
+          return HeaderMap::Iterate::Continue;
+        },
+        &iterate_data);
+  }
+
   /**
    * Allow easy pretty-printing of the key/value pairs in HeaderMap
    * @param os supplies the ostream to print to.
    * @param headers the headers to print.
    */
   friend std::ostream& operator<<(std::ostream& os, const HeaderMap& headers) {
-    headers.iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          *static_cast<std::ostream*>(context) << "'" << header.key().getStringView() << "', '"
-                                               << header.value().getStringView() << "'\n";
-          return HeaderMap::Iterate::Continue;
-        },
-        &os);
+    headers.logState(os);
     return os;
   }
 };

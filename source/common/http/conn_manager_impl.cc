@@ -1535,6 +1535,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
 
 void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
   if (end_stream) {
+    ENVOY_STREAM_LOG(error, "Wrapping up sesssion \n{}", *this, *this);
     ASSERT(!state_.codec_saw_local_complete_);
     state_.codec_saw_local_complete_ = true;
     stream_info_.onLastDownstreamTxByteSent();

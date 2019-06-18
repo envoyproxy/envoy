@@ -28,6 +28,7 @@
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
+#include "common/common/log_state_utils.h"
 #include "common/grpc/common.h"
 #include "common/http/conn_manager_config.h"
 #include "common/http/user_agent.h"
@@ -493,6 +494,24 @@ private:
     void onRequestTimeout();
 
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
+
+    void logState(std::ostream& os, int indent_level = 0) const {
+      const char* spaces = spacesForLevel(indent_level);
+      os << spaces << "ActiveStream " << this << LOG_MEMBER(stream_id_)
+         << LOG_MEMBER(has_continue_headers_) << LOG_MEMBER(is_head_request_)
+         << LOG_MEMBER(decoding_headers_only_) << LOG_MEMBER(encoding_headers_only_) << "\n";
+
+      LOG_DETAILS(request_headers_);
+      LOG_DETAILS(request_trailers_);
+      LOG_DETAILS(response_headers_);
+      LOG_DETAILS(response_trailers_);
+      LOG_DETAILS(&stream_info_);
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const ActiveStream& s) {
+      s.logState(os);
+      return os;
+    }
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;

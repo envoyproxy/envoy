@@ -174,6 +174,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/common:linked_object",
+        "//source/common/common:log_state_utils",
         "//source/common/common:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
