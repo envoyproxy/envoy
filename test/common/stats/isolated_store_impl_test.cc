@@ -14,8 +14,7 @@ namespace Stats {
 class StatsIsolatedStoreImplTest : public testing::Test {
 protected:
   StatsIsolatedStoreImplTest()
-      : pool_(symbol_table_),
-        store_(std::make_unique<IsolatedStoreImpl>(symbol_table_)) {}
+      : pool_(symbol_table_), store_(std::make_unique<IsolatedStoreImpl>(symbol_table_)) {}
   ~StatsIsolatedStoreImplTest() override {
     pool_.clear();
     store_.reset();
