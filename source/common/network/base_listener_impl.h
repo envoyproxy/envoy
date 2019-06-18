@@ -14,7 +14,7 @@ namespace Network {
 /**
  * Base libevent implementation of Network::Listener.
  */
-class BaseListenerImpl : public Listener {
+class BaseListenerImpl : public virtual Listener {
 public:
   BaseListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket);
 

@@ -77,5 +77,21 @@ SysCallIntResult OsSysCallsImpl::socket(int domain, int type, int protocol) {
   return {rc, errno};
 }
 
+SysCallSizeResult OsSysCallsImpl::sendto(int fd, const void* buffer, size_t size, int flags,
+                                         const sockaddr* addr, socklen_t addrlen) {
+  const int rc = ::sendto(fd, buffer, size, flags, addr, addrlen);
+  return {rc, errno};
+}
+
+SysCallSizeResult OsSysCallsImpl::sendmsg(int fd, const msghdr* message, int flags) {
+  const int rc = ::sendmsg(fd, message, flags);
+  return {rc, errno};
+}
+
+SysCallIntResult OsSysCallsImpl::getsockname(int sockfd, sockaddr* addr, socklen_t* addrlen) {
+  const int rc = ::getsockname(sockfd, addr, addrlen);
+  return {rc, errno};
+}
+
 } // namespace Api
 } // namespace Envoy

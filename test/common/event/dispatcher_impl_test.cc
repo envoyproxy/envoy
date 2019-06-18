@@ -5,6 +5,7 @@
 #include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/event/timer_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
@@ -195,6 +196,29 @@ TEST(TimerImplTest, TimerEnabledDisabled) {
   EXPECT_TRUE(timer->enabled());
   dispatcher->run(Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(timer->enabled());
+}
+
+TEST(TimerImplTest, TimerValueConversion) {
+  timeval tv;
+  std::chrono::milliseconds msecs;
+
+  // Basic test with zero milliseconds.
+  msecs = std::chrono::milliseconds(0);
+  TimerUtils::millisecondsToTimeval(msecs, tv);
+  EXPECT_EQ(tv.tv_sec, 0);
+  EXPECT_EQ(tv.tv_usec, 0);
+
+  // 2050 milliseconds is 2 seconds and 50000 microseconds.
+  msecs = std::chrono::milliseconds(2050);
+  TimerUtils::millisecondsToTimeval(msecs, tv);
+  EXPECT_EQ(tv.tv_sec, 2);
+  EXPECT_EQ(tv.tv_usec, 50000);
+
+  // Check maximum value conversion.
+  msecs = std::chrono::milliseconds::duration::max();
+  TimerUtils::millisecondsToTimeval(msecs, tv);
+  EXPECT_EQ(tv.tv_sec, msecs.count() / 1000);
+  EXPECT_EQ(tv.tv_usec, (msecs.count() % tv.tv_sec) * 1000);
 }
 
 } // namespace

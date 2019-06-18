@@ -365,7 +365,7 @@ public:
     envoy::config::transport_socket::tap::v2alpha::Tap tap_config =
         createTapConfig(raw_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(raw_transport_socket);
-    MessageUtil::jsonConvert(tap_config, *transport_socket->mutable_config());
+    TestUtility::jsonConvert(tap_config, *transport_socket->mutable_config());
   }
 
   void setupDownstreamTap(envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -374,14 +374,14 @@ public:
     // Configure inner SSL transport socket based on existing config.
     envoy::api::v2::core::TransportSocket ssl_transport_socket;
     ssl_transport_socket.set_name("tls");
-    MessageUtil::jsonConvert(filter_chain->tls_context(), *ssl_transport_socket.mutable_config());
+    TestUtility::jsonConvert(filter_chain->tls_context(), *ssl_transport_socket.mutable_config());
     // Configure outer tap transport socket.
     auto* transport_socket = filter_chain->mutable_transport_socket();
     transport_socket->set_name("envoy.transport_sockets.tap");
     envoy::config::transport_socket::tap::v2alpha::Tap tap_config =
         createTapConfig(ssl_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
-    MessageUtil::jsonConvert(tap_config, *transport_socket->mutable_config());
+    TestUtility::jsonConvert(tap_config, *transport_socket->mutable_config());
     // Nuke TLS context from legacy location.
     filter_chain->clear_tls_context();
   }
@@ -451,7 +451,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::data::tap::v2alpha::TraceWrapper trace;
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace, *api_);
+  TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace, *api_);
   // Validate general expected properties in the trace.
   EXPECT_EQ(first_id, trace.socket_buffered_trace().trace_id());
   EXPECT_THAT(expected_local_address,
@@ -482,7 +482,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 2);
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace, *api_);
+  TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace, *api_);
   // Validate second connection ID.
   EXPECT_EQ(second_id, trace.socket_buffered_trace().trace_id());
   ASSERT_GE(trace.socket_buffered_trace().events().size(), 2);
@@ -529,7 +529,7 @@ TEST_P(SslTapIntegrationTest, TruncationWithMultipleDataFrames) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
   envoy::data::tap::v2alpha::TraceWrapper trace;
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, id), trace, *api_);
+  TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, id), trace, *api_);
 
   ASSERT_EQ(trace.socket_buffered_trace().events().size(), 2);
   EXPECT_TRUE(trace.socket_buffered_trace().events(0).read().data().truncated());
@@ -550,7 +550,7 @@ TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::data::tap::v2alpha::TraceWrapper trace;
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace, *api_);
+  TestUtility::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace, *api_);
   // Test some obvious properties.
   EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data().as_bytes(),
                                "POST /test/long/url HTTP/1.1"));
@@ -580,7 +580,7 @@ TEST_P(SslTapIntegrationTest, RequestWithJsonBodyAsStringUpstreamTap) {
   // This must be done after server shutdown so that connection pool connections are closed and
   // the tap written.
   envoy::data::tap::v2alpha::TraceWrapper trace;
-  MessageUtil::loadFromFile(fmt::format("{}_{}.json", path_prefix_, id), trace, *api_);
+  TestUtility::loadFromFile(fmt::format("{}_{}.json", path_prefix_, id), trace, *api_);
 
   // Test some obvious properties.
   EXPECT_EQ(trace.socket_buffered_trace().events(0).write().data().as_string(), "POST");

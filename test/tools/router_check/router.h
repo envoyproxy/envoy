@@ -130,6 +130,8 @@ private:
   bool compareResults(const std::string& actual, const std::string& expected,
                       const std::string& test_type);
 
+  bool headers_finalized_{false};
+
   bool details_{false};
 
   // TODO(hennna): Switch away from mocks following work done by @rlazarus in github issue #499.

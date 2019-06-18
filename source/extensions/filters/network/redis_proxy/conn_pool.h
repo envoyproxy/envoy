@@ -21,7 +21,7 @@ namespace ConnPool {
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   /**
    * Makes a redis request.
@@ -50,7 +50,7 @@ public:
                     Common::Redis::Client::PoolCallbacks& callbacks) PURE;
 };
 
-typedef std::shared_ptr<Instance> InstanceSharedPtr;
+using InstanceSharedPtr = std::shared_ptr<Instance>;
 
 } // namespace ConnPool
 } // namespace RedisProxy

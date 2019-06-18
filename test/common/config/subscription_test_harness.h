@@ -18,7 +18,7 @@ namespace Config {
 class SubscriptionTestHarness {
 public:
   SubscriptionTestHarness() : stats_(Utility::generateStats(stats_store_)) {}
-  virtual ~SubscriptionTestHarness() {}
+  virtual ~SubscriptionTestHarness() = default;
 
   /**
    * Start subscription and set related expectations.
@@ -61,7 +61,10 @@ public:
   }
 
   virtual void verifyControlPlaneStats(uint32_t connected_state) {
-    EXPECT_EQ(connected_state, stats_store_.gauge("control_plane.connected_state").value());
+    EXPECT_EQ(
+        connected_state,
+        stats_store_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)
+            .value());
   }
 
   virtual void expectConfigUpdateFailed() PURE;

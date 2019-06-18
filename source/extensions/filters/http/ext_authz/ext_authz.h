@@ -88,7 +88,7 @@ private:
   Http::Context& http_context_;
 };
 
-typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 /**
  * Per route settings for ExtAuth. Allows customizing the CheckRequest on a

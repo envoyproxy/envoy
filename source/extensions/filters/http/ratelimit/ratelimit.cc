@@ -23,7 +23,7 @@ struct RcDetailsValues {
   // The rate limiter encountered a failure, and was configured to fail-closed.
   const std::string RateLimitError = "rate_limiter_error";
 };
-typedef ConstSingleton<RcDetailsValues> RcDetails;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 void Filter::initiateCall(const Http::HeaderMap& headers) {
   bool is_internal_request =

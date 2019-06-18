@@ -18,7 +18,7 @@ namespace Server {
  */
 class LdsApi {
 public:
-  virtual ~LdsApi() {}
+  virtual ~LdsApi() = default;
 
   /**
    * @return std::string the last received version by the xDS API for LDS.
@@ -26,14 +26,14 @@ public:
   virtual std::string versionInfo() const PURE;
 };
 
-typedef std::unique_ptr<LdsApi> LdsApiPtr;
+using LdsApiPtr = std::unique_ptr<LdsApi>;
 
 /**
  * Factory for creating listener components.
  */
 class ListenerComponentFactory {
 public:
-  virtual ~ListenerComponentFactory() {}
+  virtual ~ListenerComponentFactory() = default;
 
   /**
    * @return an LDS API provider.
@@ -75,6 +75,16 @@ public:
       Configuration::ListenerFactoryContext& context) PURE;
 
   /**
+   * Creates a list of UDP listener filter factories.
+   * @param filters supplies the configuration.
+   * @param context supplies the factory creation context.
+   * @return std::vector<Network::UdpListenerFilterFactoryCb> the list of filter factories.
+   */
+  virtual std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      Configuration::ListenerFactoryContext& context) PURE;
+
+  /**
    * @return DrainManagerPtr a new drain manager.
    * @param drain_type supplies the type of draining to do for the owning listener.
    */
@@ -91,7 +101,7 @@ public:
  */
 class ListenerManager {
 public:
-  virtual ~ListenerManager() {}
+  virtual ~ListenerManager() = default;
 
   /**
    * Add or update a listener. Listeners are referenced by a unique name. If no name is provided,

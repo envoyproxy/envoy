@@ -18,7 +18,7 @@ class Instance;
  */
 class IoHandle {
 public:
-  virtual ~IoHandle() {}
+  virtual ~IoHandle() = default;
 
   /**
    * Return data associated with IoHandle.
@@ -57,9 +57,29 @@ public:
    * err_ = nullptr and rc_ = the bytes written for success.
    */
   virtual Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
+
+  /**
+   * Send buffer to address.
+   * @param slice points to the location of the data to be sent.
+   * @param to_address is the destination address.
+   * @return a Api::IoCallUint64Result with err_ = an Api::IoError instance or
+   * err_ = nullptr and rc_ = the bytes written for success.
+   */
+  virtual Api::IoCallUint64Result sendto(const Buffer::RawSlice& slice, int flags,
+                                         const Address::Instance& address) PURE;
+  /**
+   * Send a message to the address.
+   * @param slices points to the location of data to be sent.
+   * @param num_slice indicates number of slices |slices| contains.
+   * @param address is the destination address.
+   * @return a Api::IoCallUint64Result with err_ = an Api::IoError instance or
+   * err_ = nullptr and rc_ = the bytes written for success.
+   */
+  virtual Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice,
+                                          int flags, const Address::Instance& address) PURE;
 };
 
-typedef std::unique_ptr<IoHandle> IoHandlePtr;
+using IoHandlePtr = std::unique_ptr<IoHandle>;
 
 } // namespace Network
 } // namespace Envoy

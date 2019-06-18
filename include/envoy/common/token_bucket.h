@@ -40,6 +40,6 @@ public:
   virtual void reset(uint64_t num_tokens) PURE;
 };
 
-typedef std::unique_ptr<TokenBucket> TokenBucketPtr;
+using TokenBucketPtr = std::unique_ptr<TokenBucket>;
 
 }; // namespace Envoy

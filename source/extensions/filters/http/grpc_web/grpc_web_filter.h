@@ -8,6 +8,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/non_copyable.h"
 #include "common/grpc/codec.h"
+#include "common/grpc/context_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,7 +20,8 @@ namespace GrpcWeb {
  */
 class GrpcWebFilter : public Http::StreamFilter, NonCopyable {
 public:
-  virtual ~GrpcWebFilter() {}
+  explicit GrpcWebFilter(Grpc::Context& context) : context_(context) {}
+  ~GrpcWebFilter() override = default;
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -48,6 +50,8 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
+  bool doStatTracking() const { return request_names_.has_value(); }
+
 private:
   friend class GrpcWebFilterTest;
 
@@ -65,10 +69,9 @@ private:
   bool is_text_response_{};
   Buffer::OwnedImpl decoding_buffer_;
   Grpc::Decoder decoder_;
-  std::string grpc_service_;
-  std::string grpc_method_;
-  bool do_stat_tracking_{};
+  absl::optional<Grpc::Context::RequestNames> request_names_;
   bool is_grpc_web_request_{};
+  Grpc::Context& context_;
 };
 
 } // namespace GrpcWeb

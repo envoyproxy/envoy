@@ -215,6 +215,16 @@ public:
   std::shared_ptr<MockHost> host_{new MockHost()};
 };
 
+class MockThreadAwareLoadBalancer : public ThreadAwareLoadBalancer {
+public:
+  MockThreadAwareLoadBalancer();
+  ~MockThreadAwareLoadBalancer();
+
+  // Upstream::ThreadAwareLoadBalancer
+  MOCK_METHOD0(factory, LoadBalancerFactorySharedPtr());
+  MOCK_METHOD0(initialize, void());
+};
+
 class MockThreadLocalCluster : public ThreadLocalCluster {
 public:
   MockThreadLocalCluster();
@@ -251,9 +261,9 @@ public:
                                         Network::TransportSocketOptionsSharedPtr));
 
   MOCK_METHOD4(clusterFromProto,
-               ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                                Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                bool added_via_api));
+               std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>(
+                   const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                   Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
 
   MOCK_METHOD2(createCds,
                CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm));
@@ -289,12 +299,11 @@ public:
   ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
 
   // Upstream::ClusterManager
-  MOCK_METHOD3(addOrUpdateCluster,
-               bool(const envoy::api::v2::Cluster& cluster, const std::string& version_info,
-                    ClusterWarmingCallback cluster_warming_cb));
+  MOCK_METHOD2(addOrUpdateCluster,
+               bool(const envoy::api::v2::Cluster& cluster, const std::string& version_info));
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_METHOD0(clusters, ClusterInfoMap());
-  MOCK_METHOD1(get, ThreadLocalCluster*(const std::string& cluster));
+  MOCK_METHOD1(get, ThreadLocalCluster*(absl::string_view cluster));
   MOCK_METHOD4(httpConnPoolForCluster,
                Http::ConnectionPool::Instance*(const std::string& cluster,
                                                ResourcePriority priority, Http::Protocol protocol,
@@ -318,6 +327,7 @@ public:
   MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks_,
                ClusterUpdateCallbacksHandle*(ClusterUpdateCallbacks& callbacks));
   MOCK_CONST_METHOD0(warmingClusterCount, std::size_t());
+  MOCK_METHOD0(subscriptionFactory, Config::SubscriptionFactory&());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
@@ -328,6 +338,7 @@ public:
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   std::string local_cluster_name_;
   NiceMock<MockClusterManagerFactory> cluster_manager_factory_;
+  NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
 };
 
 class MockHealthChecker : public HealthChecker {

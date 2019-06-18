@@ -22,7 +22,7 @@ MockLoadBalancerSubsetInfo::MockLoadBalancerSubsetInfo() {
   ON_CALL(*this, fallbackPolicy())
       .WillByDefault(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
   ON_CALL(*this, defaultSubset()).WillByDefault(ReturnRef(ProtobufWkt::Struct::default_instance()));
-  ON_CALL(*this, subsetKeys()).WillByDefault(ReturnRef(subset_keys_));
+  ON_CALL(*this, subsetSelectors()).WillByDefault(ReturnRef(subset_selectors_));
 }
 
 MockLoadBalancerSubsetInfo::~MockLoadBalancerSubsetInfo() {}
@@ -71,10 +71,11 @@ MockClusterInfo::MockClusterInfo()
       .WillByDefault(Invoke([this]() -> const Envoy::Config::TypedMetadata& {
         if (typed_metadata_ == nullptr) {
           typed_metadata_ =
-              absl::make_unique<Config::TypedMetadataImpl<ClusterTypedMetadataFactory>>(metadata_);
+              std::make_unique<Config::TypedMetadataImpl<ClusterTypedMetadataFactory>>(metadata_);
         }
         return *typed_metadata_;
       }));
+  ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
 }
 
 MockClusterInfo::~MockClusterInfo() {}

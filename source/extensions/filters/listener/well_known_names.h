@@ -24,7 +24,7 @@ public:
   const std::string TlsInspector = "envoy.listener.tls_inspector";
 };
 
-typedef ConstSingleton<ListenerFilterNameValues> ListenerFilterNames;
+using ListenerFilterNames = ConstSingleton<ListenerFilterNameValues>;
 
 } // namespace ListenerFilters
 } // namespace Extensions

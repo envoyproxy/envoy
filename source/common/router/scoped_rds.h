@@ -4,7 +4,6 @@
 
 #include "envoy/api/v2/srds.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
-#include "envoy/config/subscription.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/config_provider_impl.h"
@@ -12,6 +11,19 @@
 
 namespace Envoy {
 namespace Router {
+
+// Scoped routing configuration utilities.
+namespace ScopedRoutesConfigProviderUtil {
+
+// If enabled in the HttpConnectionManager config, returns a ConfigProvider for scoped routing
+// configuration.
+Envoy::Config::ConfigProviderPtr
+create(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+           config,
+       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+       Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager);
+
+} // namespace ScopedRoutesConfigProviderUtil
 
 class ScopedRoutesConfigProviderManager;
 
@@ -81,8 +93,13 @@ public:
 
   const std::string& name() const { return name_; }
 
+  const ScopedConfigManager::ScopedRouteMap& scopedRouteMap() const {
+    return scoped_config_manager_.scopedRouteMap();
+  }
+
+private:
   // Envoy::Config::ConfigSubscriptionCommonBase
-  void start() override { subscription_->start({}, *this); }
+  void start() override { subscription_->start({}); }
 
   // Envoy::Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -95,18 +112,17 @@ public:
     ConfigSubscriptionCommonBase::onConfigUpdateFailed();
   }
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource).name();
-  }
-  const ScopedConfigManager::ScopedRouteMap& scopedRouteMap() const {
-    return scoped_config_manager_.scopedRouteMap();
+    return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource,
+                                                                             validation_visitor_)
+        .name();
   }
 
-private:
   const std::string name_;
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   Stats::ScopePtr scope_;
   ScopedRdsStats stats_;
   ScopedConfigManager scoped_config_manager_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubscription>;

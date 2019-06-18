@@ -20,10 +20,13 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
     const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
     Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
     std::chrono::milliseconds request_timeout, const Protobuf::MethodDescriptor& service_method,
-    SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout)
+    SubscriptionCallbacks& callbacks, SubscriptionStats stats,
+    std::chrono::milliseconds init_fetch_timeout,
+    ProtobufMessage::ValidationVisitor& validation_visitor)
     : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval,
                            request_timeout),
-      stats_(stats), dispatcher_(dispatcher), init_fetch_timeout_(init_fetch_timeout) {
+      callbacks_(callbacks), stats_(stats), dispatcher_(dispatcher),
+      init_fetch_timeout_(init_fetch_timeout), validation_visitor_(validation_visitor) {
   request_.mutable_node()->CopyFrom(local_info.node());
   ASSERT(service_method.options().HasExtension(google::api::http));
   const auto& http_rule = service_method.options().GetExtension(google::api::http);
@@ -32,21 +35,18 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
 }
 
 // Config::Subscription
-void HttpSubscriptionImpl::start(const std::set<std::string>& resources,
-                                 Config::SubscriptionCallbacks& callbacks) {
-  ASSERT(callbacks_ == nullptr);
-
+void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       ENVOY_LOG(warn, "REST config: initial fetch timed out for", path_);
-      callbacks_->onConfigUpdateFailed(nullptr);
+      callbacks_.onConfigUpdateFailed(nullptr);
     });
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
 
-  Protobuf::RepeatedPtrField<std::string> resources_vector(resources.begin(), resources.end());
+  Protobuf::RepeatedPtrField<std::string> resources_vector(resource_names.begin(),
+                                                           resource_names.end());
   request_.mutable_resource_names()->Swap(&resources_vector);
-  callbacks_ = &callbacks;
   initialize();
 }
 
@@ -73,21 +73,21 @@ void HttpSubscriptionImpl::parseResponse(const Http::Message& response) {
   disableInitFetchTimeoutTimer();
   envoy::api::v2::DiscoveryResponse message;
   try {
-    MessageUtil::loadFromJson(response.bodyAsString(), message);
+    MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "REST config JSON conversion error: {}", e.what());
     handleFailure(nullptr);
     return;
   }
   try {
-    callbacks_->onConfigUpdate(message.resources(), message.version_info());
+    callbacks_.onConfigUpdate(message.resources(), message.version_info());
     request_.set_version_info(message.version_info());
     stats_.version_.set(HashUtil::xxHash64(request_.version_info()));
     stats_.update_success_.inc();
   } catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "REST config update rejected: {}", e.what());
     stats_.update_rejected_.inc();
-    callbacks_->onConfigUpdateFailed(&e);
+    callbacks_.onConfigUpdateFailed(&e);
   }
 }
 
@@ -101,7 +101,7 @@ void HttpSubscriptionImpl::onFetchFailure(const EnvoyException* e) {
 
 void HttpSubscriptionImpl::handleFailure(const EnvoyException* e) {
   stats_.update_failure_.inc();
-  callbacks_->onConfigUpdateFailed(e);
+  callbacks_.onConfigUpdateFailed(e);
 }
 
 void HttpSubscriptionImpl::disableInitFetchTimeoutTimer() {

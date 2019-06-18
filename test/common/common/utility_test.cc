@@ -429,7 +429,7 @@ private:
   const std::string name_;
   const uint64_t weight_;
 };
-typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
+using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
 TEST(WeightedClusterUtil, pickCluster) {
   std::vector<WeightedClusterEntrySharedPtr> clusters;
@@ -836,6 +836,12 @@ TEST(TrieLookupTable, LongestPrefix) {
   EXPECT_EQ(nullptr, trie.findLongestPrefix("toto"));
   EXPECT_EQ(nullptr, trie.find(" "));
   EXPECT_EQ(nullptr, trie.findLongestPrefix(" "));
+}
+
+TEST(InlineStorageTest, InlineString) {
+  InlineStringPtr hello = InlineString::create("Hello, world!");
+  EXPECT_EQ("Hello, world!", hello->toStringView());
+  EXPECT_EQ("Hello, world!", hello->toString());
 }
 
 } // namespace Envoy

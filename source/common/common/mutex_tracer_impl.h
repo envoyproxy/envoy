@@ -6,8 +6,7 @@
 
 #include "envoy/common/mutex_tracer.h"
 
-#include "absl/base/internal/spinlock.h"
-#include "absl/base/thread_annotations.h"
+#include "common/common/thread_annotations.h"
 
 namespace Envoy {
 

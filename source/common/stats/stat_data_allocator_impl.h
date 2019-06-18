@@ -40,7 +40,7 @@ public:
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
 private:
-  // SymbolTable encodes encodes stat names as back into strings. This does not
+  // SymbolTable encodes stat names as back into strings. This does not
   // get guarded by a mutex, since it has its own internal mutex to guarantee
   // thread safety.
   SymbolTable& symbol_table_;
@@ -116,8 +116,24 @@ public:
 template <class StatData> class GaugeImpl : public Gauge, public MetricImpl {
 public:
   GaugeImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
-            absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
-      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {}
+            absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
+            ImportMode import_mode)
+      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {
+    switch (import_mode) {
+    case ImportMode::Accumulate:
+      data_.flags_ |= Flags::LogicAccumulate;
+      break;
+    case ImportMode::NeverImport:
+      data_.flags_ |= Flags::NeverImport;
+      break;
+    case ImportMode::Uninitialized:
+      // Note that we don't clear any flag bits for import_mode==Uninitialized,
+      // as we may have an established import_mode when this stat was created in
+      // an alternate scope. See
+      // https://github.com/envoyproxy/envoy/issues/7227.
+      break;
+    }
+  }
   ~GaugeImpl() override {
     alloc_.free(data_);
 
@@ -147,19 +163,39 @@ public:
   uint64_t value() const override { return data_.value_; }
   bool used() const override { return data_.flags_ & Flags::Used; }
 
-  // Returns true if values should be added, false if no import.
-  absl::optional<bool> cachedShouldImport() const override {
-    if ((data_.flags_ & Flags::LogicCached) == 0) {
-      return absl::nullopt;
+  ImportMode importMode() const override {
+    if (data_.flags_ & Flags::NeverImport) {
+      return ImportMode::NeverImport;
+    } else if (data_.flags_ & Flags::LogicAccumulate) {
+      return ImportMode::Accumulate;
     }
-    return (data_.flags_ & Flags::LogicAccumulate) != 0;
+    return ImportMode::Uninitialized;
   }
 
-  void setShouldImport(bool should_import) override {
-    if (should_import) {
+  void mergeImportMode(ImportMode import_mode) override {
+    ImportMode current = importMode();
+    if (current == import_mode) {
+      return;
+    }
+
+    switch (import_mode) {
+    case ImportMode::Uninitialized:
+      // mergeImportNode(ImportMode::Uninitialized) is called when merging an
+      // existing stat with importMode() == Accumulate or NeverImport.
+      break;
+    case ImportMode::Accumulate:
+      ASSERT(current == ImportMode::Uninitialized);
       data_.flags_ |= Flags::LogicAccumulate;
-    } else {
-      data_.flags_ |= Flags::LogicNeverImport;
+      break;
+    case ImportMode::NeverImport:
+      ASSERT(current == ImportMode::Uninitialized);
+      // A previous revision of Envoy may have transferred a gauge that it
+      // thought was Accumulate. But the new version thinks it's NeverImport, so
+      // we clear the accumulated value.
+      data_.value_ = 0;
+      data_.flags_ &= ~Flags::Used;
+      data_.flags_ |= Flags::NeverImport;
+      break;
     }
   }
 
@@ -191,8 +227,8 @@ public:
   void set(uint64_t) override {}
   void sub(uint64_t) override {}
   uint64_t value() const override { return 0; }
-  absl::optional<bool> cachedShouldImport() const override { return absl::nullopt; }
-  void setShouldImport(bool) override {}
+  ImportMode importMode() const override { return ImportMode::NeverImport; }
+  void mergeImportMode(ImportMode /* import_mode */) override {}
 };
 
 } // namespace Stats

@@ -14,7 +14,7 @@ namespace Stats {
 
 class TagProducer {
 public:
-  virtual ~TagProducer() {}
+  virtual ~TagProducer() = default;
 
   /**
    * Take a metric name and a vector then add proper tags into the vector and
@@ -32,7 +32,7 @@ public:
   virtual std::string produceTags(absl::string_view metric_name, std::vector<Tag>& tags) const PURE;
 };
 
-typedef std::unique_ptr<const TagProducer> TagProducerPtr;
+using TagProducerPtr = std::unique_ptr<const TagProducer>;
 
 } // namespace Stats
 } // namespace Envoy

@@ -90,7 +90,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+      [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
@@ -134,15 +134,17 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
       });
 }
 
-ClusterImplBaseSharedPtr StrictDnsClusterFactory::createClusterImpl(
+std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+StrictDnsClusterFactory::createClusterImpl(
     const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);
 
-  return std::make_unique<StrictDnsClusterImpl>(cluster, context.runtime(), selected_dns_resolver,
-                                                socket_factory_context, std::move(stats_scope),
-                                                context.addedViaApi());
+  return std::make_pair(std::make_shared<StrictDnsClusterImpl>(
+                            cluster, context.runtime(), selected_dns_resolver,
+                            socket_factory_context, std::move(stats_scope), context.addedViaApi()),
+                        nullptr);
 }
 
 /**

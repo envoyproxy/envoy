@@ -18,7 +18,7 @@ public:
   const std::string PreviousPrioritiesRetryPriority = "envoy.retry_priorities.previous_priorities";
 };
 
-typedef ConstSingleton<RetryPriorityNameValues> RetryPriorityValues;
+using RetryPriorityValues = ConstSingleton<RetryPriorityNameValues>;
 
 } // namespace Priority
 } // namespace Retry

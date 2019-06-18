@@ -28,8 +28,13 @@ public:
 
       cluster_0->clear_hosts();
 
+      if (cluster_provided_lb_) {
+        cluster_0->set_lb_policy(envoy::api::v2::Cluster::CLUSTER_PROVIDED);
+      }
+
       envoy::api::v2::Cluster_CustomClusterType cluster_type;
-      cluster_type.set_name("envoy.clusters.custom_static");
+      cluster_type.set_name(cluster_provided_lb_ ? "envoy.clusters.custom_static_with_lb"
+                                                 : "envoy.clusters.custom_static");
       test::integration::clusters::CustomStaticConfig config;
       config.set_priority(10);
       config.set_address(Network::Test::getLoopbackAddressString(ipVersion()));
@@ -43,6 +48,7 @@ public:
   }
 
   Network::Address::IpVersion ipVersion() const { return version_; }
+  bool cluster_provided_lb_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, CustomClusterIntegrationTest,
@@ -53,6 +59,11 @@ TEST_P(CustomClusterIntegrationTest, TestRouterHeaderOnly) {
 }
 
 TEST_P(CustomClusterIntegrationTest, TestTwoRequests) { testTwoRequests(false); }
+
+TEST_P(CustomClusterIntegrationTest, TestTwoRequestsWithClusterLb) {
+  cluster_provided_lb_ = true;
+  testTwoRequests(false);
+}
 
 TEST_P(CustomClusterIntegrationTest, TestCustomConfig) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
@@ -70,5 +81,6 @@ TEST_P(CustomClusterIntegrationTest, TestCustomConfig) {
   EXPECT_EQ(1, host_set->healthyHosts().size());
   EXPECT_EQ(10, host_set->priority());
 }
+
 } // namespace
 } // namespace Envoy

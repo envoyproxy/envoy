@@ -14,6 +14,7 @@
 
 #include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 
+#include "test/common/buffer/utility.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/quic_listeners/quiche/platform/quic_epoll_clock.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
@@ -42,6 +43,9 @@
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
+#include "quiche/quic/platform/api/quic_mem_slice.h"
+#include "quiche/quic/platform/api/quic_mem_slice_span.h"
+#include "quiche/quic/platform/api/quic_mem_slice_storage.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_pcc_sender.h"
@@ -53,6 +57,7 @@
 #include "quiche/quic/platform/api/quic_stream_buffer_allocator.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
 #include "quiche/quic/platform/api/quic_system_event_loop.h"
+#include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
@@ -679,19 +684,17 @@ TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
 }
 
 TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
-  bool deterministic_stats = Envoy::Stats::TestUtil::hasDeterministicMallocStats();
-  const size_t start_mem = Envoy::Memory::Stats::totalCurrentlyAllocated();
   QuicStreamBufferAllocator allocator;
-  char* p = allocator.New(1024);
-  if (deterministic_stats) {
-    EXPECT_LT(start_mem, Envoy::Memory::Stats::totalCurrentlyAllocated());
+  Envoy::Stats::TestUtil::MemoryTest memory_test;
+  if (memory_test.mode() == Envoy::Stats::TestUtil::MemoryTest::Mode::Disabled) {
+    return;
   }
+  char* p = allocator.New(1024);
   EXPECT_NE(nullptr, p);
+  EXPECT_GT(memory_test.consumedBytes(), 0);
   memset(p, 'a', 1024);
   allocator.Delete(p);
-  if (deterministic_stats) {
-    EXPECT_EQ(start_mem, Envoy::Memory::Stats::totalCurrentlyAllocated());
-  }
+  EXPECT_EQ(memory_test.consumedBytes(), 0);
 }
 
 TEST_F(QuicPlatformTest, TestSystemEventLoop) {
@@ -699,6 +702,71 @@ TEST_F(QuicPlatformTest, TestSystemEventLoop) {
   // build.
   QuicRunSystemEventLoopIteration();
   QuicSystemEventLoop("dummy");
+}
+
+class QuicMemSliceTest : public Envoy::Buffer::BufferImplementationParamTest {
+public:
+  ~QuicMemSliceTest() override {}
+};
+
+INSTANTIATE_TEST_CASE_P(QuicMemSliceTests, QuicMemSliceTest,
+                        testing::ValuesIn({Envoy::Buffer::BufferImplementation::Old,
+                                           Envoy::Buffer::BufferImplementation::New}));
+
+TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
+  std::string str(512, 'b');
+  // Fragment needs to out-live buffer.
+  bool fragment_releaser_called = false;
+  Envoy::Buffer::BufferFragmentImpl fragment(
+      str.data(), str.length(),
+      [&fragment_releaser_called](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
+        // Used to verify that mem slice release appropriately.
+        fragment_releaser_called = true;
+      });
+  Envoy::Buffer::OwnedImpl buffer;
+  Envoy::Buffer::BufferImplementationParamTest::verifyImplementation(buffer);
+  EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer, 0)}, "");
+  std::string str2(1024, 'a');
+  // str2 is copied.
+  buffer.add(str2);
+  EXPECT_EQ(1u, buffer.getRawSlices(nullptr, 0));
+  buffer.addBufferFragment(fragment);
+
+  quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer, str2.length())};
+  EXPECT_EQ(str.length(), buffer.length());
+  EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
+  std::string str2_old = str2;
+  // slice1 is released, but str2 should not be affected.
+  slice1.Reset();
+  EXPECT_TRUE(slice1.empty());
+  EXPECT_EQ(nullptr, slice1.data());
+  EXPECT_EQ(str2_old, str2);
+
+  quic::QuicMemSlice slice2{quic::QuicMemSliceImpl(buffer, str.length())};
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_EQ(str.data(), slice2.data());
+  EXPECT_EQ(str, std::string(slice2.data(), slice2.length()));
+  slice2.Reset();
+  EXPECT_TRUE(slice2.empty());
+  EXPECT_EQ(nullptr, slice2.data());
+  EXPECT_TRUE(fragment_releaser_called);
+}
+
+TEST_P(QuicMemSliceTest, QuicMemSliceStorage) {
+  std::string str(512, 'a');
+  struct iovec iov = {const_cast<char*>(str.data()), str.length()};
+  SimpleBufferAllocator allocator;
+  QuicMemSliceStorage storage(&iov, 1, &allocator, 1024);
+  // Test copy constructor.
+  QuicMemSliceStorage other = storage;
+  QuicMemSliceSpan span = storage.ToSpan();
+  EXPECT_EQ(1u, span.NumSlices());
+  EXPECT_EQ(str.length(), span.total_length());
+  EXPECT_EQ(str, span.GetData(0));
+  QuicMemSliceSpan span_other = other.ToSpan();
+  EXPECT_EQ(1u, span_other.NumSlices());
+  EXPECT_EQ(str, span_other.GetData(0));
+  EXPECT_NE(span_other.GetData(0).data(), span.GetData(0).data());
 }
 
 } // namespace
