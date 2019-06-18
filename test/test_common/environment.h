@@ -203,6 +203,11 @@ public:
    * Set environment variable. Same args as setenv(2).
    */
   static void setEnvVar(const std::string& name, const std::string& value, int overwrite);
+
+  /**
+   * Removes environment variable. Same args as unsetenv(3).
+   */
+  static void unsetEnvVar(const std::string& name);
 };
 
 } // namespace Envoy

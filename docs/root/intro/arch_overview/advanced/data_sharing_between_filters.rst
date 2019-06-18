@@ -1,12 +1,14 @@
 .. _arch_overview_data_sharing_between_filters:
 
+Sharing data between filters
+============================
+
 Envoy provides the following mechanisms for the transfer of configuration,
 metadata and per-request/connection state to, from and between filters, as
 well as to other core subsystems (e.g., access logging).
 
-
 Static State
-============
+^^^^^^^^^^^^
 
 Static state is any immutable state specified at configuration load time
 (e.g., through xDS). There are three categories of static state:
@@ -51,7 +53,6 @@ into an instance of `ServicePolicy` class (inherited from
 metadata is not a new source of metadata. It is obtained from metadata that
 is specified as part of the configuration.
 
-
 HTTP Per-Route Filter Configuration
 -----------------------------------
 
@@ -71,9 +72,8 @@ convert it into a typed class object that’s stored with the route
 itself. HTTP filters can then query the route-specific filter config during
 request processing.
 
-
 Dynamic State
-=============
+^^^^^^^^^^^^^
 
 Dynamic state is generated per network connection or per HTTP
 stream. Dynamic state can be mutable if desired by the filter generating

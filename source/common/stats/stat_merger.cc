@@ -13,19 +13,14 @@ void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& count
 
 void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges) {
   for (const auto& gauge : gauges) {
-    // Merging gauges via RPC from the parent has 4 cases; case 2 and 4b are the
+    // Merging gauges via RPC from the parent has 3 cases; case 1 and 3b are the
     // most common.
     //
-    // 1. Parent process thinks gauge is NeverImport: no data sent, and we
-    //    do not run this loop for such a gauge. Only if the parent process
-    //    thinks the gauge is Accumulate do we consider cases 2-4.
-    // 2. Child thinks gauge is Accumulate : data is combined in
+    // 1. Child thinks gauge is Accumulate : data is combined in
     //    gauge_ref.add() below.
-    // 3. Child thinks gauge is NeverImport: we skip this loop entry via
-    //    'continue'. This only happens with a code-change where the child
-    //    contains a code-change relative to parent, switching a Gauge from
-    //    Accumulate to NeverImport.
-    // 4. Child has not yet initialized gauge yet -- this merge is the
+    // 2. Child thinks gauge is NeverImport: we skip this loop entry via
+    //    'continue'.
+    // 3. Child has not yet initialized gauge yet -- this merge is the
     //    first time the child learns of the gauge. It's possible the child
     //    will think the gauge is NeverImport due to a code change. But for
     //    now we will leave the gauge in the child process as
@@ -33,9 +28,9 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
     //    gauge_ref.add(). Gauges in this mode will not be included in
     //    stats-sinks or the admin /stats calls, until the child initializes
     //    the gauge, in which case:
-    // 4a. Child later initializes gauges as NeverImport: the parent value is
+    // 3a. Child later initializes gauges as NeverImport: the parent value is
     //     cleared during the mergeImportMode call.
-    // 4b. Child later initializes gauges as Accumulate: the parent value is
+    // 3b. Child later initializes gauges as Accumulate: the parent value is
     //     retained.
 
     StatNameManagedStorage storage(gauge.first, temp_scope_->symbolTable());
@@ -52,6 +47,21 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
     }
 
     auto& gauge_ref = temp_scope_->gaugeFromStatName(stat_name, import_mode);
+    if (gauge_ref.importMode() == Gauge::ImportMode::NeverImport) {
+      // On the first iteration through the loop, the gauge will not be loaded into the scope
+      // cache even though it might exist in another scope. Thus, we need to check again for
+      // the import status to see if we should skip this gauge.
+      //
+      // TODO(mattklein123): There is a race condition here. It's technically possible that
+      // between the time we created this stat, the stat might be created by the child as a
+      // never import stat, making the below math invalid. A follow up solution is to take the
+      // store lock starting from gaugeFromStatName() to the end of this function, but this will
+      // require adding some type of mergeGauge() function to the scope and dealing with recursive
+      // lock acquisition, etc. so we will leave this as a follow up. This race should be incredibly
+      // rare.
+      continue;
+    }
+
     uint64_t& parent_value_ref = parent_gauge_values_[gauge_ref.statName()];
     uint64_t old_parent_value = parent_value_ref;
     uint64_t new_parent_value = gauge.second;
