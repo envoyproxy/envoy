@@ -19,6 +19,8 @@ stages:
         pool:
           vmImage: 'Ubuntu 16.04'
         container: envoy-container
+        variables:
+          buildifier_bin: /usr/local/bin/buildifier
         steps:
           - checkout: self
             submodules: true
