@@ -65,6 +65,9 @@ message HostStatus {
 
   // The host's weight. If not configured, the value defaults to 1.
   uint32 weight = 5;
+
+  // The host's priority. If not configured, the value defaults to 0 (highest priority).
+  uint32 priority = 6;
 }
 
 // Health status for a host.

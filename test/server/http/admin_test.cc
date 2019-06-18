@@ -1090,6 +1090,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 
   ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
   ON_CALL(*host, weight()).WillByDefault(Return(5));
+  ON_CALL(*host, priority()).WillByDefault(Return(6));
 
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
@@ -1152,7 +1153,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
      "success_rate": {
       "value": 43.2
      },
-     "weight": 5
+     "weight": 5,
+     "priority": 6
     }
    ]
   }
