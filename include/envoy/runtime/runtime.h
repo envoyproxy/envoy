@@ -16,6 +16,11 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+
+namespace Upstream {
+class ClusterManager;
+}
+
 namespace Runtime {
 
 /**
@@ -205,6 +210,14 @@ public:
 class Loader {
 public:
   virtual ~Loader() = default;
+
+  /**
+   * Post-construction initialization. Runtime will be generally available after
+   * the constructor is finished, with the exception of dynamic RTDS layers,
+   * which require ClusterManager.
+   * @param cm cluster manager reference.
+   */
+  virtual void initialize(Upstream::ClusterManager& cm) PURE;
 
   /**
    * @return Snapshot& the current snapshot. This reference is safe to use for the duration of

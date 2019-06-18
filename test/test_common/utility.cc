@@ -26,6 +26,7 @@
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
+#include "envoy/service/discovery/v2/rtds.pb.h"
 
 #include "common/api/api_impl.h"
 #include "common/common/empty_string.h"
@@ -193,6 +194,9 @@ std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
   }
   if (resource.type_url() == Config::TypeUrl::get().VirtualHost) {
     return TestUtility::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().Runtime) {
+    return TestUtility::anyConvert<envoy::service::discovery::v2::Runtime>(resource).name();
   }
   throw EnvoyException(
       fmt::format("xdsResourceName does not know about type URL {}", resource.type_url()));
