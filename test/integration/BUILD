@@ -598,6 +598,16 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "rtds_integration_test",
+    srcs = ["rtds_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "@envoy_api//envoy/service/discovery/v2:rtds_cc",
+    ],
+)
+
 envoy_cc_test_library(
     name = "server_stats_interface",
     hdrs = ["server_stats.h"],
