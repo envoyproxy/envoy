@@ -14,8 +14,6 @@ import shutil
 import subprocess
 import sys
 
-os.putenv("BUILDIFIER_BIN", "/usr/local/bin/buildifier")
-
 tools = os.path.dirname(os.path.realpath(__file__))
 tmp = os.path.join(os.getenv('TEST_TMPDIR', "/tmp"), "check_format_test")
 src = os.path.join(tools, 'testdata', 'check_format')
@@ -136,7 +134,7 @@ def checkToolNotFoundError():
   # Temporarily change PATH to test the error about lack of external tools.
   oldPath = os.environ["PATH"]
   os.environ["PATH"] = "/sbin:/usr/sbin"
-  clang_format = os.getenv("CLANG_FORMAT", "clang-format-7")
+  clang_format = os.getenv("CLANG_FORMAT", "clang-format-8")
   errors = checkFileExpectingError("no_namespace_envoy.cc", "Command %s not found." % clang_format)
   os.environ["PATH"] = oldPath
   return errors
@@ -229,6 +227,9 @@ if __name__ == "__main__":
   errors += checkAndFixError("bad_envoy_build_sys_ref.BUILD", "Superfluous '@envoy//' prefix")
   errors += checkAndFixError("proto_format.proto", "clang-format check failed")
   errors += checkAndFixError("api/java_options.proto", "Java proto option")
+  errors += checkAndFixError(
+      "cpp_std.cc",
+      "term absl::make_unique< should be replaced with standard library term std::make_unique<")
 
   errors += checkFileExpectingOK("real_time_source_override.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")

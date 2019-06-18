@@ -59,7 +59,7 @@ private:
     AdminPerTapSinkHandle(AdminHandler& parent) : parent_(parent) {}
 
     // Extensions::Common::Tap::PerTapSinkHandle
-    void submitTrace(const TraceWrapperSharedPtr& trace,
+    void submitTrace(TraceWrapperPtr&& trace,
                      envoy::service::tap::v2alpha::OutputSink::Format format) override;
 
     AdminHandler& parent_;

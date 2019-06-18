@@ -422,13 +422,30 @@ TEST_P(Http2IntegrationTest, GrpcRouterNotFound) {
       lookupPort("http"), "POST", "/service/notfound", "", downstream_protocol_, version_, "host",
       Http::Headers::get().ContentTypeValues.Grpc);
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
-            response->headers().ContentType()->value().c_str());
-  EXPECT_STREQ("12", response->headers().GrpcStatus()->value().c_str());
+            response->headers().ContentType()->value().getStringView());
+  EXPECT_EQ("12", response->headers().GrpcStatus()->value().getStringView());
 }
 
 TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
+
+// Verify the case where there is an HTTP/2 codec/protocol error with an active stream.
+TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Sends a request.
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  waitForNextUpstreamRequest();
+
+  // Send bogus raw data on the connection.
+  Buffer::OwnedImpl bogus_data("some really bogus data");
+  codec_client_->rawConnection().write(bogus_data, false);
+
+  // Verifies reset is received.
+  response->waitForReset();
+}
 
 TEST_P(Http2IntegrationTest, BadMagic) {
   initialize();
@@ -477,7 +494,7 @@ TEST_P(Http2IntegrationTest, GoAway) {
   codec_client_->close();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048); }
@@ -511,9 +528,9 @@ TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
                               {"content-type", "application/grpc"}});
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_NE(response->headers().GrpcStatus(), nullptr);
-  EXPECT_STREQ("14", response->headers().GrpcStatus()->value().c_str()); // Service Unavailable
+  EXPECT_EQ("14", response->headers().GrpcStatus()->value().getStringView()); // Service Unavailable
   EXPECT_LT(0, test_server_->counter("cluster.cluster_0.upstream_rq_timeout")->value());
 }
 
@@ -580,7 +597,7 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   EXPECT_TRUE(upstream_request2->complete());
   EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
   EXPECT_TRUE(response2->complete());
-  EXPECT_STREQ("200", response2->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response2->headers().Status()->value().getStringView());
   EXPECT_EQ(request2_bytes, response2->body().size());
 
   // Validate that idle time is not kicked in.
@@ -594,7 +611,7 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   EXPECT_TRUE(upstream_request1->complete());
   EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
   EXPECT_TRUE(response1->complete());
-  EXPECT_STREQ("200", response1->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response1->headers().Status()->value().getStringView());
   EXPECT_EQ(request1_bytes, response1->body().size());
 
   // Do not send any requests and validate idle timeout kicks in after both the requests are done.
@@ -700,7 +717,7 @@ void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t r
   EXPECT_TRUE(upstream_request2->complete());
   EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
   EXPECT_TRUE(response2->complete());
-  EXPECT_STREQ("200", response2->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response2->headers().Status()->value().getStringView());
   EXPECT_EQ(request2_bytes, response2->body().size());
 
   // Respond to request 1
@@ -710,7 +727,7 @@ void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t r
   EXPECT_TRUE(upstream_request1->complete());
   EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
   EXPECT_TRUE(response1->complete());
-  EXPECT_STREQ("200", response1->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response1->headers().Status()->value().getStringView());
   EXPECT_EQ(request2_bytes, response1->body().size());
 
   // Cleanup both downstream and upstream
@@ -783,6 +800,32 @@ TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
   EXPECT_EQ(connection.last_connection_event(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             0);
+}
+
+TEST_P(Http2IntegrationTest, PauseAndResume) {
+  config_helper_.addFilter(R"EOF(
+  name: stop-iteration-and-continue-filter
+  config: {}
+  )EOF");
+  initialize();
+
+  // Send a request with a bit of data, to trigger the filter pausing.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  codec_client_->sendData(*request_encoder_, 1, false);
+
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Now send the final data frame and make sure it gets proxied.
+  codec_client_->sendData(*request_encoder_, 0, true);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
 }
 
 Http2RingHashIntegrationTest::Http2RingHashIntegrationTest() {
@@ -897,10 +940,10 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieNoTtl) {
                               {":scheme", "http"},
                               {":authority", "host"}},
       [&](IntegrationStreamDecoder& response) {
-        EXPECT_STREQ("200", response.headers().Status()->value().c_str());
+        EXPECT_EQ("200", response.headers().Status()->value().getStringView());
         EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie) == nullptr);
-        served_by.insert(
-            response.headers().get(Http::LowerCaseString("x-served-by"))->value().c_str());
+        served_by.insert(std::string(
+            response.headers().get(Http::LowerCaseString("x-served-by"))->value().getStringView()));
       });
   EXPECT_EQ(served_by.size(), num_upstreams_);
 }
@@ -927,8 +970,9 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithNonzeroTtlSet) {
                               {":scheme", "http"},
                               {":authority", "host"}},
       [&](IntegrationStreamDecoder& response) {
-        EXPECT_STREQ("200", response.headers().Status()->value().c_str());
-        std::string value = response.headers().get(Http::Headers::get().SetCookie)->value().c_str();
+        EXPECT_EQ("200", response.headers().Status()->value().getStringView());
+        std::string value(
+            response.headers().get(Http::Headers::get().SetCookie)->value().getStringView());
         set_cookies.insert(value);
         EXPECT_THAT(value, MatchesRegex("foo=.*; Max-Age=15; HttpOnly"));
       });
@@ -957,8 +1001,9 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithZeroTtlSet) {
                               {":scheme", "http"},
                               {":authority", "host"}},
       [&](IntegrationStreamDecoder& response) {
-        EXPECT_STREQ("200", response.headers().Status()->value().c_str());
-        std::string value = response.headers().get(Http::Headers::get().SetCookie)->value().c_str();
+        EXPECT_EQ("200", response.headers().Status()->value().getStringView());
+        std::string value(
+            response.headers().get(Http::Headers::get().SetCookie)->value().getStringView());
         set_cookies.insert(value);
         EXPECT_THAT(value, MatchesRegex("^foo=.*$"));
       });
@@ -987,10 +1032,10 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieNoTtl) {
                               {":scheme", "http"},
                               {":authority", "host"}},
       [&](IntegrationStreamDecoder& response) {
-        EXPECT_STREQ("200", response.headers().Status()->value().c_str());
+        EXPECT_EQ("200", response.headers().Status()->value().getStringView());
         EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie) == nullptr);
-        served_by.insert(
-            response.headers().get(Http::LowerCaseString("x-served-by"))->value().c_str());
+        served_by.insert(std::string(
+            response.headers().get(Http::LowerCaseString("x-served-by"))->value().getStringView()));
       });
   EXPECT_EQ(served_by.size(), 1);
 }
@@ -1018,10 +1063,10 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
                               {":scheme", "http"},
                               {":authority", "host"}},
       [&](IntegrationStreamDecoder& response) {
-        EXPECT_STREQ("200", response.headers().Status()->value().c_str());
+        EXPECT_EQ("200", response.headers().Status()->value().getStringView());
         EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie) == nullptr);
-        served_by.insert(
-            response.headers().get(Http::LowerCaseString("x-served-by"))->value().c_str());
+        served_by.insert(std::string(
+            response.headers().get(Http::LowerCaseString("x-served-by"))->value().getStringView()));
       });
   EXPECT_EQ(served_by.size(), 1);
 }

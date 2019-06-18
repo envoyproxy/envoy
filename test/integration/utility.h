@@ -52,14 +52,14 @@ private:
   std::function<void()> on_complete_cb_;
 };
 
-typedef std::unique_ptr<BufferingStreamDecoder> BufferingStreamDecoderPtr;
+using BufferingStreamDecoderPtr = std::unique_ptr<BufferingStreamDecoder>;
 
 /**
  * Basic driver for a raw connection.
  */
 class RawConnectionDriver {
 public:
-  typedef std::function<void(Network::ClientConnection&, const Buffer::Instance&)> ReadCallback;
+  using ReadCallback = std::function<void(Network::ClientConnection&, const Buffer::Instance&)>;
 
   RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
                       Network::Address::IpVersion version);
@@ -183,6 +183,7 @@ public:
   }
   const std::string& data() { return data_; }
   bool readLastByte() { return read_end_stream_; }
+  void clearData() { data_.clear(); }
 
 private:
   Event::Dispatcher& dispatcher_;

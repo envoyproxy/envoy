@@ -23,6 +23,7 @@ import "envoy/config/metrics/v2/stats.proto";
 import "envoy/config/overload/v2alpha/overload.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
@@ -109,15 +110,29 @@ message Bootstrap {
 
   reserved 10;
 
-  // Configuration for the runtime configuration provider. If not specified, a
-  // “null” provider will be used which will result in all defaults being used.
-  Runtime runtime = 11;
+  // Configuration for the runtime configuration provider (deprecated). If not
+  // specified, a “null” provider will be used which will result in all defaults
+  // being used.
+  Runtime runtime = 11 [deprecated = true];
+
+  // Configuration for the runtime configuration provider. If not
+  // specified, a “null” provider will be used which will result in all defaults
+  // being used.
+  LayeredRuntime layered_runtime = 17;
 
   // Configuration for the local administration HTTP server.
   Admin admin = 12;
 
   // Optional overload manager configuration.
   envoy.config.overload.v2alpha.OverloadManager overload_manager = 15;
+
+  // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
+  // Note that this records a value for each iteration of the event loop on every thread. This
+  // should normally be minimal overhead, but when using
+  // :ref:`statsd <envoy_api_msg_config.metrics.v2.StatsdSink>`, it will send each observed value
+  // over the wire individually because the statsd protocol doesn't have any way to represent a
+  // histogram summary. Be aware that this can be a very large volume of data.
+  bool enable_dispatcher_stats = 16;
 }
 
 // Administration interface :ref:`operations documentation
@@ -191,14 +206,15 @@ message Watchdog {
   google.protobuf.Duration multikill_timeout = 4;
 }
 
-// Runtime :ref:`configuration overview <config_runtime>`.
+// Runtime :ref:`configuration overview <config_runtime>` (deprecated).
 message Runtime {
   // The implementation assumes that the file system tree is accessed via a
   // symbolic link. An atomic link swap is used when a new tree should be
   // switched to. This parameter specifies the path to the symbolic link. Envoy
   // will watch the location for changes and reload the file system tree when
-  // they happen.
-  string symlink_root = 1 [(validate.rules).string.min_bytes = 1];
+  // they happen. If this parameter is not set, there will be no disk based
+  // runtime.
+  string symlink_root = 1;
 
   // Specifies the subdirectory to load within the root directory. This is
   // useful if multiple systems share the same delivery mechanism. Envoy
@@ -212,4 +228,69 @@ message Runtime {
   // Sometimes it is useful to have a per service cluster directory for runtime
   // configuration. See below for exactly how the override directory is used.
   string override_subdirectory = 3;
+
+  // Static base runtime. This will be :ref:`overridden
+  // <config_runtime_layering>` by other runtime layers, e.g.
+  // disk or admin. This follows the :ref:`runtime protobuf JSON representation
+  // encoding <config_runtime_proto_json>`.
+  google.protobuf.Struct base = 4;
+}
+
+message RuntimeLayer {
+  // :ref:`Static runtime <config_runtime_bootstrap>` layer.
+  message StaticLayer {
+    // This follows the :ref:`runtime protobuf JSON representation encoding
+    // <config_runtime_proto_json>`.
+    google.protobuf.Struct value = 1;
+  }
+
+  // :ref:`Disk runtime <config_runtime_local_disk>` layer.
+  message DiskLayer {
+    // The implementation assumes that the file system tree is accessed via a
+    // symbolic link. An atomic link swap is used when a new tree should be
+    // switched to. This parameter specifies the path to the symbolic link.
+    // Envoy will watch the location for changes and reload the file system tree
+    // when they happen. See documentation on runtime :ref:`atomicity
+    // <config_runtime_atomicity>` for further details on how reloads are
+    // treated.
+    string symlink_root = 1;
+
+    // :ref:`Append <config_runtime_local_disk_service_cluster_subdirs>` the
+    // service cluster to the path under symlink root.
+    bool append_service_cluster = 2;
+  }
+
+  // :ref:`Admin console runtime <config_runtime_admin>` layer.
+  message AdminLayer {
+  }
+
+  // [#not-implemented-hide:]
+  message TdsLayer {
+    // Resource to subscribe to at *tds_config* for the TDS layer.
+    string name = 1;
+
+    // TDS configuration source.
+    envoy.api.v2.core.ConfigSource tds_config = 2;
+  }
+
+  // Descriptive name for the runtime layer. This is only used for the runtime
+  // :http:get:`/runtime` output.
+  string name = 1;
+
+  oneof layer_specifier {
+    // Unlike static xDS resources, this static layer is overridable by later
+    // layers in the runtime virtual filesystem.
+    google.protobuf.Struct static_layer = 2;
+    DiskLayer disk_layer = 3;
+    AdminLayer admin_layer = 4;
+    // [#not-implemented-hide:]
+    TdsLayer tds_layer = 5;
+  }
+}
+
+// Runtime :ref:`configuration overview <config_runtime>`.
+message LayeredRuntime {
+  // The :ref:`layers <config_runtime_layering>` of the runtime. This is ordered
+  // such that later layers in the list overlay earlier entries.
+  repeated RuntimeLayer layers = 1;
 }

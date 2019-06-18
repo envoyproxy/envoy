@@ -15,7 +15,7 @@ int64_t getCurrentThreadId() {
   return static_cast<int64_t>(syscall(SYS_gettid));
 #elif defined(__APPLE__)
   uint64_t tid;
-  pthread_threadid_np(NULL, &tid);
+  pthread_threadid_np(nullptr, &tid);
   return tid;
 #else
 #error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
@@ -33,12 +33,13 @@ bool ThreadIdImplPosix::isCurrentThreadId() const { return id_ == getCurrentThre
 ThreadImplPosix::ThreadImplPosix(std::function<void()> thread_routine)
     : thread_routine_(thread_routine) {
   RELEASE_ASSERT(Logger::Registry::initialized(), "");
-  const int rc = pthread_create(&thread_handle_, nullptr,
-                                [](void* arg) -> void* {
-                                  static_cast<ThreadImplPosix*>(arg)->thread_routine_();
-                                  return nullptr;
-                                },
-                                this);
+  const int rc = pthread_create(
+      &thread_handle_, nullptr,
+      [](void* arg) -> void* {
+        static_cast<ThreadImplPosix*>(arg)->thread_routine_();
+        return nullptr;
+      },
+      this);
   RELEASE_ASSERT(rc == 0, "");
 }
 

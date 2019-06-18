@@ -7,6 +7,8 @@
 
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
 
+using testing::Eq;
+
 namespace Envoy {
 namespace Grpc {
 namespace {
@@ -142,6 +144,22 @@ TEST_P(GrpcClientIntegrationTest, BadReplyProtobuf) {
   dispatcher_helper_.runDispatcher();
 }
 
+// Validate that a reply with bad protobuf is handled as an INTERNAL gRPC error.
+TEST_P(GrpcClientIntegrationTest, BadRequestReplyProtobuf) {
+  initialize();
+  auto request = createRequest(empty_metadata_);
+  request->fake_stream_->startGrpcStream();
+  EXPECT_CALL(*request->child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("0")));
+  EXPECT_CALL(*request, onFailure(Status::Internal, "", _)).WillExitIfNeeded();
+  EXPECT_CALL(*request->child_span_, finishSpan());
+  dispatcher_helper_.setStreamEventPending();
+  Buffer::OwnedImpl reply_buffer("\x00\x00\x00\x00\x02\xff\xff", 7);
+  Common::prependGrpcFrameHeader(reply_buffer);
+  request->fake_stream_->encodeData(reply_buffer, false);
+  request->fake_stream_->finishGrpcStream(Grpc::Status::Ok);
+  dispatcher_helper_.runDispatcher();
+}
+
 // Validate that an out-of-range gRPC status is handled as an INVALID_CODE gRPC
 // error.
 TEST_P(GrpcClientIntegrationTest, OutOfRangeGrpcStatus) {
@@ -188,7 +206,7 @@ TEST_P(GrpcClientIntegrationTest, ReplyNoTrailers) {
   dispatcher_helper_.setStreamEventPending();
   stream->expectTrailingMetadata(empty_metadata_);
   stream->expectGrpcStatus(Status::GrpcStatus::InvalidCode);
-  auto serialized_response = Grpc::Common::serializeBody(reply);
+  auto serialized_response = Grpc::Common::serializeToGrpcFrame(reply);
   stream->fake_stream_->encodeData(*serialized_response, true);
   stream->fake_stream_->encodeResetStream();
   dispatcher_helper_.runDispatcher();
@@ -272,8 +290,9 @@ TEST_P(GrpcClientIntegrationTest, RequestTrailersOnly) {
   initialize();
   auto request = createRequest(empty_metadata_);
   const Http::TestHeaderMapImpl reply_headers{{":status", "200"}, {"grpc-status", "0"}};
-  EXPECT_CALL(*request->child_span_, setTag(Tracing::Tags::get().GrpcStatusCode, "0"));
-  EXPECT_CALL(*request->child_span_, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
+  EXPECT_CALL(*request->child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("0")));
+  EXPECT_CALL(*request->child_span_,
+              setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*request, onFailure(Status::Internal, "", _)).WillExitIfNeeded();
   dispatcher_helper_.setStreamEventPending();
   EXPECT_CALL(*request->child_span_, finishSpan());
@@ -340,7 +359,7 @@ TEST_P(GrpcClientIntegrationTest, CancelRequest) {
   initialize();
   auto request = createRequest(empty_metadata_);
   EXPECT_CALL(*request->child_span_,
-              setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled));
+              setTag(Eq(Tracing::Tags::get().Status), Eq(Tracing::Tags::get().Canceled)));
   EXPECT_CALL(*request->child_span_, finishSpan());
   request->grpc_request_->cancel();
   dispatcher_helper_.dispatcher_.run(Event::Dispatcher::RunType::NonBlock);

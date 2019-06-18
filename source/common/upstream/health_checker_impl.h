@@ -29,13 +29,15 @@ public:
    * @param random supplies the random generator.
    * @param dispatcher supplies the dispatcher.
    * @param event_logger supplies the event_logger.
+   * @param validation_visitor message validation visitor instance.
    * @return a health checker.
    */
   static HealthCheckerSharedPtr create(const envoy::api::v2::core::HealthCheck& health_check_config,
                                        Upstream::Cluster& cluster, Runtime::Loader& runtime,
                                        Runtime::RandomGenerator& random,
                                        Event::Dispatcher& dispatcher,
-                                       AccessLog::AccessLogManager& log_manager);
+                                       AccessLog::AccessLogManager& log_manager,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
 /**
@@ -71,10 +73,12 @@ private:
     void onResponseComplete();
     enum class HealthCheckResult { Succeeded, Degraded, Failed };
     HealthCheckResult healthCheckResult();
+    bool shouldClose() const;
 
     // ActiveHealthCheckSession
     void onInterval() override;
     void onTimeout() override;
+    void onDeferredDelete() final;
 
     // Http::StreamDecoder
     void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
@@ -110,7 +114,6 @@ private:
     ConnectionCallbackImpl connection_callback_impl_{*this};
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
-    Http::StreamEncoder* request_encoder_{};
     Http::HeaderMapPtr response_headers_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
@@ -118,7 +121,7 @@ private:
     bool expect_reset_{};
   };
 
-  typedef std::unique_ptr<HttpActiveHealthCheckSession> HttpActiveHealthCheckSessionPtr;
+  using HttpActiveHealthCheckSessionPtr = std::unique_ptr<HttpActiveHealthCheckSession>;
 
   virtual Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
 
@@ -198,7 +201,7 @@ public:
  */
 class TcpHealthCheckMatcher {
 public:
-  typedef std::list<std::vector<uint8_t>> MatchSegments;
+  using MatchSegments = std::list<std::vector<uint8_t>>;
 
   static MatchSegments loadProtoBytes(
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload>& byte_array);
@@ -246,13 +249,17 @@ private:
     // ActiveHealthCheckSession
     void onInterval() override;
     void onTimeout() override;
+    void onDeferredDelete() final;
 
     TcpHealthCheckerImpl& parent_;
     Network::ClientConnectionPtr client_;
     std::shared_ptr<TcpSessionCallbacks> session_callbacks_;
+    // If true, stream close was initiated by us, not e.g. remote close or TCP reset.
+    // In this case healthcheck status already reported, only state cleanup required.
+    bool expect_close_{};
   };
 
-  typedef std::unique_ptr<TcpActiveHealthCheckSession> TcpActiveHealthCheckSessionPtr;
+  using TcpActiveHealthCheckSessionPtr = std::unique_ptr<TcpActiveHealthCheckSession>;
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
@@ -292,6 +299,7 @@ private:
     // ActiveHealthCheckSession
     void onInterval() override;
     void onTimeout() override;
+    void onDeferredDelete() final;
 
     // Http::StreamDecoder
     void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}

@@ -17,9 +17,9 @@ PerSocketTapperImpl::PerSocketTapperImpl(SocketTapConfigSharedPtr config,
       connection_(connection), statuses_(config_->createMatchStatusVector()) {
   config_->rootMatcher().onNewStream(statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
-    TapCommon::TraceWrapperSharedPtr trace = makeTraceSegment();
+    TapCommon::TraceWrapperPtr trace = makeTraceSegment();
     fillConnectionInfo(*trace->mutable_socket_streamed_trace_segment()->mutable_connection());
-    sink_handle_->submitTrace(trace);
+    sink_handle_->submitTrace(std::move(trace));
   }
 }
 
@@ -36,15 +36,15 @@ void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
   }
 
   if (config_->streaming()) {
-    TapCommon::TraceWrapperSharedPtr trace = makeTraceSegment();
+    TapCommon::TraceWrapperPtr trace = makeTraceSegment();
     auto& event = *trace->mutable_socket_streamed_trace_segment()->mutable_event();
     initEvent(event);
     event.mutable_closed();
-    sink_handle_->submitTrace(trace);
+    sink_handle_->submitTrace(std::move(trace));
   } else {
     makeBufferedTraceIfNeeded();
     fillConnectionInfo(*buffered_trace_->mutable_socket_buffered_trace()->mutable_connection());
-    sink_handle_->submitTrace(buffered_trace_);
+    sink_handle_->submitTrace(std::move(buffered_trace_));
   }
 
   // Here we explicitly reset the sink_handle_ to release any sink resources and force a flush
@@ -67,13 +67,13 @@ void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_re
   }
 
   if (config_->streaming()) {
-    TapCommon::TraceWrapperSharedPtr trace = makeTraceSegment();
+    TapCommon::TraceWrapperPtr trace = makeTraceSegment();
     auto& event = *trace->mutable_socket_streamed_trace_segment()->mutable_event();
     initEvent(event);
     TapCommon::Utility::addBufferToProtoBytes(*event.mutable_read()->mutable_data(),
                                               config_->maxBufferedRxBytes(), data,
                                               data.length() - bytes_read, bytes_read);
-    sink_handle_->submitTrace(trace);
+    sink_handle_->submitTrace(std::move(trace));
   } else {
     if (buffered_trace_ != nullptr && buffered_trace_->socket_buffered_trace().read_truncated()) {
       return;
@@ -99,14 +99,14 @@ void PerSocketTapperImpl::onWrite(const Buffer::Instance& data, uint32_t bytes_w
   }
 
   if (config_->streaming()) {
-    TapCommon::TraceWrapperSharedPtr trace = makeTraceSegment();
+    TapCommon::TraceWrapperPtr trace = makeTraceSegment();
     auto& event = *trace->mutable_socket_streamed_trace_segment()->mutable_event();
     initEvent(event);
     TapCommon::Utility::addBufferToProtoBytes(*event.mutable_write()->mutable_data(),
                                               config_->maxBufferedTxBytes(), data, 0,
                                               bytes_written);
     event.mutable_write()->set_end_stream(end_stream);
-    sink_handle_->submitTrace(trace);
+    sink_handle_->submitTrace(std::move(trace));
   } else {
     if (buffered_trace_ != nullptr && buffered_trace_->socket_buffered_trace().write_truncated()) {
       return;

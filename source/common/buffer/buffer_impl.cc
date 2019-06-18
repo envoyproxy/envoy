@@ -69,7 +69,7 @@ void OwnedImpl::prepend(absl::string_view data) {
     // only seems to happen the original buffer was created via
     // addBufferFragment(), this forces the code execution path in
     // evbuffer_prepend related to immutable buffers.
-    if (data.size() == 0) {
+    if (data.empty()) {
       return;
     }
     evbuffer_prepend(buffer_.get(), data.data(), data.size());
@@ -132,6 +132,9 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
     if (slice_index < 0) {
       // There was no slice containing any data, so rewind the iterator at the first slice.
       slice_index = 0;
+      if (!slices_[0]) {
+        return;
+      }
     }
 
     // Next, scan forward and attempt to match the slices against iovecs.

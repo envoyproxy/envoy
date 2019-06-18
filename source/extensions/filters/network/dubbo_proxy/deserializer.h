@@ -10,6 +10,7 @@
 #include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/network/dubbo_proxy/message.h"
+#include "extensions/filters/network/dubbo_proxy/metadata.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,12 +26,11 @@ public:
     template <typename T> std::size_t operator()(T t) const { return static_cast<std::size_t>(t); }
   };
 
-  typedef std::unordered_map<SerializationType, std::string, SerializationTypeHash>
-      DeserializerTypeNameMap;
+  using DeserializerTypeNameMap =
+      std::unordered_map<SerializationType, std::string, SerializationTypeHash>;
 
   const DeserializerTypeNameMap deserializerTypeNameMap = {
       {SerializationType::Hessian, "hessian"},
-      {SerializationType::Json, "json"},
   };
 
   const std::string& fromType(SerializationType type) const {
@@ -43,7 +43,7 @@ public:
   }
 };
 
-typedef ConstSingleton<DeserializerNameValues> DeserializerNames;
+using DeserializerNames = ConstSingleton<DeserializerNameValues>;
 
 /**
  * RpcInvocation represent an rpc call
@@ -52,13 +52,13 @@ typedef ConstSingleton<DeserializerNameValues> DeserializerNames;
  */
 class RpcInvocation {
 public:
-  virtual ~RpcInvocation() {}
+  virtual ~RpcInvocation() = default;
   virtual const std::string& getMethodName() const PURE;
   virtual const std::string& getServiceName() const PURE;
   virtual const std::string& getServiceVersion() const PURE;
 };
 
-typedef std::unique_ptr<RpcInvocation> RpcInvocationPtr;
+using RpcInvocationPtr = std::unique_ptr<RpcInvocation>;
 
 /**
  * RpcResult represent the result of an rpc call
@@ -67,15 +67,15 @@ typedef std::unique_ptr<RpcInvocation> RpcInvocationPtr;
  */
 class RpcResult {
 public:
-  virtual ~RpcResult() {}
+  virtual ~RpcResult() = default;
   virtual bool hasException() const PURE;
 };
 
-typedef std::unique_ptr<RpcResult> RpcResultPtr;
+using RpcResultPtr = std::unique_ptr<RpcResult>;
 
 class Deserializer {
 public:
-  virtual ~Deserializer() {}
+  virtual ~Deserializer() = default;
   /**
    * Return this Deserializer's name
    *
@@ -96,8 +96,8 @@ public:
    * @body_size the complete RpcInvocation size
    * @throws EnvoyException if the data is not valid for this serialization
    */
-  virtual RpcInvocationPtr deserializeRpcInvocation(Buffer::Instance& buffer,
-                                                    size_t body_size) PURE;
+  virtual void deserializeRpcInvocation(Buffer::Instance& buffer, size_t body_size,
+                                        MessageMetadataSharedPtr metadata) PURE;
   /**
    * deserialize result of an rpc call
    * If successful, the RpcResult removed from the buffer
@@ -121,7 +121,7 @@ public:
                                     RpcResponseType type) PURE;
 };
 
-typedef std::unique_ptr<Deserializer> DeserializerPtr;
+using DeserializerPtr = std::unique_ptr<Deserializer>;
 
 /**
  * Implemented by each Dubbo deserialize and registered via Registry::registerFactory or the
@@ -129,7 +129,7 @@ typedef std::unique_ptr<Deserializer> DeserializerPtr;
  */
 class NamedDeserializerConfigFactory {
 public:
-  virtual ~NamedDeserializerConfigFactory() {}
+  virtual ~NamedDeserializerConfigFactory() = default;
 
   /**
    * Create a particular Dubbo deserializer.

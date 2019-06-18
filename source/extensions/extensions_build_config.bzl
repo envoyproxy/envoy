@@ -8,10 +8,15 @@ EXTENSIONS = {
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/http_grpc:config",
 
     #
+    # Clusters
+    #
+    "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",
+
+    #
     # gRPC Credentials Plugins
     #
 
-    "envoy.grpc_credentials.file_based_metadata":      "//source/extensions/grpc_credentials/file_based_metadata:config",
+    "envoy.grpc_credentials.file_based_metadata":       "//source/extensions/grpc_credentials/file_based_metadata:config",
 
     #
     # Health checkers
@@ -25,6 +30,7 @@ EXTENSIONS = {
 
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
+    "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
     "envoy.filters.http.dynamo":                        "//source/extensions/filters/http/dynamo:config",
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
@@ -38,6 +44,7 @@ EXTENSIONS = {
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
     "envoy.filters.http.lua":                           "//source/extensions/filters/http/lua:config",
+    "envoy.filters.http.original_src":                  "//source/extensions/filters/http/original_src:config",
     "envoy.filters.http.ratelimit":                     "//source/extensions/filters/http/ratelimit:config",
     "envoy.filters.http.rbac":                          "//source/extensions/filters/http/rbac:config",
     "envoy.filters.http.router":                        "//source/extensions/filters/http/router:config",
@@ -69,6 +76,9 @@ EXTENSIONS = {
     "envoy.filters.network.echo":                       "//source/extensions/filters/network/echo:config",
     "envoy.filters.network.ext_authz":                  "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.http_connection_manager":    "//source/extensions/filters/network/http_connection_manager:config",
+    # NOTE: Kafka filter does not have a proper filter implemented right now. We are referencing to
+    #       codec implementation that is going to be used by the filter.
+    "envoy.filters.network.kafka":                      "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
     "envoy.filters.network.mongo_proxy":                "//source/extensions/filters/network/mongo_proxy:config",
     "envoy.filters.network.mysql_proxy":                "//source/extensions/filters/network/mysql_proxy:config",
     "envoy.filters.network.ratelimit":                  "//source/extensions/filters/network/ratelimit:config",
@@ -110,6 +120,7 @@ EXTENSIONS = {
     "envoy.tracers.lightstep":                          "//source/extensions/tracers/lightstep:config",
     "envoy.tracers.datadog":                            "//source/extensions/tracers/datadog:config",
     "envoy.tracers.zipkin":                             "//source/extensions/tracers/zipkin:config",
+    "envoy.tracers.opencensus":                         "//source/extensions/tracers/opencensus:config",
 
     #
     # Transport sockets
@@ -152,6 +163,7 @@ WINDOWS_EXTENSIONS = {
 
     #"envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     #"envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
+    #"envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
     #"envoy.filters.http.dynamo":                        "//source/extensions/filters/http/dynamo:config",
     #"envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
     #"envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",

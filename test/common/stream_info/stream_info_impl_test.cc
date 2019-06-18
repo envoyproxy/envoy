@@ -142,6 +142,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     ASSERT_TRUE(stream_info.responseCode());
     EXPECT_EQ(200, stream_info.responseCode().value());
 
+    EXPECT_FALSE(stream_info.responseCodeDetails().has_value());
+    stream_info.setResponseCodeDetails(ResponseCodeDetails::get().ViaUpstream);
+    ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
+    EXPECT_EQ(ResponseCodeDetails::get().ViaUpstream, stream_info.responseCodeDetails().value());
+
     EXPECT_EQ(nullptr, stream_info.upstreamHost());
     Upstream::HostDescriptionConstSharedPtr host(new NiceMock<Upstream::MockHostDescription>());
     stream_info.onUpstreamHostSelected(host);
@@ -187,7 +192,7 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(stream_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
-  ProtobufTypes::String json;
+  std::string json;
   const auto test_struct = stream_info.dynamicMetadata().filter_metadata().at("com.test");
   const auto status = Protobuf::util::MessageToJsonString(test_struct, &json);
   EXPECT_TRUE(status.ok());

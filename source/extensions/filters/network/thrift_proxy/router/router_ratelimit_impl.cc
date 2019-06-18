@@ -44,7 +44,8 @@ bool RequestHeadersAction::populateDescriptor(const RouteEntry&, RateLimit::Desc
     return false;
   }
 
-  descriptor.entries_.push_back({descriptor_key_, header_value->value().c_str()});
+  descriptor.entries_.push_back(
+      {descriptor_key_, std::string(header_value->value().getStringView())});
   return true;
 }
 

@@ -26,6 +26,10 @@ struct AppException : public EnvoyException,
   const RpcResponseType response_type_;
 };
 
+struct DownstreamConnectionCloseException : public EnvoyException {
+  DownstreamConnectionCloseException(const std::string& what);
+};
+
 } // namespace DubboProxy
 } // namespace NetworkFilters
 } // namespace Extensions

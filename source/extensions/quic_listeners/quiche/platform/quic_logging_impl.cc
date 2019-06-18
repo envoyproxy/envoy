@@ -40,6 +40,7 @@ QuicLogEmitter::~QuicLogEmitter() {
   }
 
   if (level_ == FATAL) {
+    GetLogger().flush();
 #ifdef NDEBUG
     // Release mode.
     abort();

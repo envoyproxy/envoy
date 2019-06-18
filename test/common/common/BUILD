@@ -119,6 +119,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:mutex_tracer_lib",
         "//test/test_common:contention_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -179,17 +180,6 @@ envoy_cc_test(
     name = "callback_impl_test",
     srcs = ["callback_impl_test.cc"],
     deps = ["//source/common/common:callback_impl_lib"],
-)
-
-envoy_cc_test(
-    name = "block_memory_hash_set_test",
-    srcs = ["block_memory_hash_set_test.cc"],
-    deps = [
-        "//include/envoy/stats:stats_interface",
-        "//source/common/common:block_memory_hash_set_lib",
-        "//source/common/common:hash_lib",
-        "//source/common/stats:stats_lib",
-    ],
 )
 
 envoy_cc_binary(

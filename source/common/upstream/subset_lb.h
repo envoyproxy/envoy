@@ -35,7 +35,15 @@ public:
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
 private:
-  typedef std::function<bool(const Host&)> HostPredicate;
+  using HostPredicate = std::function<bool(const Host&)>;
+
+  void initSubsetSelectorMap();
+  void initSelectorFallbackSubset(const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
+                                      LbSubsetSelectorFallbackPolicy&);
+  HostConstSharedPtr chooseHostForSelectorFallbackPolicy(
+      const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
+          LbSubsetSelectorFallbackPolicy& fallback_policy,
+      LoadBalancerContext* context);
 
   // Represents a subset of an original HostSet.
   class HostSubsetImpl : public HostSetImpl {
@@ -105,15 +113,24 @@ private:
     bool empty_ = true;
   };
 
-  typedef std::shared_ptr<HostSubsetImpl> HostSubsetImplPtr;
-  typedef std::shared_ptr<PrioritySubsetImpl> PrioritySubsetImplPtr;
+  using HostSubsetImplPtr = std::shared_ptr<HostSubsetImpl>;
+  using PrioritySubsetImplPtr = std::shared_ptr<PrioritySubsetImpl>;
 
-  typedef std::vector<std::pair<std::string, ProtobufWkt::Value>> SubsetMetadata;
+  using SubsetMetadata = std::vector<std::pair<std::string, ProtobufWkt::Value>>;
 
   class LbSubsetEntry;
-  typedef std::shared_ptr<LbSubsetEntry> LbSubsetEntryPtr;
-  typedef std::unordered_map<HashedValue, LbSubsetEntryPtr> ValueSubsetMap;
-  typedef std::unordered_map<std::string, ValueSubsetMap> LbSubsetMap;
+  struct SubsetSelectorMap;
+
+  using LbSubsetEntryPtr = std::shared_ptr<LbSubsetEntry>;
+  using SubsetSelectorMapPtr = std::shared_ptr<SubsetSelectorMap>;
+  using ValueSubsetMap = std::unordered_map<HashedValue, LbSubsetEntryPtr>;
+  using LbSubsetMap = std::unordered_map<std::string, ValueSubsetMap>;
+
+  struct SubsetSelectorMap {
+    std::unordered_map<std::string, SubsetSelectorMapPtr> subset_keys_;
+    envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+        fallback_policy_;
+  };
 
   // Entry in the subset hierarchy.
   class LbSubsetEntry {
@@ -145,6 +162,10 @@ private:
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
 
+  absl::optional<
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy>
+  tryFindSelectorFallbackPolicy(LoadBalancerContext* context);
+
   bool hostMatches(const SubsetMetadata& kvs, const Host& host);
 
   LbSubsetEntryPtr
@@ -168,7 +189,7 @@ private:
 
   const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
   const SubsetMetadata default_subset_metadata_;
-  const std::vector<std::set<std::string>> subset_keys_;
+  const std::vector<SubsetSelectorPtr> subset_selectors_;
 
   const PrioritySet& original_priority_set_;
   const PrioritySet* original_local_priority_set_;
@@ -177,8 +198,14 @@ private:
   LbSubsetEntryPtr fallback_subset_;
   LbSubsetEntryPtr panic_mode_subset_;
 
+  LbSubsetEntryPtr selector_fallback_subset_any_;
+  LbSubsetEntryPtr selector_fallback_subset_default_;
+
   // Forms a trie-like structure. Requires lexically sorted Host and Route metadata.
   LbSubsetMap subsets_;
+  // Forms a trie-like structure of lexically sorted keys+fallback policy from subset
+  // selectors configuration
+  SubsetSelectorMapPtr selectors_;
 
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;

@@ -69,6 +69,13 @@ private:
   void encodeHeader(const char* key, uint32_t key_size, const char* value, uint32_t value_size);
 
   /**
+   * Called to encode an individual header.
+   * @param key supplies the header to encode as a string_view.
+   * @param value supplies the value to encode as a string_view.
+   */
+  void encodeHeader(absl::string_view key, absl::string_view value);
+
+  /**
    * Called to finalize a stream encode.
    */
   void endEncode();

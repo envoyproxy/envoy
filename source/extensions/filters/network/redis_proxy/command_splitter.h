@@ -17,7 +17,7 @@ namespace CommandSplitter {
  */
 class SplitRequest {
 public:
-  virtual ~SplitRequest() {}
+  virtual ~SplitRequest() = default;
 
   /**
    * Cancel the request. No further request callbacks will be called.
@@ -25,14 +25,26 @@ public:
   virtual void cancel() PURE;
 };
 
-typedef std::unique_ptr<SplitRequest> SplitRequestPtr;
+using SplitRequestPtr = std::unique_ptr<SplitRequest>;
 
 /**
  * Split request callbacks.
  */
 class SplitCallbacks {
 public:
-  virtual ~SplitCallbacks() {}
+  virtual ~SplitCallbacks() = default;
+
+  /**
+   * Called to verify that commands should be processed.
+   * @return bool true if commands from this client connection can be processed, false if not.
+   */
+  virtual bool connectionAllowed() PURE;
+
+  /**
+   * Called when an authentication command has been received.
+   * @param password supplies the AUTH password provided by the downstream client.
+   */
+  virtual void onAuth(const std::string& password) PURE;
 
   /**
    * Called when the response is ready.
@@ -47,17 +59,17 @@ public:
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   /**
-   * Make a split redis request.
-   * @param request supplies the split request to make.
+   * Make a split redis request capable of being retried/redirected.
+   * @param request supplies the split request to make (ownership transferred to call).
    * @param callbacks supplies the split request completion callbacks.
    * @return SplitRequestPtr a handle to the active request or nullptr if the request has already
    *         been satisfied (via onResponse() being called). The splitter ALWAYS calls
    *         onResponse() for a given request.
    */
-  virtual SplitRequestPtr makeRequest(const Common::Redis::RespValue& request,
+  virtual SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
                                       SplitCallbacks& callbacks) PURE;
 };
 

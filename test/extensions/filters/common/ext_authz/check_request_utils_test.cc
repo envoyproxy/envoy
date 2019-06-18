@@ -75,17 +75,23 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
 
 // Verify that createHttpCheck's dependencies are invoked when it's called.
 // Verify that check request object has no request data.
+// Verify that a client supplied EnvoyAuthPartialBody will not affect the
+// CheckRequest call.
 TEST_F(CheckRequestUtilsTest, BasicHttp) {
   const uint64_t size = 0;
-  Http::HeaderMapImpl headers_;
   envoy::service::auth::v2::CheckRequest request_;
 
+  // A client supplied EnvoyAuthPartialBody header should be ignored.
+  Http::TestHeaderMapImpl request_headers{{Http::Headers::get().EnvoyAuthPartialBody.get(), "1"}};
+
   ExpectBasicHttp();
-  CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
-                                     Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>(),
-                                     request_, size);
+  CheckRequestUtils::createHttpCheck(&callbacks_, request_headers,
+                                     Protobuf::Map<std::string, std::string>(), request_, size);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
+  EXPECT_EQ(request_.attributes().request().http().headers().end(),
+            request_.attributes().request().http().headers().find(
+                Http::Headers::get().EnvoyAuthPartialBody.get()));
 }
 
 // Verify that check request object has only a portion of the request data.
@@ -96,10 +102,11 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
 
   ExpectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
-                                     Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>(),
-                                     request_, size);
+                                     Protobuf::Map<std::string, std::string>(), request_, size);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
+  EXPECT_EQ("true", request_.attributes().request().http().headers().at(
+                        Http::Headers::get().EnvoyAuthPartialBody.get()));
 }
 
 // Verify that check request object has all the request data.
@@ -109,11 +116,13 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
 
   ExpectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
-                                     Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>(),
-                                     request_, buffer_->length());
+                                     Protobuf::Map<std::string, std::string>(), request_,
+                                     buffer_->length());
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().body());
+  EXPECT_EQ("false", request_.attributes().request().http().headers().at(
+                         Http::Headers::get().EnvoyAuthPartialBody.get()));
 }
 
 // Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest
@@ -134,7 +143,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
 
-  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> context_extensions;
+  Protobuf::Map<std::string, std::string> context_extensions;
   context_extensions["key"] = "value";
 
   CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),

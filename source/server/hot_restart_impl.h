@@ -10,63 +10,43 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/server/hot_restart.h"
-#include "envoy/server/options.h"
-#include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
-#include "common/stats/raw_stat_data.h"
+#include "common/stats/heap_stat_data.h"
+
+#include "server/hot_restarting_child.h"
+#include "server/hot_restarting_parent.h"
 
 namespace Envoy {
 namespace Server {
+
+// Increment this whenever there is a shared memory / RPC change that will prevent a hot restart
+// from working. Operations code can then cope with this and do a full restart.
+const uint64_t HOT_RESTART_VERSION = 11;
 
 /**
  * Shared memory segment. This structure is laid directly into shared memory and is used amongst
  * all running envoy processes.
  */
-class SharedMemory {
-public:
-  static void configure(uint64_t max_num_stats, uint64_t max_stat_name_len);
-  static std::string version(uint64_t max_num_stats, const Stats::StatsOptions& stats_options);
-
-  // Made public for testing.
-  static const uint64_t VERSION;
-
-  int64_t maxStats() const { return max_stats_; }
-
-private:
-  struct Flags {
-    static const uint64_t INITIALIZING = 0x1;
-  };
-
-  // Due to the flexible-array-length of stats_set_data_, c-style allocation
-  // and initialization are necessary.
-  SharedMemory() = delete;
-  ~SharedMemory() = delete;
-
-  /**
-   * Initialize the shared memory segment, depending on whether we should be the first running
-   * envoy, or a host restarted envoy process.
-   */
-  static SharedMemory& initialize(uint64_t stats_set_size, const Options& options);
-
-  /**
-   * Initialize a pthread mutex for process shared locking.
-   */
-  void initializeMutex(pthread_mutex_t& mutex);
-
+struct SharedMemory {
   uint64_t size_;
   uint64_t version_;
-  uint64_t max_stats_;
-  uint64_t entry_size_;
-  std::atomic<uint64_t> flags_;
   pthread_mutex_t log_lock_;
   pthread_mutex_t access_log_lock_;
-  pthread_mutex_t stat_lock_;
-  pthread_mutex_t init_lock_;
-  alignas(BlockMemoryHashSet<Stats::RawStatData>) uint8_t stats_set_data_[];
-
-  friend class HotRestartImpl;
+  std::atomic<uint64_t> flags_;
 };
+static const uint64_t SHMEM_FLAGS_INITIALIZING = 0x1;
+
+/**
+ * Initialize the shared memory segment, depending on whether we are the first running
+ * envoy, or a host restarted envoy process.
+ */
+SharedMemory* attachSharedMemory(const Options& options);
+
+/**
+ * Initialize a pthread mutex for process shared locking.
+ */
+void initializeMutex(pthread_mutex_t& mutex);
 
 /**
  * Implementation of Thread::BasicLockable that operates on a process shared pthread mutex.
@@ -110,118 +90,39 @@ private:
 };
 
 /**
- * Implementation of HotRestart built for Linux.
+ * Implementation of HotRestart built for Linux. Most of the "protocol" type logic is split out into
+ * HotRestarting{Base,Parent,Child}. This class ties all that to shared memory and version logic.
  */
-class HotRestartImpl : public HotRestart, Logger::Loggable<Logger::Id::main> {
+class HotRestartImpl : public HotRestart {
 public:
-  HotRestartImpl(const Options& options, Stats::SymbolTable& symbol_table);
+  HotRestartImpl(const Options& options);
 
   // Server::HotRestart
   void drainParentListeners() override;
   int duplicateParentListenSocket(const std::string& address) override;
-  void getParentStats(GetParentStatsInfo& info) override;
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
-  void shutdownParentAdmin(ShutdownParentAdminInfo& info) override;
-  void terminateParent() override;
+  void sendParentAdminShutdownRequest(time_t& original_start_time) override;
+  void sendParentTerminateRequest() override;
+  ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot& stats_store) override;
   void shutdown() override;
   std::string version() override;
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
-  Stats::RawStatDataAllocator& statsAllocator() override { return *stats_allocator_; }
 
   /**
    * envoy --hot_restart_version doesn't initialize Envoy, but computes the version string
    * based on the configured options.
    */
-  static std::string hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len);
+  static std::string hotRestartVersion();
 
 private:
-  enum class RpcMessageType {
-    DrainListenersRequest = 1,
-    GetListenSocketRequest = 2,
-    GetListenSocketReply = 3,
-    ShutdownAdminRequest = 4,
-    ShutdownAdminReply = 5,
-    TerminateRequest = 6,
-    UnknownRequestReply = 7,
-    GetStatsRequest = 8,
-    GetStatsReply = 9
-  };
-
-  PACKED_STRUCT(struct RpcBase {
-    RpcBase(RpcMessageType type, uint64_t length = sizeof(RpcBase))
-        : type_(type), length_(length) {}
-
-    RpcMessageType type_;
-    uint64_t length_;
-  });
-
-  PACKED_STRUCT(struct RpcGetListenSocketRequest
-                : public RpcBase {
-                  RpcGetListenSocketRequest()
-                      : RpcBase(RpcMessageType::GetListenSocketRequest, sizeof(*this)) {}
-
-                  char address_[256]{0};
-                });
-
-  PACKED_STRUCT(struct RpcGetListenSocketReply
-                : public RpcBase {
-                  RpcGetListenSocketReply()
-                      : RpcBase(RpcMessageType::GetListenSocketReply, sizeof(*this)) {}
-
-                  int fd_{0};
-                });
-
-  PACKED_STRUCT(struct RpcShutdownAdminReply
-                : public RpcBase {
-                  RpcShutdownAdminReply()
-                      : RpcBase(RpcMessageType::ShutdownAdminReply, sizeof(*this)) {}
-
-                  uint64_t original_start_time_{0};
-                });
-
-  PACKED_STRUCT(struct RpcGetStatsReply
-                : public RpcBase {
-                  RpcGetStatsReply() : RpcBase(RpcMessageType::GetStatsReply, sizeof(*this)) {}
-
-                  uint64_t memory_allocated_{0};
-                  uint64_t num_connections_{0};
-                  uint64_t unused_[16]{0};
-                });
-
-  template <class rpc_class, RpcMessageType rpc_type> rpc_class* receiveTypedRpc() {
-    RpcBase* base_message = receiveRpc(true);
-    RELEASE_ASSERT(base_message->length_ == sizeof(rpc_class), "");
-    RELEASE_ASSERT(base_message->type_ == rpc_type, "");
-    return reinterpret_cast<rpc_class*>(base_message);
-  }
-
-  int bindDomainSocket(uint64_t id);
-  void initDomainSocketAddress(sockaddr_un* address);
-  sockaddr_un createDomainSocketAddress(uint64_t id);
-  void onGetListenSocket(RpcGetListenSocketRequest& rpc);
-  void onSocketEvent();
-  RpcBase* receiveRpc(bool block);
-  void sendMessage(sockaddr_un& address, RpcBase& rpc);
-  static std::string versionHelper(uint64_t max_num_stats, const Stats::StatsOptions& stats_options,
-                                   Stats::RawStatDataSet& stats_set);
-
-  const Options& options_;
-  BlockMemoryHashSetOptions stats_set_options_;
-  SharedMemory& shmem_;
-  std::unique_ptr<Stats::RawStatDataSet> stats_set_ GUARDED_BY(stat_lock_);
-  std::unique_ptr<Stats::RawStatDataAllocator> stats_allocator_;
+  HotRestartingChild as_child_;
+  HotRestartingParent as_parent_;
+  // This pointer is shared memory, and is expected to exist until process end.
+  // It will automatically be unmapped when the process terminates.
+  SharedMemory* shmem_;
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
-  ProcessSharedMutex stat_lock_;
-  ProcessSharedMutex init_lock_;
-  int my_domain_socket_{-1};
-  sockaddr_un parent_address_;
-  sockaddr_un child_address_;
-  Event::FileEventPtr socket_event_;
-  std::array<uint8_t, 4096> rpc_buffer_;
-  Server::Instance* server_{};
-  bool parent_terminated_{};
 };
 
 } // namespace Server

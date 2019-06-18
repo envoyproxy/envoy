@@ -17,7 +17,7 @@ namespace Upstream {
  */
 class LoadBalancerContext {
 public:
-  virtual ~LoadBalancerContext() {}
+  virtual ~LoadBalancerContext() = default;
 
   /**
    * Compute and return an optional hash key to use during load balancing. This
@@ -71,6 +71,11 @@ public:
    * ignored.
    */
   virtual uint32_t hostSelectionRetryCount() const PURE;
+
+  /**
+   * Returns the set of socket options which should be applied on upstream connections
+   */
+  virtual Network::Socket::OptionsSharedPtr upstreamSocketOptions() const PURE;
 };
 
 /**
@@ -78,7 +83,7 @@ public:
  */
 class LoadBalancer {
 public:
-  virtual ~LoadBalancer() {}
+  virtual ~LoadBalancer() = default;
 
   /**
    * Ask the load balancer for the next host to use depending on the underlying LB algorithm.
@@ -89,14 +94,14 @@ public:
   virtual HostConstSharedPtr chooseHost(LoadBalancerContext* context) PURE;
 };
 
-typedef std::unique_ptr<LoadBalancer> LoadBalancerPtr;
+using LoadBalancerPtr = std::unique_ptr<LoadBalancer>;
 
 /**
  * Factory for load balancers.
  */
 class LoadBalancerFactory {
 public:
-  virtual ~LoadBalancerFactory() {}
+  virtual ~LoadBalancerFactory() = default;
 
   /**
    * @return LoadBalancerPtr a new load balancer.
@@ -104,7 +109,7 @@ public:
   virtual LoadBalancerPtr create() PURE;
 };
 
-typedef std::shared_ptr<LoadBalancerFactory> LoadBalancerFactorySharedPtr;
+using LoadBalancerFactorySharedPtr = std::shared_ptr<LoadBalancerFactory>;
 
 /**
  * A thread aware load balancer is a load balancer that is global to all workers on behalf of a
@@ -134,7 +139,7 @@ typedef std::shared_ptr<LoadBalancerFactory> LoadBalancerFactorySharedPtr;
  */
 class ThreadAwareLoadBalancer {
 public:
-  virtual ~ThreadAwareLoadBalancer() {}
+  virtual ~ThreadAwareLoadBalancer() = default;
 
   /**
    * @return LoadBalancerFactorySharedPtr the shared factory to use for creating new worker local
@@ -151,7 +156,7 @@ public:
   virtual void initialize() PURE;
 };
 
-typedef std::unique_ptr<ThreadAwareLoadBalancer> ThreadAwareLoadBalancerPtr;
+using ThreadAwareLoadBalancerPtr = std::unique_ptr<ThreadAwareLoadBalancer>;
 
 } // namespace Upstream
 } // namespace Envoy

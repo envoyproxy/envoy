@@ -92,4 +92,26 @@ message GrpcJsonTranscoder {
   // binding for ``foo`` is not defined. Adding ``foo`` to ``ignored_query_parameters`` will allow
   // the same request to be mapped to ``GetShelf``.
   repeated string ignored_query_parameters = 6;
+
+  // Whether to route methods without the ``google.api.http`` option.
+  //
+  // Example :
+  //
+  // .. code-block:: proto
+  //
+  //     package bookstore;
+  //
+  //     service Bookstore {
+  //       rpc GetShelf(GetShelfRequest) returns (Shelf) {}
+  //     }
+  //
+  //     message GetShelfRequest {
+  //       int64 shelf = 1;
+  //     }
+  //
+  //     message Shelf {}
+  //
+  // The client could ``post`` a json body ``{"shelf": 1234}`` with the path of
+  // ``/bookstore.Bookstore/GetShelfRequest`` to call ``GetShelfRequest``.
+  bool auto_mapping = 7;
 }

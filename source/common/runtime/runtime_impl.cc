@@ -13,6 +13,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/filesystem/directory.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -293,6 +294,12 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
   return entry;
 }
 
+SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value) {
+  // This isn't the smartest way to do it; we're round-tripping via YAML, this should be optimized
+  // if runtime parsing becomes performance sensitive.
+  return createEntry(MessageUtil::getYamlStringFromMessage(value, false, false));
+}
+
 bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
   absl::string_view stripped = entry.raw_string_value_;
   stripped = absl::StripAsciiWhitespace(stripped);
@@ -309,7 +316,7 @@ bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
 
 bool SnapshotImpl::parseEntryUintValue(Entry& entry) {
   uint64_t converted_uint64;
-  if (StringUtil::atoull(entry.raw_string_value_.c_str(), converted_uint64)) {
+  if (absl::SimpleAtoi(entry.raw_string_value_, &converted_uint64)) {
     entry.uint_value_ = converted_uint64;
     return true;
   }
@@ -319,7 +326,8 @@ bool SnapshotImpl::parseEntryUintValue(Entry& entry) {
 void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
   envoy::type::FractionalPercent converted_fractional_percent;
   try {
-    MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent);
+    MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent,
+                                         ProtobufMessage::getStrictValidationVisitor());
   } catch (const ProtoValidationException& ex) {
     ENVOY_LOG(error, "unable to validate fraction percent runtime proto: {}", ex.what());
     return;
@@ -401,21 +409,67 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
   }
 }
 
-LoaderImpl::LoaderImpl(RandomGenerator& generator, Stats::Store& store,
-                       ThreadLocal::SlotAllocator& tls)
-    : LoaderImpl(DoNotLoadSnapshot{}, generator, store, tls) {
-  loadNewSnapshot();
+ProtoLayer::ProtoLayer(const ProtobufWkt::Struct& proto) : OverrideLayerImpl{"base"} {
+  for (const auto& f : proto.fields()) {
+    walkProtoValue(f.second, f.first);
+  }
 }
 
-LoaderImpl::LoaderImpl(DoNotLoadSnapshot /* unused */, RandomGenerator& generator,
-                       Stats::Store& store, ThreadLocal::SlotAllocator& tls)
-    : generator_(generator), stats_(generateStats(store)), admin_layer_(stats_),
-      tls_(tls.allocateSlot()) {}
+void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix) {
+  switch (v.kind_case()) {
+  case ProtobufWkt::Value::KIND_NOT_SET:
+  case ProtobufWkt::Value::kListValue:
+  case ProtobufWkt::Value::kNullValue:
+    throw EnvoyException(fmt::format("Invalid runtime entry value for {}", prefix));
+    break;
+  case ProtobufWkt::Value::kStringValue:
+    values_.emplace(prefix, SnapshotImpl::createEntry(v.string_value()));
+    break;
+  case ProtobufWkt::Value::kNumberValue:
+  case ProtobufWkt::Value::kBoolValue:
+    values_.emplace(prefix, SnapshotImpl::createEntry(v));
+    break;
+  case ProtobufWkt::Value::kStructValue: {
+    const ProtobufWkt::Struct& s = v.struct_value();
+    if (s.fields().empty() || s.fields().find("numerator") != s.fields().end() ||
+        s.fields().find("denominator") != s.fields().end()) {
+      values_.emplace(prefix, SnapshotImpl::createEntry(v));
+      break;
+    }
+    for (const auto& f : s.fields()) {
+      walkProtoValue(f.second, prefix + "." + f.first);
+    }
+    break;
+  }
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
 
-std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
-  std::vector<Snapshot::OverrideLayerConstPtr> layers;
-  layers.emplace_back(std::make_unique<const AdminLayer>(admin_layer_));
-  return std::make_unique<SnapshotImpl>(generator_, stats_, std::move(layers));
+LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
+                       const envoy::config::bootstrap::v2::LayeredRuntime& config,
+                       absl::string_view service_cluster, Stats::Store& store,
+                       RandomGenerator& generator, Api::Api& api)
+    : generator_(generator), stats_(generateStats(store)), admin_layer_(stats_),
+      tls_(tls.allocateSlot()), config_(config), service_cluster_(service_cluster), api_(api) {
+  for (const auto& layer : config_.layers()) {
+    if (layer.has_admin_layer()) {
+      if (config_has_admin_layer_) {
+        throw EnvoyException(
+            "Too many admin layers specified in LayeredRuntime, at most one may be specified");
+      } else {
+        config_has_admin_layer_ = true;
+      }
+    } else if (layer.has_disk_layer()) {
+      if (watcher_ == nullptr) {
+        watcher_ = dispatcher.createFilesystemWatcher();
+      }
+      watcher_->addWatch(layer.disk_layer().symlink_root(), Filesystem::Watcher::Events::MovedTo,
+                         [this](uint32_t) -> void { loadNewSnapshot(); });
+    }
+  }
+
+  loadNewSnapshot();
 }
 
 void LoaderImpl::loadNewSnapshot() {
@@ -428,22 +482,10 @@ void LoaderImpl::loadNewSnapshot() {
 Snapshot& LoaderImpl::snapshot() { return tls_->getTyped<Snapshot>(); }
 
 void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>& values) {
+  if (!config_has_admin_layer_) {
+    throw EnvoyException("No admin layer specified");
+  }
   admin_layer_.mergeValues(values);
-  loadNewSnapshot();
-}
-
-DiskBackedLoaderImpl::DiskBackedLoaderImpl(Event::Dispatcher& dispatcher,
-                                           ThreadLocal::SlotAllocator& tls,
-                                           const std::string& root_symlink_path,
-                                           const std::string& subdir,
-                                           const std::string& override_dir, Stats::Store& store,
-                                           RandomGenerator& generator, Api::Api& api)
-    : LoaderImpl(DoNotLoadSnapshot{}, generator, store, tls),
-      watcher_(dispatcher.createFilesystemWatcher()), root_path_(root_symlink_path + "/" + subdir),
-      override_path_(root_symlink_path + "/" + override_dir), api_(api) {
-  watcher_->addWatch(root_symlink_path, Filesystem::Watcher::Events::MovedTo,
-                     [this](uint32_t) -> void { loadNewSnapshot(); });
-
   loadNewSnapshot();
 }
 
@@ -454,22 +496,52 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   return stats;
 }
 
-std::unique_ptr<SnapshotImpl> DiskBackedLoaderImpl::createNewSnapshot() {
+std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
   std::vector<Snapshot::OverrideLayerConstPtr> layers;
-  try {
-    layers.push_back(std::make_unique<DiskLayer>("root", root_path_, api_));
-    if (api_.fileSystem().directoryExists(override_path_)) {
-      layers.push_back(std::make_unique<DiskLayer>("override", override_path_, api_));
-      stats_.override_dir_exists_.inc();
-    } else {
-      stats_.override_dir_not_exists_.inc();
+  uint32_t disk_layers = 0;
+  uint32_t error_layers = 0;
+  for (const auto& layer : config_.layers()) {
+    switch (layer.layer_specifier_case()) {
+    case envoy::config::bootstrap::v2::RuntimeLayer::kStaticLayer:
+      layers.emplace_back(std::make_unique<const ProtoLayer>(layer.static_layer()));
+      break;
+    case envoy::config::bootstrap::v2::RuntimeLayer::kDiskLayer: {
+      std::string path = layer.disk_layer().symlink_root();
+      if (layer.disk_layer().append_service_cluster()) {
+        path += "/" + service_cluster_;
+      }
+      if (api_.fileSystem().directoryExists(path)) {
+        try {
+          layers.emplace_back(std::make_unique<DiskLayer>(layer.name(), path, api_));
+          ++disk_layers;
+        } catch (EnvoyException& e) {
+          // TODO(htuch): Consider latching here, rather than ignoring the
+          // layer. This would be consistent with filesystem TDS.
+          ++error_layers;
+          ENVOY_LOG(debug, "error loading runtime values for layer {} from disk: {}",
+                    layer.DebugString(), e.what());
+        }
+      }
+      break;
     }
-  } catch (EnvoyException& e) {
-    layers.clear();
-    stats_.load_error_.inc();
-    ENVOY_LOG(debug, "error loading runtime values from disk: {}", e.what());
+    case envoy::config::bootstrap::v2::RuntimeLayer::kAdminLayer:
+      layers.push_back(std::make_unique<AdminLayer>(admin_layer_));
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
   }
-  layers.push_back(std::make_unique<AdminLayer>(admin_layer_));
+  stats_.num_layers_.set(layers.size());
+  if (error_layers == 0) {
+    stats_.load_success_.inc();
+  } else {
+    stats_.load_error_.inc();
+  }
+  if (disk_layers > 1) {
+    stats_.override_dir_exists_.inc();
+  } else {
+    stats_.override_dir_not_exists_.inc();
+  }
   return std::make_unique<SnapshotImpl>(generator_, stats_, std::move(layers));
 }
 

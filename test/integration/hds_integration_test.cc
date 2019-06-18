@@ -79,19 +79,19 @@ public:
     ASSERT_TRUE(host_stream_->waitForEndStream(*dispatcher_));
 
     host_upstream_->set_allow_unexpected_disconnects(true);
-    EXPECT_STREQ(host_stream_->headers().Path()->value().c_str(), "/healthcheck");
-    EXPECT_STREQ(host_stream_->headers().Method()->value().c_str(), "GET");
-    EXPECT_STREQ(host_stream_->headers().Host()->value().c_str(), "anna");
+    EXPECT_EQ(host_stream_->headers().Path()->value().getStringView(), "/healthcheck");
+    EXPECT_EQ(host_stream_->headers().Method()->value().getStringView(), "GET");
+    EXPECT_EQ(host_stream_->headers().Host()->value().getStringView(), "anna");
 
-    if (cluster2 != "") {
+    if (!cluster2.empty()) {
       ASSERT_TRUE(host2_upstream_->waitForHttpConnection(*dispatcher_, host2_fake_connection_));
       ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
       ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
 
       host2_upstream_->set_allow_unexpected_disconnects(true);
-      EXPECT_STREQ(host2_stream_->headers().Path()->value().c_str(), "/healthcheck");
-      EXPECT_STREQ(host2_stream_->headers().Method()->value().c_str(), "GET");
-      EXPECT_STREQ(host2_stream_->headers().Host()->value().c_str(), cluster2.c_str());
+      EXPECT_EQ(host2_stream_->headers().Path()->value().getStringView(), "/healthcheck");
+      EXPECT_EQ(host2_stream_->headers().Method()->value().getStringView(), "GET");
+      EXPECT_EQ(host2_stream_->headers().Host()->value().getStringView(), cluster2);
     }
   }
 
@@ -186,9 +186,8 @@ public:
     if (address->ip()->port() != endpoint.endpoint().address().socket_address().port_value()) {
       return false;
     }
-    // SocketAddress.address is a proto string, not std::string, so convert it before comparing.
     if (address->ip()->addressAsString() !=
-        absl::string_view(endpoint.endpoint().address().socket_address().address())) {
+        endpoint.endpoint().address().socket_address().address()) {
       return false;
     }
     return true;

@@ -100,6 +100,14 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<uint32_t> responseCode() const override { return response_code_; }
 
+  const absl::optional<std::string>& responseCodeDetails() const override {
+    return response_code_details_;
+  }
+
+  void setResponseCodeDetails(absl::string_view rc_details) override {
+    response_code_details_.emplace(rc_details);
+  }
+
   void addBytesSent(uint64_t bytes_sent) override { bytes_sent_ += bytes_sent; }
 
   uint64_t bytesSent() const override { return bytes_sent_; }
@@ -119,6 +127,12 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
+
+  void setRouteName(absl::string_view route_name) override {
+    route_name_ = std::string(route_name);
+  }
+
+  const std::string& getRouteName() const override { return route_name_; }
 
   void setUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& upstream_local_address) override {
@@ -205,12 +219,14 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
+  absl::optional<std::string> response_code_details_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
   FilterStateImpl filter_state_{};
+  std::string route_name_;
 
 private:
   uint64_t bytes_received_{};

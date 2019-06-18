@@ -59,7 +59,7 @@ public:
   const std::string True = "true";
 };
 
-typedef ConstSingleton<TracingTagValues> Tags;
+using Tags = ConstSingleton<TracingTagValues>;
 
 class TracingLogValues {
 public:
@@ -76,7 +76,7 @@ public:
   const std::string LastDownstreamTxByteSent = "last_downstream_tx_byte_sent";
 };
 
-typedef ConstSingleton<TracingLogValues> Logs;
+using Logs = ConstSingleton<TracingLogValues>;
 
 class HttpTracerUtility {
 public:
@@ -117,10 +117,10 @@ public:
   bool verbose() const override { return false; }
 
 private:
-  const std::vector<Http::LowerCaseString> request_headers_for_tags_;
+  const std::vector<Http::LowerCaseString> request_headers_for_tags_{};
 };
 
-typedef ConstSingleton<EgressConfigImpl> EgressConfig;
+using EgressConfig = ConstSingleton<EgressConfigImpl>;
 
 class NullSpan : public Span {
 public:
@@ -130,8 +130,8 @@ public:
   }
 
   // Tracing::Span
-  void setOperation(const std::string&) override {}
-  void setTag(const std::string&, const std::string&) override {}
+  void setOperation(absl::string_view) override {}
+  void setTag(absl::string_view, absl::string_view) override {}
   void log(SystemTime, const std::string&) override {}
   void finishSpan() override {}
   void injectContext(Http::HeaderMap&) override {}

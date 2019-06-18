@@ -34,6 +34,11 @@ routing PRs, questions, etc. to the right place.
 * Snow Pettersen ([snowp](https://github.com/snowp)) (snowp@squareup.com)
   * Upstream, host/priority sets, load balancing, and retry plugins.
 
+# Envoy security team
+
+* All maintainers
+* Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
+
 # Emeritus maintainers
 
 * Constance Caramanolis ([ccaraman](https://github.com/ccaraman)) (ccaramanolis@lyft.com)

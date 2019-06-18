@@ -5,15 +5,21 @@
 #include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/event/timer_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
+using testing::NiceMock;
+using testing::Return;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Event {
@@ -80,6 +86,7 @@ protected:
     dispatcher_thread_->join();
   }
 
+  NiceMock<Stats::MockStore> scope_; // Used in InitializeStats, must outlive dispatcher_->exit().
   Api::ApiPtr api_;
   Thread::ThreadPtr dispatcher_thread_;
   DispatcherPtr dispatcher_;
@@ -89,6 +96,14 @@ protected:
   bool work_finished_;
   TimerPtr keepalive_timer_;
 };
+
+// TODO(mergeconflict): We also need integration testing to validate that the expected histograms
+// are written when `enable_dispatcher_stats` is true. See issue #6582.
+TEST_F(DispatcherImplTest, InitializeStats) {
+  EXPECT_CALL(scope_, histogram("test.dispatcher.loop_duration_us"));
+  EXPECT_CALL(scope_, histogram("test.dispatcher.poll_delay_us"));
+  dispatcher_->initializeStats(scope_, "test.");
+}
 
 TEST_F(DispatcherImplTest, Post) {
   dispatcher_->post([this]() {
@@ -181,6 +196,29 @@ TEST(TimerImplTest, TimerEnabledDisabled) {
   EXPECT_TRUE(timer->enabled());
   dispatcher->run(Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(timer->enabled());
+}
+
+TEST(TimerImplTest, TimerValueConversion) {
+  timeval tv;
+  std::chrono::milliseconds msecs;
+
+  // Basic test with zero milliseconds.
+  msecs = std::chrono::milliseconds(0);
+  TimerUtils::millisecondsToTimeval(msecs, tv);
+  EXPECT_EQ(tv.tv_sec, 0);
+  EXPECT_EQ(tv.tv_usec, 0);
+
+  // 2050 milliseconds is 2 seconds and 50000 microseconds.
+  msecs = std::chrono::milliseconds(2050);
+  TimerUtils::millisecondsToTimeval(msecs, tv);
+  EXPECT_EQ(tv.tv_sec, 2);
+  EXPECT_EQ(tv.tv_usec, 50000);
+
+  // Check maximum value conversion.
+  msecs = std::chrono::milliseconds::duration::max();
+  TimerUtils::millisecondsToTimeval(msecs, tv);
+  EXPECT_EQ(tv.tv_sec, msecs.count() / 1000);
+  EXPECT_EQ(tv.tv_usec, (msecs.count() % tv.tv_sec) * 1000);
 }
 
 } // namespace

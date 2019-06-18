@@ -20,6 +20,10 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
 
@@ -30,11 +34,10 @@
 #include "common/common/stack_array.h"
 #include "common/common/thread_impl.h"
 #include "common/common/utility.h"
-#include "common/config/bootstrap_json.h"
+#include "common/config/resources.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_options_impl.h"
 #include "common/filesystem/directory.h"
 #include "common/filesystem/filesystem_impl.h"
 
@@ -82,8 +85,8 @@ bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
         State* state = static_cast<State*>(context);
         const Http::HeaderEntry* entry =
-            state->lhs.get(Http::LowerCaseString(std::string(header.key().c_str())));
-        if (entry == nullptr || (entry->value() != header.value().c_str())) {
+            state->lhs.get(Http::LowerCaseString(std::string(header.key().getStringView())));
+        if (entry == nullptr || (entry->value() != header.value().getStringView())) {
           state->equal = false;
           return Http::HeaderMap::Iterate::Break;
         }
@@ -175,13 +178,31 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
   return file_names;
 }
 
-envoy::config::bootstrap::v2::Bootstrap
-TestUtility::parseBootstrapFromJson(const std::string& json_string) {
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Stats::StatsOptionsImpl stats_options;
-  Config::BootstrapJson::translateBootstrap(*json_object_ptr, bootstrap, stats_options);
-  return bootstrap;
+std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
+  if (resource.type_url() == Config::TypeUrl::get().Listener) {
+    return TestUtility::anyConvert<envoy::api::v2::Listener>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
+    return TestUtility::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().Cluster) {
+    return TestUtility::anyConvert<envoy::api::v2::Cluster>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
+    return TestUtility::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().VirtualHost) {
+    return TestUtility::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
+  }
+  throw EnvoyException(
+      fmt::format("xdsResourceName does not know about type URL {}", resource.type_url()));
+}
+
+std::string TestUtility::addLeftAndRightPadding(absl::string_view to_pad, int desired_length) {
+  int line_fill_len = desired_length - to_pad.length();
+  int first_half_len = line_fill_len / 2;
+  int second_half_len = line_fill_len - first_half_len;
+  return absl::StrCat(std::string(first_half_len, '='), to_pad, std::string(second_half_len, '='));
 }
 
 std::vector<std::string> TestUtility::split(const std::string& source, char split) {
@@ -371,7 +392,7 @@ std::string TestHeaderMapImpl::get_(const LowerCaseString& key) {
   if (!header) {
     return EMPTY_STRING;
   } else {
-    return header->value().c_str();
+    return std::string(header->value().getStringView());
   }
 }
 
@@ -380,55 +401,6 @@ bool TestHeaderMapImpl::has(const std::string& key) { return get(LowerCaseString
 bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nullptr; }
 
 } // namespace Http
-
-namespace Stats {
-
-MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options,
-                                         SymbolTable& symbol_table)
-    : TestAllocator(stats_options, symbol_table) {
-  ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
-    return TestAllocator::alloc(name);
-  }));
-
-  ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
-    return TestAllocator::free(data);
-  }));
-
-  EXPECT_CALL(*this, alloc(absl::string_view("stats.overflow")));
-}
-
-MockedTestAllocator::~MockedTestAllocator() {}
-
-} // namespace Stats
-
-namespace Thread {
-
-// TODO(sesmith177) Tests should get the ThreadFactory from the same location as the main code
-ThreadFactory& threadFactoryForTest() {
-#ifdef WIN32
-  static ThreadFactoryImplWin32* thread_factory = new ThreadFactoryImplWin32();
-#else
-  static ThreadFactoryImplPosix* thread_factory = new ThreadFactoryImplPosix();
-#endif
-  return *thread_factory;
-}
-
-} // namespace Thread
-
-namespace Filesystem {
-
-// TODO(sesmith177) Tests should get the Filesystem::Instance from the same location as the main
-// code
-Instance& fileSystemForTest() {
-#ifdef WIN32
-  static InstanceImplWin32* file_system = new InstanceImplWin32();
-#else
-  static InstanceImplPosix* file_system = new InstanceImplPosix();
-#endif
-  return *file_system;
-}
-
-} // namespace Filesystem
 
 namespace Api {
 

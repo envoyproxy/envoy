@@ -23,7 +23,6 @@ namespace Redis {
 
 void PrintTo(const RespValue& value, std::ostream* os);
 void PrintTo(const RespValuePtr& value, std::ostream* os);
-bool operator==(const RespValue& lhs, const RespValue& rhs);
 
 class MockEncoder : public Common::Redis::Encoder {
 public:
@@ -94,6 +93,7 @@ public:
 
   MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));
   MOCK_METHOD0(onFailure, void());
+  MOCK_METHOD1(onRedirection, bool(const Common::Redis::RespValue& value));
 };
 
 } // namespace Client

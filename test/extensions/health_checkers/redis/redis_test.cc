@@ -24,7 +24,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HealthCheckers {
 namespace RedisHealthChecker {
-namespace {
 
 class RedisHealthCheckerTest
     : public testing::Test,
@@ -48,7 +47,8 @@ public:
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisHealthCheckConfig(health_check_config);
+    const auto& redis_config = getRedisHealthCheckConfig(
+        health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_.reset(
         new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
@@ -70,7 +70,8 @@ public:
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisHealthCheckConfig(health_check_config);
+    const auto& redis_config = getRedisHealthCheckConfig(
+        health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_.reset(
         new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
@@ -92,7 +93,8 @@ public:
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisHealthCheckConfig(health_check_config);
+    const auto& redis_config = getRedisHealthCheckConfig(
+        health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_.reset(
         new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
@@ -114,7 +116,8 @@ public:
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisHealthCheckConfig(health_check_config);
+    const auto& redis_config = getRedisHealthCheckConfig(
+        health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_.reset(
         new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
@@ -152,6 +155,21 @@ public:
     EXPECT_CALL(*timeout_timer_, enableTimer(_));
   }
 
+  void exerciseStubs() {
+    Upstream::HostSharedPtr host = Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:100");
+    RedisHealthChecker::RedisActiveHealthCheckSessionPtr session =
+        std::make_unique<RedisHealthChecker::RedisActiveHealthCheckSession>(*health_checker_, host);
+
+    EXPECT_TRUE(session->disableOutlierEvents());
+    EXPECT_EQ(session->opTimeout(),
+              std::chrono::milliseconds(2000)); // Timeout is 1s is test configurations.
+    EXPECT_FALSE(session->enableHashtagging());
+    EXPECT_TRUE(session->enableRedirection());
+    EXPECT_EQ(session->maxBufferSizeBeforeFlush(), 0);
+    EXPECT_EQ(session->bufferFlushTimeoutInMs(), std::chrono::milliseconds(1));
+    session->onDeferredDeleteBase(); // This must be called to pass assertions in the destructor.
+  }
+
   std::shared_ptr<Upstream::MockClusterMockPrioritySet> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -168,6 +186,9 @@ public:
 TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   InSequence s;
   setup();
+
+  // Exercise stubbed out interfaces for coverage.
+  exerciseStubs();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -393,6 +414,47 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
 }
 
+TEST_F(RedisHealthCheckerTest, ExistsRedirected) {
+  InSequence s;
+  setupExistsHealthcheck();
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectClientCreate();
+  expectExistsRequestCreate();
+  health_checker_->start();
+
+  client_->runHighWatermarkCallbacks();
+  client_->runLowWatermarkCallbacks();
+
+  // Success with moved redirection
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  NetworkFilters::Common::Redis::RespValue moved_response;
+  moved_response.type(NetworkFilters::Common::Redis::RespType::Error);
+  moved_response.asString() = "MOVED 1111 127.0.0.1:81"; // exact values not important
+  pool_callbacks_->onRedirection(moved_response);
+
+  expectExistsRequestCreate();
+  interval_timer_->callback_();
+
+  // Success with ask redirection
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  NetworkFilters::Common::Redis::RespValue ask_response;
+  ask_response.type(NetworkFilters::Common::Redis::RespType::Error);
+  ask_response.asString() = "ASK 1111 127.0.0.1:81"; // exact values not important
+  pool_callbacks_->onRedirection(ask_response);
+
+  EXPECT_CALL(*client_, close());
+
+  EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
+  EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+}
+
 // Tests that redis client will behave appropriately when reuse_connection is false.
 TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   InSequence s;
@@ -464,7 +526,6 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
-} // namespace
 } // namespace RedisHealthChecker
 } // namespace HealthCheckers
 } // namespace Extensions

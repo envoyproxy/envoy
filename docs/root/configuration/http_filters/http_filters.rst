@@ -8,6 +8,7 @@ HTTP filters
 
   buffer_filter
   cors_filter
+  csrf_filter
   dynamodb_filter
   ext_authz_filter
   fault_filter
@@ -21,6 +22,7 @@ HTTP filters
   ip_tagging_filter
   jwt_authn_filter
   lua_filter
+  original_src_filter
   rate_limit_filter
   rbac_filter
   router_filter

@@ -14,6 +14,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/common/macros.h"
 
 #include "absl/strings/string_view.h"
 
@@ -23,9 +24,18 @@ namespace Http {
 // Used by ASSERTs to validate internal consistency. E.g. valid HTTP header keys/values should
 // never contain embedded NULLs.
 static inline bool validHeaderString(absl::string_view s) {
-  for (const char c : {'\0', '\r', '\n'}) {
-    if (s.find(c) != absl::string_view::npos) {
+  // If you modify this list of illegal embedded characters you will probably
+  // want to change header_map_fuzz_impl_test at the same time.
+  for (const char c : s) {
+    switch (c) {
+    case '\0':
+      FALLTHRU;
+    case '\r':
+      FALLTHRU;
+    case '\n':
       return false;
+    default:
+      continue;
     }
   }
   return true;
@@ -66,13 +76,13 @@ struct LowerCaseStringHash {
 /**
  * Convenient type for unordered set of lower case string.
  */
-typedef std::unordered_set<LowerCaseString, LowerCaseStringHash> LowerCaseStrUnorderedSet;
+using LowerCaseStrUnorderedSet = std::unordered_set<LowerCaseString, LowerCaseStringHash>;
 
 /**
  * Convenient type for a vector of lower case string and string pair.
  */
-typedef std::vector<std::pair<const Http::LowerCaseString, const std::string>>
-    LowerCaseStrPairVector;
+using LowerCaseStrPairVector =
+    std::vector<std::pair<const Http::LowerCaseString, const std::string>>;
 
 /**
  * This is a string implementation for use in header processing. It is heavily optimized for
@@ -119,11 +129,8 @@ public:
   char* buffer() { return buffer_.dynamic_; }
 
   /**
-   * @return a null terminated C string.
-   */
-  const char* c_str() const { return buffer_.ref_; }
-
-  /**
+   * Get an absl::string_view. It will NOT be NUL terminated!
+   *
    * @return an absl::string_view.
    */
   absl::string_view getStringView() const {
@@ -141,15 +148,17 @@ public:
    */
   bool empty() const { return string_length_ == 0; }
 
-  /**
-   * @return whether a substring exists in the string.
-   */
-  bool find(const char* str) const { return strstr(c_str(), str); }
+  // Looking for find? Use getStringView().find()
 
   /**
    * Set the value of the string by copying data into it. This overwrites any existing string.
    */
   void setCopy(const char* data, uint32_t size);
+
+  /**
+   * Set the value of the string by copying data into it. This overwrites any existing string.
+   */
+  void setCopy(absl::string_view view);
 
   /**
    * Set the value of the string to an integer. This overwrites any existing string.
@@ -173,8 +182,10 @@ public:
    */
   Type type() const { return type_; }
 
-  bool operator==(const char* rhs) const { return 0 == strcmp(c_str(), rhs); }
-  bool operator!=(const char* rhs) const { return 0 != strcmp(c_str(), rhs); }
+  bool operator==(const char* rhs) const { return getStringView() == absl::string_view(rhs); }
+  bool operator==(absl::string_view rhs) const { return getStringView() == rhs; }
+  bool operator!=(const char* rhs) const { return getStringView() != absl::string_view(rhs); }
+  bool operator!=(absl::string_view rhs) const { return getStringView() != rhs; }
 
 private:
   union Buffer {
@@ -203,7 +214,7 @@ private:
  */
 class HeaderEntry {
 public:
-  virtual ~HeaderEntry() {}
+  virtual ~HeaderEntry() = default;
 
   /**
    * @return the header key.
@@ -278,6 +289,7 @@ private:
   HEADER_FUNC(EnvoyExpectedRequestTimeoutMs)                                                       \
   HEADER_FUNC(EnvoyExternalAddress)                                                                \
   HEADER_FUNC(EnvoyForceTrace)                                                                     \
+  HEADER_FUNC(EnvoyHedgeOnPerTryTimeout)                                                           \
   HEADER_FUNC(EnvoyImmediateHealthCheckFail)                                                       \
   HEADER_FUNC(EnvoyInternalRequest)                                                                \
   HEADER_FUNC(EnvoyIpTags)                                                                         \
@@ -347,7 +359,7 @@ private:
  */
 class HeaderMap {
 public:
-  virtual ~HeaderMap() {}
+  virtual ~HeaderMap() = default;
 
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER)
 
@@ -512,6 +524,11 @@ public:
   virtual size_t size() const PURE;
 
   /**
+   * @return true if the map is empty, false otherwise.
+   */
+  virtual bool empty() const PURE;
+
+  /**
    * Allow easy pretty-printing of the key/value pairs in HeaderMap
    * @param os supplies the ostream to print to.
    * @param headers the headers to print.
@@ -519,8 +536,8 @@ public:
   friend std::ostream& operator<<(std::ostream& os, const HeaderMap& headers) {
     headers.iterate(
         [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          *static_cast<std::ostream*>(context)
-              << "'" << header.key().c_str() << "', '" << header.value().c_str() << "'\n";
+          *static_cast<std::ostream*>(context) << "'" << header.key().getStringView() << "', '"
+                                               << header.value().getStringView() << "'\n";
           return HeaderMap::Iterate::Continue;
         },
         &os);
@@ -528,12 +545,12 @@ public:
   }
 };
 
-typedef std::unique_ptr<HeaderMap> HeaderMapPtr;
+using HeaderMapPtr = std::unique_ptr<HeaderMap>;
 
 /**
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.
  */
-typedef std::vector<std::pair<LowerCaseString, std::string>> HeaderVector;
+using HeaderVector = std::vector<std::pair<LowerCaseString, std::string>>;
 
 } // namespace Http
 } // namespace Envoy

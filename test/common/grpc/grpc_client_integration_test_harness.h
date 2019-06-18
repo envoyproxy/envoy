@@ -35,6 +35,7 @@
 #include "test/test_common/utility.h"
 
 using testing::_;
+using testing::Eq;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
@@ -50,7 +51,7 @@ const char HELLO_REPLY[] = "DEFG";
 
 MATCHER_P(HelloworldReplyEq, rhs, "") { return arg.message() == rhs; }
 
-typedef std::vector<std::pair<Http::LowerCaseString, std::string>> TestMetadata;
+using TestMetadata = std::vector<std::pair<Http::LowerCaseString, std::string>>;
 
 // Use in EXPECT_CALL(foo, bar(_)).WillExitIfNeeded() to exit dispatcher loop if
 // there are no longer any pending events in DispatcherHelper.
@@ -189,7 +190,7 @@ public:
 
   DispatcherHelper& dispatcher_helper_;
   FakeStream* fake_stream_{};
-  AsyncStream* grpc_stream_{};
+  AsyncStream<helloworld::HelloRequest> grpc_stream_{};
   const TestMetadata empty_metadata_;
 };
 
@@ -202,7 +203,7 @@ public:
     fake_stream_->startGrpcStream();
     helloworld::HelloReply reply;
     reply.set_message(HELLO_REPLY);
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().GrpcStatusCode, "0"));
+    EXPECT_CALL(*child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("0")));
     EXPECT_CALL(*this, onSuccess_(HelloworldReplyEq(HELLO_REPLY), _)).WillExitIfNeeded();
     EXPECT_CALL(*child_span_, finishSpan());
     dispatcher_helper_.setStreamEventPending();
@@ -221,7 +222,7 @@ public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())),
-        dispatcher_(api_->allocateDispatcher()) {}
+        dispatcher_(api_->allocateDispatcher()), http_context_(stats_store_->symbolTable()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -266,12 +267,12 @@ public:
 
   // Create a Grpc::AsyncClientImpl instance backed by enough fake/mock
   // infrastructure to initiate a loopback TCP connection to fake_upstream_.
-  AsyncClientPtr createAsyncClientImpl() {
+  RawAsyncClientPtr createAsyncClientImpl() {
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
         *dispatcher_, fake_upstream_->localAddress(), nullptr,
         std::move(async_client_transport_socket_), nullptr);
     ON_CALL(*mock_cluster_info_, connectTimeout())
-        .WillByDefault(Return(std::chrono::milliseconds(1000)));
+        .WillByDefault(Return(std::chrono::milliseconds(10000)));
     EXPECT_CALL(*mock_cluster_info_, name()).WillRepeatedly(ReturnRef(fake_cluster_name_));
     EXPECT_CALL(cm_, get(_)).WillRepeatedly(Return(&thread_local_cluster_));
     EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_ptr_));
@@ -289,7 +290,7 @@ public:
         std::move(shadow_writer_ptr_), http_context_);
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
-    EXPECT_CALL(cm_, get(fake_cluster_name_)).WillRepeatedly(Return(&thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq(fake_cluster_name_))).WillRepeatedly(Return(&thread_local_cluster_));
     envoy::api::v2::core::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
     fillServiceWideInitialMetadata(config);
@@ -305,7 +306,7 @@ public:
     return config;
   }
 
-  AsyncClientPtr createGoogleAsyncClientImpl() {
+  RawAsyncClientPtr createGoogleAsyncClientImpl() {
 #ifdef ENVOY_GOOGLE_GRPC
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
@@ -349,9 +350,9 @@ public:
     EXPECT_CALL(active_span, spawnChild_(_, "async fake_cluster egress", _))
         .WillOnce(Return(request->child_span_));
     EXPECT_CALL(*request->child_span_,
-                setTag(Tracing::Tags::get().UpstreamCluster, fake_cluster_name_));
+                setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(fake_cluster_name_)));
     EXPECT_CALL(*request->child_span_,
-                setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+                setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
     EXPECT_CALL(*request->child_span_, injectContext(_));
 
     request->grpc_request_ =
@@ -425,7 +426,7 @@ public:
 #ifdef ENVOY_GOOGLE_GRPC
   std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;
 #endif
-  AsyncClientPtr grpc_client_;
+  AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
   Event::TimerPtr timeout_timer_;
   const TestMetadata empty_metadata_;
 

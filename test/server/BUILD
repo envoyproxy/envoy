@@ -36,6 +36,7 @@ envoy_cc_test(
         "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:configuration_lib",
+        "//test/common/upstream:utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
@@ -81,6 +82,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "hot_restarting_parent_test",
+    srcs = envoy_select_hot_restart(["hot_restarting_parent_test.cc"]),
+    deps = [
+        "//source/common/stats:stats_lib",
+        "//source/server:hot_restart_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "guarddog_impl_test",
     srcs = ["guarddog_impl_test.cc"],
     deps = [
@@ -122,6 +133,7 @@ envoy_cc_test(
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "//source/server:overload_manager_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
@@ -135,8 +147,10 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
-        "//source/common/config:utility_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/server:lds_api_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
@@ -190,6 +204,11 @@ envoy_cc_fuzz_test(
     ] + envoy_all_extensions(),
 )
 
+filegroup(
+    name = "runtime_test_data",
+    srcs = glob(["test_data/runtime/**"]),
+)
+
 envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
@@ -197,10 +216,13 @@ envoy_cc_test(
         ":cluster_dupe_bootstrap.yaml",
         ":cluster_health_check_bootstrap.yaml",
         ":empty_bootstrap.yaml",
-        ":empty_runtime.yaml",
+        ":invalid_bootstrap.yaml",
+        ":invalid_runtime_bootstrap.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",
         ":node_bootstrap_without_access_log.yaml",
+        ":runtime_bootstrap.yaml",
+        ":runtime_test_data",
         ":zipkin_tracing.yaml",
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",
@@ -231,9 +253,9 @@ envoy_cc_test_library(
     name = "utility_lib",
     hdrs = ["utility.h"],
     deps = [
-        "//source/common/config:lds_json_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:lds_cc",
     ],
 )
 

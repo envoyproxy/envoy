@@ -11,6 +11,7 @@
 #include "extensions/tracers/zipkin/tracer_interface.h"
 #include "extensions/tracers/zipkin/util.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -27,7 +28,7 @@ public:
   /**
    * Destructor.
    */
-  virtual ~ZipkinBase() {}
+  virtual ~ZipkinBase() = default;
 
   /**
    * All classes defining Zipkin abstractions need to implement this method to convert
@@ -224,7 +225,7 @@ public:
    * @param key The key name of the annotation.
    * @param value The value associated with the key.
    */
-  BinaryAnnotation(const std::string& key, const std::string& value)
+  BinaryAnnotation(absl::string_view key, absl::string_view value)
       : key_(key), value_(value), annotation_type_(STRING) {}
 
   /**
@@ -287,10 +288,10 @@ private:
   std::string key_;
   std::string value_;
   absl::optional<Endpoint> endpoint_;
-  AnnotationType annotation_type_;
+  AnnotationType annotation_type_{};
 };
 
-typedef std::unique_ptr<Span> SpanPtr;
+using SpanPtr = std::unique_ptr<Span>;
 
 /**
  * Represents a Zipkin span. This class is based on Zipkin's Thrift definition of a span.
@@ -547,7 +548,7 @@ public:
    * @param name The binary annotation's key.
    * @param value The binary annotation's value.
    */
-  void setTag(const std::string& name, const std::string& value);
+  void setTag(absl::string_view name, absl::string_view value);
 
   /**
    * Adds an annotation to the span

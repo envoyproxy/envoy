@@ -3,7 +3,6 @@
 #include <string>
 
 #include "common/api/api_impl.h"
-#include "common/config/bootstrap_json.h"
 #include "common/config/well_known_names.h"
 #include "common/json/json_loader.h"
 #include "common/upstream/cluster_manager_impl.h"
@@ -12,6 +11,7 @@
 
 #include "extensions/stat_sinks/well_known_names.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -55,11 +55,12 @@ class ConfigurationImplTest : public testing::Test {
 protected:
   ConfigurationImplTest()
       : api_(Api::createApiForTest()),
-        cluster_manager_factory_(
-            server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
-            server_.random(), server_.dnsResolver(), server_.sslContextManager(),
-            server_.dispatcher(), server_.localInfo(), server_.secretManager(), *api_,
-            server_.httpContext(), server_.accessLogManager(), server_.singletonManager()) {}
+        cluster_manager_factory_(server_.admin(), server_.runtime(), server_.stats(),
+                                 server_.threadLocal(), server_.random(), server_.dnsResolver(),
+                                 server_.sslContextManager(), server_.dispatcher(),
+                                 server_.localInfo(), server_.secretManager(),
+                                 server_.messageValidationVisitor(), *api_, server_.httpContext(),
+                                 server_.accessLogManager(), server_.singletonManager()) {}
 
   Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
@@ -78,19 +79,21 @@ TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {
 TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
   std::string json = R"EOF(
   {
-    "listeners": [],
+    "stats_flush_interval": "0.500s",
 
-    "stats_flush_interval_ms": 500,
-
-    "cluster_manager": {
-      "clusters": []
-    },
-
-    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
@@ -101,26 +104,39 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
 TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
   const std::string json = R"EOF(
   {
-    "listeners" : [],
-    "cluster_manager": {
+    "static_resources": {
+      "listeners" : [],
       "clusters": [
         {
           "name": "test_cluster",
           "type": "static",
-          "connect_timeout_ms": 1,
+          "connect_timeout": "0.01s",
           "per_connection_buffer_limit_bytes": 8192,
-          "lb_type": "round_robin",
+          "lb_policy": "round_robin",
           "hosts": [
-            { "url" : "tcp://127.0.0.1:9999" }
+            {
+              "socket_address" : {
+                "address": "127.0.0.1",
+                "port_value": 9999
+              }
+            }
           ]
         }
       ]
     },
-    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
@@ -138,20 +154,33 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
 TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
   std::string json = R"EOF(
   {
-    "listeners" : [
-      {
-        "address": "tcp://127.0.0.1:1234",
-        "filters": []
-      }
-    ],
-    "cluster_manager": {
+    "static_resources": {
+      "listeners" : [
+        {
+          "address": {
+            "socket_address": {
+              "address": "127.0.0.1",
+              "port_value": 1234
+            }
+          },
+          "filter_chains": []
+        }
+      ],
       "clusters": []
     },
-    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   server_.local_info_.node_.set_cluster("");
   MainImpl config;
@@ -163,31 +192,34 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
 TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfiguration) {
   std::string json = R"EOF(
   {
-    "listeners" : [
-      {
-        "address": "tcp://127.0.0.1:1234",
-        "filters": []
-      }
-    ],
-    "cluster_manager": {
+    "static_resources": {
+      "listeners" : [
+        {
+          "address": {
+            "socket_address": {
+              "address": "127.0.0.1",
+              "port_value": 1234
+            }
+          },
+          "filter_chains": []
+        }
+      ],
       "clusters": []
     },
-    "tracing": {
-      "not_http": {
-        "driver": {
-          "type": "lightstep",
-          "config": {
-            "collector_cluster": "cluster_0",
-            "access_token_file": "/etc/envoy/envoy.cfg"
-          }
+    "tracing": {},
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
         }
       }
-    },
-    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+    }
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   server_.local_info_.node_.set_cluster("");
   MainImpl config;
@@ -199,32 +231,43 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
 TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
   std::string json = R"EOF(
   {
-    "listeners" : [
-      {
-        "address": "tcp://127.0.0.1:1234",
-        "filters": []
-      }
-    ],
-    "cluster_manager": {
+    "static_resources": {
+      "listeners" : [
+        {
+          "address": {
+            "socket_address": {
+              "address": "127.0.0.1",
+              "port_value": 1234
+            }
+          },
+          "filter_chains": []
+        }
+      ],
       "clusters": []
     },
     "tracing": {
       "http": {
-        "driver": {
-          "type": "lightstep",
-          "config": {
-            "collector_cluster": "cluster_0",
-            "access_token_file": "/etc/envoy/envoy.cfg"
-          }
+        "name": "invalid",
+        "typed_config": {
+          "@type": "type.googleapis.com/envoy.config.trace.v2.LightstepConfig",
+          "collector_cluster": "cluster_0",
+          "access_token_file": "/etc/envoy/envoy.cfg"
         }
       }
     },
-    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
-  bootstrap.mutable_tracing()->mutable_http()->set_name("invalid");
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
@@ -234,17 +277,23 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
 TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   std::string json = R"EOF(
   {
-    "listeners": [],
-
-    "cluster_manager": {
+    "static_resources": {
+      "listeners": [],
       "clusters": []
     },
-
-    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
@@ -260,17 +309,23 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
 TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
   std::string json = R"EOF(
   {
-    "listeners": [],
-
-    "cluster_manager": {
+    "static_resources": {
+      "listeners": [],
       "clusters": []
     },
-
-    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   envoy::config::metrics::v2::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name("envoy.invalid");
@@ -286,17 +341,23 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
 TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
   std::string json = R"EOF(
   {
-    "listeners": [],
-
-    "cluster_manager": {
+    "static_resources": {
+      "listeners": [],
       "clusters": []
     },
-
-    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
   }
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
   auto& field_map = *sink.mutable_config()->mutable_fields();
@@ -306,6 +367,88 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
                             "Provided name for static registration lookup was empty.");
+}
+
+// An explicit non-empty LayeredRuntime is available to the server with no
+// changes made.
+TEST(InitialImplTest, LayeredRuntime) {
+  const std::string yaml = R"EOF(
+  layered_runtime:
+    layers:
+    - static_layer:
+        health_check:
+          min_interval: 5
+    - disk_layer: { symlink_root: /srv/runtime/current/envoy }
+    - disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
+    - admin_layer: {}
+  )EOF";
+  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v2::Bootstrap>(yaml);
+  InitialImpl config(bootstrap);
+  EXPECT_THAT(config.runtime(), ProtoEq(bootstrap.layered_runtime()));
+}
+
+// An empty LayeredRuntime has an admin layer injected.
+TEST(InitialImplTest, EmptyLayeredRuntime) {
+  const std::string bootstrap_yaml = R"EOF(
+  layered_runtime: {}
+  )EOF";
+  const auto bootstrap =
+      TestUtility::parseYaml<envoy::config::bootstrap::v2::Bootstrap>(bootstrap_yaml);
+  InitialImpl config(bootstrap);
+
+  const std::string expected_yaml = R"EOF(
+  layers:
+  - admin_layer: {}
+  )EOF";
+  const auto expected_runtime =
+      TestUtility::parseYaml<envoy::config::bootstrap::v2::LayeredRuntime>(expected_yaml);
+  EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
+}
+
+// An empty deprecated Runtime has an empty static and admin layer injected.
+TEST(InitialImplTest, EmptyDeprecatedRuntime) {
+  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v2::Bootstrap>("{}");
+  InitialImpl config(bootstrap);
+
+  const std::string expected_yaml = R"EOF(
+  layers:
+  - static_layer: {}
+  - admin_layer: {}
+  )EOF";
+  const auto expected_runtime =
+      TestUtility::parseYaml<envoy::config::bootstrap::v2::LayeredRuntime>(expected_yaml);
+  EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
+}
+
+// A deprecated Runtime is transformed to the equivalent LayeredRuntime.
+TEST(InitialImplTest, DeprecatedRuntimeTranslation) {
+  const std::string bootstrap_yaml = R"EOF(
+  runtime:
+    symlink_root: /srv/runtime/current
+    subdirectory: envoy
+    override_subdirectory: envoy_override
+    base:
+      health_check:
+        min_interval: 5
+  )EOF";
+  const auto bootstrap =
+      TestUtility::parseYaml<envoy::config::bootstrap::v2::Bootstrap>(bootstrap_yaml);
+  InitialImpl config(bootstrap);
+
+  const std::string expected_yaml = R"EOF(
+  layers:
+  - static_layer:
+      health_check:
+        min_interval: 5
+  - name: root
+    disk_layer: { symlink_root: /srv/runtime/current/envoy }
+  - name: override
+    disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
+  - admin_layer: {}
+  )EOF";
+  const auto expected_runtime =
+      TestUtility::parseYaml<envoy::config::bootstrap::v2::LayeredRuntime>(expected_yaml);
+  EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
 }
 
 } // namespace

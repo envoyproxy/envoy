@@ -21,6 +21,7 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::Eq;
 using testing::Invoke;
 using testing::Ref;
 using testing::Return;
@@ -46,7 +47,8 @@ class RateLimitGrpcClientTest : public testing::Test {
 public:
   RateLimitGrpcClientTest()
       : async_client_(new Grpc::MockAsyncClient()),
-        client_(Grpc::AsyncClientPtr{async_client_}, absl::optional<std::chrono::milliseconds>()) {}
+        client_(Grpc::RawAsyncClientPtr{async_client_},
+                absl::optional<std::chrono::milliseconds>()) {}
 
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncRequest async_request_;
@@ -62,14 +64,14 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     envoy::service::ratelimit::v2::RateLimitRequest request;
     Http::HeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}});
-    EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(client_), _, _))
+    EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(client_), _, _))
         .WillOnce(
-            Invoke([this](const Protobuf::MethodDescriptor& service_method,
-                          const Protobuf::Message&, Grpc::AsyncRequestCallbacks&, Tracing::Span&,
+            Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
+                          Buffer::InstancePtr&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
                           const absl::optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
               std::string service_name = "envoy.service.ratelimit.v2.RateLimitService";
-              EXPECT_EQ(service_name, service_method.service()->full_name());
-              EXPECT_EQ("ShouldRateLimit", service_method.name());
+              EXPECT_EQ(service_name, service_full_name);
+              EXPECT_EQ("ShouldRateLimit", method_name);
               return &async_request_;
             }));
 
@@ -80,7 +82,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
     response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
     response->set_overall_code(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT);
-    EXPECT_CALL(span_, setTag("ratelimit_status", "over_limit"));
+    EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("over_limit")));
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OverLimit, _));
     client_.onSuccess(std::move(response), span_);
   }
@@ -89,7 +91,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     envoy::service::ratelimit::v2::RateLimitRequest request;
     Http::HeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}}});
-    EXPECT_CALL(*async_client_, send(_, ProtoEq(request), _, _, _))
+    EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), _, _, _))
         .WillOnce(Return(&async_request_));
 
     client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}}},
@@ -99,7 +101,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
     response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
     response->set_overall_code(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK);
-    EXPECT_CALL(span_, setTag("ratelimit_status", "ok"));
+    EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("ok")));
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _));
     client_.onSuccess(std::move(response), span_);
   }
@@ -109,7 +111,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     GrpcClientImpl::createRequest(
         request, "foo",
         {{{{"foo", "bar"}, {"bar", "baz"}}}, {{{"foo2", "bar2"}, {"bar2", "baz2"}}}});
-    EXPECT_CALL(*async_client_, send(_, ProtoEq(request), _, _, _))
+    EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), _, _, _))
         .WillOnce(Return(&async_request_));
 
     client_.limit(request_callbacks_, "foo",
@@ -125,7 +127,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 TEST_F(RateLimitGrpcClientTest, Cancel) {
   std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse> response;
 
-  EXPECT_CALL(*async_client_, send(_, _, _, _, _)).WillOnce(Return(&async_request_));
+  EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _)).WillOnce(Return(&async_request_));
 
   client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance());
 

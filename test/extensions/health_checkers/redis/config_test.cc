@@ -14,9 +14,9 @@ namespace HealthCheckers {
 namespace RedisHealthChecker {
 namespace {
 
-typedef Extensions::HealthCheckers::RedisHealthChecker::RedisHealthChecker CustomRedisHealthChecker;
+using CustomRedisHealthChecker = Extensions::HealthCheckers::RedisHealthChecker::RedisHealthChecker;
 
-TEST(HealthCheckerFactoryTest, createRedis) {
+TEST(HealthCheckerFactoryTest, CreateRedis) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -40,7 +40,7 @@ TEST(HealthCheckerFactoryTest, createRedis) {
               .get()));
 }
 
-TEST(HealthCheckerFactoryTest, createRedisWithoutKey) {
+TEST(HealthCheckerFactoryTest, CreateRedisWithoutKey) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -63,7 +63,7 @@ TEST(HealthCheckerFactoryTest, createRedisWithoutKey) {
               .get()));
 }
 
-TEST(HealthCheckerFactoryTest, createRedisWithLogHCFailure) {
+TEST(HealthCheckerFactoryTest, CreateRedisWithLogHCFailure) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -87,7 +87,7 @@ TEST(HealthCheckerFactoryTest, createRedisWithLogHCFailure) {
               .get()));
 }
 
-TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
+TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -106,10 +106,11 @@ TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
+
   EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
                          Upstream::HealthCheckerFactory::create(
                              Upstream::parseHealthCheckFromV2Yaml(yaml), cluster, runtime, random,
-                             dispatcher, log_manager)
+                             dispatcher, log_manager, ProtobufMessage::getStrictValidationVisitor())
                              .get()));
 }
 } // namespace

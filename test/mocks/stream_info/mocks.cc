@@ -70,6 +70,7 @@ MockStreamInfo::MockStreamInfo()
   }));
   ON_CALL(*this, protocol()).WillByDefault(ReturnPointee(&protocol_));
   ON_CALL(*this, responseCode()).WillByDefault(ReturnPointee(&response_code_));
+  ON_CALL(*this, responseCodeDetails()).WillByDefault(ReturnPointee(&response_code_details_));
   ON_CALL(*this, addBytesReceived(_)).WillByDefault(Invoke([this](uint64_t bytes_received) {
     bytes_received_ += bytes_received;
   }));
@@ -87,6 +88,10 @@ MockStreamInfo::MockStreamInfo()
         requested_server_name_ = std::string(requested_server_name);
       }));
   ON_CALL(*this, requestedServerName()).WillByDefault(ReturnRef(requested_server_name_));
+  ON_CALL(*this, setRouteName(_)).WillByDefault(Invoke([this](const absl::string_view route_name) {
+    route_name_ = std::string(route_name);
+  }));
+  ON_CALL(*this, getRouteName()).WillByDefault(ReturnRef(route_name_));
   ON_CALL(*this, upstreamTransportFailureReason())
       .WillByDefault(ReturnRef(upstream_transport_failure_reason_));
 }

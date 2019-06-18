@@ -39,14 +39,6 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
   };
 }
 
-Network::FilterFactoryCb
-RateLimitConfigFactory::createFilterFactory(const Json::Object& json_config,
-                                            Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::network::rate_limit::v2::RateLimit proto_config;
-  Envoy::Config::FilterJson::translateTcpRateLimitFilter(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, context);
-}
-
 /**
  * Static registration for the rate limit filter. @see RegisterFactory.
  */

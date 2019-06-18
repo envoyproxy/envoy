@@ -20,6 +20,7 @@ envoy_cc_library(
         "//include/envoy/upstream:host_description_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
+        "//source/common/singleton:const_singleton",
     ],
 )
 

@@ -74,7 +74,7 @@ you may instead just tag the PR with the issue:
 ### <a name="deprecated"></a>Deprecated
 
 If this PR deprecates existing Envoy APIs or code, it should include
-an update to the [deprecated file](DEPRECATED.md) and a one line note in the PR
+an update to the [deprecated file](docs/root/intro/deprecated.rst) and a one line note in the PR
 description.
 
 If you mark existing APIs or code as deprecated, when the next release is cut, the

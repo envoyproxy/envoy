@@ -18,6 +18,7 @@ public:
   ~MockInstance();
 
   MOCK_METHOD1(runOnAllThreads, void(Event::PostCb cb));
+  MOCK_METHOD2(runOnAllThreads, void(Event::PostCb cb, Event::PostCb main_callback));
 
   // Server::ThreadLocal
   MOCK_METHOD0(allocateSlot, SlotPtr());
@@ -27,8 +28,8 @@ public:
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
 
   SlotPtr allocateSlot_() { return SlotPtr{new SlotImpl(*this, current_slot_++)}; }
-  void runOnAllThreads_(Event::PostCb cb) { cb(); }
-  void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) {
+  void runOnAllThreads1_(Event::PostCb cb) { cb(); }
+  void runOnAllThreads2_(Event::PostCb cb, Event::PostCb main_callback) {
     cb();
     main_callback();
   }

@@ -19,7 +19,7 @@ public:
   const std::string OmitCanaryHostsPredicate = "envoy.retry_host_predicates.omit_canary_hosts";
 };
 
-typedef ConstSingleton<RetryHostPredicatesNameValues> RetryHostPredicateValues;
+using RetryHostPredicateValues = ConstSingleton<RetryHostPredicatesNameValues>;
 
 } // namespace Host
 } // namespace Retry

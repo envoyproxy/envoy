@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace {
 
-typedef HttpProtocolIntegrationTest BufferIntegrationTest;
+using BufferIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, BufferIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
@@ -53,12 +53,12 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("413", response->headers().Status()->value().c_str());
+  EXPECT_EQ("413", response->headers().Status()->value().getStringView());
 }
 
 ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {
   ProtobufWkt::Struct pfc;
-  MessageUtil::loadFromJson(json_config, pfc);
+  TestUtility::loadFromJson(json_config, pfc);
 
   return
       [pfc](
@@ -94,7 +94,7 @@ TEST_P(BufferIntegrationTest, RouteDisabled) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(BufferIntegrationTest, RouteOverride) {
@@ -120,7 +120,7 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 } // namespace

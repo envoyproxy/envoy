@@ -339,6 +339,32 @@ message RequirementRule {
   JwtRequirement requires = 2;
 }
 
+// This message specifies Jwt requirements based on stream_info.filterState.
+// This FilterState should use `Router::StringAccessor` object to set a string value.
+// Other HTTP filters can use it to specify Jwt requirements dynamically.
+//
+// Example:
+//
+// .. code-block:: yaml
+//
+//    name: jwt_selector
+//    requires:
+//      issuer_1:
+//        provider_name: issuer1
+//      issuer_2:
+//        provider_name: issuer2
+//
+// If a filter set "jwt_selector" with "issuer_1" to FilterState for a request,
+// jwt_authn filter will use JwtRequirement{"provider_name": "issuer1"} to verify.
+message FilterStateRule {
+  // The filter state name to retrieve the `Router::StringAccessor` object.
+  string name = 1 [(validate.rules).string.min_bytes = 1];
+
+  // A map of string keys to requirements. The string key is the string value
+  // in the FilterState with the name specified in the *name* field above.
+  map<string, JwtRequirement> requires = 3;
+}
+
 // This is the Envoy HTTP filter config for JWT authentication.
 //
 // For example:
@@ -432,4 +458,10 @@ message JwtAuthentication {
   //           - provider_name: provider2
   //
   repeated RequirementRule rules = 2;
+
+  // This message specifies Jwt requirements based on stream_info.filterState.
+  // Other HTTP filters can use it to specify Jwt requirements dynamically.
+  // The *rules* field above is checked first, if it could not find any matches,
+  // check this one.
+  FilterStateRule filter_state_rules = 3;
 }

@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/config/rbac/v2alpha/rbac.pb.h"
+#include "envoy/config/rbac/v2/rbac.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
@@ -18,14 +18,14 @@ namespace Common {
 namespace RBAC {
 
 class Matcher;
-typedef std::shared_ptr<const Matcher> MatcherConstSharedPtr;
+using MatcherConstSharedPtr = std::shared_ptr<const Matcher>;
 
 /**
  *  Matchers describe the rules for matching either a permission action or principal.
  */
 class Matcher {
 public:
-  virtual ~Matcher() {}
+  virtual ~Matcher() = default;
 
   /**
    * Returns whether or not the permission/principal matches the rules of the matcher.
@@ -42,13 +42,13 @@ public:
    * Creates a shared instance of a matcher based off the rules defined in the Permission config
    * proto message.
    */
-  static MatcherConstSharedPtr create(const envoy::config::rbac::v2alpha::Permission& permission);
+  static MatcherConstSharedPtr create(const envoy::config::rbac::v2::Permission& permission);
 
   /**
    * Creates a shared instance of a matcher based off the rules defined in the Principal config
    * proto message.
    */
-  static MatcherConstSharedPtr create(const envoy::config::rbac::v2alpha::Principal& principal);
+  static MatcherConstSharedPtr create(const envoy::config::rbac::v2::Principal& principal);
 };
 
 /**
@@ -68,8 +68,8 @@ public:
  */
 class AndMatcher : public Matcher {
 public:
-  AndMatcher(const envoy::config::rbac::v2alpha::Permission_Set& rules);
-  AndMatcher(const envoy::config::rbac::v2alpha::Principal_Set& ids);
+  AndMatcher(const envoy::config::rbac::v2::Permission_Set& rules);
+  AndMatcher(const envoy::config::rbac::v2::Principal_Set& ids);
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const envoy::api::v2::core::Metadata&) const override;
@@ -84,10 +84,10 @@ private:
  */
 class OrMatcher : public Matcher {
 public:
-  OrMatcher(const envoy::config::rbac::v2alpha::Permission_Set& set) : OrMatcher(set.rules()) {}
-  OrMatcher(const envoy::config::rbac::v2alpha::Principal_Set& set) : OrMatcher(set.ids()) {}
-  OrMatcher(const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Permission>& rules);
-  OrMatcher(const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Principal>& ids);
+  OrMatcher(const envoy::config::rbac::v2::Permission_Set& set) : OrMatcher(set.rules()) {}
+  OrMatcher(const envoy::config::rbac::v2::Principal_Set& set) : OrMatcher(set.ids()) {}
+  OrMatcher(const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2::Permission>& rules);
+  OrMatcher(const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2::Principal>& ids);
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const envoy::api::v2::core::Metadata&) const override;
@@ -98,9 +98,9 @@ private:
 
 class NotMatcher : public Matcher {
 public:
-  NotMatcher(const envoy::config::rbac::v2alpha::Permission& permission)
+  NotMatcher(const envoy::config::rbac::v2::Permission& permission)
       : matcher_(Matcher::create(permission)) {}
-  NotMatcher(const envoy::config::rbac::v2alpha::Principal& principal)
+  NotMatcher(const envoy::config::rbac::v2::Principal& principal)
       : matcher_(Matcher::create(principal)) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
@@ -162,7 +162,7 @@ private:
  */
 class AuthenticatedMatcher : public Matcher {
 public:
-  AuthenticatedMatcher(const envoy::config::rbac::v2alpha::Principal_Authenticated& auth)
+  AuthenticatedMatcher(const envoy::config::rbac::v2::Principal_Authenticated& auth)
       : matcher_(auth.has_principal_name()
                      ? absl::make_optional<Matchers::StringMatcher>(auth.principal_name())
                      : absl::nullopt) {}
@@ -180,7 +180,7 @@ private:
  */
 class PolicyMatcher : public Matcher {
 public:
-  PolicyMatcher(const envoy::config::rbac::v2alpha::Policy& policy)
+  PolicyMatcher(const envoy::config::rbac::v2::Policy& policy)
       : permissions_(policy.permissions()), principals_(policy.principals()) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/upstream/cluster_manager.h"
 
 #include "extensions/filters/network/common/redis/codec_impl.h"
@@ -16,7 +18,7 @@ namespace Client {
  */
 class PoolRequest {
 public:
-  virtual ~PoolRequest() {}
+  virtual ~PoolRequest() = default;
 
   /**
    * Cancel the request. No further request callbacks will be called.
@@ -29,7 +31,7 @@ public:
  */
 class PoolCallbacks {
 public:
-  virtual ~PoolCallbacks() {}
+  virtual ~PoolCallbacks() = default;
 
   /**
    * Called when a pipelined response is received.
@@ -41,6 +43,25 @@ public:
    * Called when a network/protocol error occurs and there is no response.
    */
   virtual void onFailure() PURE;
+
+  /**
+   * Called when a MOVED or ASK redirection error is received, and the request must be retried.
+   * @param value supplies the MOVED error response
+   * @return bool true if the request is successfully redirected, false otherwise
+   */
+  virtual bool onRedirection(const Common::Redis::RespValue& value) PURE;
+};
+
+/**
+ * DoNothingPoolCallbacks is used for internally generated commands whose response is
+ * transparently filtered, and redirection never occurs (e.g., "asking", "auth", etc.).
+ */
+class DoNothingPoolCallbacks : public PoolCallbacks {
+public:
+  // PoolCallbacks
+  void onResponse(Common::Redis::RespValuePtr&&) override {}
+  void onFailure() override {}
+  bool onRedirection(const Common::Redis::RespValue&) override { return false; }
 };
 
 /**
@@ -48,7 +69,7 @@ public:
  */
 class Client : public Event::DeferredDeletable {
 public:
-  virtual ~Client() {}
+  ~Client() override = default;
 
   /**
    * Adds network connection callbacks to the underlying network connection.
@@ -70,14 +91,14 @@ public:
   virtual PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) PURE;
 };
 
-typedef std::unique_ptr<Client> ClientPtr;
+using ClientPtr = std::unique_ptr<Client>;
 
 /**
  * Configuration for a redis connection pool.
  */
 class Config {
 public:
-  virtual ~Config() {}
+  virtual ~Config() = default;
 
   /**
    * @return std::chrono::milliseconds the timeout for an individual redis operation. Currently,
@@ -97,6 +118,22 @@ public:
    * same hash tag will be forwarded to the same upstream.
    */
   virtual bool enableHashtagging() const PURE;
+
+  /**
+   * @return when enabled, moved/ask redirection errors from upstream redis servers will be
+   * processed.
+   */
+  virtual bool enableRedirection() const PURE;
+
+  /**
+   * @return buffer size for batching commands for a single upstream host.
+   */
+  virtual uint32_t maxBufferSizeBeforeFlush() const PURE;
+
+  /**
+   * @return timeout for batching commands for a single upstream host.
+   */
+  virtual std::chrono::milliseconds bufferFlushTimeoutInMs() const PURE;
 };
 
 /**
@@ -104,7 +141,7 @@ public:
  */
 class ClientFactory {
 public:
-  virtual ~ClientFactory() {}
+  virtual ~ClientFactory() = default;
 
   /**
    * Create a client given an upstream host.

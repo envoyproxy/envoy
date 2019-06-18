@@ -82,12 +82,12 @@ TEST_F(SignerImplTest, SignDateHeader) {
   addPath("/");
   signer_.sign(*message_);
   EXPECT_EQ(nullptr, message_->headers().get(SignatureHeaders::get().ContentSha256));
-  EXPECT_STREQ("20180102T030400Z",
-               message_->headers().get(SignatureHeaders::get().Date)->value().c_str());
-  EXPECT_STREQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
-               "SignedHeaders=x-amz-date, "
-               "Signature=1310784f67248cab70d98b9404d601f30d8fe20bd1820560cce224f4131dc1cc",
-               message_->headers().Authorization()->value().c_str());
+  EXPECT_EQ("20180102T030400Z",
+            message_->headers().get(SignatureHeaders::get().Date)->value().getStringView());
+  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
+            "SignedHeaders=x-amz-date, "
+            "Signature=1310784f67248cab70d98b9404d601f30d8fe20bd1820560cce224f4131dc1cc",
+            message_->headers().Authorization()->value().getStringView());
 }
 
 // Verify we sign the security token header if the token is present in the credentials
@@ -96,12 +96,13 @@ TEST_F(SignerImplTest, SignSecurityTokenHeader) {
   addMethod("GET");
   addPath("/");
   signer_.sign(*message_);
-  EXPECT_STREQ("token",
-               message_->headers().get(SignatureHeaders::get().SecurityToken)->value().c_str());
-  EXPECT_STREQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
-               "SignedHeaders=x-amz-date;x-amz-security-token, "
-               "Signature=ff1d9fa7e54a72677b5336df047bb1f1493f86b92099973bf62da3af852d1679",
-               message_->headers().Authorization()->value().c_str());
+  EXPECT_EQ(
+      "token",
+      message_->headers().get(SignatureHeaders::get().SecurityToken)->value().getStringView());
+  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
+            "SignedHeaders=x-amz-date;x-amz-security-token, "
+            "Signature=ff1d9fa7e54a72677b5336df047bb1f1493f86b92099973bf62da3af852d1679",
+            message_->headers().Authorization()->value().getStringView());
 }
 
 // Verify we sign the content header as the hashed empty string if the body is empty
@@ -110,12 +111,13 @@ TEST_F(SignerImplTest, SignEmptyContentHeader) {
   addMethod("GET");
   addPath("/");
   signer_.sign(*message_, true);
-  EXPECT_STREQ(SignatureConstants::get().HashedEmptyString.c_str(),
-               message_->headers().get(SignatureHeaders::get().ContentSha256)->value().c_str());
-  EXPECT_STREQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
-               "SignedHeaders=x-amz-content-sha256;x-amz-date, "
-               "Signature=4ee6aa9355259c18133f150b139ea9aeb7969c9408ad361b2151f50a516afe42",
-               message_->headers().Authorization()->value().c_str());
+  EXPECT_EQ(
+      SignatureConstants::get().HashedEmptyString,
+      message_->headers().get(SignatureHeaders::get().ContentSha256)->value().getStringView());
+  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
+            "SignedHeaders=x-amz-content-sha256;x-amz-date, "
+            "Signature=4ee6aa9355259c18133f150b139ea9aeb7969c9408ad361b2151f50a516afe42",
+            message_->headers().Authorization()->value().getStringView());
 }
 
 // Verify we sign the content header correctly when we have a body
@@ -125,12 +127,13 @@ TEST_F(SignerImplTest, SignContentHeader) {
   addPath("/");
   setBody("test1234");
   signer_.sign(*message_, true);
-  EXPECT_STREQ("937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
-               message_->headers().get(SignatureHeaders::get().ContentSha256)->value().c_str());
-  EXPECT_STREQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
-               "SignedHeaders=x-amz-content-sha256;x-amz-date, "
-               "Signature=4eab89c36f45f2032d6010ba1adab93f8510ddd6afe540821f3a05bb0253e27b",
-               message_->headers().Authorization()->value().c_str());
+  EXPECT_EQ(
+      "937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
+      message_->headers().get(SignatureHeaders::get().ContentSha256)->value().getStringView());
+  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
+            "SignedHeaders=x-amz-content-sha256;x-amz-date, "
+            "Signature=4eab89c36f45f2032d6010ba1adab93f8510ddd6afe540821f3a05bb0253e27b",
+            message_->headers().Authorization()->value().getStringView());
 }
 
 // Verify we sign some extra headers
@@ -142,10 +145,10 @@ TEST_F(SignerImplTest, SignExtraHeaders) {
   addHeader("b", "b_value");
   addHeader("c", "c_value");
   signer_.sign(*message_);
-  EXPECT_STREQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
-               "SignedHeaders=a;b;c;x-amz-date, "
-               "Signature=d5e025e1cf0d5af0d83110bc2ef1cafd2d9dca1dea9d7767f58308da64aa6558",
-               message_->headers().Authorization()->value().c_str());
+  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
+            "SignedHeaders=a;b;c;x-amz-date, "
+            "Signature=d5e025e1cf0d5af0d83110bc2ef1cafd2d9dca1dea9d7767f58308da64aa6558",
+            message_->headers().Authorization()->value().getStringView());
 }
 
 // Verify signing a host header
@@ -155,10 +158,10 @@ TEST_F(SignerImplTest, SignHostHeader) {
   addPath("/");
   addHeader("host", "www.example.com");
   signer_.sign(*message_);
-  EXPECT_STREQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
-               "SignedHeaders=host;x-amz-date, "
-               "Signature=60216ee44dd651322ea10cc6747308dd30e582aaa773f6c1b1354e486385c021",
-               message_->headers().Authorization()->value().c_str());
+  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
+            "SignedHeaders=host;x-amz-date, "
+            "Signature=60216ee44dd651322ea10cc6747308dd30e582aaa773f6c1b1354e486385c021",
+            message_->headers().Authorization()->value().getStringView());
 }
 
 } // namespace

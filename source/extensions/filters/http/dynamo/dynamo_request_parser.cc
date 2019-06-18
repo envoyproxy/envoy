@@ -59,7 +59,7 @@ std::string RequestParser::parseOperation(const Http::HeaderMap& headerMap) {
   const Http::HeaderEntry* x_amz_target = headerMap.get(X_AMZ_TARGET);
   if (x_amz_target) {
     // Normally x-amz-target contains Version.Operation, e.g., DynamoDB_20160101.GetItem
-    auto version_and_operation = StringUtil::splitToken(x_amz_target->value().c_str(), ".");
+    auto version_and_operation = StringUtil::splitToken(x_amz_target->value().getStringView(), ".");
     if (version_and_operation.size() == 2) {
       operation = std::string{version_and_operation[1]};
     }

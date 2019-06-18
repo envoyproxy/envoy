@@ -44,7 +44,7 @@ private:
   std::vector<FakeStreamPtr> streams_;
 };
 
-typedef std::unique_ptr<AutonomousHttpConnection> AutonomousHttpConnectionPtr;
+using AutonomousHttpConnectionPtr = std::unique_ptr<AutonomousHttpConnection>;
 
 // An upstream which creates AutonomousHttpConnection for new incoming connections.
 class AutonomousUpstream : public FakeUpstream {
@@ -60,6 +60,8 @@ public:
   createNetworkFilterChain(Network::Connection& connection,
                            const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
+  bool createUdpListenerFilterChain(Network::UdpListenerFilterManager& listener,
+                                    Network::UdpReadFilterCallbacks& callbacks) override;
 
   void setLastRequestHeaders(const Http::HeaderMap& headers);
   std::unique_ptr<Http::TestHeaderMapImpl> lastRequestHeaders();

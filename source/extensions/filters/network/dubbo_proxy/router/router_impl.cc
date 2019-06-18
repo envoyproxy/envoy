@@ -152,6 +152,12 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 void Router::onEvent(Network::ConnectionEvent event) {
   if (!upstream_request_ || upstream_request_->response_complete_) {
     // Client closed connection after completing response.
+    ENVOY_LOG(debug, "dubbo upstream request: the upstream request had completed");
+    return;
+  }
+
+  if (upstream_request_->stream_reset_ && event == Network::ConnectionEvent::LocalClose) {
+    ENVOY_LOG(debug, "dubbo upstream request: the stream reset");
     return;
   }
 
@@ -188,7 +194,8 @@ Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::In
       deserializer_(
           NamedDeserializerConfigFactory::getFactory(serialization_type).createDeserializer()),
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
-      request_complete_(false), response_started_(false), response_complete_(false) {}
+      request_complete_(false), response_started_(false), response_complete_(false),
+      stream_reset_(false) {}
 
 Router::UpstreamRequest::~UpstreamRequest() {}
 
@@ -204,6 +211,8 @@ Network::FilterStatus Router::UpstreamRequest::start() {
 }
 
 void Router::UpstreamRequest::resetStream() {
+  stream_reset_ = true;
+
   if (conn_pool_handle_) {
     ASSERT(!conn_data_);
     conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);

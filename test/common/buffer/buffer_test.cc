@@ -37,7 +37,6 @@ protected:
     EXPECT_NE(nullptr, reservation.mem_);
     EXPECT_EQ(static_cast<const uint8_t*>(slice.data()) + slice.dataSize(), reservation.mem_);
     EXPECT_EQ(reservation_size, reservation.len_);
-    EXPECT_EQ(0, slice.reservableSize());
   }
 
   static void expectReservationFailure(const Slice::Reservation& reservation, const Slice& slice,
@@ -88,10 +87,10 @@ TEST_F(OwnedSliceTest, ReserveCommit) {
     expectReservationSuccess(reservation, *slice, 10);
 
     // Request a second reservation while the first reservation remains uncommitted.
-    // This should fail.
-    EXPECT_EQ(0, slice->reservableSize());
+    // This should succeed.
+    EXPECT_EQ(initial_capacity, slice->reservableSize());
     Slice::Reservation reservation2 = slice->reserve(1);
-    expectReservationFailure(reservation2, *slice, 0);
+    expectReservationSuccess(reservation2, *slice, 1);
 
     // Commit the entire reserved size.
     bool committed = slice->commit(reservation);

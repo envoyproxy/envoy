@@ -18,9 +18,9 @@
 #include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats_options.h"
 #include "envoy/thread/thread.h"
 
+#include "common/grpc/context_impl.h"
 #include "common/http/context_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/stats/fake_symbol_table_impl.h"
@@ -37,6 +37,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -44,7 +45,6 @@
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -60,6 +60,7 @@ public:
   MOCK_CONST_METHOD0(concurrency, uint32_t());
   MOCK_CONST_METHOD0(configPath, const std::string&());
   MOCK_CONST_METHOD0(configYaml, const std::string&());
+  MOCK_CONST_METHOD0(allowUnknownFields, bool());
   MOCK_CONST_METHOD0(adminAddressPath, const std::string&());
   MOCK_CONST_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_CONST_METHOD0(drainTime, std::chrono::seconds());
@@ -75,8 +76,6 @@ public:
   MOCK_CONST_METHOD0(serviceClusterName, const std::string&());
   MOCK_CONST_METHOD0(serviceNodeName, const std::string&());
   MOCK_CONST_METHOD0(serviceZone, const std::string&());
-  MOCK_CONST_METHOD0(maxStats, uint64_t());
-  MOCK_CONST_METHOD0(statsOptions, const Stats::StatsOptions&());
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
   MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
   MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
@@ -92,7 +91,6 @@ public:
   std::string service_zone_name_;
   spdlog::level::level_enum log_level_{spdlog::level::trace};
   std::string log_path_;
-  Stats::StatsOptionsImpl stats_options_;
   uint32_t concurrency_{1};
   uint64_t hot_restart_epoch_{};
   bool hot_restart_disabled_{};
@@ -199,10 +197,11 @@ public:
   // Server::HotRestart
   MOCK_METHOD0(drainParentListeners, void());
   MOCK_METHOD1(duplicateParentListenSocket, int(const std::string& address));
-  MOCK_METHOD1(getParentStats, void(GetParentStatsInfo& info));
+  MOCK_METHOD0(getParentStats, std::unique_ptr<envoy::HotRestartMessage>());
   MOCK_METHOD2(initialize, void(Event::Dispatcher& dispatcher, Server::Instance& server));
-  MOCK_METHOD1(shutdownParentAdmin, void(ShutdownParentAdminInfo& info));
-  MOCK_METHOD0(terminateParent, void());
+  MOCK_METHOD1(sendParentAdminShutdownRequest, void(time_t& original_start_time));
+  MOCK_METHOD0(sendParentTerminateRequest, void());
+  MOCK_METHOD1(mergeParentStatsIfAny, ServerStatsFromParent(Stats::StoreRoot& stats_store));
   MOCK_METHOD0(shutdown, void());
   MOCK_METHOD0(version, std::string());
   MOCK_METHOD0(logLock, Thread::BasicLockable&());
@@ -237,6 +236,10 @@ public:
                std::vector<Network::ListenerFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
                    Configuration::ListenerFactoryContext& context));
+  MOCK_METHOD2(createUdpListenerFilterFactoryList,
+               std::vector<Network::UdpListenerFilterFactoryCb>(
+                   const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
+                   Configuration::ListenerFactoryContext& context));
   MOCK_METHOD4(createListenSocket,
                Network::SocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
                                         Network::Address::SocketType socket_type,
@@ -269,8 +272,9 @@ public:
   MockServerLifecycleNotifier();
   ~MockServerLifecycleNotifier();
 
-  MOCK_METHOD2(registerCallback, void(Stage, StageCallback));
-  MOCK_METHOD2(registerCallback, void(Stage, StageCallbackWithCompletion));
+  MOCK_METHOD2(registerCallback, ServerLifecycleNotifier::HandlePtr(Stage, StageCallback));
+  MOCK_METHOD2(registerCallback,
+               ServerLifecycleNotifier::HandlePtr(Stage, StageCallbackWithCompletion));
 };
 
 class MockWorkerFactory : public WorkerFactory {
@@ -308,6 +312,7 @@ public:
   MOCK_METHOD2(removeListener,
                void(Network::ListenerConfig& listener, std::function<void()> completion));
   MOCK_METHOD1(start, void(GuardDog& guard_dog));
+  MOCK_METHOD2(initializeStats, void(Stats::Scope& scope, const std::string& prefix));
   MOCK_METHOD0(stop, void());
   MOCK_METHOD1(stopListener, void(Network::ListenerConfig& listener));
   MOCK_METHOD0(stopListeners, void());
@@ -347,7 +352,7 @@ public:
   MOCK_METHOD0(drainManager, DrainManager&());
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
   MOCK_METHOD1(failHealthcheck, void(bool fail));
-  MOCK_METHOD1(getParentStats, void(HotRestart::GetParentStatsInfo&));
+  MOCK_METHOD1(exportStatsToChild, void(envoy::HotRestartMessage::Reply::Stats*));
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(hotRestart, HotRestart&());
   MOCK_METHOD0(initManager, Init::Manager&());
@@ -365,16 +370,19 @@ public:
   MOCK_METHOD0(startTimeCurrentEpoch, time_t());
   MOCK_METHOD0(startTimeFirstEpoch, time_t());
   MOCK_METHOD0(stats, Stats::Store&());
+  MOCK_METHOD0(grpcContext, Grpc::Context&());
   MOCK_METHOD0(httpContext, Http::Context&());
+  MOCK_METHOD0(processContext, ProcessContext&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
+  MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
 
   TimeSource& timeSource() override { return time_system_; }
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   std::shared_ptr<testing::NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new testing::NiceMock<Network::MockDnsResolver>()};
   testing::NiceMock<Api::MockApi> api_;
@@ -396,6 +404,7 @@ public:
   testing::NiceMock<MockListenerManager> listener_manager_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Singleton::ManagerPtr singleton_manager_;
+  Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
 };
 
@@ -447,7 +456,10 @@ public:
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
+  Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
+  MOCK_METHOD0(processContext, ProcessContext&());
+  MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   MOCK_METHOD0(api, Api::Api&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
@@ -467,6 +479,7 @@ public:
   Stats::IsolatedStoreImpl listener_scope_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
+  Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   testing::NiceMock<Api::MockApi> api_;
 };
@@ -490,8 +503,10 @@ public:
   MOCK_METHOD0(initManager, Init::Manager*());
   MOCK_METHOD0(singletonManager, Singleton::Manager&());
   MOCK_METHOD0(threadLocal, ThreadLocal::SlotAllocator&());
+  MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   MOCK_METHOD0(api, Api::Api&());
 
+  testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<Api::MockApi> api_;
 };
@@ -525,6 +540,7 @@ public:
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
   MOCK_METHOD0(eventLogger_, Upstream::HealthCheckEventLogger*());
+  MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   Upstream::HealthCheckEventLoggerPtr eventLogger() override {
     return Upstream::HealthCheckEventLoggerPtr(eventLogger_());
   }

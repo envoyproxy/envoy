@@ -22,7 +22,7 @@ only works on x86-64).
 
 All incoming requests are routed via the front Envoy, which is acting as a reverse proxy
 sitting on the edge of the ``envoymesh`` network. Port ``80`` is mapped to  port ``8000``
-by docker compose (see :repo:`/examples/jaeger-native-tracing/docker-compose.yml`). Notice that
+by docker compose (see :repo:`/examples/jaeger-native-tracing/docker-compose.yaml`). Notice that
 all Envoys are configured to collect request traces (e.g., http_connection_manager/config/tracing setup in
 :repo:`/examples/jaeger-native-tracing/front-envoy-jaeger.yaml`) and setup to propagate the spans generated
 by the Jaeger tracer to a Jaeger cluster (trace driver setup

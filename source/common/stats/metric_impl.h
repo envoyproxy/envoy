@@ -3,10 +3,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/tag.h"
 
 #include "common/common/assert.h"
+#include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Stats {
@@ -20,23 +22,48 @@ namespace Stats {
  */
 class MetricImpl : public virtual Metric {
 public:
-  MetricImpl(std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-      : tag_extracted_name_(std::move(tag_extracted_name)), tags_(std::move(tags)) {}
+  MetricImpl(absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
+             SymbolTable& symbol_table);
+  ~MetricImpl();
 
-  const std::string& tagExtractedName() const override { return tag_extracted_name_; }
-  const std::vector<Tag>& tags() const override { return tags_; }
+  std::string name() const override { return constSymbolTable().toString(statName()); }
+  std::string tagExtractedName() const override;
+  std::vector<Tag> tags() const override;
+  StatName tagExtractedStatName() const override;
+  void iterateTagStatNames(const TagStatNameIterFn& fn) const override;
+  void iterateTags(const TagIterFn& fn) const override;
+
+  // Metric implementations must each implement Metric::symbolTable(). However,
+  // they can inherit the const version of that accessor from MetricImpl.
+  const SymbolTable& constSymbolTable() const override {
+    // Cast our 'this', which is of type `const MetricImpl*` to a non-const
+    // pointer, so we can use it to call the subclass implementation of
+    // symbolTable(). That will be returned as a non-const SymbolTable&,
+    // which will become const on return.
+    //
+    // This pattern is used to share a single non-trivial implementation to
+    // provide const and non-const variants of a method.
+    return const_cast<MetricImpl*>(this)->symbolTable();
+  }
 
 protected:
-  /**
-   * Flags used by all stats types to figure out whether they have been used.
-   */
-  struct Flags {
-    static const uint8_t Used = 0x1;
-  };
+  void clear();
 
 private:
-  const std::string tag_extracted_name_;
-  const std::vector<Tag> tags_;
+  StatNameList stat_names_;
+};
+
+class NullMetricImpl : public MetricImpl {
+public:
+  explicit NullMetricImpl(SymbolTable& symbol_table)
+      : MetricImpl("", std::vector<Tag>(), symbol_table), stat_name_storage_("", symbol_table) {}
+
+  SymbolTable& symbolTable() override { return stat_name_storage_.symbolTable(); }
+  bool used() const override { return false; }
+  StatName statName() const override { return stat_name_storage_.statName(); }
+
+private:
+  StatNameManagedStorage stat_name_storage_;
 };
 
 } // namespace Stats

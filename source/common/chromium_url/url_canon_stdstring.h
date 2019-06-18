@@ -21,7 +21,7 @@
   TypeName(const TypeName&) = delete;                                                              \
   TypeName& operator=(const TypeName&) = delete
 
-namespace url {
+namespace chromium_url {
 
 // Write into a std::string given in the constructor. This object does not own
 // the string itself, and the user must ensure that the string stays alive
@@ -53,6 +53,6 @@ protected:
   DISALLOW_COPY_AND_ASSIGN(StdStringCanonOutput);
 };
 
-} // namespace url
+} // namespace chromium_url
 
 #endif // URL_URL_CANON_STDSTRING_H_

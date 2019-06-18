@@ -93,11 +93,13 @@ connection, the connection manager tracks how many outstanding high watermark
 events have occurred and passes any on to the router filter when it subscribes.
 
 It is worth noting that the router does not unwind `readDisable(true)` calls on
-destruction. Each codec must ensure that any necessary readDisable calls are
-unwound. In the case of HTTP/2 the `Envoy::Http::Http2::ConnectionImpl` will consume
+destruction. In the case of HTTP/2 the `Envoy::Http::Http2::ConnectionImpl` will consume
 any outstanding flow control window on stream deletion to avoid leaking the connection-level
-window. In the case of HTTP, the Envoy::Http::ConnectionManagerImpl unwinds any readDisable()
-calls to ensure that pipelined requests will be read.
+window. In the case of HTTP/1, the Envoy::Http::ConnectionManagerImpl unwinds any readDisable()
+calls downstream to ensure that pipelined requests will be read. For HTTP/1
+upstream connections, the `readDisable(true)` calls are unwound in
+ClientConnectionImpl::onMessageComplete() to make sure that as connections are
+returned to the connection pool they are ready to read.
 
 ## HTTP/2 codec recv buffer
 

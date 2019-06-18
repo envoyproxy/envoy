@@ -30,7 +30,7 @@ FaultDelayConfig::HeaderDelayProvider::duration(const Http::HeaderEntry* header)
   }
 
   uint64_t value;
-  if (!StringUtil::atoull(header->value().getStringView().data(), value)) {
+  if (!absl::SimpleAtoi(header->value().getStringView(), &value)) {
     return absl::nullopt;
   }
 
@@ -60,7 +60,7 @@ FaultRateLimitConfig::HeaderRateLimitProvider::rateKbps(const Http::HeaderEntry*
   }
 
   uint64_t value;
-  if (!StringUtil::atoull(header->value().getStringView().data(), value)) {
+  if (!absl::SimpleAtoi(header->value().getStringView(), &value)) {
     return absl::nullopt;
   }
 

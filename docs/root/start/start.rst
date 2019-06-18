@@ -159,6 +159,7 @@ features. The following sandboxes are available:
     :maxdepth: 1
 
     sandboxes/cors
+    sandboxes/csrf
     sandboxes/fault_injection
     sandboxes/front_proxy
     sandboxes/grpc_bridge

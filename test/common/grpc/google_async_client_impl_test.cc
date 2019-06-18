@@ -15,6 +15,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Eq;
 using testing::Return;
 
 namespace Envoy {
@@ -67,7 +68,7 @@ public:
   std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
   MockStubFactory stub_factory_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  std::unique_ptr<GoogleAsyncClientImpl> grpc_client_;
+  AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
 };
 
 // Validate that a failure in gRPC stub call creation returns immediately with
@@ -78,8 +79,8 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, StreamHttpStartFail) {
   EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
   EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Unavailable, ""));
-  auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
-  EXPECT_EQ(grpc_stream, nullptr);
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
+  EXPECT_TRUE(grpc_stream == nullptr);
 }
 
 // Validate that a failure in gRPC stub call creation returns immediately with
@@ -95,16 +96,17 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, RequestHttpStartFail) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
       .WillOnce(Return(child_span));
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamCluster, "test_cluster"));
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().GrpcStatusCode, "14"));
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("test_cluster")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, finishSpan());
   EXPECT_CALL(*child_span, injectContext(_));
 
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
                                           active_span, absl::optional<std::chrono::milliseconds>());
-  EXPECT_EQ(grpc_request, nullptr);
+  EXPECT_TRUE(grpc_request == nullptr);
 }
 
 } // namespace

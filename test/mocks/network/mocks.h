@@ -13,6 +13,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
+#include "common/network/filter_manager_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -63,6 +64,7 @@ public:
 
   MOCK_METHOD0(connection, Connection&());
   MOCK_METHOD0(continueReading, void());
+  MOCK_METHOD2(injectReadDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD0(upstreamHost, Upstream::HostDescriptionConstSharedPtr());
   MOCK_METHOD1(upstreamHost, void(Upstream::HostDescriptionConstSharedPtr host));
 
@@ -82,12 +84,26 @@ public:
   ReadFilterCallbacks* callbacks_{};
 };
 
+class MockWriteFilterCallbacks : public WriteFilterCallbacks {
+public:
+  MockWriteFilterCallbacks();
+  ~MockWriteFilterCallbacks();
+
+  MOCK_METHOD0(connection, Connection&());
+  MOCK_METHOD2(injectWriteDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
+
+  testing::NiceMock<MockConnection> connection_;
+};
+
 class MockWriteFilter : public WriteFilter {
 public:
   MockWriteFilter();
   ~MockWriteFilter();
 
   MOCK_METHOD2(onWrite, FilterStatus(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD1(initializeWriteFilterCallbacks, void(WriteFilterCallbacks& callbacks));
+
+  WriteFilterCallbacks* write_callbacks_{};
 };
 
 class MockFilter : public Filter {
@@ -99,8 +115,10 @@ public:
   MOCK_METHOD0(onNewConnection, FilterStatus());
   MOCK_METHOD2(onWrite, FilterStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(initializeReadFilterCallbacks, void(ReadFilterCallbacks& callbacks));
+  MOCK_METHOD1(initializeWriteFilterCallbacks, void(WriteFilterCallbacks& callbacks));
 
   ReadFilterCallbacks* callbacks_{};
+  WriteFilterCallbacks* write_callbacks_{};
 };
 
 class MockListenerCallbacks : public ListenerCallbacks {
@@ -122,17 +140,19 @@ public:
   MockUdpListenerCallbacks();
   ~MockUdpListenerCallbacks();
 
-  void onData(const UdpData& data) override { onData_(data); }
+  void onData(UdpRecvData& data) override { onData_(data); }
 
   void onWriteReady(const Socket& socket) override { onWriteReady_(socket); }
 
-  void onError(const ErrorCode& err_code, int err) override { onError_(err_code, err); }
+  void onReceiveError(const ErrorCode& err_code, int err) override {
+    onReceiveError_(err_code, err);
+  }
 
-  MOCK_METHOD1(onData_, void(const UdpData& data));
+  MOCK_METHOD1(onData_, void(UdpRecvData& data));
 
   MOCK_METHOD1(onWriteReady_, void(const Socket& socket));
 
-  MOCK_METHOD2(onError_, void(const ErrorCode& err_code, int err));
+  MOCK_METHOD2(onReceiveError_, void(const ErrorCode& err_code, int err));
 };
 
 class MockDrainDecision : public DrainDecision {
@@ -143,12 +163,12 @@ public:
   MOCK_CONST_METHOD0(drainClose, bool());
 };
 
-class MockListenerFilter : public Network::ListenerFilter {
+class MockListenerFilter : public ListenerFilter {
 public:
   MockListenerFilter();
   ~MockListenerFilter();
 
-  MOCK_METHOD1(onAccept, Network::FilterStatus(Network::ListenerFilterCallbacks&));
+  MOCK_METHOD1(onAccept, Network::FilterStatus(ListenerFilterCallbacks&));
 };
 
 class MockListenerFilterManager : public ListenerFilterManager {
@@ -156,7 +176,7 @@ public:
   MockListenerFilterManager();
   ~MockListenerFilterManager();
 
-  void addAcceptFilter(Network::ListenerFilterPtr&& filter) override { addAcceptFilter_(filter); }
+  void addAcceptFilter(ListenerFilterPtr&& filter) override { addAcceptFilter_(filter); }
 
   MOCK_METHOD1(addAcceptFilter_, void(Network::ListenerFilterPtr&));
 };
@@ -189,6 +209,8 @@ public:
                bool(Connection& connection,
                     const std::vector<Network::FilterFactoryCb>& filter_factories));
   MOCK_METHOD1(createListenerFilterChain, bool(ListenerFilterManager& listener));
+  MOCK_METHOD2(createUdpListenerFilterChain,
+               bool(UdpListenerFilterManager& listener, UdpReadFilterCallbacks& callbacks));
 };
 
 class MockListenSocket : public Socket {
@@ -312,7 +334,6 @@ public:
 
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(addListener, void(ListenerConfig& config));
-  MOCK_METHOD1(addUdpListener, void(ListenerConfig& config));
   MOCK_METHOD1(findListenerByAddress,
                Network::Listener*(const Network::Address::Instance& address));
   MOCK_METHOD1(removeListeners, void(uint64_t listener_tag));
@@ -351,6 +372,8 @@ public:
   MOCK_CONST_METHOD0(ip, Address::Ip*());
   MOCK_CONST_METHOD1(socket, IoHandlePtr(Address::SocketType));
   MOCK_CONST_METHOD0(type, Address::Type());
+  MOCK_CONST_METHOD0(sockAddr, sockaddr*());
+  MOCK_CONST_METHOD0(sockAddrLen, socklen_t());
 
   const std::string& asString() const override { return physical_; }
   const std::string& logicalName() const override { return logical_; }
@@ -399,6 +422,47 @@ public:
   MOCK_METHOD1(raiseEvent, void(ConnectionEvent));
 
   testing::NiceMock<MockConnection> connection_;
+};
+
+class MockUdpListener : public UdpListener {
+public:
+  MockUdpListener();
+  ~MockUdpListener();
+
+  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD0(enable, void());
+  MOCK_METHOD0(disable, void());
+  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
+  MOCK_CONST_METHOD0(localAddress, Address::InstanceConstSharedPtr&());
+  MOCK_METHOD1(send, Api::IoCallUint64Result(const UdpSendData&));
+};
+
+class MockUdpReadFilterCallbacks : public UdpReadFilterCallbacks {
+public:
+  MockUdpReadFilterCallbacks();
+  ~MockUdpReadFilterCallbacks();
+
+  MOCK_METHOD0(udpListener, UdpListener&());
+
+  testing::NiceMock<MockUdpListener> udp_listener_;
+};
+
+class MockUdpListenerReadFilter : public UdpListenerReadFilter {
+public:
+  MockUdpListenerReadFilter(UdpReadFilterCallbacks& callbacks);
+  ~MockUdpListenerReadFilter();
+
+  MOCK_METHOD1(onData, void(UdpRecvData&));
+};
+
+class MockUdpListenerFilterManager : public UdpListenerFilterManager {
+public:
+  MockUdpListenerFilterManager();
+  ~MockUdpListenerFilterManager();
+
+  void addReadFilter(UdpListenerReadFilterPtr&& filter) override { addReadFilter_(filter); }
+
+  MOCK_METHOD1(addReadFilter_, void(Network::UdpListenerReadFilterPtr&));
 };
 
 } // namespace Network

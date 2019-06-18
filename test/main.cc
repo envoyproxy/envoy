@@ -21,7 +21,6 @@ int main(int argc, char** argv) {
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
   Envoy::SignalAction handle_sigs;
 #endif
-  Envoy::Thread::ThreadFactorySingleton::set(&Envoy::Thread::threadFactoryForTest());
 
   Envoy::TestEnvironment::setEnvVar("TEST_RUNDIR",
                                     (Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +

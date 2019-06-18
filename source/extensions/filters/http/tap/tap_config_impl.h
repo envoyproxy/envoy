@@ -42,15 +42,24 @@ public:
   bool onDestroyLog() override;
 
 private:
+  typedef envoy::data::tap::v2alpha::Body* (
+      envoy::data::tap::v2alpha::HttpStreamedTraceSegment::*MutableBodyChunk)();
+  typedef envoy::data::tap::v2alpha::HttpBufferedTrace::Message* (
+      envoy::data::tap::v2alpha::HttpBufferedTrace::*MutableMessage)();
+
+  void onBody(const Buffer::Instance& data,
+              Extensions::Common::Tap::TraceWrapperPtr& buffered_streamed_body,
+              uint32_t maxBufferedBytes, MutableBodyChunk mutable_body_chunk,
+              MutableMessage mutable_message);
+
   void makeBufferedFullTraceIfNeeded() {
     if (buffered_full_trace_ == nullptr) {
       buffered_full_trace_ = Extensions::Common::Tap::makeTraceWrapper();
     }
   }
 
-  Extensions::Common::Tap::TraceWrapperSharedPtr makeTraceSegment() {
-    Extensions::Common::Tap::TraceWrapperSharedPtr segment =
-        Extensions::Common::Tap::makeTraceWrapper();
+  Extensions::Common::Tap::TraceWrapperPtr makeTraceSegment() {
+    Extensions::Common::Tap::TraceWrapperPtr segment = Extensions::Common::Tap::makeTraceWrapper();
     segment->mutable_http_streamed_trace_segment()->set_trace_id(stream_id_);
     return segment;
   }
@@ -71,9 +80,9 @@ private:
   const Http::HeaderMap* response_headers_{};
   const Http::HeaderMap* response_trailers_{};
   // Must be a shared_ptr because of submitTrace().
-  Extensions::Common::Tap::TraceWrapperSharedPtr buffered_streamed_request_body_;
-  Extensions::Common::Tap::TraceWrapperSharedPtr buffered_streamed_response_body_;
-  Extensions::Common::Tap::TraceWrapperSharedPtr buffered_full_trace_;
+  Extensions::Common::Tap::TraceWrapperPtr buffered_streamed_request_body_;
+  Extensions::Common::Tap::TraceWrapperPtr buffered_streamed_response_body_;
+  Extensions::Common::Tap::TraceWrapperPtr buffered_full_trace_;
 };
 
 } // namespace TapFilter

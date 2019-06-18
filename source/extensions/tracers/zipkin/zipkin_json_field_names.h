@@ -34,7 +34,7 @@ public:
   const std::string ENDPOINT_IPV6 = "ipv6";
 };
 
-typedef ConstSingleton<ZipkinJsonFieldNameValues> ZipkinJsonFieldNames;
+using ZipkinJsonFieldNames = ConstSingleton<ZipkinJsonFieldNameValues>;
 
 } // namespace Zipkin
 } // namespace Tracers

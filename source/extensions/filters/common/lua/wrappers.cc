@@ -76,9 +76,8 @@ void MetadataMapHelper::setValue(lua_State* state, const ProtobufWkt::Value& val
   }
 }
 
-void MetadataMapHelper::createTable(
-    lua_State* state,
-    const Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Value>& fields) {
+void MetadataMapHelper::createTable(lua_State* state,
+                                    const Protobuf::Map<std::string, ProtobufWkt::Value>& fields) {
   lua_createtable(state, 0, fields.size());
   for (const auto& field : fields) {
     int top = lua_gettop(state);

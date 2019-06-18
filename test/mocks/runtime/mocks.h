@@ -27,6 +27,18 @@ public:
   MockSnapshot();
   ~MockSnapshot() override;
 
+  // Provide a default implementation of mocked featureEnabled/2.
+  bool featureEnabledDefault(const std::string&, uint64_t default_value) {
+    if (default_value == 0) {
+      return false;
+    } else if (default_value == 100) {
+      return true;
+    } else {
+      throw std::invalid_argument("Not implemented yet. You may want to set expectation of mocked "
+                                  "featureEnabled() instead.");
+    }
+  }
+
   MOCK_CONST_METHOD1(deprecatedFeatureEnabled, bool(const std::string& key));
   MOCK_CONST_METHOD1(runtimeFeatureEnabled, bool(absl::string_view key));
   MOCK_CONST_METHOD2(featureEnabled, bool(const std::string& key, uint64_t default_value));

@@ -14,7 +14,7 @@
 #include "common/chromium_url/envoy_shim.h"
 #include "common/chromium_url/url_parse.h"
 
-namespace url {
+namespace chromium_url {
 
 // Canonicalizer output -------------------------------------------------------
 
@@ -29,7 +29,7 @@ namespace url {
 template <typename T> class CanonOutputT {
 public:
   CanonOutputT() : buffer_(NULL), buffer_len_(0), cur_len_(0) {}
-  virtual ~CanonOutputT() {}
+  virtual ~CanonOutputT() = default;
 
   // Implemented to resize the buffer. This function should update the buffer
   // pointer to point to the new buffer, and any old data up to |cur_len_| in
@@ -163,7 +163,7 @@ extern template class EXPORT_TEMPLATE_DECLARE(COMPONENT_EXPORT(URL)) CanonOutput
 // Normally, all canonicalization output is in narrow characters. We support
 // the templates so it can also be used internally if a wide buffer is
 // required.
-typedef CanonOutputT<char> CanonOutput;
+using CanonOutput = CanonOutputT<char>;
 
 template <int fixed_capacity>
 class RawCanonOutput : public RawCanonOutputT<char, fixed_capacity> {};
@@ -181,6 +181,6 @@ COMPONENT_EXPORT(URL)
 bool CanonicalizePath(const char* spec, const Component& path, CanonOutput* output,
                       Component* out_path);
 
-} // namespace url
+} // namespace chromium_url
 
 #endif // URL_URL_CANON_H_

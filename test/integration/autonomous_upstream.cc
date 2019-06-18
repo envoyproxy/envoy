@@ -4,11 +4,11 @@ namespace Envoy {
 namespace {
 
 void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeaderMapImpl& headers) {
-  std::string header_value = headers.get_(header_name);
+  const std::string header_value(headers.get_(header_name));
   if (!header_value.empty()) {
     uint64_t parsed_value;
-    RELEASE_ASSERT(StringUtil::atoull(header_value.c_str(), parsed_value, 10) &&
-                       parsed_value < std::numeric_limits<int32_t>::max(),
+    RELEASE_ASSERT(absl::SimpleAtoi(header_value, &parsed_value) &&
+                       parsed_value < static_cast<uint32_t>(std::numeric_limits<int32_t>::max()),
                    "");
     return_int = parsed_value;
   }
@@ -91,6 +91,11 @@ bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connectio
 }
 
 bool AutonomousUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { return true; }
+
+bool AutonomousUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
+                                                      Network::UdpReadFilterCallbacks&) {
+  return true;
+}
 
 void AutonomousUpstream::setLastRequestHeaders(const Http::HeaderMap& headers) {
   Thread::LockGuard lock(headers_lock_);

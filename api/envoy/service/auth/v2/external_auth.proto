@@ -61,8 +61,7 @@ message OkHttpResponse {
 
 // Intended for gRPC and Network Authorization servers `only`.
 message CheckResponse {
-  // Status `OK` allows the request. Status `UNKNOWN` causes Envoy to abort. Any other status
-  // indicates the request should be denied.
+  // Status `OK` allows the request. Any other status indicates the request should be denied.
   google.rpc.Status status = 1;
 
   // An message that contains HTTP response attributes. This message is

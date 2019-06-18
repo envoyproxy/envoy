@@ -1,0 +1,8 @@
+---
+tasks:
+  ubuntu_1804:
+    platform: ubuntu1804
+    build_targets:
+      - "//source/..."
+    test_targets:
+      - "//test/..."

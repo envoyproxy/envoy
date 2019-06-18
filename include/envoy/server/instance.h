@@ -8,6 +8,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/mutex_tracer.h"
 #include "envoy/event/timer.h"
+#include "envoy/grpc/context.h"
 #include "envoy/http/context.h"
 #include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
@@ -34,7 +35,7 @@ namespace Server {
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   /**
    * @return Admin& the global HTTP admin endpoint for the server.
@@ -86,12 +87,6 @@ public:
    * Toggle whether the server fails or passes external healthchecks.
    */
   virtual void failHealthcheck(bool fail) PURE;
-
-  /**
-   * Fetch server stats specific to this process vs. global shared stats in a hot restart scenario.
-   * @param info supplies the stats structure to fill.
-   */
-  virtual void getParentStats(HotRestart::GetParentStatsInfo& info) PURE;
 
   /**
    * @return whether external healthchecks are currently failed or not.
@@ -189,9 +184,19 @@ public:
   virtual Stats::Store& stats() PURE;
 
   /**
+   * @return the server-wide grpc context.
+   */
+  virtual Grpc::Context& grpcContext() PURE;
+
+  /**
    * @return the server-wide http context.
    */
   virtual Http::Context& httpContext() PURE;
+
+  /**
+   * @return the server-wide process context.
+   */
+  virtual ProcessContext& processContext() PURE;
 
   /**
    * @return ThreadLocal::Instance& the thread local storage engine for the server. This is used to
@@ -213,6 +218,12 @@ public:
    * @return the flush interval of stats sinks.
    */
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
 } // namespace Server

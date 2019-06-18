@@ -33,7 +33,30 @@ enum class FilterHeadersStatus {
   StopIteration,
   // Continue iteration to remaining filters, but ignore any subsequent data or trailers. This
   // results in creating a header only request/response.
-  ContinueAndEndStream
+  ContinueAndEndStream,
+  // Do not iterate for headers as well as data and trailers for the current filter and the filters
+  // following, and buffer body data for later dispatching. ContinueDecoding() MUST
+  // be called if continued filter iteration is desired.
+  //
+  // Used when a filter wants to stop iteration on data and trailers while waiting for headers'
+  // iteration to resume.
+  //
+  // If buffering the request causes buffered data to exceed the configured buffer limit, a 413 will
+  // be sent to the user. On the response path exceeding buffer limits will result in a 500.
+  //
+  // TODO(soya3129): stop metadata parsing when StopAllIterationAndBuffer is set.
+  StopAllIterationAndBuffer,
+  // Do not iterate for headers as well as data and trailers for the current filter and the filters
+  // following, and buffer body data for later dispatching. continueDecoding() MUST
+  // be called if continued filter iteration is desired.
+  //
+  // Used when a filter wants to stop iteration on data and trailers while waiting for headers'
+  // iteration to resume.
+  //
+  // This will cause the flow of incoming data to cease until continueDecoding() function is called.
+  //
+  // TODO(soya3129): stop metadata parsing when StopAllIterationAndWatermark is set.
+  StopAllIterationAndWatermark,
 };
 
 /**
@@ -101,7 +124,7 @@ enum class FilterMetadataStatus {
  */
 class StreamFilterCallbacks {
 public:
-  virtual ~StreamFilterCallbacks() {}
+  virtual ~StreamFilterCallbacks() = default;
 
   /**
    * @return const Network::Connection* the originating connection, or nullptr if there is none.
@@ -272,10 +295,12 @@ public:
    * @param modify_headers supplies an optional callback function that can modify the
    *                       response headers.
    * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
+   * @param details a string detailing why this local reply was sent.
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(HeaderMap& headers)> modify_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status) PURE;
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              absl::string_view details) PURE;
 
   /**
    * Called with 100-Continue headers to be encoded.
@@ -381,6 +406,20 @@ public:
   // Note that HttpConnectionManager sanitization will *not* be performed on the
   // recreated stream, as it is assumed that sanitization has already been done.
   virtual bool recreateStream() PURE;
+
+  /**
+   * Adds socket options to be applied to any connections used for upstream requests. Note that
+   * unique values for the options will likely lead to many connection pools being created. The
+   * added options are appended to any previously added.
+   *
+   * @param options The options to be added.
+   */
+  virtual void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) PURE;
+
+  /**
+   * @return The socket options to be applied to the upstream request.
+   */
+  virtual Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const PURE;
 };
 
 /**
@@ -388,7 +427,7 @@ public:
  */
 class StreamFilterBase {
 public:
-  virtual ~StreamFilterBase() {}
+  virtual ~StreamFilterBase() = default;
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
@@ -441,7 +480,7 @@ public:
   virtual void decodeComplete() {}
 };
 
-typedef std::shared_ptr<StreamDecoderFilter> StreamDecoderFilterSharedPtr;
+using StreamDecoderFilterSharedPtr = std::shared_ptr<StreamDecoderFilter>;
 
 /**
  * Stream encoder filter callbacks add additional callbacks that allow a encoding filter to restart
@@ -627,14 +666,14 @@ public:
   virtual void encodeComplete() {}
 };
 
-typedef std::shared_ptr<StreamEncoderFilter> StreamEncoderFilterSharedPtr;
+using StreamEncoderFilterSharedPtr = std::shared_ptr<StreamEncoderFilter>;
 
 /**
  * A filter that handles both encoding and decoding.
  */
 class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEncoderFilter {};
 
-typedef std::shared_ptr<StreamFilter> StreamFilterSharedPtr;
+using StreamFilterSharedPtr = std::shared_ptr<StreamFilter>;
 
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
@@ -642,7 +681,7 @@ typedef std::shared_ptr<StreamFilter> StreamFilterSharedPtr;
  */
 class FilterChainFactoryCallbacks {
 public:
-  virtual ~FilterChainFactoryCallbacks() {}
+  virtual ~FilterChainFactoryCallbacks() = default;
 
   /**
    * Add a decoder filter that is used when reading stream data.
@@ -677,7 +716,7 @@ public:
  * function will install a single filter, but it's technically possibly to install more than one
  * if desired.
  */
-typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> FilterFactoryCb;
+using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
 
 /**
  * A FilterChainFactory is used by a connection manager to create an HTTP level filter chain when a
@@ -687,7 +726,7 @@ typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> FilterFactor
  */
 class FilterChainFactory {
 public:
-  virtual ~FilterChainFactory() {}
+  virtual ~FilterChainFactory() = default;
 
   /**
    * Called when a new HTTP stream is created on the connection.
@@ -705,7 +744,7 @@ public:
    * @return true if upgrades of this type are allowed and the filter chain has been created.
    *    returns false if this upgrade type is not configured, and no filter chain is created.
    */
-  typedef std::map<std::string, bool> UpgradeMap;
+  using UpgradeMap = std::map<std::string, bool>;
   virtual bool createUpgradeFilterChain(absl::string_view upgrade,
                                         const UpgradeMap* per_route_upgrade_map,
                                         FilterChainFactoryCallbacks& callbacks) PURE;

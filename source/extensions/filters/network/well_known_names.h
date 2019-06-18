@@ -50,7 +50,7 @@ public:
                        RedisProxy, TcpProxy, ExtAuthorization}) {}
 };
 
-typedef ConstSingleton<NetworkFilterNameValues> NetworkFilterNames;
+using NetworkFilterNames = ConstSingleton<NetworkFilterNameValues>;
 
 } // namespace NetworkFilters
 } // namespace Extensions

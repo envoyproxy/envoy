@@ -54,7 +54,7 @@ public:
                               Deserializer& deserializer, Buffer::Instance& buffer) const PURE;
 };
 
-typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
+using DirectResponsePtr = std::unique_ptr<DirectResponse>;
 
 /**
  * Decoder filter callbacks add additional callbacks.
@@ -164,7 +164,7 @@ public:
   virtual void setDecoderFilterCallbacks(DecoderFilterCallbacks& callbacks) PURE;
 };
 
-typedef std::shared_ptr<DecoderFilter> DecoderFilterSharedPtr;
+using DecoderFilterSharedPtr = std::shared_ptr<DecoderFilter>;
 
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
@@ -189,7 +189,7 @@ public:
  * function will install a single filter, but it's technically possibly to install more than one
  * if desired.
  */
-typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> FilterFactoryCb;
+using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
 
 /**
  * A FilterChainFactory is used by a connection manager to create a Dubbo level filter chain when

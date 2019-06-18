@@ -54,7 +54,8 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
   is_cors_request_ = true;
 
   const auto method = headers.Method();
-  if (method == nullptr || method->value().c_str() != Http::Headers::get().MethodValues.Options) {
+  if (method == nullptr ||
+      method->value().getStringView() != Http::Headers::get().MethodValues.Options) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -134,7 +135,8 @@ bool CorsFilter::isOriginAllowedRegex(const Http::HeaderString& origin) {
     return false;
   }
   for (const auto& regex : *allowOriginRegexes()) {
-    if (std::regex_match(origin.c_str(), regex)) {
+    const absl::string_view origin_view = origin.getStringView();
+    if (std::regex_match(origin_view.begin(), origin_view.end(), regex)) {
       return true;
     }
   }

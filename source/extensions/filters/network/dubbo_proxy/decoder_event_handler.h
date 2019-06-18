@@ -108,7 +108,7 @@ public:
   virtual void onHeartbeat(MessageMetadataSharedPtr) {}
 };
 
-typedef std::shared_ptr<DecoderEventHandler> DecoderEventHandlerSharedPtr;
+using DecoderEventHandlerSharedPtr = std::shared_ptr<DecoderEventHandler>;
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

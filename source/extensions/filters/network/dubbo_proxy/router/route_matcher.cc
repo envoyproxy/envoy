@@ -64,15 +64,15 @@ ParameterRouteEntryImpl::ParameterRouteEntryImpl(
 
 ParameterRouteEntryImpl::~ParameterRouteEntryImpl() {}
 
-bool ParameterRouteEntryImpl::matchParameter(const std::string& request_data,
+bool ParameterRouteEntryImpl::matchParameter(absl::string_view request_data,
                                              const ParameterData& config_data) const {
   switch (config_data.match_type_) {
   case Http::HeaderUtility::HeaderMatchType::Value:
     return config_data.value_.empty() || request_data == config_data.value_;
   case Http::HeaderUtility::HeaderMatchType::Range: {
     int64_t value = 0;
-    return StringUtil::atoll(request_data.c_str(), value, 10) &&
-           value >= config_data.range_.start() && value < config_data.range_.end();
+    return absl::SimpleAtoi(request_data, &value) && value >= config_data.range_.start() &&
+           value < config_data.range_.end();
   }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

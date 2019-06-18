@@ -21,18 +21,18 @@ std::map<std::string, std::string> Utility::canonicalizeHeaders(const Http::Head
           return Http::HeaderMap::Iterate::Continue;
         }
         // Pseudo-headers should not be canonicalized
-        if (entry.key().c_str()[0] == ':') {
+        if (!entry.key().getStringView().empty() && entry.key().getStringView()[0] == ':') {
           return Http::HeaderMap::Iterate::Continue;
         }
         std::string value(entry.value().getStringView());
         // Remove leading, trailing, and deduplicate repeated ascii spaces
         absl::RemoveExtraAsciiWhitespace(&value);
-        const auto iter = map->find(entry.key().c_str());
+        const auto iter = map->find(std::string(entry.key().getStringView()));
         // If the entry already exists, append the new value to the end
         if (iter != map->end()) {
           iter->second += fmt::format(",{}", value);
         } else {
-          map->emplace(entry.key().c_str(), value);
+          map->emplace(std::string(entry.key().getStringView()), value);
         }
         return Http::HeaderMap::Iterate::Continue;
       },

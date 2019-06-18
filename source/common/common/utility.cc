@@ -32,7 +32,7 @@ public:
   const std::regex PATTERN{"(%([1-9])?f)|(%s)", std::regex::optimize};
 };
 
-typedef ConstSingleton<SpecifierConstantValues> SpecifierConstants;
+using SpecifierConstants = ConstSingleton<SpecifierConstantValues>;
 
 } // namespace
 
@@ -234,21 +234,6 @@ const char* StringUtil::strtoull(const char* str, uint64_t& out, int base) {
 bool StringUtil::atoull(const char* str, uint64_t& out, int base) {
   const char* end_ptr = StringUtil::strtoull(str, out, base);
   if (end_ptr == nullptr || *end_ptr != '\0') {
-    return false;
-  } else {
-    return true;
-  }
-}
-
-bool StringUtil::atoll(const char* str, int64_t& out, int base) {
-  if (strlen(str) == 0) {
-    return false;
-  }
-
-  char* end_ptr;
-  errno = 0;
-  out = std::strtoll(str, &end_ptr, base);
-  if (*end_ptr != '\0' || ((out == LLONG_MAX || out == LLONG_MIN) && errno == ERANGE)) {
     return false;
   } else {
     return true;
@@ -545,6 +530,11 @@ double WelfordStandardDeviation::computeStandardDeviation() const {
   // It seems very difficult for variance to go negative, but from the calculation in update()
   // above, I can't quite convince myself it's impossible, so put in a guard to be sure.
   return (std::isnan(variance) || variance < 0) ? std::nan("") : sqrt(variance);
+}
+
+InlineString::InlineString(const char* str, size_t size) : size_(size) {
+  RELEASE_ASSERT(size <= 0xffffffff, "size must fit in 32 bits");
+  memcpy(data_, str, size);
 }
 
 } // namespace Envoy

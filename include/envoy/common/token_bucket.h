@@ -15,7 +15,7 @@ namespace Envoy {
  */
 class TokenBucket {
 public:
-  virtual ~TokenBucket() {}
+  virtual ~TokenBucket() = default;
 
   /**
    * @param tokens supplies the number of tokens to be consumed.
@@ -32,8 +32,14 @@ public:
    * returns the upper bound on the amount of time until a next token is available.
    */
   virtual std::chrono::milliseconds nextTokenAvailable() PURE;
+
+  /**
+   * Reset the bucket with a specific number of tokens. Refill will begin again from the time that
+   * this routine is called.
+   */
+  virtual void reset(uint64_t num_tokens) PURE;
 };
 
-typedef std::unique_ptr<TokenBucket> TokenBucketPtr;
+using TokenBucketPtr = std::unique_ptr<TokenBucket>;
 
 }; // namespace Envoy

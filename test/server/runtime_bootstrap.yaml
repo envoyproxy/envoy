@@ -1,0 +1,6 @@
+layered_runtime:
+  layers:
+    - static_layer:
+        foo: bar
+    - disk_layer: { symlink_root: {{ test_rundir }}/test/server/test_data/runtime/primary }
+    - disk_layer: { symlink_root: {{ test_rundir }}/test/server/test_data/runtime/override, append_service_cluster: true }

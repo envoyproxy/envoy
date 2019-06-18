@@ -61,7 +61,7 @@ void DrainManagerImpl::startParentShutdownSequence() {
   parent_shutdown_timer_ = server_.dispatcher().createTimer([this]() -> void {
     // Shut down the parent now. It should have already been draining.
     ENVOY_LOG(info, "shutting down parent after drain");
-    server_.hotRestart().terminateParent();
+    server_.hotRestart().sendParentTerminateRequest();
   });
 
   parent_shutdown_timer_->enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(

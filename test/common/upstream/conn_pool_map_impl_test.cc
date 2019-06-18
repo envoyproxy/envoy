@@ -225,6 +225,28 @@ TEST_F(ConnPoolMapImplTest, GetPoolHittingLimitFails) {
   EXPECT_EQ(test_map->size(), 1);
 }
 
+TEST_F(ConnPoolMapImplTest, GetPoolHittingLimitIncrementsFailureCounter) {
+  TestMapPtr test_map = makeTestMapWithLimit(1);
+
+  test_map->getPool(1, getBasicFactory());
+  ON_CALL(*mock_pools_[0], hasActiveConnections()).WillByDefault(Return(true));
+  test_map->getPool(2, getNeverCalledFactory());
+
+  EXPECT_EQ(host_->cluster_.stats_.upstream_cx_pool_overflow_.value(), 1);
+}
+
+TEST_F(ConnPoolMapImplTest, GetPoolHittingLimitIncrementsFailureMultiple) {
+  TestMapPtr test_map = makeTestMapWithLimit(1);
+
+  test_map->getPool(1, getBasicFactory());
+  ON_CALL(*mock_pools_[0], hasActiveConnections()).WillByDefault(Return(true));
+  test_map->getPool(2, getNeverCalledFactory());
+  test_map->getPool(2, getNeverCalledFactory());
+  test_map->getPool(2, getNeverCalledFactory());
+
+  EXPECT_EQ(host_->cluster_.stats_.upstream_cx_pool_overflow_.value(), 3);
+}
+
 TEST_F(ConnPoolMapImplTest, GetPoolHittingLimitGreaterThan1Fails) {
   TestMapPtr test_map = makeTestMapWithLimit(2);
 
@@ -248,6 +270,18 @@ TEST_F(ConnPoolMapImplTest, GetPoolLimitHitThenOneFreesUpNextCallSucceeds) {
 
   EXPECT_TRUE(opt_pool.has_value());
   EXPECT_EQ(test_map->size(), 1);
+}
+
+TEST_F(ConnPoolMapImplTest, GetPoolLimitHitFollowedBySuccessDoesNotClearFailure) {
+  TestMapPtr test_map = makeTestMapWithLimit(1);
+
+  test_map->getPool(1, getActivePoolFactory());
+  test_map->getPool(2, getNeverCalledFactory());
+
+  ON_CALL(*mock_pools_[0], hasActiveConnections()).WillByDefault(Return(false));
+
+  test_map->getPool(2, getBasicFactory());
+  EXPECT_EQ(host_->cluster_.stats_.upstream_cx_pool_overflow_.value(), 1);
 }
 
 // Test that only the pool which are idle are actually cleared

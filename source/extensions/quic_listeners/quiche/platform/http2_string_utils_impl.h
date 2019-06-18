@@ -36,7 +36,7 @@ inline std::string Http2HexDecodeImpl(absl::string_view data) {
   return absl::HexStringToBytes(data);
 }
 
-std::string Http2HexDumpImpl(absl::string_view data) { return quiche::HexDump(data); }
+inline std::string Http2HexDumpImpl(absl::string_view data) { return quiche::HexDump(data); }
 
 inline std::string Http2HexEscapeImpl(absl::string_view data) { return absl::CHexEscape(data); }
 

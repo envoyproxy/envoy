@@ -74,7 +74,7 @@ public:
         : parent_(parent), handle_(parent.sink_to_use_->createPerTapSinkHandle(trace_id)) {}
 
     // PerTapSinkHandleManager
-    void submitTrace(const TraceWrapperSharedPtr& trace) override;
+    void submitTrace(TraceWrapperPtr&& trace) override;
 
   private:
     TapConfigBaseImpl& parent_;
@@ -129,7 +129,7 @@ private:
         : parent_(parent), trace_id_(trace_id) {}
 
     // PerTapSinkHandle
-    void submitTrace(const TraceWrapperSharedPtr& trace,
+    void submitTrace(TraceWrapperPtr&& trace,
                      envoy::service::tap::v2alpha::OutputSink::Format format) override;
 
     FilePerTapSink& parent_;

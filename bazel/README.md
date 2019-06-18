@@ -8,12 +8,7 @@ independently sourced, the following steps should be followed:
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
 2. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements).
-3. Configure a Bazel [WORKSPACE](https://bazel.build/versions/master/docs/be/workspace.html)
-   to point Bazel at the Envoy dependencies. An example is provided in the CI Docker image
-   [WORKSPACE](https://github.com/envoyproxy/envoy/blob/master/ci/WORKSPACE) and corresponding
-   [BUILD](https://github.com/envoyproxy/envoy/blob/master/ci/prebuilt/BUILD) files.
-4. `bazel build --package_path %workspace%:<path to Envoy source tree> //source/exe:envoy-static`
-   from the directory containing your WORKSPACE.
+3. `bazel build //source/exe:envoy-static` from the repository root.
 
 ## Quick start Bazel build for developers
 
@@ -33,7 +28,7 @@ for how to update or override dependencies.
     sudo apt-get install \
        libtool \
        cmake \
-       clang-format-7 \
+       clang-format-8 \
        automake \
        autoconf \
        make \
@@ -45,14 +40,14 @@ for how to update or override dependencies.
 
     On Fedora (maybe also other red hat distros), run the following:
     ```
-    dnf install cmake libtool libstdc++ ninja-build lld patch
+    dnf install cmake libtool libstdc++ ninja-build lld patch aspell-en
     ```
 
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```
-    brew install coreutils wget cmake libtool go bazel automake ninja llvm@7 autoconf
+    brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell
     ```
-    _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`; `llvm@7` is used for `clang-format`
+    _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
 
     Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
     Apple LLVM version 9.1.0 (clang-902.0.30).
@@ -304,6 +299,13 @@ You can use the `-c <compilation_mode>` flag to control this, e.g.
 bazel build -c opt //source/exe:envoy-static
 ```
 
+To override the compilation mode and optimize the build for binary size, you can
+use the `sizeopt` configuration:
+
+```
+bazel build //source/exe:envoy-static --config=sizeopt
+```
+
 ## Sanitizers
 
 To build and run tests with the gcc compiler's [address sanitizer
@@ -366,6 +368,12 @@ The following optional features can be enabled on the Bazel build command-line:
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
 * memory-debugging (scribbling over memory after allocation and before freeing) with
   `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL.
+* Default [path normalization](https://github.com/envoyproxy/envoy/issues/6435) with
+  `--define path_normalization_by_default=true`. Note this still could be disable by explicit xDS config.
+* Manual stamping via VersionInfo with `--define manual_stamp=manual_stamp`.
+  This is needed if the `version_info_lib` is compiled via a non-binary bazel rules, e.g `envoy_cc_library`.
+  Otherwise, the linker will fail to resolve symbols that are included via the `linktamp` rule, which is only available to binary targets.
+  This is being tracked as a feature in: https://github.com/envoyproxy/envoy/issues/6859.
 
 ## Disabling extensions
 
@@ -407,18 +415,6 @@ local_repository(
 )
 
 ...
-```
-
-## Stats Tunables
-
-The default maximum number of stats in shared memory, and the default
-maximum length of a cluster/route config/listener name, can be
-overridden at compile-time by defining `ENVOY_DEFAULT_MAX_STATS` and
-`ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH`, respectively, to the desired
-value. For example:
-
-```
-bazel build --copt=-DENVOY_DEFAULT_MAX_STATS=32768 --copt=-DENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH=150 //source/exe:envoy-static
 ```
 
 # Release builds
@@ -533,19 +529,20 @@ to run clang-format scripts on your workstation directly:
  * It's possible there is a speed advantage
  * Docker itself can sometimes go awry and you then have to deal with that
  * Type-ahead doesn't always work when waiting running a command through docker
+
 To run the tools directly, you must install the correct version of clang. This
-may change over time but as of January 2019,
-[clang+llvm-7.0.0](https://releases.llvm.org/download.html) works well. You must
+may change over time but as of June 2019,
+[clang+llvm-8.0.0](https://releases.llvm.org/download.html) works well. You must
 also have 'buildifier' installed from the bazel distribution.
 
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-8.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
 
-Once this is set up, you can run clang-tidy without docker:
+Once this is set up, you can run clang-format without docker:
 
 ```shell
 ./tools/check_format.py check

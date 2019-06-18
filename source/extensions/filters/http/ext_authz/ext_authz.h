@@ -10,11 +10,13 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/type/http_status.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/common/matchers.h"
+#include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
@@ -41,7 +43,9 @@ public:
                Runtime::Loader& runtime, Http::Context& http_context)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
-        max_request_bytes_(config.with_request_body().max_request_bytes()), local_info_(local_info),
+        clear_route_cache_(config.clear_route_cache()),
+        max_request_bytes_(config.with_request_body().max_request_bytes()),
+        status_on_error_(toErrorCode(config.status_on_error().code())), local_info_(local_info),
         scope_(scope), runtime_(runtime), http_context_(http_context) {}
 
   bool allowPartialMessage() const { return allow_partial_message_; }
@@ -50,9 +54,13 @@ public:
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
+  bool clearRouteCache() const { return clear_route_cache_; }
+
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
+
+  Http::Code statusOnError() const { return status_on_error_; }
 
   Runtime::Loader& runtime() { return runtime_; }
 
@@ -61,16 +69,26 @@ public:
   Http::Context& httpContext() { return http_context_; }
 
 private:
+  static Http::Code toErrorCode(uint64_t status) {
+    const auto code = static_cast<Http::Code>(status);
+    if (code >= Http::Code::Continue && code <= Http::Code::NetworkAuthenticationRequired) {
+      return code;
+    }
+    return Http::Code::Forbidden;
+  }
+
   const bool allow_partial_message_;
   const bool failure_mode_allow_;
+  const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
+  const Http::Code status_on_error_;
   const LocalInfo::LocalInfo& local_info_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
 };
 
-typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 /**
  * Per route settings for ExtAuth. Allows customizing the CheckRequest on a
@@ -78,7 +96,7 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  */
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
-  using ContextExtensionsMap = Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>;
+  using ContextExtensionsMap = Protobuf::Map<std::string, std::string>;
 
   FilterConfigPerRoute(const envoy::config::filter::http::ext_authz::v2::ExtAuthzPerRoute& config)
       : context_extensions_(config.has_check_settings()
@@ -130,6 +148,7 @@ public:
 private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::HeaderMap& headers);
+  void continueDecoding();
   bool isBufferFull();
 
   // State of this filter's communication with the external authorization service.

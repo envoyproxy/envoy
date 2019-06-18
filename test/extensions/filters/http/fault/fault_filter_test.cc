@@ -307,6 +307,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
 }
 
 TEST_F(FaultFilterTest, FixedDelayZeroDuration) {

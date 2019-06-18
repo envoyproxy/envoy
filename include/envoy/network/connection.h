@@ -39,7 +39,7 @@ enum class ConnectionBufferType { Read, Write };
  */
 class ConnectionCallbacks {
 public:
-  virtual ~ConnectionCallbacks() {}
+  virtual ~ConnectionCallbacks() = default;
 
   /**
    * Callback for connection events.
@@ -80,7 +80,7 @@ public:
    * Callback function for when bytes have been sent by a connection.
    * @param bytes_sent supplies the number of bytes written to the connection.
    */
-  typedef std::function<void(uint64_t bytes_sent)> BytesSentCb;
+  using BytesSentCb = std::function<void(uint64_t bytes_sent)>;
 
   struct ConnectionStats {
     Stats::Counter& read_total_;
@@ -93,7 +93,7 @@ public:
     Stats::Counter* delayed_close_timeouts_;
   };
 
-  virtual ~Connection() {}
+  ~Connection() override = default;
 
   /**
    * Register callbacks that fire when connection events occur.
@@ -144,6 +144,12 @@ public:
    * enabled again if there is data still in the input buffer it will be redispatched through
    * the filter chain.
    * @param disable supplies TRUE is reads should be disabled, FALSE if they should be enabled.
+   *
+   * Note that this function reference counts calls. For example
+   * readDisable(true);  // Disables data
+   * readDisable(true);  // Notes the connection is blocked by two sources
+   * readDisable(false);  // Notes the connection is blocked by one source
+   * readDisable(false);  // Marks the connection as unblocked, so resumes reading.
    */
   virtual void readDisable(bool disable) PURE;
 
@@ -165,6 +171,30 @@ public:
    * @return The address of the remote client. Note that this method will never return nullptr.
    */
   virtual const Network::Address::InstanceConstSharedPtr& remoteAddress() const PURE;
+
+  /**
+   * Credentials of the peer of a socket as decided by SO_PEERCRED.
+   */
+  struct UnixDomainSocketPeerCredentials {
+    /**
+     * The process id of the peer.
+     */
+    int32_t pid;
+    /**
+     * The user id of the peer.
+     */
+    uint32_t uid;
+    /**
+     * The group id of the peer.
+     */
+    uint32_t gid;
+  };
+
+  /**
+   * @return The unix socket peer credentials of the remote client. Note that this is only
+   * supported for unix socket connections.
+   */
+  virtual absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;
 
   /**
    * @return the local address of the connection. For client connections, this is the origin
@@ -254,6 +284,7 @@ public:
 
   /**
    * Set the timeout for delayed connection close()s.
+   * This can only be called prior to issuing a close() on the connection.
    * @param timeout The timeout value in milliseconds
    */
   virtual void setDelayedCloseTimeout(std::chrono::milliseconds timeout) PURE;
@@ -270,7 +301,7 @@ public:
   virtual absl::string_view transportFailureReason() const PURE;
 };
 
-typedef std::unique_ptr<Connection> ConnectionPtr;
+using ConnectionPtr = std::unique_ptr<Connection>;
 
 /**
  * Connections capable of outbound connects.
@@ -284,7 +315,7 @@ public:
   virtual void connect() PURE;
 };
 
-typedef std::unique_ptr<ClientConnection> ClientConnectionPtr;
+using ClientConnectionPtr = std::unique_ptr<ClientConnection>;
 
 } // namespace Network
 } // namespace Envoy

@@ -9,8 +9,8 @@
 
 #include "common/chromium_url/envoy_shim.h"
 
-namespace url {
+namespace chromium_url {
 
 template class EXPORT_TEMPLATE_DEFINE(COMPONENT_EXPORT(URL)) CanonOutputT<char>;
 
-} // namespace url
+} // namespace chromium_url

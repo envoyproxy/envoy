@@ -23,6 +23,21 @@ TEST(RedisProxyFilterConfigFactoryTest, ValidateFail) {
                ProtoValidationException);
 }
 
+TEST(RedisProxyFilterConfigFactoryTest, NoUpstreamDefined) {
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings settings;
+  settings.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(20));
+
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy config;
+  config.set_stat_prefix("foo");
+  config.mutable_settings()->CopyFrom(settings);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  EXPECT_THROW_WITH_MESSAGE(
+      RedisProxyFilterConfigFactory().createFilterFactoryFromProto(config, context), EnvoyException,
+      "cannot configure a redis-proxy without any upstream");
+}
+
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyNoSettings) {
   const std::string yaml = R"EOF(
 cluster: fake_cluster
@@ -30,7 +45,7 @@ stat_prefix: foo
   )EOF";
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config;
-  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromYamlAndValidate(yaml, proto_config),
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config),
                           ProtoValidationException, "value is required");
 }
 
@@ -42,7 +57,7 @@ settings: {}
   )EOF";
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config;
-  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromYamlAndValidate(yaml, proto_config),
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config),
                           ProtoValidationException, "embedded message failed validation");
 }
 
@@ -55,7 +70,7 @@ settings:
   )EOF";
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config{};
-  MessageUtil::loadFromYamlAndValidate(yaml, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
@@ -78,7 +93,7 @@ settings:
       *dynamic_cast<envoy::config::filter::network::redis_proxy::v2::RedisProxy*>(
           factory.createEmptyConfigProto().get());
 
-  MessageUtil::loadFromYamlAndValidate(yaml, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;

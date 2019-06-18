@@ -2,10 +2,10 @@
 
 #include <string>
 
-#include "common/json/json_loader.h"
+#include "envoy/api/api.h"
 
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "common/stats/isolated_store_impl.h"
+
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -18,7 +18,7 @@ public:
   /**
    * List of supported schemas to validate.
    */
-  enum Type { Route };
+  enum Type { DiscoveryResponse, Route };
 
   /**
    * Get a string representation of the schema type.
@@ -28,6 +28,7 @@ public:
   static const std::string& toString(Type type);
 
 private:
+  static const std::string DISCOVERY_RESPONSE;
   static const std::string ROUTE;
 };
 
@@ -44,30 +45,30 @@ public:
   Schema::Type schemaType() const { return schema_type_; }
 
   /**
-   * @return the path to JSON file.
+   * @return the path to configuration file.
    */
-  const std::string& jsonPath() const { return json_path_; }
+  const std::string& configPath() const { return config_path_; }
 
 private:
   Schema::Type schema_type_;
-  std::string json_path_;
+  std::string config_path_;
 };
 
 /**
- * Validates the schema of a JSON.
+ * Validates the schema of a configuration.
  */
 class Validator {
 public:
   Validator() : api_(Api::createApiForTest(stats_)) {}
   /**
-   * Validates the JSON at config_path against schema_type.
+   * Validates the configuration at config_path against schema_type.
    * An EnvoyException is thrown in several cases:
-   *  - Cannot load the JSON from config_path(invalid path or malformed JSON).
-   *  - A schema error from validating the JSON.
-   * @param json_path specifies the path to the JSON file.
-   * @param schema_type specifies the schema to validate the JSON against.
+   *  - Cannot load the configuration from config_path(invalid path or malformed data).
+   *  - A schema error from validating the configuration.
+   * @param config_path specifies the path to the configuration file.
+   * @param schema_type specifies the schema to validate the configuration against.
    */
-  void validate(const std::string& json_path, Schema::Type schema_type);
+  void validate(const std::string& config_path, Schema::Type schema_type);
 
 private:
   Stats::IsolatedStoreImpl stats_;

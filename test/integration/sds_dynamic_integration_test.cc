@@ -410,7 +410,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/test/long/url", "", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 
   // To flush out the reset connection from the first request in upstream.
   FakeRawConnectionPtr fake_upstream_connection;

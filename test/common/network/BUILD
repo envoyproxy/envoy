@@ -112,7 +112,6 @@ envoy_cc_test(
     srcs = ["filter_manager_impl_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:filter_manager_lib",
         "//source/common/stats:stats_lib",
@@ -130,6 +129,7 @@ envoy_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -149,7 +149,7 @@ envoy_cc_test(
     name = "listen_socket_impl_test",
     srcs = ["listen_socket_impl_test.cc"],
     deps = [
-        "//source/common/network:io_socket_handle_lib",
+        "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
         "//test/mocks/network:network_mocks",
@@ -235,6 +235,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "socket_option_factory_test",
     srcs = ["socket_option_factory_test.cc"],
+    external_deps = ["abseil_str_format"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:socket_option_factory_lib",
@@ -252,7 +253,7 @@ envoy_cc_test(
     deps = [
         ":socket_option_test",
         "//source/common/network:addr_family_aware_socket_option_lib",
-        "//source/common/network:io_socket_handle_lib",
+        "//source/common/network:address_lib",
     ],
 )
 
@@ -284,6 +285,6 @@ envoy_cc_test(
     name = "io_socket_handle_impl_test",
     srcs = ["io_socket_handle_impl_test.cc"],
     deps = [
-        "//source/common/network:io_socket_handle_lib",
+        "//source/common/network:address_lib",
     ],
 )

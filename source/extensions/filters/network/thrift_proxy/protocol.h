@@ -26,7 +26,7 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 class DirectResponse;
-typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
+using DirectResponsePtr = std::unique_ptr<DirectResponse>;
 
 /**
  * Protocol represents the operations necessary to implement the a generic Thrift protocol.
@@ -34,7 +34,7 @@ typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
  */
 class Protocol {
 public:
-  virtual ~Protocol() {}
+  virtual ~Protocol() = default;
 
   /**
    * @return const std::string& the human-readable name of the protocol
@@ -462,14 +462,14 @@ public:
   }
 };
 
-typedef std::unique_ptr<Protocol> ProtocolPtr;
+using ProtocolPtr = std::unique_ptr<Protocol>;
 
 /**
  * A DirectResponse manipulates a Protocol to directly create a Thrift response message.
  */
 class DirectResponse {
 public:
-  virtual ~DirectResponse() {}
+  virtual ~DirectResponse() = default;
 
   enum class ResponseType {
     // DirectResponse encodes MessageType::Reply with success payload
@@ -500,7 +500,7 @@ public:
  */
 class NamedProtocolConfigFactory {
 public:
-  virtual ~NamedProtocolConfigFactory() {}
+  virtual ~NamedProtocolConfigFactory() = default;
 
   /**
    * Create a particular Thrift protocol

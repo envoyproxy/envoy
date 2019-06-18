@@ -8,6 +8,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/stack_array.h"
+#include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
 
 using Envoy::Api::SysCallIntResult;
@@ -66,6 +67,51 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSizeResult result = os_syscalls.writev(fd_, iov.begin(), num_slices_to_write);
+  return sysCallResultToIoCallResult(result);
+}
+
+Api::IoCallUint64Result IoSocketHandleImpl::sendto(const Buffer::RawSlice& slice, int flags,
+                                                   const Address::Instance& address) {
+  const Address::InstanceBase* address_base = dynamic_cast<const Address::InstanceBase*>(&address);
+  sockaddr* sock_addr = const_cast<sockaddr*>(address_base->sockAddr());
+
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  const Api::SysCallSizeResult result = os_syscalls.sendto(fd_, slice.mem_, slice.len_, flags,
+                                                           sock_addr, address_base->sockAddrLen());
+  return sysCallResultToIoCallResult(result);
+}
+
+Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
+                                                    uint64_t num_slice, int flags,
+                                                    const Address::Instance& address) {
+  const Address::InstanceBase* address_base = dynamic_cast<const Address::InstanceBase*>(&address);
+  sockaddr* sock_addr = const_cast<sockaddr*>(address_base->sockAddr());
+
+  STACK_ARRAY(iov, iovec, num_slice);
+  uint64_t num_slices_to_write = 0;
+  for (uint64_t i = 0; i < num_slice; i++) {
+    if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
+      iov[num_slices_to_write].iov_base = slices[i].mem_;
+      iov[num_slices_to_write].iov_len = slices[i].len_;
+      num_slices_to_write++;
+    }
+  }
+  if (num_slices_to_write == 0) {
+    return Api::ioCallUint64ResultNoError();
+  }
+
+  struct msghdr message;
+  message.msg_name = reinterpret_cast<void*>(sock_addr);
+  message.msg_namelen = address_base->sockAddrLen();
+  message.msg_iov = iov.begin();
+  message.msg_iovlen = num_slices_to_write;
+  message.msg_control = nullptr;
+  message.msg_controllen = 0;
+  message.msg_flags = 0;
+
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
+
   return sysCallResultToIoCallResult(result);
 }
 

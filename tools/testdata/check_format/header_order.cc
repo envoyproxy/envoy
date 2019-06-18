@@ -3,7 +3,6 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/config/bootstrap_json.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/local_info/local_info_impl.h"
@@ -29,7 +28,7 @@
 #include "server/configuration_impl.h"
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
-#include "server/test_hooks.h"
+#include "server/listener_hooks.h"
 #include <signal.h>
 #include <string>
 #include <unordered_set>

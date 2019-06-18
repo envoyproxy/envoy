@@ -338,7 +338,7 @@ public:
   std::deque<Buffer::OwnedImpl> bufs_;
 };
 
-typedef std::unique_ptr<HttpStream> HttpStreamPtr;
+using HttpStreamPtr = std::unique_ptr<HttpStream>;
 
 namespace {
 
@@ -355,23 +355,23 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   const bool http2 = http_version == HttpVersion::Http2;
 
   if (http2) {
-    client = absl::make_unique<Http2::TestClientConnectionImpl>(client_connection, client_callbacks,
-                                                                stats_store, client_http2settings,
-                                                                max_request_headers_kb);
+    client = std::make_unique<Http2::TestClientConnectionImpl>(client_connection, client_callbacks,
+                                                               stats_store, client_http2settings,
+                                                               max_request_headers_kb);
   } else {
-    client = absl::make_unique<Http1::ClientConnectionImpl>(client_connection, client_callbacks);
+    client = std::make_unique<Http1::ClientConnectionImpl>(client_connection, client_callbacks);
   }
 
   NiceMock<Network::MockConnection> server_connection;
   NiceMock<MockServerConnectionCallbacks> server_callbacks;
   if (http2) {
     const Http2Settings server_http2settings{fromHttp2Settings(input.h2_settings().server())};
-    server = absl::make_unique<Http2::TestServerConnectionImpl>(server_connection, server_callbacks,
-                                                                stats_store, server_http2settings,
-                                                                max_request_headers_kb);
+    server = std::make_unique<Http2::TestServerConnectionImpl>(server_connection, server_callbacks,
+                                                               stats_store, server_http2settings,
+                                                               max_request_headers_kb);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
-    server = absl::make_unique<Http1::ServerConnectionImpl>(
+    server = std::make_unique<Http1::ServerConnectionImpl>(
         server_connection, server_callbacks, server_http1settings, max_request_headers_kb);
   }
 

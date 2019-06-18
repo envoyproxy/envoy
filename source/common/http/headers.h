@@ -36,16 +36,20 @@ public:
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
   const LowerCaseString EnvoyAttemptCount{"x-envoy-attempt-count"};
+  const LowerCaseString EnvoyAuthPartialBody{"x-envoy-auth-partial-body"};
+  const LowerCaseString EnvoyCluster{"x-envoy-cluster"};
   const LowerCaseString EnvoyDegraded{"x-envoy-degraded"};
   const LowerCaseString EnvoyDownstreamServiceCluster{"x-envoy-downstream-service-cluster"};
   const LowerCaseString EnvoyDownstreamServiceNode{"x-envoy-downstream-service-node"};
   const LowerCaseString EnvoyExternalAddress{"x-envoy-external-address"};
   const LowerCaseString EnvoyForceTrace{"x-envoy-force-trace"};
+  const LowerCaseString EnvoyHedgeOnPerTryTimeout{"x-envoy-hedge-on-per-try-timeout"};
   const LowerCaseString EnvoyImmediateHealthCheckFail{"x-envoy-immediate-health-check-fail"};
   const LowerCaseString EnvoyOriginalUrl{"x-envoy-original-url"};
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
   const LowerCaseString EnvoyIpTags{"x-envoy-ip-tags"};
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
+  const LowerCaseString EnvoyNotForwarded{"x-envoy-not-forwarded"};
   const LowerCaseString EnvoyOriginalDstHost{"x-envoy-original-dst-host"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
   const LowerCaseString EnvoyOverloaded{"x-envoy-overloaded"};
@@ -55,6 +59,8 @@ public:
   const LowerCaseString EnvoyRetriableStatusCodes{"x-envoy-retriable-status-codes"};
   const LowerCaseString EnvoyUpstreamAltStatName{"x-envoy-upstream-alt-stat-name"};
   const LowerCaseString EnvoyUpstreamCanary{"x-envoy-upstream-canary"};
+  const LowerCaseString EnvoyUpstreamHostAddress{"x-envoy-upstream-host-address"};
+  const LowerCaseString EnvoyUpstreamHostname{"x-envoy-upstream-hostname"};
   const LowerCaseString EnvoyUpstreamRequestTimeoutAltResponse{
       "x-envoy-upstream-rq-timeout-alt-response"};
   const LowerCaseString EnvoyUpstreamRequestTimeoutMs{"x-envoy-upstream-rq-timeout-ms"};
@@ -129,6 +135,7 @@ public:
     const std::string GrpcWebText{"application/grpc-web-text"};
     const std::string GrpcWebTextProto{"application/grpc-web-text+proto"};
     const std::string Json{"application/json"};
+    const std::string FormUrlEncoded{"application/x-www-form-urlencoded"};
   } ContentTypeValues;
 
   struct {
@@ -170,10 +177,12 @@ public:
 
   struct {
     const std::string Connect{"CONNECT"};
+    const std::string Delete{"DELETE"};
     const std::string Get{"GET"};
     const std::string Head{"HEAD"};
-    const std::string Options{"OPTIONS"};
     const std::string Post{"POST"};
+    const std::string Put{"PUT"};
+    const std::string Options{"OPTIONS"};
     const std::string Trace{"TRACE"};
   } MethodValues;
 
@@ -234,7 +243,7 @@ public:
   } AccessControlAllowOriginValue;
 };
 
-typedef ConstSingleton<HeaderValues> Headers;
+using Headers = ConstSingleton<HeaderValues>;
 
 } // namespace Http
 } // namespace Envoy
