@@ -1,0 +1,11 @@
+--- absl/time/internal/cctz/BUILD.bazel
++++ absl/time/internal/cctz/BUILD.bazel
+@@ -78,7 +78,7 @@ cc_library(
+     ],
+     linkopts = select({
+         ":osx": [
+-            "-framework Foundation",
++            # "-framework Foundation",
+         ],
+         ":ios": [
+             "-framework Foundation",
