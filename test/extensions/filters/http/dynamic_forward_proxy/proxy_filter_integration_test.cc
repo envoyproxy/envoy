@@ -15,6 +15,9 @@ public:
     case Network::Address::IpVersion::v6:
       return "V6_ONLY";
     }
+
+    // This seems to be needed on the coverage build for some reason.
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   void SetUp() override {
