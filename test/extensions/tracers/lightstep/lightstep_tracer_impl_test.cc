@@ -45,7 +45,7 @@ namespace {
 
 class LightStepDriverTest : public testing::Test {
 public:
-  LightStepDriverTest() : grpc_context_(*symbol_table_) {}
+  LightStepDriverTest() : grpc_context_(*symbol_table_), stats_(*symbol_table_) {}
 
   void setup(envoy::config::trace::v2::LightstepConfig& lightstep_config, bool init_timer,
              Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
@@ -89,7 +89,7 @@ public:
   SystemTime start_time_;
   StreamInfo::MockStreamInfo stream_info_;
 
-  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Envoy::Test::Global<Stats::SymbolTableImpl> symbol_table_;
   Grpc::ContextImpl grpc_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::IsolatedStoreImpl stats_;
