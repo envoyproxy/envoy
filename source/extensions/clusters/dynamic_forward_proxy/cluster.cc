@@ -28,6 +28,19 @@ Cluster::Cluster(
   // TODO(mattklein123): Technically, we should support attaching to an already warmed DNS cache.
   //                     This will require adding a hosts() or similar API to the cache and
   //                     reading it during initialization.
+
+  // Block certain TLS context parameters that don't make sense on a cluster-wide scale. We will
+  // support these parameters dynamically in the future. This is not an exhaustive list of
+  // parameters that don't make sense but should be the most obvious ones that a user might set
+  // in error.
+  if (!cluster.tls_context().sni().empty() || !cluster.tls_context()
+                                                   .common_tls_context()
+                                                   .validation_context()
+                                                   .verify_subject_alt_name()
+                                                   .empty()) {
+    throw EnvoyException(
+        "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
+  }
 }
 
 void Cluster::onDnsHostAddOrUpdate(

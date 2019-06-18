@@ -28,22 +28,22 @@ HTTP dynamic forward proxy.
 
 .. attention::
 
-  While configuring an empty :ref:`tls_context <envoy_api_field_Cluster.tls_Context>` on the cluster
-  instructs Envoy to use TLS when connecting to upstream hosts, currently it is not possible to
-  configure per-host TLS configuration parameters including SNI, certificate verification, etc. This
-  will be added in a future change. **This means that the following configuration will not fully
-  validate TLS certificates**. Use with care until full support for per-host validation is
-  implemented.
+  While configuring a :ref:`tls_context <envoy_api_field_Cluster.tls_Context>` on the cluster with
+  *trusted_ca* certificates instructs Envoy to use TLS when connecting to upstream hosts and verify
+  the certificate chain, currently it is not possible to configure per-host TLS configuration
+  parameters including SNI, subject alt name verification, etc. This will be added in a future
+  change. **This means that the following configuration will not fully validate TLS certificates**.
+  Use with care until full support for per-host validation is implemented.
 
 .. code-block:: yaml
 
   admin:
-  access_log_path: /tmp/admin_access.log
-  address:
-    socket_address:
-      protocol: TCP
-      address: 127.0.0.1
-      port_value: 9901
+    access_log_path: /tmp/admin_access.log
+    address:
+      socket_address:
+        protocol: TCP
+        address: 127.0.0.1
+        port_value: 9901
   static_resources:
     listeners:
     - name: listener_0
@@ -88,4 +88,7 @@ HTTP dynamic forward proxy.
           dns_cache_config:
             name: dynamic_forward_proxy_cache_config
             dns_lookup_family: V4_ONLY
-      tls_context: {}
+      tls_context:
+        common_tls_context:
+          validation_context:
+            trusted_ca: {filename: /etc/ssl/certs/ca-certificates.crt}

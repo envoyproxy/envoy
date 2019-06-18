@@ -22,19 +22,7 @@ namespace DynamicForwardProxy {
 class ClusterTest : public testing::Test,
                     public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
 public:
-  ClusterTest() {
-    const std::string yaml_config = R"EOF(
-name: name
-connect_timeout: 0.25s
-cluster_type:
-  name: envoy.clusters.dynamic_forward_proxy
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
-    dns_cache_config:
-      name: foo
-      dns_lookup_family: AUTO
-  )EOF";
-
+  void initialize(const std::string& yaml_config, bool uses_tls) {
     envoy::api::v2::Cluster cluster_config = Upstream::parseClusterFromV2Yaml(yaml_config);
     envoy::config::cluster::dynamic_forward_proxy::v2alpha::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
@@ -44,6 +32,9 @@ cluster_type:
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
+    if (uses_tls) {
+      EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _));
+    }
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
     // Below we return a nullptr handle which has no effect on the code under test but isn't
     // actually correct. It's possible this will have to change in the future.
@@ -117,10 +108,23 @@ cluster_type:
   absl::flat_hash_map<std::string,
                       std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>>
       host_map_;
+
+  const std::string default_yaml_config_ = R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: envoy.clusters.dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+    dns_cache_config:
+      name: foo
+      dns_lookup_family: AUTO
+)EOF";
 };
 
 // Basic flow of the cluster including adding hosts and removing them.
 TEST_F(ClusterTest, BasicFlow) {
+  initialize(default_yaml_config_, false);
   makeTestHost("host1", "1.2.3.4");
   InSequence s;
 
@@ -159,9 +163,56 @@ TEST_F(ClusterTest, BasicFlow) {
 
 // Various invalid LB context permutations in case the cluster is used outside of HTTP.
 TEST_F(ClusterTest, InvalidLbContext) {
+  initialize(default_yaml_config_, false);
   ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(nullptr));
   EXPECT_EQ(nullptr, lb_->chooseHost(&lb_context_));
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+}
+
+// Verify that using 'sni' causes a failure.
+TEST_F(ClusterTest, InvalidSNI) {
+  const std::string yaml_config = R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: envoy.clusters.dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+    dns_cache_config:
+      name: foo
+tls_context:
+  sni: api.lyft.com
+  common_tls_context:
+    validation_context:
+      trusted_ca: {filename: /etc/ssl/certs/ca-certificates.crt}
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize(yaml_config, true), EnvoyException,
+      "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
+}
+
+// Verify that using 'verify_subject_alt_name' causes a failure.
+TEST_F(ClusterTest, InvalidVerifySubjectAltName) {
+  const std::string yaml_config = R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: envoy.clusters.dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+    dns_cache_config:
+      name: foo
+tls_context:
+  common_tls_context:
+    validation_context:
+      trusted_ca: {filename: /etc/ssl/certs/ca-certificates.crt}
+      verify_subject_alt_name: [api.lyft.com]
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize(yaml_config, true), EnvoyException,
+      "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
 }
 
 } // namespace DynamicForwardProxy

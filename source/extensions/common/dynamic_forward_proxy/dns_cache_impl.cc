@@ -72,8 +72,8 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
   }
 
   // TODO(mattklein123): Figure out if we want to support addresses of the form <IP>:<port>. This
-  //                     seems unlikely to be useful in TLS scenarios, but it technically supported.
-  //                     We might want to block this form for now.
+  //                     seems unlikely to be useful in TLS scenarios, but it is technically
+  //                     supported. We might want to block this form for now.
   const auto colon_pos = host.find(':');
   absl::string_view host_to_resolve = host;
   if (colon_pos != absl::string_view::npos) {
@@ -164,6 +164,7 @@ void DnsCacheImpl::finishResolve(
   bool address_changed = false;
   if (new_address != nullptr && (primary_host_info.host_info_->address_ == nullptr ||
                                  *primary_host_info.host_info_->address_ != *new_address)) {
+    ENVOY_LOG(debug, "host '{}' address has changed", host);
     primary_host_info.host_info_->address_ = new_address;
     runAddUpdateCallbacks(host, primary_host_info.host_info_);
     address_changed = true;
