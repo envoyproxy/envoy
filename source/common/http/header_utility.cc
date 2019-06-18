@@ -124,9 +124,8 @@ bool HeaderUtility::validateHeaders(const Http::HeaderMap& headers) {
   headers.iterate(
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
         const absl::string_view header_value = header.value().getStringView();
-        if (nghttp2_check_header_value(
-                reinterpret_cast<const uint8_t*>(std::string(header_value).data()),
-                header_value.size()) == 0) {
+        if (nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
+                                       header_value.size()) == 0) {
           bool* valid = static_cast<bool*>(context);
           *valid = false;
           return Http::HeaderMap::Iterate::Break;
