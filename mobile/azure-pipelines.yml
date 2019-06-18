@@ -68,7 +68,7 @@ stages:
           - task: PublishPipelineArtifact@0
             displayName: 'Publish envoy.aar distributable'
             inputs:
-              artifactName: 'envoy.aar'
+              artifactName: 'envoy-linux.aar'
               targetPath: 'dist/envoy.aar'
       - job: linux_java_helloworld
         dependsOn: linux_dist
@@ -82,12 +82,10 @@ stages:
             submodules: true
           - script: ./ci/linux_ci_setup.sh
             displayName: 'Install dependencies'
-          - script: mkdir -p dist/
-            displayName: 'Create directory for distributable'
           - task: DownloadPipelineArtifact@0
             displayName: 'Download envoy.aar distributable'
             inputs:
-              artifactName: 'envoy.aar'
+              artifactName: 'envoy-linux.aar'
               targetPath: dist
           - script: bazel build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
             displayName: 'Build java app'
@@ -103,12 +101,60 @@ stages:
             submodules: true
           - script: ./ci/linux_ci_setup.sh
             displayName: 'Install dependencies'
-          - script: mkdir -p dist/
-            displayName: 'Create directory for distributable'
           - task: DownloadPipelineArtifact@0
             displayName: 'Download envoy.aar distributable'
             inputs:
-              artifactName: 'envoy.aar'
+              artifactName: 'envoy-linux.aar'
+              targetPath: dist
+          - script: bazel build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
+            displayName: 'Build kotlin app'
+      - job: mac_dist
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'macos-10.14'
+        steps:
+          - checkout: self
+            submodules: true
+          - script: ./ci/mac_ci_setup.sh
+            displayName: 'Install dependencies'
+          - script: bazel build --fat_apk_cpu=x86 //:android_dist
+            displayName: 'Build envoy.aar distributable'
+          - task: PublishPipelineArtifact@0
+            displayName: 'Publish envoy.aar distributable'
+            inputs:
+              artifactName: 'envoy-mac.aar'
+              targetPath: 'dist/envoy.aar'
+      - job: mac_java_helloworld
+        dependsOn: mac_dist
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'macos-10.14'
+        steps:
+          - checkout: self
+            submodules: true
+          - script: ./ci/mac_ci_setup.sh
+            displayName: 'Install dependencies'
+          - task: DownloadPipelineArtifact@0
+            displayName: 'Download envoy.aar distributable'
+            inputs:
+              artifactName: 'envoy-mac.aar'
+              targetPath: dist
+          - script: bazel build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
+            displayName: 'Build java app'
+      - job: mac_kotlin_helloworld
+        dependsOn: mac_dist
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'macos-10.14'
+        steps:
+          - checkout: self
+            submodules: true
+          - script: ./ci/mac_ci_setup.sh
+            displayName: 'Install dependencies'
+          - task: DownloadPipelineArtifact@0
+            displayName: 'Download envoy.aar distributable'
+            inputs:
+              artifactName: 'envoy-mac.aar'
               targetPath: dist
           - script: bazel build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
             displayName: 'Build kotlin app'
