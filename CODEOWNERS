@@ -36,3 +36,5 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/zookeeper_proxy @rgs1 @snowp
 # redis cluster extension
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
+# permissive transport socket extension
+/*/extensions/transport_sockets/permissive @crazyxy
