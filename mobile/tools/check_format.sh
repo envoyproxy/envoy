@@ -2,8 +2,6 @@
 
 set -e
 
-export BUILDIFIER_BIN="/usr/local/bin/buildifier"
-
 ENVOY_FORMAT_ACTION="$1"
 if [ -z "$ENVOY_FORMAT_ACTION" ]; then
   echo "No action specified, defaulting to check"
