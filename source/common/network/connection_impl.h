@@ -133,7 +133,9 @@ public:
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
 
 protected:
-  void closeSocket(ConnectionEvent close_type);
+  virtual void closeSocket(ConnectionEvent close_type);
+
+  void initializeConnection(bool connected);
 
   void onLowWatermark();
   void onHighWatermark();
@@ -232,6 +234,14 @@ public:
 
   // Network::ClientConnection
   void connect() override;
+
+  void closeSocket(ConnectionEvent close_type) override;
+  void initializeClientConnection();
+
+private:
+  Address::InstanceConstSharedPtr remote_address_;
+  Address::InstanceConstSharedPtr source_address_;
+  Network::ConnectionSocket::OptionsSharedPtr options_;
 };
 
 } // namespace Network

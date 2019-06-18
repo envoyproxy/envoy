@@ -27,6 +27,7 @@ enum class ConnectionEvent {
   RemoteClose,
   LocalClose,
   Connected,
+  Reconnect,
 };
 
 /**

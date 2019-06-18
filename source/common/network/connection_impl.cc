@@ -52,21 +52,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), id_(next_global_id_++) {
-  // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
-  // condition and just crash.
-  RELEASE_ASSERT(ioHandle().fd() != -1, "");
-
-  if (!connected) {
-    connecting_ = true;
-  }
-
-  // We never ask for both early close and read at the same time. If we are reading, we want to
-  // consume all available data.
-  file_event_ = dispatcher_.createFileEvent(
-      ioHandle().fd(), [this](uint32_t events) -> void { onFileEvent(events); },
-      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
-
-  transport_socket_->setTransportSocketCallbacks(*this);
+  initializeConnection(connected);
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -196,7 +182,9 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   file_event_.reset();
   socket_->close();
 
-  raiseEvent(close_type);
+  if (close_type != ConnectionEvent::Reconnect) {
+    raiseEvent(close_type);
+  }
 }
 
 Event::Dispatcher& ConnectionImpl::dispatcher() { return dispatcher_; }
@@ -484,8 +472,9 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   }
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
-  // In this case ignore write event processing.
-  if (ioHandle().isOpen() && (events & Event::FileReadyType::Read)) {
+  // It's possible for a write event callback to close the the socket and open an new socket.
+  // In these cases ignore write event processing.
+  if (ioHandle().isOpen() && (events & Event::FileReadyType::Read) && !connecting_) {
     onReadReady();
   }
 }
@@ -571,7 +560,9 @@ void ConnectionImpl::onWriteReady() {
   // period of inactivity from the last write event. Therefore, the timer must be reset to its
   // original timeout value unless the socket is going to be closed as a result of the doWrite().
 
-  if (result.action_ == PostIoAction::Close) {
+  if (result.action_ == PostIoAction::Reconnect) {
+    closeSocket(ConnectionEvent::Reconnect);
+  } else if (result.action_ == PostIoAction::Close) {
     // It is possible (though unlikely) for the connection to have already been closed during the
     // write callback. This can happen if we manage to complete the SSL handshake in the write
     // callback, raise a connected event, and close the connection.
@@ -656,46 +647,33 @@ absl::string_view ConnectionImpl::transportFailureReason() const {
   return transport_socket_->failureReason();
 }
 
+void ConnectionImpl::initializeConnection(bool connected) {
+  // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
+  // condition and just crash.
+  RELEASE_ASSERT(ioHandle().fd() != -1, "");
+
+  if (!connected) {
+    connecting_ = true;
+  }
+
+  // We never ask for both early close and read at the same time. If we are reading, we want to
+  // consume all available data.
+  file_event_ = dispatcher_.createFileEvent(
+      ioHandle().fd(), [this](uint32_t events) -> void { onFileEvent(events); },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
+
+  transport_socket_->setTransportSocketCallbacks(*this);
+}
+
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
-                     std::move(transport_socket), false) {
-  // There are no meaningful socket options or source address semantics for
-  // non-IP sockets, so skip.
-  if (remote_address->ip() != nullptr) {
-    if (!Network::Socket::applyOptions(options, *socket_,
-                                       envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
-      // Set a special error state to ensure asynchronous close to give the owner of the
-      // ConnectionImpl a chance to add callbacks and detect the "disconnect".
-      immediate_error_event_ = ConnectionEvent::LocalClose;
-      // Trigger a write event to close this connection out-of-band.
-      file_event_->activate(Event::FileReadyType::Write);
-      return;
-    }
-    const Network::Address::Instance* source_to_use = source_address.get();
-    if (socket_->localAddress()) {
-      source_to_use = socket_->localAddress().get();
-    }
-
-    if (source_to_use != nullptr) {
-      const Api::SysCallIntResult result = source_to_use->bind(ioHandle().fd());
-      if (result.rc_ < 0) {
-        // TODO(lizan): consider add this error into transportFailureReason.
-        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_to_use->asString(),
-                       strerror(result.errno_));
-        bind_error_ = true;
-        // Set a special error state to ensure asynchronous close to give the owner of the
-        // ConnectionImpl a chance to add callbacks and detect the "disconnect".
-        immediate_error_event_ = ConnectionEvent::LocalClose;
-
-        // Trigger a write event to close this connection out-of-band.
-        file_event_->activate(Event::FileReadyType::Write);
-      }
-    }
-  }
+                     std::move(transport_socket), false),
+      remote_address_(remote_address), source_address_(source_address), options_(options) {
+  initializeClientConnection();
 }
 
 void ClientConnectionImpl::connect() {
@@ -723,6 +701,59 @@ void ClientConnectionImpl::connect() {
   // types, such as UDS, don't have a notion of a local address.
   if (socket_->remoteAddress()->type() == Address::Type::Ip) {
     socket_->setLocalAddress(Address::addressFromFd(ioHandle().fd()));
+  }
+}
+
+void ClientConnectionImpl::closeSocket(ConnectionEvent close_type) {
+  // Close current socket.
+  ConnectionImpl::closeSocket(close_type);
+
+  if (close_type == ConnectionEvent::Reconnect) {
+    ENVOY_CONN_LOG(debug, "client is reconnecting", *this);
+
+    socket_ = std::make_unique<ClientSocketImpl>(remote_address_);
+
+    // TODO(crazyxy): raise event and delegate reconnection to upper level protocol.
+    initializeConnection(false);
+    initializeClientConnection();
+    connect();
+    noDelay(true);
+  }
+}
+
+void ClientConnectionImpl::initializeClientConnection() {
+  // There are no meaningful socket options or source address semantics for
+  // non-IP sockets, so skip.
+  if (remote_address_->ip() != nullptr) {
+    if (!Network::Socket::applyOptions(options_, *socket_,
+                                       envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
+      // Set a special error state to ensure asynchronous close to give the owner of the
+      // ConnectionImpl a chance to add callbacks and detect the "disconnect".
+      immediate_error_event_ = ConnectionEvent::LocalClose;
+      // Trigger a write event to close this connection out-of-band.
+      file_event_->activate(Event::FileReadyType::Write);
+      return;
+    }
+    const Network::Address::Instance* source_to_use = source_address_.get();
+    if (socket_->localAddress()) {
+      source_to_use = socket_->localAddress().get();
+    }
+
+    if (source_to_use != nullptr) {
+      const Api::SysCallIntResult result = source_to_use->bind(ioHandle().fd());
+      if (result.rc_ < 0) {
+        // TODO(lizan): consider add this error into transportFailureReason.
+        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_to_use->asString(),
+                       strerror(result.errno_));
+        bind_error_ = true;
+        // Set a special error state to ensure asynchronous close to give the owner of the
+        // ConnectionImpl a chance to add callbacks and detect the "disconnect".
+        immediate_error_event_ = ConnectionEvent::LocalClose;
+
+        // Trigger a write event to close this connection out-of-band.
+        file_event_->activate(Event::FileReadyType::Write);
+      }
+    }
   }
 }
 
