@@ -4147,7 +4147,7 @@ TEST_F(HttpConnectionManagerImplTest, InvalidHeadersRejected) {
 
     EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
         .WillOnce(Invoke([&response_code](const HeaderMap& headers, bool) -> void {
-          response_code = headers.Status()->getStringView();
+          response_code = std::string(headers.Status()->value().getStringView());
         }));
     decoder->decodeHeaders(std::move(headers), true);
     conn_manager_->newStream(response_encoder_);
