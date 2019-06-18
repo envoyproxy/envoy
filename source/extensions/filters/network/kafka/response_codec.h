@@ -60,7 +60,6 @@ private:
   ExpectedResponseSpec getNextResponseSpec();
 
   std::queue<ExpectedResponseSpec> expected_responses_;
-  std::mutex expected_responses_mutex_;
 };
 
 using ResponseInitialParserFactorySharedPtr = std::shared_ptr<ResponseInitialParserFactory>;

@@ -9,7 +9,6 @@ namespace Kafka {
 
 void ResponseInitialParserFactory::expectResponse(const int16_t api_key,
                                                   const int16_t api_version) {
-  std::lock_guard<std::mutex> lock{expected_responses_mutex_};
   expected_responses_.push({api_key, api_version});
 }
 
@@ -21,7 +20,6 @@ ResponseInitialParserFactory::create(const ResponseParserResolver& parser_resolv
 }
 
 ExpectedResponseSpec ResponseInitialParserFactory::getNextResponseSpec() {
-  std::lock_guard<std::mutex> lock{expected_responses_mutex_};
   if (!expected_responses_.empty()) {
     const ExpectedResponseSpec spec = expected_responses_.front();
     expected_responses_.pop();
