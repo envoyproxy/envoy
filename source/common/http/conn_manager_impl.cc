@@ -605,13 +605,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // called with end_stream=true.
   maybeEndDecode(end_stream);
 
-  ENVOY_STREAM_LOG(trace, "validating header values\n{}", *this, *request_headers_);
-  if (!Http::HeaderUtility::validateHeaders(*request_headers_)) {
-    ENVOY_STREAM_LOG(debug, "found an invalid header value\n", *this);
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
-                   nullptr, is_head_request_, absl::nullopt,
-                   StreamInfo::ResponseCodeDetails::get().InvalidHeader);
-    return;
+  if (connection_manager_.config_.validateHeaders()) {
+    ENVOY_STREAM_LOG(trace, "validating header values\n{}", *this, *request_headers_);
+    if (!Http::HeaderUtility::validateHeaders(*request_headers_)) {
+      ENVOY_STREAM_LOG(debug, "found an invalid header value\n", *this);
+      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
+                     nullptr, is_head_request_, absl::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().InvalidHeader);
+      return;
+    }
   }
 
   // Drop new requests when overloaded as soon as we have decoded the headers.
