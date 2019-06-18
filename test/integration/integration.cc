@@ -409,7 +409,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
                                                        const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(bootstrap_path, version_, on_server_init_function_,
                                                deterministic_, timeSystem(), *api_,
-                                               defer_listener_finalization_);
+                                               defer_listener_finalization_, process_object_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
