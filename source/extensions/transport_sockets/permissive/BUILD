@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/transport_sockets:well_known_names",
+        "@envoy_api//envoy/config/transport_socket/permissive/v2alpha:permissive_cc",
     ],
 )
 

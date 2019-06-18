@@ -38,16 +38,16 @@ private:
 
   bool downgraded_{};
   Network::TransportSocketCallbacks* callbacks_{};
-  Network::TransportSocketPtr tls_transport_socket_;
-  Network::TransportSocketPtr raw_buffer_transport_socket_;
+  Network::TransportSocketPtr primary_transport_socket_;
+  Network::TransportSocketPtr secondary_transport_socket_;
 };
 
 class PermissiveSocketFactory : public Network::TransportSocketFactory {
 public:
-  PermissiveSocketFactory(Network::TransportSocketFactoryPtr&& tls_transport_socket_factory,
-                          Network::TransportSocketFactoryPtr&& raw_buffer_transport_socket_factory)
-      : tls_transport_socket_factory_(std::move(tls_transport_socket_factory)),
-        raw_buffer_transport_socket_facotry_(std::move(raw_buffer_transport_socket_factory)) {}
+  PermissiveSocketFactory(Network::TransportSocketFactoryPtr&& primary_transport_socket_factory,
+                          Network::TransportSocketFactoryPtr&& secondary_transport_socket_factory)
+      : primary_transport_socket_factory_(std::move(primary_transport_socket_factory)),
+        secondary_transport_socket_factory_(std::move(secondary_transport_socket_factory)) {}
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
@@ -55,8 +55,8 @@ public:
   bool implementsSecureTransport() const override;
 
 private:
-  Network::TransportSocketFactoryPtr tls_transport_socket_factory_;
-  Network::TransportSocketFactoryPtr raw_buffer_transport_socket_facotry_;
+  Network::TransportSocketFactoryPtr primary_transport_socket_factory_;
+  Network::TransportSocketFactoryPtr secondary_transport_socket_factory_;
 };
 
 } // namespace Permissive

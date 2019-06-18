@@ -7,25 +7,25 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Permissive {
 
-PermissiveSocket::PermissiveSocket(Network::TransportSocketPtr&& tls_transport_socket,
-                                   Network::TransportSocketPtr&& raw_buffer_transport_socket)
-    : tls_transport_socket_(std::move(tls_transport_socket)),
-      raw_buffer_transport_socket_(std::move(raw_buffer_transport_socket)) {}
+PermissiveSocket::PermissiveSocket(Network::TransportSocketPtr&& primary_transport_socket,
+                                   Network::TransportSocketPtr&& secondary_transport_socket)
+    : primary_transport_socket_(std::move(primary_transport_socket)),
+      secondary_transport_socket_(std::move(secondary_transport_socket)) {}
 
 void PermissiveSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   callbacks_ = &callbacks;
   if (downgraded_) {
-    raw_buffer_transport_socket_->setTransportSocketCallbacks(callbacks);
+    secondary_transport_socket_->setTransportSocketCallbacks(callbacks);
   } else {
-    tls_transport_socket_->setTransportSocketCallbacks(callbacks);
+    primary_transport_socket_->setTransportSocketCallbacks(callbacks);
   }
 }
 
 Network::IoResult PermissiveSocket::doRead(Buffer::Instance& buffer) {
   if (downgraded_) {
-    return raw_buffer_transport_socket_->doRead(buffer);
+    return secondary_transport_socket_->doRead(buffer);
   } else {
-    Network::IoResult io_result = tls_transport_socket_->doRead(buffer);
+    Network::IoResult io_result = primary_transport_socket_->doRead(buffer);
     checkIoResult(io_result);
     return io_result;
   }
@@ -33,9 +33,9 @@ Network::IoResult PermissiveSocket::doRead(Buffer::Instance& buffer) {
 
 Network::IoResult PermissiveSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   if (downgraded_) {
-    return raw_buffer_transport_socket_->doWrite(buffer, end_stream);
+    return secondary_transport_socket_->doWrite(buffer, end_stream);
   } else {
-    Network::IoResult io_result = tls_transport_socket_->doWrite(buffer, end_stream);
+    Network::IoResult io_result = primary_transport_socket_->doWrite(buffer, end_stream);
     checkIoResult(io_result);
     return io_result;
   }
@@ -43,49 +43,49 @@ Network::IoResult PermissiveSocket::doWrite(Buffer::Instance& buffer, bool end_s
 
 std::string PermissiveSocket::protocol() const {
   if (downgraded_) {
-    return raw_buffer_transport_socket_->protocol();
+    return secondary_transport_socket_->protocol();
   } else {
-    return tls_transport_socket_->protocol();
+    return primary_transport_socket_->protocol();
   }
 }
 
 absl::string_view PermissiveSocket::failureReason() const {
   if (downgraded_) {
-    return raw_buffer_transport_socket_->failureReason();
+    return secondary_transport_socket_->failureReason();
   } else {
-    return tls_transport_socket_->failureReason();
+    return primary_transport_socket_->failureReason();
   }
 }
 
 void PermissiveSocket::onConnected() {
   if (downgraded_) {
-    raw_buffer_transport_socket_->onConnected();
+    secondary_transport_socket_->onConnected();
   } else {
-    tls_transport_socket_->onConnected();
+    primary_transport_socket_->onConnected();
   }
 }
 
 bool PermissiveSocket::canFlushClose() {
   if (downgraded_) {
-    return raw_buffer_transport_socket_->canFlushClose();
+    return secondary_transport_socket_->canFlushClose();
   } else {
-    return tls_transport_socket_->canFlushClose();
+    return primary_transport_socket_->canFlushClose();
   }
 }
 
 void PermissiveSocket::closeSocket(Network::ConnectionEvent event) {
   if (downgraded_) {
-    raw_buffer_transport_socket_->closeSocket(event);
+    secondary_transport_socket_->closeSocket(event);
   } else {
-    tls_transport_socket_->closeSocket(event);
+    primary_transport_socket_->closeSocket(event);
   }
 }
 
 const Ssl::ConnectionInfo* PermissiveSocket::ssl() const {
   if (downgraded_) {
-    return raw_buffer_transport_socket_->ssl();
+    return secondary_transport_socket_->ssl();
   } else {
-    return tls_transport_socket_->ssl();
+    return primary_transport_socket_->ssl();
   }
 }
 
@@ -114,8 +114,8 @@ void PermissiveSocket::checkIoResult(Network::IoResult& io_result) {
 Network::TransportSocketPtr PermissiveSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsSharedPtr options) const {
   return std::make_unique<PermissiveSocket>(
-      tls_transport_socket_factory_->createTransportSocket(options),
-      raw_buffer_transport_socket_facotry_->createTransportSocket(options));
+      primary_transport_socket_factory_->createTransportSocket(options),
+      secondary_transport_socket_factory_->createTransportSocket(options));
 }
 
 bool PermissiveSocketFactory::implementsSecureTransport() const { return false; }
