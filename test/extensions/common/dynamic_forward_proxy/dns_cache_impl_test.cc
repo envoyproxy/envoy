@@ -27,15 +27,15 @@ makeAddressList(const std::list<std::string> address_list) {
 
 class DnsCacheImplTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
-  DnsCacheImplTest() {
-    envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig config;
-    config.set_dns_lookup_family(envoy::api::v2::Cluster::V4_ONLY);
+  void initialize() {
+    config_.set_dns_lookup_family(envoy::api::v2::Cluster::V4_ONLY);
 
     EXPECT_CALL(dispatcher_, createDnsResolver(_)).WillOnce(Return(resolver_));
-    dns_cache_ = std::make_unique<DnsCacheImpl>(dispatcher_, tls_, config);
+    dns_cache_ = std::make_unique<DnsCacheImpl>(dispatcher_, tls_, config_);
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
   }
 
+  envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig config_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -54,6 +54,7 @@ MATCHER_P(SharedAddressEquals, expected, "") {
 
 // Basic successful resolution and then re-resolution.
 TEST_F(DnsCacheImplTest, ResolveSuccess) {
+  initialize();
   InSequence s;
 
   MockLoadDnsCacheCallbacks callbacks;
@@ -88,6 +89,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccess) {
 
 // TTL purge test.
 TEST_F(DnsCacheImplTest, TTL) {
+  initialize();
   InSequence s;
 
   MockLoadDnsCacheCallbacks callbacks;
@@ -126,8 +128,44 @@ TEST_F(DnsCacheImplTest, TTL) {
   EXPECT_NE(handle, nullptr);
 }
 
+// TTL purge test with different refresh/TTL parameters.
+TEST_F(DnsCacheImplTest, TTLWithCustomParameters) {
+  *config_.mutable_dns_refresh_rate() = Protobuf::util::TimeUtil::SecondsToDuration(30);
+  *config_.mutable_host_ttl() = Protobuf::util::TimeUtil::SecondsToDuration(60);
+  initialize();
+  InSequence s;
+
+  MockLoadDnsCacheCallbacks callbacks;
+  Network::DnsResolver::ResolveCb resolve_cb;
+  Event::MockTimer* resolve_timer = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  DnsCache::LoadDnsCacheHandlePtr handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
+  EXPECT_NE(handle, nullptr);
+
+  EXPECT_CALL(update_callbacks_,
+              onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.1:80")));
+  EXPECT_CALL(callbacks, onLoadDnsCacheComplete());
+  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(30000)));
+  resolve_cb(makeAddressList({"10.0.0.1"}));
+
+  // Re-resolve with ~30s passed. TTL should still be OK at 60s.
+  simTime().sleep(std::chrono::milliseconds(30001));
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  resolve_timer->invokeCallback();
+  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(30000)));
+  resolve_cb(makeAddressList({"10.0.0.1"}));
+
+  // Re-resolve with ~30s passed. TTL should expire.
+  simTime().sleep(std::chrono::milliseconds(30001));
+  EXPECT_CALL(update_callbacks_, onDnsHostRemove("foo.com"));
+  resolve_timer->invokeCallback();
+}
+
 // Resolve that completes inline without any callback.
 TEST_F(DnsCacheImplTest, InlineResolve) {
+  initialize();
   InSequence s;
 
   MockLoadDnsCacheCallbacks callbacks;
@@ -152,6 +190,7 @@ TEST_F(DnsCacheImplTest, InlineResolve) {
 
 // Resolve failure that returns no addresses.
 TEST_F(DnsCacheImplTest, ResolveFailure) {
+  initialize();
   InSequence s;
 
   MockLoadDnsCacheCallbacks callbacks;
@@ -171,6 +210,7 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
 
 // Cancel a cache load before the resolve completes.
 TEST_F(DnsCacheImplTest, CancelResolve) {
+  initialize();
   InSequence s;
 
   MockLoadDnsCacheCallbacks callbacks;
@@ -189,6 +229,7 @@ TEST_F(DnsCacheImplTest, CancelResolve) {
 // Two cache loads that are trying to resolve the same host. Make sure we only do a single resolve
 // and fire both callbacks on completion.
 TEST_F(DnsCacheImplTest, MultipleResolveSameHost) {
+  initialize();
   InSequence s;
 
   MockLoadDnsCacheCallbacks callbacks1;
@@ -211,6 +252,7 @@ TEST_F(DnsCacheImplTest, MultipleResolveSameHost) {
 
 // Two cache loads that are resolving different hosts.
 TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
+  initialize();
   InSequence s;
 
   MockLoadDnsCacheCallbacks callbacks1;
@@ -240,6 +282,7 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
 
 // A successful resolve followed by a cache hit.
 TEST_F(DnsCacheImplTest, CacheHit) {
+  initialize();
   InSequence s;
 
   MockLoadDnsCacheCallbacks callbacks;
@@ -259,6 +302,7 @@ TEST_F(DnsCacheImplTest, CacheHit) {
 
 // Make sure we destroy active queries if the cache goes away.
 TEST_F(DnsCacheImplTest, CancelActiveQueriesOnDestroy) {
+  initialize();
   InSequence s;
 
   MockLoadDnsCacheCallbacks callbacks;
@@ -274,6 +318,7 @@ TEST_F(DnsCacheImplTest, CancelActiveQueriesOnDestroy) {
 
 // Invalid port
 TEST_F(DnsCacheImplTest, InvalidPort) {
+  initialize();
   InSequence s;
 
   MockLoadDnsCacheCallbacks callbacks;

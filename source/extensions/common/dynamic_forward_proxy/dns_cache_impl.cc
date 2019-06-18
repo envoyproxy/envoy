@@ -21,7 +21,7 @@ DnsCacheImpl::DnsCacheImpl(
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(main_thread_dispatcher.createDnsResolver({})), tls_slot_(tls.allocateSlot()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
-      host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 300000)) {
+      host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)) {
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(); });
   updateTlsHostsMap();
 }

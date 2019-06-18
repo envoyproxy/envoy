@@ -31,6 +31,12 @@ message DnsCacheConfig {
   google.protobuf.Duration dns_refresh_rate = 3 [(validate.rules).duration.gt = {}];
 
   // The TTL for hosts that are unused. Hosts that have not been used in the configured time
-  // interval will be purged.
+  // interval will be purged. If not specified defaults to 5m.
+  //
+  // .. note:
+  //
+  //   The TTL is only checked at the time of DNS refresh, as specified by *dns_refresh_rate*. This
+  //   means that if the configured TTL is shorter than the refresh rate the host may not be removed
+  //   immediately.
   google.protobuf.Duration host_ttl = 4 [(validate.rules).duration.gt = {}];
 }
