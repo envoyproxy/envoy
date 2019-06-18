@@ -171,10 +171,6 @@ void InstanceImpl::flushStats() {
   // not be updated and flushed to stat sinks. So skip mergeHistograms call if workers are
   // not started yet.
   if (initManager().state() == Init::Manager::State::Initialized) {
-    // Disable any pending stats timers.
-    if (stat_flush_timer_ != nullptr) {
-      stat_flush_timer_->disableTimer();
-    }
     // A shutdown initiated before this callback may prevent this from being called as per
     // the semantics documented in ThreadLocal's runOnAllThreads method.
     stats_store_.mergeHistograms([this]() -> void { flushStatsInternal(); });
