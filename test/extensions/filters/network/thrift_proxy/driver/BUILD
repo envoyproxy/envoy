@@ -16,23 +16,23 @@ filegroup(
 py_binary(
     name = "client",
     srcs = ["client.py"],
+    python_version = "PY2",
     deps = [
         "//test/extensions/filters/network/thrift_proxy/driver/fbthrift:fbthrift_lib",
         "//test/extensions/filters/network/thrift_proxy/driver/finagle:finagle_lib",
         "//test/extensions/filters/network/thrift_proxy/driver/generated/example:example_lib",
         "@com_github_twitter_common_rpc//:twitter_common_rpc",
     ],
-    python_version = "PY2",
 )
 
 py_binary(
     name = "server",
     srcs = ["server.py"],
+    python_version = "PY2",
     deps = [
         "//test/extensions/filters/network/thrift_proxy/driver/fbthrift:fbthrift_lib",
         "//test/extensions/filters/network/thrift_proxy/driver/finagle:finagle_lib",
         "//test/extensions/filters/network/thrift_proxy/driver/generated/example:example_lib",
         "@com_github_twitter_common_rpc//:twitter_common_rpc",
     ],
-    python_version = "PY2",
 )
