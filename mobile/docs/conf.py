@@ -91,8 +91,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'envoy-mobile'
-copyright = u'2019-{}, Lyft'.format(datetime.now().year)
-author = u'Lyft'
+author = u'Lyft, Inc.'
+copyright = u'{} {}'.format(datetime.now().year, author)
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
