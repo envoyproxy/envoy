@@ -49,7 +49,7 @@ tls_certificate:
   ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
 
   Ssl::TlsCertificateConfigImpl tls_config(
-      *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), *api_);
+      *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), nullptr, *api_);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -188,7 +188,7 @@ tls_certificate:
   init_target_handle->initialize(init_watcher);
   secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(secret_resources,
                                                                                    "");
-  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), *api_);
+  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), nullptr, *api_);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),

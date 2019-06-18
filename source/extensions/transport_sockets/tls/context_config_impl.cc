@@ -145,7 +145,7 @@ ContextConfigImpl::ContextConfigImpl(
   if (!tls_certificate_providers_.empty()) {
     for (auto& provider : tls_certificate_providers_) {
       if (provider->secret() != nullptr) {
-        tls_certificate_configs_.emplace_back(*provider->secret(), factory_context, api_);
+        tls_certificate_configs_.emplace_back(*provider->secret(), &factory_context, api_);
       }
     }
   }
@@ -176,7 +176,8 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
           // This breaks multiple certificate support, but today SDS is only single cert.
           // TODO(htuch): Fix this when SDS goes multi-cert.
           tls_certificate_configs_.clear();
-          tls_certificate_configs_.emplace_back(*tls_certificate_providers_[0]->secret(), api_);
+          tls_certificate_configs_.emplace_back(*tls_certificate_providers_[0]->secret(), nullptr,
+                                                api_);
           callback();
         });
   }

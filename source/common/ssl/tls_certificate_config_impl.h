@@ -12,11 +12,8 @@ namespace Ssl {
 
 class TlsCertificateConfigImpl : public TlsCertificateConfig {
 public:
-  // SDS uses this constructor.
-  TlsCertificateConfigImpl(const envoy::api::v2::auth::TlsCertificate& config, Api::Api& api);
-  // Regular constructor, works also for private key methods.
   TlsCertificateConfigImpl(const envoy::api::v2::auth::TlsCertificate& config,
-                           Server::Configuration::TransportSocketFactoryContext& factory_context,
+                           Server::Configuration::TransportSocketFactoryContext* factory_context,
                            Api::Api& api);
 
   const std::string& certificateChain() const override { return certificate_chain_; }
