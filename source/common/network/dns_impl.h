@@ -52,8 +52,8 @@ private:
     }
 
     template <typename AddressInstance>
-    bool fireCallback(std::function<void(const std::list<AddressInstance>&&)> callback,
-                      const std::list<AddressInstance>&& address_list) {
+    bool fireCallback(std::function<void(std::list<AddressInstance>&&)> callback,
+                      std::list<AddressInstance>&& address_list) {
       if (completed_) {
         if (!cancelled_) {
           try {

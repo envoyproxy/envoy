@@ -69,7 +69,7 @@ public:
    *        resolution failed.
    */
   using ResolveSrvCb =
-      std::function<void(const std::list<Address::SrvInstanceConstSharedPtr>&& srv_records)>;
+      std::function<void(std::list<Address::SrvInstanceConstSharedPtr>&& srv_records)>;
 
   /**
    * Initiate an async DNS resolution for an SRV record.

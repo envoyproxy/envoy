@@ -188,7 +188,7 @@ public:
   virtual const std::string& asString() const PURE;
 };
 
-typedef std::shared_ptr<const SrvInstance> SrvInstanceConstSharedPtr;
+using SrvInstanceConstSharedPtr = std::shared_ptr<const SrvInstance>;
 
 } // namespace Address
 } // namespace Network
