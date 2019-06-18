@@ -50,16 +50,16 @@ SubsetLoadBalancer::SubsetLoadBalancer(
                 describeMetadata(default_subset_metadata_));
     }
 
-    fallback_subset_ = std::make_unique<LbSubsetEntry>();
-    fallback_subset_->priority_subset_ = std::make_unique<PrioritySubsetImpl>(
+    fallback_subset_ = std::make_shared<LbSubsetEntry>();
+    fallback_subset_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
         *this, predicate, locality_weight_aware_, scale_locality_weight_);
   }
 
   if (subsets.panicModeAny()) {
     HostPredicate predicate = [](const Host&) -> bool { return true; };
 
-    panic_mode_subset_ = std::make_unique<LbSubsetEntry>();
-    panic_mode_subset_->priority_subset_ = std::make_unique<PrioritySubsetImpl>(
+    panic_mode_subset_ = std::make_shared<LbSubsetEntry>();
+    panic_mode_subset_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
         *this, predicate, locality_weight_aware_, scale_locality_weight_);
   }
 
@@ -304,8 +304,8 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
           // Initialize new entry with hosts and update stats. (An uninitialized entry
           // with only removed hosts is a degenerate case and we leave the entry
           // uninitialized.)
-          entry->priority_subset_.reset(new PrioritySubsetImpl(
-              *this, predicate, locality_weight_aware_, scale_locality_weight_));
+          entry->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
+              *this, predicate, locality_weight_aware_, scale_locality_weight_);
           stats_.lb_subsets_active_.inc();
           stats_.lb_subsets_created_.inc();
         }
@@ -410,7 +410,7 @@ SubsetLoadBalancer::findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadat
 
   if (!entry) {
     // Not found. Create an uninitialized entry.
-    entry.reset(new LbSubsetEntry());
+    entry = std::make_shared<LbSubsetEntry>();
     if (kv_it != subsets.end()) {
       ValueSubsetMap& value_subset_map = kv_it->second;
       value_subset_map.emplace(value, entry);
