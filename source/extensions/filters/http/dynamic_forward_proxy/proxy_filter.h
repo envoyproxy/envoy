@@ -31,7 +31,7 @@ using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
 
 class ProxyFilter : public Http::PassThroughDecoderFilter,
                     public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheCallbacks,
-                    Logger::Loggable<Logger::Id::dfproxy> {
+                    Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   ProxyFilter(const ProxyFilterConfigSharedPtr& config) : config_(config) {}
 

@@ -18,7 +18,7 @@ follows:
 * The dynamic forward proxy HTTP filter is used to pause requests if the target DNS host is not
   already in cache.
 * Envoy will begin asynchronously resolving the DNS address, unblocking any requests waiting on
-  the response.
+  the response when the resolution completes.
 * Any future requests will not be blocked as the DNS address is already in cache. The resolution
   process works similarly to the :ref:`logical DNS
   <arch_overview_service_discovery_types_logical_dns>` service discovery type with a single target
@@ -36,3 +36,19 @@ including authentication, RBAC, rate limiting, etc.
 
 For further configuration information see the :ref:`HTTP filter configuration documentation
 <config_http_filters_dynamic_forward_proxy>`.
+
+Memory usage details
+--------------------
+
+.. attention::
+
+  HTTP dynamic forward proxy support currently can use unbounded memory and is not ready for
+  production use. Circuit breakers and other limits will be added soon.
+
+Memory usage detail's for Envoy's dynamic forward proxy support are as follows:
+
+* Each resolved host/port pair uses a fixed amount of memory global to the server and shared
+  amongst all workers.
+* Address changes are performed inline using read/write locks and require no host reallocations.
+* Hosts removed via TTL are purged once all active connections stop referring to them and all used
+  memory is regained.

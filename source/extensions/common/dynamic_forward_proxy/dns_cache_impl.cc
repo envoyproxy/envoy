@@ -71,11 +71,15 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
     return;
   }
 
+  // TODO(mattklein123): Figure out if we want to support addresses of the form <IP>:<port>. This
+  //                     seems unlikely to be useful in TLS scenarios, but it technically supported.
+  //                     We might want to block this form for now.
   const auto colon_pos = host.find(':');
-  std::string host_to_resolve = host;
+  absl::string_view host_to_resolve = host;
   if (colon_pos != absl::string_view::npos) {
-    host_to_resolve = host.substr(0, colon_pos);
-    const auto port_str = host.substr(colon_pos + 1);
+    const absl::string_view string_view_host = host;
+    host_to_resolve = string_view_host.substr(0, colon_pos);
+    const auto port_str = string_view_host.substr(colon_pos + 1);
     uint64_t port64;
     if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
       // Just attempt to resolve whatever we were given. This will very likely fail.
@@ -86,8 +90,12 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
     }
   }
 
+  // TODO(mattklein123): Right now, the same host with different ports will become two
+  // independent primary hosts with independent DNS resolutions. I'm not sure how much this will
+  // matter, but we could consider collapsing these down and sharing the underlying DNS resolution.
   auto& primary_host =
       *primary_hosts_
+           // try_emplace() is used here for direct argument forwarding.
            .try_emplace(host,
                         std::make_unique<PrimaryHostInfo>(*this, host_to_resolve, default_port,
                                                           [this, host]() { onReResolve(host); }))

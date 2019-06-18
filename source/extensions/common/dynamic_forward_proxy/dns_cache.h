@@ -18,7 +18,7 @@ public:
   virtual ~DnsHostInfo() = default;
 
   /**
-   * Returns the host's currently resolved address. This address my change periodically due to
+   * Returns the host's currently resolved address. This address may change periodically due to
    * async re-resolution.
    */
   virtual Network::Address::InstanceConstSharedPtr address() PURE;

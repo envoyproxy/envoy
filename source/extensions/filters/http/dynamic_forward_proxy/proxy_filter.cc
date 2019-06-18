@@ -38,6 +38,11 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
     default_port = 443;
   }
 
+  // See the comments in dns_cache.h for how loadDnsCache() handles hosts with embedded ports.
+  // TODO(mattklein123): Because the filter and cluster have independent configuration, it is
+  //                     not obvious to the user if something is misconfigured. We should see if
+  //                     we can do better here, perhaps by checking the cache to see if anything
+  //                     else is attached to it or something else?
   cache_load_handle_ =
       config_->cache().loadDnsCache(headers.Host()->value().getStringView(), default_port, *this);
   if (cache_load_handle_ == nullptr) {

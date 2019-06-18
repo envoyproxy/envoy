@@ -14,7 +14,7 @@ namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 
-class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::dfproxy> {
+class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   DnsCacheImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
                const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config);
@@ -58,6 +58,8 @@ private:
 
     TimeSource& time_source_;
     Network::Address::InstanceConstSharedPtr address_;
+    // Using std::chrono::steady_clock::duration is required for compilation within an atomic vs.
+    // using MonotonicTime.
     std::atomic<std::chrono::steady_clock::duration> last_used_time_;
   };
 
@@ -65,7 +67,7 @@ private:
 
   // Primary host information that accounts for TTL, re-resolution, etc.
   struct PrimaryHostInfo {
-    PrimaryHostInfo(DnsCacheImpl& parent, const std::string& host_to_resolve, uint16_t port,
+    PrimaryHostInfo(DnsCacheImpl& parent, absl::string_view host_to_resolve, uint16_t port,
                     const Event::TimerCb& timer_cb)
         : host_to_resolve_(host_to_resolve), port_(port),
           refresh_timer_(parent.main_thread_dispatcher_.createTimer(timer_cb)) {}

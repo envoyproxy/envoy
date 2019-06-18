@@ -52,6 +52,8 @@ MockClusterInfo::MockClusterInfo()
       .WillByDefault(ReturnPointee(&max_requests_per_connection_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(stats_store_));
+  // TODO(mattklein123): The following is a hack because it's not possible to directly embed
+  // a mock transport socket factory due to circular dependencies. Fix this up in a follow up.
   ON_CALL(*this, transportSocketFactory())
       .WillByDefault(Invoke(
           [this]() -> Network::TransportSocketFactory& { return *transport_socket_factory_; }));

@@ -33,7 +33,6 @@ Cluster::Cluster(
 void Cluster::onDnsHostAddOrUpdate(
     const std::string& host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
-
   // We should never get a host with no address from the cache.
   ASSERT(host_info->address() != nullptr);
 
@@ -41,7 +40,20 @@ void Cluster::onDnsHostAddOrUpdate(
   const auto host_map_it = current_map->find(host);
   if (host_map_it != current_map->end()) {
     // If we only have an address change, we can do that swap inline without any other updates. The
-    // appropriate locking is in place to allow this.
+    // appropriate R/W locking is in place to allow this. The details of this locking are:
+    //  - Hosts are not thread local, they are global.
+    //  - We take a read lock when reading the address and a write lock when changing it.
+    //  - Address updates are very rare.
+    //  - Address reads are only done when a connection is being made and a "real" host description
+    //    is created or the host is queries via the admin endpoint. Both of these operations are
+    //    relatively rare and the read lock is held for a short period of time.
+    //
+    // TODO(mattklein123): Right now the dynamic forward proxy / DNS cache works similar to how
+    //                     logical DNS works, meaning that we only store a single address per
+    //                     resolution. It would not be difficult to also expose strict DNS
+    //                     semantics, meaning the cache would expose multiple addresses and the
+    //                     cluster would create multiple logical hosts based on those addresses.
+    //                     We will leave this is a follow up depending on need.
     ASSERT(host_info == host_map_it->second.shared_host_info_);
     ASSERT(host_map_it->second.shared_host_info_->address() !=
            host_map_it->second.logical_host_->address());

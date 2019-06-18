@@ -31,7 +31,9 @@ HTTP dynamic forward proxy.
   While configuring an empty :ref:`tls_context <envoy_api_field_Cluster.tls_Context>` on the cluster
   instructs Envoy to use TLS when connecting to upstream hosts, currently it is not possible to
   configure per-host TLS configuration parameters including SNI, certificate verification, etc. This
-  will be added in a future change.
+  will be added in a future change. **This means that the following configuration will not fully
+  validate TLS certificates**. Use with care until full support for per-host validation is
+  implemented.
 
 .. code-block:: yaml
 

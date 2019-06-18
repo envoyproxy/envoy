@@ -80,5 +80,8 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   checkSimpleRequestSuccess(512, 512, response.get());
 }
 
+// TODO(mattklein123): Add a test for host expiration. We can do this both with simulated time
+// and by checking stats.
+
 } // namespace
 } // namespace Envoy

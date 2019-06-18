@@ -13,8 +13,8 @@ Http::FilterFactoryCb DynamicForwardProxyFilterFactory::createFilterFactoryFromP
     const std::string&, Server::Configuration::FactoryContext& context) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context.singletonManager(), context.dispatcher(), context.threadLocal());
-  ProxyFilterConfigSharedPtr filter_config(
-      new ProxyFilterConfig(proto_config, cache_manager_factory, context.clusterManager()));
+  ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
+      proto_config, cache_manager_factory, context.clusterManager()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<ProxyFilter>(filter_config));
   };
