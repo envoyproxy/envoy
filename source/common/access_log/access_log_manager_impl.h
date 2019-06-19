@@ -54,7 +54,7 @@ private:
 /**
  * This is a file implementation geared for writing out access logs. It turn out that in certain
  * cases even if a standard file is opened with O_NONBLOCK, the kernel can still block when writing.
- * This implementation uses a flush thread per file, with the idea there there aren't that many
+ * This implementation uses a flush thread per file, with the idea there aren't that many
  * files. If this turns out to be a good implementation we can potentially have a single flush
  * thread that flushes all files, but we will start with this.
  */

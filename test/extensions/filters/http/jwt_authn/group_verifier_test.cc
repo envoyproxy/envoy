@@ -61,7 +61,7 @@ rules:
             - provider_name: "provider_4"
 )";
 
-typedef std::unordered_map<std::string, const Status&> StatusMap;
+using StatusMap = std::unordered_map<std::string, const Status&>;
 
 constexpr auto allowfailed = "_allow_failed_";
 
@@ -167,7 +167,7 @@ rules:
               requirements:
               - provider_name: "example_provider"
 )";
-  MessageUtil::loadFromYaml(config, proto_config_);
+  TestUtility::loadFromYaml(config, proto_config_);
   createSyncMockAuthsAndVerifier(StatusMap{{"example_provider", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setPayload(_)).WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
@@ -205,7 +205,7 @@ rules:
       requirements:
       - requires_all:
 )";
-  MessageUtil::loadFromYaml(config, proto_config_);
+  TestUtility::loadFromYaml(config, proto_config_);
   auto mock_auth = std::make_unique<MockAuthenticator>();
   EXPECT_CALL(*mock_auth, doVerify(_, _, _, _)).Times(0);
   mock_auths_["example_provider"] = std::move(mock_auth);
@@ -219,7 +219,7 @@ rules:
 
 // test requires all with both auth returning OK
 TEST_F(GroupVerifierTest, TestRequiresAll) {
-  MessageUtil::loadFromYaml(RequiresAllConfig, proto_config_);
+  TestUtility::loadFromYaml(RequiresAllConfig, proto_config_);
   createSyncMockAuthsAndVerifier(
       StatusMap{{"example_provider", Status::Ok}, {"other_provider", Status::Ok}});
 
@@ -241,7 +241,7 @@ TEST_F(GroupVerifierTest, TestRequiresAll) {
 
 // test requires all with first auth returning bad format
 TEST_F(GroupVerifierTest, TestRequiresAllBadFormat) {
-  MessageUtil::loadFromYaml(RequiresAllConfig, proto_config_);
+  TestUtility::loadFromYaml(RequiresAllConfig, proto_config_);
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"example_provider", "other_provider"});
 
@@ -265,7 +265,7 @@ TEST_F(GroupVerifierTest, TestRequiresAllBadFormat) {
 
 // test requires all with second auth returning missing jwt
 TEST_F(GroupVerifierTest, TestRequiresAllMissing) {
-  MessageUtil::loadFromYaml(RequiresAllConfig, proto_config_);
+  TestUtility::loadFromYaml(RequiresAllConfig, proto_config_);
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"example_provider", "other_provider"});
 
@@ -289,7 +289,7 @@ TEST_F(GroupVerifierTest, TestRequiresAllMissing) {
 
 // Test requires all and mock auths simulate cache misses and async return of failure statuses.
 TEST_F(GroupVerifierTest, TestRequiresAllBothFailed) {
-  MessageUtil::loadFromYaml(RequiresAllConfig, proto_config_);
+  TestUtility::loadFromYaml(RequiresAllConfig, proto_config_);
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"example_provider", "other_provider"});
 
@@ -310,7 +310,7 @@ TEST_F(GroupVerifierTest, TestRequiresAllBothFailed) {
 
 // Test requires any with first auth returning OK.
 TEST_F(GroupVerifierTest, TestRequiresAnyFirstAuthOK) {
-  MessageUtil::loadFromYaml(RequiresAnyConfig, proto_config_);
+  TestUtility::loadFromYaml(RequiresAnyConfig, proto_config_);
   createSyncMockAuthsAndVerifier(StatusMap{{"example_provider", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setPayload(_)).WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
@@ -330,7 +330,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyFirstAuthOK) {
 
 // Test requires any with last auth returning OK.
 TEST_F(GroupVerifierTest, TestRequiresAnyLastAuthOk) {
-  MessageUtil::loadFromYaml(RequiresAnyConfig, proto_config_);
+  TestUtility::loadFromYaml(RequiresAnyConfig, proto_config_);
   createSyncMockAuthsAndVerifier(
       StatusMap{{"example_provider", Status::JwtUnknownIssuer}, {"other_provider", Status::Ok}});
 
@@ -352,7 +352,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyLastAuthOk) {
 // Test requires any with both auth returning error. Requires any returns the error last received
 // back to the caller.
 TEST_F(GroupVerifierTest, TestRequiresAnyAllAuthFailed) {
-  MessageUtil::loadFromYaml(RequiresAnyConfig, proto_config_);
+  TestUtility::loadFromYaml(RequiresAnyConfig, proto_config_);
   auto mock_auth = std::make_unique<MockAuthenticator>();
   createSyncMockAuthsAndVerifier(StatusMap{{"example_provider", Status::JwtHeaderBadKid},
                                            {"other_provider", Status::JwtUnknownIssuer}});
@@ -373,7 +373,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyAllAuthFailed) {
 // Test contains a 2 provider_name in a require any along with another provider_name in require all.
 // Test simulates first require any is OK and provider_name is OK.
 TEST_F(GroupVerifierTest, TestAnyInAllFirstAnyIsOk) {
-  MessageUtil::loadFromYaml(AllWithAny, proto_config_);
+  TestUtility::loadFromYaml(AllWithAny, proto_config_);
   createSyncMockAuthsAndVerifier(StatusMap{{"provider_1", Status::Ok}, {"provider_3", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setPayload(_)).WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
@@ -389,7 +389,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllFirstAnyIsOk) {
 // Test contains a 2 provider_name in a require any along with another provider_name in require all.
 // Test simulates first require any is OK and provider_name is OK.
 TEST_F(GroupVerifierTest, TestAnyInAllLastAnyIsOk) {
-  MessageUtil::loadFromYaml(AllWithAny, proto_config_);
+  TestUtility::loadFromYaml(AllWithAny, proto_config_);
   createSyncMockAuthsAndVerifier(StatusMap{{"provider_1", Status::JwtUnknownIssuer},
                                            {"provider_2", Status::Ok},
                                            {"provider_3", Status::Ok}});
@@ -407,7 +407,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllLastAnyIsOk) {
 // Test contains a 2 provider_name in a require any along with another provider_name in require all.
 // Test simulates all require any OK and provider_name is OK.
 TEST_F(GroupVerifierTest, TestAnyInAllBothInRequireAnyIsOk) {
-  MessageUtil::loadFromYaml(AllWithAny, proto_config_);
+  TestUtility::loadFromYaml(AllWithAny, proto_config_);
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"provider_1", "provider_2", "provider_3"});
 
@@ -425,7 +425,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllBothInRequireAnyIsOk) {
 // Test contains a 2 provider_name in a require any along with another provider_name in require all.
 // Test simulates all require any failed and provider_name is OK.
 TEST_F(GroupVerifierTest, TestAnyInAllBothInRequireAnyFailed) {
-  MessageUtil::loadFromYaml(AllWithAny, proto_config_);
+  TestUtility::loadFromYaml(AllWithAny, proto_config_);
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"provider_1", "provider_2", "provider_3"});
 
@@ -443,7 +443,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllBothInRequireAnyFailed) {
 // hits and inline return of errors. Requires any returns the error last received back to the
 // caller.
 TEST_F(GroupVerifierTest, TestAllInAnyBothRequireAllFailed) {
-  MessageUtil::loadFromYaml(AnyWithAll, proto_config_);
+  TestUtility::loadFromYaml(AnyWithAll, proto_config_);
   createSyncMockAuthsAndVerifier(
       StatusMap{{"provider_1", Status::JwksFetchFail}, {"provider_3", Status::JwtExpired}});
 
@@ -457,7 +457,7 @@ TEST_F(GroupVerifierTest, TestAllInAnyBothRequireAllFailed) {
 // Test contains a requires any which in turn has 2 requires all. The first inner requires all is
 // completed with OKs. Mock auths simulate JWKs cache misses and async return of OKs.
 TEST_F(GroupVerifierTest, TestAllInAnyFirstAllIsOk) {
-  MessageUtil::loadFromYaml(AnyWithAll, proto_config_);
+  TestUtility::loadFromYaml(AnyWithAll, proto_config_);
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"provider_1", "provider_2", "provider_3", "provider_4"});
 
@@ -475,7 +475,7 @@ TEST_F(GroupVerifierTest, TestAllInAnyFirstAllIsOk) {
 // Test contains a requires any which in turn has 2 requires all. The last inner requires all is
 // completed with OKs. Mock auths simulate JWKs cache misses and async return of OKs.
 TEST_F(GroupVerifierTest, TestAllInAnyLastAllIsOk) {
-  MessageUtil::loadFromYaml(AnyWithAll, proto_config_);
+  TestUtility::loadFromYaml(AnyWithAll, proto_config_);
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"provider_1", "provider_2", "provider_3", "provider_4"});
 
@@ -491,7 +491,7 @@ TEST_F(GroupVerifierTest, TestAllInAnyLastAllIsOk) {
 // Test contains a requires any which in turn has 2 requires all. The both inner requires all are
 // completed with OKs. Mock auths simulate JWKs cache misses and async return of OKs.
 TEST_F(GroupVerifierTest, TestAllInAnyBothRequireAllAreOk) {
-  MessageUtil::loadFromYaml(AnyWithAll, proto_config_);
+  TestUtility::loadFromYaml(AnyWithAll, proto_config_);
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"provider_1", "provider_2", "provider_3", "provider_4"});
 
@@ -507,7 +507,7 @@ TEST_F(GroupVerifierTest, TestAllInAnyBothRequireAllAreOk) {
 
 // Test require any with additional allow all
 TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowAll) {
-  MessageUtil::loadFromYaml(RequiresAnyConfig, proto_config_);
+  TestUtility::loadFromYaml(RequiresAnyConfig, proto_config_);
   proto_config_.mutable_rules(0)
       ->mutable_requires()
       ->mutable_requires_any()

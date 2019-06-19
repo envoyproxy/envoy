@@ -1,9 +1,10 @@
 #include "common/api/os_sys_calls_impl.h"
 
-#include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#include <cerrno>
 
 namespace Envoy {
 namespace Api {

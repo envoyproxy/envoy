@@ -26,6 +26,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -331,7 +332,7 @@ TEST(ConfigTest, AccessLogConfig) {
     file_access_log.set_path("some_path");
     file_access_log.set_format("the format specifier");
     ProtobufWkt::Struct* custom_config = log->mutable_config();
-    MessageUtil::jsonConvert(file_access_log, *custom_config);
+    TestUtility::jsonConvert(file_access_log, *custom_config);
   }
 
   log = config.mutable_access_log()->Add();
@@ -340,7 +341,7 @@ TEST(ConfigTest, AccessLogConfig) {
     envoy::config::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("another path");
     ProtobufWkt::Struct* custom_config = log->mutable_config();
-    MessageUtil::jsonConvert(file_access_log, *custom_config);
+    TestUtility::jsonConvert(file_access_log, *custom_config);
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -385,7 +386,7 @@ public:
     envoy::config::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
     file_access_log.set_format(access_log_format);
-    MessageUtil::jsonConvert(file_access_log, *access_log->mutable_config());
+    TestUtility::jsonConvert(file_access_log, *access_log->mutable_config());
 
     return config;
   }

@@ -155,7 +155,13 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
     return nullptr;
   }
 
-  LbContextImpl lb_context(key, parent_.config_.enableHashtagging());
+  Upstream::ClusterInfoConstSharedPtr info = cluster_->info();
+  const auto& cluster_type = info->clusterType();
+  const bool use_crc16 = info->lbType() == Upstream::LoadBalancerType::ClusterProvided &&
+                         cluster_type.has_value() &&
+                         cluster_type->name() == Extensions::Clusters::ClusterTypes::get().Redis;
+  Clusters::Redis::RedisLoadBalancerContext lb_context(key, parent_.config_.enableHashtagging(),
+                                                       use_crc16);
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     return nullptr;
@@ -182,13 +188,13 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
     return nullptr;
   }
 
-  auto colon_pos = host_address.rfind(":");
+  auto colon_pos = host_address.rfind(':');
   if ((colon_pos == std::string::npos) || (colon_pos == (host_address.size() - 1))) {
     return nullptr;
   }
 
   const std::string ip_address = host_address.substr(0, colon_pos);
-  const bool ipv6 = (ip_address.find(":") != std::string::npos);
+  const bool ipv6 = (ip_address.find(':') != std::string::npos);
   std::string host_address_map_key;
   Network::Address::InstanceConstSharedPtr address_ptr;
 
@@ -249,26 +255,6 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
     parent_.dispatcher_.deferredDelete(std::move(client_to_delete->second->redis_client_));
     parent_.client_map_.erase(client_to_delete);
   }
-}
-
-// Inspired by the redis-cluster hashtagging algorithm
-// https://redis.io/topics/cluster-spec#keys-hash-tags
-absl::string_view InstanceImpl::LbContextImpl::hashtag(absl::string_view v, bool enabled) {
-  if (!enabled) {
-    return v;
-  }
-
-  auto start = v.find('{');
-  if (start == std::string::npos) {
-    return v;
-  }
-
-  auto end = v.find('}', start);
-  if (end == std::string::npos || end == start + 1) {
-    return v;
-  }
-
-  return v.substr(start + 1, end - start - 1);
 }
 
 } // namespace ConnPool

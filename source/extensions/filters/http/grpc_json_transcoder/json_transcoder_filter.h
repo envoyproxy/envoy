@@ -91,7 +91,7 @@ private:
   bool match_incoming_request_route_{false};
 };
 
-typedef std::shared_ptr<JsonTranscoderConfig> JsonTranscoderConfigSharedPtr;
+using JsonTranscoderConfigSharedPtr = std::shared_ptr<JsonTranscoderConfig>;
 
 /**
  * The filter instance for gRPC JSON transcoder.

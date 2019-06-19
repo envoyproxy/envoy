@@ -55,11 +55,12 @@ class ConfigurationImplTest : public testing::Test {
 protected:
   ConfigurationImplTest()
       : api_(Api::createApiForTest()),
-        cluster_manager_factory_(
-            server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
-            server_.random(), server_.dnsResolver(), server_.sslContextManager(),
-            server_.dispatcher(), server_.localInfo(), server_.secretManager(), *api_,
-            server_.httpContext(), server_.accessLogManager(), server_.singletonManager()) {}
+        cluster_manager_factory_(server_.admin(), server_.runtime(), server_.stats(),
+                                 server_.threadLocal(), server_.random(), server_.dnsResolver(),
+                                 server_.sslContextManager(), server_.dispatcher(),
+                                 server_.localInfo(), server_.secretManager(),
+                                 server_.messageValidationVisitor(), *api_, server_.httpContext(),
+                                 server_.accessLogManager(), server_.singletonManager()) {}
 
   Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
@@ -374,12 +375,16 @@ TEST(InitialImplTest, LayeredRuntime) {
   const std::string yaml = R"EOF(
   layered_runtime:
     layers:
-    - static_layer:
+    - name: base
+      static_layer:
         health_check:
           min_interval: 5
-    - disk_layer: { symlink_root: /srv/runtime/current/envoy }
-    - disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
-    - admin_layer: {}
+    - name: root
+      disk_layer: { symlink_root: /srv/runtime/current/envoy }
+    - name: override
+      disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
+    - name: admin
+      admin_layer: {}
   )EOF";
   const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v2::Bootstrap>(yaml);
   InitialImpl config(bootstrap);
@@ -411,8 +416,10 @@ TEST(InitialImplTest, EmptyDeprecatedRuntime) {
 
   const std::string expected_yaml = R"EOF(
   layers:
-  - static_layer: {}
-  - admin_layer: {}
+  - name: base
+    static_layer: {}
+  - name: admin
+    admin_layer: {}
   )EOF";
   const auto expected_runtime =
       TestUtility::parseYaml<envoy::config::bootstrap::v2::LayeredRuntime>(expected_yaml);
@@ -436,14 +443,16 @@ TEST(InitialImplTest, DeprecatedRuntimeTranslation) {
 
   const std::string expected_yaml = R"EOF(
   layers:
-  - static_layer:
+  - name: base
+    static_layer:
       health_check:
         min_interval: 5
   - name: root
     disk_layer: { symlink_root: /srv/runtime/current/envoy }
   - name: override
     disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
-  - admin_layer: {}
+  - name: admin
+    admin_layer: {}
   )EOF";
   const auto expected_runtime =
       TestUtility::parseYaml<envoy::config::bootstrap::v2::LayeredRuntime>(expected_yaml);

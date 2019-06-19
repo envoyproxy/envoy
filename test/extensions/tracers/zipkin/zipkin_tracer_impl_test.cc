@@ -27,6 +27,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -56,14 +57,14 @@ public:
   }
 
   void setupValidDriver() {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
 
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     collector_endpoint: /api/v1/spans
     )EOF";
     envoy::config::trace::v2::ZipkinConfig zipkin_config;
-    MessageUtil::loadFromYaml(yaml_string, zipkin_config);
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     setup(zipkin_config, true);
   }
@@ -104,20 +105,20 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
 
   {
     // Valid config but not valid cluster.
-    EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     collector_endpoint: /api/v1/spans
     )EOF";
     envoy::config::trace::v2::ZipkinConfig zipkin_config;
-    MessageUtil::loadFromYaml(yaml_string, zipkin_config);
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     EXPECT_THROW(setup(zipkin_config, false), EnvoyException);
   }
 
   {
     // valid config
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
 
     const std::string yaml_string = R"EOF(
@@ -125,7 +126,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     collector_endpoint: /api/v1/spans
     )EOF";
     envoy::config::trace::v2::ZipkinConfig zipkin_config;
-    MessageUtil::loadFromYaml(yaml_string, zipkin_config);
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     setup(zipkin_config, true);
   }
@@ -635,7 +636,7 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, false});
 
-  typedef std::function<bool(absl::string_view key)> DupCallback;
+  using DupCallback = std::function<bool(absl::string_view key)>;
   DupCallback dup_callback = [](absl::string_view key) -> bool {
     static absl::flat_hash_map<std::string, bool> dup;
     if (dup.find(key) == dup.end()) {

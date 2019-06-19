@@ -124,7 +124,7 @@ ProtocolState DecoderStateMachine::run(Buffer::Instance& buffer) {
   return state_;
 }
 
-typedef std::unique_ptr<DecoderStateMachine> DecoderStateMachinePtr;
+using DecoderStateMachinePtr = std::unique_ptr<DecoderStateMachine>;
 
 Decoder::Decoder(Protocol& protocol, Deserializer& deserializer,
                  DecoderCallbacks& decoder_callbacks)

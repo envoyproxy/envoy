@@ -292,8 +292,53 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_validate_packet_number_post_decrypti
             "If true, a QUIC endpoint will valid a received packet number after "
             "successfully decrypting the packet.")
 
-QUICHE_FLAG(bool, quic_reloadable_flag_quic_v44_disable_trial_decryption, false,
-            "Disables trial decryption in QUIC v44 and above.")
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_send_version_negotiation_fixed_bit, false,
+            "When true, version negotiation packets sent by the server will set the fixed bit.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_eliminate_static_stream_map_3, false,
+            "If true, static streams in a QuicSession will be stored inside dynamic stream map. "
+            "static_stream_map will no longer be used.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_simplify_stop_waiting, false,
+            "Do not send STOP_WAITING if no_stop_waiting_frame_ is true.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_send_quic_fallback_server_config_on_leto_error, false,
+            "If true and using Leto for QUIC shared-key calculations, GFE will react to a failure "
+            "to contact Leto by sending a REJ containing a fallback ServerConfig, allowing the "
+            "client to continue the handshake.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_fix_bbr_cwnd_in_bandwidth_resumption, true,
+            " If true, adjust congestion window when doing bandwidth resumption in BBR.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_no_lumpy_pacing_at_low_bw, false,
+            "If true, disable lumpy pacing for low bandwidth flows.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_conservative_cwnd_and_pacing_gains, false,
+            "If true, uses conservative cwnd gain and pacing gain.")
+
+QUICHE_FLAG(
+    bool, quic_reloadable_flag_quic_do_not_accept_stop_waiting, false,
+    "In v44 and above, where STOP_WAITING is never sent, close the connection if it's received.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_loss_removes_from_inflight, false,
+            "When true, remove packets from inflight where they're declared lost, rather than in "
+            "MarkForRetransmission. Also no longer marks handshake packets as no longer inflight "
+            "when they're retransmitted.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_conservative_bursts, false,
+            "If true, set burst token to 2 in cwnd bootstrapping experiment.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_deprecate_queued_control_frames, false,
+            "If true, deprecate queued_control_frames_ from QuicPacketGenerator.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_check_connected_before_flush, false,
+            "If true, check whether connection is connected before flush.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_ignore_tlpr_if_sending_ping, false,
+            "If true, ignore TLPR for retransmission delay when sending pings from ping alarm.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_terminate_gquic_connection_as_ietf, false,
+            "If true, terminate Google QUIC connections similarly as IETF QUIC.")
 
 QUICHE_FLAG(bool, quic_restart_flag_quic_allow_loas_multipacket_chlo, false,
             "If true, inspects QUIC CHLOs for kLOAS and early creates sessions "
@@ -344,6 +389,29 @@ QUICHE_FLAG(bool, quic_restart_flag_quic_use_leto_for_quic_configs, false,
 QUICHE_FLAG(bool, quic_restart_flag_quic_use_pigeon_socket_to_backend, false,
             "If true, create a shared pigeon socket for all quic to backend "
             "connections and switch to use it after successful handshake.")
+
+QUICHE_FLAG(bool, quic_restart_flag_quic_do_not_override_connection_id, false,
+            " When true, QuicFramer will not override connection IDs in headers and will instead "
+            "respect the source/destination direction as expected by IETF QUIC.")
+
+QUICHE_FLAG(bool, quic_restart_flag_quic_server_drop_version_negotiation, false,
+            "When true, QUIC server will drop IETF QUIC Version Negotiation packets.")
+
+QUICHE_FLAG(
+    bool, quic_restart_flag_quic_allow_variable_length_connection_id_for_negotiation, false,
+    "When true, allow variable length QUIC connection IDs for unsupported versions. This allows "
+    "performing version negotiation when the client-chosen server connection ID length is not 8")
+
+QUICHE_FLAG(bool, quic_restart_flag_quic_no_framer_object_in_dispatcher, false,
+            "If true, make QuicDispatcher no longer have an instance of QuicFramer.")
+
+QUICHE_FLAG(
+    bool, quic_restart_flag_dont_fetch_quic_private_keys_from_leto, false,
+    "If true, GFE will not request private keys when fetching QUIC ServerConfigs from Leto.")
+
+QUICHE_FLAG(bool, quic_restart_flag_quic_use_allocated_connection_ids, false,
+            "When true, QuicConnectionId will allocate long connection IDs on the heap instead of "
+            "inline in the object.")
 
 QUICHE_FLAG(bool, quic_allow_chlo_buffering, true,
             "If true, allows packets to be buffered in anticipation of a "
@@ -398,6 +466,9 @@ QUICHE_FLAG(int32_t, quic_max_pace_time_into_future_ms, 10,
 QUICHE_FLAG(double, quic_pace_time_into_future_srtt_fraction,
             0.125f, // One-eighth smoothed RTT
             "Smoothed RTT fraction that a connection can pace packets into the future.")
+
+QUICHE_FLAG(bool, quic_export_server_num_packets_per_write_histogram, false,
+            "If true, export number of packets written per write operation histogram.")
 
 QUICHE_FLAG(bool, http2_reloadable_flag_http2_testonly_default_false, false,
             "A testonly reloadable flag that will always default to false.")

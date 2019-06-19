@@ -28,6 +28,7 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -54,7 +55,7 @@ public:
   }
 
   void setupValidDriver() {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
@@ -62,7 +63,7 @@ public:
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v2::DatadogConfig datadog_config;
-    MessageUtil::loadFromYaml(yaml_string, datadog_config);
+    TestUtility::loadFromYaml(yaml_string, datadog_config);
 
     setup(datadog_config, true);
   }
@@ -94,19 +95,19 @@ TEST_F(DatadogDriverTest, InitializeDriver) {
 
   {
     // Valid config but not valid cluster.
-    EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
 
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v2::DatadogConfig datadog_config;
-    MessageUtil::loadFromYaml(yaml_string, datadog_config);
+    TestUtility::loadFromYaml(yaml_string, datadog_config);
 
     EXPECT_THROW(setup(datadog_config, false), EnvoyException);
   }
 
   {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
@@ -114,7 +115,7 @@ TEST_F(DatadogDriverTest, InitializeDriver) {
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v2::DatadogConfig datadog_config;
-    MessageUtil::loadFromYaml(yaml_string, datadog_config);
+    TestUtility::loadFromYaml(yaml_string, datadog_config);
 
     setup(datadog_config, true);
   }

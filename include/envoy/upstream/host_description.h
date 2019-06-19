@@ -43,7 +43,7 @@ class ClusterInfo;
  */
 class HostDescription {
 public:
-  virtual ~HostDescription() {}
+  virtual ~HostDescription() = default;
 
   /**
    * @return whether the host is a canary.
@@ -113,11 +113,6 @@ public:
   virtual Network::Address::InstanceConstSharedPtr healthCheckAddress() const PURE;
 
   /**
-   * Set the address used to health check the host.
-   */
-  virtual void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr) PURE;
-
-  /**
    * @return the priority of the host.
    */
   virtual uint32_t priority() const PURE;
@@ -128,7 +123,7 @@ public:
   virtual void priority(uint32_t) PURE;
 };
 
-typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
+using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;
 
 } // namespace Upstream
 } // namespace Envoy

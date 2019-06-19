@@ -68,10 +68,8 @@ public:
    * Start a configuration subscription asynchronously. This should be called once and will continue
    * to fetch throughout the lifetime of the Subscription object.
    * @param resources set of resource names to fetch.
-   * @param callbacks the callbacks to be notified of configuration updates. The callback must not
-   *        result in the deletion of the Subscription object.
    */
-  virtual void start(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks) PURE;
+  virtual void start(const std::set<std::string>& resource_names) PURE;
 
   /**
    * Update the resources to fetch.
@@ -80,6 +78,8 @@ public:
    */
   virtual void updateResources(const std::set<std::string>& update_to_these_names) PURE;
 };
+
+using SubscriptionPtr = std::unique_ptr<Subscription>;
 
 /**
  * Per subscription stats. @see stats_macros.h

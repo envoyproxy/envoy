@@ -123,7 +123,7 @@ protected:
         dynamic_cast<const envoy::admin::v2alpha::ListenersConfigDump&>(*message_ptr);
 
     envoy::admin::v2alpha::ListenersConfigDump expected_listeners_config_dump;
-    MessageUtil::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
+    TestUtility::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
   }
 
@@ -730,7 +730,7 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
 
   InSequence s;
 
-  MockLdsApi* lds_api = new MockLdsApi();
+  auto* lds_api = new MockLdsApi();
   EXPECT_CALL(listener_factory_, createLdsApi_(_)).WillOnce(Return(lds_api));
   envoy::api::v2::core::ConfigSource lds_config;
   manager_->createLdsApi(lds_config);
@@ -2349,7 +2349,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappi
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
                             EnvoyException,
-                            "error adding listener '127.0.0.1:1234': multiple filter chains with "
+                            "error adding listener: multiple filter chains with "
                             "overlapping matching rules are defined");
 }
 

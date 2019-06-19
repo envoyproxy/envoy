@@ -94,7 +94,7 @@ public:
     }
 
     if (!yaml.empty()) {
-      MessageUtil::loadFromYaml(yaml, proto_config_);
+      TestUtility::loadFromYaml(yaml, proto_config_);
       MessageUtil::validate(proto_config_);
     }
 
@@ -933,7 +933,7 @@ TEST_F(ConnectionManagerTest, EmptyRequestData) {
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(0);
   EXPECT_EQ(filter_->onData(buffer_, true), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(0U, store_.counter("test.request_active").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(ConnectionManagerTest, StopHandleRequest) {

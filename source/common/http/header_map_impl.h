@@ -201,7 +201,7 @@ protected:
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
 };
 
-typedef std::unique_ptr<HeaderMapImpl> HeaderMapImplPtr;
+using HeaderMapImplPtr = std::unique_ptr<HeaderMapImpl>;
 
 } // namespace Http
 } // namespace Envoy

@@ -36,7 +36,7 @@ namespace Router {
  */
 class Matchable {
 public:
-  virtual ~Matchable() {}
+  virtual ~Matchable() = default;
 
   /**
    * See if this object matches the incoming headers.
@@ -62,7 +62,7 @@ private:
 };
 
 class RouteEntryImplBase;
-typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
+using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBase>;
 
 /**
  * Direct response entry that does an SSL redirect.
@@ -218,7 +218,7 @@ private:
   const CatchAllVirtualCluster virtual_cluster_catch_all_;
 };
 
-typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
+using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
 
 /**
  * Implementation of RetryPolicy that reads from the proto route or virtual host config.
@@ -226,7 +226,8 @@ typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
 class RetryPolicyImpl : public RetryPolicy {
 
 public:
-  RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy);
+  RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy,
+                  ProtobufMessage::ValidationVisitor& validation_visitor);
   RetryPolicyImpl() {}
 
   // Router::RetryPolicy
@@ -293,7 +294,7 @@ public:
 
   class HashMethod {
   public:
-    virtual ~HashMethod() {}
+    virtual ~HashMethod() = default;
     virtual absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
                                               const Http::HeaderMap& headers,
                                               const AddCookieCallback add_cookie) const PURE;
@@ -302,7 +303,7 @@ public:
     virtual bool terminal() const PURE;
   };
 
-  typedef std::unique_ptr<HashMethod> HashMethodPtr;
+  using HashMethodPtr = std::unique_ptr<HashMethod>;
 
 private:
   std::vector<HashMethodPtr> hash_impls_;
@@ -616,7 +617,7 @@ private:
     PerFilterConfigs per_filter_configs_;
   };
 
-  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
+  using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
   absl::optional<RuntimeData> loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
 
@@ -635,7 +636,8 @@ private:
 
   RetryPolicyImpl
   buildRetryPolicy(const absl::optional<envoy::api::v2::route::RetryPolicy>& vhost_retry_policy,
-                   const envoy::api::v2::route::RouteAction& route_config) const;
+                   const envoy::api::v2::route::RouteAction& route_config,
+                   ProtobufMessage::ValidationVisitor& validation_visitor) const;
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
@@ -644,6 +646,7 @@ private:
   const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
                                  // to virtual host is currently safe.
   const bool auto_host_rewrite_;
+  const absl::optional<Http::LowerCaseString> auto_host_rewrite_header_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
   const Http::Code cluster_not_found_response_code_;
@@ -774,10 +777,9 @@ public:
 private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
 
-  typedef std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>,
-                   std::greater<int64_t>>
-      WildcardVirtualHosts;
-  typedef std::function<std::string(const std::string&, int)> SubstringFunction;
+  using WildcardVirtualHosts =
+      std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
+  using SubstringFunction = std::function<std::string(const std::string&, int)>;
   const VirtualHostImpl* findWildcardVirtualHost(const std::string& host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;

@@ -1,0 +1,2 @@
+static_resources {   clusters {     name: " "     connect_timeout {       nanos: 4     }     hosts {
+      pipe {       }     }     health_checks {       timeout {         nanos: 4       }       interval {         nanos: 4       }       unhealthy_threshold {       }       healthy_threshold {       }       tcp_health_check {       }       no_traffic_interval {         seconds: 2818048       }       interval_jitter_percent: 537791091     }   } } 

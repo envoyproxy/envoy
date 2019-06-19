@@ -59,23 +59,20 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
     : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
       init_target_(fmt::format("RdsRouteConfigSubscription {}", route_config_name_),
-                   [this]() { subscription_->start({route_config_name_}, *this); }),
+                   [this]() { subscription_->start({route_config_name_}); }),
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
-      manager_identifier_(manager_identifier) {
-  Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
+      manager_identifier_(manager_identifier),
+      validation_visitor_(factory_context_.messageValidationVisitor()) {
+  subscription_ =
+      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+          rds.config_source(),
+          Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
+          *scope_, *this);
 
-  subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
-      rds.config_source(), factory_context.localInfo(), factory_context.dispatcher(),
-      factory_context.clusterManager(), factory_context.random(), *scope_,
-      "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
-      "envoy.api.v2.RouteDiscoveryService.StreamRoutes",
-      Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
-      factory_context.api());
-
-  config_update_info_ =
-      std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource());
+  config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(
+      factory_context.timeSource(), factory_context.messageValidationVisitor());
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -95,7 +92,8 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   if (!validateUpdateSize(resources.size())) {
     return;
   }
-  auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resources[0]);
+  auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(
+      resources[0], validation_visitor_);
   MessageUtil::validate(route_config);
   if (route_config.name() != route_config_name_) {
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
@@ -108,6 +106,8 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     if (config_update_info_->routeConfiguration().has_vhds()) {
       ENVOY_LOG(debug, "rds: vhds configuration present, starting vhds: config_name={} hash={}",
                 route_config_name_, config_update_info_->configHash());
+      // TODO(dmitri-d): It's unsafe to depend directly on factory context here,
+      // the listener might have been torn down, need to remove this.
       vhds_subscription_ = std::make_unique<VhdsSubscription>(
           config_update_info_, factory_context_, stat_prefix_, route_config_providers_);
       vhds_subscription_->registerInitTargetWithInitManager(factory_context_.initManager());
@@ -127,8 +127,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
 
 void RdsRouteConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    const std::string& system_version_info) {
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   if (!removed_resources.empty()) {
     // TODO(#2500) when on-demand resource loading is supported, an RDS removal may make sense (see
     // discussion in #6879), and so we should do something other than ignoring here.
@@ -137,13 +136,10 @@ void RdsRouteConfigSubscription::onConfigUpdate(
         "Server sent a delta RDS update attempting to remove a resource (name: {}). Ignoring.",
         removed_resources[0]);
   }
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
   if (!added_resources.empty()) {
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
     *unwrapped_resource.Add() = added_resources[0].resource();
     onConfigUpdate(unwrapped_resource, added_resources[0].version());
-  } else {
-    onConfigUpdate({}, system_version_info);
-    return;
   }
 }
 

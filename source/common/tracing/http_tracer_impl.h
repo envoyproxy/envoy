@@ -59,7 +59,7 @@ public:
   const std::string True = "true";
 };
 
-typedef ConstSingleton<TracingTagValues> Tags;
+using Tags = ConstSingleton<TracingTagValues>;
 
 class TracingLogValues {
 public:
@@ -76,7 +76,7 @@ public:
   const std::string LastDownstreamTxByteSent = "last_downstream_tx_byte_sent";
 };
 
-typedef ConstSingleton<TracingLogValues> Logs;
+using Logs = ConstSingleton<TracingLogValues>;
 
 class HttpTracerUtility {
 public:
@@ -120,7 +120,7 @@ private:
   const std::vector<Http::LowerCaseString> request_headers_for_tags_{};
 };
 
-typedef ConstSingleton<EgressConfigImpl> EgressConfig;
+using EgressConfig = ConstSingleton<EgressConfigImpl>;
 
 class NullSpan : public Span {
 public:

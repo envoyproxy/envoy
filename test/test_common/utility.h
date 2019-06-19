@@ -1,7 +1,6 @@
 #pragma once
 
-#include <stdlib.h>
-
+#include <cstdlib>
 #include <list>
 #include <random>
 #include <string>
@@ -19,6 +18,7 @@
 #include "common/common/c_smart_ptr.h"
 #include "common/common/thread.h"
 #include "common/http/header_map_impl.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/fake_symbol_table_impl.h"
 
@@ -264,30 +264,59 @@ public:
    *
    * @param lhs RepeatedPtrField on LHS.
    * @param rhs RepeatedPtrField on RHS.
+   * @param ignore_ordering if ordering should be ignored. Note if true this turns
+   *   comparison into an N^2 operation.
    * @return bool indicating whether the RepeatedPtrField are equal. TestUtility::protoEqual() is
    *              used for individual element testing.
    */
-  template <class ProtoType>
+  template <typename ProtoType>
   static bool repeatedPtrFieldEqual(const Protobuf::RepeatedPtrField<ProtoType>& lhs,
-                                    const Protobuf::RepeatedPtrField<ProtoType>& rhs) {
+                                    const Protobuf::RepeatedPtrField<ProtoType>& rhs,
+                                    bool ignore_ordering = false) {
     if (lhs.size() != rhs.size()) {
       return false;
     }
 
-    for (int i = 0; i < lhs.size(); ++i) {
-      if (!TestUtility::protoEqual(lhs[i], rhs[i], /*ignore_repeated_field_ordering=*/false)) {
+    if (!ignore_ordering) {
+      for (int i = 0; i < lhs.size(); ++i) {
+        if (!TestUtility::protoEqual(lhs[i], rhs[i], /*ignore_ordering=*/false)) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+    typedef std::list<std::unique_ptr<const Protobuf::Message>> ProtoList;
+    // Iterate through using protoEqual as ignore_ordering is true, and fields
+    // in the sub-protos may also be out of order.
+    ProtoList lhs_list =
+        RepeatedPtrUtil::convertToConstMessagePtrContainer<ProtoType, ProtoList>(lhs);
+    ProtoList rhs_list =
+        RepeatedPtrUtil::convertToConstMessagePtrContainer<ProtoType, ProtoList>(rhs);
+    while (!lhs_list.empty()) {
+      bool found = false;
+      for (auto it = rhs_list.begin(); it != rhs_list.end(); ++it) {
+        if (TestUtility::protoEqual(*lhs_list.front(), **it,
+                                    /*ignore_ordering=*/true)) {
+          lhs_list.pop_front();
+          rhs_list.erase(it);
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
         return false;
       }
     }
-
     return true;
   }
 
   template <class ProtoType>
   static AssertionResult
   assertRepeatedPtrFieldEqual(const Protobuf::RepeatedPtrField<ProtoType>& lhs,
-                              const Protobuf::RepeatedPtrField<ProtoType>& rhs) {
-    if (!repeatedPtrFieldEqual(lhs, rhs)) {
+                              const Protobuf::RepeatedPtrField<ProtoType>& rhs,
+                              bool ignore_ordering = false) {
+    if (!repeatedPtrFieldEqual(lhs, rhs, ignore_ordering)) {
       return AssertionFailure() << RepeatedPtrUtil::debugString(lhs) << " does not match "
                                 << RepeatedPtrUtil::debugString(rhs);
     }
@@ -324,7 +353,7 @@ public:
    */
   template <class MessageType> static MessageType parseYaml(const std::string& yaml) {
     MessageType message;
-    MessageUtil::loadFromYaml(yaml, message);
+    TestUtility::loadFromYaml(yaml, message);
     return message;
   }
 
@@ -406,7 +435,51 @@ public:
    * @param vector of gauges to check.
    * @return bool indicating that passed gauges not matching the omitted regex have a value of 0.
    */
-  static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr> gauges);
+  static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges);
+
+  // Strict variants of Protobuf::MessageUtil
+  static void loadFromJson(const std::string& json, Protobuf::Message& message) {
+    return MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
+    return MessageUtil::loadFromJson(json, message);
+  }
+
+  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
+    return MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
+    return MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(),
+                                     api);
+  }
+
+  template <class MessageType>
+  static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
+    return MessageUtil::anyConvert<MessageType>(message,
+                                                ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  template <class MessageType>
+  static void loadFromFileAndValidate(const std::string& path, MessageType& message) {
+    return MessageUtil::loadFromFileAndValidate(path, message,
+                                                ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  template <class MessageType>
+  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
+    return MessageUtil::loadFromYamlAndValidate(yaml, message,
+                                                ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
+    // Explicit round-tripping to support conversions inside tests between arbitrary messages as a
+    // convenience.
+    ProtobufWkt::Struct tmp;
+    MessageUtil::jsonConvert(source, tmp);
+    MessageUtil::jsonConvert(tmp, ProtobufMessage::getStrictValidationVisitor(), dest);
+  }
 };
 
 /**

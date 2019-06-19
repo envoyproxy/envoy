@@ -206,7 +206,7 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // contents into a local that we can hold onto until the TLS cache is cleared
   // of all references.
   //
-  // We use a raw pointer here as it's easier to capture it in in the lambda.
+  // We use a raw pointer here as it's easier to capture it in the lambda.
   auto rejected_stats = new StatNameStorageSet;
   rejected_stats->swap(scope->central_cache_.rejected_stats_);
 
@@ -569,7 +569,7 @@ ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name,
                                                    absl::string_view tag_extracted_name,
                                                    const std::vector<Tag>& tags,
                                                    SymbolTable& symbol_table)
-    : MetricImpl(tag_extracted_name, tags, symbol_table), current_active_(0), flags_(0),
+    : MetricImpl(tag_extracted_name, tags, symbol_table), current_active_(0), used_(false),
       created_thread_id_(std::this_thread::get_id()), name_(name, symbol_table),
       symbol_table_(symbol_table) {
   histograms_[0] = hist_alloc();
@@ -586,7 +586,7 @@ ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
 void ThreadLocalHistogramImpl::recordValue(uint64_t value) {
   ASSERT(std::this_thread::get_id() == created_thread_id_);
   hist_insert_intscale(histograms_[current_active_], value, 0, 1);
-  flags_ |= Flags::Used;
+  used_ = true;
 }
 
 void ThreadLocalHistogramImpl::merge(histogram_t* target) {

@@ -28,7 +28,8 @@ Tracing::HttpTracerPtr LightstepTracerFactory::createHttpTracerTyped(
 
   Tracing::DriverPtr lightstep_driver = std::make_unique<LightStepDriver>(
       proto_config, server.clusterManager(), server.stats(), server.threadLocal(), server.runtime(),
-      std::move(opts), Common::Ot::OpenTracingDriver::PropagationMode::TracerNative);
+      std::move(opts), Common::Ot::OpenTracingDriver::PropagationMode::TracerNative,
+      server.grpcContext());
   return std::make_unique<Tracing::HttpTracerImpl>(std::move(lightstep_driver), server.localInfo());
 }
 

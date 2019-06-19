@@ -29,13 +29,15 @@ public:
    * @param random supplies the random generator.
    * @param dispatcher supplies the dispatcher.
    * @param event_logger supplies the event_logger.
+   * @param validation_visitor message validation visitor instance.
    * @return a health checker.
    */
   static HealthCheckerSharedPtr create(const envoy::api::v2::core::HealthCheck& health_check_config,
                                        Upstream::Cluster& cluster, Runtime::Loader& runtime,
                                        Runtime::RandomGenerator& random,
                                        Event::Dispatcher& dispatcher,
-                                       AccessLog::AccessLogManager& log_manager);
+                                       AccessLog::AccessLogManager& log_manager,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
 /**
@@ -66,7 +68,7 @@ private:
                                         public Http::StreamDecoder,
                                         public Http::StreamCallbacks {
     HttpActiveHealthCheckSession(HttpHealthCheckerImpl& parent, const HostSharedPtr& host);
-    ~HttpActiveHealthCheckSession();
+    ~HttpActiveHealthCheckSession() override;
 
     void onResponseComplete();
     enum class HealthCheckResult { Succeeded, Degraded, Failed };
@@ -119,7 +121,7 @@ private:
     bool expect_reset_{};
   };
 
-  typedef std::unique_ptr<HttpActiveHealthCheckSession> HttpActiveHealthCheckSessionPtr;
+  using HttpActiveHealthCheckSessionPtr = std::unique_ptr<HttpActiveHealthCheckSession>;
 
   virtual Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
 
@@ -199,7 +201,7 @@ public:
  */
 class TcpHealthCheckMatcher {
 public:
-  typedef std::list<std::vector<uint8_t>> MatchSegments;
+  using MatchSegments = std::list<std::vector<uint8_t>>;
 
   static MatchSegments loadProtoBytes(
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload>& byte_array);
@@ -239,7 +241,7 @@ private:
   struct TcpActiveHealthCheckSession : public ActiveHealthCheckSession {
     TcpActiveHealthCheckSession(TcpHealthCheckerImpl& parent, const HostSharedPtr& host)
         : ActiveHealthCheckSession(parent, host), parent_(parent) {}
-    ~TcpActiveHealthCheckSession();
+    ~TcpActiveHealthCheckSession() override;
 
     void onData(Buffer::Instance& data);
     void onEvent(Network::ConnectionEvent event);
@@ -257,7 +259,7 @@ private:
     bool expect_close_{};
   };
 
-  typedef std::unique_ptr<TcpActiveHealthCheckSession> TcpActiveHealthCheckSessionPtr;
+  using TcpActiveHealthCheckSessionPtr = std::unique_ptr<TcpActiveHealthCheckSession>;
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
@@ -285,7 +287,7 @@ private:
                                         public Http::StreamDecoder,
                                         public Http::StreamCallbacks {
     GrpcActiveHealthCheckSession(GrpcHealthCheckerImpl& parent, const HostSharedPtr& host);
-    ~GrpcActiveHealthCheckSession();
+    ~GrpcActiveHealthCheckSession() override;
 
     void onRpcComplete(Grpc::Status::GrpcStatus grpc_status, const std::string& grpc_message,
                        bool end_stream);

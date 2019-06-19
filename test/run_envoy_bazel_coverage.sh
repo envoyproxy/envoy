@@ -42,7 +42,7 @@ done
 echo "Cleanup completed. ${NUM_PREVIOUS_GCOV_FILES} files deleted."
 
 # Force dbg for path consistency later, don't include debug code in coverage.
-BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
+BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} -c dbg --copt=-DNDEBUG"
 
 # Run all tests under "bazel test", no sandbox. We're going to generate the
 # .gcda inplace in the bazel-out/ directory. This is in contrast to the "bazel
@@ -50,7 +50,7 @@ BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
 # https://github.com/bazelbuild/bazel/issues/1118). This works today as we have
 # a single coverage test binary and do not require the "bazel coverage" support
 # for collecting multiple traces and glueing them together.
-"${BAZEL_COVERAGE}" test "${COVERAGE_TARGET}" ${BAZEL_TEST_OPTIONS} \
+"${BAZEL_COVERAGE}" test "${COVERAGE_TARGET}" ${BAZEL_BUILD_OPTIONS} \
   --cache_test_results=no --cxxopt="--coverage" --cxxopt="-DENVOY_CONFIG_COVERAGE=1" \
   --linkopt="--coverage" --define ENVOY_CONFIG_COVERAGE=1 --test_output=streamed \
   --strategy=Genrule=standalone --spawn_strategy=standalone --test_timeout=4000 \
@@ -61,7 +61,7 @@ BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
 # stats. The #foo# pattern is because gcov produces files such as
 # bazel-out#local-fastbuild#bin#external#spdlog_git#_virtual_includes#spdlog#spdlog#details#pattern_formatter_impl.h.gcov.
 # To find these while modifying this regex, perform a gcov run with -k set.
-[[ -z "${GCOVR_EXCLUDE_REGEX}" ]] && GCOVR_EXCLUDE_REGEX=".*pb.h.gcov|.*#genfiles#.*|test#.*|external#.*|.*#external#.*|.*#prebuilt#.*|.*#config_validation#.*|.*#chromium_url#.*"
+[[ -z "${GCOVR_EXCLUDE_REGEX}" ]] && GCOVR_EXCLUDE_REGEX=".*pb.h.gcov|.*#k8-dbg#bin#.*|test#.*|external#.*|.*#external#.*|.*#prebuilt#.*|.*#config_validation#.*|.*#chromium_url#.*"
 [[ -z "${GCOVR_EXCLUDE_DIR}" ]] && GCOVR_EXCLUDE_DIR=".*/external/.*"
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage

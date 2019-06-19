@@ -70,8 +70,8 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
       terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
-      http_context_(store.symbolTable()), process_context_(std::move(process_context)),
-      main_thread_id_(std::this_thread::get_id()) {
+      grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
+      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -191,9 +191,9 @@ void InstanceImpl::flushStats() {
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
 
-InstanceUtil::BootstrapVersion
-InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                  const Options& options, Api::Api& api) {
+InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
+    envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
 
@@ -205,11 +205,11 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, api);
+    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
-    MessageUtil::loadFromYaml(config_yaml, bootstrap_override);
+    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     bootstrap.MergeFrom(bootstrap_override);
   }
   MessageUtil::validate(bootstrap);
@@ -252,7 +252,7 @@ void InstanceImpl::initialize(const Options& options,
             Buffer::OwnedImpl().usesOldImpl() ? "old (libevent)" : "new");
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options, *api_);
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options, messageValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
@@ -311,7 +311,8 @@ void InstanceImpl::initialize(const Options& options,
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(), *api_);
+      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
+      messageValidationVisitor(), *api_);
 
   heap_shrinker_ =
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
@@ -344,8 +345,8 @@ void InstanceImpl::initialize(const Options& options,
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
-      dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_, *api_,
-      http_context_, access_log_manager_, *singleton_manager_);
+      dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
+      messageValidationVisitor(), *api_, http_context_, access_log_manager_, *singleton_manager_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -360,6 +361,10 @@ void InstanceImpl::initialize(const Options& options,
     listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config());
   }
 
+  // We have to defer RTDS initialization until after the cluster manager is
+  // instantiated (which in turn relies on runtime...).
+  Runtime::LoaderSingleton::get().initialize(clusterManager());
+
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
@@ -371,7 +376,8 @@ void InstanceImpl::initialize(const Options& options,
             ->create(),
         *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
         *random_generator_, info_factory_, access_log_manager_, *config_.clusterManager(),
-        *local_info_, *admin_, *singleton_manager_, thread_local_, *api_);
+        *local_info_, *admin_, *singleton_manager_, thread_local_, messageValidationVisitor(),
+        *api_);
   }
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
@@ -400,9 +406,10 @@ void InstanceImpl::startWorkers() {
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
-  return std::make_unique<Runtime::LoaderImpl>(server.dispatcher(), server.threadLocal(),
-                                               config.runtime(), server.localInfo().clusterName(),
-                                               server.stats(), server.random(), server.api());
+  return std::make_unique<Runtime::LoaderImpl>(
+      server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
+      server.initManager(), server.stats(), server.random(), server.messageValidationVisitor(),
+      server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {
@@ -573,23 +580,21 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
     }
   }
 
+  // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
+  // have finished their work.
+  std::shared_ptr<Event::PostCb> cb_guard(new Event::PostCb([] {}),
+                                          [this, completion_cb](Event::PostCb* cb) {
+                                            ASSERT(std::this_thread::get_id() == main_thread_id_);
+                                            completion_cb();
+                                            delete cb;
+                                          });
+
   auto it2 = stage_completable_callbacks_.find(stage);
   if (it2 != stage_completable_callbacks_.end()) {
-    ASSERT(!it2->second.empty());
-    // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
-    // have finished their work.
-    auto completion_cb_count = std::make_shared<int>(it2->second.size());
-    Event::PostCb wrapped_cb = [this, completion_cb, completion_cb_count] {
-      ASSERT(std::this_thread::get_id() == main_thread_id_);
-      if (--*completion_cb_count == 0) {
-        completion_cb();
-      }
-    };
+    ENVOY_LOG(info, "Notifying {} callback(s) with completion.", it2->second.size());
     for (const StageCallbackWithCompletion& callback : it2->second) {
-      callback(wrapped_cb);
+      callback([cb_guard] { (*cb_guard)(); });
     }
-  } else {
-    completion_cb();
   }
 }
 

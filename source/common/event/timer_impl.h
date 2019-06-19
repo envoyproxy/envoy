@@ -11,6 +11,14 @@ namespace Envoy {
 namespace Event {
 
 /**
+ * Utility helper functions for Timer implementation.
+ */
+class TimerUtils {
+public:
+  static void millisecondsToTimeval(const std::chrono::milliseconds& d, timeval& tv);
+};
+
+/**
  * libevent implementation of Timer.
  */
 class TimerImpl : public Timer, ImplBase {

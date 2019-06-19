@@ -201,6 +201,27 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
+  absl::Notification started;
+
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    initialize("test/server/node_bootstrap.yaml");
+    auto startup_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
+                                                    [&] { started.Notify(); });
+    auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                                                     [&](Event::PostCb) { FAIL(); });
+    shutdown_handle = nullptr; // unregister callback
+    server_->run();
+    startup_handle = nullptr;
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  started.WaitForNotification();
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   bool startup = false, shutdown = false, shutdown_with_completion = false;
   absl::Notification started, shutdown_begin, completion_block, completion_done;
@@ -339,6 +360,19 @@ TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
 TEST_P(ServerInstanceImplTest, InvalidBootstrapRuntime) {
   EXPECT_THROW_WITH_MESSAGE(initialize("test/server/invalid_runtime_bootstrap.yaml"),
                             EnvoyException, "Invalid runtime entry value for foo");
+}
+
+// Validate invalid layered runtime missing a name is rejected.
+TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapMissingName) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/invalid_layered_runtime_missing_name.yaml"),
+                          EnvoyException,
+                          "RuntimeLayerValidationError.Name: \\[\"value length must be at least");
+}
+
+// Validate invalid layered runtime with duplicate names is rejected.
+TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapDuplicateName) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/invalid_layered_runtime_duplicate_name.yaml"),
+                          EnvoyException, "Duplicate layer name: some_static_laye");
 }
 
 // Regression test for segfault when server initialization fails prior to

@@ -27,7 +27,10 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "quic_platform_test",
-    srcs = ["quic_platform_test.cc"],
+    srcs = select({
+        "//bazel:linux": ["quic_platform_test.cc"],
+        "//conditions:default": [],
+    }),
     copts = ["-Wno-unused-parameter"],
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     external_deps = ["quiche_quic_platform"],
@@ -47,7 +50,7 @@ envoy_cc_test(
         "@com_googlesource_quiche//:quic_core_error_codes_lib",
         "@com_googlesource_quiche//:quic_core_types_lib",
         "@com_googlesource_quiche//:quic_platform_expect_bug",
-        "@com_googlesource_quiche//:quic_platform_mem_slice_span_lib",
+        "@com_googlesource_quiche//:quic_platform_mem_slice_span",
         "@com_googlesource_quiche//:quic_platform_mem_slice_storage_lib",
         "@com_googlesource_quiche//:quic_platform_mock_log",
         "@com_googlesource_quiche//:quic_platform_port_utils",
@@ -102,8 +105,14 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "quic_platform_epoll_clock_lib",
-    srcs = ["quic_epoll_clock.cc"],
-    hdrs = ["quic_epoll_clock.h"],
+    srcs = select({
+        "//bazel:linux": ["quic_epoll_clock.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "//bazel:linux": ["quic_epoll_clock.h"],
+        "//conditions:default": [],
+    }),
     deps = [
         "@com_googlesource_quiche//:quic_platform",
         "@com_googlesource_quiche//:quic_platform_epoll_lib",
@@ -146,7 +155,7 @@ envoy_cc_test_library(
     hdrs = ["quic_test_mem_slice_vector_impl.h"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
-        "@com_googlesource_quiche//:quic_platform_mem_slice_span_lib",
+        "@com_googlesource_quiche//:quic_platform_mem_slice_span",
     ],
 )
 

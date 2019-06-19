@@ -16,9 +16,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
-typedef envoy::config::filter::http::header_to_metadata::v2::Config::Rule Rule;
-typedef envoy::config::filter::http::header_to_metadata::v2::Config::ValueType ValueType;
-typedef std::vector<std::pair<Http::LowerCaseString, Rule>> HeaderToMetadataRules;
+using Rule = envoy::config::filter::http::header_to_metadata::v2::Config::Rule;
+using ValueType = envoy::config::filter::http::header_to_metadata::v2::Config::ValueType;
+using HeaderToMetadataRules = std::vector<std::pair<Http::LowerCaseString, Rule>>;
 
 /**
  *  Encapsulates the filter configuration with STL containers and provides an area for any custom
@@ -34,7 +34,7 @@ public:
   bool doRequest() const { return request_set_; }
 
 private:
-  typedef Protobuf::RepeatedPtrField<Rule> ProtobufRepeatedRule;
+  using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<Rule>;
 
   HeaderToMetadataRules request_rules_;
   HeaderToMetadataRules response_rules_;
@@ -56,7 +56,7 @@ private:
   const std::string& decideNamespace(const std::string& nspace) const;
 };
 
-typedef std::shared_ptr<Config> ConfigSharedPtr;
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
  * Header-To-Metadata examines request/response headers and either copies or
@@ -98,7 +98,7 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
 private:
-  typedef std::map<std::string, ProtobufWkt::Struct> StructMap;
+  using StructMap = std::map<std::string, ProtobufWkt::Struct>;
 
   const ConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};

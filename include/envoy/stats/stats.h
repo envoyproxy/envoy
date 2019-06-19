@@ -22,7 +22,7 @@ struct Tag;
  */
 class Metric {
 public:
-  virtual ~Metric() {}
+  virtual ~Metric() = default;
   /**
    * Returns the full name of the Metric. This is intended for most uses, such
    * as streaming out the name to a stats sink or admin request, or comparing
@@ -97,11 +97,8 @@ public:
    */
   struct Flags {
     static const uint8_t Used = 0x01;
-    // TODO(fredlas) these logic flags should be removed if we move to indicating combine logic in
-    // the stat declaration macros themselves. (Now that stats no longer use shared memory, it's
-    // safe to mess with what these flag bits mean whenever we want).
     static const uint8_t LogicAccumulate = 0x02;
-    static const uint8_t ImportModeUninitialized = 0x04; // Stat was discovered during import.
+    static const uint8_t NeverImport = 0x04;
   };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;
@@ -114,7 +111,7 @@ public:
  */
 class Counter : public virtual Metric {
 public:
-  virtual ~Counter() {}
+  ~Counter() override = default;
   virtual void add(uint64_t amount) PURE;
   virtual void inc() PURE;
   virtual uint64_t latch() PURE;
@@ -122,7 +119,7 @@ public:
   virtual uint64_t value() const PURE;
 };
 
-typedef std::shared_ptr<Counter> CounterSharedPtr;
+using CounterSharedPtr = std::shared_ptr<Counter>;
 
 /**
  * A gauge that can both increment and decrement.
@@ -135,7 +132,7 @@ public:
     Accumulate,    // Transfers gauge state on hot-restart.
   };
 
-  virtual ~Gauge() {}
+  ~Gauge() override = default;
 
   virtual void add(uint64_t amount) PURE;
   virtual void dec() PURE;
@@ -143,11 +140,25 @@ public:
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
   virtual uint64_t value() const PURE;
+
+  /**
+   * @return the import mode, dictating behavior of the gauge across hot restarts.
+   */
   virtual ImportMode importMode() const PURE;
+
+  /**
+   * Gauges can be created with ImportMode::Uninitialized during hot-restart
+   * merges, if they haven't yet been instantiated by the child process. When
+   * they finally get instantiated, mergeImportMode should be called to
+   * initialize the gauge's import mode. It is only valid to call
+   * mergeImportMode when the current mode is ImportMode::Uninitialized.
+   *
+   * @param import_mode the new import mode.
+   */
   virtual void mergeImportMode(ImportMode import_mode) PURE;
 };
 
-typedef std::shared_ptr<Gauge> GaugeSharedPtr;
+using GaugeSharedPtr = std::shared_ptr<Gauge>;
 
 } // namespace Stats
 } // namespace Envoy

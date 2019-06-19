@@ -86,7 +86,7 @@ public:
     absl::optional<std::chrono::milliseconds> idle_timeout_;
   };
 
-  typedef std::shared_ptr<SharedConfig> SharedConfigSharedPtr;
+  using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
 
   Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
          Server::Configuration::FactoryContext& context);
@@ -138,7 +138,7 @@ private:
     const std::string cluster_name_;
     const uint64_t cluster_weight_;
   };
-  typedef std::unique_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
+  using WeightedClusterEntrySharedPtr = std::unique_ptr<WeightedClusterEntry>;
 
   std::vector<Route> routes_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
@@ -151,7 +151,7 @@ private:
   Runtime::RandomGenerator& random_generator_;
 };
 
-typedef std::shared_ptr<Config> ConfigSharedPtr;
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
  * Per-connection TCP Proxy Cluster configuration.
@@ -311,7 +311,7 @@ private:
   Config::SharedConfigSharedPtr config_;
 };
 
-typedef std::unique_ptr<Drainer> DrainerPtr;
+using DrainerPtr = std::unique_ptr<Drainer>;
 
 class UpstreamDrainManager : public ThreadLocal::ThreadLocalObject {
 public:

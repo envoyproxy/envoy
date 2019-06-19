@@ -265,10 +265,10 @@ public:
         [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
                 hcm) {
           // Overwrite default config with our own.
-          MessageUtil::loadFromYaml(http_connection_mgr_config, hcm);
+          TestUtility::loadFromYaml(http_connection_mgr_config, hcm);
           envoy::config::filter::http::router::v2::Router router_config;
           router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
-          MessageUtil::jsonConvert(router_config, *hcm.mutable_http_filters(0)->mutable_config());
+          TestUtility::jsonConvert(router_config, *hcm.mutable_http_filters(0)->mutable_config());
 
           const bool append = mode == HeaderMode::Append;
 
@@ -285,24 +285,24 @@ public:
 
           if (use_eds_) {
             addHeader(route_config->mutable_response_headers_to_add(), "x-routeconfig-dynamic",
-                      "%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
+                      R"(%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
 
             // Iterate over VirtualHosts, nested Routes and WeightedClusters, adding a dynamic
             // response header.
             for (auto& vhost : *route_config->mutable_virtual_hosts()) {
               addHeader(vhost.mutable_response_headers_to_add(), "x-vhost-dynamic",
-                        "vhost:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
+                        R"(vhost:%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
 
               for (auto& route : *vhost.mutable_routes()) {
                 addHeader(route.mutable_response_headers_to_add(), "x-route-dynamic",
-                          "route:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
+                          R"(route:%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
 
                 if (route.has_route()) {
                   auto* route_action = route.mutable_route();
                   if (route_action->has_weighted_clusters()) {
                     for (auto& c : *route_action->mutable_weighted_clusters()->mutable_clusters()) {
                       addHeader(c.mutable_response_headers_to_add(), "x-weighted-cluster-dynamic",
-                                "weighted:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%",
+                                R"(weighted:%UPSTREAM_METADATA(["test.namespace", "key"])%)",
                                 append);
                     }
                   }
