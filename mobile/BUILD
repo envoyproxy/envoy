@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_application", "ios_framework", "ios_static_framework")
 load("@io_bazel_rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
+load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library")
 
 envoy_package()
 
@@ -35,12 +36,36 @@ aar_with_jni(
     visibility = ["//visibility:public"],
 )
 
-android_library(
+kt_android_library(
     name = "android_lib",
-    srcs = ["library/java/io/envoyproxy/envoymobile/Envoy.java"],
+    srcs = [
+        "library/java/io/envoyproxy/envoymobile/Envoy.java",
+        "library/java/io/envoyproxy/envoymobile/EnvoyEmptyClass.kt",
+    ],
+    custom_package = "io.envoyproxy.envoymobile",
+    manifest = "library/EnvoyManifest.xml",
+    deps = ["java_cc_alias"],
+)
+
+# Work around for transtive dependencies related to not including cc_libraries for kt_jvm_library
+# Related to: https://github.com/bazelbuild/rules_kotlin/issues/132
+#
+# This work around is to use an empty java_library to include the cc_library dependencies needed
+# for the kotlin jni layer
+android_library(
+    name = "java_cc_alias",
+    srcs = ["library/kotlin/io/envoyproxy/envoymobile/EnovyKotlinEmptyClass.java"],
     custom_package = "io.envoyproxy.envoymobile",
     manifest = "library/EnvoyManifest.xml",
     deps = ["//library/common:envoy_jni_interface_lib"],
+)
+
+kt_android_library(
+    name = "android_lib_kotlin",
+    srcs = ["library/kotlin/io/envoyproxy/envoymobile/Envoy.kt"],
+    custom_package = "io.envoyproxy.envoymobile",
+    manifest = "library/EnvoyManifest.xml",
+    deps = ["java_cc_alias"],
 )
 
 genrule(

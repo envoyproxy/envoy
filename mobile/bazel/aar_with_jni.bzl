@@ -23,6 +23,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+# android_library's implicit aar doesn't flatten its transitive
+# dependencies. When using the kotlin rules, the kt_android_library rule
+# creates a few underlying libraries, because of this the classes.jar in
+# the aar we built was empty. This rule separately builds the underlying
+# kt.jar file, and replaces the aar's classes.jar with the kotlin jar
 def aar_with_jni(name, android_library, archive_name = "", visibility = None):
     if not archive_name:
         archive_name = name
@@ -50,16 +55,17 @@ EOF
 
     native.genrule(
         name = name,
-        srcs = [android_library + ".aar", archive_name + "_jni_unsigned.apk"],
+        srcs = [android_library + "_kt.jar", android_library + ".aar", archive_name + "_jni_unsigned.apk"],
         outs = [archive_name + ".aar"],
         cmd = """
-cp $(location {}.aar) $(location :{}.aar)
-chmod +w $(location :{}.aar)
+cp $(location {android_library}.aar) $(location :{archive_name}.aar)
+chmod +w $(location :{archive_name}.aar)
 origdir=$$PWD
 cd $$(mktemp -d)
-unzip $$origdir/$(location :{}_jni_unsigned.apk) "lib/*"
+unzip $$origdir/$(location :{archive_name}_jni_unsigned.apk) "lib/*"
 cp -r lib jni
-zip -r $$origdir/$(location :{}.aar) jni/*/*.so
-""".format(android_library, archive_name, archive_name, archive_name, archive_name),
+cp $$origdir/$(location {android_library}_kt.jar) classes.jar
+zip -r $$origdir/$(location :{archive_name}.aar) jni/*/*.so classes.jar
+""".format(android_library = android_library, archive_name = archive_name),
         visibility = visibility,
     )

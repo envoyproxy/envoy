@@ -45,7 +45,7 @@ public class Envoy {
   // initialization with the configuration provided. If the Envoy native library and its
   // dependencies haven't been loaded and initialized yet, this will happen lazily when
   // the first instance is created.
-  public Envoy(Context context, String config) {
+  public Envoy(final Context context, final String config) {
     // Lazily initialize Envoy and its dependencies, if necessary.
     load(context);
 
