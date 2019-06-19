@@ -137,7 +137,7 @@ public:
   Http::FilterTrailersStatus onTrailers();
 
   /**
-   * Like the owning filter, we must handle inline destruction, do we have a destroy() method which
+   * Like the owning filter, we must handle inline destruction, so we have a destroy() method which
    * kills any callbacks.
    */
   void destroy() { token_timer_.reset(); }
