@@ -336,12 +336,6 @@ message UpstreamTlsContext {
   //
   // Defaults to 1, setting this to 0 disables session resumption.
   google.protobuf.UInt32Value max_session_keys = 4;
-
-  // High risky setting! If true, client will downgrade to plain text connection.
-  // Should only be used for opportunistic encryption.
-  // .. attention::
-  // TLS renegotiation is considered insecure and shouldn't be used unless absolutely necessary.
-  bool allow_downgrade = 5;
 }
 
 message DownstreamTlsContext {
