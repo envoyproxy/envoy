@@ -26,6 +26,9 @@
 namespace Envoy {
 namespace Network {
 
+// Max UDP payload.
+static const uint64_t MAX_UDP_PACKET_SIZE = 1500;
+
 UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket,
                                  UdpListenerCallbacks& cb, TimeSource& time_source)
     : BaseListenerImpl(dispatcher, socket), cb_(cb), time_source_(time_source) {
@@ -68,8 +71,8 @@ void UdpListenerImpl::onSocketEvent(short flags) {
 
 void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
-  // Max UDP payload.
-  const uint64_t read_buffer_length = 1500;
+  // TODO(danzh) make this variable configurable to support jumbo frames.
+  const uint64_t read_buffer_length = MAX_UDP_PACKET_SIZE;
   do {
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     Buffer::RawSlice slice;
