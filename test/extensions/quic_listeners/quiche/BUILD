@@ -13,11 +13,13 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "dummy_test",
-    srcs = ["dummy_test.cc"],
-    external_deps = ["quiche_http2_platform"],
+    name = "envoy_quic_alarm_test",
+    srcs = ["envoy_quic_alarm_test.cc"],
+    external_deps = ["quiche_quic_platform"],
     deps = [
-        "//source/extensions/quic_listeners/quiche:dummy_lib",
-        "//test/test_common:utility_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_factory_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_lib",
+        "//source/extensions/quic_listeners/quiche/platform:envoy_quic_clock_lib",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )

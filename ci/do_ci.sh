@@ -11,7 +11,7 @@ if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositor
   build_setup_args="-nofetch"
 fi
 
-. "$(dirname "$0")"/setup_gcs_cache.sh
+. "$(dirname "$0")"/setup_cache.sh
 . "$(dirname "$0")"/build_setup.sh $build_setup_args
 cd "${ENVOY_SRCDIR}"
 
@@ -39,72 +39,108 @@ function bazel_with_collection() {
   collect_build_profile $1
 }
 
-function bazel_release_binary_build() {
-  echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static
-  collect_build_profile release_build
-  # Copy the envoy-static binary somewhere that we can access outside of the
-  # container.
+function cp_binary_for_outside_access() {
+  DELIVERY_LOCATION="$1"
   cp -f \
     "${ENVOY_SRCDIR}"/bazel-bin/source/exe/envoy-static \
-    "${ENVOY_DELIVERY_DIR}"/envoy
-
-  # TODO(mattklein123): Replace this with caching and a different job which creates images.
-  echo "Copying release binary for image build..."
-  mkdir -p "${ENVOY_SRCDIR}"/build_release
-  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_release
-  mkdir -p "${ENVOY_SRCDIR}"/build_release_stripped
-  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_release_stripped/envoy
+    "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}"
 }
 
-function bazel_debug_binary_build() {
+function cp_binary_for_image_build() {
+  # TODO(mattklein123): Replace this with caching and a different job which creates images.
+  echo "Copying binary for image build..."
+  mkdir -p "${ENVOY_SRCDIR}"/build_"$1"
+  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_"$1"
+  mkdir -p "${ENVOY_SRCDIR}"/build_"$1"_stripped
+  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_"$1"_stripped/envoy
+}
+
+# When testing memory consumption, we want to test against exact byte-counts
+# where possible. As these differ between platforms and compile options, we
+# define the 'release' builds as canonical and test them only in CI, so the
+# toolchain is kept consistent. This ifdef is checked in
+# test/common/stats/stat_test_utility.cc when computing
+# Stats::TestUtil::MemoryTest::mode().
+MEMORY_TEST_EXACT_ARGS="--cxxopt=-DMEMORY_TEST_EXACT=1"
+
+function bazel_binary_build() {
+  BINARY_TYPE="$1"
+  if [[ "${BINARY_TYPE}" == "release" ]]; then
+    COMPILE_TYPE="opt"
+    CONFIG_ARGS="$MEMORY_TEST_EXACT_ARGS"
+  elif [[ "${BINARY_TYPE}" == "debug" ]]; then
+    COMPILE_TYPE="dbg"
+  elif [[ "${BINARY_TYPE}" == "sizeopt" ]]; then
+    # The COMPILE_TYPE variable is redundant in this case and is only here for
+    # readability. It is already set in the .bazelrc config for sizeopt.
+    COMPILE_TYPE="opt"
+    CONFIG_ARGS="--config=sizeopt"
+  elif [[ "${BINARY_TYPE}" == "fastbuild" ]]; then
+    COMPILE_TYPE="fastbuild"
+  fi
+
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c dbg //source/exe:envoy-static
-  collect_build_profile debug_build
+  bazel build ${BAZEL_BUILD_OPTIONS} -c "${COMPILE_TYPE}" //source/exe:envoy-static ${CONFIG_ARGS}
+  collect_build_profile "${BINARY_TYPE}"_build
+
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container.
-  cp -f \
-    "${ENVOY_SRCDIR}"/bazel-bin/source/exe/envoy-static \
-    "${ENVOY_DELIVERY_DIR}"/envoy-debug
+  cp_binary_for_outside_access envoy
+
+  cp_binary_for_image_build "${BINARY_TYPE}"
 }
 
 if [[ "$1" == "bazel.release" ]]; then
   setup_clang_toolchain
   echo "bazel release build with tests..."
-  bazel_release_binary_build
+  bazel_binary_build release
+  RELEASE_OPTIONS="-c opt ${MEMORY_TEST_EXACT_ARGS}"
+  BAZEL_TEST_RELEASE_OPTIONS="test ${BAZEL_TEST_OPTIONS} ${RELEASE_OPTIONS}"
 
   if [[ $# -gt 1 ]]; then
     shift
     echo "Testing $* ..."
     # Run only specified tests. Argument can be a single test
     # (e.g. '//test/common/common:assert_test') or a test group (e.g. '//test/common/...')
-    bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c opt $*
+    bazel_with_collection $BAZEL_TEST_RELEASE_OPTIONS $*
   else
     echo "Testing..."
     # We have various test binaries in the test directory such as tools, benchmarks, etc. We
     # run a build pass to make sure they compile.
 
-    bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
+    bazel build ${BAZEL_BUILD_OPTIONS} ${RELEASE_OPTIONS} //include/... //source/... //test/...
     # Now run all of the tests which should already be compiled.
-    bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c opt //test/...
+    bazel_with_collection $BAZEL_TEST_RELEASE_OPTIONS //test/...
   fi
   exit 0
 elif [[ "$1" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel release build..."
-  bazel_release_binary_build
+  bazel_binary_build release
+  exit 0
+elif [[ "$1" == "bazel.sizeopt.server_only" ]]; then
+  setup_clang_toolchain
+  echo "bazel size optimized build..."
+  bazel_binary_build sizeopt
+  exit 0
+elif [[ "$1" == "bazel.sizeopt" ]]; then
+  setup_clang_toolchain
+  echo "bazel size optimized build with tests..."
+  bazel_binary_build sizeopt
+  echo "Testing..."
+  bazel test ${BAZEL_TEST_OPTIONS} //test/... --config=sizeopt
   exit 0
 elif [[ "$1" == "bazel.debug" ]]; then
   setup_clang_toolchain
   echo "bazel debug build with tests..."
-  bazel_debug_binary_build
+  bazel_binary_build debug
   echo "Testing..."
   bazel test ${BAZEL_TEST_OPTIONS} -c dbg //test/...
   exit 0
 elif [[ "$1" == "bazel.debug.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel debug build..."
-  bazel_debug_binary_build
+  bazel_binary_build debug
   exit 0
 elif [[ "$1" == "bazel.asan" ]]; then
   setup_clang_toolchain
@@ -146,12 +182,8 @@ elif [[ "$1" == "bazel.dev" ]]; then
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel fastbuild build with tests..."
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild //source/exe:envoy-static
-  # Copy the envoy-static binary somewhere that we can access outside of the
-  # container for developers.
-  cp -f \
-    "${ENVOY_SRCDIR}"/bazel-bin/source/exe/envoy-static \
-    "${ENVOY_DELIVERY_DIR}"/envoy-fastbuild
+  bazel_binary_build fastbuild
+
   echo "Building and testing..."
   bazel test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/...
   exit 0

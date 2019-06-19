@@ -44,16 +44,6 @@ SysCallSizeResult OsSysCallsImpl::recvfrom(int sockfd, void* buffer, size_t leng
   return {rc, errno};
 }
 
-SysCallIntResult OsSysCallsImpl::shmOpen(const char* name, int oflag, mode_t mode) {
-  const int rc = ::shm_open(name, oflag, mode);
-  return {rc, errno};
-}
-
-SysCallIntResult OsSysCallsImpl::shmUnlink(const char* name) {
-  const int rc = ::shm_unlink(name);
-  return {rc, errno};
-}
-
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
   const int rc = ::ftruncate(fd, length);
   return {rc, errno};
@@ -84,6 +74,22 @@ SysCallIntResult OsSysCallsImpl::getsockopt(int sockfd, int level, int optname, 
 
 SysCallIntResult OsSysCallsImpl::socket(int domain, int type, int protocol) {
   const int rc = ::socket(domain, type, protocol);
+  return {rc, errno};
+}
+
+SysCallSizeResult OsSysCallsImpl::sendto(int fd, const void* buffer, size_t size, int flags,
+                                         const sockaddr* addr, socklen_t addrlen) {
+  const int rc = ::sendto(fd, buffer, size, flags, addr, addrlen);
+  return {rc, errno};
+}
+
+SysCallSizeResult OsSysCallsImpl::sendmsg(int fd, const msghdr* message, int flags) {
+  const int rc = ::sendmsg(fd, message, flags);
+  return {rc, errno};
+}
+
+SysCallIntResult OsSysCallsImpl::getsockname(int sockfd, sockaddr* addr, socklen_t* addrlen) {
+  const int rc = ::getsockname(sockfd, addr, addrlen);
   return {rc, errno};
 }
 

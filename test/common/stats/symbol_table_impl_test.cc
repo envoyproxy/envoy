@@ -542,19 +542,11 @@ TEST_P(StatNameTest, SharedStatNameStorageSetSwap) {
 // 2M. Note that only SymbolTableImpl is tested for memory consumption,
 // and not FakeSymbolTableImpl.
 TEST(SymbolTableTest, Memory) {
-  if (!TestUtil::hasDeterministicMallocStats()) {
-    return;
-  }
-
   // Tests a stat-name allocation strategy.
   auto test_memory_usage = [](std::function<void(absl::string_view)> fn) -> size_t {
-    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+    TestUtil::MemoryTest memory_test;
     TestUtil::forEachSampleStat(1000, fn);
-    const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
-    if (end_mem != 0) { // See warning below for asan, tsan, and mac.
-      EXPECT_GT(end_mem, start_mem);
-    }
-    return end_mem - start_mem;
+    return memory_test.consumedBytes();
   };
 
   size_t string_mem_used, symbol_table_mem_used;
@@ -575,26 +567,13 @@ TEST(SymbolTableTest, Memory) {
     }
   }
 
-  // This test only works if Memory::Stats::totalCurrentlyAllocated() works, which
-  // appears not to be the case in some tests, including asan, tsan, and mac.
-  if (Memory::Stats::totalCurrentlyAllocated() == 0) {
-    ENVOY_LOG_MISC(info,
-                   "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0.");
-  } else {
-    // Make sure we don't regress. Data as of 2019/01/04:
-    //
-    // libstdc++:
-    // ----------
-    // string_mem_used:        7759488
-    // symbol_table_mem_used:  1744280 (4.45x)
-    //
-    // libc++:
-    // -------
-    // string_mem_used:        6710912
-    // symbol_table_mem_used:  1743512 (3.85x)
-    EXPECT_LT(symbol_table_mem_used, string_mem_used / 3);
-    EXPECT_LT(symbol_table_mem_used, 1750000);
-  }
+  // Make sure we don't regress. Data as of 2019/05/29:
+  //
+  // string_mem_used:        6710912 (libc++), 7759488 (libstdc++).
+  // symbol_table_mem_used:  1726056 (3.9x) -- does not seem to depend on STL sizes.
+  EXPECT_MEMORY_LE(string_mem_used, 7759488);
+  EXPECT_MEMORY_LE(symbol_table_mem_used, string_mem_used / 3);
+  EXPECT_MEMORY_EQ(symbol_table_mem_used, 1726056);
 }
 
 } // namespace Stats

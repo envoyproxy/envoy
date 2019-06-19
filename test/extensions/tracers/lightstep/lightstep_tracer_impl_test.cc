@@ -10,6 +10,7 @@
 #include "common/http/message_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/lightstep/lightstep_tracer_impl.h"
@@ -21,6 +22,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -29,6 +31,7 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -42,6 +45,8 @@ namespace {
 
 class LightStepDriverTest : public testing::Test {
 public:
+  LightStepDriverTest() : grpc_context_(*symbol_table_) {}
+
   void setup(envoy::config::trace::v2::LightstepConfig& lightstep_config, bool init_timer,
              Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
                  Common::Ot::OpenTracingDriver::PropagationMode::TracerNative) {
@@ -59,12 +64,12 @@ public:
     }
 
     driver_ = std::make_unique<LightStepDriver>(lightstep_config, cm_, stats_, tls_, runtime_,
-                                                std::move(opts), propagation_mode);
+                                                std::move(opts), propagation_mode, grpc_context_);
   }
 
   void setupValidDriver(Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
                             Common::Ot::OpenTracingDriver::PropagationMode::TracerNative) {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
@@ -72,7 +77,7 @@ public:
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v2::LightstepConfig lightstep_config;
-    MessageUtil::loadFromYaml(yaml_string, lightstep_config);
+    TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     setup(lightstep_config, true, propagation_mode);
   }
@@ -84,10 +89,12 @@ public:
   SystemTime start_time_;
   StreamInfo::MockStreamInfo stream_info_;
 
+  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Grpc::ContextImpl grpc_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::IsolatedStoreImpl stats_;
   std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
-  Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -114,33 +121,33 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 
   {
     // Valid config but not valid cluster.
-    EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
 
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v2::LightstepConfig lightstep_config;
-    MessageUtil::loadFromYaml(yaml_string, lightstep_config);
+    TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     EXPECT_THROW(setup(lightstep_config, false), EnvoyException);
   }
 
   {
     // Valid config, but upstream cluster does not support http2.
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
 
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v2::LightstepConfig lightstep_config;
-    MessageUtil::loadFromYaml(yaml_string, lightstep_config);
+    TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     EXPECT_THROW(setup(lightstep_config, false), EnvoyException);
   }
 
   {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
@@ -148,7 +155,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v2::LightstepConfig lightstep_config;
-    MessageUtil::loadFromYaml(yaml_string, lightstep_config);
+    TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     setup(lightstep_config, true);
   }

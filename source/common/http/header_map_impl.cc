@@ -73,9 +73,8 @@ HeaderString::HeaderString(HeaderString&& move_value) {
   }
   case Type::Inline: {
     buffer_.dynamic_ = inline_buffer_;
-    memcpy(inline_buffer_, move_value.inline_buffer_, string_length_ + 1);
+    memcpy(inline_buffer_, move_value.inline_buffer_, string_length_);
     move_value.string_length_ = 0;
-    move_value.inline_buffer_[0] = 0;
     break;
   }
   }
@@ -113,7 +112,7 @@ void HeaderString::append(const char* data, uint32_t size) {
   }
 
   case Type::Inline: {
-    const uint64_t new_capacity = static_cast<uint64_t>(size) + 1 + string_length_;
+    const uint64_t new_capacity = static_cast<uint64_t>(size) + string_length_;
     if (new_capacity <= sizeof(inline_buffer_)) {
       // Already inline and the new value fits in inline storage.
       break;
@@ -133,7 +132,7 @@ void HeaderString::append(const char* data, uint32_t size) {
       dynamic_capacity_ = new_capacity;
       type_ = Type::Dynamic;
     } else {
-      if (size + 1 + string_length_ > dynamic_capacity_) {
+      if (size + string_length_ > dynamic_capacity_) {
         const uint64_t new_capacity = newCapacity(string_length_, size);
         validateCapacity(new_capacity);
 
@@ -148,7 +147,6 @@ void HeaderString::append(const char* data, uint32_t size) {
 
   memcpy(buffer_.dynamic_ + string_length_, data, size);
   string_length_ += size;
-  buffer_.dynamic_[string_length_] = 0;
   ASSERT(valid());
 }
 
@@ -158,7 +156,6 @@ void HeaderString::clear() {
     break;
   }
   case Type::Inline: {
-    inline_buffer_[0] = 0;
     FALLTHRU;
   }
   case Type::Dynamic: {
@@ -178,7 +175,7 @@ void HeaderString::setCopy(const char* data, uint32_t size) {
   }
 
   case Type::Inline: {
-    if (size + 1 <= sizeof(inline_buffer_)) {
+    if (size <= sizeof(inline_buffer_)) {
       // Already inline and the new value fits in inline storage.
       break;
     }
@@ -195,7 +192,7 @@ void HeaderString::setCopy(const char* data, uint32_t size) {
       RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
       type_ = Type::Dynamic;
     } else {
-      if (size + 1 > dynamic_capacity_) {
+      if (size > dynamic_capacity_) {
         // Need to reallocate. Use free/malloc to avoid the copy since we are about to overwrite.
         dynamic_capacity_ = size * 2;
         validateCapacity(dynamic_capacity_);
@@ -208,7 +205,6 @@ void HeaderString::setCopy(const char* data, uint32_t size) {
   }
 
   memcpy(buffer_.dynamic_, data, size);
-  buffer_.dynamic_[size] = 0;
   string_length_ = size;
   ASSERT(valid());
 }

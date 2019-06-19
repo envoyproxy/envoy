@@ -16,8 +16,8 @@ namespace ThriftProxy {
  */
 class ProtocolConverter : public virtual DecoderEventHandler {
 public:
-  ProtocolConverter() {}
-  virtual ~ProtocolConverter() {}
+  ProtocolConverter() = default;
+  ~ProtocolConverter() override = default;
 
   void initProtocolConverter(Protocol& proto, Buffer::Instance& buffer) {
     proto_ = &proto;

@@ -25,12 +25,12 @@ void StatName::debugPrint() {
   if (size_and_data_ == nullptr) {
     ENVOY_LOG_MISC(info, "Null StatName");
   } else {
-    uint64_t nbytes = dataSize();
+    const uint64_t nbytes = dataSize();
     std::string msg = absl::StrCat("dataSize=", nbytes, ":");
     for (uint64_t i = 0; i < nbytes; ++i) {
       absl::StrAppend(&msg, " ", static_cast<uint64_t>(data()[i]));
     }
-    SymbolVec encoding = SymbolTableImpl::Encoding::decodeSymbols(data(), dataSize());
+    const SymbolVec encoding = SymbolTableImpl::Encoding::decodeSymbols(data(), dataSize());
     absl::StrAppend(&msg, ", numSymbols=", encoding.size(), ":");
     for (Symbol symbol : encoding) {
       absl::StrAppend(&msg, " ", symbol);
@@ -87,7 +87,7 @@ SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage ar
 }
 
 uint64_t SymbolTableImpl::Encoding::moveToStorage(SymbolTable::Storage symbol_array) {
-  uint64_t sz = dataBytesRequired();
+  const uint64_t sz = dataBytesRequired();
   symbol_array = writeLengthReturningNext(sz, symbol_array);
   if (sz != 0) {
     memcpy(symbol_array, vec_.data(), sz * sizeof(uint8_t));
@@ -118,7 +118,7 @@ void SymbolTableImpl::addTokensToEncoding(const absl::string_view name, Encoding
 
   // We want to hold the lock for the minimum amount of time, so we do the
   // string-splitting and prepare a temp vector of Symbol first.
-  std::vector<absl::string_view> tokens = absl::StrSplit(name, '.');
+  const std::vector<absl::string_view> tokens = absl::StrSplit(name, '.');
   std::vector<Symbol> symbols;
   symbols.reserve(tokens.size());
 
@@ -167,14 +167,14 @@ std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
 
 void SymbolTableImpl::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
-  SymbolVec symbols = Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
+  const SymbolVec symbols = Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
 
-    auto encode_search = encode_map_.find(*decode_search->second);
+    auto encode_search = encode_map_.find(decode_search->second->toStringView());
     ASSERT(encode_search != encode_map_.end());
 
     ++encode_search->second.ref_count_;
@@ -183,14 +183,14 @@ void SymbolTableImpl::incRefCount(const StatName& stat_name) {
 
 void SymbolTableImpl::free(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
-  SymbolVec symbols = Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
+  const SymbolVec symbols = Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
 
-    auto encode_search = encode_map_.find(*decode_search->second);
+    auto encode_search = encode_map_.find(decode_search->second->toStringView());
     ASSERT(encode_search != encode_map_.end());
 
     // If that was the last remaining client usage of the symbol, erase the
@@ -215,8 +215,8 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
     // a string_view pointing to it in the encode_map_. This allows us to only
     // store the string once. We use unique_ptr so copies are not made as
     // flat_hash_map moves values around.
-    auto str = std::make_unique<std::string>(std::string(sv));
-    auto encode_insert = encode_map_.insert({*str, SharedSymbol(next_symbol_)});
+    InlineStringPtr str = InlineString::create(sv);
+    auto encode_insert = encode_map_.insert({str->toStringView(), SharedSymbol(next_symbol_)});
     ASSERT(encode_insert.second);
     auto decode_insert = decode_map_.insert({next_symbol_, std::move(str)});
     ASSERT(decode_insert.second);
@@ -236,7 +236,7 @@ absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const
     EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
   RELEASE_ASSERT(search != decode_map_.end(), "no such symbol");
-  return {*search->second};
+  return search->second->toStringView();
 }
 
 void SymbolTableImpl::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
@@ -255,8 +255,8 @@ bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
   // If this becomes a performance bottleneck (e.g. during sorting), we could
   // provide an iterator-like interface for incrementally decoding the symbols
   // without allocating memory.
-  SymbolVec av = Encoding::decodeSymbols(a.data(), a.dataSize());
-  SymbolVec bv = Encoding::decodeSymbols(b.data(), b.dataSize());
+  const SymbolVec av = Encoding::decodeSymbols(a.data(), a.dataSize());
+  const SymbolVec bv = Encoding::decodeSymbols(b.data(), b.dataSize());
 
   // Calling fromSymbol requires holding the lock, as it needs read-access to
   // the maps that are written when adding new symbols.
@@ -279,9 +279,9 @@ void SymbolTableImpl::debugPrint() const {
   }
   std::sort(symbols.begin(), symbols.end());
   for (Symbol symbol : symbols) {
-    std::string& token = *decode_map_.find(symbol)->second;
-    const SharedSymbol& shared_symbol = encode_map_.find(token)->second;
-    ENVOY_LOG_MISC(info, "{}: '{}' ({})", symbol, token, shared_symbol.ref_count_);
+    const InlineString& token = *decode_map_.find(symbol)->second;
+    const SharedSymbol& shared_symbol = encode_map_.find(token.toStringView())->second;
+    ENVOY_LOG_MISC(info, "{}: '{}' ({})", symbol, token.toStringView(), shared_symbol.ref_count_);
   }
 }
 #endif
@@ -298,7 +298,7 @@ StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table)
     : bytes_(table.encode(name)) {}
 
 StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
-  uint64_t size = src.size();
+  const uint64_t size = src.size();
   bytes_ = std::make_unique<SymbolTable::Storage>(size);
   src.copyToStorage(bytes_.get());
   table.incRefCount(statName());
@@ -324,10 +324,12 @@ void StatNamePool::clear() {
   storage_vector_.clear();
 }
 
-StatName StatNamePool::add(absl::string_view str) {
+uint8_t* StatNamePool::addReturningStorage(absl::string_view str) {
   storage_vector_.push_back(Stats::StatNameStorage(str, symbol_table_));
-  return StatName(storage_vector_.back().bytes());
+  return storage_vector_.back().bytes();
 }
+
+StatName StatNamePool::add(absl::string_view str) { return StatName(addReturningStorage(str)); }
 
 StatNameStorageSet::~StatNameStorageSet() {
   // free() must be called before destructing StatNameStorageSet to decrement
@@ -367,9 +369,9 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_
   auto bytes = std::make_unique<Storage>(num_bytes + StatNameSizeEncodingBytes);
   uint8_t* p = writeLengthReturningNext(num_bytes, bytes.get());
   for (StatName stat_name : stat_names) {
-    num_bytes = stat_name.dataSize();
-    memcpy(p, stat_name.data(), num_bytes);
-    p += num_bytes;
+    const uint64_t stat_name_bytes = stat_name.dataSize();
+    memcpy(p, stat_name.data(), stat_name_bytes);
+    p += stat_name_bytes;
   }
   return bytes;
 }
@@ -408,10 +410,10 @@ void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_
 StatNameList::~StatNameList() { ASSERT(!populated()); }
 
 void StatNameList::iterate(const std::function<bool(StatName)>& f) const {
-  uint8_t* p = &storage_[0];
-  uint32_t num_elements = *p++;
+  const uint8_t* p = &storage_[0];
+  const uint32_t num_elements = *p++;
   for (uint32_t i = 0; i < num_elements; ++i) {
-    StatName stat_name(p);
+    const StatName stat_name(p);
     p += stat_name.size();
     if (!f(stat_name)) {
       break;

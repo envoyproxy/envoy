@@ -130,7 +130,7 @@ struct ResponseCodeDetailValues {
   const std::string LateUpstreamReset = "upstream_reset_after_response_started";
 };
 
-typedef ConstSingleton<ResponseCodeDetailValues> ResponseCodeDetails;
+using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
 
 struct UpstreamTiming {
   /**
@@ -176,7 +176,7 @@ struct UpstreamTiming {
  */
 class StreamInfo {
 public:
-  virtual ~StreamInfo() {}
+  virtual ~StreamInfo() = default;
 
   /**
    * @param response_flag the response flag. Each filter can set independent response flags. The
@@ -202,6 +202,15 @@ public:
    */
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
 
+  /**
+   * @param std::string name denotes the name of the route.
+   */
+  virtual void setRouteName(absl::string_view name) PURE;
+
+  /**
+   * @return std::string& the name of the route.
+   */
+  virtual const std::string& getRouteName() const PURE;
   /**
    * @param bytes_received denotes number of bytes to add to total received bytes.
    */

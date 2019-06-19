@@ -352,7 +352,8 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
               "enum" : ["Subject", "SAN"]
           }
       },
-      "generate_request_id" : {"type" : "boolean"}
+      "generate_request_id" : {"type" : "boolean"},
+      "preserve_external_request_id" : {"type" : "boolean"}
     },
     "required" : ["codec_type", "stat_prefix", "filters"],
     "additionalProperties" : false
@@ -1127,101 +1128,6 @@ const std::string Json::Schema::ROUTER_HTTP_FILTER_SCHEMA(R"EOF(
   }
   )EOF");
 
-const std::string Json::Schema::CLUSTER_MANAGER_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "definitions" : {
-      "sds" : {
-        "type" : "object",
-        "properties" : {
-          "cluster" : {"type" : "object"},
-          "refresh_delay_ms" : {
-            "type" : "integer",
-            "minimum" : 0,
-            "exclusiveMinimum" : true
-          }
-        },
-        "required" : ["cluster", "refresh_delay_ms"],
-        "additionalProperties" : false
-      },
-      "cds" : {
-        "type" : "object",
-        "properties" : {
-          "cluster" : {"type" : "object"},
-          "refresh_delay_ms" : {
-            "type" : "integer",
-            "minimum" : 0,
-            "exclusiveMinimum" : true
-          },
-          "api_type" : {
-            "type" : "string",
-            "enum" : ["REST", "GRPC"]
-          }
-        },
-        "required" : ["cluster"],
-        "additionalProperties" : false
-      }
-    },
-    "type" : "object",
-    "properties" : {
-      "clusters" : {
-        "type" : "array",
-        "items" : {"type": "object"}
-      },
-      "sds" : {"$ref" : "#/definitions/sds"},
-      "local_cluster_name" : {"type" : "string"},
-      "outlier_detection" : {
-        "type" : "object",
-        "properties" : {
-          "event_log_path" : {"type" : "string"}
-        },
-        "additionalProperties" : false
-      },
-      "cds" : {"$ref" : "#/definitions/cds"}
-    },
-    "required" : ["clusters"],
-    "additionalProperties" : false
-  }
-  )EOF");
-
-const std::string Json::Schema::LDS_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "type" : "object",
-    "properties" : {
-      "listeners" : {
-        "type" : "array",
-        "items" : {"type" : "object"}
-      }
-    },
-    "required" : ["listeners"],
-    "additionalProperties" : false
-  }
-  )EOF");
-
-const std::string Json::Schema::LDS_CONFIG_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "type" : "object",
-    "properties" : {
-      "api_type" : {
-        "type" : "string",
-        "enum" : ["REST", "GRPC"]
-      },
-      "cluster" : {
-        "type" : "string"
-      },
-      "refresh_delay_ms" : {
-        "type" : "integer",
-        "minimum" : 0,
-        "exclusiveMinimum" : true
-      }
-    },
-    "required" : ["cluster"],
-    "additionalProperties" : false
-  }
-  )EOF");
-
 const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
@@ -1618,57 +1524,6 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
     },
     "required" : ["name", "type", "connect_timeout_ms", "lb_type"],
     "additionalProperties" : false
-  }
-  )EOF");
-
-const std::string Json::Schema::CDS_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "type" : "object",
-    "properties" : {
-      "clusters" : {
-        "type" : "array",
-        "items" : {"type" : "object"}
-      }
-    },
-    "required" : ["clusters"],
-    "additionalProperties" : false
-  }
-  )EOF");
-
-const std::string Json::Schema::SDS_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "definitions" : {
-      "host" : {
-        "type" : "object",
-        "properties" : {
-          "ip_address" : {"type" : "string"},
-          "port" : {"type" : "integer"},
-          "tags" : {
-            "type" : "object",
-            "properties" : {
-              "az" : {"type" : "string"},
-              "canary" : {"type" : "boolean"},
-              "load_balancing_weight": {
-                "type" : "integer",
-                "minimum" : 1,
-                "maximum" : 100
-              }
-            }
-          }
-        },
-        "required" : ["ip_address", "port"]
-      }
-    },
-    "type" : "object",
-    "properties" : {
-      "hosts" : {
-        "type" : "array",
-        "items" : {"$ref" : "#/definitions/host"}
-      }
-    },
-    "required" : ["hosts"]
   }
   )EOF");
 } // namespace Envoy

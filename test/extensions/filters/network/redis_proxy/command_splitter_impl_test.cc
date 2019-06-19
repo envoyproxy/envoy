@@ -13,11 +13,7 @@
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
-
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ByRef;
@@ -40,12 +36,13 @@ namespace CommandSplitter {
 
 class PassthruRouter : public Router {
 public:
-  PassthruRouter(ConnPool::InstanceSharedPtr conn_pool) : conn_pool_(conn_pool) {}
+  PassthruRouter(ConnPool::InstanceSharedPtr conn_pool)
+      : route_(std::make_shared<testing::NiceMock<MockRoute>>(conn_pool)) {}
 
-  ConnPool::InstanceSharedPtr upstreamPool(std::string&) override { return conn_pool_; }
+  RouteSharedPtr upstreamPool(std::string&) override { return route_; }
 
 private:
-  ConnPool::InstanceSharedPtr conn_pool_;
+  RouteSharedPtr route_;
 };
 
 class RedisCommandSplitterImplTest : public testing::Test {
@@ -71,6 +68,29 @@ public:
   SplitRequestPtr handle_;
 };
 
+TEST_F(RedisCommandSplitterImplTest, AuthWithNoPassword) {
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = Response::get().InvalidRequest;
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"auth"});
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.invalid_request").value());
+}
+
+TEST_F(RedisCommandSplitterImplTest, CommandWhenAuthStillNeeded) {
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "NOAUTH Authentication required.";
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(false));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"get", "foo"});
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_));
+}
+
 TEST_F(RedisCommandSplitterImplTest, InvalidRequestNotArray) {
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
@@ -82,10 +102,23 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestNotArray) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.invalid_request").value());
 }
 
+TEST_F(RedisCommandSplitterImplTest, InvalidRequestEmptyArray) {
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = Response::get().InvalidRequest;
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  request->type(Common::Redis::RespType::Array);
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.invalid_request").value());
+}
+
 TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayTooSmall) {
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
   response.asString() = Response::get().InvalidRequest;
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"incr"});
@@ -111,6 +144,7 @@ TEST_F(RedisCommandSplitterImplTest, UnsupportedCommand) {
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
   response.asString() = "unsupported command 'newcommand'";
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"newcommand", "hello"});
@@ -123,6 +157,7 @@ class RedisSingleServerRequestTest : public RedisCommandSplitterImplTest,
                                      public testing::WithParamInterface<std::string> {
 public:
   void makeRequest(const std::string& hash_key, Common::Redis::RespValuePtr&& request) {
+    EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
     EXPECT_CALL(*conn_pool_, makeRequest(hash_key, Ref(*request), _))
         .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
     handle_ = splitter_.makeRequest(std::move(request), callbacks_);
@@ -233,6 +268,7 @@ TEST_P(RedisSingleServerRequestTest, Cancel) {
 TEST_P(RedisSingleServerRequestTest, NoUpstream) {
   InSequence s;
 
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {GetParam(), "hello"});
   EXPECT_CALL(*conn_pool_, makeRequest("hello", Ref(*request), _)).WillOnce(Return(nullptr));
@@ -261,6 +297,7 @@ TEST_F(RedisSingleServerRequestTest, PingSuccess) {
   response.type(Common::Redis::RespType::SimpleString);
   response.asString() = "PONG";
 
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   handle_ = splitter_.makeRequest(std::move(request), callbacks_);
   EXPECT_EQ(nullptr, handle_);
@@ -323,11 +360,13 @@ TEST_F(RedisSingleServerRequestTest, EvalWrongNumberOfArgs) {
   response.type(Common::Redis::RespType::Error);
 
   response.asString() = "wrong number of arguments for 'eval' command";
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   makeBulkStringArray(*request1, {"eval", "return {ARGV[1]}"});
   EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request1), callbacks_));
 
   response.asString() = "wrong number of arguments for 'evalsha' command";
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   makeBulkStringArray(*request2, {"evalsha", "return {ARGV[1]}", "1"});
   EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request2), callbacks_));
@@ -336,6 +375,7 @@ TEST_F(RedisSingleServerRequestTest, EvalWrongNumberOfArgs) {
 TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
   InSequence s;
 
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"eval", "return {ARGV[1]}", "1", "key", "arg"});
   EXPECT_CALL(*conn_pool_, makeRequest("key", Ref(*request), _)).WillOnce(Return(nullptr));
@@ -565,6 +605,9 @@ public:
     pool_callbacks_.resize(num_gets);
     std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_gets);
     pool_requests_.swap(tmp_pool_requests);
+
+    EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+
     for (uint32_t i = 0; i < num_gets; i++) {
       makeBulkStringArray(expected_requests_[i], {"get", std::to_string(i)});
       Common::Redis::Client::PoolRequest* request_to_use = nullptr;
@@ -959,6 +1002,9 @@ public:
     pool_callbacks_.resize(num_sets);
     std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_sets);
     pool_requests_.swap(tmp_pool_requests);
+
+    EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+
     for (uint32_t i = 0; i < num_sets; i++) {
       makeBulkStringArray(expected_requests_[i], {"set", std::to_string(i), std::to_string(i)});
       Common::Redis::Client::PoolRequest* request_to_use = nullptr;
@@ -1057,6 +1103,7 @@ TEST_F(RedisMSETCommandHandlerTest, WrongNumberOfArgs) {
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
   response.asString() = "wrong number of arguments for 'mset' command";
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"mset", "foo", "bar", "fizz"});
@@ -1212,6 +1259,9 @@ public:
     pool_callbacks_.resize(num_commands);
     std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_commands);
     pool_requests_.swap(tmp_pool_requests);
+
+    EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+
     for (uint32_t i = 0; i < num_commands; i++) {
       makeBulkStringArray(expected_requests_[i], {GetParam(), std::to_string(i)});
       Common::Redis::Client::PoolRequest* request_to_use = nullptr;
@@ -1435,6 +1485,7 @@ INSTANTIATE_TEST_SUITE_P(
 class RedisSingleServerRequestWithLatencyMicrosTest : public RedisSingleServerRequestTest {
 public:
   void makeRequest(const std::string& hash_key, Common::Redis::RespValuePtr&& request) {
+    EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
     EXPECT_CALL(*conn_pool_, makeRequest(hash_key, Ref(*request), _))
         .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
     handle_ = splitter_.makeRequest(std::move(request), callbacks_);

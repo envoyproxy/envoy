@@ -24,7 +24,7 @@ public:
    * Build Buffer::Instance which aliases the data in a grpc::ByteBuffer.
    * @param buffer source data container.
    * @return a Buffer::InstancePtr aliased to the data in the provided grpc::ByteBuffer and
-   * owning the corresponding grpc::Slice(s).
+   * owning the corresponding grpc::Slice(s) or nullptr if the grpc::ByteBuffer is bad.
    */
   static Buffer::InstancePtr makeBufferInstance(const grpc::ByteBuffer& buffer);
 };

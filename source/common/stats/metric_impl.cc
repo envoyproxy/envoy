@@ -34,7 +34,7 @@ MetricImpl::MetricImpl(absl::string_view tag_extracted_name, const std::vector<T
 void MetricImpl::clear() { stat_names_.clear(symbolTable()); }
 
 std::string MetricImpl::tagExtractedName() const {
-  return symbolTable().toString(tagExtractedStatName());
+  return constSymbolTable().toString(tagExtractedStatName());
 }
 
 StatName MetricImpl::tagExtractedStatName() const {
@@ -76,7 +76,7 @@ void MetricImpl::iterateTagStatNames(const TagStatNameIterFn& fn) const {
 }
 
 void MetricImpl::iterateTags(const TagIterFn& fn) const {
-  const SymbolTable& symbol_table = symbolTable();
+  const SymbolTable& symbol_table = constSymbolTable();
   iterateTagStatNames([&fn, &symbol_table](StatName name, StatName value) -> bool {
     return fn(Tag{symbol_table.toString(name), symbol_table.toString(value)});
   });

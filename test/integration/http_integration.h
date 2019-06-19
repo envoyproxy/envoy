@@ -39,6 +39,7 @@ public:
   bool waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::milliseconds(0));
   Network::ClientConnection* connection() const { return connection_.get(); }
   Network::ConnectionEvent last_connection_event() const { return last_connection_event_; }
+  Network::Connection& rawConnection() { return *connection_; }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -72,7 +73,7 @@ private:
   Network::ConnectionEvent last_connection_event_;
 };
 
-typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
+using IntegrationCodecClientPtr = std::unique_ptr<IntegrationCodecClient>;
 
 /**
  * Test fixture for HTTP and HTTP/2 integration tests.
@@ -141,11 +142,12 @@ protected:
   void checkSimpleRequestSuccess(uint64_t expected_request_size, uint64_t expected_response_size,
                                  IntegrationStreamDecoder* response);
 
-  typedef std::function<Network::ClientConnectionPtr()> ConnectionCreationFunction;
+  using ConnectionCreationFunction = std::function<Network::ClientConnectionPtr()>;
   // Sends a simple header-only HTTP request, and waits for a response.
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
                                                     int upstream_index,
-                                                    const std::string& path = "/test/long/url");
+                                                    const std::string& path = "/test/long/url",
+                                                    const std::string& authority = "host");
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
 
@@ -154,7 +156,8 @@ protected:
                                             ConnectionCreationFunction* creator = nullptr);
   void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
                                               int upstream_index = 0,
-                                              const std::string& path = "/test/long/url");
+                                              const std::string& path = "/test/long/url",
+                                              const std::string& authority = "host");
   void testRequestAndResponseShutdownWithActiveConnection();
 
   // Disconnect tests

@@ -24,19 +24,17 @@ namespace RedisProxy {
 /**
  * All redis proxy stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_REDIS_PROXY_STATS(COUNTER, GAUGE)                                                      \
-  COUNTER(downstream_cx_rx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_rx_bytes_buffered)                                                         \
-  COUNTER(downstream_cx_tx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
-  COUNTER(downstream_cx_protocol_error)                                                            \
-  COUNTER(downstream_cx_total)                                                                     \
-  GAUGE  (downstream_cx_active)                                                                    \
   COUNTER(downstream_cx_drain_close)                                                               \
+  COUNTER(downstream_cx_protocol_error)                                                            \
+  COUNTER(downstream_cx_rx_bytes_total)                                                            \
+  COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_cx_tx_bytes_total)                                                            \
   COUNTER(downstream_rq_total)                                                                     \
-  GAUGE  (downstream_rq_active)
-// clang-format on
+  GAUGE(downstream_cx_active, Accumulate)                                                          \
+  GAUGE(downstream_cx_rx_bytes_buffered, Accumulate)                                               \
+  GAUGE(downstream_cx_tx_bytes_buffered, Accumulate)                                               \
+  GAUGE(downstream_rq_active, Accumulate)
 
 /**
  * Struct definition for all redis proxy stats. @see stats_macros.h
@@ -52,19 +50,20 @@ class ProxyFilterConfig {
 public:
   ProxyFilterConfig(const envoy::config::filter::network::redis_proxy::v2::RedisProxy& config,
                     Stats::Scope& scope, const Network::DrainDecision& drain_decision,
-                    Runtime::Loader& runtime);
+                    Runtime::Loader& runtime, Api::Api& api);
 
   const Network::DrainDecision& drain_decision_;
   Runtime::Loader& runtime_;
   const std::string stat_prefix_;
   const std::string redis_drain_close_runtime_key_{"redis.drain_close_enabled"};
   ProxyStats stats_;
+  const std::string downstream_auth_password_;
 
 private:
   static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
 };
 
-typedef std::shared_ptr<ProxyFilterConfig> ProxyFilterConfigSharedPtr;
+using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
 
 /**
  * A redis multiplexing proxy filter. This filter will take incoming redis pipelined commands, and
@@ -91,12 +90,16 @@ public:
   // Common::Redis::DecoderCallbacks
   void onRespValue(Common::Redis::RespValuePtr&& value) override;
 
+  bool connectionAllowed() { return connection_allowed_; }
+
 private:
   struct PendingRequest : public CommandSplitter::SplitCallbacks {
     PendingRequest(ProxyFilter& parent);
     ~PendingRequest();
 
     // RedisProxy::CommandSplitter::SplitCallbacks
+    bool connectionAllowed() override { return parent_.connectionAllowed(); }
+    void onAuth(const std::string& password) override { parent_.onAuth(*this, password); }
     void onResponse(Common::Redis::RespValuePtr&& value) override {
       parent_.onResponse(*this, std::move(value));
     }
@@ -106,6 +109,7 @@ private:
     CommandSplitter::SplitRequestPtr request_handle_;
   };
 
+  void onAuth(PendingRequest& request, const std::string& password);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
 
   Common::Redis::DecoderPtr decoder_;
@@ -115,6 +119,7 @@ private:
   Buffer::OwnedImpl encoder_buffer_;
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;
+  bool connection_allowed_;
 };
 
 } // namespace RedisProxy

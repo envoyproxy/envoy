@@ -13,7 +13,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/hash.h"
 #include "common/network/address_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
@@ -21,8 +20,11 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "source/extensions/clusters/redis/redis_cluster_lb.h"
+
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
+#include "extensions/filters/network/common/redis/utility.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
 
 namespace Envoy {
@@ -39,7 +41,8 @@ public:
   InstanceImpl(
       const std::string& cluster_name, Upstream::ClusterManager& cm,
       Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-      const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config);
+      const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
+      Api::Api& api, Stats::SymbolTable& symbol_table);
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
   makeRequest(const std::string& key, const Common::Redis::RespValue& request,
@@ -47,6 +50,10 @@ public:
   Common::Redis::Client::PoolRequest*
   makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                     Common::Redis::Client::PoolCallbacks& callbacks) override;
+  Stats::SymbolTable& symbolTable() { return symbol_table_; }
+
+  // Allow the unit test to have access to private members.
+  friend class RedisConnPoolImplTest;
 
 private:
   struct ThreadLocalPool;
@@ -64,12 +71,13 @@ private:
     Common::Redis::Client::ClientPtr redis_client_;
   };
 
-  typedef std::unique_ptr<ThreadLocalActiveClient> ThreadLocalActiveClientPtr;
+  using ThreadLocalActiveClientPtr = std::unique_ptr<ThreadLocalActiveClient>;
 
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
                            public Upstream::ClusterUpdateCallbacks {
     ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
     ~ThreadLocalPool();
+    ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);
     Common::Redis::Client::PoolRequest*
     makeRequest(const std::string& key, const Common::Redis::RespValue& request,
                 Common::Redis::Client::PoolCallbacks& callbacks);
@@ -93,23 +101,15 @@ private:
     std::unordered_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
     Envoy::Common::CallbackHandle* host_set_member_update_cb_handle_{};
     std::unordered_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
-  };
-
-  struct LbContextImpl : public Upstream::LoadBalancerContextBase {
-    LbContextImpl(const std::string& key, bool enabled_hashtagging)
-        : hash_key_(MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))) {}
-
-    absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
-
-    absl::string_view hashtag(absl::string_view v, bool enabled);
-
-    const absl::optional<uint64_t> hash_key_;
+    std::string auth_password_;
   };
 
   Upstream::ClusterManager& cm_;
   Common::Redis::Client::ClientFactory& client_factory_;
   ThreadLocal::SlotPtr tls_;
   Common::Redis::Client::ConfigImpl config_;
+  Api::Api& api_;
+  Stats::SymbolTable& symbol_table_;
 };
 
 } // namespace ConnPool

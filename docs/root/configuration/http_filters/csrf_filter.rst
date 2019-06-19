@@ -26,11 +26,12 @@ a request originated from the same host.
 
 When the filter is evaluating a request, it ensures both pieces of information are present
 and compares their values. If the source origin is missing or the origins do not match
-the request is rejected.
+the request is rejected. The exception to this being if the source origin has been
+added to the policy as valid.
 
   .. note::
     Due to differing functionality between browsers this filter will determine
-    a request's source origin from the Host header. If that is not present it will
+    a request's source origin from the Origin header. If that is not present it will
     fall back to the host and port value from the requests Referer header.
 
 
@@ -43,6 +44,29 @@ For more information on CSRF please refer to the pages below.
   .. note::
 
     This filter should be configured with the name *envoy.csrf*.
+
+.. _csrf-configuration:
+
+Configuration
+-------------
+
+The CSRF filter supports the ability to extend the source origins it will consider
+valid. The reason it is able to do this while still mitigating cross-site request
+forgery attempts is because the target origin has already been reached by the time
+front-envoy is applying the filter. This means that while endpoints may support
+cross-origin requests they are still protected from malicious third-parties who
+have not been whitelisted.
+
+It's important to note that requests should generally originate from the same
+origin as the target but there are use cases where that may not be possible.
+For example, if you are hosting a static site on a third-party vendor but need
+to make requests for tracking purposes.
+
+.. warning::
+
+  Additional origins can be either an exact string, regex pattern, prefix string,
+  or suffix string. It's advised to be cautious when adding regex, prefix, or suffix
+  origins since an ambiguous origin can pose a security vulnerability.
 
 .. _csrf-runtime:
 

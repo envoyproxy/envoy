@@ -589,12 +589,21 @@ public:
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
     EXPECT_TRUE(admin_.setCurrentClientCertDetails().empty());
+    admin_filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                         Buffer::Instance& response, absl::string_view method) {
+                         Buffer::Instance& response, absl::string_view method,
+                         absl::string_view body = absl::string_view()) {
+    if (!body.empty()) {
+      request_headers_.insertContentType().value(
+          Http::Headers::get().ContentTypeValues.FormUrlEncoded);
+      callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>(body);
+    }
+
     request_headers_.insertMethod().value(method.data(), method.size());
     admin_filter_.decodeHeaders(request_headers_, false);
+
     return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
   }
 
@@ -617,6 +626,7 @@ public:
   AdminImpl admin_;
   Http::TestHeaderMapImpl request_headers_;
   Server::AdminFilter admin_filter_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
@@ -875,7 +885,7 @@ TEST_P(AdminInstanceTest, Memory) {
   EXPECT_EQ(Http::Code::OK, getCallback("/memory", header_map, response));
   const std::string output_json = response.toString();
   envoy::admin::v2alpha::Memory output_proto;
-  MessageUtil::loadFromJson(output_json, output_proto);
+  TestUtility::loadFromJson(output_json, output_proto);
   EXPECT_THAT(output_proto,
               AllOf(Property(&envoy::admin::v2alpha::Memory::allocated, Ge(0)),
                     Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0)),
@@ -997,6 +1007,22 @@ TEST_P(AdminInstanceTest, RuntimeModify) {
   EXPECT_EQ("OK\n", response.toString());
 }
 
+TEST_P(AdminInstanceTest, RuntimeModifyParamsInBody) {
+  Runtime::MockLoader loader;
+  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
+
+  const std::string key = "routing.traffic_shift.foo";
+  const std::string value = "numerator: 1\ndenominator: TEN_THOUSAND\n";
+  const std::unordered_map<std::string, std::string> overrides = {{key, value}};
+  EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
+
+  const std::string body = fmt::format("{}={}", key, value);
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(Http::Code::OK, runCallback("/runtime_modify", header_map, response, "POST", body));
+  EXPECT_EQ("OK\n", response.toString());
+}
+
 TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
@@ -1044,8 +1070,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   store.counter("test_counter").add(10);
   store.counter("rest_counter").add(10);
   store.counter("arest_counter").add(5);
-  store.gauge("test_gauge").set(11);
-  store.gauge("atest_gauge").set(10);
+  store.gauge("test_gauge", Stats::Gauge::ImportMode::Accumulate).set(11);
+  store.gauge("atest_gauge", Stats::Gauge::ImportMode::Accumulate).set(10);
   ON_CALL(*host, gauges()).WillByDefault(Invoke([&store]() { return store.gauges(); }));
   ON_CALL(*host, counters()).WillByDefault(Invoke([&store]() { return store.counters(); }));
 
@@ -1070,7 +1096,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json", header_map, response));
   std::string output_json = response.toString();
   envoy::admin::v2alpha::Clusters output_proto;
-  MessageUtil::loadFromJson(output_json, output_proto);
+  TestUtility::loadFromJson(output_json, output_proto);
 
   const std::string expected_json = R"EOF({
  "cluster_statuses": [
@@ -1135,7 +1161,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 )EOF";
 
   envoy::admin::v2alpha::Clusters expected_proto;
-  MessageUtil::loadFromJson(expected_json, expected_proto);
+  TestUtility::loadFromJson(expected_json, expected_proto);
 
   // Ensure the protos created from each JSON are equivalent.
   EXPECT_THAT(output_proto, ProtoEq(expected_proto));
@@ -1144,7 +1170,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters", header_map, response));
   std::string text_output = response.toString();
   envoy::admin::v2alpha::Clusters failed_conversion_proto;
-  EXPECT_THROW(MessageUtil::loadFromJson(text_output, failed_conversion_proto), EnvoyException);
+  EXPECT_THROW(TestUtility::loadFromJson(text_output, failed_conversion_proto), EnvoyException);
 }
 
 TEST_P(AdminInstanceTest, GetRequest) {
@@ -1170,7 +1196,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
 
     // We only test that it parses as the proto and that some fields are correct, since
     // values such as timestamps + Envoy version are tricky to test for.
-    MessageUtil::loadFromJson(body, server_info_proto);
+    TestUtility::loadFromJson(body, server_info_proto);
     EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::LIVE);
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
@@ -1188,7 +1214,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
 
     // We only test that it parses as the proto and that some fields are correct, since
     // values such as timestamps + Envoy version are tricky to test for.
-    MessageUtil::loadFromJson(body, server_info_proto);
+    TestUtility::loadFromJson(body, server_info_proto);
     EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING);
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
@@ -1205,10 +1231,48 @@ TEST_P(AdminInstanceTest, GetRequest) {
 
   // We only test that it parses as the proto and that some fields are correct, since
   // values such as timestamps + Envoy version are tricky to test for.
-  MessageUtil::loadFromJson(body, server_info_proto);
+  TestUtility::loadFromJson(body, server_info_proto);
   EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::INITIALIZING);
   EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
   EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
+}
+
+TEST_P(AdminInstanceTest, GetReadyRequest) {
+  NiceMock<Init::MockManager> initManager;
+  ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
+
+  {
+    Http::HeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/ready", "GET", response_headers, body));
+    EXPECT_EQ(body, "LIVE\n");
+    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+                HasSubstr("text/plain"));
+  }
+
+  {
+    Http::HeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
+    EXPECT_EQ(Http::Code::ServiceUnavailable,
+              admin_.request("/ready", "GET", response_headers, body));
+    EXPECT_EQ(body, "PRE_INITIALIZING\n");
+    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+                HasSubstr("text/plain"));
+  }
+
+  Http::HeaderMapImpl response_headers;
+  std::string body;
+
+  ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
+  EXPECT_EQ(Http::Code::ServiceUnavailable,
+            admin_.request("/ready", "GET", response_headers, body));
+  EXPECT_EQ(body, "INITIALIZING\n");
+  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+              HasSubstr("text/plain"));
 }
 
 TEST_P(AdminInstanceTest, GetRequestJson) {
@@ -1265,7 +1329,8 @@ protected:
 
   void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
     Stats::StatNameManagedStorage storage(name, symbol_table_);
-    gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags));
+    gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags,
+                                       Stats::Gauge::ImportMode::Accumulate));
   }
 
   void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {
@@ -1326,8 +1391,8 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
            {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  auto size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
+                                                          false, absl::nullopt);
   EXPECT_EQ(2UL, size);
 }
 
@@ -1346,8 +1411,8 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
            {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  auto size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
+                                                          false, absl::nullopt);
   EXPECT_EQ(4UL, size);
 }
 
@@ -1365,8 +1430,8 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  auto size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
+                                                          false, absl::nullopt);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
@@ -1418,8 +1483,8 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  auto size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
+                                                          false, absl::nullopt);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
@@ -1470,8 +1535,8 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
       .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
-  auto size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
+                                                          false, absl::nullopt);
   EXPECT_EQ(5UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
@@ -1530,8 +1595,8 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
       .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
-  auto size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, true);
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
+                                                          true, absl::nullopt);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_rq_time histogram
@@ -1580,7 +1645,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
 
     Buffer::OwnedImpl response;
     auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
-                                                            response, used_only);
+                                                            response, used_only, absl::nullopt);
     EXPECT_EQ(0UL, size);
   }
 
@@ -1591,9 +1656,39 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
 
     Buffer::OwnedImpl response;
     auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
-                                                            response, used_only);
+                                                            response, used_only, absl::nullopt);
     EXPECT_EQ(1UL, size);
   }
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
+  addCounter("cluster.test_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+  addCounter("cluster.test_2.upstream_cx_total", {{"another_tag_name", "another_tag-value"}});
+  addGauge("cluster.test_3.upstream_cx_total", {{"another_tag_name_3", "another_tag_3-value"}});
+  addGauge("cluster.test_4.upstream_cx_total", {{"another_tag_name_4", "another_tag_4-value"}});
+
+  const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(h1_values);
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
+  addHistogram(histogram1);
+
+  Buffer::OwnedImpl response;
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(
+      counters_, gauges_, histograms_, response, false,
+      absl::optional<std::regex>{std::regex("cluster.test_1.upstream_cx_total")});
+  EXPECT_EQ(1UL, size);
+
+  const std::string expected_output =
+      R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
+envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
 }
 
 } // namespace Server

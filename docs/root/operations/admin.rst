@@ -162,6 +162,19 @@ modify different aspects of the server:
 
   See :option:`--hot-restart-version`.
 
+.. _operations_admin_interface_listeners:
+
+.. http:get:: /listeners
+
+  List out all configured :ref:`listeners <arch_overview_listeners>`. This information includes the names of listeners as well as
+  the addresses that they are listening on. If a listener is configured to listen on port 0, then the output will contain the actual
+  port that was allocated by the OS.
+
+.. http:get:: /listeners?format=json
+
+  Dump the */listeners* output in a JSON-serialized proto. See the
+  :ref:`definition <envoy_api_msg_admin.v2alpha.Listeners>` for more information.
+
 .. _operations_admin_interface_logging:
 
 .. http:post:: /logging
@@ -223,8 +236,22 @@ modify different aspects of the server:
       "uptime_all_epochs": "6s"
     }
 
-See the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
-explanation of the output.
+  See the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
+  explanation of the output.
+
+.. http:get:: /ready
+
+  Outputs a string and error code reflecting the state of the server. 200 is returned for the LIVE state,
+  and 503 otherwise. This can be used as a readiness check.
+
+  Example output:
+
+  .. code-block:: none
+
+    LIVE
+
+  See the `state` field of the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
+  explanation of the output.
 
 .. _operations_admin_interface_stats:
 

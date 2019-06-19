@@ -12,6 +12,27 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
 
+namespace {
+
+using namespace envoy::data::accesslog::v2;
+
+// Helper function to convert from a BoringSSL textual representation of the
+// TLS version to the corresponding enum value used in gRPC access logs.
+TLSProperties_TLSVersion tlsVersionStringToEnum(const std::string& tls_version) {
+  if (tls_version == "TLSv1") {
+    return TLSProperties_TLSVersion_TLSv1;
+  } else if (tls_version == "TLSv1.1") {
+    return TLSProperties_TLSVersion_TLSv1_1;
+  } else if (tls_version == "TLSv1.2") {
+    return TLSProperties_TLSVersion_TLSv1_2;
+  } else if (tls_version == "TLSv1.3") {
+    return TLSProperties_TLSVersion_TLSv1_3;
+  }
+
+  return TLSProperties_TLSVersion_VERSION_UNSPECIFIED;
+}
+}; // namespace
+
 GrpcAccessLogStreamerImpl::GrpcAccessLogStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
                                                      ThreadLocal::SlotAllocator& tls,
                                                      const LocalInfo::LocalInfo& local_info)
@@ -201,25 +222,30 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   }
   if (stream_info.downstreamSslConnection() != nullptr) {
     auto* tls_properties = common_properties->mutable_tls_properties();
+    const auto* downstream_ssl_connection = stream_info.downstreamSslConnection();
 
     tls_properties->set_tls_sni_hostname(stream_info.requestedServerName());
 
     auto* local_properties = tls_properties->mutable_local_certificate_properties();
-    for (const auto& uri_san : stream_info.downstreamSslConnection()->uriSanLocalCertificate()) {
+    for (const auto& uri_san : downstream_ssl_connection->uriSanLocalCertificate()) {
       auto* local_san = local_properties->add_subject_alt_name();
       local_san->set_uri(uri_san);
     }
-    local_properties->set_subject(stream_info.downstreamSslConnection()->subjectLocalCertificate());
+    local_properties->set_subject(downstream_ssl_connection->subjectLocalCertificate());
 
     auto* peer_properties = tls_properties->mutable_peer_certificate_properties();
-    for (const auto& uri_san : stream_info.downstreamSslConnection()->uriSanPeerCertificate()) {
+    for (const auto& uri_san : downstream_ssl_connection->uriSanPeerCertificate()) {
       auto* peer_san = peer_properties->add_subject_alt_name();
       peer_san->set_uri(uri_san);
     }
 
-    peer_properties->set_subject(stream_info.downstreamSslConnection()->subjectPeerCertificate());
+    peer_properties->set_subject(downstream_ssl_connection->subjectPeerCertificate());
+    tls_properties->set_tls_session_id(downstream_ssl_connection->sessionId());
+    tls_properties->set_tls_version(
+        tlsVersionStringToEnum(downstream_ssl_connection->tlsVersion()));
 
-    // TODO(snowp): Populate remaining tls_properties fields.
+    auto* local_tls_cipher_suite = tls_properties->mutable_tls_cipher_suite();
+    local_tls_cipher_suite->set_value(downstream_ssl_connection->ciphersuiteId());
   }
   common_properties->mutable_start_time()->MergeFrom(
       Protobuf::util::TimeUtil::NanosecondsToTimestamp(
@@ -275,6 +301,11 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
         *common_properties->mutable_upstream_remote_address());
     common_properties->set_upstream_cluster(stream_info.upstreamHost()->cluster().name());
   }
+
+  if (!stream_info.getRouteName().empty()) {
+    common_properties->set_route_name(stream_info.getRouteName());
+  }
+
   if (stream_info.upstreamLocalAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
         *stream_info.upstreamLocalAddress(), *common_properties->mutable_upstream_local_address());

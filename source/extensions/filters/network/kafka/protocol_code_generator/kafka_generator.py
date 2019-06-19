@@ -235,7 +235,7 @@ class FieldList:
     return ', '.join(init_list)
 
   def field_count(self):
-    return len(self.used_fields())
+    return len(list(self.used_fields()))
 
   def example_value(self):
     return ', '.join(map(lambda x: x.example_value_for_test(self.version), self.used_fields()))

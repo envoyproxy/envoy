@@ -27,7 +27,7 @@ namespace Stats {
  */
 class StatDataAllocator {
 public:
-  virtual ~StatDataAllocator() {}
+  virtual ~StatDataAllocator() = default;
 
   /**
    * @param name the full name of the stat.
@@ -47,9 +47,10 @@ public:
    *     tag_extracted_name and tags are not moved.
    */
   virtual GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
-                                   const std::vector<Tag>& tags) PURE;
+                                   const std::vector<Tag>& tags,
+                                   Gauge::ImportMode import_mode) PURE;
 
-  virtual const SymbolTable& symbolTable() const PURE;
+  virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 
   // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At

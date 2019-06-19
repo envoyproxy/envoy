@@ -1,17 +1,21 @@
 #include <memory>
-#include <string>
 
 #include "common/network/utility.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "extensions/filters/network/common/redis/utility.h"
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 
+#include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -41,17 +45,28 @@ public:
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
     if (!cluster_exists) {
-      EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
+      EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
     }
 
-    conn_pool_ = std::make_unique<InstanceImpl>(
+    std::unique_ptr<InstanceImpl> conn_pool_impl = std::make_unique<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
-        Common::Redis::Client::createConnPoolSettings(20, hashtagging, true));
+        Common::Redis::Client::createConnPoolSettings(20, hashtagging, true), api_, *symbol_table_);
+    // Set the authentication password for this connection pool.
+    conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
+    conn_pool_ = std::move(conn_pool_impl);
     test_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
   }
 
-  void makeSimpleRequest(bool create_client) {
-    EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_));
+  void makeSimpleRequest(bool create_client, const std::string& hash_key, uint64_t hash_value) {
+    auto expectHash = [&](const uint64_t hash) {
+      return [&, hash](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        EXPECT_EQ(context->computeHashKey().value(), hash);
+        return cm_.thread_local_cluster_.lb_.host_;
+      };
+    };
+
+    EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+        .WillOnce(Invoke(expectHash(hash_value)));
     if (create_client) {
       client_ = new NiceMock<Common::Redis::Client::MockClient>();
       EXPECT_CALL(*this, create_(_)).WillOnce(Return(client_));
@@ -59,12 +74,15 @@ public:
     Common::Redis::RespValue value;
     Common::Redis::Client::MockPoolCallbacks callbacks;
     Common::Redis::Client::MockPoolRequest active_request;
+    if (create_client && !auth_password_.empty()) {
+      EXPECT_CALL(*client_, makeRequest(_, _)).WillOnce(Return(nullptr));
+    }
     EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(test_address_));
     EXPECT_CALL(*client_, makeRequest(Ref(value), Ref(callbacks)))
         .WillOnce(Return(&active_request));
     Common::Redis::Client::PoolRequest* request =
-        conn_pool_->makeRequest("hash_key", value, callbacks);
+        conn_pool_->makeRequest(hash_key, value, callbacks);
     EXPECT_EQ(&active_request, request);
   }
 
@@ -77,12 +95,15 @@ public:
   MOCK_METHOD1(create_, Common::Redis::Client::Client*(Upstream::HostConstSharedPtr host));
 
   const std::string cluster_name_{"fake_cluster"};
+  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   InstanceSharedPtr conn_pool_;
   Upstream::ClusterUpdateCallbacks* update_callbacks_{};
   Common::Redis::Client::MockClient* client_{};
   Network::Address::InstanceConstSharedPtr test_address_;
+  std::string auth_password_;
+  NiceMock<Api::MockApi> api_;
 };
 
 TEST_F(RedisConnPoolImplTest, Basic) {
@@ -103,6 +124,40 @@ TEST_F(RedisConnPoolImplTest, Basic) {
         return cm_.thread_local_cluster_.lb_.host_;
       }));
   EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(*client, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));
+  Common::Redis::Client::PoolRequest* request =
+      conn_pool_->makeRequest("hash_key", value, callbacks);
+  EXPECT_EQ(&active_request, request);
+
+  EXPECT_CALL(*client, close());
+  tls_.shutdownThread();
+};
+
+TEST_F(RedisConnPoolImplTest, BasicWithAuthPassword) {
+  InSequence s;
+
+  auth_password_ = "testing password";
+  setup();
+
+  Common::Redis::RespValue value;
+  Common::Redis::Client::MockPoolRequest auth_request, active_request;
+  Common::Redis::Client::MockPoolCallbacks callbacks;
+  Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+        EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+        EXPECT_EQ(context->downstreamConnection(), nullptr);
+        return cm_.thread_local_cluster_.lb_.host_;
+      }));
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+  EXPECT_CALL(
+      *client,
+      makeRequest(Eq(NetworkFilters::Common::Redis::Utility::makeAuthCommand(auth_password_)), _))
+      .WillOnce(Return(&auth_request));
   EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
       .WillRepeatedly(Return(test_address_));
   EXPECT_CALL(*client, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));
@@ -194,7 +249,8 @@ TEST_F(RedisConnPoolImplTest, NoClusterAtConstruction) {
 
   // Now add the cluster. Request to the cluster should succeed.
   update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
-  makeSimpleRequest(true);
+  // MurmurHash of "foo" is 9631199822919835226U
+  makeSimpleRequest(true, "foo", 9631199822919835226U);
 
   // Remove the cluster. Request to the cluster should fail.
   EXPECT_CALL(*client_, close());
@@ -209,17 +265,20 @@ TEST_F(RedisConnPoolImplTest, NoClusterAtConstruction) {
 
   // Add the cluster back. Request to the cluster should succeed.
   update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
-  makeSimpleRequest(true);
+  // MurmurHash of "foo" is 9631199822919835226U
+  makeSimpleRequest(true, "foo", 9631199822919835226U);
 
   // Remove a cluster we don't care about. Request to the cluster should succeed.
   update_callbacks_->onClusterRemoval("some_other_cluster");
-  makeSimpleRequest(false);
+  // MurmurHash of "foo" is 9631199822919835226U
+  makeSimpleRequest(false, "foo", 9631199822919835226U);
 
   // Update the cluster. This should count as a remove followed by an add. Request to the cluster
   // should succeed.
   EXPECT_CALL(*client_, close());
   update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
-  makeSimpleRequest(true);
+  // MurmurHash of "foo" is 9631199822919835226U
+  makeSimpleRequest(true, "foo", 9631199822919835226U);
 
   // Remove the cluster to make sure we safely destruct with no cluster.
   EXPECT_CALL(*client_, close());
@@ -377,6 +436,103 @@ TEST_F(RedisConnPoolImplTest, makeRequestToHost) {
   EXPECT_CALL(*client1, close());
   tls_.shutdownThread();
 }
+
+TEST_F(RedisConnPoolImplTest, makeRequestToHostWithAuthPassword) {
+  InSequence s;
+
+  auth_password_ = "superduperpassword";
+  setup(false);
+
+  Common::Redis::RespValue value;
+  Common::Redis::Client::MockPoolRequest auth_request1, active_request1;
+  Common::Redis::Client::MockPoolRequest auth_request2, active_request2;
+  Common::Redis::Client::MockPoolCallbacks callbacks1;
+  Common::Redis::Client::MockPoolCallbacks callbacks2;
+  Common::Redis::Client::MockClient* client1 = new NiceMock<Common::Redis::Client::MockClient>();
+  Common::Redis::Client::MockClient* client2 = new NiceMock<Common::Redis::Client::MockClient>();
+  Upstream::HostConstSharedPtr host1;
+  Upstream::HostConstSharedPtr host2;
+
+  // There is no cluster yet, so makeRequestToHost() should fail.
+  EXPECT_EQ(nullptr, conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1));
+  // Add the cluster now.
+  update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
+
+  EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client1)));
+  EXPECT_CALL(
+      *client1,
+      makeRequest(Eq(NetworkFilters::Common::Redis::Utility::makeAuthCommand(auth_password_)), _))
+      .WillOnce(Return(&auth_request1));
+  EXPECT_CALL(*client1, makeRequest(Ref(value), Ref(callbacks1)))
+      .WillOnce(Return(&active_request1));
+  Common::Redis::Client::PoolRequest* request1 =
+      conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1);
+  EXPECT_EQ(&active_request1, request1);
+  EXPECT_EQ(host1->address()->asString(), "10.0.0.1:3000");
+
+  // IPv6 address returned from Redis server will not have square brackets
+  // around it, while Envoy represents Address::Ipv6Instance addresses with square brackets around
+  // the address.
+  EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host2), Return(client2)));
+  EXPECT_CALL(
+      *client2,
+      makeRequest(Eq(NetworkFilters::Common::Redis::Utility::makeAuthCommand(auth_password_)), _))
+      .WillOnce(Return(&auth_request2));
+  EXPECT_CALL(*client2, makeRequest(Ref(value), Ref(callbacks2)))
+      .WillOnce(Return(&active_request2));
+  Common::Redis::Client::PoolRequest* request2 =
+      conn_pool_->makeRequestToHost("2001:470:813B:0:0:0:0:1:3333", value, callbacks2);
+  EXPECT_EQ(&active_request2, request2);
+  EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
+
+  EXPECT_CALL(*client2, close());
+  EXPECT_CALL(*client1, close());
+  tls_.shutdownThread();
+}
+
+TEST_F(RedisConnPoolImplTest, MakeRequestToRedisCluster) {
+
+  absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type;
+  cluster_type.emplace();
+  cluster_type->set_name("envoy.clusters.redis");
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(cluster_type));
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, lbType())
+      .Times(2)
+      .WillRepeatedly(Return(Upstream::LoadBalancerType::ClusterProvided));
+
+  setup();
+
+  makeSimpleRequest(true, "foo", 44950);
+
+  makeSimpleRequest(false, "bar", 37829);
+
+  EXPECT_CALL(*client_, close());
+  tls_.shutdownThread();
+};
+
+TEST_F(RedisConnPoolImplTest, MakeRequestToRedisClusterHashtag) {
+
+  absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type;
+  cluster_type.emplace();
+  cluster_type->set_name("envoy.clusters.redis");
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(cluster_type));
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, lbType())
+      .Times(2)
+      .WillRepeatedly(Return(Upstream::LoadBalancerType::ClusterProvided));
+
+  setup();
+
+  makeSimpleRequest(true, "{foo}bar", 44950);
+
+  makeSimpleRequest(false, "foo{bar}", 37829);
+
+  EXPECT_CALL(*client_, close());
+  tls_.shutdownThread();
+};
 
 } // namespace ConnPool
 } // namespace RedisProxy

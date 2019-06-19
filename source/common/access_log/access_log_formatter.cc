@@ -23,6 +23,9 @@ static const std::string UnspecifiedValueString = "-";
 
 namespace {
 
+// Matches newline pattern in a StartTimeFormatter format string.
+const std::regex& getNewlinePattern(){CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n")};
+
 // Helper that handles the case when the ConnectionInfo is missing or if the desired value is
 // empty.
 StreamInfoFormatter::FieldExtractor sslConnectionInfoStringExtractor(
@@ -40,6 +43,22 @@ StreamInfoFormatter::FieldExtractor sslConnectionInfoStringExtractor(
     }
   };
 }
+
+// Helper that handles the case when the desired time field is empty.
+StreamInfoFormatter::FieldExtractor sslConnectionInfoStringTimeExtractor(
+    std::function<absl::optional<SystemTime>(const Ssl::ConnectionInfo& connection_info)>
+        time_extractor) {
+  return sslConnectionInfoStringExtractor(
+      [time_extractor](const Ssl::ConnectionInfo& connection_info) {
+        absl::optional<SystemTime> time = time_extractor(connection_info);
+        if (!time.has_value()) {
+          return UnspecifiedValueString;
+        }
+
+        return AccessLogDateTimeFormatter::fromTime(time.value());
+      });
+}
+
 } // namespace
 
 const std::string AccessLogFormatUtils::DEFAULT_FORMAT =
@@ -259,6 +278,11 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
         const std::string args = token[StartTimeParamStart - 1] == '('
                                      ? token.substr(StartTimeParamStart, parameters_end)
                                      : "";
+        // Validate the input specifier here. The formatted string may be destined for a header, and
+        // should not contain invalid characters {NUL, LR, CF}.
+        if (std::regex_search(args, getNewlinePattern())) {
+          throw EnvoyException("Invalid header configuration. Format string contains newline.");
+        }
         formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(args)});
       } else {
         formatters.emplace_back(FormatterProviderPtr{new StreamInfoFormatter(token)});
@@ -377,6 +401,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         return UnspecifiedValueString;
       }
     };
+  } else if (field_name == "ROUTE_NAME") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      std::string route_name = stream_info.getRouteName();
+      return route_name.empty() ? UnspecifiedValueString : route_name;
+    };
   } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
     field_extractor_ =
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
@@ -396,6 +425,52 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ =
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.subjectLocalCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_TLS_SESSION_ID") {
+    field_extractor_ = sslConnectionInfoStringExtractor(
+        [](const Ssl::ConnectionInfo& connection_info) { return connection_info.sessionId(); });
+  } else if (field_name == "DOWNSTREAM_TLS_CIPHER") {
+    field_extractor_ =
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.ciphersuiteString();
+        });
+  } else if (field_name == "DOWNSTREAM_TLS_VERSION") {
+    field_extractor_ = sslConnectionInfoStringExtractor(
+        [](const Ssl::ConnectionInfo& connection_info) { return connection_info.tlsVersion(); });
+  } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_256") {
+    field_extractor_ =
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.sha256PeerCertificateDigest();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_SERIAL") {
+    field_extractor_ =
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.serialNumberPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_ISSUER") {
+    field_extractor_ =
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.issuerPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_SUBJECT") {
+    field_extractor_ =
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.subjectPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_CERT") {
+    field_extractor_ =
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.urlEncodedPemEncodedPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_START") {
+    field_extractor_ =
+        sslConnectionInfoStringTimeExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.validFromPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_END") {
+    field_extractor_ =
+        sslConnectionInfoStringTimeExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.expirationPeerCertificate();
         });
   } else if (field_name == "UPSTREAM_TRANSPORT_FAILURE_REASON") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {

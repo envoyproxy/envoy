@@ -30,7 +30,7 @@ struct RcDetailsValues {
   // The fault filter injected an abort for this request.
   const std::string FaultAbort = "fault_filter_abort";
 };
-typedef ConstSingleton<RcDetailsValues> RcDetails;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
   if (fault.has_abort()) {

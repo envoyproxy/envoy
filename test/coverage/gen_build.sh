@@ -37,7 +37,8 @@ fi
 # gcov requires gcc
 if [ "${NO_GCOV}" != 1 ]
 then
-  TARGETS="${TARGETS} ${REPOSITORY}//test/coverage/gcc_only_test:gcc_only_test_lib"
+  # Here we use the synthetic library target created by envoy_build_system.bzl
+  TARGETS="${TARGETS} ${REPOSITORY}//test/coverage/gcc_only_test:gcc_only_test_lib_internal_only"
 fi
 
 (

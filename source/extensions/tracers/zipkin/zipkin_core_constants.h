@@ -48,7 +48,7 @@ public:
   const bool DEFAULT_SHARED_SPAN_CONTEXT = true;
 };
 
-typedef ConstSingleton<ZipkinCoreConstantValues> ZipkinCoreConstants;
+using ZipkinCoreConstants = ConstSingleton<ZipkinCoreConstantValues>;
 
 } // namespace Zipkin
 } // namespace Tracers

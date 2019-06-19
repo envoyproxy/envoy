@@ -15,12 +15,10 @@ namespace Upstream {
 /**
  * All ring hash load balancer stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_RING_HASH_LOAD_BALANCER_STATS(GAUGE)                                                   \
-  GAUGE(size)                                                                                      \
-  GAUGE(min_hashes_per_host)                                                                       \
-  GAUGE(max_hashes_per_host)
-// clang-format on
+  GAUGE(max_hashes_per_host, Accumulate)                                                           \
+  GAUGE(min_hashes_per_host, Accumulate)                                                           \
+  GAUGE(size, Accumulate)
 
 /**
  * Struct definition for all ring hash load balancer stats. @see stats_macros.h
@@ -68,7 +66,7 @@ private:
 
     RingHashLoadBalancerStats& stats_;
   };
-  typedef std::shared_ptr<const Ring> RingConstSharedPtr;
+  using RingConstSharedPtr = std::shared_ptr<const Ring>;
 
   // ThreadAwareLoadBalancerBase
   HashingLoadBalancerSharedPtr

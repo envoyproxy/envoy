@@ -26,12 +26,25 @@ public:
              SymbolTable& symbol_table);
   ~MetricImpl();
 
-  std::string name() const override { return symbolTable().toString(statName()); }
+  std::string name() const override { return constSymbolTable().toString(statName()); }
   std::string tagExtractedName() const override;
   std::vector<Tag> tags() const override;
   StatName tagExtractedStatName() const override;
   void iterateTagStatNames(const TagStatNameIterFn& fn) const override;
   void iterateTags(const TagIterFn& fn) const override;
+
+  // Metric implementations must each implement Metric::symbolTable(). However,
+  // they can inherit the const version of that accessor from MetricImpl.
+  const SymbolTable& constSymbolTable() const override {
+    // Cast our 'this', which is of type `const MetricImpl*` to a non-const
+    // pointer, so we can use it to call the subclass implementation of
+    // symbolTable(). That will be returned as a non-const SymbolTable&,
+    // which will become const on return.
+    //
+    // This pattern is used to share a single non-trivial implementation to
+    // provide const and non-const variants of a method.
+    return const_cast<MetricImpl*>(this)->symbolTable();
+  }
 
 protected:
   void clear();
@@ -45,7 +58,6 @@ public:
   explicit NullMetricImpl(SymbolTable& symbol_table)
       : MetricImpl("", std::vector<Tag>(), symbol_table), stat_name_storage_("", symbol_table) {}
 
-  const SymbolTable& symbolTable() const override { return stat_name_storage_.symbolTable(); }
   SymbolTable& symbolTable() override { return stat_name_storage_.symbolTable(); }
   bool used() const override { return false; }
   StatName statName() const override { return stat_name_storage_.statName(); }

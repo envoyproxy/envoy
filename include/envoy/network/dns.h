@@ -17,7 +17,7 @@ namespace Network {
  */
 class ActiveDnsQuery {
 public:
-  virtual ~ActiveDnsQuery() {}
+  virtual ~ActiveDnsQuery() = default;
 
   /**
    * Cancel an outstanding DNS request.
@@ -40,14 +40,14 @@ enum class DnsLookupFamily { V4Only, V6Only, Auto };
  */
 class DnsResolver {
 public:
-  virtual ~DnsResolver() {}
+  virtual ~DnsResolver() = default;
 
   /**
    * Called when a resolution attempt is complete.
    * @param response supplies the list of resolved IP addresses and TTLs. The list will be empty if
    *                     the resolution failed.
    */
-  typedef std::function<void(const std::list<DnsResponse>& response)> ResolveCb;
+  using ResolveCb = std::function<void(const std::list<DnsResponse>& response)>;
 
   /**
    * Initiate an async DNS resolution.
@@ -61,7 +61,7 @@ public:
                                   ResolveCb callback) PURE;
 };
 
-typedef std::shared_ptr<DnsResolver> DnsResolverSharedPtr;
+using DnsResolverSharedPtr = std::shared_ptr<DnsResolver>;
 
 } // namespace Network
 } // namespace Envoy

@@ -75,9 +75,10 @@ MockCounter::MockCounter() {
 }
 MockCounter::~MockCounter() {}
 
-MockGauge::MockGauge() {
+MockGauge::MockGauge() : used_(false), value_(0), import_mode_(ImportMode::Accumulate) {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
+  ON_CALL(*this, importMode()).WillByDefault(ReturnPointee(&import_mode_));
 }
 MockGauge::~MockGauge() {}
 
@@ -102,13 +103,13 @@ MockParentHistogram::MockParentHistogram() {
 }
 MockParentHistogram::~MockParentHistogram() {}
 
-MockSource::MockSource() {
-  ON_CALL(*this, cachedCounters()).WillByDefault(ReturnRef(counters_));
-  ON_CALL(*this, cachedGauges()).WillByDefault(ReturnRef(gauges_));
-  ON_CALL(*this, cachedHistograms()).WillByDefault(ReturnRef(histograms_));
+MockMetricSnapshot::MockMetricSnapshot() {
+  ON_CALL(*this, counters()).WillByDefault(ReturnRef(counters_));
+  ON_CALL(*this, gauges()).WillByDefault(ReturnRef(gauges_));
+  ON_CALL(*this, histograms()).WillByDefault(ReturnRef(histograms_));
 }
 
-MockSource::~MockSource() {}
+MockMetricSnapshot::~MockMetricSnapshot() {}
 
 MockSink::MockSink() {}
 MockSink::~MockSink() {}

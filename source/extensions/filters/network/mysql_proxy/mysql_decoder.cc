@@ -9,8 +9,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int seq, int len) {
-  ENVOY_LOG(trace, "mysql_proxy: parsing message, offset {}, seq {}, len {}", offset, seq, len);
+void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t len) {
+  ENVOY_LOG(trace, "mysql_proxy: parsing message, seq {}, len {}", seq, len);
 
   // Run the MySQL state machine
   switch (session_.getState()) {
@@ -18,7 +18,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
   // Expect Server Challenge packet
   case MySQLSession::State::MYSQL_INIT: {
     ServerGreeting greeting;
-    greeting.decode(message, offset, seq, len);
+    greeting.decode(message, seq, len);
     callbacks_.onServerGreeting(greeting);
 
     session_.setState(MySQLSession::State::MYSQL_CHALLENGE_REQ);
@@ -28,7 +28,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
   // Process Client Handshake Response
   case MySQLSession::State::MYSQL_CHALLENGE_REQ: {
     ClientLogin client_login{};
-    client_login.decode(message, offset, seq, len);
+    client_login.decode(message, seq, len);
     callbacks_.onClientLogin(client_login);
 
     if (client_login.isSSLRequest()) {
@@ -47,7 +47,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
   case MySQLSession::State::MYSQL_CHALLENGE_RESP_41:
   case MySQLSession::State::MYSQL_CHALLENGE_RESP_320: {
     ClientLoginResponse client_login_resp{};
-    client_login_resp.decode(message, offset, seq, len);
+    client_login_resp.decode(message, seq, len);
     callbacks_.onClientLoginResponse(client_login_resp);
 
     if (client_login_resp.getRespCode() == MYSQL_RESP_OK) {
@@ -68,7 +68,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
 
   case MySQLSession::State::MYSQL_AUTH_SWITCH_RESP: {
     ClientSwitchResponse client_switch_resp{};
-    client_switch_resp.decode(message, offset, seq, len);
+    client_switch_resp.decode(message, seq, len);
     callbacks_.onClientSwitchResponse(client_switch_resp);
 
     session_.setState(MySQLSession::State::MYSQL_AUTH_SWITCH_MORE);
@@ -77,7 +77,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
 
   case MySQLSession::State::MYSQL_AUTH_SWITCH_MORE: {
     ClientLoginResponse client_login_resp{};
-    client_login_resp.decode(message, offset, seq, len);
+    client_login_resp.decode(message, seq, len);
     callbacks_.onMoreClientLoginResponse(client_login_resp);
 
     if (client_login_resp.getRespCode() == MYSQL_RESP_OK) {
@@ -104,25 +104,21 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
   // Process Command
   case MySQLSession::State::MYSQL_REQ: {
     Command command{};
-    command.decode(message, offset, seq, len);
+    command.decode(message, seq, len);
     callbacks_.onCommand(command);
 
-    if (BufferHelper::endOfBuffer(message, offset)) {
-      session_.setState(MySQLSession::State::MYSQL_REQ_RESP);
-    }
+    session_.setState(MySQLSession::State::MYSQL_REQ_RESP);
     break;
   }
 
   // Process Command Response
   case MySQLSession::State::MYSQL_REQ_RESP: {
     CommandResponse command_resp{};
-    command_resp.decode(message, offset, seq, len);
+    command_resp.decode(message, seq, len);
     callbacks_.onCommandResponse(command_resp);
 
-    if (BufferHelper::endOfBuffer(message, offset)) {
-      session_.setState(MySQLSession::State::MYSQL_REQ);
-      session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
-    }
+    session_.setState(MySQLSession::State::MYSQL_REQ);
+    session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
     break;
   }
 
@@ -136,36 +132,47 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint64_t& offset, int 
             static_cast<int>(session_.getState()));
 }
 
-void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
-  ENVOY_LOG(trace, "mysql_proxy: decoding {} bytes at offset {}", data.length(), offset);
+bool DecoderImpl::decode(Buffer::Instance& data) {
+  ENVOY_LOG(trace, "mysql_proxy: decoding {} bytes", data.length());
 
-  int len = 0;
-  int seq = 0;
-  if (BufferHelper::peekHdr(data, offset, len, seq) != MYSQL_SUCCESS) {
+  uint32_t len = 0;
+  uint8_t seq = 0;
+  if (BufferHelper::peekHdr(data, len, seq) != MYSQL_SUCCESS) {
     throw EnvoyException("error parsing mysql packet header");
   }
 
+  // If message is split over multiple packets, hold off until the entire message is available.
+  // Consider the size of the header here as it's not consumed yet.
+  if (sizeof(uint32_t) + len > data.length()) {
+    return false;
+  }
+
+  BufferHelper::consumeHdr(data); // Consume the header once the message is fully available.
   callbacks_.onNewMessage(session_.getState());
 
   // Ignore duplicate and out-of-sync packets.
   if (seq != session_.getExpectedSeq()) {
     callbacks_.onProtocolError();
-    offset += len;
     ENVOY_LOG(info, "mysql_proxy: ignoring out-of-sync packet");
-    return;
+    data.drain(len); // Ensure that the whole message was consumed
+    return true;
   }
+
   session_.setExpectedSeq(seq + 1);
 
-  parseMessage(data, offset, seq, len);
-  ENVOY_LOG(trace, "mysql_proxy: offset after decoding is {} out of {}", offset, data.length());
+  const ssize_t data_len = data.length();
+  parseMessage(data, seq, len);
+  const ssize_t consumed_len = data_len - data.length();
+  data.drain(len - consumed_len); // Ensure that the whole message was consumed
+
+  ENVOY_LOG(trace, "mysql_proxy: {} bytes remaining in buffer", data.length());
+  return true;
 }
 
 void DecoderImpl::onData(Buffer::Instance& data) {
   // TODO(venilnoronha): handle messages over 16 mb. See
-  // https://dev.mysql.com/doc/dev/mysql-server/8.0.2/page_protocol_basic_packets.html#sect_protocol_basic_packets_sending_mt_16mb.
-  uint64_t offset = 0;
-  while (!BufferHelper::endOfBuffer(data, offset)) {
-    decode(data, offset);
+  // https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_packets.html#sect_protocol_basic_packets_sending_mt_16mb.
+  while (!BufferHelper::endOfBuffer(data) && decode(data)) {
   }
 }
 

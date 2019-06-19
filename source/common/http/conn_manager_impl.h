@@ -18,6 +18,7 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/router/rds.h"
+#include "envoy/router/scopes.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/ssl/connection.h"
@@ -269,7 +270,7 @@ private:
     bool is_grpc_request_{};
   };
 
-  typedef std::unique_ptr<ActiveStreamDecoderFilter> ActiveStreamDecoderFilterPtr;
+  using ActiveStreamDecoderFilterPtr = std::unique_ptr<ActiveStreamDecoderFilter>;
 
   /**
    * Wrapper for a stream encoder filter.
@@ -322,7 +323,7 @@ private:
     StreamEncoderFilterSharedPtr handle_;
   };
 
-  typedef std::unique_ptr<ActiveStreamEncoderFilter> ActiveStreamEncoderFilterPtr;
+  using ActiveStreamEncoderFilterPtr = std::unique_ptr<ActiveStreamEncoderFilter>;
 
   /**
    * Wraps a single active stream on the connection. These are either full request/response pairs
@@ -450,8 +451,8 @@ private:
     // All state for the stream. Put here for readability.
     struct State {
       State()
-          : remote_complete_(false), local_complete_(false), saw_connection_close_(false),
-            successful_upgrade_(false), created_filter_chain_(false),
+          : remote_complete_(false), local_complete_(false), codec_saw_local_complete_(false),
+            saw_connection_close_(false), successful_upgrade_(false), created_filter_chain_(false),
             is_internally_created_(false) {}
 
       uint32_t filter_call_state_{0};
@@ -462,7 +463,11 @@ private:
       bool decoder_filters_streaming_{true};
       bool destroyed_{false};
       bool remote_complete_ : 1;
-      bool local_complete_ : 1;
+      bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
+                                // A filter can still stop the stream from being complete as seen
+                                // by the codec.
+      bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written all
+                                          // the way through to the codec.
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
       bool created_filter_chain_ : 1;
@@ -487,8 +492,11 @@ private:
     // Per-stream request timeout callback
     void onRequestTimeout();
 
+    bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
+
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
+    Router::ScopedConfigConstSharedPtr snapped_scoped_route_config_;
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
@@ -528,7 +536,7 @@ private:
     Network::Socket::OptionsSharedPtr upstream_options_;
   };
 
-  typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
+  using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
 
   /**
    * Check to see if the connection can be closed after gracefully waiting to send pending codec

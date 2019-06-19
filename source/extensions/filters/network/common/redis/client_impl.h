@@ -30,7 +30,7 @@ struct RedirectionValues {
   const std::string MOVED = "MOVED";
 };
 
-typedef ConstSingleton<RedirectionValues> RedirectionResponse;
+using RedirectionResponse = ConstSingleton<RedirectionValues>;
 
 class ConfigImpl : public Config {
 public:
@@ -71,6 +71,8 @@ public:
   void flushBufferAndResetTimer();
 
 private:
+  friend class RedisClientImplTest;
+
   struct UpstreamReadFilter : public Network::ReadFilterBaseImpl {
     UpstreamReadFilter(ClientImpl& parent) : parent_(parent) {}
 

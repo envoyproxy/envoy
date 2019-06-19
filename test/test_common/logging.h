@@ -61,9 +61,9 @@ private:
   std::vector<std::string> messages_;
 };
 
-typedef std::pair<std::string, std::string> StringPair;
+using StringPair = std::pair<std::string, std::string>;
 
-typedef std::vector<StringPair> ExpectedLogMessages;
+using ExpectedLogMessages = std::vector<StringPair>;
 
 // Below macros specify Envoy:: before class names so that the macro can be used outside of
 // namespace Envoy.

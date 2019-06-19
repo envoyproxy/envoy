@@ -397,26 +397,6 @@ void FilterJson::translateTcpProxy(
   }
 }
 
-void FilterJson::translateTcpRateLimitFilter(
-    const Json::Object& json_config,
-    envoy::config::filter::network::rate_limit::v2::RateLimit& proto_config) {
-  json_config.validateSchema(Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA);
-
-  JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
-  JSON_UTIL_SET_STRING(json_config, proto_config, domain);
-  JSON_UTIL_SET_DURATION(json_config, proto_config, timeout);
-
-  auto* descriptors = proto_config.mutable_descriptors();
-  for (const auto& json_descriptor : json_config.getObjectArray("descriptors", false)) {
-    auto* entries = descriptors->Add()->mutable_entries();
-    for (const auto& json_entry : json_descriptor->asObjectArray()) {
-      auto* entry = entries->Add();
-      JSON_UTIL_SET_STRING(*json_entry, *entry, key);
-      JSON_UTIL_SET_STRING(*json_entry, *entry, value);
-    }
-  }
-}
-
 void FilterJson::translateHttpRateLimitFilter(
     const Json::Object& json_config,
     envoy::config::filter::http::rate_limit::v2::RateLimit& proto_config) {

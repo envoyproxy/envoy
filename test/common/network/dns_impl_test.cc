@@ -43,11 +43,11 @@ namespace Network {
 namespace {
 
 // List of IP address (in human readable format).
-typedef std::list<std::string> IpList;
+using IpList = std::list<std::string>;
 // Map from hostname to IpList.
-typedef std::unordered_map<std::string, IpList> HostMap;
+using HostMap = std::unordered_map<std::string, IpList>;
 // Map from hostname to CNAME
-typedef std::unordered_map<std::string, std::string> CNameMap;
+using CNameMap = std::unordered_map<std::string, std::string>;
 // Represents a single TestDnsServer query state and lifecycle. This implements
 // just enough of RFC 1035 to handle queries we generate in the tests below.
 enum record_type { A, AAAA };
@@ -540,7 +540,6 @@ TEST_P(DnsImplTest, DnsIpAddressVersionV6) {
             resolver_->resolve("some.good.domain", DnsLookupFamily::Auto,
                                [&](const std::list<Network::DnsResponse>& results) -> void {
                                  address_list = getAddressList(results);
-
                                  dispatcher_->exit();
                                }));
 
@@ -551,7 +550,6 @@ TEST_P(DnsImplTest, DnsIpAddressVersionV6) {
             resolver_->resolve("some.good.domain", DnsLookupFamily::V4Only,
                                [&](const std::list<Network::DnsResponse>& results) -> void {
                                  address_list = getAddressList(results);
-
                                  dispatcher_->exit();
                                }));
 
@@ -562,7 +560,6 @@ TEST_P(DnsImplTest, DnsIpAddressVersionV6) {
             resolver_->resolve("some.good.domain", DnsLookupFamily::V6Only,
                                [&](const std::list<Network::DnsResponse>& results) -> void {
                                  address_list = getAddressList(results);
-
                                  dispatcher_->exit();
                                }));
 

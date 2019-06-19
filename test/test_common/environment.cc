@@ -296,8 +296,10 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
 }
 
 std::string TestEnvironment::writeStringToFileForTest(const std::string& filename,
-                                                      const std::string& contents) {
-  const std::string out_path = TestEnvironment::temporaryPath(filename);
+                                                      const std::string& contents,
+                                                      bool fully_qualified_path) {
+  const std::string out_path =
+      fully_qualified_path ? filename : TestEnvironment::temporaryPath(filename);
   createParentPath(out_path);
   unlink(out_path.c_str());
   {
@@ -312,8 +314,8 @@ void TestEnvironment::setEnvVar(const std::string& name, const std::string& valu
 #ifdef WIN32
   if (!overwrite) {
     size_t requiredSize;
-    const int rc = ::getenv_s(&requiredSize, NULL, 0, name.c_str());
-    ASSERT_EQ(rc, 0);
+    const int rc = ::getenv_s(&requiredSize, nullptr, 0, name.c_str());
+    ASSERT_EQ(0, rc);
     if (requiredSize != 0) {
       return;
     }
@@ -322,7 +324,17 @@ void TestEnvironment::setEnvVar(const std::string& name, const std::string& valu
   ASSERT_EQ(0, rc);
 #else
   const int rc = ::setenv(name.c_str(), value.c_str(), overwrite);
-  ASSERT_EQ(rc, 0);
+  ASSERT_EQ(0, rc);
+#endif
+}
+
+void TestEnvironment::unsetEnvVar(const std::string& name) {
+#ifdef WIN32
+  const int rc = ::_putenv_s(name.c_str(), "");
+  ASSERT_EQ(0, rc);
+#else
+  const int rc = ::unsetenv(name.c_str());
+  ASSERT_EQ(0, rc);
 #endif
 }
 

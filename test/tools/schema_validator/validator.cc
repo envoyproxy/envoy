@@ -1,5 +1,7 @@
 #include "test/tools/schema_validator/validator.h"
 
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/discovery.pb.validate.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/rds.pb.validate.h"
 
@@ -9,10 +11,13 @@
 
 namespace Envoy {
 
+const std::string Schema::DISCOVERY_RESPONSE = "discovery_response";
 const std::string Schema::ROUTE = "route";
 
 const std::string& Schema::toString(Type type) {
   switch (type) {
+  case Type::DiscoveryResponse:
+    return DISCOVERY_RESPONSE;
   case Type::Route:
     return ROUTE;
   }
@@ -38,6 +43,8 @@ Options::Options(int argc, char** argv) {
 
   if (schema_type.getValue() == Schema::toString(Schema::Type::Route)) {
     schema_type_ = Schema::Type::Route;
+  } else if (schema_type.getValue() == Schema::toString(Schema::Type::DiscoveryResponse)) {
+    schema_type_ = Schema::Type::DiscoveryResponse;
   } else {
     std::cerr << "error: unknown schema type '" << schema_type.getValue() << "'" << std::endl;
     exit(EXIT_FAILURE);
@@ -49,11 +56,15 @@ Options::Options(int argc, char** argv) {
 void Validator::validate(const std::string& config_path, Schema::Type schema_type) {
 
   switch (schema_type) {
+  case Schema::Type::DiscoveryResponse: {
+    envoy::api::v2::DiscoveryResponse discovery_response_config;
+    TestUtility::loadFromFile(config_path, discovery_response_config, *api_);
+    MessageUtil::validate(discovery_response_config);
+    break;
+  }
   case Schema::Type::Route: {
-    // Construct a envoy::api::v2::RouteConfiguration to validate the Route configuration and
-    // ignore the output since nothing will consume it.
     envoy::api::v2::RouteConfiguration route_config;
-    MessageUtil::loadFromFile(config_path, route_config, *api_);
+    TestUtility::loadFromFile(config_path, route_config, *api_);
     MessageUtil::validate(route_config);
     break;
   }

@@ -148,10 +148,6 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       return;
     }
 
-    // All close types that follow do not actually close() the socket immediately so that buffered
-    // data can be written. However, we do want to stop reading to apply TCP backpressure.
-    read_enabled_ = false;
-
     // NOTE: At this point, it's already been validated that the connection is not already in
     // delayed close processing and therefore the timer has not yet been created.
     if (delayed_close_timeout_set) {
@@ -244,9 +240,10 @@ void ConnectionImpl::noDelay(bool enable) {
 uint64_t ConnectionImpl::id() const { return id_; }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
-  if (!read_enabled_) {
+  if (!read_enabled_ || inDelayedClose()) {
     return;
   }
+  ASSERT(ioHandle().isOpen());
 
   if (read_buffer_size == 0 && !read_end_stream_) {
     return;

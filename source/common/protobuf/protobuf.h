@@ -44,9 +44,10 @@ namespace ProtobufWkt = google::protobuf;
 // Below we provide wrappers to facilitate remapping of the type during import.
 namespace ProtobufTypes {
 
-typedef std::unique_ptr<Protobuf::Message> MessagePtr;
+using MessagePtr = std::unique_ptr<Protobuf::Message>;
+using ConstMessagePtrVector = std::vector<std::unique_ptr<const Protobuf::Message>>;
 
-typedef int64_t Int64;
+using Int64 = int64_t;
 
 } // namespace ProtobufTypes
 } // namespace Envoy

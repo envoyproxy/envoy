@@ -18,7 +18,7 @@ public:
   /**
    * List of supported schemas to validate.
    */
-  enum Type { Route };
+  enum Type { DiscoveryResponse, Route };
 
   /**
    * Get a string representation of the schema type.
@@ -28,6 +28,7 @@ public:
   static const std::string& toString(Type type);
 
 private:
+  static const std::string DISCOVERY_RESPONSE;
   static const std::string ROUTE;
 };
 

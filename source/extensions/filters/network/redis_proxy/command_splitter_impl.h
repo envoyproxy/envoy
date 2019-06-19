@@ -31,9 +31,10 @@ struct ResponseValues {
   const std::string NoUpstreamHost = "no upstream host";
   const std::string UpstreamFailure = "upstream failure";
   const std::string UpstreamProtocolError = "upstream protocol error";
+  const std::string AuthRequiredError = "NOAUTH Authentication required.";
 };
 
-typedef ConstSingleton<ResponseValues> Response;
+using Response = ConstSingleton<ResponseValues>;
 
 class Utility {
 public:
@@ -60,7 +61,7 @@ struct CommandStats {
 
 class CommandHandler {
 public:
-  virtual ~CommandHandler() {}
+  virtual ~CommandHandler() = default;
 
   virtual SplitRequestPtr startRequest(Common::Redis::RespValuePtr&& request,
                                        SplitCallbacks& callbacks, CommandStats& command_stats,
@@ -313,7 +314,7 @@ private:
     std::reference_wrapper<CommandHandler> handler_;
   };
 
-  typedef std::shared_ptr<HandlerData> HandlerDataPtr;
+  using HandlerDataPtr = std::shared_ptr<HandlerData>;
 
   void addHandler(Stats::Scope& scope, const std::string& stat_prefix, const std::string& name,
                   CommandHandler& handler);
@@ -330,18 +331,6 @@ private:
   const ToLowerTable to_lower_table_;
   const bool latency_in_micros_;
   TimeSource& time_source_;
-};
-
-/**
- * DoNothingPoolCallbacks is used for internally generated commands whose response is
- * transparently filtered, and redirection never occurs (e.g., "asking", etc.).
- */
-class DoNothingPoolCallbacks : public Common::Redis::Client::PoolCallbacks {
-public:
-  // Common::Redis::Client::PoolCallbacks
-  void onResponse(Common::Redis::RespValuePtr&&) override {}
-  void onFailure() override {}
-  bool onRedirection(const Common::Redis::RespValue&) override { return false; }
 };
 
 } // namespace CommandSplitter

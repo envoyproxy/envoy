@@ -50,6 +50,7 @@ DER
 DESC
 DFATAL
 DGRAM
+DHE
 DLOG
 DNS
 DRYs
@@ -90,6 +91,7 @@ FIN
 FIPS
 FQDN
 FUZZER
+FUZZERS
 GB
 GC
 GCC
@@ -149,6 +151,7 @@ MGET
 MSET
 MSVC
 MTLS
+MTU
 MiB
 NACK
 NACKs
@@ -157,6 +160,7 @@ NBF
 NBSP
 NDEBUG
 NGHTTP
+NOAUTH
 NOLINT
 NOLINTNEXTLINE
 NONCES
@@ -209,6 +213,7 @@ RNG
 RPC
 RSA
 RST
+RTDS
 RTTI
 RW
 RX
@@ -280,7 +285,7 @@ WS
 Welford's
 Werror
 XDS
-getHostbyName
+sendto
 vip
 xDSes
 XFCC
@@ -299,6 +304,7 @@ accessors
 acls
 addr
 agg
+alignas
 alignof
 alloc
 alloca
@@ -316,6 +322,7 @@ argv
 artisanal
 ary
 async
+atomicity
 atomicly
 atomics
 atoull
@@ -349,6 +356,7 @@ casted
 chrono
 chroot
 chunked
+ci
 circllhist
 cmd
 codec
@@ -359,6 +367,7 @@ comparator
 cond
 condvar
 conf
+configdump
 conn
 conns
 const
@@ -709,6 +718,7 @@ strtoull
 struct
 structs
 subexpr
+subdirs
 symlink
 symlinked
 sync
@@ -789,6 +799,7 @@ usr
 util
 utils
 validator
+validators
 vanishingly
 var
 variadic
@@ -798,6 +809,7 @@ verifiers
 versa
 versioned
 vhost
+vip
 vptr
 vptrs
 wakeup
@@ -816,3 +828,5 @@ zag
 zig
 zlib
 zxid
+xmodem
+citt

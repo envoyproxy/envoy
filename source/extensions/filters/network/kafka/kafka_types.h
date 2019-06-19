@@ -14,17 +14,17 @@ namespace Kafka {
 /**
  * Nullable string used by Kafka.
  */
-typedef absl::optional<std::string> NullableString;
+using NullableString = absl::optional<std::string>;
 
 /**
  * Bytes array used by Kafka.
  */
-typedef std::vector<unsigned char> Bytes;
+using Bytes = std::vector<unsigned char>;
 
 /**
  * Nullable bytes array used by Kafka.
  */
-typedef absl::optional<Bytes> NullableBytes;
+using NullableBytes = absl::optional<Bytes>;
 
 /**
  * Kafka array of elements of type T.

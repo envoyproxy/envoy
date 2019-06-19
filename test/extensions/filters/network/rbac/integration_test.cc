@@ -43,7 +43,7 @@ public:
   void initializeFilter(const std::string& config) {
     config_helper_.addConfigModifier([config](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       envoy::api::v2::listener::Filter filter;
-      MessageUtil::loadFromYaml(config, filter);
+      TestUtility::loadFromYaml(config, filter);
       ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
       auto l = bootstrap.mutable_static_resources()->mutable_listeners(0);
       ASSERT_GT(l->filter_chains_size(), 0);

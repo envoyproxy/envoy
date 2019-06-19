@@ -180,10 +180,12 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // explicitly nulls out response_encoder to avoid the downstream being notified of the
   // Envoy-internal stream instance being ended.
   if (stream.response_encoder_ != nullptr &&
-      (!stream.state_.remote_complete_ || !stream.state_.local_complete_)) {
+      (!stream.state_.remote_complete_ || !stream.state_.codec_saw_local_complete_)) {
     // Indicate local is complete at this point so that if we reset during a continuation, we don't
     // raise further data or trailers.
+    ENVOY_STREAM_LOG(debug, "doEndStream() resetting stream", stream);
     stream.state_.local_complete_ = true;
+    stream.state_.codec_saw_local_complete_ = true;
     stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
     reset_stream = true;
   }
@@ -311,8 +313,17 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
 
 void ConnectionManagerImpl::resetAllStreams() {
   while (!streams_.empty()) {
-    // Mimic a downstream reset in this case.
-    streams_.front()->onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
+    // Mimic a downstream reset in this case. We must also remove callbacks here. Though we are
+    // about to close the connection and will disable further reads, it is possible that flushing
+    // data out can cause stream callbacks to fire (e.g., low watermark callbacks).
+    //
+    // TODO(mattklein123): I tried to actually reset through the codec here, but ran into issues
+    // with nghttp2 state and being unhappy about sending reset frames after the connection had
+    // been terminated via GOAWAY. It might be possible to do something better here inside the h2
+    // codec but there are no easy answers and this seems simpler.
+    auto& stream = *streams_.front();
+    stream.response_encoder_->getStream().removeCallbacks(stream);
+    stream.onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
   }
 }
 
@@ -399,7 +410,7 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager),
-      snapped_route_config_(connection_manager.config_.routeConfigProvider().config()),
+      snapped_route_config_(connection_manager.config_.routeConfigProvider()->config()),
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::Timespan(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
@@ -708,17 +719,24 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     stream_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
         *request_headers_, connection_manager_.read_callbacks_->connection(),
         connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
-        connection_manager_.runtime_, connection_manager_.local_info_));
+        connection_manager_.local_info_));
   }
   ASSERT(stream_info_.downstreamRemoteAddress() != nullptr);
 
   ASSERT(!cached_route_);
   refreshCachedRoute();
+
+  if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
+    ConnectionManagerUtility::mutateTracingRequestHeader(
+        *request_headers_, connection_manager_.runtime_, connection_manager_.config_,
+        cached_route_.value().get());
+  }
+
   const bool upgrade_rejected = createFilterChain() == false;
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
-  if (protocol == Protocol::Http11 && cached_route_.value()) {
+  if (protocol == Protocol::Http11 && hasCachedRoute()) {
     if (upgrade_rejected) {
       // Do not allow upgrades if the route does not support it.
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
@@ -730,7 +748,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     // Allow non websocket requests to go through websocket enabled routes.
   }
 
-  if (cached_route_.value()) {
+  if (hasCachedRoute()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     if (route_entry != nullptr && route_entry->idleTimeout()) {
       idle_timeout_ms_ = route_entry->idleTimeout().value();
@@ -778,7 +796,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
   // be broken in the case a filter changes the route.
 
   // If a decorator has been defined, apply it to the active span.
-  if (cached_route_.value() && cached_route_.value()->decorator()) {
+  if (hasCachedRoute() && cached_route_.value()->decorator()) {
     cached_route_.value()->decorator()->apply(*active_span_);
 
     // Cache decorated operation.
@@ -1517,6 +1535,8 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
 
 void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
   if (end_stream) {
+    ASSERT(!state_.codec_saw_local_complete_);
+    state_.codec_saw_local_complete_ = true;
     stream_info_.onLastDownstreamTxByteSent();
     request_response_timespan_->complete();
     connection_manager_.doEndStream(*this);
@@ -1542,6 +1562,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl:
   //       2) The codec TX a codec level reset
   //       3) The codec RX a reset
   //       If we need to differentiate we need to do it inside the codec. Can start with this.
+  ENVOY_STREAM_LOG(debug, "stream reset", *this);
   connection_manager_.stats_.named_.downstream_rq_rx_reset_.inc();
   connection_manager_.doDeferredStreamDestroy(*this);
 }
@@ -1607,7 +1628,7 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
 
     // We must check if the 'cached_route_' optional is populated since this function can be called
     // early via sendLocalReply(), before the cached route is populated.
-    if (cached_route_.has_value() && cached_route_.value() && cached_route_.value()->routeEntry()) {
+    if (hasCachedRoute() && cached_route_.value()->routeEntry()) {
       upgrade_map = &cached_route_.value()->routeEntry()->upgradeMap();
     }
 
@@ -1665,10 +1686,16 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
     doHeaders(complete() && !bufferedData() && !trailers());
   }
 
-  // TODO(mattklein123): If a filter returns StopIterationNoBuffer and then does a continue, we
-  // won't be able to end the stream if there is no buffered data. Need to handle this.
-  if (bufferedData()) {
-    doData(complete() && !trailers());
+  // Make sure we handle filters returning StopIterationNoBuffer and then commonContinue by flushing
+  // the terminal fin.
+  const bool end_stream_with_data = complete() && !trailers();
+  if (bufferedData() || end_stream_with_data) {
+    if (end_stream_with_data && !bufferedData()) {
+      // In the StopIterationNoBuffer case the ConnectionManagerImpl will not have created a
+      // buffer but encode/decodeData expects the buffer to exist, so create one.
+      bufferedData() = createBuffer();
+    }
+    doData(end_stream_with_data);
   }
 
   if (trailers()) {

@@ -177,10 +177,64 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(16384U, string.size());
   }
 
+  // Copy, exactly filling inline capacity
+  //
+  // ASAN does not catch the clobber in the case where the code writes one past the
+  // end of the inline buffer. To ensure coverage the next block checks that setCopy
+  // is not introducing a NUL in a way that does not rely on an actual clobber getting
+  // detected.
+  {
+    HeaderString string;
+    std::string large(128, 'z');
+    string.setCopy(large.c_str(), large.size());
+    EXPECT_EQ(string.type(), HeaderString::Type::Inline);
+    EXPECT_EQ(string.getStringView(), large);
+  }
+
+  // Ensure setCopy does not add NUL.
+  {
+    HeaderString string;
+    std::string large(128, 'z');
+    string.setCopy(large.c_str(), large.size());
+    EXPECT_EQ(string.type(), HeaderString::Type::Inline);
+    EXPECT_EQ(string.getStringView(), large);
+    std::string small(1, 'a');
+    string.setCopy(small.c_str(), small.size());
+    EXPECT_EQ(string.type(), HeaderString::Type::Inline);
+    EXPECT_EQ(string.getStringView(), small);
+    // If we peek past the valid first character of the
+    // header string_view it should still be 'z' and not '\0'.
+    // We know this peek is OK since the memory is much larger
+    // than two bytes.
+    EXPECT_EQ(string.getStringView().data()[1], 'z');
+  }
+
+  // Copy, exactly filling dynamic capacity
+  //
+  // ASAN should catch a write one past the end of the dynamic buffer. This test
+  // forces a dynamic buffer with one copy and then fills it with the next.
+  {
+    HeaderString string;
+    // Force Dynamic with setCopy of inline buffer size + 1.
+    std::string large1(129, 'z');
+    string.setCopy(large1.c_str(), large1.size());
+    EXPECT_EQ(string.type(), HeaderString::Type::Dynamic);
+    const void* dynamic_buffer_address = string.getStringView().data();
+    // Dynamic capacity in setCopy is 2x required by the size.
+    // So to fill it exactly setCopy with a total of 258 chars.
+    std::string large2(258, 'z');
+    string.setCopy(large2.c_str(), large2.size());
+    EXPECT_EQ(string.type(), HeaderString::Type::Dynamic);
+    // The actual buffer address should be the same as it was after
+    // setCopy(large1), ensuring no reallocation occurred.
+    EXPECT_EQ(string.getStringView().data(), dynamic_buffer_address);
+    EXPECT_EQ(string.getStringView(), large2);
+  }
+
   // Append, small buffer to dynamic
   {
     HeaderString string;
-    std::string test(127, 'a');
+    std::string test(128, 'a');
     string.append(test.c_str(), test.size());
     EXPECT_EQ(HeaderString::Type::Inline, string.type());
     string.append("a", 1);
@@ -208,20 +262,20 @@ TEST(HeaderStringTest, All) {
   // Append, realloc dynamic.
   {
     HeaderString string;
-    std::string large(128, 'a');
+    std::string large(129, 'a');
     string.append(large.c_str(), large.size());
     EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
     std::string large2 = large + large;
     string.append(large2.c_str(), large2.size());
     large += large2;
     EXPECT_EQ(large, string.getStringView());
-    EXPECT_EQ(384U, string.size());
+    EXPECT_EQ(387U, string.size());
   }
 
   // Append, realloc close to limit with small buffer.
   {
     HeaderString string;
-    std::string large(128, 'a');
+    std::string large(129, 'a');
     string.append(large.c_str(), large.size());
     EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
     std::string large2(120, 'b');
@@ -229,7 +283,29 @@ TEST(HeaderStringTest, All) {
     std::string large3(32, 'c');
     string.append(large3.c_str(), large3.size());
     EXPECT_EQ((large + large2 + large3), string.getStringView());
-    EXPECT_EQ(280U, string.size());
+    EXPECT_EQ(281U, string.size());
+  }
+
+  // Append, exactly filling dynamic capacity
+  //
+  // ASAN should catch a write one past the end of the dynamic buffer. This test
+  // forces a dynamic buffer with one copy and then fills it with the next.
+  {
+    HeaderString string;
+    // Force Dynamic with setCopy of inline buffer size + 1.
+    std::string large1(129, 'z');
+    string.setCopy(large1.c_str(), large1.size());
+    EXPECT_EQ(string.type(), HeaderString::Type::Dynamic);
+    const void* dynamic_buffer_address = string.getStringView().data();
+    // Dynamic capacity in setCopy is 2x required by the size.
+    // So to fill it exactly append 129 chars for a total of 258 chars.
+    std::string large2(129, 'z');
+    string.append(large2.c_str(), large2.size());
+    EXPECT_EQ(string.type(), HeaderString::Type::Dynamic);
+    // The actual buffer address should be the same as it was after
+    // setCopy(large1), ensuring no reallocation occurred.
+    EXPECT_EQ(string.getStringView().data(), dynamic_buffer_address);
+    EXPECT_EQ(string.getStringView(), large1 + large2);
   }
 
   // Set integer, inline
@@ -243,7 +319,7 @@ TEST(HeaderStringTest, All) {
   // Set integer, dynamic
   {
     HeaderString string;
-    std::string large(128, 'a');
+    std::string large(129, 'a');
     string.append(large.c_str(), large.size());
     string.setInteger(123456789);
     EXPECT_EQ("123456789", string.getStringView());
@@ -260,7 +336,7 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(11U, string.size());
     EXPECT_EQ(HeaderString::Type::Reference, string.type());
 
-    const std::string large(128, 'a');
+    const std::string large(129, 'a');
     string.setCopy(large.c_str(), large.size());
     EXPECT_NE(string.getStringView().data(), large.c_str());
     EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
@@ -408,7 +484,7 @@ TEST(HeaderMapImplTest, SetRemovesAllValues) {
   headers.addReference(key1, ref_value3);
   headers.addReference(key1, ref_value4);
 
-  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
 
   {
     MockCb cb;
@@ -606,7 +682,7 @@ TEST(HeaderMapImplTest, Iterate) {
   LowerCaseString foo_key("foo");
   headers.setReferenceKey(foo_key, "bar"); // set moves key to end
 
-  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
   MockCb cb;
 
   InSequence seq;
@@ -629,7 +705,7 @@ TEST(HeaderMapImplTest, IterateReverse) {
   LowerCaseString world_key("world");
   headers.setReferenceKey(world_key, "hello");
 
-  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
   MockCb cb;
 
   InSequence seq;
@@ -743,7 +819,7 @@ TEST(HeaderMapImplDeathTest, TestHeaderLengthChecks) {
 }
 
 TEST(HeaderMapImplTest, PseudoHeaderOrder) {
-  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
   MockCb cb;
 
   {

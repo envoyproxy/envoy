@@ -1355,6 +1355,7 @@ public:
 private:
   ReadFilterCallbacks* callbacks_{nullptr};
 };
+
 class MockTransportConnectionImplTest : public testing::Test {
 public:
   MockTransportConnectionImplTest() {
@@ -1694,6 +1695,169 @@ TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
   file_ready_cb_(Event::FileReadyType::Read);
   EXPECT_CALL(*transport_socket_, doWrite(_, true))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
+}
+
+// Fixture for validating behavior after a connection is closed.
+class PostCloseConnectionImplTest : public MockTransportConnectionImplTest {
+protected:
+  // Setup connection, single read event.
+  void initialize() {
+    connection_->addReadFilter(read_filter_);
+    connection_->setDelayedCloseTimeout(std::chrono::milliseconds(100));
+
+    EXPECT_CALL(*transport_socket_, doRead(_))
+        .WillOnce(Invoke([this](Buffer::Instance& buffer) -> IoResult {
+          buffer.add(val_.c_str(), val_.size());
+          return {PostIoAction::KeepOpen, val_.size(), false};
+        }));
+    EXPECT_CALL(*read_filter_, onNewConnection());
+    EXPECT_CALL(*read_filter_, onData(_, _));
+    file_ready_cb_(Event::FileReadyType::Read);
+  }
+
+  void writeSomeData() {
+    Buffer::OwnedImpl buffer("data");
+    EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write));
+    connection_->write(buffer, false);
+  }
+
+  const std::string val_{"a"};
+  std::shared_ptr<MockReadFilter> read_filter_{new StrictMock<MockReadFilter>()};
+};
+
+// Test that if a read event occurs after
+// close(ConnectionCloseType::FlushWriteAndDelay), the read is not propagated to
+// a read filter.
+TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnored) {
+  InSequence s;
+  initialize();
+
+  // Delayed connection close.
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  connection_->close(ConnectionCloseType::FlushWriteAndDelay);
+
+  // Read event, doRead() happens on connection but no filter onData().
+  EXPECT_CALL(*read_filter_, onData(_, _)).Times(0);
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Invoke([this](Buffer::Instance& buffer) -> IoResult {
+        buffer.add(val_.c_str(), val_.size());
+        return {PostIoAction::KeepOpen, val_.size(), false};
+      }));
+  file_ready_cb_(Event::FileReadyType::Read);
+  // Deferred close.
+  EXPECT_CALL(*transport_socket_, closeSocket(_));
+}
+
+// Test that if a read event occurs after
+// close(ConnectionCloseType::FlushWriteAndDelay) with pending write data, the
+// read is not propagated to a read filter.
+TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithWriteData) {
+  InSequence s;
+  initialize();
+  writeSomeData();
+
+  // Delayed connection close.
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  connection_->close(ConnectionCloseType::FlushWriteAndDelay);
+
+  // Read event, doRead() happens on connection but no filter onData().
+  EXPECT_CALL(*read_filter_, onData(_, _)).Times(0);
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Invoke([this](Buffer::Instance& buffer) -> IoResult {
+        buffer.add(val_.c_str(), val_.size());
+        return {PostIoAction::KeepOpen, val_.size(), false};
+      }));
+  file_ready_cb_(Event::FileReadyType::Read);
+  // We have data written above in writeSomeData(), it will be flushed here.
+  EXPECT_CALL(*transport_socket_, doWrite(_, true))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  // Deferred close.
+  EXPECT_CALL(*transport_socket_, closeSocket(_));
+}
+
+// Test that if a read event occurs after
+// close(ConnectionCloseType::FlushWriteAndDelay) with pending write data and a
+// transport socket than canFlushClose(), the read is not propagated to a read
+// filter.
+TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredCanFlushClose) {
+  InSequence s;
+  initialize();
+  writeSomeData();
+
+  // The path of interest is when the transport socket canFlushClose().
+  ON_CALL(*transport_socket_, canFlushClose()).WillByDefault(Return(true));
+
+  // Delayed connection close.
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed));
+  connection_->close(ConnectionCloseType::FlushWriteAndDelay);
+
+  // Read event, doRead() happens on connection but no filter onData().
+  EXPECT_CALL(*read_filter_, onData(_, _)).Times(0);
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Invoke([this](Buffer::Instance& buffer) -> IoResult {
+        buffer.add(val_.c_str(), val_.size());
+        return {PostIoAction::KeepOpen, val_.size(), false};
+      }));
+  file_ready_cb_(Event::FileReadyType::Read);
+
+  // Deferred close.
+  EXPECT_CALL(*transport_socket_, closeSocket(_));
+}
+
+// Test that if a read event occurs after close(ConnectionCloseType::NoFlush),
+// then no read is attempted from the transport socket and hence the read is not
+// propagated to a read filter.
+TEST_F(PostCloseConnectionImplTest, NoReadAfterCloseNoFlush) {
+  InSequence s;
+  initialize();
+
+  // Immediate connection close.
+  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  connection_->close(ConnectionCloseType::NoFlush);
+
+  // We don't even see a doRead(), let alone an onData() callback.
+  EXPECT_CALL(*read_filter_, onData(_, _)).Times(0);
+  EXPECT_CALL(*transport_socket_, doRead(_)).Times(0);
+  file_ready_cb_(Event::FileReadyType::Read);
+}
+
+// Test that if a read event occurs after close(ConnectionCloseType::FlushWrite),
+// then no read is attempted from the transport socket and hence the read is not
+// propagated to a read filter.
+TEST_F(PostCloseConnectionImplTest, NoReadAfterCloseFlushWrite) {
+  InSequence s;
+  initialize();
+
+  // Connection flush and close.
+  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  connection_->close(ConnectionCloseType::FlushWrite);
+
+  // We don't even see a doRead(), let alone an onData() callback.
+  EXPECT_CALL(*read_filter_, onData(_, _)).Times(0);
+  EXPECT_CALL(*transport_socket_, doRead(_)).Times(0);
+  file_ready_cb_(Event::FileReadyType::Read);
+}
+
+// Test that if a read event occurs after close(ConnectionCloseType::FlushWrite)
+// with pending write data, then no read is attempted from the transport socket
+// and hence the read is not propagated to a read filter.
+TEST_F(PostCloseConnectionImplTest, NoReadAfterCloseFlushWriteWriteData) {
+  InSequence s;
+  initialize();
+  writeSomeData();
+
+  // Connection flush and close. We have data written above in writeSomeData(),
+  // it will be flushed here.
+  EXPECT_CALL(*transport_socket_, doWrite(_, true))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  connection_->close(ConnectionCloseType::FlushWrite);
+
+  // We don't even see a doRead(), let alone an onData() callback.
+  EXPECT_CALL(*read_filter_, onData(_, _)).Times(0);
+  EXPECT_CALL(*transport_socket_, doRead(_)).Times(0);
+  file_ready_cb_(Event::FileReadyType::Read);
 }
 
 class ReadBufferLimitTest : public ConnectionImplTest {

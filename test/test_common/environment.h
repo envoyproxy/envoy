@@ -15,9 +15,9 @@
 namespace Envoy {
 class TestEnvironment {
 public:
-  typedef std::unordered_map<std::string, uint32_t> PortMap;
+  using PortMap = std::unordered_map<std::string, uint32_t>;
 
-  typedef std::unordered_map<std::string, std::string> ParamMap;
+  using ParamMap = std::unordered_map<std::string, std::string>;
 
   /**
    * Initialize command-line options for later access by tests in getOptions().
@@ -164,10 +164,12 @@ public:
    *
    * @param filename: the name of the file to use
    * @param contents: the data to go in the file.
+   * @param fully_qualified_path: if true, will write to filename without prepending the tempdir.
    * @return the fully qualified path of the output file.
    */
   static std::string writeStringToFileForTest(const std::string& filename,
-                                              const std::string& contents);
+                                              const std::string& contents,
+                                              bool fully_qualified_path = false);
   /**
    * Dumps the contents of the file into the string.
    *
@@ -201,6 +203,11 @@ public:
    * Set environment variable. Same args as setenv(2).
    */
   static void setEnvVar(const std::string& name, const std::string& value, int overwrite);
+
+  /**
+   * Removes environment variable. Same args as unsetenv(3).
+   */
+  static void unsetEnvVar(const std::string& name);
 };
 
 } // namespace Envoy

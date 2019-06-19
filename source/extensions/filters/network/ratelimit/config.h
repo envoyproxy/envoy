@@ -20,11 +20,6 @@ class RateLimitConfigFactory
 public:
   RateLimitConfigFactory() : FactoryBase(NetworkFilterNames::get().RateLimit) {}
 
-  // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config,
-                      Server::Configuration::FactoryContext& context) override;
-
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::rate_limit::v2::RateLimit& proto_config,

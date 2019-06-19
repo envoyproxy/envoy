@@ -15,9 +15,10 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
-#include "common/config/lds_json.h"
+#include "common/config/runtime_utility.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -38,6 +39,16 @@ bool FilterChainUtility::buildFilterChain(
     const std::vector<Network::ListenerFilterFactoryCb>& factories) {
   for (const Network::ListenerFilterFactoryCb& factory : factories) {
     factory(filter_manager);
+  }
+
+  return true;
+}
+
+bool FilterChainUtility::buildUdpFilterChain(
+    Network::UdpListenerFilterManager& filter_manager, Network::UdpReadFilterCallbacks& callbacks,
+    const std::vector<Network::UdpListenerFilterFactoryCb>& factories) {
+  for (const Network::UdpListenerFilterFactoryCb& factory : factories) {
+    factory(filter_manager, callbacks);
   }
 
   return true;
@@ -95,8 +106,8 @@ void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& config
 
   // Now see if there is a factory that will accept the config.
   auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(type);
-  ProtobufTypes::MessagePtr message =
-      Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), server.messageValidationVisitor(), factory);
   http_tracer_ = factory.createHttpTracer(*message, server);
 }
 
@@ -107,8 +118,8 @@ void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstra
   for (const envoy::config::metrics::v2::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config
     auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object.name());
-    ProtobufTypes::MessagePtr message =
-        Config::Utility::translateToFactoryConfig(sink_object, factory);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        sink_object, server.messageValidationVisitor(), factory);
 
     stats_sinks_.emplace_back(factory.createStatsSink(*message, server));
   }
@@ -127,12 +138,13 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstra
     flags_path_ = bootstrap.flags_path();
   }
 
-  base_runtime_ = bootstrap.runtime().base();
-  if (!bootstrap.runtime().symlink_root().empty()) {
-    disk_runtime_ = std::make_unique<DiskRuntimeImpl>();
-    disk_runtime_->symlink_root_ = bootstrap.runtime().symlink_root();
-    disk_runtime_->subdirectory_ = bootstrap.runtime().subdirectory();
-    disk_runtime_->override_subdirectory_ = bootstrap.runtime().override_subdirectory();
+  if (bootstrap.has_layered_runtime()) {
+    layered_runtime_.MergeFrom(bootstrap.layered_runtime());
+    if (layered_runtime_.layers().empty()) {
+      layered_runtime_.add_layers()->mutable_admin_layer();
+    }
+  } else {
+    Config::translateRuntime(bootstrap.runtime(), layered_runtime_);
   }
 }
 

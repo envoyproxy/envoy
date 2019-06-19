@@ -33,7 +33,7 @@ public:
    * @param find_tag_name The name of the tag to search for.
    * @return The value of the tag, if found.
    */
-  static absl::optional<StatName> findTag(Metric& metric, StatName find_tag_name);
+  static absl::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
 };
 
 } // namespace Stats

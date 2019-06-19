@@ -32,6 +32,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "route_config_update_info_interface",
+    hdrs = ["route_config_update_receiver.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":rds_interface",
+        "//include/envoy/common:time_interface",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
     external_deps = ["abseil_optional"],
@@ -47,6 +58,16 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2:rds_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "scopes_interface",
+    hdrs = ["scopes.h"],
+    deps = [
+        ":router_interface",
+        "//include/envoy/config:config_provider_interface",
+        "//include/envoy/http:header_map_interface",
     ],
 )
 

@@ -12,11 +12,9 @@ namespace Upstream {
 /**
  * All Maglev load balancer stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_MAGLEV_LOAD_BALANCER_STATS(GAUGE)                                                      \
-  GAUGE(min_entries_per_host)                                                                      \
-  GAUGE(max_entries_per_host)
-// clang-format on
+  GAUGE(max_entries_per_host, Accumulate)                                                          \
+  GAUGE(min_entries_per_host, Accumulate)
 
 /**
  * Struct definition for all Maglev load balancer stats. @see stats_macros.h

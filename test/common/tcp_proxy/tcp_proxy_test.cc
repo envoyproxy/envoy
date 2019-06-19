@@ -26,6 +26,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -331,7 +332,7 @@ TEST(ConfigTest, AccessLogConfig) {
     file_access_log.set_path("some_path");
     file_access_log.set_format("the format specifier");
     ProtobufWkt::Struct* custom_config = log->mutable_config();
-    MessageUtil::jsonConvert(file_access_log, *custom_config);
+    TestUtility::jsonConvert(file_access_log, *custom_config);
   }
 
   log = config.mutable_access_log()->Add();
@@ -340,7 +341,7 @@ TEST(ConfigTest, AccessLogConfig) {
     envoy::config::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("another path");
     ProtobufWkt::Struct* custom_config = log->mutable_config();
-    MessageUtil::jsonConvert(file_access_log, *custom_config);
+    TestUtility::jsonConvert(file_access_log, *custom_config);
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -385,7 +386,7 @@ public:
     envoy::config::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
     file_access_log.set_format(access_log_format);
-    MessageUtil::jsonConvert(file_access_log, *access_log->mutable_config());
+    TestUtility::jsonConvert(file_access_log, *access_log->mutable_config());
 
     return config;
   }
@@ -938,8 +939,7 @@ TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
 }
 
-// Test that access log fields %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% and
-// %DOWNSTREAM_LOCAL_ADDRESS% are correctly logged.
+// Test that access log fields %DOWNSTREAM_PEER_URI_SAN% is correctly logged.
 TEST_F(TcpProxyTest, AccessLogPeerUriSan) {
   filter_callbacks_.connection_.local_address_ =
       Network::Utility::resolveUrl("tcp://1.1.1.2:20000");
@@ -955,6 +955,25 @@ TEST_F(TcpProxyTest, AccessLogPeerUriSan) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "someSan");
+}
+
+// Test that access log fields %DOWNSTREAM_TLS_SESSION_ID% is correctly logged.
+TEST_F(TcpProxyTest, AccessLogTlsSessionId) {
+  filter_callbacks_.connection_.local_address_ =
+      Network::Utility::resolveUrl("tcp://1.1.1.2:20000");
+  filter_callbacks_.connection_.remote_address_ =
+      Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
+
+  const std::string tlsSessionId{
+      "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B"};
+  Ssl::MockConnectionInfo mockConnectionInfo;
+  EXPECT_CALL(mockConnectionInfo, sessionId()).WillOnce(Return(tlsSessionId));
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(&mockConnectionInfo));
+
+  setup(1, accessLogConfig("%DOWNSTREAM_TLS_SESSION_ID%"));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B");
 }
 
 // Test that access log fields %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% and

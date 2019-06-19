@@ -8,7 +8,7 @@ The Envoy v2 APIs are defined as `proto3
 <https://developers.google.com/protocol-buffers/>`_ in the `data plane API
 repository <https://github.com/envoyproxy/data-plane-api/tree/master/envoy/api>`_. They support
 
-* Streaming delivery of :repo:`xDS <api/XDS_PROTOCOL.md>` API updates via gRPC. This reduces
+* Streaming delivery of :ref:`xDS <xds_protocol>` API updates via gRPC. This reduces
   resource requirements and can lower the update latency.
 * A new REST-JSON API in which the JSON/YAML formats are derived mechanically via the `proto3
   canonical JSON mapping
@@ -16,11 +16,11 @@ repository <https://github.com/envoyproxy/data-plane-api/tree/master/envoy/api>`
 * Delivery of updates via the filesystem, REST-JSON or gRPC endpoints.
 * Advanced load balancing through an extended endpoint assignment API and load
   and resource utilization reporting to management servers.
-* :repo:`Stronger consistency and ordering properties
-  <api/XDS_PROTOCOL.md#eventual-consistency-considerations>`
+* :ref:`Stronger consistency and ordering properties
+  <xds_protocol_eventual_consistency_considerations>`
   when needed. The v2 APIs still maintain a baseline eventual consistency model.
 
-See the :repo:`xDS protocol description <api/XDS_PROTOCOL.md>` for
+See the :ref:`xDS protocol description <xds_protocol>` for
 further details on aspects of v2 message exchange between Envoy and the management server.
 
 .. _config_overview_v2_bootstrap:
@@ -199,8 +199,8 @@ In the above example, the EDS management server could then return a proto encodi
 
 
 The versioning and type URL scheme that appear above are explained in more
-detail in the :repo:`streaming gRPC subscription protocol
-<api/XDS_PROTOCOL.md#streaming-grpc-subscriptions>`
+detail in the :ref:`streaming gRPC subscription protocol
+<xds_protocol_streaming_grpc_subscriptions>`
 documentation.
 
 Dynamic
@@ -341,7 +341,7 @@ A v2 xDS management server will implement the below endpoints as required for
 gRPC and/or REST serving. In both streaming gRPC and
 REST-JSON cases, a :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` is sent and a
 :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` received following the
-:repo:`xDS protocol <api/XDS_PROTOCOL.md>`.
+:ref:`xDS protocol <xds_protocol>`.
 
 .. _v2_grpc_streaming_endpoints:
 
@@ -496,6 +496,12 @@ is set in the :ref:`rds
 <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.rds>` field of the :ref:`HttpConnectionManager
 <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>` config.
 
+.. note::
+
+    The management server responding to these endpoints must respond with a :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
+    along with a HTTP status of 200. Additionally, if the configuration that would be supplied has not changed (as indicated by the version
+    supplied by the Envoy client) then the management server can respond with an empty body and a HTTP status of 304.
+
 .. _config_overview_v2_ads:
 
 Aggregated Discovery Service
@@ -524,8 +530,7 @@ synchronization to correctly sequence the update. With ADS, the management
 server would deliver the CDS, EDS and then RDS updates on a single stream.
 
 ADS is only available for gRPC streaming (not REST) and is described more fully
-in :repo:`this
-<api/XDS_PROTOCOL.md#aggregated-discovery-services-ads>`
+in :ref:`xDS <xds_protocol_ads>`
 document. The gRPC endpoint is:
 
 .. http:post:: /envoy.service.discovery.v2.AggregatedDiscoveryService/StreamAggregatedResources

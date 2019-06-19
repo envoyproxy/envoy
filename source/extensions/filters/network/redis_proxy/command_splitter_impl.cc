@@ -1,15 +1,5 @@
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include "envoy/stats/scope.h"
-
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-
 #include "extensions/filters/network/common/redis/supported_commands.h"
 
 namespace Envoy {
@@ -29,7 +19,7 @@ namespace {
 
 // null_pool_callbacks is used for requests that must be filtered and not redirected such as
 // "asking".
-DoNothingPoolCallbacks null_pool_callbacks;
+Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
 
 // Create an asking command request.
 const Common::Redis::RespValue& askingRequest() {
@@ -80,6 +70,30 @@ bool redirectionArgsInvalid(const Common::Redis::RespValue* original_request,
   return false;
 }
 
+/**
+ * Make request and maybe mirror the request based on the mirror policies of the route.
+ * @param route supplies the route matched with the request.
+ * @param command supplies the command of the request.
+ * @param key supplies the key of the request.
+ * @param incoming_request supplies the request.
+ * @param callbacks supplies the request completion callbacks.
+ * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
+ *         for some reason.
+ */
+Common::Redis::Client::PoolRequest* makeRequest(const RouteSharedPtr& route,
+                                                const std::string& command, const std::string& key,
+                                                const Common::Redis::RespValue& incoming_request,
+                                                Common::Redis::Client::PoolCallbacks& callbacks) {
+  auto handler = route->upstream()->makeRequest(key, incoming_request, callbacks);
+  if (handler) {
+    for (auto& mirror_policy : route->mirrorPolicies()) {
+      if (mirror_policy->shouldMirror(command)) {
+        mirror_policy->upstream()->makeRequest(key, incoming_request, null_pool_callbacks);
+      }
+    }
+  }
+  return handler;
+}
 } // namespace
 
 void SplitRequestBase::onWrongNumberOfArguments(SplitCallbacks& callbacks,
@@ -147,11 +161,12 @@ SplitRequestPtr SimpleRequest::create(Router& router,
   std::unique_ptr<SimpleRequest> request_ptr{
       new SimpleRequest(callbacks, command_stats, time_source, latency_in_micros)};
 
-  auto conn_pool = router.upstreamPool(incoming_request->asArray()[1].asString());
-  if (conn_pool) {
-    request_ptr->conn_pool_ = conn_pool;
-    request_ptr->handle_ = conn_pool->makeRequest(incoming_request->asArray()[1].asString(),
-                                                  *incoming_request, *request_ptr);
+  const auto route = router.upstreamPool(incoming_request->asArray()[1].asString());
+  if (route) {
+    request_ptr->conn_pool_ = route->upstream();
+    request_ptr->handle_ =
+        makeRequest(route, incoming_request->asArray()[0].asString(),
+                    incoming_request->asArray()[1].asString(), *incoming_request, *request_ptr);
   }
 
   if (!request_ptr->handle_) {
@@ -177,11 +192,12 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
   std::unique_ptr<EvalRequest> request_ptr{
       new EvalRequest(callbacks, command_stats, time_source, latency_in_micros)};
 
-  auto conn_pool = router.upstreamPool(incoming_request->asArray()[3].asString());
-  if (conn_pool) {
-    request_ptr->conn_pool_ = conn_pool;
-    request_ptr->handle_ = conn_pool->makeRequest(incoming_request->asArray()[3].asString(),
-                                                  *incoming_request, *request_ptr);
+  const auto route = router.upstreamPool(incoming_request->asArray()[3].asString());
+  if (route) {
+    request_ptr->conn_pool_ = route->upstream();
+    request_ptr->handle_ =
+        makeRequest(route, incoming_request->asArray()[0].asString(),
+                    incoming_request->asArray()[3].asString(), *incoming_request, *request_ptr);
   }
 
   if (!request_ptr->handle_) {
@@ -243,11 +259,11 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
 
     single_mget.asArray()[1].asString() = incoming_request->asArray()[i].asString();
     ENVOY_LOG(debug, "redis: parallel get: '{}'", single_mget.toString());
-    auto conn_pool = router.upstreamPool(incoming_request->asArray()[i].asString());
-    if (conn_pool) {
-      pending_request.conn_pool_ = conn_pool;
-      pending_request.handle_ = conn_pool->makeRequest(incoming_request->asArray()[i].asString(),
-                                                       single_mget, pending_request);
+    const auto route = router.upstreamPool(incoming_request->asArray()[i].asString());
+    if (route) {
+      pending_request.conn_pool_ = route->upstream();
+      pending_request.handle_ = makeRequest(route, "get", incoming_request->asArray()[i].asString(),
+                                            single_mget, pending_request);
     }
 
     if (!pending_request.handle_) {
@@ -375,11 +391,11 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
     single_mset.asArray()[2].asString() = incoming_request->asArray()[i + 1].asString();
 
     ENVOY_LOG(debug, "redis: parallel set: '{}'", single_mset.toString());
-    auto conn_pool = router.upstreamPool(incoming_request->asArray()[i].asString());
-    if (conn_pool) {
-      pending_request.conn_pool_ = conn_pool;
-      pending_request.handle_ = conn_pool->makeRequest(incoming_request->asArray()[i].asString(),
-                                                       single_mset, pending_request);
+    const auto route = router.upstreamPool(incoming_request->asArray()[i].asString());
+    if (route) {
+      pending_request.conn_pool_ = route->upstream();
+      pending_request.handle_ = makeRequest(route, "set", incoming_request->asArray()[i].asString(),
+                                            single_mset, pending_request);
     }
 
     if (!pending_request.handle_) {
@@ -469,11 +485,12 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
     single_fragment.asArray()[1].asString() = incoming_request->asArray()[i].asString();
     ENVOY_LOG(debug, "redis: parallel {}: '{}'", incoming_request->asArray()[0].asString(),
               single_fragment.toString());
-    auto conn_pool = router.upstreamPool(incoming_request->asArray()[i].asString());
-    if (conn_pool) {
-      pending_request.conn_pool_ = conn_pool;
-      pending_request.handle_ = conn_pool->makeRequest(incoming_request->asArray()[i].asString(),
-                                                       single_fragment, pending_request);
+    const auto route = router.upstreamPool(incoming_request->asArray()[i].asString());
+    if (route) {
+      pending_request.conn_pool_ = route->upstream();
+      pending_request.handle_ =
+          makeRequest(route, single_fragment.asArray()[0].asString(),
+                      incoming_request->asArray()[i].asString(), single_fragment, pending_request);
     }
 
     if (!pending_request.handle_) {
@@ -558,13 +575,34 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
 
 SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
                                           SplitCallbacks& callbacks) {
-  if (request->type() != Common::Redis::RespType::Array) {
+  if ((request->type() != Common::Redis::RespType::Array) || request->asArray().empty()) {
     onInvalidRequest(callbacks);
     return nullptr;
   }
 
+  for (const Common::Redis::RespValue& value : request->asArray()) {
+    if (value.type() != Common::Redis::RespType::BulkString) {
+      onInvalidRequest(callbacks);
+      return nullptr;
+    }
+  }
+
   std::string to_lower_string(request->asArray()[0].asString());
   to_lower_table_.toLowerCase(to_lower_string);
+
+  if (to_lower_string == Common::Redis::SupportedCommands::auth()) {
+    if (request->asArray().size() < 2) {
+      onInvalidRequest(callbacks);
+      return nullptr;
+    }
+    callbacks.onAuth(request->asArray()[1].asString());
+    return nullptr;
+  }
+
+  if (!callbacks.connectionAllowed()) {
+    callbacks.onResponse(Utility::makeError(Response::get().AuthRequiredError));
+    return nullptr;
+  }
 
   if (to_lower_string == Common::Redis::SupportedCommands::ping()) {
     // Respond to PING locally.
@@ -579,13 +617,6 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     // Commands other than PING all have at least two arguments.
     onInvalidRequest(callbacks);
     return nullptr;
-  }
-
-  for (const Common::Redis::RespValue& value : request->asArray()) {
-    if (value.type() != Common::Redis::RespType::BulkString) {
-      onInvalidRequest(callbacks);
-      return nullptr;
-    }
   }
 
   auto handler = handler_lookup_table_.find(to_lower_string.c_str());

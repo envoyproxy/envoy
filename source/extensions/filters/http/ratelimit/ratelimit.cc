@@ -23,7 +23,7 @@ struct RcDetailsValues {
   // The rate limiter encountered a failure, and was configured to fail-closed.
   const std::string RateLimitError = "rate_limiter_error";
 };
-typedef ConstSingleton<RcDetailsValues> RcDetails;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 void Filter::initiateCall(const Http::HeaderMap& headers) {
   bool is_internal_request =
@@ -129,6 +129,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Http::HeaderMapPtr&& headers) {
   state_ = State::Complete;
   headers_to_add_ = std::move(headers);
+  Stats::StatName empty_stat_name;
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
@@ -141,13 +142,13 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     cluster_->statsScope().counter("ratelimit.over_limit").inc();
     Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                            cluster_->statsScope(),
-                                           EMPTY_STRING,
+                                           empty_stat_name,
                                            enumToInt(Http::Code::TooManyRequests),
                                            true,
-                                           EMPTY_STRING,
-                                           EMPTY_STRING,
-                                           EMPTY_STRING,
-                                           EMPTY_STRING,
+                                           empty_stat_name,
+                                           empty_stat_name,
+                                           empty_stat_name,
+                                           empty_stat_name,
                                            false};
     httpContext().codeStats().chargeResponseStat(info);
     headers_to_add_->insertEnvoyRateLimited().value(

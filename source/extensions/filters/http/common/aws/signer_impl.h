@@ -20,7 +20,7 @@ public:
   const Http::LowerCaseString SecurityToken{"x-amz-security-token"};
 };
 
-typedef ConstSingleton<SignatureHeaderValues> SignatureHeaders;
+using SignatureHeaders = ConstSingleton<SignatureHeaderValues>;
 
 class SignatureConstantValues {
 public:
@@ -37,7 +37,7 @@ public:
   const std::string ShortDateFormat{"%Y%m%d"};
 };
 
-typedef ConstSingleton<SignatureConstantValues> SignatureConstants;
+using SignatureConstants = ConstSingleton<SignatureConstantValues>;
 
 /**
  * Implementation of the Signature V4 signing process.

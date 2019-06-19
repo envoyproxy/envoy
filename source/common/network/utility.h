@@ -26,7 +26,7 @@ private:
   const uint32_t max_;
 };
 
-typedef std::list<PortRange> PortRangeList;
+using PortRangeList = std::list<PortRange>;
 
 /**
  * Common network utility routines.
@@ -178,6 +178,16 @@ public:
    *         IPv6 address are to be accepted.
    */
   static Address::InstanceConstSharedPtr getIpv6AnyAddress();
+
+  /**
+   * @return the IPv4 CIDR catch-all address (0.0.0.0/0).
+   */
+  static const std::string& getIpv4CidrCatchAllAddress();
+
+  /**
+   * @return the IPv6 CIDR catch-all address (::/0).
+   */
+  static const std::string& getIpv6CidrCatchAllAddress();
 
   /**
    * @param address IP address instance.

@@ -56,3 +56,20 @@ api_go_grpc_library(
         "//envoy/api/v2:discovery_go_proto",
     ],
 )
+
+api_proto_library_internal(
+    name = "rtds",
+    srcs = ["rtds.proto"],
+    has_services = 1,
+    deps = [
+        "//envoy/api/v2:discovery",
+    ],
+)
+
+api_go_grpc_library(
+    name = "rtds",
+    proto = ":rtds",
+    deps = [
+        "//envoy/api/v2:discovery_go_proto",
+    ],
+)

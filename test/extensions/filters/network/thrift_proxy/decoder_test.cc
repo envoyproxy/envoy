@@ -181,7 +181,7 @@ ExpectationSet expectContainerEnd(MockProtocol& proto, MockDecoderEventHandler& 
 class DecoderStateMachineTestBase {
 public:
   DecoderStateMachineTestBase() : metadata_(std::make_shared<MessageMetadata>()) {}
-  virtual ~DecoderStateMachineTestBase() {}
+  virtual ~DecoderStateMachineTestBase() = default;
 
   NiceMock<MockProtocol> proto_;
   MessageMetadataSharedPtr metadata_;

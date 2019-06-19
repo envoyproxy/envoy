@@ -132,7 +132,7 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
     // returns TSI_OK assuming there is no fatal error. Asserting OK.
     tsi_frame_protector* frame_protector;
     status =
-        tsi_handshaker_result_create_frame_protector(handshaker_result, NULL, &frame_protector);
+        tsi_handshaker_result_create_frame_protector(handshaker_result, nullptr, &frame_protector);
     ASSERT(status == TSI_OK);
     frame_protector_ = std::make_unique<TsiFrameProtector>(frame_protector);
 

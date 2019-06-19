@@ -14,7 +14,7 @@ envoy_cc_library(
     hdrs = ["heap_stat_data.h"],
     deps = [
         ":metric_impl_lib",
-        ":stat_data_allocator_lib",
+        ":stat_merger_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:thread_annotations",
@@ -45,6 +45,8 @@ envoy_cc_library(
     deps = [
         ":fake_symbol_table_lib",
         ":histogram_lib",
+        ":null_counter_lib",
+        ":null_gauge_lib",
         ":scope_prefixer_lib",
         ":stats_lib",
         ":store_impl_lib",
@@ -61,6 +63,26 @@ envoy_cc_library(
         ":symbol_table_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "null_counter_lib",
+    hdrs = ["null_counter.h"],
+    deps = [
+        ":metric_impl_lib",
+        ":symbol_table_lib",
+        "//include/envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "null_gauge_lib",
+    hdrs = ["null_gauge.h"],
+    deps = [
+        ":metric_impl_lib",
+        ":symbol_table_lib",
+        "//include/envoy/stats:stats_interface",
     ],
 )
 
@@ -85,28 +107,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "source_impl_lib",
-    srcs = ["source_impl.cc"],
-    hdrs = ["source_impl.h"],
-    external_deps = [
-        "abseil_optional",
-    ],
-    deps = [
-        "//include/envoy/stats:stats_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "stat_data_allocator_lib",
-    hdrs = ["stat_data_allocator_impl.h"],
-    deps = [
-        ":metric_impl_lib",
-        "//include/envoy/stats:stats_interface",
-        "//source/common/common:assert_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "stat_merger_lib",
     srcs = ["stat_merger.cc"],
     hdrs = ["stat_merger.h"],
@@ -122,7 +122,6 @@ envoy_cc_library(
     deps = [
         ":histogram_lib",
         ":metric_impl_lib",
-        ":source_impl_lib",
         ":symbol_table_lib",
         ":tag_extractor_lib",
         ":utility_lib",
@@ -204,6 +203,8 @@ envoy_cc_library(
     hdrs = ["thread_local_store.h"],
     deps = [
         ":heap_stat_data_lib",
+        ":null_counter_lib",
+        ":null_gauge_lib",
         ":scope_prefixer_lib",
         ":stats_lib",
         ":stats_matcher_lib",

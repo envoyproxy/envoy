@@ -65,8 +65,8 @@ index 0000000..9c71271
 +
 +    os.environ["MACOSX_DEPLOYMENT_TARGET"] = "10.6"
 +    os.environ["DEFAULT_CC"] = os.environ.get("CC", "")
-+    os.environ["TARGET_CFLAGS"] = os.environ.get("CFLAGS", "")
-+    os.environ["TARGET_LDFLAGS"] = os.environ.get("CFLAGS", "")
++    os.environ["TARGET_CFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"
++    os.environ["TARGET_LDFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"
 +    os.environ["CFLAGS"] = ""
 +    # LuaJIT compile process build a tool `buildvm` and use it, building `buildvm` with ASAN
 +    # will cause LSAN detect its leak and fail the build, set exitcode to 0 to make LSAN doesn't

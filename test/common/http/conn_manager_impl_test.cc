@@ -26,6 +26,7 @@
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 
+#include "test/common/http/conn_manager_impl_common.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
@@ -45,6 +46,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::An;
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::DoAll;
@@ -63,20 +65,10 @@ namespace Http {
 
 class HttpConnectionManagerImplTest : public testing::Test, public ConnectionManagerConfig {
 public:
-  struct RouteConfigProvider : public Router::RouteConfigProvider {
-    RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}
-
-    // Router::RouteConfigProvider
-    Router::ConfigConstSharedPtr config() override { return route_config_; }
-    absl::optional<ConfigInfo> configInfo() const override { return {}; }
-    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
-
-    TimeSource& time_source_;
-    std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
-  };
-
   HttpConnectionManagerImplTest()
-      : route_config_provider_(test_time_.timeSystem()), access_log_path_("dummy_path"),
+      : route_config_provider_(test_time_.timeSystem()),
+        scoped_route_config_provider_(test_time_.timeSystem()),
+        http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
         access_logs_{
             AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
                 access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
@@ -119,12 +111,17 @@ public:
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
     if (tracing) {
+      envoy::type::FractionalPercent percent1;
+      percent1.set_numerator(100);
+      envoy::type::FractionalPercent percent2;
+      percent2.set_numerator(10000);
+      percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
       tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
           TracingConnectionManagerConfig{Tracing::OperationName::Ingress,
                                          {LowerCaseString(":method")},
-                                         100,
-                                         10000,
-                                         100,
+                                         percent1,
+                                         percent2,
+                                         percent1,
                                          false});
     }
   }
@@ -250,12 +247,16 @@ public:
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() override { return true; }
+  bool preserveExternalRequestId() const override { return false; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
-  Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
+  Router::RouteConfigProvider* routeConfigProvider() override { return &route_config_provider_; }
+  Config::ConfigProvider* scopedRouteConfigProvider() override {
+    return &scoped_route_config_provider_;
+  }
   const std::string& serverName() override { return server_name_; }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
@@ -279,7 +280,8 @@ public:
   bool shouldNormalizePath() const override { return normalize_path_; }
 
   DangerousDeprecatedTestTime test_time_;
-  RouteConfigProvider route_config_provider_;
+  ConnectionManagerImplHelper::RouteConfigProvider route_config_provider_;
+  ConnectionManagerImplHelper::ScopedRouteConfigProvider scoped_route_config_provider_;
   NiceMock<Tracing::MockHttpTracer> tracer_;
   Stats::IsolatedStoreImpl fake_stats_;
   Http::ContextImpl http_context_;
@@ -321,6 +323,7 @@ public:
   Stats::IsolatedStoreImpl fake_listener_stats_;
   ConnectionManagerListenerStats listener_stats_;
   bool proxy_100_continue_ = false;
+  bool preserve_external_request_id_ = false;
   Http::Http1Settings http1_settings_;
   bool normalize_path_ = false;
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
@@ -695,7 +698,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   EXPECT_CALL(*span, setTag(Eq(":method"), Eq("GET")));
   // Verify if the activeSpan interface returns reference to the current span.
   EXPECT_CALL(*span, setTag(Eq("service-cluster"), Eq("scoobydoo")));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(_)).Times(0);
 
@@ -760,7 +764,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
           Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(_)).Times(0);
 
@@ -822,7 +827,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
           Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(Eq("testOp")));
 
@@ -870,8 +876,18 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
 
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorator) {
   setup(false, "");
-  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
-      Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100, false});
+  envoy::type::FractionalPercent percent1;
+  percent1.set_numerator(100);
+  envoy::type::FractionalPercent percent2;
+  percent2.set_numerator(10000);
+  percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
+      TracingConnectionManagerConfig{Tracing::OperationName::Egress,
+                                     {LowerCaseString(":method")},
+                                     percent1,
+                                     percent2,
+                                     percent1,
+                                     false});
 
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
@@ -889,7 +905,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
           Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(_)).Times(0);
 
@@ -937,8 +954,18 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
 
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecoratorOverrideOp) {
   setup(false, "");
-  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
-      Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100, false});
+  envoy::type::FractionalPercent percent1;
+  percent1.set_numerator(100);
+  envoy::type::FractionalPercent percent2;
+  percent2.set_numerator(10000);
+  percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
+      TracingConnectionManagerConfig{Tracing::OperationName::Egress,
+                                     {LowerCaseString(":method")},
+                                     percent1,
+                                     percent2,
+                                     percent1,
+                                     false});
 
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
@@ -956,7 +983,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
           Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   // Verify that span operation overridden by value supplied in response header.
   EXPECT_CALL(*span, setOperation(Eq("testOp")));
@@ -999,10 +1027,21 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
 TEST_F(HttpConnectionManagerImplTest,
        StartAndFinishSpanNormalFlowEgressDecoratorOverrideOpNoActiveSpan) {
   setup(false, "");
-  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
-      Tracing::OperationName::Egress, {LowerCaseString(":method")}, 100, 10000, 100, false});
+  envoy::type::FractionalPercent percent1;
+  percent1.set_numerator(100);
+  envoy::type::FractionalPercent percent2;
+  percent2.set_numerator(10000);
+  percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
+      TracingConnectionManagerConfig{Tracing::OperationName::Egress,
+                                     {LowerCaseString(":method")},
+                                     percent1,
+                                     percent2,
+                                     percent1,
+                                     false});
 
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(false));
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
@@ -1274,7 +1313,8 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
   tracing_config_.reset();
 
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _)).Times(0);
-  ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("tracing.global_enabled", An<const envoy::type::FractionalPercent&>(), _))
       .WillByDefault(Return(true));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -2259,6 +2299,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamProtocolError) {
     throw CodecProtocolException("protocol error");
   }));
 
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_));
   EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
 
   // A protocol exception should result in reset of the streams followed by a remote or local close
@@ -3143,10 +3184,13 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
       .WillOnce(Return(FilterDataStatus::StopIterationAndWatermark));
   decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
 
+  // unregister callbacks2
+  decoder_filters_[0]->callbacks_->removeDownstreamWatermarkCallbacks(callbacks2);
+
   // Change the limit so the buffered data is below the new watermark.
   buffer_len = encoder_filters_[1]->callbacks_->encodingBuffer()->length();
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
-  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   encoder_filters_[1]->callbacks_->setEncoderBufferLimit((buffer_len + 1) * 2);
 }
 
@@ -3293,7 +3337,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         decoder_filters_[0]->callbacks_->sendLocalReply(Code::BadRequest, "Bad request", nullptr,
-                                                        absl::nullopt);
+                                                        absl::nullopt, "");
         return FilterHeadersStatus::Continue;
       }));
 
@@ -3309,6 +3353,53 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+}
+
+// Verify that if an encoded stream has been ended, but gets stopped by a filter chain, we end
+// up resetting the stream in the doEndStream() path (e.g., via filter reset due to timeout, etc.),
+// we emit a reset to the codec.
+TEST_F(HttpConnectionManagerImplTest, ResetWithStoppedFilter) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+  }));
+
+  setupFilterChain(1, 1);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        decoder_filters_[0]->callbacks_->sendLocalReply(Code::BadRequest, "Bad request", nullptr,
+                                                        absl::nullopt, "");
+        return FilterHeadersStatus::Continue;
+      }));
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Invoke([&](HeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_EQ("11", headers.ContentLength()->value().getStringView());
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterDataStatus {
+        return FilterDataStatus::StopIterationAndBuffer;
+      }));
+
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(response_encoder_.stream_, resetStream(_));
+  expectOnDestroy();
+  encoder_filters_[0]->callbacks_->resetStream();
 }
 
 TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamHeaders) {

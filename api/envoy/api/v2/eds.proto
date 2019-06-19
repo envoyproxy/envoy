@@ -31,6 +31,9 @@ service EndpointDiscoveryService {
   rpc StreamEndpoints(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 
+  rpc DeltaEndpoints(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  }
+
   rpc FetchEndpoints(DiscoveryRequest) returns (DiscoveryResponse) {
     option (google.api.http) = {
       post: "/v2/discovery:endpoints"

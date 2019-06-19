@@ -116,7 +116,8 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
 
 ProtocolOptionsConfigConstSharedPtr
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
-                            const ProtobufWkt::Struct& config) {
+                            const ProtobufWkt::Struct& config,
+                            ProtobufMessage::ValidationVisitor& validation_visitor) {
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
           name);
@@ -137,13 +138,15 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
     throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
   }
 
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, *proto_config);
+  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validation_visitor,
+                                                *proto_config);
 
   return factory->createProtocolOptionsConfig(*proto_config);
 }
 
 std::map<std::string, ProtocolOptionsConfigConstSharedPtr>
-parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
+parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config,
+                              ProtobufMessage::ValidationVisitor& validation_visitor) {
   if (!config.typed_extension_protocol_options().empty() &&
       !config.extension_protocol_options().empty()) {
     throw EnvoyException("Only one of typed_extension_protocol_options or "
@@ -153,16 +156,16 @@ parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
   std::map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
 
   for (const auto& it : config.typed_extension_protocol_options()) {
-    auto object =
-        createProtocolOptionsConfig(it.first, it.second, ProtobufWkt::Struct::default_instance());
+    auto object = createProtocolOptionsConfig(
+        it.first, it.second, ProtobufWkt::Struct::default_instance(), validation_visitor);
     if (object != nullptr) {
       options[it.first] = std::move(object);
     }
   }
 
   for (const auto& it : config.extension_protocol_options()) {
-    auto object =
-        createProtocolOptionsConfig(it.first, ProtobufWkt::Any::default_instance(), it.second);
+    auto object = createProtocolOptionsConfig(it.first, ProtobufWkt::Any::default_instance(),
+                                              it.second, validation_visitor);
     if (object != nullptr) {
       options[it.first] = std::move(object);
     }
@@ -544,7 +547,8 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                                  const envoy::api::v2::core::BindConfig& bind_config,
                                  Runtime::Loader& runtime,
                                  Network::TransportSocketFactoryPtr&& socket_factory,
-                                 Stats::ScopePtr&& stats_scope, bool added_via_api)
+                                 Stats::ScopePtr&& stats_scope, bool added_via_api,
+                                 ProtobufMessage::ValidationVisitor& validation_visitor)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
@@ -557,7 +561,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       features_(parseFeatures(config)),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
-      extension_protocol_options_(parseExtensionProtocolOptions(config)),
+      extension_protocol_options_(parseExtensionProtocolOptions(config, validation_visitor)),
       resource_managers_(config, runtime, name_, *stats_scope_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
       source_address_(getSourceAddress(config, bind_config)),
@@ -570,7 +574,11 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       cluster_socket_options_(parseClusterSocketOptions(config, bind_config)),
       drain_connections_on_host_removal_(config.drain_connections_on_host_removal()),
       warm_hosts_(!config.health_checks().empty() &&
-                  common_lb_config_.ignore_new_hosts_until_first_hc()) {
+                  common_lb_config_.ignore_new_hosts_until_first_hc()),
+      cluster_type_(config.has_cluster_type()
+                        ? absl::make_optional<envoy::api::v2::Cluster::CustomClusterType>(
+                              config.cluster_type())
+                        : absl::nullopt) {
   switch (config.lb_policy()) {
   case envoy::api::v2::Cluster::ROUND_ROBIN:
     lb_type_ = LoadBalancerType::RoundRobin;
@@ -593,6 +601,9 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
     break;
   case envoy::api::v2::Cluster::MAGLEV:
     lb_type_ = LoadBalancerType::Maglev;
+    break;
+  case envoy::api::v2::Cluster::CLUSTER_PROVIDED:
+    lb_type_ = LoadBalancerType::ClusterProvided;
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -659,8 +670,8 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket.name());
-  ProtobufTypes::MessagePtr message =
-      Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      transport_socket, factory_context.messageValidationVisitor(), config_factory);
   return config_factory.createTransportSocketFactory(*message, factory_context);
 }
 
@@ -669,12 +680,13 @@ ClusterImplBase::ClusterImplBase(
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
-      init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime) {
+      init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
+      symbol_table_(stats_scope->symbolTable()) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
-  info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
-                                            runtime, std::move(socket_factory),
-                                            std::move(stats_scope), added_via_api);
+  info_ = std::make_unique<ClusterInfoImpl>(
+      cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_factory),
+      std::move(stats_scope), added_via_api, factory_context.messageValidationVisitor());
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);
@@ -1262,6 +1274,26 @@ Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Clu
     return Network::DnsLookupFamily::Auto;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+void reportUpstreamCxDestroy(const Upstream::HostDescriptionConstSharedPtr& host,
+                             Network::ConnectionEvent event) {
+  host->cluster().stats().upstream_cx_destroy_.inc();
+  if (event == Network::ConnectionEvent::RemoteClose) {
+    host->cluster().stats().upstream_cx_destroy_remote_.inc();
+  } else {
+    host->cluster().stats().upstream_cx_destroy_local_.inc();
+  }
+}
+
+void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSharedPtr& host,
+                                          Network::ConnectionEvent event) {
+  host->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
+  if (event == Network::ConnectionEvent::RemoteClose) {
+    host->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
+  } else {
+    host->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
   }
 }
 

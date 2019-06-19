@@ -39,6 +39,7 @@
 #include "common/common/callback_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
+#include "common/config/datasource.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
 #include "common/network/address_impl.h"
@@ -50,12 +51,16 @@
 #include "common/upstream/resource_manager_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "source/extensions/clusters/redis/redis_cluster_lb.h"
+
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/clusters/well_known_names.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec.h"
+#include "extensions/filters/network/common/redis/utility.h"
+#include "extensions/filters/network/redis_proxy/config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -77,25 +82,21 @@ namespace Redis {
  * the `CLUSTER SLOTS command <https://redis.io/commands/cluster-slots>`_, and the responses and
  * failure cases.
  *
- * The topology is stored in cluster_slots_map_. According to the
- * `Redis Cluster Spec <https://redis.io/topics/cluster-spec#keys-distribution-model`_, the key
- * space is split into a fixed size 16384 slots. The current implementation uses a fixed size
- * std::array() of shared_ptr pointing to the master host. This has a fixed cpu and memory cost and
- * provide a fast lookup constant time lookup similar to Maglev. This will be used by the redis
- * proxy filter for load balancing purpose.
+ * Once the topology is fetched from Redis, the cluster will update the
+ * RedisClusterLoadBalancerFactory, which will be used by the redis proxy filter for load balancing
+ * purpose.
  */
-
-typedef std::array<Upstream::HostSharedPtr, 16384> SlotArray;
 
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
   RedisCluster(const envoy::api::v2::Cluster& cluster,
                const envoy::config::cluster::redis::RedisClusterConfig& redisCluster,
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-               Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime,
+               Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime, Api::Api& api,
                Network::DnsResolverSharedPtr dns_resolver,
                Server::Configuration::TransportSocketFactoryContext& factory_context,
-               Stats::ScopePtr&& stats_scope, bool added_via_api);
+               Stats::ScopePtr&& stats_scope, bool added_via_api,
+               ClusterSlotUpdateCallBackSharedPtr factory);
 
   struct ClusterSlotsRequest : public Extensions::NetworkFilters::Common::Redis::RespValue {
   public:
@@ -120,15 +121,6 @@ private:
 
   void updateAllHosts(const Upstream::HostVector& hosts_added,
                       const Upstream::HostVector& hosts_removed, uint32_t priority);
-
-  struct ClusterSlot {
-    ClusterSlot(int64_t start, int64_t end, Network::Address::InstanceConstSharedPtr master)
-        : start_(start), end_(end), master_(std::move(master)) {}
-
-    int64_t start_;
-    int64_t end_;
-    Network::Address::InstanceConstSharedPtr master_;
-  };
 
   void onClusterSlotUpdate(const std::vector<ClusterSlot>&);
 
@@ -163,10 +155,8 @@ private:
 
   // Resolves the discovery endpoint.
   struct DnsDiscoveryResolveTarget {
-    DnsDiscoveryResolveTarget(
-        RedisCluster& parent, const std::string& dns_address, const uint32_t port,
-        const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-        const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
+    DnsDiscoveryResolveTarget(RedisCluster& parent, const std::string& dns_address,
+                              const uint32_t port);
 
     ~DnsDiscoveryResolveTarget();
 
@@ -176,11 +166,9 @@ private:
     Network::ActiveDnsQuery* active_query_{};
     const std::string dns_address_;
     const uint32_t port_;
-    const envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
-    const envoy::api::v2::endpoint::LbEndpoint lb_endpoint_;
   };
 
-  typedef std::unique_ptr<DnsDiscoveryResolveTarget> DnsDiscoveryResolveTargetPtr;
+  using DnsDiscoveryResolveTargetPtr = std::unique_ptr<DnsDiscoveryResolveTarget>;
 
   struct RedisDiscoverySession;
 
@@ -197,7 +185,7 @@ private:
     Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client_;
   };
 
-  typedef std::unique_ptr<RedisDiscoveryClient> RedisDiscoveryClientPtr;
+  using RedisDiscoveryClientPtr = std::unique_ptr<RedisDiscoveryClient>;
 
   struct RedisDiscoverySession
       : public Extensions::NetworkFilters::Common::Redis::Client::Config,
@@ -256,11 +244,13 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Runtime::RandomGenerator& random_;
   RedisDiscoverySession redis_discovery_session_;
-  // The slot to master node map.
-  SlotArray cluster_slots_map_;
+  const ClusterSlotUpdateCallBackSharedPtr lb_factory_;
 
   Upstream::HostVector hosts_;
   Upstream::HostMap all_hosts_;
+
+  envoy::api::v2::core::DataSource auth_password_datasource_;
+  Api::Api& api_;
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
@@ -272,7 +262,8 @@ public:
 private:
   friend class RedisClusterTest;
 
-  Upstream::ClusterImplBaseSharedPtr createClusterWithConfig(
+  std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
+  createClusterWithConfig(
       const envoy::api::v2::Cluster& cluster,
       const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,

@@ -8,7 +8,10 @@
 #include "envoy/api/v2/cluster/outlier_detection.pb.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/stats/fake_symbol_table_impl.h"
+
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/test_common/global.h"
 
 #include "gmock/gmock.h"
 
@@ -77,7 +80,6 @@ public:
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(healthCheckAddress, Network::Address::InstanceConstSharedPtr());
-  MOCK_METHOD1(setHealthCheckAddress, void(Network::Address::InstanceConstSharedPtr));
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_METHOD1(canary, void(bool new_canary));
   MOCK_CONST_METHOD0(metadata, const std::shared_ptr<envoy::api::v2::core::Metadata>());
@@ -90,6 +92,12 @@ public:
   MOCK_CONST_METHOD0(locality, const envoy::api::v2::core::Locality&());
   MOCK_CONST_METHOD0(priority, uint32_t());
   MOCK_METHOD1(priority, void(uint32_t));
+  Stats::StatName localityZoneStatName() const override {
+    Stats::SymbolTable& symbol_table = *symbol_table_;
+    locality_zone_stat_name_ =
+        std::make_unique<Stats::StatNameManagedStorage>(locality().zone(), symbol_table);
+    return locality_zone_stat_name_->statName();
+  }
 
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
@@ -98,6 +106,8 @@ public:
   testing::NiceMock<MockClusterInfo> cluster_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
+  mutable Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
 
 class MockHost : public Host {
@@ -130,9 +140,14 @@ public:
     setOutlierDetector_(outlier_detector);
   }
 
+  Stats::StatName localityZoneStatName() const override {
+    locality_zone_stat_name_ =
+        std::make_unique<Stats::StatNameManagedStorage>(locality().zone(), *symbol_table_);
+    return locality_zone_stat_name_->statName();
+  }
+
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(healthCheckAddress, Network::Address::InstanceConstSharedPtr());
-  MOCK_METHOD1(setHealthCheckAddress, void(Network::Address::InstanceConstSharedPtr));
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_METHOD1(canary, void(bool new_canary));
   MOCK_CONST_METHOD0(metadata, const std::shared_ptr<envoy::api::v2::core::Metadata>());
@@ -169,6 +184,8 @@ public:
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
+  mutable Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
 
 } // namespace Upstream

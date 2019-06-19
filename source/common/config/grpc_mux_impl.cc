@@ -8,8 +8,8 @@
 namespace Envoy {
 namespace Config {
 
-GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
-                         Event::Dispatcher& dispatcher,
+GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
+                         Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings)
@@ -23,7 +23,7 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
 GrpcMuxImpl::~GrpcMuxImpl() {
   for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second.watches_) {
-      watch->inserted_ = false;
+      watch->clear();
     }
   }
 }
@@ -112,6 +112,14 @@ void GrpcMuxImpl::resume(const std::string& type_url) {
     queueDiscoveryRequest(type_url);
     api_state.pending_ = false;
   }
+}
+
+bool GrpcMuxImpl::paused(const std::string& type_url) const {
+  auto entry = api_state_.find(type_url);
+  if (entry == api_state_.end()) {
+    return false;
+  }
+  return entry->second.paused_;
 }
 
 void GrpcMuxImpl::onDiscoveryResponse(

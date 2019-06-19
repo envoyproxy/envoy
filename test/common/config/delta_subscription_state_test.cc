@@ -33,7 +33,8 @@ protected:
   UpdateAck deliverDiscoveryResponse(
       const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& version_info, absl::optional<std::string> nonce = absl::nullopt) {
+      const std::string& version_info, absl::optional<std::string> nonce = absl::nullopt,
+      bool expect_config_update_call = true) {
     envoy::api::v2::DeltaDiscoveryResponse message;
     *message.mutable_resources() = added_resources;
     *message.mutable_removed_resources() = removed_resources;
@@ -41,7 +42,7 @@ protected:
     if (nonce.has_value()) {
       message.set_nonce(nonce.value());
     }
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _)).Times(1);
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _)).Times(expect_config_update_call ? 1 : 0);
     return state_.handleResponse(message);
   }
 
@@ -340,6 +341,37 @@ TEST_F(DeltaSubscriptionStateTest, PauseAndResume) {
   EXPECT_TRUE(state_.paused());
   state_.resume();
   EXPECT_FALSE(state_.paused());
+}
+
+// The next three tests test that duplicate resource names (whether additions or removals) cause
+// DeltaSubscriptionState to reject the update without even trying to hand it to the consuming API's
+// onConfigUpdate().
+TEST_F(DeltaSubscriptionStateTest, DuplicatedAdd) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> additions =
+      populateRepeatedResource({{"name1", "version1A"}, {"name1", "sdfsdfsdfds"}});
+  UpdateAck ack = deliverDiscoveryResponse(additions, {}, "debugversion1", absl::nullopt, false);
+  EXPECT_EQ("duplicate name name1 found among added/updated resources",
+            ack.error_detail_.message());
+}
+
+TEST_F(DeltaSubscriptionStateTest, DuplicatedRemove) {
+  Protobuf::RepeatedPtrField<std::string> removals;
+  *removals.Add() = "name1";
+  *removals.Add() = "name1";
+  UpdateAck ack = deliverDiscoveryResponse({}, removals, "debugversion1", absl::nullopt, false);
+  EXPECT_EQ("duplicate name name1 found in the union of added+removed resources",
+            ack.error_detail_.message());
+}
+
+TEST_F(DeltaSubscriptionStateTest, AddedAndRemoved) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> additions =
+      populateRepeatedResource({{"name1", "version1A"}});
+  Protobuf::RepeatedPtrField<std::string> removals;
+  *removals.Add() = "name1";
+  UpdateAck ack =
+      deliverDiscoveryResponse(additions, removals, "debugversion1", absl::nullopt, false);
+  EXPECT_EQ("duplicate name name1 found in the union of added+removed resources",
+            ack.error_detail_.message());
 }
 
 } // namespace

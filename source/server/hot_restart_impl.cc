@@ -15,6 +15,7 @@
 #include "envoy/server/options.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/api/os_sys_calls_impl_hot_restart.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
 
@@ -25,6 +26,7 @@ namespace Server {
 
 SharedMemory* attachSharedMemory(const Options& options) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  Api::HotRestartOsSysCalls& hot_restart_os_sys_calls = Api::HotRestartOsSysCallsSingleton::get();
 
   int flags = O_RDWR;
   const std::string shmem_name = fmt::format("/envoy_shared_memory_{}", options.baseId());
@@ -33,11 +35,11 @@ SharedMemory* attachSharedMemory(const Options& options) {
 
     // If we are meant to be first, attempt to unlink a previous shared memory instance. If this
     // is a clean restart this should then allow the shm_open() call below to succeed.
-    os_sys_calls.shmUnlink(shmem_name.c_str());
+    hot_restart_os_sys_calls.shmUnlink(shmem_name.c_str());
   }
 
   const Api::SysCallIntResult result =
-      os_sys_calls.shmOpen(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
+      hot_restart_os_sys_calls.shmOpen(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
   if (result.rc_ == -1) {
     PANIC(fmt::format("cannot open shared memory region {} check user permissions. Error: {}",
                       shmem_name, strerror(result.errno_)));

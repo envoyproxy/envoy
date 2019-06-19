@@ -52,7 +52,8 @@ class SimulatedTimeSystemHelper::Alarm : public Timer {
 public:
   Alarm(SimulatedTimeSystemHelper& time_system, Scheduler& base_scheduler, TimerCb cb)
       : base_timer_(base_scheduler.createTimer([this, cb] { runAlarm(cb); })),
-        time_system_(time_system), index_(time_system.nextIndex()), armed_(false) {}
+        time_system_(time_system), index_(time_system.nextIndex()), armed_(false), pending_(false) {
+  }
 
   virtual ~Alarm();
 
@@ -61,7 +62,7 @@ public:
   void enableTimer(const std::chrono::milliseconds& duration) override;
   bool enabled() override {
     Thread::LockGuard lock(time_system_.mutex_);
-    return armed_;
+    return armed_ || base_timer_->enabled();
   }
 
   void disableTimerLockHeld() EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_);
@@ -77,6 +78,10 @@ public:
   void activateLockHeld() EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
     ASSERT(armed_);
     armed_ = false;
+    if (pending_) {
+      return;
+    }
+    pending_ = true;
     time_system_.incPending();
 
     // We don't want to activate the alarm under lock, as it will make a
@@ -101,6 +106,10 @@ private:
   friend SimulatedTimeSystemHelper::CompareAlarms;
 
   void runAlarm(TimerCb cb) {
+    {
+      Thread::LockGuard lock(time_system_.mutex_);
+      pending_ = false;
+    }
     // Capture time_system_ in a local in case the alarm gets deleted in the callback.
     SimulatedTimeSystemHelper& time_system = time_system_;
     cb();
@@ -112,6 +121,7 @@ private:
   MonotonicTime time_ GUARDED_BY(time_system_.mutex_);
   const uint64_t index_;
   bool armed_ GUARDED_BY(time_system_.mutex_);
+  bool pending_ GUARDED_BY(time_system_.mutex_);
 };
 
 // Compare two alarms, based on wakeup time and insertion order. Returns true if

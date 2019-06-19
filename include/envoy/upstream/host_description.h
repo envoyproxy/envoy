@@ -19,17 +19,15 @@ namespace Upstream {
  * envoy.api.v2.endpoint.UpstreamLocalityStats for the definitions of success/error. These are
  * latched by LoadStatsReporter, independent of the normal stats sink flushing.
  */
-// clang-format off
 #define ALL_HOST_STATS(COUNTER, GAUGE)                                                             \
-  COUNTER(cx_total)                                                                                \
-  GAUGE  (cx_active)                                                                               \
   COUNTER(cx_connect_fail)                                                                         \
-  COUNTER(rq_total)                                                                                \
-  COUNTER(rq_timeout)                                                                              \
-  COUNTER(rq_success)                                                                              \
+  COUNTER(cx_total)                                                                                \
   COUNTER(rq_error)                                                                                \
-  GAUGE  (rq_active)
-// clang-format on
+  COUNTER(rq_success)                                                                              \
+  COUNTER(rq_timeout)                                                                              \
+  COUNTER(rq_total)                                                                                \
+  GAUGE(cx_active, Accumulate)                                                                     \
+  GAUGE(rq_active, Accumulate)
 
 /**
  * All per host stats defined. @see stats_macros.h
@@ -45,7 +43,7 @@ class ClusterInfo;
  */
 class HostDescription {
 public:
-  virtual ~HostDescription() {}
+  virtual ~HostDescription() = default;
 
   /**
    * @return whether the host is a canary.
@@ -105,14 +103,14 @@ public:
   virtual const envoy::api::v2::core::Locality& locality() const PURE;
 
   /**
+   * @return the human readable name of the host's locality zone as a StatName.
+   */
+  virtual Stats::StatName localityZoneStatName() const PURE;
+
+  /**
    * @return the address used to health check the host.
    */
   virtual Network::Address::InstanceConstSharedPtr healthCheckAddress() const PURE;
-
-  /**
-   * Set the address used to health check the host.
-   */
-  virtual void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr) PURE;
 
   /**
    * @return the priority of the host.
@@ -125,7 +123,7 @@ public:
   virtual void priority(uint32_t) PURE;
 };
 
-typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
+using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;
 
 } // namespace Upstream
 } // namespace Envoy

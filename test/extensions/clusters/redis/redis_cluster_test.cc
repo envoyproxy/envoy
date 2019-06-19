@@ -12,10 +12,12 @@
 #include "source/extensions/clusters/redis/redis_cluster.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 
@@ -35,6 +37,25 @@ namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace Redis {
+
+namespace {
+const std::string BasicConfig = R"EOF(
+  name: name
+  connect_timeout: 0.25s
+  dns_lookup_family: V4_ONLY
+  hosts:
+  - socket_address:
+      address: foo.bar.com
+      port_value: 22120
+  cluster_type:
+    name: envoy.clusters.redis
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        cluster_refresh_rate: 4s
+        cluster_refresh_timeout: 0.25s
+  )EOF";
+}
 
 class RedisClusterTest : public testing::Test,
                          public Extensions::NetworkFilters::Common::Redis::Client::ClientFactory {
@@ -71,17 +92,19 @@ protected:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
-        singleton_manager_, tls_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_);
 
     envoy::config::cluster::redis::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(), config);
-
+                                           ProtobufWkt::Struct::default_instance(),
+                                           ProtobufMessage::getStrictValidationVisitor(), config);
+    cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
     cluster_.reset(new RedisCluster(
         cluster_config,
         MessageUtil::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
             config),
-        *this, cm, runtime_, dns_resolver_, factory_context, std::move(scope), false));
+        *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false,
+        cluster_callback_));
     // This allows us to create expectation on cluster slot response without waiting for
     // makeRequest.
     pool_callbacks_ = &cluster_->redis_discovery_session_;
@@ -99,11 +122,12 @@ protected:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
-        singleton_manager_, tls_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_);
 
     envoy::config::cluster::redis::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(), config);
+                                           ProtobufWkt::Struct::default_instance(),
+                                           validation_visitor_, config);
 
     NiceMock<AccessLog::MockAccessLogManager> log_manager;
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
@@ -111,7 +135,7 @@ protected:
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
         cm, stats_store_, tls_, std::move(dns_resolver_), ssl_context_manager_, runtime_, random_,
         dispatcher_, log_manager, local_info_, admin_, singleton_manager_,
-        std::move(outlier_event_logger), false, api);
+        std::move(outlier_event_logger), false, validation_visitor_, api);
 
     RedisClusterFactory factory = RedisClusterFactory();
     factory.createClusterWithConfig(cluster_config, config, cluster_factory_context,
@@ -345,6 +369,7 @@ protected:
     EXPECT_CALL(initialized_, ready());
     cluster_->initialize([&]() -> void { initialized_.ready(); });
 
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
     expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
     // TODO(hyang): this will change once we register slaves as well
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
@@ -353,12 +378,14 @@ protected:
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
     resolve_timer_->callback_();
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
     expectClusterSlotResponse(twoSlotsMasters());
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
     // No change.
     expectRedisResolve();
     resolve_timer_->callback_();
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1).WillOnce(Return(false));
     expectClusterSlotResponse(twoSlotsMasters());
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
@@ -366,8 +393,53 @@ protected:
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
     resolve_timer_->callback_();
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
     expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
+  }
+
+  void exerciseStubs() {
+    EXPECT_CALL(dispatcher_, createTimer_(_));
+    RedisCluster::RedisDiscoverySession discovery_session(*cluster_, *this);
+    EXPECT_FALSE(discovery_session.enableHashtagging());
+    EXPECT_EQ(discovery_session.bufferFlushTimeoutInMs(), std::chrono::milliseconds(0));
+
+    NetworkFilters::Common::Redis::RespValue dummy_value;
+    dummy_value.type(NetworkFilters::Common::Redis::RespType::Error);
+    dummy_value.asString() = "dummy text";
+    EXPECT_TRUE(discovery_session.onRedirection(dummy_value));
+
+    RedisCluster::RedisDiscoveryClient discovery_client(discovery_session);
+    EXPECT_NO_THROW(discovery_client.onAboveWriteBufferHighWatermark());
+    EXPECT_NO_THROW(discovery_client.onBelowWriteBufferLowWatermark());
+  }
+
+  void testDnsResolve(const char* const address, const int port) {
+    RedisCluster::DnsDiscoveryResolveTarget resolver_target(*cluster_, address, port);
+    EXPECT_CALL(*dns_resolver_, resolve(address, Network::DnsLookupFamily::V4Only, _))
+        .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                             Network::DnsResolver::ResolveCb) -> Network::ActiveDnsQuery* {
+          return &active_dns_query_;
+        }));
+    ;
+    resolver_target.startResolve();
+
+    EXPECT_CALL(active_dns_query_, cancel());
+  }
+
+  void testRedisResolve() {
+    EXPECT_CALL(dispatcher_, createTimer_(_));
+    RedisCluster::RedisDiscoverySession discovery_session(*cluster_, *this);
+    discovery_session.registerDiscoveryAddress(
+        TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"})), 22120);
+    expectRedisResolve(true);
+    discovery_session.startResolve();
+
+    // 2nd startResolve() call will be a no-opt until the first startResolve is done.
+    discovery_session.startResolve();
+
+    // Make sure cancel is called.
+    EXPECT_CALL(pool_request_, cancel());
   }
 
   Stats::IsolatedStoreImpl stats_store_;
@@ -384,6 +456,7 @@ protected:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   std::shared_ptr<Upstream::MockClusterMockPrioritySet> hosts_;
   Upstream::MockHealthCheckEventLogger* event_logger_{};
@@ -392,11 +465,12 @@ protected:
   Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest pool_request_;
   Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks* pool_callbacks_{};
   std::shared_ptr<RedisCluster> cluster_;
+  std::shared_ptr<NiceMock<MockClusterSlotUpdateCallBack>> cluster_callback_;
+  Network::MockActiveDnsQuery active_dns_query_;
 };
 
-typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>,
-                   std::list<std::string>>
-    RedisDnsConfigTuple;
+using RedisDnsConfigTuple = std::tuple<std::string, Network::DnsLookupFamily,
+                                       std::list<std::string>, std::list<std::string>>;
 std::vector<RedisDnsConfigTuple> generateRedisDnsParams() {
   std::vector<RedisDnsConfigTuple> dns_config;
   {
@@ -465,6 +539,7 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         std::list<std::string> address_pair = std::get<2>(GetParam());
         cb(TestUtility::makeDnsResponse(address_pair));
+        EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
         expectClusterSlotResponse(
             singleSlotMasterSlave(address_pair.front(), address_pair.back(), 22120));
         return nullptr;
@@ -478,23 +553,6 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
 }
 
 TEST_F(RedisClusterTest, Basic) {
-  const std::string basic_yaml_hosts = R"EOF(
-  name: name
-  connect_timeout: 0.25s
-  dns_lookup_family: V4_ONLY
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 22120
-  cluster_type:
-    name: envoy.clusters.redis
-    typed_config:
-      "@type": type.googleapis.com/google.protobuf.Struct
-      value:
-        cluster_refresh_rate: 4s
-        cluster_refresh_timeout: 0.25s
-  )EOF";
-
   // Using load assignment.
   const std::string basic_yaml_load_assignment = R"EOF(
   name: name
@@ -520,28 +578,15 @@ TEST_F(RedisClusterTest, Basic) {
         cluster_refresh_timeout: 0.25s
   )EOF";
 
-  testBasicSetup(basic_yaml_hosts, "foo.bar.com");
+  testBasicSetup(BasicConfig, "foo.bar.com");
   testBasicSetup(basic_yaml_load_assignment, "foo.bar.com");
+
+  // Exercise stubbed out interfaces for coverage.
+  exerciseStubs();
 }
 
 TEST_F(RedisClusterTest, RedisResolveFailure) {
-  const std::string basic_yaml_hosts = R"EOF(
-  name: name
-  connect_timeout: 0.25s
-  dns_lookup_family: V4_ONLY
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 22120
-  cluster_type:
-    name: envoy.clusters.redis
-    typed_config:
-      "@type": type.googleapis.com/google.protobuf.Struct
-      value:
-        cluster_refresh_rate: 4s
-        cluster_refresh_timeout: 0.25s
-  )EOF";
-  setupFromV2Yaml(basic_yaml_hosts);
+  setupFromV2Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
   expectRedisResolve(true);
@@ -557,6 +602,7 @@ TEST_F(RedisClusterTest, RedisResolveFailure) {
   resolve_timer_->callback_();
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
   expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
 
@@ -588,47 +634,15 @@ TEST_F(RedisClusterTest, FactoryInitNotRedisClusterTypeFailure) {
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(setupFactoryFromV2Yaml(basic_yaml_hosts), EnvoyException,
-                            "Redis cluster can only created with redis cluster type");
+                            "Redis cluster can only created with redis cluster type.");
 }
 
 TEST_F(RedisClusterTest, FactoryInitRedisClusterTypeSuccess) {
-  const std::string basic_yaml_hosts = R"EOF(
-  name: name
-  connect_timeout: 0.25s
-  dns_lookup_family: V4_ONLY
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 22120
-  cluster_type:
-    name: envoy.clusters.redis
-    typed_config:
-      "@type": type.googleapis.com/google.protobuf.Struct
-      value:
-        cluster_refresh_rate: 4s
-        cluster_refresh_timeout: 0.25s
-  )EOF";
-  setupFactoryFromV2Yaml(basic_yaml_hosts);
+  setupFactoryFromV2Yaml(BasicConfig);
 }
 
 TEST_F(RedisClusterTest, RedisErrorResponse) {
-  const std::string basic_yaml_hosts = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    dns_lookup_family: V4_ONLY
-    hosts:
-    - socket_address:
-        address: foo.bar.com
-        port_value: 22120
-    cluster_type:
-      name: envoy.clusters.redis
-      typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
-        value:
-          cluster_refresh_rate: 4s
-          cluster_refresh_timeout: 0.25s
-    )EOF";
-  setupFromV2Yaml(basic_yaml_hosts);
+  setupFromV2Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
   expectRedisResolve(true);
@@ -647,6 +661,7 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
   hello_world_response->type(NetworkFilters::Common::Redis::RespType::Array);
   hello_world_response->asArray().swap(hello_world);
 
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(0);
   expectClusterSlotResponse(std::move(hello_world_response));
   EXPECT_EQ(1U, cluster_->info()->stats().update_attempt_.value());
   EXPECT_EQ(1U, cluster_->info()->stats().update_failure_.value());
@@ -655,6 +670,7 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
   resolve_timer_->callback_();
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
   expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
 
@@ -666,6 +682,9 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
     std::bitset<10> flags(i);
     expectRedisResolve();
     resolve_timer_->callback_();
+    if (flags.all()) {
+      EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1).WillOnce(Return(false));
+    }
     expectClusterSlotResponse(createResponse(flags));
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
     EXPECT_EQ(++update_attempt, cluster_->info()->stats().update_attempt_.value());
@@ -673,6 +692,16 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
       EXPECT_EQ(++update_failure, cluster_->info()->stats().update_failure_.value());
     }
   }
+}
+
+TEST_F(RedisClusterTest, DnsDiscoveryResolverBasic) {
+  setupFromV2Yaml(BasicConfig);
+  testDnsResolve("foo.bar.com", 22120);
+}
+
+TEST_F(RedisClusterTest, RedisDiscoveryResolverBasic) {
+  setupFromV2Yaml(BasicConfig);
+  testRedisResolve();
 }
 
 } // namespace Redis

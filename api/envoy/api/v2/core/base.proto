@@ -140,6 +140,7 @@ enum RequestMethod {
   CONNECT = 6;
   OPTIONS = 7;
   TRACE = 8;
+  PATCH = 9;
 }
 
 // Header name/value pair.

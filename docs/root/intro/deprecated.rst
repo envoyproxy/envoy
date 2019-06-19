@@ -13,7 +13,20 @@ Deprecated items below are listed in chronological order.
 Version 1.11.0 (Pending)
 ========================
 * The --max-stats and --max-obj-name-len flags no longer has any effect.
-* Use of :ref:`cluster <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.cluster>` in :ref:`redis_proxy.proto <envoy_api_file_envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto>` is deprecated. Set a :ref:`catch_all_cluster <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>` instead.
+* Use of :ref:`cluster <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.cluster>` in :ref:`redis_proxy.proto <envoy_api_file_envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto>` is deprecated. Set a :ref:`catch_all_route <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>` instead.
+* Use of :ref:`catch_all_cluster <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>` in :ref:`redis_proxy.proto <envoy_api_file_envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto>` is deprecated. Set a :ref:`catch_all_route <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>` instead.
+* Use of json based schema in router check tool tests. The tests should follow validation :repo:`schema<test/tools/router_check/validation.proto>`.
+* Use of the v1 style route configuration for the :ref:`TCP proxy filter <config_network_filters_tcp_proxy>`
+  is now fully replaced with listener :ref:`filter chain matching <envoy_api_msg_listener.FilterChainMatch>`.
+  Use this instead.
+* Use of :ref:`runtime <envoy_api_field_config.bootstrap.v2.Bootstrap.runtime>` in :ref:`Bootstrap
+  <envoy_api_msg_config.bootstrap.v2.Bootstrap>`. Use :ref:`layered_runtime
+  <envoy_api_field_config.bootstrap.v2.Bootstrap.layered_runtime>` instead.
+* Specifying "deprecated_v1: true" in HTTP and network filter configuration to allow loading JSON
+  configuration is now deprecated and will be removed in a following release. Update any custom
+  filters to use protobuf configuration. A struct can be used for a mostly 1:1 conversion if needed.
+  The `envoy.deprecated_features.v1_filter_json_config` runtime key can be used to temporarily
+  enable this feature once the deprecation becomes fail by default.
 
 Version 1.10.0 (Apr 5, 2019)
 ============================

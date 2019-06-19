@@ -7,7 +7,6 @@
 
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
-#include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
 
 #include "common/access_log/access_log_impl.h"
@@ -23,6 +22,7 @@
 #include "common/json/config_schemas.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
+#include "common/router/scoped_rds.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,8 +30,8 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 namespace {
 
-typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
-typedef std::map<std::string, HttpConnectionManagerConfig::FilterConfig> FilterFactoryMap;
+using FilterFactoriesList = std::list<Http::FilterFactoryCb>;
+using FilterFactoryMap = std::map<std::string, HttpConnectionManagerConfig::FilterConfig>;
 
 HttpConnectionManagerConfig::UpgradeMap::const_iterator
 findUpgradeBoolCaseInsensitive(const HttpConnectionManagerConfig::UpgradeMap& upgrade_map,
@@ -69,6 +69,7 @@ std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
 // Singleton registration via macro defined in envoy/singleton/manager.h
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
+SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
 
 Network::FilterFactoryCb
 HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
@@ -88,14 +89,21 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
           });
 
+  std::shared_ptr<Config::ConfigProviderManager> scoped_routes_config_provider_manager =
+      context.singletonManager().getTyped<Config::ConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(scoped_routes_config_provider_manager), [&context] {
+            return std::make_shared<Router::ScopedRoutesConfigProviderManager>(context.admin());
+          });
+
   std::shared_ptr<HttpConnectionManagerConfig> filter_config(new HttpConnectionManagerConfig(
-      proto_config, context, *date_provider, *route_config_provider_manager));
+      proto_config, context, *date_provider, *route_config_provider_manager,
+      *scoped_routes_config_provider_manager));
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count. Moreover, keep in mind the capture list determines
   // destruction order.
-  return [route_config_provider_manager, filter_config, &context,
-          date_provider](Network::FilterManager& filter_manager) -> void {
+  return [route_config_provider_manager, scoped_routes_config_provider_manager, filter_config,
+          &context, date_provider](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
         context.runtime(), context.localInfo(), context.clusterManager(),
@@ -125,7 +133,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
-    Router::RouteConfigProviderManager& route_config_provider_manager)
+    Router::RouteConfigProviderManager& route_config_provider_manager,
+    Config::ConfigProviderManager& scoped_routes_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
@@ -135,6 +144,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
       route_config_provider_manager_(route_config_provider_manager),
+      scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -145,6 +155,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
+      preserve_external_request_id_(config.preserve_external_request_id()),
       date_provider_(date_provider),
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
@@ -162,9 +173,25 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                       0
 #endif
                                                       ))) {
-
-  route_config_provider_ = Router::RouteConfigProviderUtil::create(config, context_, stats_prefix_,
-                                                                   route_config_provider_manager_);
+  // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
+  // be managed by the scoped routing logic instead.
+  switch (config.route_specifier_case()) {
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::kRds:
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      kRouteConfig:
+    route_config_provider_ = Router::RouteConfigProviderUtil::create(
+        config, context_, stats_prefix_, route_config_provider_manager_);
+    break;
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      kScopedRoutes:
+    ENVOY_LOG(warn, "Scoped routing has been enabled but it is not yet fully implemented! HTTP "
+                    "request routing DOES NOT work (yet) with this configuration.");
+    scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
+        config, context_, stats_prefix_, scoped_routes_config_provider_manager_);
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 
   switch (config.forward_client_cert_details()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::SANITIZE:
@@ -193,6 +220,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   const auto& set_current_client_cert_details = config.set_current_client_cert_details();
   if (set_current_client_cert_details.cert()) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Cert);
+  }
+  if (set_current_client_cert_details.chain()) {
+    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Chain);
   }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, subject, false)) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
@@ -231,12 +261,18 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       request_headers_for_tags.push_back(Http::LowerCaseString(header));
     }
 
-    uint64_t client_sampling{
-        PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing_config, client_sampling, 100, 100)};
-    uint64_t random_sampling{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-        tracing_config, random_sampling, 10000, 10000)};
-    uint64_t overall_sampling{
-        PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing_config, overall_sampling, 100, 100)};
+    envoy::type::FractionalPercent client_sampling;
+    client_sampling.set_numerator(
+        tracing_config.has_client_sampling() ? tracing_config.client_sampling().value() : 100);
+    envoy::type::FractionalPercent random_sampling;
+    // TODO: Random sampling historically was an integer and default to out of 10,000. We should
+    // deprecate that and move to a straight fractional percent config.
+    random_sampling.set_numerator(
+        tracing_config.has_random_sampling() ? tracing_config.random_sampling().value() : 10000);
+    random_sampling.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+    envoy::type::FractionalPercent overall_sampling;
+    overall_sampling.set_numerator(
+        tracing_config.has_overall_sampling() ? tracing_config.overall_sampling().value() : 100);
 
     tracing_config_ =
         std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
@@ -315,12 +351,12 @@ void HttpConnectionManagerConfig::processFilter(
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           string_name);
   Http::FilterFactoryCb callback;
-  if (filter_config->getBoolean("deprecated_v1", false)) {
+  if (Config::Utility::allowDeprecatedV1Config(context_.runtime(), *filter_config)) {
     callback = factory.createFilterFactory(*filter_config->getObject("value", true), stats_prefix_,
                                            context_);
   } else {
-    ProtobufTypes::MessagePtr message =
-        Config::Utility::translateToFactoryConfig(proto_config, factory);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        proto_config, context_.messageValidationVisitor(), factory);
     callback = factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
   }
   filter_factories.push_back(callback);

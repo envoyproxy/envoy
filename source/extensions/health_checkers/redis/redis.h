@@ -43,6 +43,8 @@ protected:
   }
 
 private:
+  friend class RedisHealthCheckerTest;
+
   struct RedisActiveHealthCheckSession
       : public ActiveHealthCheckSession,
         public Extensions::NetworkFilters::Common::Redis::Client::Config,
@@ -99,7 +101,7 @@ private:
     NetworkFilters::Common::Redis::RespValue request_;
   };
 
-  typedef std::unique_ptr<RedisActiveHealthCheckSession> RedisActiveHealthCheckSessionPtr;
+  using RedisActiveHealthCheckSessionPtr = std::unique_ptr<RedisActiveHealthCheckSession>;
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(Upstream::HostSharedPtr host) override {

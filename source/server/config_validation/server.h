@@ -10,6 +10,8 @@
 
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/common/assert.h"
+#include "common/grpc/common.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
@@ -22,8 +24,6 @@
 #include "server/http/admin.h"
 #include "server/listener_manager_impl.h"
 #include "server/server.h"
-
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -92,7 +92,9 @@ public:
   time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Stats::Store& stats() override { return stats_store_; }
+  Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
+  ProcessContext& processContext() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
@@ -102,11 +104,15 @@ public:
     return config_.statsFlushInterval();
   }
 
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return options_.allowUnknownFields() ? ProtobufMessage::getStrictValidationVisitor()
+                                         : ProtobufMessage::getNullValidationVisitor();
+  }
+
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
-    return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), dispatcher(), random(),
-                                        initManager(), localInfo(), stats(), listenerManager(),
-                                        api());
+    return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), initManager(), stats(),
+                                        listenerManager(), messageValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -117,6 +123,11 @@ public:
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
+  }
+  std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      Configuration::ListenerFactoryContext& context) override {
+    return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters, context);
   }
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
                                               Network::Address::SocketType,
@@ -139,8 +150,12 @@ public:
   }
 
   // ServerLifecycleNotifier
-  void registerCallback(Stage, StageCallback) override {}
-  void registerCallback(Stage, StageCallbackWithCompletion) override {}
+  ServerLifecycleNotifier::HandlePtr registerCallback(Stage, StageCallback) override {
+    return nullptr;
+  }
+  ServerLifecycleNotifier::HandlePtr registerCallback(Stage, StageCallbackWithCompletion) override {
+    return nullptr;
+  }
 
 private:
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
@@ -174,6 +189,7 @@ private:
   std::unique_ptr<ListenerManagerImpl> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
   MutexTracer* mutex_tracer_;
+  Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Event::TimeSystem& time_system_;
 };

@@ -6,15 +6,15 @@ Schema Validator check tool
 The schema validator tool validates that the passed in configuration conforms to
 a given schema. The configuration may be JSON or YAML. To validate the entire
 config, please refer to the
-:ref:`config load check tool<install_tools_config_load_check_tool>`. Currently, only
-:ref:`route config<envoy_api_msg_RouteConfiguration>` schema validation is supported.
+:ref:`config load check tool<install_tools_config_load_check_tool>`.
 
 Input
   The tool expects two inputs:
 
-  1. The schema type to check the passed in configuration against. The supported type is:
+  1. The schema type to check the passed in configuration against. The supported types are:
 
     * `route` - for :ref:`route configuration<envoy_api_msg_RouteConfiguration>` validation.
+    * `discovery_response` for :ref:`discovery response<envoy_api_msg_DiscoveryResponse>` validation.
 
   2. The path to the configuration file.
 

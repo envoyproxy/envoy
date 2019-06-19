@@ -14,7 +14,7 @@ namespace Envoy {
 namespace Router {
 
 class HeaderParser;
-typedef std::unique_ptr<HeaderParser> HeaderParserPtr;
+using HeaderParserPtr = std::unique_ptr<HeaderParser>;
 
 /**
  * HeaderParser manipulates Http::HeaderMap instances. Headers to be added are pre-parsed to select

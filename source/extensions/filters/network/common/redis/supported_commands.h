@@ -1,9 +1,12 @@
 #pragma once
 
+#include <set>
 #include <string>
 #include <vector>
 
 #include "common/common/macros.h"
+
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -46,6 +49,11 @@ struct SupportedCommands {
   }
 
   /**
+   * @return auth command
+   */
+  static const std::string& auth() { CONSTRUCT_ON_FIRST_USE(std::string, "auth"); }
+
+  /**
    * @return mget command
    */
   static const std::string& mget() { CONSTRUCT_ON_FIRST_USE(std::string, "mget"); }
@@ -59,6 +67,20 @@ struct SupportedCommands {
    * @return ping command
    */
   static const std::string& ping() { CONSTRUCT_ON_FIRST_USE(std::string, "ping"); }
+
+  /**
+   * @return commands which alters the state of redis
+   */
+  static const absl::flat_hash_set<std::string>& writeCommands() {
+    CONSTRUCT_ON_FIRST_USE(
+        absl::flat_hash_set<std::string>, "append", "bitfield", "decr", "decrby", "del", "expire",
+        "expireat", "eval", "evalsha", "geoadd", "hdel", "hincrby", "hincrbyfloat", "hmset", "hset",
+        "hsetnx", "incr", "incrby", "incrbyfloat", "linsert", "lpop", "lpush", "lpushx", "lrem",
+        "lset", "ltrim", "mset", "persist", "pexpire", "pexpireat", "psetex", "restore", "rpop",
+        "rpush", "rpushx", "sadd", "set", "setbit", "setex", "setnx", "setrange", "spop", "srem",
+        "zadd", "zincrby", "touch", "zpopmin", "zpopmax", "zrem", "zremrangebylex",
+        "zremrangebyrank", "zremrangebyscore", "unlink");
+  }
 };
 
 } // namespace Redis

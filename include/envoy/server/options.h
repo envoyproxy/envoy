@@ -40,14 +40,14 @@ enum class Mode {
   // to be validated in a non-prod environment.
 };
 
-typedef std::unique_ptr<envoy::admin::v2alpha::CommandLineOptions> CommandLineOptionsPtr;
+using CommandLineOptionsPtr = std::unique_ptr<envoy::admin::v2alpha::CommandLineOptions>;
 
 /**
  * General options for the server.
  */
 class Options {
 public:
-  virtual ~Options() {}
+  virtual ~Options() = default;
 
   /**
    * @return uint64_t the base ID for the server. This is required for system-wide things like
@@ -77,6 +77,11 @@ public:
    *                            into the config loaded in configPath().
    */
   virtual const std::string& configYaml() const PURE;
+
+  /**
+   * @return bool allow unknown fields in the configuration?
+   */
+  virtual bool allowUnknownFields() const PURE;
 
   /**
    * @return const std::string& the admin address output file.
