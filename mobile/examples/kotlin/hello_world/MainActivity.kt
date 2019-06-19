@@ -25,15 +25,16 @@ private const val ENVOY_SERVER_HEADER = "server"
 class MainActivity : Activity() {
   private lateinit var recyclerView: RecyclerView
   private val thread = HandlerThread(REQUEST_HANDLER_THREAD_NAME)
+  private lateinit var envoy: Envoy
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
 
-    // Load an envoy config, and run envoy on a separate thread.
-    val envoy = Envoy()
-    envoy.load()
-    envoy.run(baseContext, loadEnvoyConfig(baseContext, R.raw.config))
+    Envoy.load(baseContext)
+ 
+    // Create Envoy instance with config.
+    envoy = Envoy(baseContext, loadEnvoyConfig(baseContext, R.raw.config))
 
     recyclerView = findViewById(R.id.recycler_view) as RecyclerView
     recyclerView.layoutManager = LinearLayoutManager(this)
