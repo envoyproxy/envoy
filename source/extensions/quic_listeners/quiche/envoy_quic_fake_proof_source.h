@@ -22,30 +22,11 @@
 namespace Envoy {
 namespace Quic {
 
-static constexpr char dummy_cert_prefix[] = "Dummy cert from ";
-
 // A dummy implementation of quic::ProofSource which returns a dummy cert and
 // a fake signature for given QUIC server config.
 class EnvoyQuicFakeProofSource : public quic::ProofSource {
 public:
-  class FakeSignatureCallback : public quic::ProofSource::SignatureCallback {
-  public:
-    FakeSignatureCallback(bool& success, std::string& signature)
-        : success_(success), signature_(signature) {}
-
-    // quic::ProofSource::SignatureCallback
-    void Run(bool ok, std::string signature) override {
-      success_ = ok;
-      signature_ = signature;
-    }
-
-  private:
-    bool& success_;
-    std::string& signature_;
-  };
-
-  EnvoyQuicFakeProofSource() {}
-  ~EnvoyQuicFakeProofSource() override {}
+  ~EnvoyQuicFakeProofSource() override = default;
 
   // quic::ProofSource
   // Returns a fake certs chain and its dummy SCT "Dummy timestamp" and dummy TLS signature wrapped
@@ -70,7 +51,7 @@ public:
   GetCertChain(const quic::QuicSocketAddress& /*server_address*/,
                const std::string& hostname) override {
     std::vector<std::string> certs;
-    certs.push_back(absl::StrCat(dummy_cert_prefix, hostname));
+    certs.push_back(absl::StrCat("Dummy cert from ", hostname));
     return quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>(
         new quic::ProofSource::Chain(certs));
   }
@@ -83,6 +64,24 @@ public:
                       std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override {
     callback->Run(true, absl::StrCat("Dummy signature for { ", in, " }"));
   }
+
+private:
+  // Used by GetProof() to get fake signature.
+  class FakeSignatureCallback : public quic::ProofSource::SignatureCallback {
+  public:
+    FakeSignatureCallback(bool& success, std::string& signature)
+        : success_(success), signature_(signature) {}
+
+    // quic::ProofSource::SignatureCallback
+    void Run(bool ok, std::string signature) override {
+      success_ = ok;
+      signature_ = signature;
+    }
+
+  private:
+    bool& success_;
+    std::string& signature_;
+  };
 };
 
 } // namespace Quic

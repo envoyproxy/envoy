@@ -1,5 +1,7 @@
 #pragma once
 
+#include "absl/strings/str_cat.h"
+
 #pragma GCC diagnostic push
 
 // QUICHE allows unused parameters.
@@ -17,12 +19,11 @@ namespace Quic {
 // signature produced by EnvoyQuicFakeProofSource.
 class EnvoyQuicFakeProofVerifier : public quic::ProofVerifier {
 public:
-  EnvoyQuicFakeProofVerifier() {}
-  ~EnvoyQuicFakeProofVerifier() override {}
+  ~EnvoyQuicFakeProofVerifier() override = default;
 
   // quic::ProofVerifier
   // Return success if the certs chain is valid and signature is "Dummy signature for {
-  // [server_config] }"
+  // [server_config] }". Otherwise failure.
   quic::QuicAsyncStatus
   VerifyProof(const std::string& hostname, const uint16_t /*port*/,
               const std::string& server_config, quic::QuicTransportVersion /*quic_version*/,
@@ -47,7 +48,7 @@ public:
                   const quic::ProofVerifyContext* /*context*/, std::string* /*error_details*/,
                   std::unique_ptr<quic::ProofVerifyDetails>* /*details*/,
                   std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) override {
-    std::string cert = absl::StrCat(dummy_cert_prefix, hostname);
+    std::string cert = absl::StrCat("Dummy cert from ", hostname);
     if (cert_sct == "Dummy timestamp" && certs.size() == 1 && certs[0] == cert) {
       return quic::QUIC_SUCCESS;
     }

@@ -13,10 +13,10 @@ namespace Quic {
 
 class TestGetProofCallback : public quic::ProofSource::Callback {
 public:
-  TestGetProofCallback(const std::string& signature, const std::string& leaf_cert_scts,
-                       const std::vector<std::string>& certs)
-      : expected_signature_(signature), expected_leaf_certs_scts_(leaf_cert_scts),
-        expected_certs_(certs) {}
+  TestGetProofCallback(std::string signature, std::string leaf_cert_scts,
+                       std::vector<std::string> certs)
+      : expected_signature_(std::move(signature)),
+        expected_leaf_certs_scts_(std::move(leaf_cert_scts)), expected_certs_(std::move(certs)) {}
 
   // quic::ProofSource::Callback
   void Run(bool ok, const quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>& chain,
@@ -42,7 +42,7 @@ protected:
   quic::QuicTransportVersion version_{quic::QUIC_VERSION_UNSUPPORTED};
   quic::QuicStringPiece chlo_hash_{""};
   std::string server_config_{"Server Config"};
-  std::vector<std::string> expected_certs_{absl::StrCat(dummy_cert_prefix, hostname_)};
+  std::vector<std::string> expected_certs_{absl::StrCat("Dummy cert from ", hostname_)};
   std::string expected_signature_{absl::StrCat("Dummy signature for { ", server_config_, " }")};
   EnvoyQuicFakeProofSource proof_source_;
   EnvoyQuicFakeProofVerifier proof_verifier_;
