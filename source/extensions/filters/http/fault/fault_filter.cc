@@ -74,7 +74,7 @@ FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
 
 FaultFilter::~FaultFilter() {
   ASSERT(delay_timer_ == nullptr);
-  ASSERT(response_limiter_ == nullptr);
+  ASSERT(response_limiter_ == nullptr || response_limiter_->destroyed());
 }
 
 // Delays and aborts are independent events. One can inject a delay
@@ -326,7 +326,9 @@ void FaultFilter::maybeIncActiveFaults() {
 
 void FaultFilter::onDestroy() {
   resetTimerState();
-  response_limiter_.reset();
+  if (response_limiter_ != nullptr) {
+    response_limiter_->destroy();
+  }
   if (fault_active_) {
     config_->stats().active_faults_.dec();
   }
