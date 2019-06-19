@@ -91,8 +91,7 @@ void TestEnvironment::createParentPath(const std::string& path) {
 #ifdef __cpp_lib_experimental_filesystem
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
-  std::filesystem::create_directories(
-      std::filesystem::path(path).parent_path());
+  std::filesystem::create_directories(std::filesystem::path(path).parent_path());
 #else
   // No support on this system for std::filesystem.
   RELEASE_ASSERT(::system(("mkdir -p $(dirname " + path + ")").c_str()) == 0, "");
