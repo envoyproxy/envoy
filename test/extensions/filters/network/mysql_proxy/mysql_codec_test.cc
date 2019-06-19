@@ -838,7 +838,7 @@ TEST_F(MySQLCodecTest, MySQLLoginOldAuthSwitch) {
 TEST_F(MySQLCodecTest, MySQLLoginOkIncompleteRespCode) {
   ClientLoginResponse mysql_loginok_encode{};
   mysql_loginok_encode.setRespCode(MYSQL_UT_RESP_OK);
-  std::string data = "";
+  std::string data;
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLoginResponse mysql_loginok_decode{};

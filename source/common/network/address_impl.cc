@@ -304,7 +304,7 @@ Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port) : Instance
 Ipv6Instance::Ipv6Instance(uint32_t port) : Ipv6Instance("", port) {}
 
 bool Ipv6Instance::operator==(const Instance& rhs) const {
-  const Ipv6Instance* rhs_casted = dynamic_cast<const Ipv6Instance*>(&rhs);
+  const auto* rhs_casted = dynamic_cast<const Ipv6Instance*>(&rhs);
   return (rhs_casted && (ip_.ipv6_.address() == rhs_casted->ip_.ipv6_.address()) &&
           (ip_.port() == rhs_casted->ip_.port()));
 }

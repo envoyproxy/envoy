@@ -545,7 +545,7 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
   }));
 
   // This test also verifies that decoder/encoder filters have onDestroy() called only once.
-  MockStreamFilter* filter = new MockStreamFilter();
+  auto* filter = new MockStreamFilter();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
         callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
@@ -584,7 +584,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
   }));
 
   // This test also verifies that decoder/encoder filters have onDestroy() called only once.
-  MockStreamFilter* filter = new MockStreamFilter();
+  auto* filter = new MockStreamFilter();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
         callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
@@ -614,7 +614,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
   const std::string original_path = "/x/%2E%2e/z";
   const std::string normalized_path = "/z";
 
-  MockStreamFilter* filter = new MockStreamFilter();
+  auto* filter = new MockStreamFilter();
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
@@ -680,7 +680,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   setup(false, "");
 
-  NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
+  auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
       .WillOnce(
           Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
@@ -748,7 +748,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorator) {
   setup(false, "");
 
-  NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
+  auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
       .WillOnce(
           Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
@@ -811,7 +811,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecoratorOverrideOp) {
   setup(false, "");
 
-  NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
+  auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
       .WillOnce(
           Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
@@ -889,7 +889,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent1,
                                      false});
 
-  NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
+  auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
       .WillOnce(
           Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
@@ -967,7 +967,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent1,
                                      false});
 
-  NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
+  auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
       .WillOnce(
           Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
@@ -2049,7 +2049,7 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
   setup(false, "envoy-custom-server", false);
 
   // Store the basic request encoder during filter chain setup.
-  MockStreamFilter* filter = new MockStreamFilter();
+  auto* filter = new MockStreamFilter();
   EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
 
   EXPECT_CALL(*filter, decodeHeaders(_, false))

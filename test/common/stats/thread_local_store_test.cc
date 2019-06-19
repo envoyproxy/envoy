@@ -715,7 +715,7 @@ public:
   void testAcceptsAll(const LookupStatFn lookup_stat) {
     InSequence s;
 
-    MockStatsMatcher* matcher = new MockStatsMatcher;
+    auto* matcher = new MockStatsMatcher;
     matcher->accepts_all_ = true;
     StatsMatcherPtr matcher_ptr(matcher);
     store_.setStatsMatcher(std::move(matcher_ptr));

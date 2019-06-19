@@ -37,7 +37,7 @@ public:
 class FileBasedMetadataAuthenticator : public grpc::MetadataCredentialsPlugin {
 public:
   FileBasedMetadataAuthenticator(
-      const envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig config, Api::Api& api)
+      const envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig& config, Api::Api& api)
       : config_(config), api_(api) {}
 
   grpc::Status GetMetadata(grpc::string_ref, grpc::string_ref, const grpc::AuthContext&,

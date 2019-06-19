@@ -47,7 +47,7 @@ void FileEventImpl::assignEvents(uint32_t events) {
           (events & FileReadyType::Write ? EV_WRITE : 0) |
           (events & FileReadyType::Closed ? EV_CLOSED : 0),
       [](evutil_socket_t, short what, void* arg) -> void {
-        FileEventImpl* event = static_cast<FileEventImpl*>(arg);
+        auto* event = static_cast<FileEventImpl*>(arg);
         uint32_t events = 0;
         if (what & EV_READ) {
           events |= FileReadyType::Read;
