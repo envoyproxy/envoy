@@ -130,7 +130,7 @@ private:
     ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                       Network::ListenerConfig& config);
 
-    ~ActiveTcpListener();
+    ~ActiveTcpListener() override;
 
     // Network::ListenerCallbacks
     void onAccept(Network::ConnectionSocketPtr&& socket,
@@ -160,7 +160,7 @@ private:
                             public Network::ConnectionCallbacks {
     ActiveConnection(ActiveTcpListener& listener, Network::ConnectionPtr&& new_connection,
                      TimeSource& time_system);
-    ~ActiveConnection();
+    ~ActiveConnection() override;
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
@@ -192,7 +192,7 @@ private:
           iter_(accept_filters_.end()) {
       listener_.stats_.downstream_pre_cx_active_.inc();
     }
-    ~ActiveSocket() {
+    ~ActiveSocket() override {
       accept_filters_.clear();
       listener_.stats_.downstream_pre_cx_active_.dec();
     }

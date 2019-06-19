@@ -1,7 +1,6 @@
 #pragma once
 
-#include <stdlib.h>
-
+#include <cstdlib>
 #include <list>
 #include <random>
 #include <string>
@@ -407,7 +406,7 @@ public:
    * @param vector of gauges to check.
    * @return bool indicating that passed gauges not matching the omitted regex have a value of 0.
    */
-  static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr> gauges);
+  static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges);
 
   // Strict variants of Protobuf::MessageUtil
   static void loadFromJson(const std::string& json, Protobuf::Message& message) {

@@ -21,9 +21,7 @@ public:
   void initialize(Event::Dispatcher&, Server::Instance&) override {}
   void sendParentAdminShutdownRequest(time_t&) override {}
   void sendParentTerminateRequest() override {}
-  ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot&) override {
-    return ServerStatsFromParent();
-  }
+  ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot&) override { return {}; }
   void shutdown() override {}
   std::string version() override { return "disabled"; }
   Thread::BasicLockable& logLock() override { return log_lock_; }

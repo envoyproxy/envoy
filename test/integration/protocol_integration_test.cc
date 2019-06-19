@@ -520,7 +520,7 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   auto downstream_request = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  Buffer::OwnedImpl data("{\"TableName\":\"locations\"}");
+  Buffer::OwnedImpl data(R"({"TableName":"locations"})");
   codec_client_->sendData(*downstream_request, data, true);
   waitForNextUpstreamRequest();
 

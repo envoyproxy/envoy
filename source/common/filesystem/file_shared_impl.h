@@ -13,7 +13,7 @@ class IoFileError : public Api::IoError {
 public:
   explicit IoFileError(int sys_errno) : errno_(sys_errno) {}
 
-  ~IoFileError() override {}
+  ~IoFileError() override = default;
 
   Api::IoError::IoErrorCode getErrorCode() const override;
   std::string getErrorDetails() const override;

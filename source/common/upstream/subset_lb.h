@@ -29,7 +29,7 @@ public:
       const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
       const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>& least_request_config,
       const envoy::api::v2::Cluster::CommonLbConfig& common_config);
-  ~SubsetLoadBalancer();
+  ~SubsetLoadBalancer() override;
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -135,7 +135,7 @@ private:
   // Entry in the subset hierarchy.
   class LbSubsetEntry {
   public:
-    LbSubsetEntry() {}
+    LbSubsetEntry() = default;
 
     bool initialized() const { return priority_subset_ != nullptr; }
     bool active() const { return initialized() && !priority_subset_->empty(); }

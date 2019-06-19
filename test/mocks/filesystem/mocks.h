@@ -16,7 +16,7 @@ namespace Filesystem {
 class MockFile : public File {
 public:
   MockFile();
-  ~MockFile();
+  ~MockFile() override;
 
   // Filesystem::File
   Api::IoCallBoolResult open() override;
@@ -43,7 +43,7 @@ private:
 class MockInstance : public Instance {
 public:
   MockInstance();
-  ~MockInstance();
+  ~MockInstance() override;
 
   // Filesystem::Instance
   MOCK_METHOD1(createFile, FilePtr(const std::string&));
@@ -57,7 +57,7 @@ public:
 class MockWatcher : public Watcher {
 public:
   MockWatcher();
-  ~MockWatcher();
+  ~MockWatcher() override;
 
   MOCK_METHOD3(addWatch, void(const std::string&, uint32_t, OnChangedCb));
 };

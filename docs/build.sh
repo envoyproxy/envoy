@@ -142,6 +142,7 @@ PROTO_RST="
   /envoy/service/accesslog/v2/als/envoy/service/accesslog/v2/als.proto.rst
   /envoy/service/auth/v2/external_auth/envoy/service/auth/v2/attribute_context.proto.rst
   /envoy/service/auth/v2/external_auth/envoy/service/auth/v2/external_auth.proto.rst
+  /envoy/service/discovery/v2/rtds/envoy/service/discovery/v2/rtds.proto.rst
   /envoy/service/ratelimit/v2/rls/envoy/service/ratelimit/v2/rls.proto.rst
   /envoy/service/tap/v2alpha/common/envoy/service/tap/v2alpha/common.proto.rst
   /envoy/type/http_status/envoy/type/http_status.proto.rst

@@ -89,6 +89,7 @@ proto_library(
         "//envoy/service/auth/v2:attribute_context",
         "//envoy/service/auth/v2:external_auth",
         "//envoy/service/discovery/v2:ads",
+        "//envoy/service/discovery/v2:rtds",
         "//envoy/service/load_stats/v2:lrs",
         "//envoy/service/metrics/v2:metrics_service",
         "//envoy/service/ratelimit/v2:rls",
