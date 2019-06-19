@@ -52,14 +52,13 @@ protected:
       : raw_buffer_transport_socket_(new NiceMock<Network::MockTransportSocket>),
         ssl_transport_socket_(new NiceMock<MockSslTransportSocket>) {}
 
-  void initialize(bool allow_fallback) {
+  void initialize() {
     auto unique_raw_buffer_transport_socket =
         std::unique_ptr<Network::MockTransportSocket>(raw_buffer_transport_socket_);
     auto unique_ssl_transport_socket =
         std::unique_ptr<MockSslTransportSocket>(ssl_transport_socket_);
     permissive_transport_socket_ = std::make_unique<PermissiveSocket>(
-        std::move(unique_ssl_transport_socket), std::move(unique_raw_buffer_transport_socket),
-        allow_fallback);
+        std::move(unique_ssl_transport_socket), std::move(unique_raw_buffer_transport_socket));
 
     EXPECT_CALL(*ssl_transport_socket_, setTransportSocketCallbacks(_)).Times(1);
     permissive_transport_socket_->setTransportSocketCallbacks(callbacks_);
@@ -73,6 +72,7 @@ protected:
 
     EXPECT_CALL(callbacks_, connection()).Times(AtMost(1));
     permissive_transport_socket_->doRead(read_buffer_);
+    EXPECT_TRUE(permissive_transport_socket_->isFallback());
   }
 
   std::unique_ptr<PermissiveSocket> permissive_transport_socket_;
@@ -87,7 +87,7 @@ protected:
 TEST_F(PermissiveSocketTest, FallbackOnWrite) {
   InSequence s;
 
-  initialize(true);
+  initialize();
 
   EXPECT_FALSE(permissive_transport_socket_->isFallback());
 
@@ -108,7 +108,7 @@ TEST_F(PermissiveSocketTest, FallbackOnWrite) {
 TEST_F(PermissiveSocketTest, FallbackOnRead) {
   InSequence s;
 
-  initialize(true);
+  initialize();
 
   EXPECT_FALSE(permissive_transport_socket_->isFallback());
 
@@ -126,7 +126,7 @@ TEST_F(PermissiveSocketTest, FallbackOnRead) {
 TEST_F(PermissiveSocketTest, DoNotFallbackWhenHandShakeNotCompleteSocketKeepOpen) {
   InSequence s;
 
-  initialize(true);
+  initialize();
 
   EXPECT_FALSE(permissive_transport_socket_->isFallback());
 
@@ -145,7 +145,7 @@ TEST_F(PermissiveSocketTest, DoNotFallbackWhenHandShakeNotCompleteSocketKeepOpen
 TEST_F(PermissiveSocketTest, DoNotFallbackWhenHandShakeCompleteSocketClosed) {
   InSequence s;
 
-  initialize(true);
+  initialize();
 
   EXPECT_FALSE(permissive_transport_socket_->isFallback());
 
@@ -164,7 +164,7 @@ TEST_F(PermissiveSocketTest, DoNotFallbackWhenHandShakeCompleteSocketClosed) {
 TEST_F(PermissiveSocketTest, ProtocolBeforeAndAfterFallback) {
   InSequence s;
 
-  initialize(true);
+  initialize();
 
   ON_CALL(*ssl_transport_socket_, protocol()).WillByDefault(Return("h2"));
   ON_CALL(*raw_buffer_transport_socket_, protocol()).WillByDefault(Return(EMPTY_STRING));
@@ -177,7 +177,7 @@ TEST_F(PermissiveSocketTest, ProtocolBeforeAndAfterFallback) {
 TEST_F(PermissiveSocketTest, FailureReasonBeforeAndAfterFallback) {
   InSequence s;
 
-  initialize(true);
+  initialize();
 
   std::string primary_failure = "primary failure";
   std::string secondary_failure = "secondary failure";
@@ -192,7 +192,7 @@ TEST_F(PermissiveSocketTest, FailureReasonBeforeAndAfterFallback) {
 TEST_F(PermissiveSocketTest, OnConnectedBeforeAndAfterFallback) {
   InSequence s;
 
-  initialize(true);
+  initialize();
 
   EXPECT_CALL(*ssl_transport_socket_, onConnected()).Times(1);
   permissive_transport_socket_->onConnected();
@@ -206,7 +206,7 @@ TEST_F(PermissiveSocketTest, OnConnectedBeforeAndAfterFallback) {
 TEST_F(PermissiveSocketTest, CanFlushCloseBeforeAndAfterFallback) {
   InSequence s;
 
-  initialize(true);
+  initialize();
 
   EXPECT_CALL(*ssl_transport_socket_, canFlushClose()).Times(1);
   permissive_transport_socket_->canFlushClose();
@@ -220,7 +220,7 @@ TEST_F(PermissiveSocketTest, CanFlushCloseBeforeAndAfterFallback) {
 TEST_F(PermissiveSocketTest, CloseSocketBeforeAndAfterFallback) {
   InSequence s;
 
-  initialize(true);
+  initialize();
 
   EXPECT_CALL(*ssl_transport_socket_, closeSocket(Network::ConnectionEvent::LocalClose)).Times(1);
   permissive_transport_socket_->closeSocket(Network::ConnectionEvent::LocalClose);
@@ -235,7 +235,7 @@ TEST_F(PermissiveSocketTest, CloseSocketBeforeAndAfterFallback) {
 TEST_F(PermissiveSocketTest, CheckSslBeforeAndAfterFallback) {
   InSequence s;
 
-  initialize(true);
+  initialize();
 
   ON_CALL(*ssl_transport_socket_, ssl()).WillByDefault(Return(ssl_transport_socket_));
   ON_CALL(*raw_buffer_transport_socket_, ssl()).WillByDefault(Return(nullptr));
@@ -244,18 +244,6 @@ TEST_F(PermissiveSocketTest, CheckSslBeforeAndAfterFallback) {
   fallback();
   EXPECT_EQ(nullptr, permissive_transport_socket_->ssl());
 }
-
-TEST_F(PermissiveSocketTest, FallbackIsNotAllowed) {
-  InSequence s;
-
-  initialize(false);
-
-  fallback();
-
-  // Failed to fall back.
-  EXPECT_FALSE(permissive_transport_socket_->isFallback());
-}
-
 } // namespace
 } // namespace Permissive
 } // namespace TransportSockets

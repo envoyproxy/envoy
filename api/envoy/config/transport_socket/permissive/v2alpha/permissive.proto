@@ -16,14 +16,11 @@ import "validate/validate.proto";
 // Configuration for permissive transport socket. This wraps transport sockets, providing the
 // ability to fall back from primary to secondary transport socket.
 message Permissive {
-  // Value indicates whether falling back from primary to secondary is allowed.
-  bool allow_fallback = 1;
-
   // The primary transport socket.
-  api.v2.core.TransportSocket primary_transport_socket = 2
+  api.v2.core.TransportSocket primary_transport_socket = 1
       [(validate.rules).message.required = true];
 
   // The secondary transport socket.
-  api.v2.core.TransportSocket secondary_transport_socket = 3
+  api.v2.core.TransportSocket secondary_transport_socket = 2
       [(validate.rules).message.required = true];
 }

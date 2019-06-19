@@ -8,10 +8,8 @@ namespace TransportSockets {
 namespace Permissive {
 
 PermissiveSocket::PermissiveSocket(Network::TransportSocketPtr&& primary_transport_socket,
-                                   Network::TransportSocketPtr&& secondary_transport_socket,
-                                   bool allow_fallback)
-    : allow_fallback_(allow_fallback),
-      primary_transport_socket_(std::move(primary_transport_socket)),
+                                   Network::TransportSocketPtr&& secondary_transport_socket)
+    : primary_transport_socket_(std::move(primary_transport_socket)),
       secondary_transport_socket_(std::move(secondary_transport_socket)) {}
 
 void PermissiveSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
@@ -101,9 +99,8 @@ void PermissiveSocket::checkIoResult(Network::IoResult& io_result) {
    * completed. Since handshake_complete_ is private in ssl_socket, we can call canFlushClose()
    * instead.
    *  * check if the action is Network::PostIoAction::Close.
-   *  * check if falling back is allowed.
    */
-  if (!canFlushClose() && io_result.action_ == Network::PostIoAction::Close && allow_fallback_) {
+  if (!canFlushClose() && io_result.action_ == Network::PostIoAction::Close) {
     // TODO(crazyxy): add metrics
     is_fallback_ = true;
     ENVOY_CONN_LOG(trace, "Transport socket fallback", callbacks_->connection());
@@ -118,7 +115,7 @@ Network::TransportSocketPtr PermissiveSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsSharedPtr options) const {
   return std::make_unique<PermissiveSocket>(
       primary_transport_socket_factory_->createTransportSocket(options),
-      secondary_transport_socket_factory_->createTransportSocket(options), allow_fallback_);
+      secondary_transport_socket_factory_->createTransportSocket(options));
 }
 
 bool PermissiveSocketFactory::implementsSecureTransport() const { return false; }
