@@ -340,6 +340,10 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_ignore_tlpr_if_sending_ping, false,
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_terminate_gquic_connection_as_ietf, false,
             "If true, terminate Google QUIC connections similarly as IETF QUIC.")
 
+QUICHE_FLAG(bool, quic_restart_flag_quic_allow_loas_multipacket_chlo, false,
+            "If true, inspects QUIC CHLOs for kLOAS and early creates sessions "
+            "to allow multi-packet CHLOs")
+
 QUICHE_FLAG(bool, quic_restart_flag_quic_enable_accept_random_ipn, false,
             "Allow QUIC to accept initial packet numbers that are random, not 1.")
 
