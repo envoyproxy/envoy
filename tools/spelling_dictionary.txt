@@ -214,6 +214,7 @@ RNG
 RPC
 RSA
 RST
+RTDS
 RTTI
 RW
 RX
@@ -249,7 +250,6 @@ TBD
 TCLAP
 TCMalloc
 TCP
-TDS
 TE
 TFO
 TID
@@ -357,6 +357,7 @@ casted
 chrono
 chroot
 chunked
+ci
 circllhist
 cmd
 codec

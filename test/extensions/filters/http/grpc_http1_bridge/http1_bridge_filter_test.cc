@@ -28,16 +28,16 @@ namespace {
 
 class GrpcHttp1BridgeFilterTest : public testing::Test {
 public:
-  GrpcHttp1BridgeFilterTest() : common_(*symbol_table_), filter_(common_) {
+  GrpcHttp1BridgeFilterTest() : context_(*symbol_table_), filter_(context_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
     ON_CALL(decoder_callbacks_.stream_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
   }
 
-  ~GrpcHttp1BridgeFilterTest() { filter_.onDestroy(); }
+  ~GrpcHttp1BridgeFilterTest() override { filter_.onDestroy(); }
 
   Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
-  Grpc::Common common_;
+  Grpc::ContextImpl context_;
   Http1BridgeFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;

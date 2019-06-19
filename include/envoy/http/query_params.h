@@ -11,7 +11,7 @@ namespace Utility {
 // using proper formatting. Perhaps similar to
 // https://github.com/apache/incubator-pagespeed-mod/blob/master/pagespeed/kernel/http/query_params.h
 
-typedef std::map<std::string, std::string> QueryParams;
+using QueryParams = std::map<std::string, std::string>;
 
 } // namespace Utility
 } // namespace Http

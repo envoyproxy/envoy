@@ -20,7 +20,7 @@ const size_t NumResourcePriorities = 2;
  */
 class Resource {
 public:
-  virtual ~Resource() {}
+  virtual ~Resource() = default;
 
   /**
    * @return true if the resource can be created.
@@ -55,7 +55,7 @@ public:
  */
 class ResourceManager {
 public:
-  virtual ~ResourceManager() {}
+  virtual ~ResourceManager() = default;
 
   /**
    * @return Resource& active TCP connections.

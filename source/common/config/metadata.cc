@@ -13,7 +13,7 @@ const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Me
   const ProtobufWkt::Struct* data_struct = &(filter_it->second);
   const ProtobufWkt::Value* val = nullptr;
   // go through path to select sub entries
-  for (const auto p : path) {
+  for (const auto& p : path) {
     if (nullptr == data_struct) { // sub entry not found
       return ProtobufWkt::Value::default_instance();
     }

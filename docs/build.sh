@@ -48,7 +48,7 @@ pip install -r "${SCRIPT_DIR}"/requirements.txt
 
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED \
-  --action_env=ENVOY_BLOB_SHA --spawn_strategy=standalone
+  --action_env=ENVOY_BLOB_SHA --spawn_strategy=standalone --host_force_python=PY2
 
 # These are the protos we want to put in docs, this list will grow.
 # TODO(htuch): Factor this out of this script.
@@ -56,6 +56,7 @@ PROTO_RST="
   /envoy/admin/v2alpha/certs/envoy/admin/v2alpha/certs.proto.rst
   /envoy/admin/v2alpha/clusters/envoy/admin/v2alpha/clusters.proto.rst
   /envoy/admin/v2alpha/config_dump/envoy/admin/v2alpha/config_dump.proto.rst
+  /envoy/admin/v2alpha/listeners/envoy/admin/v2alpha/listeners.proto.rst
   /envoy/admin/v2alpha/memory/envoy/admin/v2alpha/memory.proto.rst
   /envoy/admin/v2alpha/clusters/envoy/admin/v2alpha/metrics.proto.rst
   /envoy/admin/v2alpha/mutex_stats/envoy/admin/v2alpha/mutex_stats.proto.rst
@@ -141,6 +142,7 @@ PROTO_RST="
   /envoy/service/accesslog/v2/als/envoy/service/accesslog/v2/als.proto.rst
   /envoy/service/auth/v2/external_auth/envoy/service/auth/v2/attribute_context.proto.rst
   /envoy/service/auth/v2/external_auth/envoy/service/auth/v2/external_auth.proto.rst
+  /envoy/service/discovery/v2/rtds/envoy/service/discovery/v2/rtds.proto.rst
   /envoy/service/ratelimit/v2/rls/envoy/service/ratelimit/v2/rls.proto.rst
   /envoy/service/tap/v2alpha/common/envoy/service/tap/v2alpha/common.proto.rst
   /envoy/type/http_status/envoy/type/http_status.proto.rst

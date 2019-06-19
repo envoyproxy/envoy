@@ -26,7 +26,7 @@ struct RequestContext {
   RequestHeader request_header_{};
 };
 
-typedef std::shared_ptr<RequestContext> RequestContextSharedPtr;
+using RequestContextSharedPtr = std::shared_ptr<RequestContext>;
 
 /**
  * Request decoder configuration object.
@@ -86,7 +86,7 @@ class RequestHeaderDeserializer
                                                  Int16Deserializer, Int32Deserializer,
                                                  NullableStringDeserializer> {};
 
-typedef std::unique_ptr<RequestHeaderDeserializer> RequestHeaderDeserializerPtr;
+using RequestHeaderDeserializerPtr = std::unique_ptr<RequestHeaderDeserializer>;
 
 /**
  * Parser responsible for extracting the request header and putting it into context.

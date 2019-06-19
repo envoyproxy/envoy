@@ -155,6 +155,16 @@ class TestClusterManagerImpl : public ClusterManagerImpl {
 public:
   using ClusterManagerImpl::ClusterManagerImpl;
 
+  TestClusterManagerImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                         ClusterManagerFactory& factory, Stats::Store& stats,
+                         ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                         Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                         AccessLog::AccessLogManager& log_manager,
+                         Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                         Api::Api& api, Http::Context& http_context)
+      : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
+                           main_thread_dispatcher, admin, validation_visitor_, api, http_context) {}
+
   std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
     std::map<std::string, std::reference_wrapper<Cluster>> clusters;
     for (auto& cluster : active_clusters_) {
@@ -162,6 +172,8 @@ public:
     }
     return clusters;
   }
+
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
 // Override postThreadLocalClusterUpdate so we can test that merged updates calls
@@ -203,8 +215,6 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 std::string clustersJson(const std::vector<std::string>& clusters) {
   return fmt::sprintf("\"clusters\": [%s]", StringUtil::join(clusters, ","));
 }
-
-const ClusterManager::ClusterWarmingCallback dummyWarmingCb = [](auto, auto) {};
 
 class ClusterManagerImplTest : public testing::Test {
 public:
@@ -1007,21 +1017,18 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
       .WillOnce(Return(std::make_pair(cluster3, nullptr)));
   ON_CALL(*cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster3"), "version1",
-                                       dummyWarmingCb);
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster3"), "version1");
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
       .WillOnce(Return(std::make_pair(cluster4, nullptr)));
   ON_CALL(*cluster4, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster4, initialize(_));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster4"), "version2",
-                                       dummyWarmingCb);
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster4"), "version2");
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
       .WillOnce(Return(std::make_pair(cluster5, nullptr)));
   ON_CALL(*cluster5, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster5"), "version3",
-                                       dummyWarmingCb);
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster5"), "version3");
 
   cds->initialized_callback_();
   EXPECT_CALL(*cds, versionInfo()).WillOnce(Return("version3"));
@@ -1154,7 +1161,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster1"), "", dummyWarmingCb);
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster1"), "");
 
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
@@ -1193,8 +1200,8 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version1",
-                                                   dummyWarmingCb));
+  EXPECT_TRUE(
+      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version1"));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   checkConfigDump(R"EOF(
@@ -1233,8 +1240,8 @@ TEST_F(ClusterManagerImplTest, ShutdownWithWarming) {
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version1",
-                                                   dummyWarmingCb));
+  EXPECT_TRUE(
+      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version1"));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   cluster_manager_->shutdown();
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 0 /*warming*/);
@@ -1255,36 +1262,23 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
       cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
-  int warming_cb_calls = 0;
-  ClusterManager::ClusterWarmingState last_warming_state =
-      ClusterManager::ClusterWarmingState::Starting;
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
   EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(1);
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
-      defaultStaticCluster("fake_cluster"), "",
-      [&last_warming_state, &warming_cb_calls](auto, auto state) {
-        warming_cb_calls++;
-        last_warming_state = state;
-      }));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
-  EXPECT_EQ(1, warming_cb_calls);
-  EXPECT_EQ(ClusterManager::ClusterWarmingState::Starting, last_warming_state);
   cluster1->initialize_callback_();
 
   EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
   EXPECT_EQ(0, cluster_manager_->warmingClusterCount());
-  EXPECT_EQ(2, warming_cb_calls);
-  EXPECT_EQ(ClusterManager::ClusterWarmingState::Finished, last_warming_state);
 
   // Now try to update again but with the same hash.
-  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "",
-                                                    dummyWarmingCb));
+  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
 
   // Now do it again with a different hash.
   auto update_cluster = defaultStaticCluster("fake_cluster");
@@ -1302,7 +1296,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
         initialize_callback();
       }));
   EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(1);
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, "", dummyWarmingCb));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, ""));
 
   EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster")->info());
   EXPECT_EQ(1UL, cluster_manager_->clusters().size());
@@ -1373,8 +1367,7 @@ TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
   EXPECT_CALL(initialized, ready());
   cluster1->initialize_callback_();
 
-  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "",
-                                                    dummyWarmingCb));
+  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
 
   // Attempt to remove a static cluster.
   EXPECT_FALSE(cluster_manager_->removeCluster("fake_cluster"));
@@ -2535,8 +2528,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   common_lb_config:
     update_merge_window: 3s
   )EOF";
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml), "version1",
-                                                   dummyWarmingCb));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml), "version1"));
 
   Cluster& cluster = cluster_manager_->activeClusters().find("new_cluster")->second;
   HostVectorSharedPtr hosts(
@@ -2603,8 +2595,8 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   EXPECT_EQ(0, factory_.stats_
                    .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml_updated), "version2",
-                                                   dummyWarmingCb));
+  EXPECT_TRUE(
+      cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml_updated), "version2"));
   EXPECT_EQ(2, factory_.stats_
                    .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());

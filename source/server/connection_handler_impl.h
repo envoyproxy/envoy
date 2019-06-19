@@ -61,20 +61,20 @@ public:
 
 private:
   struct ActiveListenerBase;
-  typedef std::unique_ptr<ActiveListenerBase> ActiveListenerBasePtr;
+  using ActiveListenerBasePtr = std::unique_ptr<ActiveListenerBase>;
 
   struct ActiveTcpListener;
-  typedef std::unique_ptr<ActiveTcpListener> ActiveTcpListenerPtr;
+  using ActiveTcpListenerPtr = std::unique_ptr<ActiveTcpListener>;
 
   struct ActiveUdpListener;
-  typedef std::unique_ptr<ActiveUdpListener> ActiveUdpListenerPtr;
+  using ActiveUdpListenerPtr = std::unique_ptr<ActiveUdpListener>;
 
   ActiveListenerBase* findActiveListenerByAddress(const Network::Address::Instance& address);
 
   struct ActiveConnection;
-  typedef std::unique_ptr<ActiveConnection> ActiveConnectionPtr;
+  using ActiveConnectionPtr = std::unique_ptr<ActiveConnection>;
   struct ActiveSocket;
-  typedef std::unique_ptr<ActiveSocket> ActiveSocketPtr;
+  using ActiveSocketPtr = std::unique_ptr<ActiveSocket>;
 
   /**
    * Wrapper for an active listener owned by this handler.
@@ -83,7 +83,7 @@ private:
     ActiveListenerBase(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                        Network::ListenerConfig& config);
 
-    virtual ~ActiveListenerBase() {}
+    virtual ~ActiveListenerBase() = default;
 
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;
@@ -130,7 +130,7 @@ private:
     ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                       Network::ListenerConfig& config);
 
-    ~ActiveTcpListener();
+    ~ActiveTcpListener() override;
 
     // Network::ListenerCallbacks
     void onAccept(Network::ConnectionSocketPtr&& socket,
@@ -160,7 +160,7 @@ private:
                             public Network::ConnectionCallbacks {
     ActiveConnection(ActiveTcpListener& listener, Network::ConnectionPtr&& new_connection,
                      TimeSource& time_system);
-    ~ActiveConnection();
+    ~ActiveConnection() override;
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
@@ -192,7 +192,7 @@ private:
           iter_(accept_filters_.end()) {
       listener_.stats_.downstream_pre_cx_active_.inc();
     }
-    ~ActiveSocket() {
+    ~ActiveSocket() override {
       accept_filters_.clear();
       listener_.stats_.downstream_pre_cx_active_.dec();
     }

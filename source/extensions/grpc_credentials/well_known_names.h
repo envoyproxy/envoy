@@ -20,7 +20,7 @@ public:
   const std::string FileBasedMetadata = "envoy.grpc_credentials.file_based_metadata";
 };
 
-typedef ConstSingleton<GrpcCredentialsNameValues> GrpcCredentialsNames;
+using GrpcCredentialsNames = ConstSingleton<GrpcCredentialsNameValues>;
 
 } // namespace GrpcCredentials
 } // namespace Extensions

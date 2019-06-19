@@ -54,7 +54,7 @@ private:
  */
 template <typename Response> class AsyncRequestCallbacks : public RawAsyncRequestCallbacks {
 public:
-  virtual ~AsyncRequestCallbacks() {}
+  ~AsyncRequestCallbacks() override = default;
   virtual void onSuccess(std::unique_ptr<Response>&& response, Tracing::Span& span) PURE;
 
 private:
@@ -75,11 +75,11 @@ private:
  */
 template <typename Response> class AsyncStreamCallbacks : public RawAsyncStreamCallbacks {
 public:
-  virtual ~AsyncStreamCallbacks() {}
+  ~AsyncStreamCallbacks() override = default;
   virtual void onReceiveMessage(std::unique_ptr<Response>&& message) PURE;
 
 private:
-  bool onReceiveMessageRaw(Buffer::InstancePtr&& response) {
+  bool onReceiveMessageRaw(Buffer::InstancePtr&& response) override {
     auto message = std::unique_ptr<Response>(dynamic_cast<Response*>(
         Internal::parseMessageUntyped(std::make_unique<Response>(), std::move(response))
             .release()));

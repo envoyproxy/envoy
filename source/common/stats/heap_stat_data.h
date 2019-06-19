@@ -1,28 +1,25 @@
+// TODO(jmarantz): rename this file and class to heap_allocator.h.
+
 #pragma once
 
-#include <cstdint>
-#include <string>
-#include <unordered_set>
+#include <vector>
 
+#include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/symbol_table.h"
 
-#include "common/common/hash.h"
-#include "common/common/thread.h"
-#include "common/common/thread_annotations.h"
 #include "common/stats/metric_impl.h"
-#include "common/stats/stat_data_allocator_impl.h"
-#include "common/stats/stat_merger.h"
-#include "common/stats/symbol_table_impl.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Stats {
 
 /**
- * This structure is an alternate backing store for both CounterImpl and GaugeImpl. It is designed
- * so that it can be allocated efficiently from the heap on demand.
+ * Holds backing store for both CounterImpl and GaugeImpl. This provides a level
+ * of indirection needed to enable stats created with the same name from
+ * different scopes to share the same value.
  */
 struct HeapStatData : public InlineStorage {
 private:
@@ -44,40 +41,21 @@ public:
   SymbolTable::Storage symbol_storage_; // This is a 'using' nickname for uint8_t[].
 };
 
-template <class Stat> class HeapStat : public Stat {
+class HeapStatDataAllocator : public StatDataAllocator {
 public:
-  HeapStat(HeapStatData& data, StatDataAllocatorImpl<HeapStatData>& alloc,
-           absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
-      : Stat(data, alloc, tag_extracted_name, tags) {}
-
-  HeapStat(HeapStatData& data, StatDataAllocatorImpl<HeapStatData>& alloc,
-           absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
-           Gauge::ImportMode import_mode)
-      : Stat(data, alloc, tag_extracted_name, tags, import_mode) {}
-
-  StatName statName() const override { return this->data_.statName(); }
-};
-
-class HeapStatDataAllocator : public StatDataAllocatorImpl<HeapStatData> {
-public:
-  HeapStatDataAllocator(SymbolTable& symbol_table) : StatDataAllocatorImpl(symbol_table) {}
+  HeapStatDataAllocator(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   ~HeapStatDataAllocator() override;
 
   HeapStatData& alloc(StatName name);
-  void free(HeapStatData& data) override;
+  void free(HeapStatData& data);
 
   // StatDataAllocator
   CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
-                               const std::vector<Tag>& tags) override {
-    return std::make_shared<HeapStat<CounterImpl<HeapStatData>>>(alloc(name), *this,
-                                                                 tag_extracted_name, tags);
-  }
-
+                               const std::vector<Tag>& tags) override;
   GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
-                           const std::vector<Tag>& tags, Gauge::ImportMode import_mode) override {
-    return std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(
-        alloc(name), *this, tag_extracted_name, tags, import_mode);
-  }
+                           const std::vector<Tag>& tags, Gauge::ImportMode import_mode) override;
+  SymbolTable& symbolTable() override { return symbol_table_; }
+  const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
@@ -96,6 +74,8 @@ private:
   // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
   using StatSet = absl::flat_hash_set<HeapStatData*, HeapStatHash, HeapStatCompare>;
   StatSet stats_ GUARDED_BY(mutex_);
+
+  SymbolTable& symbol_table_;
 
   // A mutex is needed here to protect both the stats_ object from both
   // alloc() and free() operations. Although alloc() operations are called under existing locking,

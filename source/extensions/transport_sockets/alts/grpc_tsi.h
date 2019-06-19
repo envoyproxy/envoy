@@ -22,10 +22,10 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 
-typedef CSmartPtr<tsi_frame_protector, tsi_frame_protector_destroy> CFrameProtectorPtr;
+using CFrameProtectorPtr = CSmartPtr<tsi_frame_protector, tsi_frame_protector_destroy>;
 
-typedef CSmartPtr<tsi_handshaker_result, tsi_handshaker_result_destroy> CHandshakerResultPtr;
-typedef CSmartPtr<tsi_handshaker, tsi_handshaker_destroy> CHandshakerPtr;
+using CHandshakerResultPtr = CSmartPtr<tsi_handshaker_result, tsi_handshaker_result_destroy>;
+using CHandshakerPtr = CSmartPtr<tsi_handshaker, tsi_handshaker_destroy>;
 
 } // namespace Alts
 } // namespace TransportSockets

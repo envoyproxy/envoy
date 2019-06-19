@@ -26,6 +26,7 @@ The Redis project offers a thorough reference on partitioning as it relates to R
 * Hash tagging.
 * Prefix routing.
 * Separate downstream client and upstream server authentication.
+* Request mirroring for all requests or write requests only.
 
 **Planned future enhancements**:
 
@@ -87,11 +88,11 @@ At the protocol level, pipelines are supported. MULTI (transaction block) is not
 Use pipelining wherever possible for the best performance.
 
 At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH and PING
-are the only exceptions. AUTH is processed locally by Envoy if a downstream password has been configured, 
-and no other commands will be processed until authentication is successful when a password has been 
-configured. Envoy will transparently issue AUTH commands upon connecting to upstream servers, if upstream 
-authentication passwords are configured for the cluster. Envoy responds to PING immediately with PONG. 
-Arguments to PING are not allowed. All other supported commands must contain a key. Supported commands are 
+are the only exceptions. AUTH is processed locally by Envoy if a downstream password has been configured,
+and no other commands will be processed until authentication is successful when a password has been
+configured. Envoy will transparently issue AUTH commands upon connecting to upstream servers, if upstream
+authentication passwords are configured for the cluster. Envoy responds to PING immediately with PONG.
+Arguments to PING are not allowed. All other supported commands must contain a key. Supported commands are
 functionally identical to the original Redis command except possibly in failure scenarios.
 
 For details on each command's usage see the official
@@ -235,7 +236,7 @@ Envoy can also generate its own errors in response to the client.
   "NOAUTH Authentication required.", "The command was rejected because a downstream authentication
   password has been set and the client has not successfully authenticated."
   ERR invalid password, "The authentication command failed due to an invalid password."
-  "ERR Client sent AUTH, but no password is set", "An authentication command was received, but no 
+  "ERR Client sent AUTH, but no password is set", "An authentication command was received, but no
   downstream authentication password has been configured."
 
 

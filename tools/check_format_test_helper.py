@@ -14,8 +14,6 @@ import shutil
 import subprocess
 import sys
 
-os.putenv("BUILDIFIER_BIN", "/usr/local/bin/buildifier")
-
 tools = os.path.dirname(os.path.realpath(__file__))
 tmp = os.path.join(os.getenv('TEST_TMPDIR', "/tmp"), "check_format_test")
 src = os.path.join(tools, 'testdata', 'check_format')

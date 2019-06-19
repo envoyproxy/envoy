@@ -149,6 +149,7 @@ envoy_cc_test(
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/server:lds_api_lib",
+        "//test/mocks/config:config_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
@@ -216,6 +217,8 @@ envoy_cc_test(
         ":cluster_health_check_bootstrap.yaml",
         ":empty_bootstrap.yaml",
         ":invalid_bootstrap.yaml",
+        ":invalid_layered_runtime_duplicate_name.yaml",
+        ":invalid_layered_runtime_missing_name.yaml",
         ":invalid_runtime_bootstrap.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",

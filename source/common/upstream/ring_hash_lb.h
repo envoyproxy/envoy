@@ -66,7 +66,7 @@ private:
 
     RingHashLoadBalancerStats& stats_;
   };
-  typedef std::shared_ptr<const Ring> RingConstSharedPtr;
+  using RingConstSharedPtr = std::shared_ptr<const Ring>;
 
   // ThreadAwareLoadBalancerBase
   HashingLoadBalancerSharedPtr

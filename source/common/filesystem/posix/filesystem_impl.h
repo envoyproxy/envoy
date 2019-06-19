@@ -13,7 +13,7 @@ namespace Filesystem {
 class FileImplPosix : public FileSharedImpl {
 public:
   FileImplPosix(const std::string& path) : FileSharedImpl(path) {}
-  ~FileImplPosix();
+  ~FileImplPosix() override;
 
 protected:
   // Filesystem::FileSharedImpl

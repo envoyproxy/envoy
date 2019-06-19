@@ -37,7 +37,7 @@ public:
   std::string value_;
   absl::optional<Endpoint> host_;
 };
-typedef std::list<Annotation> AnnotationList;
+using AnnotationList = std::list<Annotation>;
 
 /**
  * AnnotationType represents a BinaryAnnotation's type.
@@ -67,7 +67,7 @@ public:
   AnnotationType annotation_type_{AnnotationType::Bool};
   absl::optional<Endpoint> host_;
 };
-typedef std::list<BinaryAnnotation> BinaryAnnotationList;
+using BinaryAnnotationList = std::list<BinaryAnnotation>;
 
 /**
  * Span is a single, annotated span in a trace.
@@ -90,7 +90,7 @@ public:
   BinaryAnnotationList binary_annotations_;
   bool debug_{false};
 };
-typedef std::list<Span> SpanList;
+using SpanList = std::list<Span>;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters
