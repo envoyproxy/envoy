@@ -2,22 +2,10 @@
 
 #include "envoy/registry/registry.h"
 
+#include "common/http/headers.h"
+
 #include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
-
-using absl::string_view;
-using absl::WrapUnique;
-using Envoy::Http::FilterDataStatus;
-using Envoy::Http::FilterHeadersStatus;
-using Envoy::Http::HeaderEntry;
-using Envoy::Http::HeaderMap;
-using Envoy::Http::HeaderMapPtr;
-using Envoy::Registry::FactoryRegistry;
-using Envoy::Stats::Scope;
-using std::function;
-using std::make_shared;
-using std::string;
-using std::vector;
 
 namespace Envoy {
 namespace Extensions {
@@ -25,19 +13,23 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-bool isCacheableRequest(HeaderMap& headers) {
-  const HeaderEntry* method = headers.Method();
+bool isCacheableRequest(Http::HeaderMap& headers) {
+  const Http::HeaderEntry* method = headers.Method();
   // TODO(toddmgreer) Also serve HEAD requests from cache.
   // TODO(toddmgreer) Check all the other cache-related headers.
-  return ((method != nullptr) && method->value().getStringView() == "GET");
+  return ((method != nullptr) &&
+          method->value().getStringView() == Http::Headers::get().MethodValues.Head);
 }
 
-bool isCacheableResponse(HeaderMap& headers) {
-  const HeaderEntry* cache_control = headers.CacheControl();
+bool isCacheableResponse(Http::HeaderMap& headers) {
+  const Http::HeaderEntry* cache_control = headers.CacheControl();
   // TODO(toddmgreer) fully check for cacheability. See for example
   // https://github.com/apache/incubator-pagespeed-mod/blob/master/pagespeed/kernel/http/caching_headers.h.
-  return (cache_control != nullptr) &&
-         (cache_control->value().getStringView().find("private") == string_view::npos);
+  if (cache_control) {
+    return !StringUtil::caseFindToken(cache_control->value().getStringView(), ",",
+                                      Http::Headers::get().CacheControlValues.Private);
+  }
+  return false;
 }
 
 HttpCache& getCache(const envoy::config::filter::http::cache::v2alpha::Cache& config) {
@@ -52,7 +44,7 @@ HttpCache& getCache(const envoy::config::filter::http::cache::v2alpha::Cache& co
 } // namespace
 
 CacheFilter::CacheFilter(const envoy::config::filter::http::cache::v2alpha::Cache& config,
-                         const string&, Stats::Scope&, TimeSource& time_source)
+                         const std::string&, Stats::Scope&, TimeSource& time_source)
     : time_source_(time_source), cache_(getCache(config)) {}
 
 void CacheFilter::onDestroy() {
@@ -60,9 +52,9 @@ void CacheFilter::onDestroy() {
   insert_ = nullptr;
 }
 
-FilterHeadersStatus CacheFilter::decodeHeaders(HeaderMap& headers, bool) {
+Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   if (!isCacheableRequest(headers)) {
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
   ASSERT(decoder_callbacks_);
   lookup_ = cache_.makeLookupContext(LookupRequest(headers, time_source_.systemTime()));
@@ -70,27 +62,28 @@ FilterHeadersStatus CacheFilter::decodeHeaders(HeaderMap& headers, bool) {
 
   CacheFilterSharedPtr self = shared_from_this();
   lookup_->getHeaders([self](LookupResult&& result) { onHeadersAsync(self, std::move(result)); });
-  return FilterHeadersStatus::StopIteration;
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
-FilterHeadersStatus CacheFilter::encodeHeaders(HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   if (lookup_ && isCacheableResponse(headers)) {
     insert_ = cache_.makeInsertContext(std::move(lookup_));
     insert_->insertHeaders(headers, end_stream);
   }
-  return FilterHeadersStatus::Continue;
+  return Http::FilterHeadersStatus::Continue;
 }
 
-FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_stream) {
+Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (insert_) {
     // TODO(toddmgreer) Wait for the cache if necessary.
     insert_->insertBody(
         data, [](bool) {}, end_stream);
   }
-  return FilterDataStatus::Continue;
+  return Http::FilterDataStatus::Continue;
 }
 
-void CacheFilter::onOkHeaders(HeaderMapPtr&& headers, vector<AdjustedByteRange>&& response_ranges,
+void CacheFilter::onOkHeaders(Http::HeaderMapPtr&& headers,
+                              std::vector<AdjustedByteRange>&& response_ranges,
                               uint64_t content_length, bool has_trailers) {
   if (!lookup_) {
     return;
@@ -110,7 +103,7 @@ void CacheFilter::onOkHeaders(HeaderMapPtr&& headers, vector<AdjustedByteRange>&
     }
     getBody();
   } else {
-    lookup_->getTrailers([self = shared_from_this()](HeaderMapPtr&& trailers) {
+    lookup_->getTrailers([self = shared_from_this()](Http::HeaderMapPtr&& trailers) {
       onTrailersAsync(self, std::move(trailers));
     });
   }
@@ -138,7 +131,7 @@ void CacheFilter::onHeadersAsync(const CacheFilterSharedPtr& self, LookupResult&
                 response_ranges = std::move(result.response_ranges),
                 content_length = result.content_length,
                 has_trailers = result.has_trailers]() mutable {
-      self->onOkHeaders(WrapUnique(headers), std::move(response_ranges), content_length,
+      self->onOkHeaders(absl::WrapUnique(headers), std::move(response_ranges), content_length,
                         has_trailers);
     });
   }
@@ -152,7 +145,7 @@ void CacheFilter::getBody() {
 }
 
 void CacheFilter::onBodyAsync(const CacheFilterSharedPtr& self, Buffer::InstancePtr&& body) {
-  self->post([self, body = body.release()] { self->onBody(WrapUnique(body)); });
+  self->post([self, body = body.release()] { self->onBody(absl::WrapUnique(body)); });
 }
 
 void CacheFilter::onBody(Buffer::InstancePtr&& body) {
@@ -181,23 +174,24 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
   if (!remaining_body_.empty()) {
     getBody();
   } else if (response_has_trailers_) {
-    lookup_->getTrailers([self = shared_from_this()](HeaderMapPtr&& trailers) {
+    lookup_->getTrailers([self = shared_from_this()](Http::HeaderMapPtr&& trailers) {
       onTrailersAsync(self, std::move(trailers));
     });
   }
 }
 
-void CacheFilter::onTrailers(HeaderMapPtr&& trailers) {
+void CacheFilter::onTrailers(Http::HeaderMapPtr&& trailers) {
   if (lookup_) {
     decoder_callbacks_->encodeTrailers(std::move(trailers));
   }
 }
 
-void CacheFilter::onTrailersAsync(const CacheFilterSharedPtr& self, HeaderMapPtr&& trailers) {
-  self->post([self, trailers = trailers.release()] { self->onTrailers(WrapUnique(trailers)); });
+void CacheFilter::onTrailersAsync(const CacheFilterSharedPtr& self, Http::HeaderMapPtr&& trailers) {
+  self->post(
+      [self, trailers = trailers.release()] { self->onTrailers(absl::WrapUnique(trailers)); });
 }
 
-void CacheFilter::post(function<void()> f) const {
+void CacheFilter::post(std::function<void()> f) const {
   decoder_callbacks_->dispatcher().post(std::move(f));
 }
 } // namespace Cache

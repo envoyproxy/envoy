@@ -5,15 +5,6 @@
 #include "common/common/lock_guard.h"
 #include "common/http/header_map_impl.h"
 
-using Envoy::Http::HeaderMap;
-using Envoy::Http::HeaderMapImpl;
-using Envoy::Http::HeaderMapImplPtr;
-using Envoy::Http::HeaderMapPtr;
-using Envoy::Registry::RegisterFactory;
-using Envoy::Thread::LockGuard;
-using std::make_unique;
-using std::string;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -35,8 +26,8 @@ public:
 
   void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override {
     RELEASE_ASSERT(range.lastBytePos() < body_.length(), "Attempt to read past end of body.");
-    cb(make_unique<Buffer::OwnedImpl>(&body_[range.firstBytePos()],
-                                      range.lastBytePos() - range.firstBytePos() + 1));
+    cb(std::make_unique<Buffer::OwnedImpl>(&body_[range.firstBytePos()],
+                                           range.lastBytePos() - range.firstBytePos() + 1));
   }
 
   void getTrailers(LookupTrailersCallback&& cb) override {
@@ -50,7 +41,7 @@ public:
 private:
   SimpleHttpCache& cache_;
   const LookupRequest request_;
-  string body_;
+  std::string body_;
 };
 
 class SimpleInsertContext : public InsertContext {
@@ -58,9 +49,9 @@ public:
   SimpleInsertContext(LookupContext& lookup_context, SimpleHttpCache& cache)
       : key_(dynamic_cast<SimpleLookupContext&>(lookup_context).request().key()), cache_(cache) {}
 
-  void insertHeaders(const HeaderMap& response_headers, bool end_stream) override {
+  void insertHeaders(const Http::HeaderMap& response_headers, bool end_stream) override {
     ASSERT(!committed_);
-    response_headers_ = make_unique<HeaderMapImpl>(response_headers);
+    response_headers_ = std::make_unique<Http::HeaderMapImpl>(response_headers);
     if (end_stream) {
       commit();
     }
@@ -79,7 +70,7 @@ public:
     }
   }
 
-  void insertTrailers(const HeaderMap&) override {
+  void insertTrailers(const Http::HeaderMap&) override {
     ASSERT(false); // TODO(toddmgreer) support trailers
   }
 
@@ -90,7 +81,7 @@ private:
   }
 
   Key key_;
-  HeaderMapImplPtr response_headers_;
+  Http::HeaderMapImplPtr response_headers_;
   SimpleHttpCache& cache_;
   Buffer::OwnedImpl body_;
   bool committed_ = false;
@@ -98,11 +89,11 @@ private:
 } // namespace
 
 LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
-  return make_unique<SimpleLookupContext>(*this, std::move(request));
+  return std::make_unique<SimpleLookupContext>(*this, std::move(request));
 }
 
 void SimpleHttpCache::updateHeaders(LookupContextPtr&& lookup_context,
-                                    HeaderMapPtr&& response_headers) {
+                                    Http::HeaderMapPtr&& response_headers) {
   ASSERT(lookup_context);
   ASSERT(response_headers);
   // TODO(toddmgreer) Support updating headers.
@@ -110,24 +101,25 @@ void SimpleHttpCache::updateHeaders(LookupContextPtr&& lookup_context,
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
-  LockGuard lock(mutex_);
+  Thread::LockGuard lock(mutex_);
   auto iter = map_.find(request.key());
   if (iter == map_.end()) {
     return Entry{};
   }
   ASSERT(iter->second.response_headers);
-  return SimpleHttpCache::Entry{make_unique<HeaderMapImpl>(*iter->second.response_headers),
-                                iter->second.body};
+  return SimpleHttpCache::Entry{
+      std::make_unique<Http::HeaderMapImpl>(*iter->second.response_headers), iter->second.body};
 }
 
-void SimpleHttpCache::insert(const Key& key, HeaderMapPtr&& response_headers, string&& body) {
-  LockGuard lock(mutex_);
+void SimpleHttpCache::insert(const Key& key, Http::HeaderMapPtr&& response_headers,
+                             std::string&& body) {
+  Thread::LockGuard lock(mutex_);
   map_[key] = SimpleHttpCache::Entry{std::move(response_headers), std::move(body)};
 }
 
 InsertContextPtr SimpleHttpCache::makeInsertContext(LookupContextPtr&& lookup_context) {
   ASSERT(lookup_context != nullptr);
-  return make_unique<SimpleInsertContext>(*lookup_context, *this);
+  return std::make_unique<SimpleInsertContext>(*lookup_context, *this);
 }
 
 CacheInfo SimpleHttpCache::cacheInfo() const {
@@ -145,7 +137,7 @@ private:
   SimpleHttpCache cache_;
 };
 
-static RegisterFactory<SimpleHttpCacheFactory, HttpCacheFactory> register_;
+static Registry::RegisterFactory<SimpleHttpCacheFactory, HttpCacheFactory> register_;
 
 } // namespace Cache
 } // namespace HttpFilters

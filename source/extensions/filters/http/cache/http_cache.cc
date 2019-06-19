@@ -8,42 +8,33 @@
 
 #include "absl/time/time.h"
 
-using absl::Duration;
-using absl::FromChrono;
-using absl::ZeroDuration;
-using Envoy::Extensions::HttpFilters::Cache::Internal::effectiveMaxAge;
-using Envoy::Extensions::HttpFilters::Cache::Internal::httpTime;
-using Envoy::Http::HeaderEntry;
-using Envoy::Http::HeaderMap;
-using Envoy::Http::HeaderMapPtr;
-using Envoy::Http::HeaderString;
-using Envoy::Http::LowerCaseString;
-using std::string;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-LookupRequest::LookupRequest(const HeaderMap& request_headers, SystemTime timestamp)
+LookupRequest::LookupRequest(const Http::HeaderMap& request_headers, SystemTime timestamp)
     : timestamp_(timestamp),
       request_cache_control_(request_headers.CacheControl() == nullptr
                                  ? ""
                                  : request_headers.CacheControl()->value().getStringView()) {
   RELEASE_ASSERT(request_headers.Path(),
-                 "Can't form cache lookup key for malformed HeaderMap with null Path.");
+                 "Can't form cache lookup key for malformed Http::HeaderMap "
+                 "with null Path.");
   RELEASE_ASSERT(request_headers.Scheme(),
-                 "Can't form cache lookup key for malformed HeaderMap with null Scheme.");
+                 "Can't form cache lookup key for malformed Http::HeaderMap "
+                 "with null Scheme.");
   RELEASE_ASSERT(request_headers.Host(),
-                 "Can't form cache lookup key for malformed HeaderMap with null Host.");
+                 "Can't form cache lookup key for malformed Http::HeaderMap "
+                 "with null Host.");
   // TODO(toddmgreer) Let config determine whether to include scheme, host, and
   // query params.
   // TODO(toddmgreer) get cluster name.
   // TODO(toddmgreer) Parse Range header into request_range_spec_.
   key_.set_cluster_name("cluster_name_goes_here");
-  key_.set_host(string(request_headers.Host()->value().getStringView()));
-  key_.set_path(string(request_headers.Path()->value().getStringView()));
-  const HeaderString& scheme = request_headers.Scheme()->value();
+  key_.set_host(std::string(request_headers.Host()->value().getStringView()));
+  key_.set_path(std::string(request_headers.Path()->value().getStringView()));
+  const Http::HeaderString& scheme = request_headers.Scheme()->value();
   ASSERT(scheme == "http" || scheme == "https");
   key_.set_clear_http(scheme == "http");
 }
@@ -55,22 +46,25 @@ size_t stableHashKey(const Key& key) { return MessageUtil::hash(key); }
 size_t localHashKey(const Key& key) { return stableHashKey(key); }
 
 // Returns true if response_headers is fresh.
-bool LookupRequest::fresh(const HeaderMap& response_headers) const {
-  const HeaderEntry* cache_control_header = response_headers.get(LowerCaseString("cache-control"));
+bool LookupRequest::fresh(const Http::HeaderMap& response_headers) const {
+  const Http::HeaderEntry* cache_control_header =
+      response_headers.get(Http::LowerCaseString("cache-control"));
   if (cache_control_header) {
-    const Duration effective_max_age =
-        effectiveMaxAge(cache_control_header->value().getStringView());
-    if (effective_max_age >= ZeroDuration()) {
-      return FromChrono(timestamp_) - httpTime(response_headers.Date()) < effective_max_age;
+    const absl::Duration effective_max_age =
+        Internal::effectiveMaxAge(cache_control_header->value().getStringView());
+    if (effective_max_age >= absl::ZeroDuration()) {
+      return absl::FromChrono(timestamp_) - Internal::httpTime(response_headers.Date()) <
+             effective_max_age;
     }
   }
 
   // We didn't find a cache-control header with enough info to determine
   // freshness, so fall back to the expires header.
-  return FromChrono(timestamp_) <= httpTime(response_headers.get(LowerCaseString("expires")));
+  return absl::FromChrono(timestamp_) <=
+         Internal::httpTime(response_headers.get(Http::LowerCaseString("expires")));
 }
 
-LookupResult LookupRequest::makeLookupResult(HeaderMapPtr&& response_headers,
+LookupResult LookupRequest::makeLookupResult(Http::HeaderMapPtr&& response_headers,
                                              uint64_t content_length) const {
   // TODO(toddmgreer) Implement all HTTP caching semantics.
   ASSERT(response_headers);

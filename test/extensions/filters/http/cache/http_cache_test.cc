@@ -10,23 +10,18 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-using Event::SimulatedTimeSystem;
-using Http::HeaderMapPtr;
-using Http::makeHeaderMap;
-using Http::TestHeaderMapImpl;
-
 class LookupRequestTest : public testing::Test {
 protected:
-  SimulatedTimeSystem time_source_;
+  Event::SimulatedTimeSystem time_source_;
   SystemTime current_time_ = time_source_.systemTime();
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
-  const TestHeaderMapImpl request_headers_{
+  const Http::TestHeaderMapImpl request_headers_{
       {":path", "/"}, {":scheme", "http"}, {":authority", "example.com"}};
   const LookupRequest lookup_request_{request_headers_, current_time_};
 };
 
 TEST_F(LookupRequestTest, makeLookupResult) {
-  HeaderMapPtr response_headers = makeHeaderMap(
+  Http::HeaderMapPtr response_headers = Http::makeHeaderMap(
       {{"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response =
       lookup_request_.makeLookupResult(std::move(response_headers), 0);
@@ -35,9 +30,10 @@ TEST_F(LookupRequestTest, makeLookupResult) {
 }
 
 TEST_F(LookupRequestTest, PrivateResponse) {
-  HeaderMapPtr response_headers = makeHeaderMap({{"age", "2"},
-                                                 {"cache-control", "private, max-age=3600"},
-                                                 {"date", formatter_.fromTime(current_time_)}});
+  Http::HeaderMapPtr response_headers =
+      Http::makeHeaderMap({{"age", "2"},
+                           {"cache-control", "private, max-age=3600"},
+                           {"date", formatter_.fromTime(current_time_)}});
   const LookupResult lookup_response =
       lookup_request_.makeLookupResult(std::move(response_headers), 0);
 

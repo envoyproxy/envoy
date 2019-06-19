@@ -14,22 +14,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-using Http::FilterChainFactoryCallbacks;
-using Server::Configuration::FactoryContext;
-using Server::Configuration::NamedHttpFilterConfigFactory;
-using std::make_shared;
-using std::string;
-
 Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::cache::v2alpha::Cache& config, const string& stats_prefix,
-    FactoryContext& context) {
-  return [config, stats_prefix, &context](FilterChainFactoryCallbacks& callbacks) -> void {
+    const envoy::config::filter::http::cache::v2alpha::Cache& config,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+  return [config, stats_prefix, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
-        make_shared<CacheFilter>(config, stats_prefix, context.scope(), context.timeSource()));
+        std::make_shared<CacheFilter>(config, stats_prefix, context.scope(), context.timeSource()));
   };
 }
 
-REGISTER_FACTORY(CacheFilterFactory, NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(CacheFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace Cache
 } // namespace HttpFilters

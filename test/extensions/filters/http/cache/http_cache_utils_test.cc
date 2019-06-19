@@ -15,32 +15,25 @@ namespace Cache {
 namespace Internal {
 namespace {
 
-using absl::InfinitePast;
-using absl::UTCTimeZone;
-using Http::TestHeaderMapImpl;
-using std::string;
-using testing::TestWithParam;
-using testing::ValuesIn;
-
-class HttpTimeTest : public TestWithParam<string> {
+class HttpTimeTest : public testing::TestWithParam<std::string> {
 protected:
-  TestHeaderMapImpl response_headers_{{"date", GetParam()}};
+  Http::TestHeaderMapImpl response_headers_{{"date", GetParam()}};
 };
 
-const std::vector<string> ok_times = {
+const std::vector<std::string> ok_times = {
     "Sun, 06 Nov 1994 08:49:37 GMT",  // IMF-fixdate
     "Sunday, 06-Nov-94 08:49:37 GMT", // obsolete RFC 850 format
     "Sun Nov  6 08:49:37 1994"        // ANSI C's asctime() format
 };
 
-INSTANTIATE_TEST_SUITE_P(Ok, HttpTimeTest, ValuesIn(ok_times));
+INSTANTIATE_TEST_SUITE_P(Ok, HttpTimeTest, testing::ValuesIn(ok_times));
 
 TEST_P(HttpTimeTest, Ok) {
-  EXPECT_EQ(FormatTime(httpTime(response_headers_.Date()), UTCTimeZone()),
+  EXPECT_EQ(FormatTime(httpTime(response_headers_.Date()), absl::UTCTimeZone()),
             "1994-11-06T08:49:37+00:00");
 }
 
-TEST(HttpTime, Null) { EXPECT_EQ(httpTime(nullptr), InfinitePast()); }
+TEST(HttpTime, Null) { EXPECT_EQ(httpTime(nullptr), absl::InfinitePast()); }
 } // namespace
 } // namespace Internal
 } // namespace Cache
