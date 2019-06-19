@@ -33,14 +33,17 @@ public class MainActivity extends Activity {
 
   private HandlerThread thread = new HandlerThread(REQUEST_HANDLER_THREAD_NAME);
 
+  private Envoy envoy;
+
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
 
-    // Load an envoy config, and run envoy on a separate thread.
-    Envoy envoy = new Envoy();
-    envoy.load();
+    Context context = getBaseContext();
+    Envoy.load(context);
+
+    // Create envoy instance with config.
     String config = null;
     try {
       config = loadEnvoyConfig(getBaseContext(), R.raw.config);
@@ -48,7 +51,7 @@ public class MainActivity extends Activity {
       Log.d("MainActivity", "exception getting config.", e);
       throw new RuntimeException("Can't get config to run envoy.");
     }
-    envoy.run(getBaseContext(), config);
+    envoy = new Envoy(context, config);
 
     recyclerView = (RecyclerView)findViewById(R.id.recycler_view);
     recyclerView.setLayoutManager(new LinearLayoutManager(this));

@@ -20,15 +20,15 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
   return JNI_VERSION_1_6;
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_Envoy_runEnvoy(JNIEnv* env,
-                                                                                jobject, // this
-                                                                                jstring config) {
+extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_Envoy_run(JNIEnv* env,
+                                                                           jobject, // this
+                                                                           jstring config) {
   return run_envoy(env->GetStringUTFChars(config, nullptr));
 }
 
 extern "C" JNIEXPORT jint JNICALL
 Java_io_envoyproxy_envoymobile_Envoy_initialize(JNIEnv* env,
-                                                jobject, // this
+                                                jclass, // class
                                                 jobject connectivity_manager) {
   // See note above about c-ares.
   return ares_library_init_android(connectivity_manager);
@@ -36,7 +36,7 @@ Java_io_envoyproxy_envoymobile_Envoy_initialize(JNIEnv* env,
 
 extern "C" JNIEXPORT jboolean JNICALL Java_io_envoyproxy_envoymobile_Envoy_isAresInitialized(
     JNIEnv* env,
-    jobject // this
+    jclass // class
 ) {
   return ares_library_android_initialized() == ARES_SUCCESS;
 }
