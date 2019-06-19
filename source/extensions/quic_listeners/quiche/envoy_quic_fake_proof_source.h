@@ -48,6 +48,8 @@ public:
   ~EnvoyQuicFakeProofSource() override {}
 
   // quic::ProofSource
+  // Returns a fake certs chain and its dummy SCT "Dummy timestamp" and dummy TLS signature wrapped
+  // in QuicCryptoProof.
   void GetProof(const quic::QuicSocketAddress& server_address, const std::string& hostname,
                 const std::string& server_config, quic::QuicTransportVersion /*transport_version*/,
                 quic::QuicStringPiece /*chlo_hash*/,
@@ -63,6 +65,7 @@ public:
     callback->Run(true, chain, proof, nullptr /* details */);
   }
 
+  // Returns a certs chain with a dummy certificate "Dummy cert from [host_name]".
   quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
   GetCertChain(const quic::QuicSocketAddress& /*server_address*/,
                const std::string& hostname) override {
@@ -72,6 +75,7 @@ public:
         new quic::ProofSource::Chain(certs));
   }
 
+  // Always call callback with a signature "Dummy signature for { [server_config] }".
   void
   ComputeTlsSignature(const quic::QuicSocketAddress& /*server_address*/,
                       const std::string& /*hostname*/, uint16_t /*signature_algorithm*/,

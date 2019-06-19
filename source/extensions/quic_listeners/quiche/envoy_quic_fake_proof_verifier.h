@@ -14,13 +14,15 @@ namespace Envoy {
 namespace Quic {
 
 // A dummy implementation of quic::ProofVerifier which approves the certs and
-// signature produced by EnvoyQuicFakeProofSource only.
+// signature produced by EnvoyQuicFakeProofSource.
 class EnvoyQuicFakeProofVerifier : public quic::ProofVerifier {
 public:
   EnvoyQuicFakeProofVerifier() {}
   ~EnvoyQuicFakeProofVerifier() override {}
 
   // quic::ProofVerifier
+  // Return success if the certs chain is valid and signature is "Dummy signature for {
+  // [server_config] }"
   quic::QuicAsyncStatus
   VerifyProof(const std::string& hostname, const uint16_t /*port*/,
               const std::string& server_config, quic::QuicTransportVersion /*quic_version*/,
@@ -37,6 +39,8 @@ public:
     return quic::QUIC_FAILURE;
   }
 
+  // Return success if the certs chain has only one fake certificate "Dummy cert from [host_name]"
+  // and its SCT is "Dummy timestamp". Otherwise failure.
   quic::QuicAsyncStatus
   VerifyCertChain(const std::string& hostname, const std::vector<std::string>& certs,
                   const std::string& /*ocsp_response*/, const std::string& cert_sct,
