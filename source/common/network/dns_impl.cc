@@ -70,9 +70,8 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
 }
 
-void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int timeouts,
-                                                            hostent* hostent, void* addrttls,
-                                                            int naddrttls) {
+void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, int timeouts,
+                                                                   struct ares_addrinfo* res) {
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
@@ -85,67 +84,40 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
 
   std::list<DnsResponse> address_list;
   if (status == ARES_SUCCESS) {
-    if (hostent->h_addrtype == AF_INET) {
-      auto aresaddrttls = static_cast<ares_addrttl*>(addrttls);
-      absl::flat_hash_map<std::string, std::chrono::seconds> ttls;
+    if (res != nullptr && res->nodes != nullptr) {
+      if (res->nodes->ai_family == AF_INET) {
+        for (const ares_addrinfo_node* ai = res->nodes; ai != nullptr; ai = ai->ai_next) {
+          if (ai->ai_family != AF_INET) {
+            continue;
+          }
 
-      for (int i = 0; i < naddrttls; ++i) {
-        char buffer[INET_ADDRSTRLEN];
-        ares_inet_ntop(AF_INET, &(aresaddrttls[i].ipaddr), buffer, INET_ADDRSTRLEN);
-        ttls[absl::string_view(buffer)] = std::chrono::seconds(aresaddrttls[i].ttl);
-      }
-
-      for (int i = 0; hostent->h_addr_list[i] != nullptr; ++i) {
-        ASSERT(hostent->h_length == sizeof(in_addr));
-        sockaddr_in address;
-        memset(&address, 0, sizeof(address));
-        address.sin_family = AF_INET;
-        address.sin_port = 0;
-        address.sin_addr = *reinterpret_cast<in_addr*>(hostent->h_addr_list[i]);
-
-        char buffer[INET_ADDRSTRLEN];
-        ares_inet_ntop(AF_INET, &(address.sin_addr), buffer, INET_ADDRSTRLEN);
-
-        auto addrttl = std::chrono::seconds::max();
-        auto key = std::string(buffer);
-        if (ttls.count(key)) {
-          addrttl = ttls[key];
+          sockaddr_in address;
+          memset(&address, 0, sizeof(address));
+          address.sin_family = AF_INET;
+          address.sin_port = 0;
+          address.sin_addr = reinterpret_cast<sockaddr_in*>(ai->ai_addr)->sin_addr;
+          address_list.emplace_back(
+              DnsResponse(Address::InstanceConstSharedPtr(new Address::Ipv4Instance(&address)),
+                          std::chrono::seconds(ai->ai_ttl)));
         }
+      } else if (res->nodes->ai_family == AF_INET6) {
+        for (const ares_addrinfo_node* ai = res->nodes; ai != nullptr; ai = ai->ai_next) {
+          if (ai->ai_family != AF_INET6) {
+            continue;
+          }
 
-        address_list.emplace_back(DnsResponse(
-            Address::InstanceConstSharedPtr(new Address::Ipv4Instance(&address)), addrttl));
-      }
-    } else if (hostent->h_addrtype == AF_INET6) {
-      auto aresaddrttls = static_cast<ares_addr6ttl*>(addrttls);
-      absl::flat_hash_map<std::string, std::chrono::seconds> ttls;
-
-      for (int i = 0; i < naddrttls; ++i) {
-        char buffer[INET6_ADDRSTRLEN];
-        ares_inet_ntop(AF_INET6, &(aresaddrttls[i].ip6addr), buffer, INET6_ADDRSTRLEN);
-        ttls[absl::string_view(buffer)] = std::chrono::seconds(aresaddrttls[i].ttl);
-      }
-
-      for (int i = 0; hostent->h_addr_list[i] != nullptr; ++i) {
-        ASSERT(hostent->h_length == sizeof(in6_addr));
-        sockaddr_in6 address;
-        memset(&address, 0, sizeof(address));
-        address.sin6_family = AF_INET6;
-        address.sin6_port = 0;
-        address.sin6_addr = *reinterpret_cast<in6_addr*>(hostent->h_addr_list[i]);
-
-        char buffer[INET6_ADDRSTRLEN];
-        ares_inet_ntop(AF_INET6, &(address.sin6_addr), buffer, INET6_ADDRSTRLEN);
-        auto key = std::string(buffer);
-
-        auto addrttl = std::chrono::seconds::max();
-        if (ttls.count(key)) {
-          addrttl = ttls[key];
+          sockaddr_in6 address;
+          memset(&address, 0, sizeof(address));
+          address.sin6_family = AF_INET6;
+          address.sin6_port = 0;
+          address.sin6_addr = reinterpret_cast<sockaddr_in6*>(ai->ai_addr)->sin6_addr;
+          address_list.emplace_back(
+              DnsResponse(Address::InstanceConstSharedPtr(new Address::Ipv6Instance(address)),
+                          std::chrono::seconds(ai->ai_ttl)));
         }
-
-        address_list.emplace_back(DnsResponse(
-            Address::InstanceConstSharedPtr(new Address::Ipv6Instance(address)), addrttl));
       }
     }
+
     if (!address_list.empty()) {
       completed_ = true;
     }
@@ -178,7 +150,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
 
   if (!completed_ && fallback_if_failed_) {
     fallback_if_failed_ = false;
-    getHostByName(AF_INET);
+    getAddrInfo(AF_INET);
     // Note: Nothing can follow this call to getHostByName due to deletion of this
     // object upon synchronous resolution.
     return;
@@ -239,9 +211,9 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   }
 
   if (dns_lookup_family == DnsLookupFamily::V4Only) {
-    pending_resolution->getHostByName(AF_INET);
+    pending_resolution->getAddrInfo(AF_INET);
   } else {
-    pending_resolution->getHostByName(AF_INET6);
+    pending_resolution->getAddrInfo(AF_INET6);
   }
 
   if (pending_resolution->completed_) {
@@ -259,218 +231,15 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   }
 }
 
-void DnsResolverImpl::PendingResolution::getHostByName(int family) {
-  ares_wrapper_.getHostbyName(
-      channel_, dns_name_, family,
-      [](void* arg, int status, int timeouts, hostent* hostent, void* addrttls, int naddrttls) {
-        static_cast<PendingResolution*>(arg)->onAresHostCallback(status, timeouts, hostent,
-                                                                 addrttls, naddrttls);
-      },
-      this);
-}
-
-void DnsResolverImpl::AresWrapper::getHostbyName(ares_channel channel, const std::string& name,
-                                                 int family, const AresHostCallback& callback,
-                                                 void* arg) const {
-  // Right now we only know how to look up Internet addresses.
-  switch (family) {
-  case AF_INET:
-  case AF_INET6:
-    break;
-  default:
-    callback(arg, ARES_ENOTIMP, 0, nullptr, nullptr, 0);
-    return;
-  }
-
-  // Per RFC 7686, reject queries for ".onion" domain names.
-  if (isOnionDomain(name)) {
-    callback(arg, ARES_ENOTFOUND, 0, nullptr, nullptr, 0);
-  }
-
-  if (fakeHostent(name, family, callback, arg)) {
-    return;
-  }
-
-  // TODO(crazyxy): "fb" flag is hard-coded since we cannot access `channel->lookups` here.
-  auto hquery = new HostQuery(channel, name, family, -1, callback, arg, "fb", 0);
-
-  // Start performing lookups according to channel->lookups.
-  nextLookup(hquery, ARES_ECONNREFUSED);
-}
-
-void DnsResolverImpl::AresWrapper::nextLookup(HostQuery* hquery, int statusCode) {
-  const char* p;
-  hostent* host;
-  int status = statusCode;
-
-  for (p = hquery->remaining_lookups_; *p; p++) {
-    switch (*p) {
-    case 'b':
-      // DNS lookup
-      hquery->remaining_lookups_ = p + 1;
-
-      if (hquery->want_family_ == AF_INET6) {
-        hquery->sent_family_ = AF_INET6;
-        ares_search(hquery->channel_, hquery->name_.c_str(), C_IN, T_AAAA, hostCallback, hquery);
-      } else {
-        hquery->sent_family_ = AF_INET;
-        ares_search(hquery->channel_, hquery->name_.c_str(), C_IN, T_A, hostCallback, hquery);
-      }
-
-      return;
-
-    case 'f':
-      // Host file lookup
-      status = ares_gethostbyname_file(hquery->channel_, hquery->name_.c_str(),
-                                       hquery->want_family_, &host);
-
-      if (status == ARES_SUCCESS) {
-        endHquery(hquery, status, host, nullptr, 0);
-        return;
-      }
-
-      // Use original status code
-      status = statusCode;
-      break;
-    }
-  }
-  endHquery(hquery, status, nullptr, nullptr, 0);
-}
-
-void DnsResolverImpl::AresWrapper::hostCallback(void* arg, int status, int timeouts,
-                                                unsigned char* abuf, int alen) {
-  auto hquery = static_cast<HostQuery*>(arg);
-  hostent* host = nullptr;
-  void* addrttls = nullptr;
-  int naddrttls = addrttl_len_;
-
-  hquery->timeouts_ += timeouts;
-  if (status == ARES_SUCCESS) {
-    if (hquery->sent_family_ == AF_INET) {
-      addrttls = new ares_addrttl[naddrttls];
-      status =
-          ares_parse_a_reply(abuf, alen, &host, static_cast<ares_addrttl*>(addrttls), &naddrttls);
-    } else if (hquery->sent_family_ == AF_INET6) {
-      addrttls = new ares_addr6ttl[naddrttls];
-      status = ares_parse_aaaa_reply(abuf, alen, &host, static_cast<ares_addr6ttl*>(addrttls),
-                                     &naddrttls);
-      if ((status == ARES_ENODATA || status == ARES_EBADRESP ||
-           (status == ARES_SUCCESS && host && host->h_addr_list[0] == nullptr)) &&
-          hquery->want_family_ == AF_UNSPEC) {
-        // The query returned something but either there were no AAAA records (e.g. just CNAME) or
-        // the response was malformed. Try looking up A instead.
-        if (host) {
-          ares_free_hostent(host);
-        }
-        delete[] static_cast<ares_addr6ttl*>(addrttls);
-
-        hquery->sent_family_ = AF_INET;
-        ares_search(hquery->channel_, hquery->name_.c_str(), C_IN, T_A, hostCallback, hquery);
-        return;
-      }
-    }
-    endHquery(hquery, status, host, addrttls, naddrttls);
-  } else if ((status == ARES_ENODATA || status == ARES_EBADRESP || status == ARES_ETIMEOUT) &&
-             (hquery->sent_family_ == AF_INET6 && hquery->want_family_ == AF_UNSPEC)) {
-    // The AAAA query yielded no useful result. Now look up an A instead.
-    hquery->sent_family_ = AF_INET;
-    ares_search(hquery->channel_, hquery->name_.c_str(), C_IN, T_A, hostCallback, hquery);
-  } else if (status == ARES_EDESTRUCTION) {
-    endHquery(hquery, status, nullptr, nullptr, 0);
-  } else {
-    nextLookup(hquery, status);
-  }
-}
-
-void DnsResolverImpl::AresWrapper::endHquery(HostQuery* hquery, int status, hostent* host,
-                                             void* addrttls, int naddrttls) {
-  hquery->callback_(hquery->arg_, status, hquery->timeouts_, host, addrttls, naddrttls);
-  if (host != nullptr) {
-    ares_free_hostent(host);
-  }
-
-  if (addrttls != nullptr) {
-    if (hquery->sent_family_ == AF_INET) {
-      delete[] static_cast<ares_addrttl*>(addrttls);
-    } else {
-      delete[] static_cast<ares_addr6ttl*>(addrttls);
-    }
-  }
-
-  delete hquery;
-}
-
-bool DnsResolverImpl::AresWrapper::fakeHostent(const std::string& name, int family,
-                                               AresHostCallback callback, void* arg) {
-  struct hostent hostent;
-  char* aliases[1] = {nullptr};
-  char* addrs[2];
-  int result = 0;
-  struct in_addr in;
-  struct ares_in6_addr in6;
-
-  if (family == AF_INET || family == AF_INET6) {
-    // It only looks like an IP address if it's all numbers and dots.
-    int numdots = 0, valid = 1;
-    for (auto c : name) {
-      if (!isdigit(c) && c != '.') {
-        valid = 0;
-        break;
-      } else if (c == '.') {
-        numdots++;
-      }
-    }
-
-    if (numdots != 3 || !valid) {
-      result = 0;
-    } else {
-      result = (ares_inet_pton(AF_INET, name.c_str(), &in) < 1 ? 0 : 1);
-    }
-
-    if (result) {
-      family = AF_INET;
-    }
-  }
-
-  if (family == AF_INET6) {
-    result = (ares_inet_pton(AF_INET6, name.c_str(), &in6) < 1 ? 0 : 1);
-  }
-
-  if (!result) {
-    return false;
-  }
-
-  if (family == AF_INET) {
-    hostent.h_length = static_cast<int>(sizeof(struct in_addr));
-    addrs[0] = reinterpret_cast<char*>(&in);
-  } else if (family == AF_INET6) {
-    hostent.h_length = static_cast<int>(sizeof(struct ares_in6_addr));
-    addrs[0] = reinterpret_cast<char*>(&in6);
-  }
-
-  hostent.h_name = strdup(name.c_str());
-  if (!hostent.h_name) {
-    callback(arg, ARES_ENOMEM, 0, nullptr, nullptr, 0);
-    return true;
-  }
-
-  // Fill in the rest of the host structure and terminate the query.
-  addrs[1] = nullptr;
-  hostent.h_aliases = aliases;
-  hostent.h_addrtype = family;
-  hostent.h_addr_list = addrs;
-  callback(arg, ARES_SUCCESS, 0, &hostent, nullptr, 0);
-
-  free(static_cast<char*>(hostent.h_name));
-  return true;
-}
-
-bool DnsResolverImpl::AresWrapper::isOnionDomain(const std::string& name) {
-  if (absl::EndsWith(name, ".onion") || absl::EndsWith(name, ".onion.")) {
-    return true;
-  }
-
-  return false;
+void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
+  struct ares_addrinfo_hints hints = {};
+  hints.ai_family = family;
+  ares_getaddrinfo(channel_, dns_name_.c_str(), /* service */ nullptr, &hints,
+                   [](void* arg, int status, int timeouts, struct ares_addrinfo* res) {
+                     static_cast<PendingResolution*>(arg)->onAresGetAddrInfoCallback(status,
+                                                                                     timeouts, res);
+                   },
+                   this);
 }
 
 } // namespace Network
