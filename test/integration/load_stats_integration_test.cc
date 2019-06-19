@@ -93,7 +93,7 @@ public:
     for (uint32_t index : p1_dragon_upstreams.endpoints_) {
       addEndpoint(*dragon_p1, index, num_endpoints);
     }
-    eds_helper_.setEds({cluster_load_assignment}, *test_server_);
+    eds_helper_.setEdsAndWait({cluster_load_assignment}, *test_server_);
   }
 
   void createUpstreams() override {

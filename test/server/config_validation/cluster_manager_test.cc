@@ -39,7 +39,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   NiceMock<Event::MockDispatcher> dispatcher;
   LocalInfo::MockLocalInfo local_info;
   NiceMock<Server::MockAdmin> admin;
-  Http::ContextImpl http_context;
+  Http::ContextImpl http_context(stats_store.symbolTable());
   AccessLog::MockAccessLogManager log_manager;
   Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest().currentThreadId()};
 

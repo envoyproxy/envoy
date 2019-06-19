@@ -40,7 +40,7 @@ public:
 
     // Set gauge value.
     membership_total_gauge_.name_ = "membership_total";
-    ON_CALL(cluster_stats_scope_, gauge("membership_total"))
+    ON_CALL(cluster_stats_scope_, gauge("membership_total", Stats::Gauge::ImportMode::Accumulate))
         .WillByDefault(ReturnRef(membership_total_gauge_));
     ON_CALL(membership_total_gauge_, value()).WillByDefault(Return(5));
 
@@ -170,7 +170,7 @@ public:
       buffer.drain(buffer.length());
       cluster1_.setCounterReturnValues(i, success_step, error_step, 0, 0, 0, timeout_step, 0, 0);
       cluster2_.setCounterReturnValues(i, success_step2, error_step2, 0, 0, 0, timeout_step2, 0, 0);
-      sink_->flush(source_);
+      sink_->flush(snapshot_);
     }
 
     return buildClusterMap(buffer.toString());
@@ -179,7 +179,7 @@ public:
   void removeSecondClusterHelper(Buffer::OwnedImpl& buffer) {
     buffer.drain(buffer.length());
     removeClusterFromMap(cluster2_name_);
-    sink_->flush(source_);
+    sink_->flush(snapshot_);
   }
 
   void validateResults(const std::string& data_message, uint64_t success_step, uint64_t error_step,
@@ -246,7 +246,7 @@ public:
   Upstream::ClusterManager::ClusterInfoMap cluster_map_;
 
   std::unique_ptr<HystrixSink> sink_;
-  NiceMock<Stats::MockSource> source_;
+  NiceMock<Stats::MockMetricSnapshot> snapshot_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
 };
 
@@ -255,7 +255,7 @@ TEST_F(HystrixSinkTest, EmptyFlush) {
   Buffer::OwnedImpl buffer = createClusterAndCallbacks();
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
-  sink_->flush(source_);
+  sink_->flush(snapshot_);
   std::unordered_map<std::string, std::string> cluster_message_map =
       buildClusterMap(buffer.toString());
   validateResults(cluster_message_map[cluster1_name_], 0, 0, 0, 0, 0, window_size_);
@@ -271,12 +271,12 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   // Later in the test we'll "shortcut" by constant traffic
   uint64_t traffic_counter = 0;
 
-  sink_->flush(source_); // init window with 0
+  sink_->flush(snapshot_); // init window with 0
   for (uint64_t i = 0; i < (window_size_ - 1); i++) {
     buffer.drain(buffer.length());
     traffic_counter += rand_.random() % 1000;
     ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return(traffic_counter));
-    sink_->flush(source_);
+    sink_->flush(snapshot_);
   }
 
   std::unordered_map<std::string, std::string> cluster_message_map =
@@ -308,7 +308,7 @@ TEST_F(HystrixSinkTest, BasicFlow) {
     cluster1_.setCounterReturnValues(i, success_step, error_4xx_step, error_4xx_retry_step,
                                      error_5xx_step, error_5xx_retry_step, timeout_step,
                                      timeout_retry_step, rejected_step);
-    sink_->flush(source_);
+    sink_->flush(snapshot_);
   }
 
   std::string rolling_map = sink_->printRollingWindows();
@@ -325,7 +325,7 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   // Check the values are reset.
   buffer.drain(buffer.length());
   sink_->resetRollingWindow();
-  sink_->flush(source_);
+  sink_->flush(snapshot_);
   cluster_message_map = buildClusterMap(buffer.toString());
   validateResults(cluster_message_map[cluster1_name_], 0, 0, 0, 0, 0, window_size_);
 }
@@ -335,7 +335,7 @@ TEST_F(HystrixSinkTest, Disconnect) {
   InSequence s;
   Buffer::OwnedImpl buffer = createClusterAndCallbacks();
 
-  sink_->flush(source_);
+  sink_->flush(snapshot_);
   EXPECT_EQ(buffer.length(), 0);
 
   // Register callback to sink.
@@ -347,7 +347,7 @@ TEST_F(HystrixSinkTest, Disconnect) {
   for (uint64_t i = 0; i < (window_size_ + 1); i++) {
     buffer.drain(buffer.length());
     ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return((i + 1) * success_step));
-    sink_->flush(source_);
+    sink_->flush(snapshot_);
   }
 
   EXPECT_NE(buffer.length(), 0);
@@ -360,14 +360,14 @@ TEST_F(HystrixSinkTest, Disconnect) {
   // Disconnect.
   buffer.drain(buffer.length());
   sink_->unregisterConnection(&callbacks_);
-  sink_->flush(source_);
+  sink_->flush(snapshot_);
   EXPECT_EQ(buffer.length(), 0);
 
   // Reconnect.
   buffer.drain(buffer.length());
   sink_->registerConnection(&callbacks_);
   ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return(success_step));
-  sink_->flush(source_);
+  sink_->flush(snapshot_);
   EXPECT_NE(buffer.length(), 0);
   cluster_message_map = buildClusterMap(buffer.toString());
   json_buffer = Json::Factory::loadFromString(cluster_message_map[cluster1_name_]);
@@ -442,7 +442,7 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   // Add cluster again and flush data to sink.
   addSecondClusterHelper(buffer);
 
-  sink_->flush(source_);
+  sink_->flush(snapshot_);
 
   // Check that add worked.
   cluster_message_map = buildClusterMap(buffer.toString());
@@ -457,7 +457,6 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
 
 TEST_F(HystrixSinkTest, HistogramTest) {
   InSequence s;
-  std::vector<Stats::ParentHistogramSharedPtr> stored_histograms;
 
   // Create histogram for the Hystrix sink to read.
   auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
@@ -478,14 +477,12 @@ TEST_F(HystrixSinkTest, HistogramTest) {
   Stats::HistogramStatisticsImpl h1_interval_statistics(hist1_interval.getHistogram());
   ON_CALL(*histogram, intervalStatistics())
       .WillByDefault(testing::ReturnRef(h1_interval_statistics));
-  stored_histograms.push_back(histogram);
-
-  ON_CALL(source_, cachedHistograms()).WillByDefault(ReturnPointee(&stored_histograms));
+  snapshot_.histograms_.push_back(*histogram);
 
   Buffer::OwnedImpl buffer = createClusterAndCallbacks();
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
-  sink_->flush(source_);
+  sink_->flush(snapshot_);
 
   std::unordered_map<std::string, std::string> cluster_message_map =
       buildClusterMap(buffer.toString());

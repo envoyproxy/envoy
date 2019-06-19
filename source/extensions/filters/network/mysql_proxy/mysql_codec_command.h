@@ -35,10 +35,10 @@ public:
   };
 
   // MySQLCodec
-  int parseMessage(Buffer::Instance&, uint64_t& offset, int len) override;
+  int parseMessage(Buffer::Instance&, uint32_t len) override;
   std::string encode() override;
 
-  Cmd parseCmd(Buffer::Instance& data, uint64_t& offset);
+  Cmd parseCmd(Buffer::Instance& data);
   Cmd getCmd() const { return cmd_; }
   const std::string& getData() const { return data_; }
   std::string& getDb() { return db_; }
@@ -57,7 +57,7 @@ private:
 class CommandResponse : public MySQLCodec {
 public:
   // MySQLCodec
-  int parseMessage(Buffer::Instance&, uint64_t&, int) override { return MYSQL_SUCCESS; }
+  int parseMessage(Buffer::Instance&, uint32_t) override { return MYSQL_SUCCESS; }
   std::string encode() override { return ""; }
 
   uint16_t getServerStatus() const { return server_status_; }

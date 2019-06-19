@@ -40,8 +40,11 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
 }
 
 HealthCheckerImplBase::~HealthCheckerImplBase() {
-  // Make sure that any sessions that were deferred deleted are cleared before we destruct.
-  dispatcher_.clearDeferredDeleteList();
+  // ASSERTs inside the session destructor check to make sure we have been previously deferred
+  // deleted. Unify that logic here before actual destruction happens.
+  for (auto& session : active_sessions_) {
+    session.second->onDeferredDeleteBase();
+  }
 }
 
 void HealthCheckerImplBase::decHealthy() {
@@ -226,12 +229,9 @@ HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
 }
 
 HealthCheckerImplBase::ActiveHealthCheckSession::~ActiveHealthCheckSession() {
-  if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    parent_.decHealthy();
-  }
-  if (host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
-    parent_.decDegraded();
-  }
+  // Make sure onDeferredDeleteBase() has been called. We should not reference our parent at this
+  // point since we may have been deferred deleted.
+  ASSERT(interval_timer_ == nullptr && timeout_timer_ == nullptr);
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
@@ -239,6 +239,12 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
   // implementation specific state is destroyed.
   interval_timer_.reset();
   timeout_timer_.reset();
+  if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+    parent_.decHealthy();
+  }
+  if (host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
+    parent_.decDegraded();
+  }
   onDeferredDelete();
 }
 

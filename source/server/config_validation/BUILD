@@ -96,7 +96,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/common:version_lib",
-        "//source/common/config:bootstrap_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/protobuf:utility_lib",

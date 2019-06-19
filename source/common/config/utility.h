@@ -188,14 +188,6 @@ public:
       const envoy::api::v2::core::ApiConfigSource& api_config_source);
 
   /**
-   * Convert a v1 CDS JSON config to v2 CDS envoy::api::v2::core::ConfigSource.
-   * @param json_config source v1 CDS JSON config.
-   * @param cds_config destination v2 CDS envoy::api::v2::core::ConfigSource.
-   */
-  static void translateCdsConfig(const Json::Object& json_config,
-                                 envoy::api::v2::core::ConfigSource& cds_config);
-
-  /**
    * Convert a v1 RDS JSON config to v2 RDS
    * envoy::config::filter::network::http_connection_manager::v2::Rds.
    * @param json_rds source v1 RDS JSON config.
@@ -204,14 +196,6 @@ public:
   static void
   translateRdsConfig(const Json::Object& json_rds,
                      envoy::config::filter::network::http_connection_manager::v2::Rds& rds);
-
-  /**
-   * Convert a v1 LDS JSON config to v2 LDS envoy::api::v2::core::ConfigSource.
-   * @param json_lds source v1 LDS JSON config.
-   * @param lds_config destination v2 LDS envoy::api::v2::core::ConfigSource.
-   */
-  static void translateLdsConfig(const Json::Object& json_lds,
-                                 envoy::api::v2::core::ConfigSource& lds_config);
 
   /**
    * Parses RateLimit configuration from envoy::api::v2::core::ApiConfigSource to RateLimitSettings.

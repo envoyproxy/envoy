@@ -110,11 +110,13 @@ TEST_F(GrpcStreamTest, ReceiveMessage) {
 // write a 0 to it.
 TEST_F(GrpcStreamTest, QueueSizeStat) {
   grpc_stream_.maybeUpdateQueueSizeStat(0);
-  EXPECT_FALSE(stats_.gauge("control_plane.pending_requests").used());
+  Stats::Gauge& pending_requests =
+      stats_.gauge("control_plane.pending_requests", Stats::Gauge::ImportMode::Accumulate);
+  EXPECT_FALSE(pending_requests.used());
   grpc_stream_.maybeUpdateQueueSizeStat(123);
-  EXPECT_EQ(123, stats_.gauge("control_plane.pending_requests").value());
+  EXPECT_EQ(123, pending_requests.value());
   grpc_stream_.maybeUpdateQueueSizeStat(0);
-  EXPECT_EQ(0, stats_.gauge("control_plane.pending_requests").value());
+  EXPECT_EQ(0, pending_requests.value());
 }
 
 // Just to add coverage to the no-op implementations of these callbacks (without exposing us to

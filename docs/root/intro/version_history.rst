@@ -4,14 +4,18 @@ Version history
 1.11.0 (Pending)
 ================
 * access log: added a new field for downstream TLS session ID to file and gRPC access logger.
+* access log: added a new field for route name to file and gRPC access logger.
 * access log: added a new field for response code details in :ref:`file access logger<config_access_log_format_response_code_details>` and :ref:`gRPC access logger<envoy_api_field_data.accesslog.v2.HTTPResponseProperties.response_code_details>`.
+* access log: added several new variables for exposing information about the downstream TLS connection to :ref:`file access logger<config_access_log_format_response_code_details>` and :ref:`gRPC access logger<envoy_api_field_data.accesslog.v2.AccessLogCommon.tls_properties>`.
 * admin: the administration interface now includes a :ref:`/ready endpoint <operations_admin_interface>` for easier readiness checks.
+* admin: extend :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to support parameters within the request body.
 * api: track and report requests issued since last load report.
 * build: releases are built with Clang and linked with LLD.
 * dubbo_proxy: support the :ref:`Dubbo proxy filter <config_network_filters_dubbo_proxy>`.
 * eds: added support to specify max time for which endpoints can be used :ref:`gRPC filter <envoy_api_msg_ClusterLoadAssignment.Policy>`.
 * event: added :ref:`loop duration and poll delay statistics <operations_performance>`.
 * ext_authz: added a `x-envoy-auth-partial-body` metadata header set to `false|true` indicating if there is a partial body sent in the authorization request message.
+* ext_authz: added configurable status code that allows customizing HTTP responses on filter check status errors.
 * ext_authz: added option to `ext_authz` that allows the filter clearing route cache.
 * grpc-json: added support for :ref:`auto mapping
   <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.auto_mapping>`.
@@ -20,22 +24,38 @@ Version history
 * http: fixed a bug where large unbufferable responses were not tracked in stats and logs correctly.
 * http: fixed a crashing bug where gRPC local replies would cause segfaults when upstream access logging was on.
 * http: mitigated a race condition with the :ref:`delayed_close_timeout<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.delayed_close_timeout>` where it could trigger while actively flushing a pending write buffer for a downstream connection.
+* http: changed `sendLocalReply` to send percent-encoded `GrpcMessage`.
 * jwt_authn: make filter's parsing of JWT more flexible, allowing syntax like ``jwt=eyJhbGciOiJS...ZFnFIw,extra=7,realm=123``
+* listener: added :ref:`source IP <envoy_api_field_listener.FilterChainMatch.source_prefix_ranges>`
+  and :ref:`source port <envoy_api_field_listener.FilterChainMatch.source_ports>` filter
+  chain matching.
+* original_src filter: added the :ref:`filter<config_http_filters_original_src>`.
+* rbac: migrated from v2alpha to v2.
 * redis: add support for Redis cluster custom cluster type.
 * redis: added :ref:`prefix routing <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.prefix_routes>` to enable routing commands based on their key's prefix to different upstream.
 * redis: add support for zpopmax and zpopmin commands.
 * redis: added
   :ref:`max_buffer_size_before_flush <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.max_buffer_size_before_flush>` to batch commands together until the encoder buffer hits a certain size, and
   :ref:`buffer_flush_timeout <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.buffer_flush_timeout>` to control how quickly the buffer is flushed if it is not full.
+* redis: added auth support :ref:`downstream_auth_password <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.downstream_auth_password>` for downstream client authentication, and :ref:`auth_password <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProtocolOptions.auth_password>` to configure authentication passwords for upstream server clusters.
 * router: add support for configuring a :ref:`grpc timeout offset <envoy_api_field_route.RouteAction.grpc_timeout_offset>` on incoming requests.
 * router: added ability to control retry back-off intervals via :ref:`retry policy <envoy_api_msg_route.RetryPolicy.RetryBackOff>`.
+* router: added ability to issue a hedged retry in response to a per try timeout via a :ref:`hedge policy <envoy_api_msg_route.HedgePolicy>`.
+* router: added a route name field to each http route in route.Route list 
+* router: added several new variables for exposing information about the downstream TLS connection via :ref:`header
+  formatters <config_http_conn_man_headers_custom_request_headers>`.
 * router: per try timeouts will no longer start before the downstream request has been received
   in full by the router. This ensures that the per try timeout does not account for slow
   downstreams and that will not start before the global timeout.
+* runtime: added support for :ref:`flexible layering configuration
+  <envoy_api_field_config.bootstrap.v2.Bootstrap.layered_runtime>`.
 * runtime: added support for statically :ref:`specifying the runtime in the bootstrap configuration
   <envoy_api_field_config.bootstrap.v2.Runtime.base>`.
+* sandbox: added :ref:`CSRF sandbox <install_sandboxes_csrf>`.
 * server: ``--define manual_stamp=manual_stamp`` was added to allow server stamping outside of binary rules.
   more info in the `bazel docs <https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#enabling-optional-features>`_.
+* tool: added :repo:`proto <test/tools/router_check/validation.proto>` support for :ref:`router check tool <install_tools_route_table_check_tool>` tests.
+* tracing: add trace sampling configuration to the route, to override the route level.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
 * upstream: an EDS management server can now force removal of a host that is still passing active
   health checking by first marking the host as failed via EDS health check and subsequently removing
@@ -193,7 +213,7 @@ Version history
 * rate-limit: removed the deprecated cluster_name attribute in :ref:`rate limit service configuration <envoy_api_file_envoy/config/ratelimit/v2/rls.proto>`.
 * rate-limit: added :ref:`rate_limit_service <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` configuration to filters.
 * rbac: added dynamic metadata to the network level filter.
-* rbac: added support for permission matching by :ref:`requested server name <envoy_api_field_config.rbac.v2alpha.Permission.requested_server_name>`.
+* rbac: added support for permission matching by :ref:`requested server name <envoy_api_field_config.rbac.v2.Permission.requested_server_name>`.
 * redis: static cluster configuration is no longer required. Redis proxy will work with clusters
   delivered via CDS.
 * router: added ability to configure arbitrary :ref:`retriable status codes. <envoy_api_field_route.RetryPolicy.retriable_status_codes>`
@@ -315,7 +335,7 @@ Version history
   Support for the legacy proto `source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
 * ratelimit: added :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in
   case of rate limit service error.
-* rbac config: added a :ref:`principal_name <envoy_api_field_config.rbac.v2alpha.Principal.Authenticated.principal_name>` field and
+* rbac config: added a :ref:`principal_name <envoy_api_field_config.rbac.v2.Principal.Authenticated.principal_name>` field and
   removed the old `name` field to give more flexibility for matching certificate identity.
 * rbac network filter: a :ref:`role-based access control network filter <config_network_filters_rbac>` has been added.
 * rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.

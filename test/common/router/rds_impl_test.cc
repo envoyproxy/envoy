@@ -49,7 +49,10 @@ parseHttpConnectionManagerFromJson(const std::string& json_string) {
 
 class RdsTestBase : public testing::Test {
 public:
-  RdsTestBase() : request_(&factory_context_.cluster_manager_.async_client_) {
+  RdsTestBase()
+      : request_(&factory_context_.cluster_manager_.async_client_),
+        rds_version_(factory_context_.scope_.gauge("foo.rds.foo_route_config.version",
+                                                   Stats::Gauge::ImportMode::NeverImport)) {
     ON_CALL(factory_context_.init_manager_, add(_))
         .WillByDefault(Invoke([this](const Init::Target& target) {
           init_target_handle_ = target.createHandle("test");
@@ -85,6 +88,7 @@ public:
   Http::MockAsyncClientRequest request_;
   Http::AsyncClient::Callbacks* callbacks_{};
   Event::MockTimer* interval_timer_{};
+  Stats::Gauge& rds_version_;
 };
 
 class RdsImplTest : public RdsTestBase {
@@ -227,7 +231,7 @@ TEST_F(RdsImplTest, Basic) {
 
   // Make sure the initial empty route table works.
   EXPECT_EQ(nullptr, route(Http::TestHeaderMapImpl{{":authority", "foo"}}));
-  EXPECT_EQ(0UL, factory_context_.scope_.gauge("foo.rds.foo_route_config.version").value());
+  EXPECT_EQ(0UL, rds_version_.value());
 
   // Initial request.
   const std::string response1_json = R"EOF(
@@ -251,8 +255,7 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(nullptr, route(Http::TestHeaderMapImpl{{":authority", "foo"}}));
-  EXPECT_EQ(13237225503670494420U,
-            factory_context_.scope_.gauge("foo.rds.foo_route_config.version").value());
+  EXPECT_EQ(13237225503670494420U, rds_version_.value());
 
   expectRequest();
   interval_timer_->callback_();
@@ -266,8 +269,7 @@ TEST_F(RdsImplTest, Basic) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(nullptr, route(Http::TestHeaderMapImpl{{":authority", "foo"}}));
 
-  EXPECT_EQ(13237225503670494420U,
-            factory_context_.scope_.gauge("foo.rds.foo_route_config.version").value());
+  EXPECT_EQ(13237225503670494420U, rds_version_.value());
 
   expectRequest();
   interval_timer_->callback_();
@@ -319,8 +321,7 @@ TEST_F(RdsImplTest, Basic) {
                        ->routeEntry()
                        ->clusterName());
 
-  EXPECT_EQ(6927017134761466251U,
-            factory_context_.scope_.gauge("foo.rds.foo_route_config.version").value());
+  EXPECT_EQ(6927017134761466251U, rds_version_.value());
 
   // Old config use count should be 1 now.
   EXPECT_EQ(1, config.use_count());
@@ -330,8 +331,7 @@ TEST_F(RdsImplTest, Basic) {
             factory_context_.scope_.counter("foo.rds.foo_route_config.update_attempt").value());
   EXPECT_EQ(3UL,
             factory_context_.scope_.counter("foo.rds.foo_route_config.update_success").value());
-  EXPECT_EQ(6927017134761466251U,
-            factory_context_.scope_.gauge("foo.rds.foo_route_config.version").value());
+  EXPECT_EQ(6927017134761466251U, rds_version_.value());
 }
 
 TEST_F(RdsImplTest, Failure) {

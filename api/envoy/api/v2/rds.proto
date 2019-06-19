@@ -53,8 +53,7 @@ service RouteDiscoveryService {
 // be the contents of a *host* or *authority* header used to make an http request. An xDS server
 // will match an alias to a virtual host based on the content of :ref:`domains'
 // <envoy_api_msg_route.VirtualHost.domains>` field. The *resource_names_unsubscribe* field contains
-// a list of virtual host names that have been `unsubscribed
-// <https://github.com/envoyproxy/envoy/blob/master/api/XDS_PROTOCOL.md#unsubscribing-from-resources>`_
+// a list of virtual host names that have been :ref:`unsubscribed <xds_protocol_unsubscribe>`
 // from the routing table associated with the RouteConfiguration.
 service VirtualHostDiscoveryService {
   rpc DeltaVirtualHosts(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
@@ -124,7 +123,7 @@ message RouteConfiguration {
   // option. This setting default to false if the route table is loaded dynamically via the
   // :ref:`rds
   // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.rds>`
-  // option. Users may which to override the default behavior in certain cases (for example when
+  // option. Users may wish to override the default behavior in certain cases (for example when
   // using CDS with a static route table).
   google.protobuf.BoolValue validate_clusters = 7;
 }

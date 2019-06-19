@@ -92,6 +92,10 @@ public:
   const Ssl::ConnectionInfo* downstreamSslConnection() const override {
     return downstream_connection_info_;
   }
+  void setRouteName(absl::string_view route_name) override {
+    route_name_ = std::string(route_name);
+  }
+  const std::string& getRouteName() const override { return route_name_; }
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
@@ -198,6 +202,7 @@ public:
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
+  std::string route_name_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;

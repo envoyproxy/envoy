@@ -134,15 +134,17 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
       });
 }
 
-ClusterImplBaseSharedPtr StrictDnsClusterFactory::createClusterImpl(
+std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+StrictDnsClusterFactory::createClusterImpl(
     const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);
 
-  return std::make_unique<StrictDnsClusterImpl>(cluster, context.runtime(), selected_dns_resolver,
-                                                socket_factory_context, std::move(stats_scope),
-                                                context.addedViaApi());
+  return std::make_pair(std::make_shared<StrictDnsClusterImpl>(
+                            cluster, context.runtime(), selected_dns_resolver,
+                            socket_factory_context, std::move(stats_scope), context.addedViaApi()),
+                        nullptr);
 }
 
 /**

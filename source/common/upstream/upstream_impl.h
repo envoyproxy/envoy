@@ -71,9 +71,9 @@ public:
         canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                                 Config::MetadataEnvoyLbKeys::get().CANARY)
                     .bool_value()),
-        metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)),
-        locality_(locality), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
-                                                   POOL_GAUGE(stats_store_))},
+        metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)), locality_(locality),
+        locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
+        stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))},
         priority_(priority) {
     if (health_check_config.port_value() != 0 &&
         dest_address->type() != Network::Address::Type::Ip) {
@@ -138,6 +138,9 @@ public:
   // Setting health check address is usually done at initialization. This is NOP by default.
   void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr) override {}
   const envoy::api::v2::core::Locality& locality() const override { return locality_; }
+  Stats::StatName localityZoneStatName() const override {
+    return locality_zone_stat_name_.statName();
+  }
   uint32_t priority() const override { return priority_; }
   void priority(uint32_t priority) override { priority_ = priority; }
 
@@ -150,6 +153,7 @@ protected:
   mutable absl::Mutex metadata_mutex_;
   std::shared_ptr<envoy::api::v2::core::Metadata> metadata_ GUARDED_BY(metadata_mutex_);
   const envoy::api::v2::core::Locality locality_;
+  Stats::StatNameManagedStorage locality_zone_stat_name_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;
@@ -668,6 +672,7 @@ public:
   static std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
                     HostsPerLocalityConstSharedPtr>
   partitionHostsPerLocality(const HostsPerLocality& hosts);
+  Stats::SymbolTable& symbolTable() { return symbol_table_; }
 
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }
@@ -727,6 +732,7 @@ private:
   bool initialization_started_{};
   std::function<void()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
+  Stats::SymbolTable& symbol_table_;
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;

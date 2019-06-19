@@ -102,7 +102,7 @@ TEST_F(AccessLogImplTest, DownstreamDisconnect) {
 
   EXPECT_CALL(*file_, write(_));
 
-  std::shared_ptr<Upstream::MockClusterInfo> cluster{new Upstream::MockClusterInfo()};
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   stream_info_.upstream_host_ = Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234");
   stream_info_.response_flags_ = StreamInfo::ResponseFlag::DownstreamConnectionTermination;
 
@@ -110,6 +110,31 @@ TEST_F(AccessLogImplTest, DownstreamDisconnect) {
   EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 DC 1 2 3 - \"-\" \"-\" \"-\" \"-\" "
             "\"10.0.0.5:1234\"\n",
             output_);
+}
+
+TEST_F(AccessLogImplTest, RouteName) {
+  const std::string json = R"EOF(
+  {
+    "path": "/dev/null",
+    "format": "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
+  }
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
+
+  EXPECT_CALL(*file_, write(_));
+  stream_info_.route_name_ = "route-test-name";
+  stream_info_.response_flags_ = StreamInfo::ResponseFlag::UpstreamConnectionFailure;
+  request_headers_.addCopy(Http::Headers::get().UserAgent, "user-agent-set");
+  request_headers_.addCopy(Http::Headers::get().RequestId, "id");
+  request_headers_.addCopy(Http::Headers::get().Host, "host");
+  request_headers_.addCopy(Http::Headers::get().ForwardedFor, "x.x.x.x");
+
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  EXPECT_EQ(
+      "[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF route-test-name 1 2 3 - \"x.x.x.x\" "
+      "\"user-agent-set\" \"id\"  \"host\"\n",
+      output_);
 }
 
 TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
@@ -147,7 +172,7 @@ TEST_F(AccessLogImplTest, NoFilter) {
 }
 
 TEST_F(AccessLogImplTest, UpstreamHost) {
-  std::shared_ptr<Upstream::MockClusterInfo> cluster{new Upstream::MockClusterInfo()};
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   stream_info_.upstream_host_ = Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234");
 
   const std::string json = R"EOF(

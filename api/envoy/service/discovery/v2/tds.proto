@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package envoy.service.discovery.v2;
+
+option java_outer_classname = "TdsProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.service.discovery.v2";
+option java_generic_services = true;
+
+import "envoy/api/v2/discovery.proto";
+
+import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
+
+// Discovery service for Runtime resources.
+// [#not-implemented-hide:]
+service RuntimeDiscoveryService {
+  rpc StreamRuntime(stream envoy.api.v2.DiscoveryRequest)
+      returns (stream envoy.api.v2.DiscoveryResponse) {
+  }
+
+  rpc FetchRuntime(envoy.api.v2.DiscoveryRequest) returns (envoy.api.v2.DiscoveryResponse) {
+    option (google.api.http) = {
+      post: "/v2/discovery:runtime"
+      body: "*"
+    };
+  }
+}
+
+// TDS resource type. This describes a layer in the runtime virtual filesystem.
+// [#not-implemented-hide:]
+message Runtime {
+  google.protobuf.Struct layer = 1;
+}

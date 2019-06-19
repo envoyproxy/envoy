@@ -36,6 +36,7 @@ envoy_cc_library(
     srcs = ["grpc_access_log_proto_descriptors.cc"],
     hdrs = ["grpc_access_log_proto_descriptors.h"],
     deps = [
+        "//source/common/common:assert_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/service/accesslog/v2:als_cc",
     ],

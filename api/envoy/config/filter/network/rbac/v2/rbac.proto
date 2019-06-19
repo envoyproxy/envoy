@@ -7,7 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.network.rbac.v2";
 option go_package = "v2";
 
-import "envoy/config/rbac/v2alpha/rbac.proto";
+import "envoy/config/rbac/v2/rbac.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
@@ -22,12 +22,12 @@ import "gogoproto/gogo.proto";
 message RBAC {
   // Specify the RBAC rules to be applied globally.
   // If absent, no enforcing RBAC policy will be applied.
-  config.rbac.v2alpha.RBAC rules = 1;
+  config.rbac.v2.RBAC rules = 1;
 
   // Shadow rules are not enforced by the filter but will emit stats and logs
   // and can be used for rule testing.
   // If absent, no shadow RBAC policy will be applied.
-  config.rbac.v2alpha.RBAC shadow_rules = 2;
+  config.rbac.v2.RBAC shadow_rules = 2;
 
   // The prefix to use when emitting statistics.
   string stat_prefix = 3 [(validate.rules).string.min_bytes = 1];

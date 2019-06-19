@@ -501,6 +501,9 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     break;
 
   case LoadBalancerType::OriginalDst:
+  case LoadBalancerType::ClusterProvided:
+    // LoadBalancerType::OriginalDst is blocked in the factory. LoadBalancerType::ClusterProvided
+    // is impossible because the subset LB returns a null load balancer from its factory.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 

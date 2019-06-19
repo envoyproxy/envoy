@@ -3,7 +3,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/histogram.h"
-#include "envoy/stats/source.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -60,6 +59,7 @@ void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge) {
   auto* gauage_metric = metric->mutable_gauge();
   gauage_metric->set_value(gauge.value());
 }
+
 void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& histogram) {
   io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
   metrics_family->set_type(io::prometheus::client::MetricType::SUMMARY);
@@ -77,30 +77,29 @@ void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& histogram)
   }
 }
 
-void MetricsServiceSink::flush(Stats::Source& source) {
+void MetricsServiceSink::flush(Stats::MetricSnapshot& snapshot) {
   message_.clear_envoy_metrics();
-  const std::vector<Stats::CounterSharedPtr>& counters = source.cachedCounters();
-  const std::vector<Stats::GaugeSharedPtr>& gauges = source.cachedGauges();
-  const std::vector<Stats::ParentHistogramSharedPtr>& histograms = source.cachedHistograms();
+
   // TODO(mrice32): there's probably some more sophisticated preallocation we can do here where we
   // actually preallocate the submessages and then pass ownership to the proto (rather than just
   // preallocating the pointer array).
-  message_.mutable_envoy_metrics()->Reserve(counters.size() + gauges.size() + histograms.size());
-  for (const Stats::CounterSharedPtr& counter : counters) {
-    if (counter->used()) {
-      flushCounter(*counter);
+  message_.mutable_envoy_metrics()->Reserve(snapshot.counters().size() + snapshot.gauges().size() +
+                                            snapshot.histograms().size());
+  for (const auto& counter : snapshot.counters()) {
+    if (counter.counter_.get().used()) {
+      flushCounter(counter.counter_.get());
     }
   }
 
-  for (const Stats::GaugeSharedPtr& gauge : gauges) {
-    if (gauge->used()) {
-      flushGauge(*gauge);
+  for (const auto& gauge : snapshot.gauges()) {
+    if (gauge.get().used()) {
+      flushGauge(gauge.get());
     }
   }
 
-  for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
-    if (histogram->used()) {
-      flushHistogram(*histogram);
+  for (const auto& histogram : snapshot.histograms()) {
+    if (histogram.get().used()) {
+      flushHistogram(histogram.get());
     }
   }
 

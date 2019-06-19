@@ -39,6 +39,7 @@ public:
   MOCK_CONST_METHOD0(uriSanLocalCertificate, std::vector<std::string>());
   MOCK_CONST_METHOD0(sha256PeerCertificateDigest, std::string&());
   MOCK_CONST_METHOD0(serialNumberPeerCertificate, std::string());
+  MOCK_CONST_METHOD0(issuerPeerCertificate, std::string());
   MOCK_CONST_METHOD0(subjectPeerCertificate, std::string());
   MOCK_CONST_METHOD0(uriSanPeerCertificate, std::vector<std::string>());
   MOCK_CONST_METHOD0(subjectLocalCertificate, std::string());
@@ -49,6 +50,9 @@ public:
   MOCK_CONST_METHOD0(validFromPeerCertificate, absl::optional<SystemTime>());
   MOCK_CONST_METHOD0(expirationPeerCertificate, absl::optional<SystemTime>());
   MOCK_CONST_METHOD0(sessionId, std::string());
+  MOCK_CONST_METHOD0(ciphersuiteId, uint16_t());
+  MOCK_CONST_METHOD0(ciphersuiteString, std::string());
+  MOCK_CONST_METHOD0(tlsVersion, std::string());
 };
 
 class MockClientContext : public ClientContext {

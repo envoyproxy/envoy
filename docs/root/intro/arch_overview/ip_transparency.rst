@@ -25,7 +25,9 @@ HTTP Headers
 
 HTTP headers may carry the original IP address of the request in the
 :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header. The upstream server
-can use this header to determine the downstream remote address.
+can use this header to determine the downstream remote address. Envoy may also use this header to
+choose the IP address used by the
+:ref:`Original Src HTTP Filter <arch_overview_ip_transparency_original_src_http>`.
 
 The HTTP header approach has a few downsides:
 
@@ -67,5 +69,29 @@ all deployments due to routing constraints.
 Some drawbacks to the Original Source filter:
 
 * It requires that Envoy have access to the downstream remote address.
+* Its configuration is relatively complex.
+* It may introduce a slight performance hit due to restrictions on connection pooling.
+
+.. _arch_overview_ip_transparency_original_src_http:
+
+Original Source HTTP Filter
+---------------------------
+
+In controlled deployments, it may be possible to replicate the downstream remote address on the
+upstream connection by using a
+:ref:`Original Source HTTP filter <config_http_filters_original_src>`. This filter operates much like
+the :ref:`Original Src Listener Filter <arch_overview_ip_transparency_original_src_listener>`. The
+main difference is that it can infer the original source address from HTTP headers, which is important
+for cases where a single downstream connection carries multiple HTTP requests from different original
+source addresses. Deployments with a front proxy forwarding to sidecar proxies are examples where case
+applies.
+
+This filter will work with any upstream HTTP host. However, it requires fairly complex configuration,
+and it may not be supported in all deployments due to routing constraints.
+
+Some drawbacks to the Original Source filter:
+
+* It requires that Envoy be properly configured to extract the downstream remote address from the
+  :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header.
 * Its configuration is relatively complex.
 * It may introduce a slight performance hit due to restrictions on connection pooling.

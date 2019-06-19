@@ -17,6 +17,8 @@ namespace Network {
 
 class Connection;
 class ConnectionSocket;
+class UdpListener;
+struct UdpRecvData;
 
 /**
  * Status codes returned by filters that can cause future filters to not get iterated to.
@@ -350,6 +352,63 @@ public:
 };
 
 /**
+ * Callbacks used by individual UDP listener read filter instances to communicate with the filter
+ * manager.
+ */
+class UdpReadFilterCallbacks {
+public:
+  virtual ~UdpReadFilterCallbacks() {}
+
+  /**
+   * @return the udp listener that owns this read filter.
+   */
+  virtual UdpListener& udpListener() PURE;
+};
+
+/**
+ * UDP Listener Read Filter
+ */
+class UdpListenerReadFilter {
+public:
+  virtual ~UdpListenerReadFilter() {}
+
+  /**
+   * Called when a new data packet is received on a UDP listener.
+   * @param data supplies the read data which may be modified.
+   */
+  virtual void onData(UdpRecvData& data) PURE;
+
+protected:
+  /**
+   * @param callbacks supplies the read filter callbacks used to interact with the filter manager.
+   */
+  UdpListenerReadFilter(UdpReadFilterCallbacks& callbacks) : read_callbacks_(&callbacks) {}
+
+  UdpReadFilterCallbacks* read_callbacks_{};
+};
+
+typedef std::unique_ptr<UdpListenerReadFilter> UdpListenerReadFilterPtr;
+
+/**
+ * Interface for adding UDP listener filters to a manager.
+ */
+class UdpListenerFilterManager {
+public:
+  virtual ~UdpListenerFilterManager() {}
+
+  /**
+   * Add a read filter to the udp listener. Filters are invoked in FIFO order (the
+   * filter added first is called first).
+   * @param filter supplies the filter being added.
+   */
+  virtual void addReadFilter(UdpListenerReadFilterPtr&& filter) PURE;
+};
+
+typedef std::function<void(UdpListenerFilterManager& udp_listener_filter_manager,
+                           UdpReadFilterCallbacks& callbacks)>
+    UdpListenerFilterFactoryCb;
+
+/**
  * Creates a chain of network filters for a new connection.
  */
 class FilterChainFactory {
@@ -372,6 +431,16 @@ public:
    * @return true if filter chain was created successfully. Otherwise false.
    */
   virtual bool createListenerFilterChain(ListenerFilterManager& listener) PURE;
+
+  /**
+   * Called to create a Udp Listener Filter Chain object
+   *
+   * @param udp_listener supplies the listener to create the chain on.
+   * @param callbacks supplies the callbacks needed to create a filter.
+   * @return true if filter chain was created successfully. Otherwise false.
+   */
+  virtual bool createUdpListenerFilterChain(UdpListenerFilterManager& udp_listener,
+                                            UdpReadFilterCallbacks& callbacks) PURE;
 };
 
 } // namespace Network

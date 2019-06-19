@@ -149,7 +149,7 @@ envoy_cc_test(
     name = "listen_socket_impl_test",
     srcs = ["listen_socket_impl_test.cc"],
     deps = [
-        "//source/common/network:io_socket_handle_lib",
+        "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
         "//test/mocks/network:network_mocks",
@@ -253,7 +253,7 @@ envoy_cc_test(
     deps = [
         ":socket_option_test",
         "//source/common/network:addr_family_aware_socket_option_lib",
-        "//source/common/network:io_socket_handle_lib",
+        "//source/common/network:address_lib",
     ],
 )
 
@@ -285,6 +285,6 @@ envoy_cc_test(
     name = "io_socket_handle_impl_test",
     srcs = ["io_socket_handle_impl_test.cc"],
     deps = [
-        "//source/common/network:io_socket_handle_lib",
+        "//source/common/network:address_lib",
     ],
 )

@@ -29,14 +29,13 @@ envoy_cc_test(
     name = "quic_platform_test",
     srcs = ["quic_platform_test.cc"],
     copts = ["-Wno-unused-parameter"],
-    data = [
-        "//test/extensions/transport_sockets/tls/test_data:certs",
-    ],
+    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     external_deps = ["quiche_quic_platform"],
     deps = [
         ":quic_platform_epoll_clock_lib",
         "//source/common/memory:stats_lib",
         "//source/extensions/quic_listeners/quiche/platform:flags_impl_lib",
+        "//test/common/buffer:utility_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/extensions/transport_sockets/tls:ssl_test_utils",
         "//test/mocks/api:api_mocks",
@@ -44,11 +43,17 @@ envoy_cc_test(
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@com_googlesource_quiche//:epoll_server_lib",
+        "@com_googlesource_quiche//:quic_core_buffer_allocator_lib",
+        "@com_googlesource_quiche//:quic_core_error_codes_lib",
+        "@com_googlesource_quiche//:quic_core_types_lib",
         "@com_googlesource_quiche//:quic_platform_expect_bug",
+        "@com_googlesource_quiche//:quic_platform_mem_slice_span_lib",
+        "@com_googlesource_quiche//:quic_platform_mem_slice_storage_lib",
         "@com_googlesource_quiche//:quic_platform_mock_log",
         "@com_googlesource_quiche//:quic_platform_port_utils",
         "@com_googlesource_quiche//:quic_platform_sleep",
         "@com_googlesource_quiche//:quic_platform_system_event_loop",
+        "@com_googlesource_quiche//:quic_platform_test",
         "@com_googlesource_quiche//:quic_platform_test_output",
         "@com_googlesource_quiche//:quic_platform_thread",
     ],
@@ -62,6 +67,7 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche/platform:flags_impl_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+        "@com_googlesource_quiche//:spdy_platform",
         "@com_googlesource_quiche//:spdy_platform_test_helpers",
     ],
 )
@@ -136,6 +142,15 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "quic_platform_test_mem_slice_vector_impl_lib",
+    hdrs = ["quic_test_mem_slice_vector_impl.h"],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+        "@com_googlesource_quiche//:quic_platform_mem_slice_span_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "quic_platform_sleep_impl_lib",
     hdrs = ["quic_sleep_impl.h"],
     deps = ["@com_googlesource_quiche//:quic_core_time_lib"],
@@ -173,9 +188,24 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "quiche_common_platform_test_impl_lib",
+    hdrs = ["quiche_test_impl.h"],
+)
+
+envoy_cc_test_library(
     name = "spdy_platform_test_helpers_impl_lib",
     hdrs = ["spdy_test_helpers_impl.h"],
     deps = [
         ":quic_platform_expect_bug_impl_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "envoy_quic_clock_test",
+    srcs = ["envoy_quic_clock_test.cc"],
+    deps = [
+        "//source/extensions/quic_listeners/quiche/platform:envoy_quic_clock_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_time_lib",
     ],
 )

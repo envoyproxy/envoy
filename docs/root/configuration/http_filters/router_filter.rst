@@ -217,6 +217,18 @@ requests. This timeout must be <= the global route timeout (see
 caller to set a tight per try timeout to allow for retries while maintaining a reasonable overall
 timeout.
 
+x-envoy-hedge-on-per-try-timeout
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Setting this header on egress requests will cause Envoy to use a request
+hedging strategy in the case of a per try timeout. This overrides the value set
+in the :ref:`route configuration
+<envoy_api_field_route.HedgePolicy.hedge_on_per_try_timeout>`. This means that a retry
+will be issued without resetting the original request, leaving multiple upstream requests
+in flight.
+
+The value of the header should be "true" or "false", and is ignored if invalid.
+
 .. _config_http_filters_router_x-envoy-immediate-health-check-fail:
 
 x-envoy-immediate-health-check-fail

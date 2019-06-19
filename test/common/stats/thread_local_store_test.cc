@@ -191,8 +191,8 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   c1.add(100);
   EXPECT_EQ(200, found_counter->get().value());
 
-  Gauge& g1 = store_->gauge("g1");
-  EXPECT_EQ(&g1, &store_->gauge("g1"));
+  Gauge& g1 = store_->gauge("g1", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(&g1, &store_->gauge("g1", Gauge::ImportMode::Accumulate));
   StatNameManagedStorage g1_name("g1", symbol_table_);
   g1.set(100);
   auto found_gauge = store_->findGauge(g1_name.statName());
@@ -239,8 +239,8 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   c1.add(100);
   EXPECT_EQ(200, found_counter->get().value());
 
-  Gauge& g1 = store_->gauge("g1");
-  EXPECT_EQ(&g1, &store_->gauge("g1"));
+  Gauge& g1 = store_->gauge("g1", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(&g1, &store_->gauge("g1", Gauge::ImportMode::Accumulate));
   StatNameManagedStorage g1_name("g1", symbol_table_);
   g1.set(100);
   auto found_gauge = store_->findGauge(g1_name.statName());
@@ -293,8 +293,8 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   ASSERT_TRUE(found_counter2.has_value());
   EXPECT_EQ(&c2, &found_counter2->get());
 
-  Gauge& g1 = store_->gauge("g1");
-  Gauge& g2 = scope1->gauge("g2");
+  Gauge& g1 = store_->gauge("g1", Gauge::ImportMode::Accumulate);
+  Gauge& g2 = scope1->gauge("g2", Gauge::ImportMode::Accumulate);
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
   StatNameManagedStorage g1_name("g1", symbol_table_);
@@ -342,6 +342,14 @@ TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
   tls_.shutdownThread();
 }
 
+TEST_F(StatsThreadLocalStoreTest, ConstSymtabAccessor) {
+  ScopePtr scope = store_->createScope("scope.");
+  const Scope& cscope = *scope;
+  const SymbolTable& const_symbol_table = cscope.constSymbolTable();
+  SymbolTable& symbol_table = scope->symbolTable();
+  EXPECT_EQ(&const_symbol_table, &symbol_table);
+}
+
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -351,15 +359,12 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_EQ(1UL, store_->counters().size());
   CounterSharedPtr c1 = TestUtility::findCounter(*store_, "scope1.c1");
   EXPECT_EQ("scope1.c1", c1->name());
-  EXPECT_EQ(TestUtility::findByName(store_->source().cachedCounters(), "scope1.c1"), c1);
+  EXPECT_EQ(TestUtility::findByName(store_->counters(), "scope1.c1"), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(tls_, runOnAllThreads(_, _));
   scope1.reset();
   EXPECT_EQ(0UL, store_->counters().size());
-  EXPECT_EQ(1UL, store_->source().cachedCounters().size());
-  store_->source().clearCache();
-  EXPECT_EQ(0UL, store_->source().cachedCounters().size());
 
   EXPECT_EQ(1L, c1.use_count());
   c1.reset();
@@ -393,7 +398,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   EXPECT_EQ(1UL, c1.value());
   EXPECT_EQ(c1.value(), c2.value());
 
-  Gauge& g1 = scope2->gauge("some_gauge");
+  Gauge& g1 = scope2->gauge("some_gauge", Gauge::ImportMode::Accumulate);
   EXPECT_EQ("scope1.foo.some_gauge", g1.name());
 
   store_->shutdownThreading();
@@ -424,8 +429,8 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ(1UL, store_->counters().size());
 
   // Gauges should work the same way.
-  Gauge& g1 = scope1->gauge("g");
-  Gauge& g2 = scope2->gauge("g");
+  Gauge& g1 = scope1->gauge("g", Gauge::ImportMode::Accumulate);
+  Gauge& g2 = scope2->gauge("g", Gauge::ImportMode::Accumulate);
   EXPECT_NE(&g1, &g2);
   g1.set(5);
   EXPECT_EQ(5UL, g1.value());
@@ -472,8 +477,8 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
 
-  Gauge& g1 = store_.gaugeFromStatName(makeStatName("g1"));
-  Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"));
+  Gauge& g1 = store_.gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::Accumulate);
+  Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"), Gauge::ImportMode::Accumulate);
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
   EXPECT_EQ("g1", g1.tagExtractedName());
@@ -504,6 +509,13 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(2UL, store_.gauges().size());
 }
 
+TEST_F(LookupWithStatNameTest, NotFound) {
+  StatName not_found(makeStatName("not_found"));
+  EXPECT_FALSE(store_.findCounter(not_found));
+  EXPECT_FALSE(store_.findGauge(not_found));
+  EXPECT_FALSE(store_.findHistogram(not_found));
+}
+
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
   envoy::config::metrics::v2::StatsConfig stats_config_;
@@ -530,9 +542,10 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   EXPECT_EQ(noop_counter.value(), 0);
   Counter& noop_counter_2 = store_->counter("noop_counter_2");
   EXPECT_EQ(&noop_counter, &noop_counter_2);
+  EXPECT_FALSE(noop_counter.used()); // hardcoded to return false in NullMetricImpl.
 
   // Gauge
-  Gauge& noop_gauge = store_->gauge("noop_gauge");
+  Gauge& noop_gauge = store_->gauge("noop_gauge", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(noop_gauge.name(), "");
   EXPECT_EQ(noop_gauge.value(), 0);
   noop_gauge.add(1);
@@ -545,7 +558,7 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   EXPECT_EQ(noop_gauge.value(), 0);
   noop_gauge.sub(2);
   EXPECT_EQ(noop_gauge.value(), 0);
-  Gauge& noop_gauge_2 = store_->gauge("noop_gauge_2");
+  Gauge& noop_gauge_2 = store_->gauge("noop_gauge_2", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&noop_gauge, &noop_gauge_2);
 
   // Histogram
@@ -572,7 +585,7 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
   Counter& lowercase_counter = store_->counter("lowercase_counter");
   EXPECT_EQ(lowercase_counter.name(), "lowercase_counter");
-  Gauge& lowercase_gauge = store_->gauge("lowercase_gauge");
+  Gauge& lowercase_gauge = store_->gauge("lowercase_gauge", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(lowercase_gauge.name(), "lowercase_gauge");
   Histogram& lowercase_histogram = store_->histogram("lowercase_histogram");
   EXPECT_EQ(lowercase_histogram.name(), "lowercase_histogram");
@@ -585,7 +598,7 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   uppercase_counter.inc();
   EXPECT_EQ(uppercase_counter.value(), 0);
 
-  Gauge& uppercase_gauge = store_->gauge("uppercase_GAUGE");
+  Gauge& uppercase_gauge = store_->gauge("uppercase_GAUGE", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(uppercase_gauge.name(), "");
   uppercase_gauge.inc();
   EXPECT_EQ(uppercase_gauge.value(), 0);
@@ -617,15 +630,15 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   EXPECT_EQ(invalid_counter_2.value(), 0);
 
   // And we expect the same behavior from gauges and histograms.
-  Gauge& valid_gauge = store_->gauge("valid_gauge");
+  Gauge& valid_gauge = store_->gauge("valid_gauge", Gauge::ImportMode::Accumulate);
   valid_gauge.set(2);
   EXPECT_EQ(valid_gauge.value(), 2);
 
-  Gauge& invalid_gauge_1 = store_->gauge("invalid_gauge");
+  Gauge& invalid_gauge_1 = store_->gauge("invalid_gauge", Gauge::ImportMode::Accumulate);
   invalid_gauge_1.inc();
   EXPECT_EQ(invalid_gauge_1.value(), 0);
 
-  Gauge& invalid_gauge_2 = store_->gauge("also_INVALID_gauge");
+  Gauge& invalid_gauge_2 = store_->gauge("also_INVALID_gauge", Gauge::ImportMode::Accumulate);
   invalid_gauge_2.inc();
   EXPECT_EQ(invalid_gauge_2.value(), 0);
 
@@ -721,7 +734,7 @@ public:
 
   LookupStatFn lookupGaugeFn() {
     return [this](const std::string& stat_name) -> std::string {
-      return scope_->gauge(stat_name).name();
+      return scope_->gauge(stat_name, Gauge::ImportMode::Accumulate).name();
     };
   }
 
@@ -786,7 +799,7 @@ TEST_P(RememberStatsMatcherTest, HistogramAcceptsAll) { testAcceptsAll(lookupHis
 TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
   Counter& counter = store_->counter("c1");
-  Gauge& gauge = store_->gauge("g1");
+  Gauge& gauge = store_->gauge("g1", Gauge::ImportMode::Accumulate);
   Histogram& histogram = store_->histogram("h1");
   ASSERT_EQ(1, store_->counters().size()); // "c1".
   EXPECT_TRUE(&counter == store_->counters()[0].get() ||
@@ -896,10 +909,10 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   store_->counter("c1");
-  store_->gauge("g1");
+  store_->gauge("g1", Gauge::ImportMode::Accumulate);
   store_->shutdownThreading();
   store_->counter("c2");
-  store_->gauge("g2");
+  store_->gauge("g2", Gauge::ImportMode::Accumulate);
 
   // c1, g1 should have a thread local ref, but c2, g2 should not.
   EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());

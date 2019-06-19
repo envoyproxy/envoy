@@ -27,6 +27,10 @@ public:
   SysCallIntResult getsockopt(int sockfd, int level, int optname, void* optval,
                               socklen_t* optlen) override;
   SysCallIntResult socket(int domain, int type, int protocol) override;
+  SysCallSizeResult sendto(int fd, const void* buffer, size_t size, int flags, const sockaddr* addr,
+                           socklen_t addrlen) override;
+  SysCallSizeResult sendmsg(int fd, const msghdr* message, int flags) override;
+  SysCallIntResult getsockname(int sockfd, sockaddr* addr, socklen_t* addrlen) override;
 };
 
 typedef ThreadSafeSingleton<OsSysCallsImpl> OsSysCallsSingleton;

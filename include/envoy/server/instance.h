@@ -188,6 +188,11 @@ public:
   virtual Http::Context& httpContext() PURE;
 
   /**
+   * @return the server-wide process context.
+   */
+  virtual ProcessContext& processContext() PURE;
+
+  /**
    * @return ThreadLocal::Instance& the thread local storage engine for the server. This is used to
    *         allow runtime lockless updates to configuration, etc. across multiple threads.
    */

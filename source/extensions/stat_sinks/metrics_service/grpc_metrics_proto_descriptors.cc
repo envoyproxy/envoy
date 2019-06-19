@@ -2,6 +2,7 @@
 
 #include "envoy/service/metrics/v2/metrics_service.pb.h"
 
+#include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/protobuf/protobuf.h"
 
@@ -10,10 +11,11 @@ namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
 
-bool validateProtoDescriptors() {
+void validateProtoDescriptors() {
   const auto method = "envoy.service.metrics.v2.MetricsService.StreamMetrics";
 
-  return Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) != nullptr;
+  RELEASE_ASSERT(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) != nullptr,
+                 "");
 };
 } // namespace MetricsService
 } // namespace StatSinks

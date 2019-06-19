@@ -8,15 +8,43 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
+#include "common/stats/symbol_table_impl.h"
+
 namespace Envoy {
 namespace Http {
 
+struct CodeStats::ResponseStatInfo {
+  Stats::Scope& global_scope_;
+  Stats::Scope& cluster_scope_;
+  Stats::StatName prefix_;
+  uint64_t response_status_code_;
+  bool internal_request_;
+  Stats::StatName request_vhost_name_;
+  Stats::StatName request_vcluster_name_;
+  Stats::StatName from_zone_;
+  Stats::StatName to_zone_;
+  bool upstream_canary_;
+};
+
+struct CodeStats::ResponseTimingInfo {
+  Stats::Scope& global_scope_;
+  Stats::Scope& cluster_scope_;
+  Stats::StatName prefix_;
+  std::chrono::milliseconds response_time_;
+  bool upstream_canary_;
+  bool internal_request_;
+  Stats::StatName request_vhost_name_;
+  Stats::StatName request_vcluster_name_;
+  Stats::StatName from_zone_;
+  Stats::StatName to_zone_;
+};
+
 class CodeStatsImpl : public CodeStats {
 public:
-  ~CodeStatsImpl() override = default;
+  explicit CodeStatsImpl(Stats::SymbolTable& symbol_table);
 
   // CodeStats
-  void chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
+  void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
                                Code response_code) const override;
   void chargeResponseStat(const ResponseStatInfo& info) const override;
   void chargeResponseTiming(const ResponseTimingInfo& info) const override;
@@ -24,46 +52,65 @@ public:
 private:
   friend class CodeStatsTest;
 
-  /**
-   * Strips any trailing "." from a prefix. This is handy as most prefixes
-   * are specified as a literal like "http.", or an empty-string "". We
-   * are going to be passing these, as well as other tokens, to join() below,
-   * which will add "." between each token.
-   *
-   * TODO(jmarantz): remove all the trailing dots in all stat prefix string
-   * literals. Then this function can be removed.
-   */
+  void writeCategory(const ResponseStatInfo& info, Stats::StatName rq_group,
+                     Stats::StatName rq_code, Stats::StatName category) const;
+  void incCounter(Stats::Scope& scope, const std::vector<Stats::StatName>& names) const;
+  void incCounter(Stats::Scope& scope, Stats::StatName a, Stats::StatName b) const;
+  void recordHistogram(Stats::Scope& scope, const std::vector<Stats::StatName>& names,
+                       uint64_t count) const;
+
   static absl::string_view stripTrailingDot(absl::string_view prefix);
+  Stats::StatName upstreamRqGroup(Code response_code) const;
+  Stats::StatName upstreamRqStatName(Code response_code) const;
 
-  /**
-   * Joins a string-view vector with "." between each token. If there's an
-   * initial blank token it is skipped. Leading blank tokens occur due to empty
-   * prefixes, which are fairly common.
-   *
-   * Note: this layer probably should be called something other than join(),
-   * like joinSkippingLeadingEmptyToken but I thought the decrease in
-   * readability at all the call-sites would not be worth it.
-   */
-  static std::string join(const std::vector<absl::string_view>& v);
+  mutable Stats::StatNamePool stat_name_pool_ GUARDED_BY(mutex_);
+  mutable absl::Mutex mutex_;
+  Stats::SymbolTable& symbol_table_;
 
-  // Predeclared tokens used for combining with join().
-  const absl::string_view canary_upstream_rq_completed_{"canary.upstream_rq_completed"};
-  const absl::string_view canary_upstream_rq_time_{"canary.upstream_rq_time"};
-  const absl::string_view canary_upstream_rq_{"canary.upstream_rq_"};
-  const absl::string_view external_rq_time_{"external.upstream_rq_time"};
-  const absl::string_view external_upstream_rq_completed_{"external.upstream_rq_completed"};
-  const absl::string_view external_upstream_rq_time_{"external.upstream_rq_time"};
-  const absl::string_view external_upstream_rq_{"external.upstream_rq_"};
-  const absl::string_view internal_rq_time_{"internal.upstream_rq_time"};
-  const absl::string_view internal_upstream_rq_completed_{"internal.upstream_rq_completed"};
-  const absl::string_view internal_upstream_rq_time_{"internal.upstream_rq_time"};
-  const absl::string_view internal_upstream_rq_{"internal.upstream_rq_"};
-  const absl::string_view upstream_rq_completed_{"upstream_rq_completed"};
-  const absl::string_view upstream_rq_time_{"upstream_rq_time"};
-  const absl::string_view upstream_rq_{"upstream_rq_"};
-  const absl::string_view vcluster_{"vcluster"};
-  const absl::string_view vhost_{"vhost"};
-  const absl::string_view zone_{"zone"};
+  const Stats::StatName canary_;
+  const Stats::StatName empty_; // Used for the group-name for invalid http codes.
+  const Stats::StatName external_;
+  const Stats::StatName internal_;
+  const Stats::StatName upstream_;
+  const Stats::StatName upstream_rq_1xx_;
+  const Stats::StatName upstream_rq_2xx_;
+  const Stats::StatName upstream_rq_3xx_;
+  const Stats::StatName upstream_rq_4xx_;
+  const Stats::StatName upstream_rq_5xx_;
+  const Stats::StatName upstream_rq_unknown_;
+  const Stats::StatName upstream_rq_completed_;
+  const Stats::StatName upstream_rq_time;
+  const Stats::StatName upstream_rq_time_;
+  const Stats::StatName vcluster_;
+  const Stats::StatName vhost_;
+  const Stats::StatName zone_;
+
+  // Use an array of atomic pointers to hold StatNameStorage objects for
+  // every conceivable HTTP response code. In the hot-path we'll reference
+  // these with a null-check, and if we need to allocate a symbol for a
+  // new code, we'll take a mutex to avoid duplicate allocations and
+  // subsequent leaks. This is similar in principle to a ReaderMutexLock,
+  // but should be faster, as ReaderMutexLocks appear to be too expensive for
+  // fine-grained controls. Another option would be to use a lock per
+  // stat-name, which might have similar performance to atomics with default
+  // barrier policy.
+  //
+  // We don't allocate these all up front during construction because
+  // SymbolTable greedily encodes the first 128 names it discovers in one
+  // byte. We don't want those high-value single-byte codes to go to fully
+  // enumerating the 4 prefixes combined with HTTP codes that are seldom used,
+  // so we allocate these on demand.
+  //
+  // There can be multiple symbol tables in a server. The one passed into the
+  // Codes constructor should be the same as the one passed to
+  // Stats::ThreadLocalStore. Note that additional symbol tables can be created
+  // from IsolatedStoreImpl's default constructor.
+  //
+  // The Codes object is global to the server.
+
+  static constexpr uint32_t NumHttpCodes = 500;
+  static constexpr uint32_t HttpCodeOffset = 100; // code 100 is at index 0.
+  mutable std::atomic<uint8_t*> rc_stat_names_[NumHttpCodes];
 };
 
 /**

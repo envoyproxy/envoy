@@ -17,7 +17,7 @@ static void validateFail(const std::string& header) {
                                    header));
 }
 
-static void validatePermission(const envoy::config::rbac::v2alpha::Permission& permission) {
+static void validatePermission(const envoy::config::rbac::v2::Permission& permission) {
   if (permission.has_header()) {
     validateFail(permission.header().DebugString());
   }
@@ -36,7 +36,7 @@ static void validatePermission(const envoy::config::rbac::v2alpha::Permission& p
   }
 }
 
-static void validatePrincipal(const envoy::config::rbac::v2alpha::Principal& principal) {
+static void validatePrincipal(const envoy::config::rbac::v2::Principal& principal) {
   if (principal.has_header()) {
     validateFail(principal.header().DebugString());
   }
@@ -58,7 +58,7 @@ static void validatePrincipal(const envoy::config::rbac::v2alpha::Principal& pri
 /**
  * Validate the RBAC rules doesn't include any header or metadata rule.
  */
-static void validateRbacRules(const envoy::config::rbac::v2alpha::RBAC& rules) {
+static void validateRbacRules(const envoy::config::rbac::v2::RBAC& rules) {
   for (const auto& policy : rules.policies()) {
     for (const auto& permission : policy.second.permissions()) {
       validatePermission(permission);

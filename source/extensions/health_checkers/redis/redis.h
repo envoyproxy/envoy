@@ -43,6 +43,8 @@ protected:
   }
 
 private:
+  friend class RedisHealthCheckerTest;
+
   struct RedisActiveHealthCheckSession
       : public ActiveHealthCheckSession,
         public Extensions::NetworkFilters::Common::Redis::Client::Config,

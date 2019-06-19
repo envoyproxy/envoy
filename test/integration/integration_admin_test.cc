@@ -319,11 +319,24 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
 
+  response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/runtime_modify", "foo=bar&foo1=bar1", downstreamProtocol(),
+      version_, "host", Http::Headers::get().ContentTypeValues.FormUrlEncoded);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/runtime?format=json",
                                                 "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
+
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  auto entries = json->getObject("entries");
+  auto foo_obj = entries->getObject("foo");
+  EXPECT_EQ("bar", foo_obj->getString("final_value"));
+  auto foo1_obj = entries->getObject("foo1");
+  EXPECT_EQ("bar1", foo1_obj->getString("final_value"));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/listeners", "",
                                                 downstreamProtocol(), version_);
@@ -331,7 +344,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
 
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  json = Json::Factory::loadFromString(response->body());
   std::vector<Json::ObjectSharedPtr> listener_info = json->asObjectArray();
   auto listener_info_it = listener_info.cbegin();
   auto listeners = test_server_->server().listenerManager().listeners();

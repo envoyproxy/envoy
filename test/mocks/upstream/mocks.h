@@ -215,6 +215,16 @@ public:
   std::shared_ptr<MockHost> host_{new MockHost()};
 };
 
+class MockThreadAwareLoadBalancer : public ThreadAwareLoadBalancer {
+public:
+  MockThreadAwareLoadBalancer();
+  ~MockThreadAwareLoadBalancer();
+
+  // Upstream::ThreadAwareLoadBalancer
+  MOCK_METHOD0(factory, LoadBalancerFactorySharedPtr());
+  MOCK_METHOD0(initialize, void());
+};
+
 class MockThreadLocalCluster : public ThreadLocalCluster {
 public:
   MockThreadLocalCluster();
@@ -251,9 +261,9 @@ public:
                                         Network::TransportSocketOptionsSharedPtr));
 
   MOCK_METHOD4(clusterFromProto,
-               ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                                Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                bool added_via_api));
+               std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>(
+                   const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                   Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
 
   MOCK_METHOD2(createCds,
                CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm));

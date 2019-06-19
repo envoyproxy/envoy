@@ -50,12 +50,15 @@ void StaticClusterImpl::startPreInit() {
   onPreInitComplete();
 }
 
-ClusterImplBaseSharedPtr StaticClusterFactory::createClusterImpl(
+std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+StaticClusterFactory::createClusterImpl(
     const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
-  return std::make_unique<StaticClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                             std::move(stats_scope), context.addedViaApi());
+  return std::make_pair(
+      std::make_shared<StaticClusterImpl>(cluster, context.runtime(), socket_factory_context,
+                                          std::move(stats_scope), context.addedViaApi()),
+      nullptr);
 }
 
 /**

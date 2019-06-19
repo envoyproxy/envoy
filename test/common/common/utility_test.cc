@@ -838,4 +838,10 @@ TEST(TrieLookupTable, LongestPrefix) {
   EXPECT_EQ(nullptr, trie.findLongestPrefix(" "));
 }
 
+TEST(InlineStorageTest, InlineString) {
+  InlineStringPtr hello = InlineString::create("Hello, world!");
+  EXPECT_EQ("Hello, world!", hello->toStringView());
+  EXPECT_EQ("Hello, world!", hello->toString());
+}
+
 } // namespace Envoy

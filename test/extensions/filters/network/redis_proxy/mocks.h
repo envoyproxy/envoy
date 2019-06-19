@@ -61,6 +61,9 @@ public:
   MockSplitCallbacks();
   ~MockSplitCallbacks();
 
+  MOCK_METHOD0(connectionAllowed, bool());
+  MOCK_METHOD1(onAuth, void(const std::string& password));
+
   void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
 
   MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));

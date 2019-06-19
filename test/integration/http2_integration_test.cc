@@ -785,6 +785,32 @@ TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
             0);
 }
 
+TEST_P(Http2IntegrationTest, PauseAndResume) {
+  config_helper_.addFilter(R"EOF(
+  name: stop-iteration-and-continue-filter
+  config: {}
+  )EOF");
+  initialize();
+
+  // Send a request with a bit of data, to trigger the filter pausing.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  codec_client_->sendData(*request_encoder_, 1, false);
+
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Now send the final data frame and make sure it gets proxied.
+  codec_client_->sendData(*request_encoder_, 0, true);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+}
+
 Http2RingHashIntegrationTest::Http2RingHashIntegrationTest() {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);

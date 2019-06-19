@@ -81,7 +81,6 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
 
-  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   EXPECT_NE(nullptr, dynamic_cast<GrpcHealthCheckerImpl*>(
                          HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster,
                                                       runtime, random, dispatcher, log_manager)

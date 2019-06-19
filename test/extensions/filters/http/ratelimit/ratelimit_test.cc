@@ -39,7 +39,7 @@ namespace {
 
 class HttpRateLimitFilterTest : public testing::Test {
 public:
-  HttpRateLimitFilterTest() {
+  HttpRateLimitFilterTest() : http_context_(stats_store_.symbolTable()) {
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.http_filter_enabled", 100))
         .WillByDefault(Return(true));
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.http_filter_enforcing", 100))

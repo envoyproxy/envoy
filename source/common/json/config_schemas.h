@@ -15,8 +15,6 @@ public:
 
   // Listener Schema
   static const std::string LISTENER_SCHEMA;
-  static const std::string LDS_SCHEMA;
-  static const std::string LDS_CONFIG_SCHEMA;
 
   // Network Filter Schemas
   static const std::string CLIENT_SSL_NETWORK_FILTER_SCHEMA;
@@ -46,13 +44,8 @@ public:
   static const std::string SQUASH_HTTP_FILTER_SCHEMA;
 
   // Cluster Schemas
-  static const std::string CLUSTER_MANAGER_SCHEMA;
   static const std::string CLUSTER_HEALTH_CHECK_SCHEMA;
   static const std::string CLUSTER_SCHEMA;
-
-  // Discovery Service Schemas
-  static const std::string CDS_SCHEMA;
-  static const std::string SDS_SCHEMA;
 
   // Redis Schemas
   static const std::string REDIS_CONN_POOL_SCHEMA;

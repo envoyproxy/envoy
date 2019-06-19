@@ -299,6 +299,13 @@ You can use the `-c <compilation_mode>` flag to control this, e.g.
 bazel build -c opt //source/exe:envoy-static
 ```
 
+To override the compilation mode and optimize the build for binary size, you can
+use the `sizeopt` configuration:
+
+```
+bazel build //source/exe:envoy-static --config=sizeopt
+```
+
 ## Sanitizers
 
 To build and run tests with the gcc compiler's [address sanitizer

@@ -115,8 +115,10 @@ MockClusterMockPrioritySet::MockClusterMockPrioritySet() = default;
 MockClusterMockPrioritySet::~MockClusterMockPrioritySet() = default;
 
 MockLoadBalancer::MockLoadBalancer() { ON_CALL(*this, chooseHost(_)).WillByDefault(Return(host_)); }
-
 MockLoadBalancer::~MockLoadBalancer() = default;
+
+MockThreadAwareLoadBalancer::MockThreadAwareLoadBalancer() = default;
+MockThreadAwareLoadBalancer::~MockThreadAwareLoadBalancer() = default;
 
 MockThreadLocalCluster::MockThreadLocalCluster() {
   ON_CALL(*this, prioritySet()).WillByDefault(ReturnRef(cluster_.priority_set_));

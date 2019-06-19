@@ -91,6 +91,22 @@ public:
    * @see man 2 socket
    */
   virtual SysCallIntResult socket(int domain, int type, int protocol) PURE;
+
+  /**
+   * @see man 2 sendto
+   */
+  virtual SysCallSizeResult sendto(int fd, const void* buffer, size_t size, int flags,
+                                   const sockaddr* addr, socklen_t addrlen) PURE;
+
+  /**
+   * @see man 2 sendmsg
+   */
+  virtual SysCallSizeResult sendmsg(int fd, const msghdr* message, int flags) PURE;
+
+  /**
+   * @see man 2 getsockname
+   */
+  virtual SysCallIntResult getsockname(int sockfd, sockaddr* addr, socklen_t* addrlen) PURE;
 };
 
 typedef std::unique_ptr<OsSysCalls> OsSysCallsPtr;

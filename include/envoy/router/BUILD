@@ -62,6 +62,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "scopes_interface",
+    hdrs = ["scopes.h"],
+    deps = [
+        ":router_interface",
+        "//include/envoy/config:config_provider_interface",
+        "//include/envoy/http:header_map_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "router_ratelimit_interface",
     hdrs = ["router_ratelimit.h"],
     deps = [

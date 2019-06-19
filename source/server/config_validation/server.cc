@@ -7,7 +7,6 @@
 
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
 #include "common/event/real_time_system.h"
 #include "common/local_info/local_info_impl.h"
@@ -48,7 +47,7 @@ ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
-      mutex_tracer_(nullptr), time_system_(time_system) {
+      mutex_tracer_(nullptr), http_context_(stats_store_.symbolTable()), time_system_(time_system) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {

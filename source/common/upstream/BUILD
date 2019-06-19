@@ -46,6 +46,7 @@ envoy_cc_library(
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/config:cds_json_lib",

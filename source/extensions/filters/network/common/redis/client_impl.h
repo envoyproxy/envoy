@@ -71,6 +71,8 @@ public:
   void flushBufferAndResetTimer();
 
 private:
+  friend class RedisClientImplTest;
+
   struct UpstreamReadFilter : public Network::ReadFilterBaseImpl {
     UpstreamReadFilter(ClientImpl& parent) : parent_(parent) {}
 

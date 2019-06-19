@@ -53,6 +53,18 @@ public:
 };
 
 /**
+ * DoNothingPoolCallbacks is used for internally generated commands whose response is
+ * transparently filtered, and redirection never occurs (e.g., "asking", "auth", etc.).
+ */
+class DoNothingPoolCallbacks : public PoolCallbacks {
+public:
+  // PoolCallbacks
+  void onResponse(Common::Redis::RespValuePtr&&) override {}
+  void onFailure() override {}
+  bool onRedirection(const Common::Redis::RespValue&) override { return false; }
+};
+
+/**
  * A single redis client connection.
  */
 class Client : public Event::DeferredDeletable {

@@ -184,14 +184,6 @@ Utility::configSourceInitialFetchTimeout(const envoy::api::v2::core::ConfigSourc
       PROTOBUF_GET_MS_OR_DEFAULT(config_source, initial_fetch_timeout, 0));
 }
 
-void Utility::translateCdsConfig(const Json::Object& json_config,
-                                 envoy::api::v2::core::ConfigSource& cds_config) {
-  translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
-                           json_config.getInteger("refresh_delay_ms", 30000),
-                           json_config.getString("api_type", ApiType::get().UnsupportedRestLegacy),
-                           *cds_config.mutable_api_config_source());
-}
-
 void Utility::translateRdsConfig(
     const Json::Object& json_rds,
     envoy::config::filter::network::http_connection_manager::v2::Rds& rds) {
@@ -204,15 +196,6 @@ void Utility::translateRdsConfig(
                            json_rds.getInteger("refresh_delay_ms", 30000),
                            json_rds.getString("api_type", ApiType::get().UnsupportedRestLegacy),
                            *rds.mutable_config_source()->mutable_api_config_source());
-}
-
-void Utility::translateLdsConfig(const Json::Object& json_lds,
-                                 envoy::api::v2::core::ConfigSource& lds_config) {
-  json_lds.validateSchema(Json::Schema::LDS_CONFIG_SCHEMA);
-  translateApiConfigSource(json_lds.getString("cluster"),
-                           json_lds.getInteger("refresh_delay_ms", 30000),
-                           json_lds.getString("api_type", ApiType::get().UnsupportedRestLegacy),
-                           *lds_config.mutable_api_config_source());
 }
 
 RateLimitSettings

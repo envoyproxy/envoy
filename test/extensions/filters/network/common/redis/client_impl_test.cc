@@ -91,6 +91,15 @@ public:
     upstream_connection_->raiseEvent(Network::ConnectionEvent::Connected);
   }
 
+  void respond() {
+    Common::Redis::RespValuePtr response1{new Common::Redis::RespValue()};
+    response1->type(Common::Redis::RespType::SimpleString);
+    response1->asString() = "OK";
+    ClientImpl* client_impl = dynamic_cast<ClientImpl*>(client_.get());
+    EXPECT_NE(client_impl, nullptr);
+    client_impl->onRespValue(std::move(response1));
+  }
+
   const std::string cluster_name_{"foo"};
   std::shared_ptr<Upstream::MockHost> host_{new NiceMock<Upstream::MockHost>()};
   Event::MockDispatcher dispatcher_;
@@ -505,6 +514,23 @@ TEST_F(RedisClientImplTest, OpTimeout) {
 
   onConnected();
 
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_active_.value());
+
+  EXPECT_CALL(callbacks1, onResponse_(_));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+  respond();
+
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
+  EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_rq_active_.value());
+
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
+  handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
   EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::TIMEOUT));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
@@ -513,6 +539,8 @@ TEST_F(RedisClientImplTest, OpTimeout) {
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_timeout_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_timeout_.value());
+  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
+  EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_rq_active_.value());
 }
 
 TEST_F(RedisClientImplTest, AskRedirection) {

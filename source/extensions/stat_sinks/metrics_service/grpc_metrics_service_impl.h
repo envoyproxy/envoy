@@ -8,7 +8,6 @@
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/sink.h"
-#include "envoy/stats/source.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -73,7 +72,7 @@ public:
   // MetricsService::Sink
   MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,
                      TimeSource& time_system);
-  void flush(Stats::Source& source) override;
+  void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 
   void flushCounter(const Stats::Counter& counter);

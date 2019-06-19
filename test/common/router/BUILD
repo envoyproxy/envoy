@@ -79,6 +79,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "scoped_rds_test",
+    srcs = ["scoped_rds_test.cc"],
+    deps = [
+        "//source/common/config:utility_lib",
+        "//source/common/http:message_lib",
+        "//source/common/json:json_loader_lib",
+        "//source/common/router:scoped_rds_lib",
+        "//source/server/http:admin_lib",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "vhds_test",
     srcs = ["vhds_test.cc"],
     deps = [
@@ -260,6 +276,8 @@ envoy_cc_test(
         "//source/common/stream_info:filter_state_lib",
         "//test/common/stream_info:test_int_accessor_lib",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
