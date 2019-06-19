@@ -265,7 +265,7 @@ public:
    *
    * @param lhs RepeatedPtrField on LHS.
    * @param rhs RepeatedPtrField on RHS.
-   * @param ignore_repeated_field_ordering if ordering should be ignored. Note if true this turns
+   * @param ignore_ordering if ordering should be ignored. Note if true this turns
    *   comparison into an N^2 operation.
    * @return bool indicating whether the RepeatedPtrField are equal. TestUtility::protoEqual() is
    *              used for individual element testing.

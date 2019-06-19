@@ -477,7 +477,6 @@ TEST_P(LoadStatsIntegrationTest, LocalityWeighted) {
   locality_weighted_lb_ = true;
   initialize();
 
-  // Debug logs for #6874
   waitForLoadStatsStream();
   waitForLoadStatsRequest({});
 

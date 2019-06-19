@@ -150,14 +150,14 @@ public:
   template <typename ProtoType, typename ReturnType>
   static ReturnType
   convertToConstMessagePtrContainer(const Protobuf::RepeatedPtrField<ProtoType>& repeated_field) {
-    ReturnType ret_vector;
-    std::transform(repeated_field.begin(), repeated_field.end(), std::back_inserter(ret_vector),
+    ReturnType ret_container;
+    std::transform(repeated_field.begin(), repeated_field.end(), std::back_inserter(ret_container),
                    [](const ProtoType& proto_message) -> std::unique_ptr<const Protobuf::Message> {
                      Protobuf::Message* clone = proto_message.New();
                      clone->MergeFrom(proto_message);
                      return std::unique_ptr<const Protobuf::Message>(clone);
                    });
-    return ret_vector;
+    return ret_container;
   }
 };
 
