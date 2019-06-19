@@ -194,31 +194,31 @@ public:
   virtual void used(bool new_used) PURE;
 };
 
-typedef std::shared_ptr<const Host> HostConstSharedPtr;
+using HostConstSharedPtr = std::shared_ptr<const Host>;
 
-typedef std::vector<HostSharedPtr> HostVector;
-typedef Phantom<HostVector, Healthy> HealthyHostVector;
-typedef Phantom<HostVector, Degraded> DegradedHostVector;
-typedef Phantom<HostVector, Excluded> ExcludedHostVector;
-typedef std::unordered_map<std::string, Upstream::HostSharedPtr> HostMap;
-typedef std::shared_ptr<HostVector> HostVectorSharedPtr;
-typedef std::shared_ptr<const HostVector> HostVectorConstSharedPtr;
+using HostVector = std::vector<HostSharedPtr>;
+using HealthyHostVector = Phantom<HostVector, Healthy>;
+using DegradedHostVector = Phantom<HostVector, Degraded>;
+using ExcludedHostVector = Phantom<HostVector, Excluded>;
+using HostMap = std::unordered_map<std::string, Upstream::HostSharedPtr>;
+using HostVectorSharedPtr = std::shared_ptr<HostVector>;
+using HostVectorConstSharedPtr = std::shared_ptr<const HostVector>;
 
-typedef std::shared_ptr<const HealthyHostVector> HealthyHostVectorConstSharedPtr;
-typedef std::shared_ptr<const DegradedHostVector> DegradedHostVectorConstSharedPtr;
-typedef std::shared_ptr<const ExcludedHostVector> ExcludedHostVectorConstSharedPtr;
+using HealthyHostVectorConstSharedPtr = std::shared_ptr<const HealthyHostVector>;
+using DegradedHostVectorConstSharedPtr = std::shared_ptr<const DegradedHostVector>;
+using ExcludedHostVectorConstSharedPtr = std::shared_ptr<const ExcludedHostVector>;
 
-typedef std::unique_ptr<HostVector> HostListPtr;
-typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
-    LocalityWeightsMap;
-typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
+using HostListPtr = std::unique_ptr<HostVector>;
+using LocalityWeightsMap =
+    std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
+using PriorityState = std::vector<std::pair<HostListPtr, LocalityWeightsMap>>;
 
 /**
  * Bucket hosts by locality.
  */
 class HostsPerLocality {
 public:
-  virtual ~HostsPerLocality() {}
+  virtual ~HostsPerLocality() = default;
 
   /**
    * @return bool is local locality one of the locality buckets? If so, the
@@ -252,13 +252,13 @@ public:
   }
 };
 
-typedef std::shared_ptr<HostsPerLocality> HostsPerLocalitySharedPtr;
-typedef std::shared_ptr<const HostsPerLocality> HostsPerLocalityConstSharedPtr;
+using HostsPerLocalitySharedPtr = std::shared_ptr<HostsPerLocality>;
+using HostsPerLocalityConstSharedPtr = std::shared_ptr<const HostsPerLocality>;
 
 // Weight for each locality index in HostsPerLocality.
-typedef std::vector<uint32_t> LocalityWeights;
-typedef std::shared_ptr<LocalityWeights> LocalityWeightsSharedPtr;
-typedef std::shared_ptr<const LocalityWeights> LocalityWeightsConstSharedPtr;
+using LocalityWeights = std::vector<uint32_t>;
+using LocalityWeightsSharedPtr = std::shared_ptr<LocalityWeights>;
+using LocalityWeightsConstSharedPtr = std::shared_ptr<const LocalityWeights>;
 
 /**
  * Base host set interface. This contains all of the endpoints for a given LocalityLbEndpoints
@@ -267,7 +267,7 @@ typedef std::shared_ptr<const LocalityWeights> LocalityWeightsConstSharedPtr;
 // TODO(snowp): Remove the const ref accessors in favor of the shared_ptr ones.
 class HostSet {
 public:
-  virtual ~HostSet() {}
+  virtual ~HostSet() = default;
 
   /**
    * @return all hosts that make up the set at the current time.
@@ -384,7 +384,7 @@ public:
   virtual uint32_t overprovisioningFactor() const PURE;
 };
 
-typedef std::unique_ptr<HostSet> HostSetPtr;
+using HostSetPtr = std::unique_ptr<HostSet>;
 
 /**
  * This class contains all of the HostSets for a given cluster grouped by priority, for
@@ -392,14 +392,13 @@ typedef std::unique_ptr<HostSet> HostSetPtr;
  */
 class PrioritySet {
 public:
-  typedef std::function<void(const HostVector& hosts_added, const HostVector& hosts_removed)>
-      MemberUpdateCb;
+  using MemberUpdateCb =
+      std::function<void(const HostVector& hosts_added, const HostVector& hosts_removed)>;
 
-  typedef std::function<void(uint32_t priority, const HostVector& hosts_added,
-                             const HostVector& hosts_removed)>
-      PriorityUpdateCb;
+  using PriorityUpdateCb = std::function<void(uint32_t priority, const HostVector& hosts_added,
+                                              const HostVector& hosts_removed)>;
 
-  virtual ~PrioritySet() {}
+  virtual ~PrioritySet() = default;
 
   /**
    * Install a callback that will be invoked when any of the HostSets in the PrioritySet changes.
@@ -461,7 +460,7 @@ public:
    */
   class HostUpdateCb {
   public:
-    virtual ~HostUpdateCb() {}
+    virtual ~HostUpdateCb() = default;
     /**
      * Updates the hosts in a given host set.
      *
@@ -483,7 +482,7 @@ public:
    */
   class BatchUpdateCb {
   public:
-    virtual ~BatchUpdateCb() {}
+    virtual ~BatchUpdateCb() = default;
 
     /**
      * Performs a batch host update. Implementors should use the provided callback to update hosts
@@ -638,9 +637,9 @@ struct ClusterCircuitBreakersStats {
  */
 class ProtocolOptionsConfig {
 public:
-  virtual ~ProtocolOptionsConfig() {}
+  virtual ~ProtocolOptionsConfig() = default;
 };
-typedef std::shared_ptr<const ProtocolOptionsConfig> ProtocolOptionsConfigConstSharedPtr;
+using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOptionsConfig>;
 
 /**
  *  Base class for all cluster typed metadata factory.
@@ -662,7 +661,7 @@ public:
     static const uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
   };
 
-  virtual ~ClusterInfo() {}
+  virtual ~ClusterInfo() = default;
 
   /**
    * @return bool whether the cluster was added via API (if false the cluster was present in the
@@ -856,7 +855,7 @@ protected:
   extensionProtocolOptions(const std::string& name) const PURE;
 };
 
-typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;
+using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
 
 class HealthChecker;
 
@@ -866,7 +865,7 @@ class HealthChecker;
  */
 class Cluster {
 public:
-  virtual ~Cluster() {}
+  virtual ~Cluster() = default;
 
   enum class InitializePhase { Primary, Secondary };
 
@@ -915,7 +914,7 @@ public:
   virtual const PrioritySet& prioritySet() const PURE;
 };
 
-typedef std::shared_ptr<Cluster> ClusterSharedPtr;
+using ClusterSharedPtr = std::shared_ptr<Cluster>;
 
 } // namespace Upstream
 } // namespace Envoy

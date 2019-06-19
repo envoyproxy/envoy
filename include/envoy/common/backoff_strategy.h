@@ -11,7 +11,7 @@ namespace Envoy {
  */
 class BackOffStrategy {
 public:
-  virtual ~BackOffStrategy() {}
+  virtual ~BackOffStrategy() = default;
 
   /**
    * @return the next backoff interval in milli seconds.
@@ -24,5 +24,5 @@ public:
   virtual void reset() PURE;
 };
 
-typedef std::unique_ptr<BackOffStrategy> BackOffStrategyPtr;
+using BackOffStrategyPtr = std::unique_ptr<BackOffStrategy>;
 } // namespace Envoy

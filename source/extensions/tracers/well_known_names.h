@@ -25,7 +25,7 @@ public:
   const std::string OpenCensus = "envoy.tracers.opencensus";
 };
 
-typedef ConstSingleton<TracerNameValues> TracerNames;
+using TracerNames = ConstSingleton<TracerNameValues>;
 
 } // namespace Tracers
 } // namespace Extensions

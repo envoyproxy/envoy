@@ -71,7 +71,7 @@ private:
     Common::Redis::Client::ClientPtr redis_client_;
   };
 
-  typedef std::unique_ptr<ThreadLocalActiveClient> ThreadLocalActiveClientPtr;
+  using ThreadLocalActiveClientPtr = std::unique_ptr<ThreadLocalActiveClient>;
 
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
                            public Upstream::ClusterUpdateCallbacks {

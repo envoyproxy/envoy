@@ -13,8 +13,8 @@ namespace FixedHeapMonitor {
  */
 class MemoryStatsReader {
 public:
-  MemoryStatsReader() {}
-  virtual ~MemoryStatsReader() {}
+  MemoryStatsReader() = default;
+  virtual ~MemoryStatsReader() = default;
 
   // Memory reserved for the process by the heap.
   virtual uint64_t reservedHeapBytes();

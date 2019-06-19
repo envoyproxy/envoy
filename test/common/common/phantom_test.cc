@@ -7,8 +7,8 @@ namespace Envoy {
 struct PhantomTest {};
 struct PhantomTest2 {};
 
-typedef Phantom<uint32_t, PhantomTest> PhantomIntTest;
-typedef Phantom<uint32_t, PhantomTest2> PhantomIntTest2;
+using PhantomIntTest = Phantom<uint32_t, PhantomTest>;
+using PhantomIntTest2 = Phantom<uint32_t, PhantomTest2>;
 
 TEST(PhantomTest, TypeBehavior) {
   // Should not be possible to implicitly convert from two phantoms with different markers.

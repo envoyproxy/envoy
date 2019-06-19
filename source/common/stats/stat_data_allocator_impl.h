@@ -119,10 +119,19 @@ public:
             absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
             ImportMode import_mode)
       : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {
-    if (import_mode == ImportMode::Uninitialized) {
-      data_.flags_ |= Flags::ImportModeUninitialized;
-    } else if (import_mode == ImportMode::Accumulate) {
+    switch (import_mode) {
+    case ImportMode::Accumulate:
       data_.flags_ |= Flags::LogicAccumulate;
+      break;
+    case ImportMode::NeverImport:
+      data_.flags_ |= Flags::NeverImport;
+      break;
+    case ImportMode::Uninitialized:
+      // Note that we don't clear any flag bits for import_mode==Uninitialized,
+      // as we may have an established import_mode when this stat was created in
+      // an alternate scope. See
+      // https://github.com/envoyproxy/envoy/issues/7227.
+      break;
     }
   }
   ~GaugeImpl() override {
@@ -155,29 +164,38 @@ public:
   bool used() const override { return data_.flags_ & Flags::Used; }
 
   ImportMode importMode() const override {
-    if (data_.flags_ & Flags::ImportModeUninitialized) {
-      return ImportMode::Uninitialized;
+    if (data_.flags_ & Flags::NeverImport) {
+      return ImportMode::NeverImport;
     } else if (data_.flags_ & Flags::LogicAccumulate) {
       return ImportMode::Accumulate;
     }
-    return ImportMode::NeverImport;
+    return ImportMode::Uninitialized;
   }
 
   void mergeImportMode(ImportMode import_mode) override {
-    if (import_mode != ImportMode::Uninitialized &&
-        (data_.flags_ & Flags::ImportModeUninitialized)) {
-      data_.flags_ &= ~Flags::ImportModeUninitialized;
-      if (import_mode == ImportMode::Accumulate) {
-        data_.flags_ |= Flags::LogicAccumulate;
-      } else {
-        // A previous revision of Envoy must have transferred a gauge that it
-        // thought was Accumulate. But the new version thinks its NeverImport,
-        // so we clear the accumulated value.
-        data_.value_ = 0;
-        data_.flags_ &= ~Flags::Used;
-      }
-    } else {
-      ASSERT(importMode() == import_mode);
+    ImportMode current = importMode();
+    if (current == import_mode) {
+      return;
+    }
+
+    switch (import_mode) {
+    case ImportMode::Uninitialized:
+      // mergeImportNode(ImportMode::Uninitialized) is called when merging an
+      // existing stat with importMode() == Accumulate or NeverImport.
+      break;
+    case ImportMode::Accumulate:
+      ASSERT(current == ImportMode::Uninitialized);
+      data_.flags_ |= Flags::LogicAccumulate;
+      break;
+    case ImportMode::NeverImport:
+      ASSERT(current == ImportMode::Uninitialized);
+      // A previous revision of Envoy may have transferred a gauge that it
+      // thought was Accumulate. But the new version thinks it's NeverImport, so
+      // we clear the accumulated value.
+      data_.value_ = 0;
+      data_.flags_ &= ~Flags::Used;
+      data_.flags_ |= Flags::NeverImport;
+      break;
     }
   }
 

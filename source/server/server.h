@@ -71,7 +71,7 @@ struct ServerStats {
  */
 class ComponentFactory {
 public:
-  virtual ~ComponentFactory() {}
+  virtual ~ComponentFactory() = default;
 
   /**
    * @return DrainManagerPtr a new drain manager for the server.

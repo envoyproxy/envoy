@@ -24,7 +24,7 @@ namespace ThriftProxy {
  */
 class Transport {
 public:
-  virtual ~Transport() {}
+  virtual ~Transport() = default;
 
   /*
    * Returns this transport's name.
@@ -76,7 +76,7 @@ public:
                            Buffer::Instance& message) PURE;
 };
 
-typedef std::unique_ptr<Transport> TransportPtr;
+using TransportPtr = std::unique_ptr<Transport>;
 
 /**
  * Implemented by each Thrift transport and registered via Registry::registerFactory or the
@@ -84,7 +84,7 @@ typedef std::unique_ptr<Transport> TransportPtr;
  */
 class NamedTransportConfigFactory {
 public:
-  virtual ~NamedTransportConfigFactory() {}
+  virtual ~NamedTransportConfigFactory() = default;
 
   /**
    * Create a particular Thrift transport.

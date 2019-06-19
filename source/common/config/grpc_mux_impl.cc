@@ -114,6 +114,14 @@ void GrpcMuxImpl::resume(const std::string& type_url) {
   }
 }
 
+bool GrpcMuxImpl::paused(const std::string& type_url) const {
+  auto entry = api_state_.find(type_url);
+  if (entry == api_state_.end()) {
+    return false;
+  }
+  return entry->second.paused_;
+}
+
 void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();

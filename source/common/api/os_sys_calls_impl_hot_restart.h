@@ -14,7 +14,7 @@ public:
   SysCallIntResult shmUnlink(const char* name) override;
 };
 
-typedef ThreadSafeSingleton<HotRestartOsSysCallsImpl> HotRestartOsSysCallsSingleton;
+using HotRestartOsSysCallsSingleton = ThreadSafeSingleton<HotRestartOsSysCallsImpl>;
 
 } // namespace Api
 } // namespace Envoy

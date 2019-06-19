@@ -429,7 +429,7 @@ private:
   const std::string name_;
   const uint64_t weight_;
 };
-typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
+using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
 TEST(WeightedClusterUtil, pickCluster) {
   std::vector<WeightedClusterEntrySharedPtr> clusters;
