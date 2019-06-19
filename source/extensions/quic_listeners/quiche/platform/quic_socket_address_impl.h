@@ -10,7 +10,7 @@
 
 #include <cstdint>
 
-#include "extensions/quic_listeners/quiche/platform/quic_ip_address_impl.h"
+#include "quiche/quic/platform/api/quic_ip_address.h"
 
 namespace quic {
 
@@ -23,9 +23,9 @@ namespace quic {
 class QuicSocketAddressImpl {
 public:
   QuicSocketAddressImpl() = default;
-  QuicSocketAddressImpl(QuicIpAddressImpl, uint16_t) {}
+  QuicSocketAddressImpl(QuicIpAddress, uint16_t) {}
   explicit QuicSocketAddressImpl(const struct sockaddr_storage&) {}
-  explicit QuicSocketAddressImpl(const struct sockaddr&) {}
+  QuicSocketAddressImpl(const struct sockaddr*, socklen_t&) {}
   QuicSocketAddressImpl(const QuicSocketAddressImpl&) = default;
   QuicSocketAddressImpl& operator=(const QuicSocketAddressImpl&) = default;
   QuicSocketAddressImpl& operator=(QuicSocketAddressImpl&&) = default;
@@ -37,7 +37,7 @@ public:
   int FromSocket(int) { return -1; }
   QuicSocketAddressImpl Normalized() const { return QuicSocketAddressImpl(); }
 
-  QuicIpAddressImpl host() const { return QuicIpAddressImpl(); }
+  QuicIpAddress host() const { return QuicIpAddress(); }
   uint16_t port() const { return 0; }
 
   sockaddr_storage generic_address() const { return sockaddr_storage{}; }
