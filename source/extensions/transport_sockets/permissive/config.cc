@@ -47,7 +47,7 @@ UpstreamPermissiveSocketConfigFactory::createTransportSocketFactory(
   auto secondary_transport_socket_factory = secondary_config_factory.createTransportSocketFactory(
       *secondary_transport_socket_factory_config, context);
 
-  // Theoretically, falling back from unsecure to secure is unrealistic.
+  // Theoretically, falling back from insecure to secure is unrealistic.
   ASSERT(!permissive_config.allow_fallback() ||
          (primary_transport_socket_factory->implementsSecureTransport() ||
           (!primary_transport_socket_factory->implementsSecureTransport() &&
