@@ -40,8 +40,8 @@ to the same IPs: if an IP is repeated many times between DNS names it might caus
 upstream host.
 
 If respect_dns_ttl is enabled, DNS record TTLs and dns_refresh_rate are used to control DNS refresh rate. 
-If the DNS resolution response includes record TTL, the TTL is used as the cluster's DNS refresh rate; 
-otherwise, DNS refresh rate is set to dns_refresh_rate, whose default value is 5000ms if not specified.
+For strict DNS cluster, if the minimum of all record TTLs is 0, dns_refresh_rate will be used as the 
+cluster's DNS refresh rate. dns_refresh_rate defaults to 5000ms if not specified.
 
 .. _arch_overview_service_discovery_types_logical_dns:
 
@@ -63,8 +63,8 @@ asynchronous/eventually consistent DNS resolution, long lived connections, and z
 forwarding path.
 
 If respect_dns_ttl is enabled, DNS record TTLs and dns_refresh_rate are used to control DNS refresh rate. 
-If the DNS resolution response includes record TTL, the TTL is used as the cluster's DNS refresh rate; 
-otherwise, DNS refresh rate is set to dns_refresh_rate, whose default value is 5000ms if not specified.
+For logical DNS cluster, if the TTL of first record is 0, dns_refresh_rate will be used as the 
+cluster's DNS refresh rate. dns_refresh_rate defaults to 5000ms if not specified.
 
 .. _arch_overview_service_discovery_types_original_destination:
 
