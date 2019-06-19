@@ -426,12 +426,21 @@ protected:
 
     EXPECT_CALL(active_dns_query_, cancel());
   }
+  std::list<Network::Address::InstanceConstSharedPtr>
+  getAddressList(const std::list<Network::DnsResponse>& response) {
+    std::list<Network::Address::InstanceConstSharedPtr> address;
+
+    for_each(response.begin(), response.end(),
+             [&](Network::DnsResponse resp) { address.emplace_back(resp.address_); });
+    return address;
+  }
 
   void testRedisResolve() {
     EXPECT_CALL(dispatcher_, createTimer_(_));
     RedisCluster::RedisDiscoverySession discovery_session(*cluster_, *this);
-    discovery_session.registerDiscoveryAddress(
-        TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"})), 22120);
+    const auto& dns_response =
+        TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"}));
+    discovery_session.registerDiscoveryAddress(getAddressList(dns_response), 22120);
     expectRedisResolve(true);
     discovery_session.startResolve();
 
