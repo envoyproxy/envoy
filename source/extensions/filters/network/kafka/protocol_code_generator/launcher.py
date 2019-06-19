@@ -6,6 +6,7 @@ import source.extensions.filters.network.kafka.protocol_code_generator.kafka_gen
 import sys
 import os
 
+
 def main():
   """
   Kafka code generator script

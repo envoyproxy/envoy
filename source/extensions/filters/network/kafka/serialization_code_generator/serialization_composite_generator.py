@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+
 def generate_files():
   """
   Serialization composite generator script

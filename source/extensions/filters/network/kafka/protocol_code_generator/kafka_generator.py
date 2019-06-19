@@ -51,7 +51,7 @@ def generate_test_code(type, header_test_cc_file, codec_test_cc_file, input_file
   template = RenderingHelper.get_template("%ss_test_cc.j2" % type)
   contents = template.render(message_types=messages)
   with open(header_test_cc_file, 'w') as fd:
-   fd.write(contents)
+    fd.write(contents)
 
   # Generate codec-test file.
   template = RenderingHelper.get_template("%s_codec_%s_test_cc.j2" % (type, type))
