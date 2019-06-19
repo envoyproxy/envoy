@@ -29,6 +29,7 @@ REPOSITORY_LOCATIONS = dict(
     com_github_c_ares_c_ares = dict(
         sha256 = "ac174f104e2f25526c82759352369fe7db0945753bf71647533c103661f15a96",
         strip_prefix = "c-ares-c5bfbe0dc3086b39218a4d9a8ef2ce4f538673da",
+        # 2019-06-19
         urls = ["https://github.com/c-ares/c-ares/archive/c5bfbe0dc3086b39218a4d9a8ef2ce4f538673da.tar.gz"],
     ),
     com_github_circonus_labs_libcircllhist = dict(
