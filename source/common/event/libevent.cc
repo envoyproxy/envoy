@@ -1,6 +1,6 @@
 #include "common/event/libevent.h"
 
-#include <signal.h>
+#include <csignal>
 
 #include "common/common/assert.h"
 

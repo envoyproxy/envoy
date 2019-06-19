@@ -738,7 +738,7 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings, bool disa
     ASSERT(rc == 0);
   } else {
     // nghttp2_submit_settings need to be called at least once
-    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, 0, 0);
+    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, nullptr, 0);
     ASSERT(rc == 0);
   }
 

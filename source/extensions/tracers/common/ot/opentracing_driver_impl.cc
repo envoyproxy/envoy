@@ -70,7 +70,7 @@ private:
 
   static Http::HeaderMap::Iterate headerMapCallback(const Http::HeaderEntry& header,
                                                     void* context) {
-    OpenTracingCb* callback = static_cast<OpenTracingCb*>(context);
+    auto* callback = static_cast<OpenTracingCb*>(context);
     opentracing::string_view key{header.key().getStringView().data(),
                                  header.key().getStringView().length()};
     opentracing::string_view value{header.value().getStringView().data(),

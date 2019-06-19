@@ -238,7 +238,7 @@ private:
    */
   template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)> struct IpPrefix {
 
-    IpPrefix() {}
+    IpPrefix() = default;
 
     IpPrefix(const IpType& ip, uint32_t length, const T& data) : ip_(ip), length_(length) {
       data_.insert(data);
