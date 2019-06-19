@@ -55,19 +55,10 @@ function cp_binary_for_image_build() {
   strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_"$1"_stripped/envoy
 }
 
-# When testing memory consumption, we want to test against exact byte-counts
-# where possible. As these differ between platforms and compile options, we
-# define the 'release' builds as canonical and test them only in CI, so the
-# toolchain is kept consistent. This ifdef is checked in
-# test/common/stats/stat_test_utility.cc when computing
-# Stats::TestUtil::MemoryTest::mode().
-MEMORY_TEST_EXACT_ARGS="--cxxopt=-DMEMORY_TEST_EXACT=1"
-
 function bazel_binary_build() {
   BINARY_TYPE="$1"
   if [[ "${BINARY_TYPE}" == "release" ]]; then
     COMPILE_TYPE="opt"
-    CONFIG_ARGS="$MEMORY_TEST_EXACT_ARGS"
   elif [[ "${BINARY_TYPE}" == "debug" ]]; then
     COMPILE_TYPE="dbg"
   elif [[ "${BINARY_TYPE}" == "sizeopt" ]]; then
@@ -91,26 +82,32 @@ function bazel_binary_build() {
 }
 
 if [[ "$1" == "bazel.release" ]]; then
+  # When testing memory consumption, we want to test against exact byte-counts
+  # where possible. As these differ between platforms and compile options, we
+  # define the 'release' builds as canonical and test them only in CI, so the
+  # toolchain is kept consistent. This ifdef is checked in
+  # test/common/stats/stat_test_utility.cc when computing
+  # Stats::TestUtil::MemoryTest::mode().
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --cxxopt=-DMEMORY_TEST_EXACT=1"
+
   setup_clang_toolchain
   echo "bazel release build with tests..."
   bazel_binary_build release
-  RELEASE_OPTIONS="-c opt ${MEMORY_TEST_EXACT_ARGS}"
-  BAZEL_TEST_RELEASE_OPTIONS="test ${BAZEL_TEST_OPTIONS} ${RELEASE_OPTIONS}"
 
   if [[ $# -gt 1 ]]; then
     shift
     echo "Testing $* ..."
     # Run only specified tests. Argument can be a single test
     # (e.g. '//test/common/common:assert_test') or a test group (e.g. '//test/common/...')
-    bazel_with_collection $BAZEL_TEST_RELEASE_OPTIONS $*
+    bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c opt $*
   else
     echo "Testing..."
     # We have various test binaries in the test directory such as tools, benchmarks, etc. We
     # run a build pass to make sure they compile.
 
-    bazel build ${BAZEL_BUILD_OPTIONS} ${RELEASE_OPTIONS} //include/... //source/... //test/...
+    bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
     # Now run all of the tests which should already be compiled.
-    bazel_with_collection $BAZEL_TEST_RELEASE_OPTIONS //test/...
+    bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c opt //test/...
   fi
   exit 0
 elif [[ "$1" == "bazel.release.server_only" ]]; then
@@ -128,14 +125,14 @@ elif [[ "$1" == "bazel.sizeopt" ]]; then
   echo "bazel size optimized build with tests..."
   bazel_binary_build sizeopt
   echo "Testing..."
-  bazel test ${BAZEL_TEST_OPTIONS} //test/... --config=sizeopt
+  bazel test ${BAZEL_BUILD_OPTIONS} //test/... --config=sizeopt
   exit 0
 elif [[ "$1" == "bazel.debug" ]]; then
   setup_clang_toolchain
   echo "bazel debug build with tests..."
   bazel_binary_build debug
   echo "Testing..."
-  bazel test ${BAZEL_TEST_OPTIONS} -c dbg //test/...
+  bazel test ${BAZEL_BUILD_OPTIONS} -c dbg //test/...
   exit 0
 elif [[ "$1" == "bazel.debug.server_only" ]]; then
   setup_clang_toolchain
@@ -146,10 +143,10 @@ elif [[ "$1" == "bazel.asan" ]]; then
   setup_clang_toolchain
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests..."
-  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan //test/...
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan //test/...
   echo "Building and testing envoy-filter-example tests..."
   pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
     //:echo2_integration_test //:envoy_binary_test
   popd
   # Also validate that integration test traffic tapping (useful when debugging etc.)
@@ -159,7 +156,7 @@ elif [[ "$1" == "bazel.asan" ]]; then
   TAP_TMP=/tmp/tap/
   rm -rf "${TAP_TMP}"
   mkdir -p "${TAP_TMP}"
-  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
     //test/extensions/transport_sockets/tls/integration:ssl_integration_test \
     --test_env=TAP_PATH="${TAP_TMP}/tap"
   # Verify that some pb_text files have been created. We can't check for pcap,
@@ -171,10 +168,10 @@ elif [[ "$1" == "bazel.tsan" ]]; then
   setup_clang_toolchain
   echo "bazel TSAN debug build with tests"
   echo "Building and testing envoy tests..."
-  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan //test/...
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan //test/...
   echo "Building and testing envoy-filter-example tests..."
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan \
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan \
     //:echo2_integration_test //:envoy_binary_test
   exit 0
 elif [[ "$1" == "bazel.dev" ]]; then
@@ -185,7 +182,7 @@ elif [[ "$1" == "bazel.dev" ]]; then
   bazel_binary_build fastbuild
 
   echo "Building and testing..."
-  bazel test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/...
+  bazel test ${BAZEL_BUILD_OPTIONS} -c fastbuild //test/...
   exit 0
 elif [[ "$1" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
@@ -208,11 +205,11 @@ elif [[ "$1" == "bazel.compile_time_options" ]]; then
   echo "Building..."
   bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //source/exe:envoy-static
   echo "Building and testing..."
-  bazel test ${BAZEL_TEST_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //test/...
+  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //test/...
 
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
   # these tests under "-c opt" to save time in CI.
-  bazel test ${BAZEL_TEST_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt //test/common/common:assert_test //test/server:server_test
+  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt //test/common/common:assert_test //test/server:server_test
   exit 0
 elif [[ "$1" == "bazel.ipv6_tests" ]]; then
   # This is around until Circle supports IPv6. We try to run a limited set of IPv6 tests as fast
@@ -230,7 +227,7 @@ elif [[ "$1" == "bazel.ipv6_tests" ]]; then
 
   setup_clang_toolchain
   echo "Testing..."
-  bazel_with_collection test ${BAZEL_TEST_OPTIONS} --test_env=ENVOY_IP_TEST_VERSIONS=v6only -c fastbuild \
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_IP_TEST_VERSIONS=v6only -c fastbuild \
     //test/integration/... //test/common/network/...
   exit 0
 elif [[ "$1" == "bazel.api" ]]; then
@@ -238,7 +235,7 @@ elif [[ "$1" == "bazel.api" ]]; then
   echo "Building API..."
   bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//envoy/...
   echo "Testing API..."
-  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
     @envoy_api//tools:tap2pcap_test
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
@@ -257,7 +254,7 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   # https://github.com/envoyproxy/envoy/pull/5611.
   # TODO(akonradi): use --local_cpu_resources flag once Bazel has a release
   # after 0.21.
-  [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=12288,4,1"
+  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_resources=12288,4,1"
 
   test/run_envoy_bazel_coverage.sh
   collect_build_profile coverage
