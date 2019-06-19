@@ -53,7 +53,7 @@ public:
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                  TransportSocketPtr&& transport_socket, bool connected);
 
-  ~ConnectionImpl();
+  ~ConnectionImpl() override;
 
   // Network::FilterManager
   void addWriteFilter(WriteFilterSharedPtr filter) override;

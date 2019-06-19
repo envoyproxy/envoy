@@ -719,7 +719,7 @@ public:
   /**
    * @return a string_view into the InlineString.
    */
-  absl::string_view toStringView() const { return absl::string_view(data_, size_); }
+  absl::string_view toStringView() const { return {data_, size_}; }
 
   /**
    * @return the number of bytes in the string

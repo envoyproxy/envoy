@@ -19,7 +19,7 @@ protected:
   struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
     PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
                    ConnectionPool::Callbacks& callbacks);
-    ~PendingRequest();
+    ~PendingRequest() override;
 
     // ConnectionPool::Cancellable
     void cancel() override { parent_.onPendingRequestCancel(*this); }
