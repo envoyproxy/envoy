@@ -862,6 +862,7 @@ envoy_cc_library(
         ":quic_core_crypto_hkdf_lib",
         ":quic_core_crypto_proof_source_lib",
         ":quic_core_crypto_random_lib",
+        ":quic_core_crypto_tls_handshake_lib",
         ":quic_core_data_lib",
         ":quic_core_error_codes_lib",
         ":quic_core_lru_cache_lib",
@@ -982,6 +983,27 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [":quic_platform_base"],
+)
+
+envoy_cc_library(
+    name = "quic_core_crypto_tls_handshake_lib",
+    srcs = [
+        "quiche/quic/core/crypto/tls_client_connection.cc",
+        "quiche/quic/core/crypto/tls_connection.cc",
+        "quiche/quic/core/crypto/tls_server_connection.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/crypto/tls_client_connection.h",
+        "quiche/quic/core/crypto/tls_connection.h",
+        "quiche/quic/core/crypto/tls_server_connection.h",
+    ],
+    copts = quiche_copt,
+    external_deps = ["ssl"],
+    repository = "@envoy",
+    deps = [
+        ":quic_core_types_lib",
+        ":quic_platform_base",
+    ],
 )
 
 envoy_cc_library(
@@ -1394,6 +1416,7 @@ envoy_cc_library(
         ":quic_core_crypto_crypto_handshake_lib",
         ":quic_core_crypto_encryption_lib",
         ":quic_core_crypto_random_lib",
+        ":quic_core_crypto_tls_handshake_lib",
         ":quic_core_frames_frames_lib",
         ":quic_core_packet_creator_lib",
         ":quic_core_packets_lib",

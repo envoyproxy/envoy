@@ -340,6 +340,16 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_ignore_tlpr_if_sending_ping, false,
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_terminate_gquic_connection_as_ietf, false,
             "If true, terminate Google QUIC connections similary as IETF QUIC.")
 
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_disable_version_44, false,
+            "If true, disable QUIC version 44.")
+
+QUICHE_FLAG(
+    bool, quic_reloadable_flag_quic_fix_packets_acked, false,
+    "If true, when detecting losses, use packets_acked of corresponding packet number space.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_ignore_tlpr_if_no_pending_stream_data, false,
+            "If true, ignore TLPR if there is no pending stream data")
+
 QUICHE_FLAG(bool, quic_restart_flag_quic_allow_loas_multipacket_chlo, false,
             "If true, inspects QUIC CHLOs for kLOAS and early creates sessions "
             "to allow multi-packet CHLOs")
@@ -469,6 +479,9 @@ QUICHE_FLAG(double, quic_pace_time_into_future_srtt_fraction,
 
 QUICHE_FLAG(bool, quic_export_server_num_packets_per_write_histogram, false,
             "If true, export number of packets written per write operation histogram.")
+
+QUICHE_FLAG(int64_t, quic_headers_stream_id_in_v99, 0,
+            "QUIC version 99 will use this stream ID for the headers stream.")
 
 QUICHE_FLAG(bool, http2_reloadable_flag_http2_testonly_default_false, false,
             "A testonly reloadable flag that will always default to false.")
