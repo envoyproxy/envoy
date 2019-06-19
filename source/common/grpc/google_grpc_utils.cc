@@ -62,6 +62,19 @@ grpc::ByteBuffer GoogleGrpcUtils::makeByteBuffer(Buffer::InstancePtr&& buffer_in
   return {&slices[0], slices.size()};
 }
 
+class GrpcSliceBufferFragmentImpl : public Buffer::BufferFragment {
+public:
+  explicit GrpcSliceBufferFragmentImpl(grpc::Slice&& slice) : slice_(std::move(slice)) {}
+
+  // Buffer::BufferFragment
+  const void* data() const override { return slice_.begin(); }
+  size_t size() const override { return slice_.size(); }
+  void done() override { delete this; }
+
+private:
+  const grpc::Slice slice_;
+};
+
 Buffer::InstancePtr GoogleGrpcUtils::makeBufferInstance(const grpc::ByteBuffer& byte_buffer) {
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
   if (byte_buffer.Length() == 0) {
@@ -75,13 +88,7 @@ Buffer::InstancePtr GoogleGrpcUtils::makeBufferInstance(const grpc::ByteBuffer& 
   }
 
   for (size_t i = 0; i < slices.size(); i++) {
-    auto* slice = new grpc::Slice(std::move(slices[i]));
-    buffer->addBufferFragment(*new Buffer::BufferFragmentImpl(
-        slice->begin(), slice->size(),
-        [slice](const void*, size_t, const Buffer::BufferFragmentImpl* frag) {
-          delete slice;
-          delete frag;
-        }));
+    buffer->addBufferFragment(*new GrpcSliceBufferFragmentImpl(std::move(slices[i])));
   }
   return buffer;
 }
