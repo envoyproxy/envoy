@@ -182,9 +182,7 @@ absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(
 
 Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
-                                                    uint32_t* dropped_packets,
-                                                    Address::InstanceConstSharedPtr& local_address,
-                                                    Address::InstanceConstSharedPtr& peer_address) {
+                                                    RecvMsgOutput& output) {
 
 #ifndef __APPLE__
   // The minimum cmsg buffer size to filled in destination address and packets dropped when
@@ -220,10 +218,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   // As a ugly workaround, we define the following constant for use in
   // automatic array declarations, and in all cases have an assert to
   // verify that the value is of sufficient size. (The assert should
-  // constant propagate and be dead-code eliminated in normal compiles
-  // and should cause a quick death if ever violated, since NaCl startup
-  // code involves the use of descriptor passing through the affected
-  // code.)
+  // constantly propagate and be dead-code eliminated in normal compiles
+  // and should cause a quick death if ever violated.)
   constexpr int cmsg_space = 128;
   char cbuf[cmsg_space];
 #endif
@@ -255,11 +251,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   if (result.rc_ < 0) {
     return sysCallResultToIoCallResult(result);
   }
-  if (hdr.msg_flags & MSG_CTRUNC) {
-    ENVOY_LOG(error, "Incorrectly set control message length: {}", hdr.msg_controllen);
-    return sysCallResultToIoCallResult(result);
-  }
 
+  RELEASE_ASSERT((hdr.msg_flags & MSG_CTRUNC) == 0,
+                 fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
   RELEASE_ASSERT(hdr.msg_namelen > 0,
                  fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
   try {
@@ -271,25 +265,32 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     // address and the socket is actually v6 only, the returned address will be
     // regarded as a v6 address from dual stack socket. However, this address is not going to be
     // used to create socket. Wrong knowledge of dual stack support won't hurt.
-    peer_address = Address::addressFromSockAddr(peer_addr, hdr.msg_namelen, /*v6only=*/false);
+    output.peer_address_ =
+        Address::addressFromSockAddr(peer_addr, hdr.msg_namelen, /*v6only=*/false);
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(error, "Invalid remote address for fd: {}, error: {}", fd_, e.what());
+    ENVOY_LOG(critical, "Invalid remote address for fd: {}, error: {}", fd_, e.what());
   }
 
   // Get overflow, local and peer addresses from control message.
   if (hdr.msg_controllen > 0) {
     struct cmsghdr* cmsg;
     for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-      Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(cmsg, self_port);
-      if (addr != nullptr) {
-        // This is a IP packet info message.
-        local_address = std::move(addr);
-        continue;
+      if (output.local_address_ == nullptr) {
+        try {
+          Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(cmsg, self_port);
+          if (addr != nullptr) {
+            // This is a IP packet info message.
+            output.local_address_ = std::move(addr);
+            continue;
+          }
+        } catch (const EnvoyException& e) {
+          ENVOY_LOG(critical, "Invalid destination address for fd: {}, error: {}", fd_, e.what());
+        }
       }
-      if (dropped_packets != nullptr) {
+      if (output.dropped_packets_ != nullptr) {
         absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(cmsg);
         if (maybe_dropped) {
-          *dropped_packets = *maybe_dropped;
+          *output.dropped_packets_ = *maybe_dropped;
         }
       }
     }

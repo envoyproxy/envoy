@@ -69,20 +69,18 @@ void UdpListenerImpl::onSocketEvent(short flags) {
 void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
   // Max UDP payload.
-  constexpr uint64_t const read_buffer_length = 1500;
+  const uint64_t read_buffer_length = 1500;
   do {
-    Address::InstanceConstSharedPtr peer_address;
-    Address::InstanceConstSharedPtr local_address;
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     Buffer::RawSlice slice;
     const uint64_t num_slices = buffer->reserve(read_buffer_length, &slice, 1);
     ASSERT(num_slices == 1);
 
+    IoHandle::RecvMsgOutput output(&packets_dropped_);
     uint32_t old_packets_dropped = packets_dropped_;
     MonotonicTime receive_time = time_source_.monotonicTime();
-    Api::IoCallUint64Result result =
-        socket_.ioHandle().recvmsg(&slice, num_slices, socket_.localAddress()->ip()->port(),
-                                   &packets_dropped_, local_address, peer_address);
+    Api::IoCallUint64Result result = socket_.ioHandle().recvmsg(
+        &slice, num_slices, socket_.localAddress()->ip()->port(), output);
 
     if (!result.ok()) {
       // No more to read or encountered a system error.
@@ -102,7 +100,7 @@ void UdpListenerImpl::handleReadCallback() {
       ENVOY_UDP_LOG(warn, "received 0-length packet");
     }
 
-    if (local_address == nullptr) {
+    if (output.local_address_ == nullptr) {
       ENVOY_UDP_LOG(error, "fail to get local address from IP header");
     }
 
@@ -114,7 +112,9 @@ void UdpListenerImpl::handleReadCallback() {
                            ? (packets_dropped_ - old_packets_dropped)
                            : (packets_dropped_ +
                               (std::numeric_limits<uint32_t>::max() - old_packets_dropped) + 1);
-      ENVOY_UDP_LOG(warn, "Kernel dropped {} more packets.", delta);
+      // TODO(danzh) add stats for this.
+      ENVOY_UDP_LOG(warn, "Kernel dropped {} more packets. Consider increase receive buffer size.",
+                    delta);
     }
 
     // Adjust used memory length.
@@ -123,18 +123,19 @@ void UdpListenerImpl::handleReadCallback() {
 
     ENVOY_UDP_LOG(trace, "recvmsg bytes {}", result.rc_);
 
-    RELEASE_ASSERT((peer_address != nullptr),
+    RELEASE_ASSERT(output.peer_address_ != nullptr,
                    fmt::format("Unable to get remote address for fd: {}, local address: {} ",
-                               socket_.ioHandle().fd(), local_address->asString()));
+                               socket_.ioHandle().fd(), socket_.localAddress()->asString()));
 
     // Unix domain sockets are not supported
-    RELEASE_ASSERT(peer_address->type() == Address::Type::Ip,
-                   fmt::format("Unsupported peer address: {} local address: {}, receive size: "
+    RELEASE_ASSERT(output.peer_address_->type() == Address::Type::Ip,
+                   fmt::format("Unsupported remote address: {} local address: {}, receive size: "
                                "{}",
-                               peer_address->asString(), local_address->asString(), result.rc_));
+                               output.peer_address_->asString(), socket_.localAddress()->asString(),
+                               result.rc_));
 
-    UdpRecvData recvData{std::move(local_address), std::move(peer_address), std::move(buffer),
-                         receive_time};
+    UdpRecvData recvData{std::move(output.local_address_), std::move(output.peer_address_),
+                         std::move(buffer), receive_time};
     cb_.onData(recvData);
   } while (true);
 }

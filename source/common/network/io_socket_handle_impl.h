@@ -38,9 +38,7 @@ public:
                                   const Address::Instance& address) override;
 
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
-                                  uint32_t self_port, uint32_t* dropped_packets,
-                                  std::shared_ptr<const Address::Instance>& local_address,
-                                  std::shared_ptr<const Address::Instance>& peer_address) override;
+                                  uint32_t self_port, RecvMsgOutput& output) override;
 
 private:
   // Converts a SysCallSizeResult to IoCallUint64Result.
