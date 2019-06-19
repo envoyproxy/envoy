@@ -54,7 +54,7 @@ kt_android_library(
 # for the kotlin jni layer
 android_library(
     name = "java_cc_alias",
-    srcs = ["library/kotlin/io/envoyproxy/envoymobile/EnovyKotlinEmptyClass.java"],
+    srcs = ["library/kotlin/io/envoyproxy/envoymobile/EnvoyKotlinEmptyClass.java"],
     custom_package = "io.envoyproxy.envoymobile",
     manifest = "library/EnvoyManifest.xml",
     deps = ["//library/common:envoy_jni_interface_lib"],
