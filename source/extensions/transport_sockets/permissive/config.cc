@@ -48,12 +48,14 @@ UpstreamPermissiveSocketConfigFactory::createTransportSocketFactory(
       *secondary_transport_socket_factory_config, context);
 
   // Theoretically, falling back from unsecure to secure is unrealistic.
-  ASSERT(primary_transport_socket_factory->implementsSecureTransport() ||
-         (!primary_transport_socket_factory->implementsSecureTransport() &&
-          !secondary_transport_socket_factory->implementsSecureTransport()));
+  ASSERT(!permissive_config.allow_fallback() ||
+         (primary_transport_socket_factory->implementsSecureTransport() ||
+          (!primary_transport_socket_factory->implementsSecureTransport() &&
+           !secondary_transport_socket_factory->implementsSecureTransport())));
 
   return std::make_unique<PermissiveSocketFactory>(std::move(primary_transport_socket_factory),
-                                                   std::move(secondary_transport_socket_factory));
+                                                   std::move(secondary_transport_socket_factory),
+                                                   permissive_config.allow_fallback());
 }
 
 ProtobufTypes::MessagePtr UpstreamPermissiveSocketConfigFactory::createEmptyConfigProto() {

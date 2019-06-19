@@ -52,27 +52,27 @@ protected:
       : raw_buffer_transport_socket_(new NiceMock<Network::MockTransportSocket>),
         ssl_transport_socket_(new NiceMock<MockSslTransportSocket>) {}
 
-  void initialize() {
+  void initialize(bool allow_fallback) {
     auto unique_raw_buffer_transport_socket =
         std::unique_ptr<Network::MockTransportSocket>(raw_buffer_transport_socket_);
     auto unique_ssl_transport_socket =
         std::unique_ptr<MockSslTransportSocket>(ssl_transport_socket_);
     permissive_transport_socket_ = std::make_unique<PermissiveSocket>(
-        std::move(unique_ssl_transport_socket), std::move(unique_raw_buffer_transport_socket));
+        std::move(unique_ssl_transport_socket), std::move(unique_raw_buffer_transport_socket),
+        allow_fallback);
 
     EXPECT_CALL(*ssl_transport_socket_, setTransportSocketCallbacks(_)).Times(1);
     permissive_transport_socket_->setTransportSocketCallbacks(callbacks_);
   }
 
-  void downgrade() {
-    EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
+  void fallback() {
+    EXPECT_FALSE(permissive_transport_socket_->isFallback());
     Network::IoResult io_result = {Network::PostIoAction::Close, 0, false};
     EXPECT_CALL(*ssl_transport_socket_, doRead(_)).WillOnce(Return(io_result));
     EXPECT_CALL(*ssl_transport_socket_, canFlushClose()).WillOnce(Return(false));
 
     EXPECT_CALL(callbacks_, connection()).Times(AtMost(1));
     permissive_transport_socket_->doRead(read_buffer_);
-    EXPECT_TRUE(permissive_transport_socket_->isDowngraded());
   }
 
   std::unique_ptr<PermissiveSocket> permissive_transport_socket_;
@@ -84,12 +84,12 @@ protected:
   Buffer::OwnedImpl read_buffer_;
 };
 
-TEST_F(PermissiveSocketTest, DowngradeOnWrite) {
+TEST_F(PermissiveSocketTest, FallbackOnWrite) {
   InSequence s;
 
-  initialize();
+  initialize(true);
 
-  EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
+  EXPECT_FALSE(permissive_transport_socket_->isFallback());
 
   Network::IoResult io_result = {Network::PostIoAction::Close, 0, false};
   EXPECT_CALL(*ssl_transport_socket_, doWrite(BufferStringEqual("hello"), false))
@@ -102,15 +102,15 @@ TEST_F(PermissiveSocketTest, DowngradeOnWrite) {
   io_result = permissive_transport_socket_->doWrite(write_buffer_, false);
 
   EXPECT_EQ(Network::PostIoAction::Reconnect, io_result.action_);
-  EXPECT_TRUE(permissive_transport_socket_->isDowngraded());
+  EXPECT_TRUE(permissive_transport_socket_->isFallback());
 }
 
-TEST_F(PermissiveSocketTest, DowngradeOnRead) {
+TEST_F(PermissiveSocketTest, FallbackOnRead) {
   InSequence s;
 
-  initialize();
+  initialize(true);
 
-  EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
+  EXPECT_FALSE(permissive_transport_socket_->isFallback());
 
   Network::IoResult io_result = {Network::PostIoAction::Close, 0, false};
   EXPECT_CALL(*ssl_transport_socket_, doRead(_)).WillOnce(Return(io_result));
@@ -120,15 +120,15 @@ TEST_F(PermissiveSocketTest, DowngradeOnRead) {
   io_result = permissive_transport_socket_->doRead(read_buffer_);
 
   EXPECT_EQ(Network::PostIoAction::Reconnect, io_result.action_);
-  EXPECT_TRUE(permissive_transport_socket_->isDowngraded());
+  EXPECT_TRUE(permissive_transport_socket_->isFallback());
 }
 
-TEST_F(PermissiveSocketTest, DoNotDowngradeWhenHandShakeNotCompleteSocketKeepOpen) {
+TEST_F(PermissiveSocketTest, DoNotFallbackWhenHandShakeNotCompleteSocketKeepOpen) {
   InSequence s;
 
-  initialize();
+  initialize(true);
 
-  EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
+  EXPECT_FALSE(permissive_transport_socket_->isFallback());
 
   Network::IoResult io_result = {Network::PostIoAction::KeepOpen, 0, false};
 
@@ -139,15 +139,15 @@ TEST_F(PermissiveSocketTest, DoNotDowngradeWhenHandShakeNotCompleteSocketKeepOpe
   io_result = permissive_transport_socket_->doRead(read_buffer_);
 
   EXPECT_EQ(Network::PostIoAction::KeepOpen, io_result.action_);
-  EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
+  EXPECT_FALSE(permissive_transport_socket_->isFallback());
 }
 
-TEST_F(PermissiveSocketTest, DoNotDowngradeWhenHandShakeCompleteSocketClosed) {
+TEST_F(PermissiveSocketTest, DoNotFallbackWhenHandShakeCompleteSocketClosed) {
   InSequence s;
 
-  initialize();
+  initialize(true);
 
-  EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
+  EXPECT_FALSE(permissive_transport_socket_->isFallback());
 
   Network::IoResult io_result = {Network::PostIoAction::Close, 0, false};
 
@@ -158,92 +158,102 @@ TEST_F(PermissiveSocketTest, DoNotDowngradeWhenHandShakeCompleteSocketClosed) {
   io_result = permissive_transport_socket_->doRead(read_buffer_);
 
   EXPECT_EQ(Network::PostIoAction::Close, io_result.action_);
-  EXPECT_FALSE(permissive_transport_socket_->isDowngraded());
+  EXPECT_FALSE(permissive_transport_socket_->isFallback());
 }
 
-TEST_F(PermissiveSocketTest, ProtocolBeforeAndAfterDowngrade) {
+TEST_F(PermissiveSocketTest, ProtocolBeforeAndAfterFallback) {
   InSequence s;
 
-  initialize();
+  initialize(true);
 
-  EXPECT_CALL(*ssl_transport_socket_, protocol()).WillOnce(Return("h2"));
+  ON_CALL(*ssl_transport_socket_, protocol()).WillByDefault(Return("h2"));
+  ON_CALL(*raw_buffer_transport_socket_, protocol()).WillByDefault(Return(EMPTY_STRING));
+
   EXPECT_EQ("h2", permissive_transport_socket_->protocol());
-
-  downgrade();
-  EXPECT_CALL(*raw_buffer_transport_socket_, protocol()).WillOnce(Return(EMPTY_STRING));
+  fallback();
   EXPECT_EQ(EMPTY_STRING, permissive_transport_socket_->protocol());
 }
 
-TEST_F(PermissiveSocketTest, FailureReasonBeforeAndAfterDowngrade) {
+TEST_F(PermissiveSocketTest, FailureReasonBeforeAndAfterFallback) {
   InSequence s;
 
-  initialize();
+  initialize(true);
 
-  std::string reason = "connection failure";
-  EXPECT_CALL(*ssl_transport_socket_, failureReason()).WillOnce(Return(reason));
-  EXPECT_EQ(reason, permissive_transport_socket_->failureReason());
+  std::string primary_failure = "primary failure";
+  std::string secondary_failure = "secondary failure";
+  ON_CALL(*ssl_transport_socket_, failureReason()).WillByDefault(Return(primary_failure));
+  ON_CALL(*raw_buffer_transport_socket_, failureReason()).WillByDefault(Return(secondary_failure));
 
-  downgrade();
-
-  EXPECT_CALL(*raw_buffer_transport_socket_, failureReason()).WillOnce(Return(reason));
-  EXPECT_EQ(reason, permissive_transport_socket_->failureReason());
+  EXPECT_EQ(primary_failure, permissive_transport_socket_->failureReason());
+  fallback();
+  EXPECT_EQ(secondary_failure, permissive_transport_socket_->failureReason());
 }
 
-TEST_F(PermissiveSocketTest, OnConnectedBeforeAndAfterDowngrade) {
+TEST_F(PermissiveSocketTest, OnConnectedBeforeAndAfterFallback) {
   InSequence s;
 
-  initialize();
+  initialize(true);
 
   EXPECT_CALL(*ssl_transport_socket_, onConnected()).Times(1);
   permissive_transport_socket_->onConnected();
 
-  downgrade();
+  fallback();
 
   EXPECT_CALL(*raw_buffer_transport_socket_, onConnected()).Times(1);
   permissive_transport_socket_->onConnected();
 }
 
-TEST_F(PermissiveSocketTest, CanFlushCloseBeforeAndAfterDowngrade) {
+TEST_F(PermissiveSocketTest, CanFlushCloseBeforeAndAfterFallback) {
   InSequence s;
 
-  initialize();
+  initialize(true);
 
   EXPECT_CALL(*ssl_transport_socket_, canFlushClose()).Times(1);
   permissive_transport_socket_->canFlushClose();
 
-  downgrade();
+  fallback();
 
   EXPECT_CALL(*raw_buffer_transport_socket_, canFlushClose()).Times(1);
   permissive_transport_socket_->canFlushClose();
 }
 
-TEST_F(PermissiveSocketTest, CloseSocketBeforeAndAfterDowngrade) {
+TEST_F(PermissiveSocketTest, CloseSocketBeforeAndAfterFallback) {
   InSequence s;
 
-  initialize();
+  initialize(true);
 
   EXPECT_CALL(*ssl_transport_socket_, closeSocket(Network::ConnectionEvent::LocalClose)).Times(1);
   permissive_transport_socket_->closeSocket(Network::ConnectionEvent::LocalClose);
 
-  downgrade();
+  fallback();
 
   EXPECT_CALL(*raw_buffer_transport_socket_, closeSocket(Network::ConnectionEvent::LocalClose))
       .Times(1);
   permissive_transport_socket_->closeSocket(Network::ConnectionEvent::LocalClose);
 }
 
-TEST_F(PermissiveSocketTest, CheckSslBeforeAndAfterDowngrade) {
+TEST_F(PermissiveSocketTest, CheckSslBeforeAndAfterFallback) {
   InSequence s;
 
-  initialize();
+  initialize(true);
 
-  EXPECT_CALL(*ssl_transport_socket_, ssl()).WillOnce(Return(ssl_transport_socket_));
+  ON_CALL(*ssl_transport_socket_, ssl()).WillByDefault(Return(ssl_transport_socket_));
+  ON_CALL(*raw_buffer_transport_socket_, ssl()).WillByDefault(Return(nullptr));
+
   EXPECT_NE(nullptr, permissive_transport_socket_->ssl());
-
-  downgrade();
-
-  EXPECT_CALL(*raw_buffer_transport_socket_, ssl()).WillOnce(Return(nullptr));
+  fallback();
   EXPECT_EQ(nullptr, permissive_transport_socket_->ssl());
+}
+
+TEST_F(PermissiveSocketTest, FallbackIsNotAllowed) {
+  InSequence s;
+
+  initialize(false);
+
+  fallback();
+
+  // Failed to fall back.
+  EXPECT_FALSE(permissive_transport_socket_->isFallback());
 }
 
 } // namespace

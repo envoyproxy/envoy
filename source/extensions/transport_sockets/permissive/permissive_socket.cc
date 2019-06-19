@@ -8,13 +8,15 @@ namespace TransportSockets {
 namespace Permissive {
 
 PermissiveSocket::PermissiveSocket(Network::TransportSocketPtr&& primary_transport_socket,
-                                   Network::TransportSocketPtr&& secondary_transport_socket)
-    : primary_transport_socket_(std::move(primary_transport_socket)),
+                                   Network::TransportSocketPtr&& secondary_transport_socket,
+                                   bool allow_fallback)
+    : allow_fallback_(allow_fallback),
+      primary_transport_socket_(std::move(primary_transport_socket)),
       secondary_transport_socket_(std::move(secondary_transport_socket)) {}
 
 void PermissiveSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   callbacks_ = &callbacks;
-  if (downgraded_) {
+  if (is_fallback_) {
     secondary_transport_socket_->setTransportSocketCallbacks(callbacks);
   } else {
     primary_transport_socket_->setTransportSocketCallbacks(callbacks);
@@ -22,7 +24,7 @@ void PermissiveSocket::setTransportSocketCallbacks(Network::TransportSocketCallb
 }
 
 Network::IoResult PermissiveSocket::doRead(Buffer::Instance& buffer) {
-  if (downgraded_) {
+  if (is_fallback_) {
     return secondary_transport_socket_->doRead(buffer);
   } else {
     Network::IoResult io_result = primary_transport_socket_->doRead(buffer);
@@ -32,7 +34,7 @@ Network::IoResult PermissiveSocket::doRead(Buffer::Instance& buffer) {
 }
 
 Network::IoResult PermissiveSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
-  if (downgraded_) {
+  if (is_fallback_) {
     return secondary_transport_socket_->doWrite(buffer, end_stream);
   } else {
     Network::IoResult io_result = primary_transport_socket_->doWrite(buffer, end_stream);
@@ -42,7 +44,7 @@ Network::IoResult PermissiveSocket::doWrite(Buffer::Instance& buffer, bool end_s
 }
 
 std::string PermissiveSocket::protocol() const {
-  if (downgraded_) {
+  if (is_fallback_) {
     return secondary_transport_socket_->protocol();
   } else {
     return primary_transport_socket_->protocol();
@@ -50,7 +52,7 @@ std::string PermissiveSocket::protocol() const {
 }
 
 absl::string_view PermissiveSocket::failureReason() const {
-  if (downgraded_) {
+  if (is_fallback_) {
     return secondary_transport_socket_->failureReason();
   } else {
     return primary_transport_socket_->failureReason();
@@ -58,7 +60,7 @@ absl::string_view PermissiveSocket::failureReason() const {
 }
 
 void PermissiveSocket::onConnected() {
-  if (downgraded_) {
+  if (is_fallback_) {
     secondary_transport_socket_->onConnected();
   } else {
     primary_transport_socket_->onConnected();
@@ -66,7 +68,7 @@ void PermissiveSocket::onConnected() {
 }
 
 bool PermissiveSocket::canFlushClose() {
-  if (downgraded_) {
+  if (is_fallback_) {
     return secondary_transport_socket_->canFlushClose();
   } else {
     return primary_transport_socket_->canFlushClose();
@@ -74,7 +76,7 @@ bool PermissiveSocket::canFlushClose() {
 }
 
 void PermissiveSocket::closeSocket(Network::ConnectionEvent event) {
-  if (downgraded_) {
+  if (is_fallback_) {
     secondary_transport_socket_->closeSocket(event);
   } else {
     primary_transport_socket_->closeSocket(event);
@@ -82,7 +84,7 @@ void PermissiveSocket::closeSocket(Network::ConnectionEvent event) {
 }
 
 const Ssl::ConnectionInfo* PermissiveSocket::ssl() const {
-  if (downgraded_) {
+  if (is_fallback_) {
     return secondary_transport_socket_->ssl();
   } else {
     return primary_transport_socket_->ssl();
@@ -90,7 +92,7 @@ const Ssl::ConnectionInfo* PermissiveSocket::ssl() const {
 }
 
 void PermissiveSocket::checkIoResult(Network::IoResult& io_result) {
-  ASSERT(!downgraded_);
+  ASSERT(!is_fallback_);
 
   /**
    * The function is for checking if the TLS handshake succeeded or not. If handshake failed,
@@ -99,11 +101,12 @@ void PermissiveSocket::checkIoResult(Network::IoResult& io_result) {
    * completed. Since handshake_complete_ is private in ssl_socket, we can call canFlushClose()
    * instead.
    *  * check if the action is Network::PostIoAction::Close.
+   *  * check if falling back is allowed.
    */
-  if (!canFlushClose() && io_result.action_ == Network::PostIoAction::Close) {
+  if (!canFlushClose() && io_result.action_ == Network::PostIoAction::Close && allow_fallback_) {
     // TODO(crazyxy): add metrics
-    downgraded_ = true;
-    ENVOY_CONN_LOG(trace, "TLS connection downgrade to plaintext", callbacks_->connection());
+    is_fallback_ = true;
+    ENVOY_CONN_LOG(trace, "Transport socket fallback", callbacks_->connection());
 
     // The underlying TCP connection is supposed to be closed. Raise the event to rebuild the TCP
     // connection.
@@ -115,7 +118,7 @@ Network::TransportSocketPtr PermissiveSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsSharedPtr options) const {
   return std::make_unique<PermissiveSocket>(
       primary_transport_socket_factory_->createTransportSocket(options),
-      secondary_transport_socket_factory_->createTransportSocket(options));
+      secondary_transport_socket_factory_->createTransportSocket(options), allow_fallback_);
 }
 
 bool PermissiveSocketFactory::implementsSecureTransport() const { return false; }

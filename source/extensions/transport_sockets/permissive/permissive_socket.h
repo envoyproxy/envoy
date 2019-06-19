@@ -17,8 +17,8 @@ namespace Permissive {
 class PermissiveSocket : public Network::TransportSocket,
                          protected Logger::Loggable<Logger::Id::connection> {
 public:
-  PermissiveSocket(Network::TransportSocketPtr&& tls_transport_socket,
-                   Network::TransportSocketPtr&& raw_buffer_transport_socket);
+  PermissiveSocket(Network::TransportSocketPtr&& primary_transport_socket,
+                   Network::TransportSocketPtr&& secondary_transport_socket, bool allow_fallback);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -31,12 +31,13 @@ public:
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   const Ssl::ConnectionInfo* ssl() const override;
 
-  bool isDowngraded() const { return downgraded_; }
+  bool isFallback() const { return is_fallback_; }
 
 private:
   void checkIoResult(Network::IoResult& io_result);
 
-  bool downgraded_{};
+  bool is_fallback_{};
+  bool allow_fallback_{};
   Network::TransportSocketCallbacks* callbacks_{};
   Network::TransportSocketPtr primary_transport_socket_;
   Network::TransportSocketPtr secondary_transport_socket_;
@@ -45,8 +46,10 @@ private:
 class PermissiveSocketFactory : public Network::TransportSocketFactory {
 public:
   PermissiveSocketFactory(Network::TransportSocketFactoryPtr&& primary_transport_socket_factory,
-                          Network::TransportSocketFactoryPtr&& secondary_transport_socket_factory)
-      : primary_transport_socket_factory_(std::move(primary_transport_socket_factory)),
+                          Network::TransportSocketFactoryPtr&& secondary_transport_socket_factory,
+                          bool allow_fallback)
+      : allow_fallback_(allow_fallback),
+        primary_transport_socket_factory_(std::move(primary_transport_socket_factory)),
         secondary_transport_socket_factory_(std::move(secondary_transport_socket_factory)) {}
 
   // Network::TransportSocketFactory
@@ -55,6 +58,7 @@ public:
   bool implementsSecureTransport() const override;
 
 private:
+  bool allow_fallback_{};
   Network::TransportSocketFactoryPtr primary_transport_socket_factory_;
   Network::TransportSocketFactoryPtr secondary_transport_socket_factory_;
 };
