@@ -163,9 +163,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)),
       normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, normalize_path,
-          // TODO(htuch): we should have a
-          // boolean variant of featureEnabled()
-          // here.
+          // TODO(htuch): we should have a boolean variant of featureEnabled() here.
           context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
 #ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
                                                       100

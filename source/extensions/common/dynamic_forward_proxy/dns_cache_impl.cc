@@ -12,14 +12,16 @@ namespace DynamicForwardProxy {
 
 // TODO(mattklein123): circuit breakers / maximums on the number of hosts that the cache can
 //                     contain.
-// TODO(mattklein123): stats
 
 DnsCacheImpl::DnsCacheImpl(
     Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
+    Stats::Scope& root_scope,
     const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config)
     : main_thread_dispatcher_(main_thread_dispatcher),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(main_thread_dispatcher.createDnsResolver({})), tls_slot_(tls.allocateSlot()),
+      scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
+      stats_{ALL_DNS_CACHE_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))},
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)) {
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(); });
@@ -126,6 +128,7 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
   ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}'", host,
             host_info.host_to_resolve_, host_info.port_);
   ASSERT(host_info.active_query_ == nullptr);
+  stats_.dns_query_attempt_.inc();
   host_info.active_query_ = resolver_->resolve(
       host_info.host_to_resolve_, dns_lookup_family_,
       [this, host](const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) {
@@ -154,6 +157,12 @@ void DnsCacheImpl::finishResolve(
           ? Network::Utility::getAddressWithPort(*address_list.front(), primary_host_info.port_)
           : nullptr;
 
+  if (address_list.empty()) {
+    stats_.dns_query_failure_.inc();
+  } else {
+    stats_.dns_query_success_.inc();
+  }
+
   // Only the change the address if:
   // 1) The new address is valid &&
   // 2a) The host doesn't yet have an address ||
@@ -168,6 +177,7 @@ void DnsCacheImpl::finishResolve(
     primary_host_info.host_info_->address_ = new_address;
     runAddUpdateCallbacks(host, primary_host_info.host_info_);
     address_changed = true;
+    stats_.host_address_changed_.inc();
   }
 
   if (first_resolve || address_changed) {
@@ -229,6 +239,20 @@ void DnsCacheImpl::ThreadLocalHostInfo::updateHostMap(const TlsHostMapSharedPtr&
       ++pending_resolution_it;
     }
   }
+}
+
+DnsCacheImpl::PrimaryHostInfo::PrimaryHostInfo(DnsCacheImpl& parent,
+                                               absl::string_view host_to_resolve, uint16_t port,
+                                               const Event::TimerCb& timer_cb)
+    : parent_(parent), host_to_resolve_(host_to_resolve), port_(port),
+      refresh_timer_(parent.main_thread_dispatcher_.createTimer(timer_cb)) {
+  parent_.stats_.host_added_.inc();
+  parent_.stats_.num_hosts_.inc();
+}
+
+DnsCacheImpl::PrimaryHostInfo::~PrimaryHostInfo() {
+  parent_.stats_.host_removed_.inc();
+  parent_.stats_.num_hosts_.dec();
 }
 
 } // namespace DynamicForwardProxy
