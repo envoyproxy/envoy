@@ -51,12 +51,12 @@ private:
     }
 
     /**
-     * AresWrapper getHostbyName query callback.
-     * @param status return status of call to getHostbyName.
+     * ares_getaddrinfo query callback.
+     * @param status return status of call to ares_getaddrinfo.
      * @param timeouts the number of times the request timed out.
-     * @param res structure to store address info.
+     * @param addrinfo structure to store address info.
      */
-    void onAresGetAddrInfoCallback(int status, int timeouts, struct ares_addrinfo* res);
+    void onAresGetAddrInfoCallback(int status, int timeouts, ares_addrinfo* addrinfo);
 
     /**
      * wrapper function of call to ares_getaddrinfo.

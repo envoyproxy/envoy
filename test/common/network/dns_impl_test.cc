@@ -746,8 +746,7 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
     EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::V4Only,
                                           [](const std::list<DnsResponse>& results) -> void {
                                             for (auto address : results) {
-                                              // Default ttl is std::chrono::seconds::max()
-                                              EXPECT_EQ(address.ttl_, std::chrono::seconds::max());
+                                              EXPECT_EQ(address.ttl_, std::chrono::seconds(0));
                                             }
                                           }));
   }
@@ -756,16 +755,14 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
     EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::V6Only,
                                           [](const std::list<DnsResponse>& results) -> void {
                                             for (auto address : results) {
-                                              // Default ttl is std::chrono::seconds::max()
-                                              EXPECT_EQ(address.ttl_, std::chrono::seconds::max());
+                                              EXPECT_EQ(address.ttl_, std::chrono::seconds(0));
                                             }
                                           }));
 
     EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::Auto,
                                           [](const std::list<DnsResponse>& results) -> void {
                                             for (auto address : results) {
-                                              // Default ttl is std::chrono::seconds::max()
-                                              EXPECT_EQ(address.ttl_, std::chrono::seconds::max());
+                                              EXPECT_EQ(address.ttl_, std::chrono::seconds(0));
                                             }
                                           }));
   }

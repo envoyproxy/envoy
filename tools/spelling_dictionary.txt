@@ -285,6 +285,7 @@ WS
 Welford's
 Werror
 XDS
+getaddrinfo
 sendto
 vip
 xDSes

@@ -84,7 +84,7 @@ void LogicalDnsCluster::startResolve() {
               Network::Utility::getAddressWithPort(*(response.front().address_),
                                                    Network::Utility::portFromTcpUrl(dns_url_));
 
-          if (respect_dns_ttl_ && response.front().ttl_ != std::chrono::seconds::max()) {
+          if (respect_dns_ttl_ && response.front().ttl_ != std::chrono::seconds(0)) {
             refresh_rate = response.front().ttl_;
           }
 

@@ -25,6 +25,9 @@ public:
   virtual void cancel() PURE;
 };
 
+/**
+ * DNS response.
+ */
 struct DnsResponse {
   DnsResponse(Address::InstanceConstSharedPtr address, const std::chrono::seconds ttl)
       : address_(address), ttl_(ttl) {}
