@@ -113,6 +113,7 @@ envoy_cc_test_library(
         "//source/common/stats:stats_lib",
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+        "@envoy_api//envoy/service/discovery/v2:rtds_cc",
     ],
 )
 

@@ -141,7 +141,7 @@ public:
   std::unique_ptr<char[]> tmp_buf_{new char[MaxAllocation]};
 };
 
-typedef std::vector<std::unique_ptr<Buffer::Instance>> BufferList;
+using BufferList = std::vector<std::unique_ptr<Buffer::Instance>>;
 
 // Process a single buffer operation.
 uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, BufferList& buffers,

@@ -17,14 +17,14 @@ namespace Network {
 
 // Optional variant of setsockopt(2) optname. The idea here is that if the option is not supported
 // on a platform, we can make this the empty value. This allows us to avoid proliferation of #ifdef.
-typedef absl::optional<std::pair<int, int>> SocketOptionName;
+using SocketOptionName = absl::optional<std::pair<int, int>>;
 
 /**
  * Base class for Sockets
  */
 class Socket {
 public:
-  virtual ~Socket() {}
+  virtual ~Socket() = default;
 
   /**
    * @return the local address of the socket.
@@ -65,7 +65,7 @@ public:
    */
   class Option {
   public:
-    virtual ~Option() {}
+    virtual ~Option() = default;
 
     /**
      * @param socket the socket on which to apply options.
@@ -105,9 +105,9 @@ public:
                      envoy::api::v2::core::SocketOption::SocketState state) const PURE;
   };
 
-  typedef std::shared_ptr<const Option> OptionConstSharedPtr;
-  typedef std::vector<OptionConstSharedPtr> Options;
-  typedef std::shared_ptr<Options> OptionsSharedPtr;
+  using OptionConstSharedPtr = std::shared_ptr<const Option>;
+  using Options = std::vector<OptionConstSharedPtr>;
+  using OptionsSharedPtr = std::shared_ptr<Options>;
 
   static OptionsSharedPtr& appendOptions(OptionsSharedPtr& to, const OptionsSharedPtr& from) {
     to->insert(to->end(), from->begin(), from->end());
@@ -143,8 +143,8 @@ public:
   virtual const OptionsSharedPtr& options() const PURE;
 };
 
-typedef std::unique_ptr<Socket> SocketPtr;
-typedef std::shared_ptr<Socket> SocketSharedPtr;
+using SocketPtr = std::unique_ptr<Socket>;
+using SocketSharedPtr = std::shared_ptr<Socket>;
 
 /**
  * A socket passed to a connection. For server connections this represents the accepted socket, and
@@ -155,7 +155,7 @@ typedef std::shared_ptr<Socket> SocketSharedPtr;
  */
 class ConnectionSocket : public virtual Socket {
 public:
-  virtual ~ConnectionSocket() {}
+  ~ConnectionSocket() override = default;
 
   /**
    * @return the remote address of the socket.
@@ -217,7 +217,7 @@ public:
   virtual absl::string_view requestedServerName() const PURE;
 };
 
-typedef std::unique_ptr<ConnectionSocket> ConnectionSocketPtr;
+using ConnectionSocketPtr = std::unique_ptr<ConnectionSocket>;
 
 /**
  * Thrown when there is a runtime error binding a socket.

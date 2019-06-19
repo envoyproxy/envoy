@@ -34,7 +34,7 @@ The following documentation runs through the setup of both services.
 
 **Step 1: Install Docker**
 
-Ensure that you have a recent versions of ``docker``, ``docker-compose``, and ``docker-machine``.
+Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
 
 A simple way to achieve this is via the `Docker Toolbox <https://www.docker.com/products/docker-toolbox>`_.
 

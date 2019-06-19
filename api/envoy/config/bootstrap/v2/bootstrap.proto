@@ -237,13 +237,6 @@ message Runtime {
 }
 
 message RuntimeLayer {
-  // :ref:`Static runtime <config_runtime_bootstrap>` layer.
-  message StaticLayer {
-    // This follows the :ref:`runtime protobuf JSON representation encoding
-    // <config_runtime_proto_json>`.
-    google.protobuf.Struct value = 1;
-  }
-
   // :ref:`Disk runtime <config_runtime_local_disk>` layer.
   message DiskLayer {
     // The implementation assumes that the file system tree is accessed via a
@@ -264,27 +257,28 @@ message RuntimeLayer {
   message AdminLayer {
   }
 
-  // [#not-implemented-hide:]
-  message TdsLayer {
-    // Resource to subscribe to at *tds_config* for the TDS layer.
+  // :ref:`Runtime Discovery Service (RTDS) <config_runtime_rtds>` layer.
+  message RtdsLayer {
+    // Resource to subscribe to at *rtds_config* for the RTDS layer.
     string name = 1;
 
-    // TDS configuration source.
-    envoy.api.v2.core.ConfigSource tds_config = 2;
+    // RTDS configuration source.
+    envoy.api.v2.core.ConfigSource rtds_config = 2;
   }
 
   // Descriptive name for the runtime layer. This is only used for the runtime
   // :http:get:`/runtime` output.
-  string name = 1;
+  string name = 1 [(validate.rules).string.min_bytes = 1];
 
   oneof layer_specifier {
-    // Unlike static xDS resources, this static layer is overridable by later
-    // layers in the runtime virtual filesystem.
+    // :ref:`Static runtime <config_runtime_bootstrap>` layer.
+    // This follows the :ref:`runtime protobuf JSON representation encoding
+    // <config_runtime_proto_json>`. Unlike static xDS resources, this static
+    // layer is overridable by later layers in the runtime virtual filesystem.
     google.protobuf.Struct static_layer = 2;
     DiskLayer disk_layer = 3;
     AdminLayer admin_layer = 4;
-    // [#not-implemented-hide:]
-    TdsLayer tds_layer = 5;
+    RtdsLayer rtds_layer = 5;
   }
 }
 

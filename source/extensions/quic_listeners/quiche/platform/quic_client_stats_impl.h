@@ -14,15 +14,19 @@
 
 #define QUIC_CLIENT_HISTOGRAM_ENUM_IMPL(name, sample, enum_size, docstring)                        \
   do {                                                                                             \
+    (void)(sample);                                                                                \
   } while (0)
 #define QUIC_CLIENT_HISTOGRAM_BOOL_IMPL(name, sample, docstring)                                   \
+  (void)(sample);                                                                                  \
   do {                                                                                             \
   } while (0)
 #define QUIC_CLIENT_HISTOGRAM_TIMES_IMPL(name, sample, min, max, num_buckets, docstring)           \
   do {                                                                                             \
+    (void)(sample);                                                                                \
   } while (0)
 #define QUIC_CLIENT_HISTOGRAM_COUNTS_IMPL(name, sample, min, max, num_buckets, docstring)          \
   do {                                                                                             \
+    (void)(sample);                                                                                \
   } while (0)
 
 namespace quic {

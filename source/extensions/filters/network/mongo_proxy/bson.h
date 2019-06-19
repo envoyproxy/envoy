@@ -18,7 +18,7 @@ namespace Bson {
  * Implementation of http://bsonspec.org/spec.html
  */
 class Document;
-typedef std::shared_ptr<Document> DocumentSharedPtr;
+using DocumentSharedPtr = std::shared_ptr<Document>;
 
 /**
  * A BSON document field. This is essentially a variably typed parameter that can be "cast" to
@@ -49,7 +49,7 @@ public:
   /**
    * 12 byte ObjectId type.
    */
-  typedef std::array<uint8_t, 12> ObjectId;
+  using ObjectId = std::array<uint8_t, 12>;
 
   /**
    * Regex type.
@@ -63,7 +63,7 @@ public:
     std::string options_;
   };
 
-  virtual ~Field() {}
+  virtual ~Field() = default;
 
   virtual double asDouble() const PURE;
   virtual const std::string& asString() const PURE;
@@ -87,14 +87,14 @@ public:
   virtual Type type() const PURE;
 };
 
-typedef std::unique_ptr<Field> FieldPtr;
+using FieldPtr = std::unique_ptr<Field>;
 
 /**
  * A BSON document. add*() is used to add strongly typed fields.
  */
 class Document {
 public:
-  virtual ~Document() {}
+  virtual ~Document() = default;
 
   virtual DocumentSharedPtr addDouble(const std::string& key, double value) PURE;
   virtual DocumentSharedPtr addString(const std::string& key, std::string&& value) PURE;

@@ -18,7 +18,7 @@ public:
   const std::string PreviousHostsPredicate = "envoy.retry_host_predicates.previous_hosts";
 };
 
-typedef ConstSingleton<RetryHostPredicatesNameValues> RetryHostPredicateValues;
+using RetryHostPredicateValues = ConstSingleton<RetryHostPredicatesNameValues>;
 
 } // namespace Host
 } // namespace Retry

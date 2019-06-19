@@ -361,6 +361,10 @@ void InstanceImpl::initialize(const Options& options,
     listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config());
   }
 
+  // We have to defer RTDS initialization until after the cluster manager is
+  // instantiated (which in turn relies on runtime...).
+  Runtime::LoaderSingleton::get().initialize(clusterManager());
+
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
@@ -402,9 +406,10 @@ void InstanceImpl::startWorkers() {
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
-  return std::make_unique<Runtime::LoaderImpl>(server.dispatcher(), server.threadLocal(),
-                                               config.runtime(), server.localInfo().clusterName(),
-                                               server.stats(), server.random(), server.api());
+  return std::make_unique<Runtime::LoaderImpl>(
+      server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
+      server.initManager(), server.stats(), server.random(), server.messageValidationVisitor(),
+      server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {

@@ -7,5 +7,6 @@ api_proto_library_internal(
     srcs = ["redis_proxy.proto"],
     deps = [
         "//envoy/api/v2/core:base",
+        "//envoy/type:percent",
     ],
 )

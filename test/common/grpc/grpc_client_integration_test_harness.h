@@ -51,7 +51,7 @@ const char HELLO_REPLY[] = "DEFG";
 
 MATCHER_P(HelloworldReplyEq, rhs, "") { return arg.message() == rhs; }
 
-typedef std::vector<std::pair<Http::LowerCaseString, std::string>> TestMetadata;
+using TestMetadata = std::vector<std::pair<Http::LowerCaseString, std::string>>;
 
 // Use in EXPECT_CALL(foo, bar(_)).WillExitIfNeeded() to exit dispatcher loop if
 // there are no longer any pending events in DispatcherHelper.

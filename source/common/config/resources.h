@@ -20,9 +20,10 @@ public:
   const std::string VirtualHost{"type.googleapis.com/envoy.api.v2.route.VirtualHost"};
   const std::string ScopedRouteConfiguration{
       "type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration"};
+  const std::string Runtime{"type.googleapis.com/envoy.service.discovery.v2.Runtime"};
 };
 
-typedef ConstSingleton<TypeUrlValues> TypeUrl;
+using TypeUrl = ConstSingleton<TypeUrlValues>;
 
 } // namespace Config
 } // namespace Envoy

@@ -17,7 +17,7 @@ public:
   /**
    * Destructor.
    */
-  virtual ~TracerInterface() {}
+  virtual ~TracerInterface() = default;
 
   /**
    * A Zipkin tracer must implement this method. Its implementation must perform whatever

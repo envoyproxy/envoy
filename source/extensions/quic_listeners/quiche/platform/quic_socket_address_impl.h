@@ -25,7 +25,7 @@ public:
   QuicSocketAddressImpl() = default;
   QuicSocketAddressImpl(QuicIpAddress, uint16_t) {}
   explicit QuicSocketAddressImpl(const struct sockaddr_storage&) {}
-  explicit QuicSocketAddressImpl(const struct sockaddr*, socklen_t&) {}
+  QuicSocketAddressImpl(const struct sockaddr*, socklen_t&) {}
   QuicSocketAddressImpl(const QuicSocketAddressImpl&) = default;
   QuicSocketAddressImpl& operator=(const QuicSocketAddressImpl&) = default;
   QuicSocketAddressImpl& operator=(QuicSocketAddressImpl&&) = default;

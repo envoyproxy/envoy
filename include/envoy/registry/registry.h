@@ -52,7 +52,7 @@ public:
    * Gets the current map of factory implementations. This is an ordered map for sorting reasons.
    */
   static std::map<std::string, Base*>& factories() {
-    static std::map<std::string, Base*>* factories = new std::map<std::string, Base*>;
+    static auto* factories = new std::map<std::string, Base*>;
     return *factories;
   }
 
