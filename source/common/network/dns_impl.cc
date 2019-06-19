@@ -1,7 +1,5 @@
 #include "common/network/dns_impl.h"
 
-#include <arpa/nameser.h>
-#include <arpa/nameser_compat.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -17,7 +15,6 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
-#include "absl/strings/match.h"
 #include "ares.h"
 
 namespace Envoy {
