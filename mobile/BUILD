@@ -25,6 +25,7 @@ genrule(
 unzip -o $< -d dist/
 touch $@
 """,
+    stamp = True,
 )
 
 aar_with_jni(
@@ -51,6 +52,7 @@ cp $< dist/envoy.aar
 chmod 755 dist/envoy.aar
 touch $@
 """,
+    stamp = True,
 )
 
 define_kt_toolchain(
