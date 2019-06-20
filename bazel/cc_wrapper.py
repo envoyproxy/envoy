@@ -24,7 +24,7 @@ def sanitize_flagfile(in_path, out_fd):
       if line != "-lstdc++\n":
         os.write(out_fd, line)
       elif "-stdlib=libc++" in envoy_cxxflags:
-        os.write(out_fd, "-lc++\n")
+        os.write(out_fd, "-l:libc++.a\n-l:libc++abi.a\n")
 
 
 # Is the arg a flag indicating that we're building for C++ (rather than C)?
@@ -45,7 +45,7 @@ def modify_driver_args(input_driver_flags):
   # Either:
   # a) remove all occurrences of -lstdc++ (when statically linking against libstdc++),
   # b) replace all occurrences of -lstdc++ with -lc++ (when linking against libc++).
-  if "-static-libstdc++" in input_driver_flags or "-stdlib=libc++" in envoy_cxxflags:
+  if "-l:libstdc++.a" in input_driver_flags or "-stdlib=libc++" in envoy_cxxflags:
     for arg in input_driver_flags:
       if arg in ("-lstdc++", "-static-libstdc++"):
         pass
