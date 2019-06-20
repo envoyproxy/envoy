@@ -13,7 +13,6 @@ jobs:
   # bazel.dev isn't for CI purpose but we use it here to experiment with Azure Pipeline 
   # as it builds faster, before Azure can provision larger VM or we can use RBE.
   - script: ci/do_ci.sh bazel.dev
-    title: bazel.dev
     env:
       ENVOY_SRCDIR: $(Build.SourcesDirectory)
       BUILD_DIR: $(Build.StagingDirectory)
