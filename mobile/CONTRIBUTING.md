@@ -32,6 +32,9 @@ maximize the chances of your PR being merged.
   Please see [envoy/support/README.md](https://github.com/envoyproxy/envoy/tree/master/support) for
   more information on these hooks.
 
+  Note: the git hooks depend upon many of the dependencies used to build envoy via Bazel. Follow the
+  [Quick start Bazel build for developers](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers) guide to install these.
+
 * Create your PR.
 * Tests will automatically run for you.
 * We will **not** merge any PR that is not passing tests.
