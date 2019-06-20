@@ -28,6 +28,7 @@
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/common/utility.h"
+#include "common/config/well_known_names.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/protobuf.h"
 
@@ -100,6 +101,25 @@ uint32_t portFromUrl(const std::string& url, const std::string& scheme,
 }
 
 } // namespace
+
+std::string Utility::urlFromSocketAddress(const envoy::api::v2::core::SocketAddress& address,
+                                          const std::string& cluster_type) {
+  if (address.resolver_name().empty() ||
+      address.resolver_name() == Config::AddressResolverNames::get().IP) {
+    return fmt::format("tcp://{}:{}", address.address(), address.port_value());
+  } else if (address.resolver_name() == Config::AddressResolverNames::get().SRV) {
+    if (absl::EndsWithIgnoreCase(address.named_port(), "srv")) {
+      return fmt::format("tcp://{}:{}", address.address(), address.named_port());
+    } else {
+      throw EnvoyException(
+          fmt::format("named_port must be set to \"srv\" when using the {} resolver type",
+                      Config::AddressResolverNames::get().SRV));
+    }
+  }
+  throw EnvoyException(fmt::format("{} clusters only support {} and {} resolver types",
+                                   cluster_type, Config::AddressResolverNames::get().IP,
+                                   Config::AddressResolverNames::get().SRV));
+}
 
 std::string Utility::hostFromTcpUrl(const std::string& url) {
   return hostFromUrl(url, TCP_SCHEME, "TCP");

@@ -22,12 +22,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& socket_address = lb_endpoint.endpoint().address().socket_address();
-      if (!socket_address.resolver_name().empty()) {
-        throw EnvoyException("STRICT_DNS clusters must NOT have a custom resolver name set");
-      }
-
-      const std::string& url =
-          fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
+      const std::string& url = Network::Utility::urlFromSocketAddress(socket_address, "STRICT_DNS");
       resolve_targets.emplace_back(new ResolveTarget(*this, factory_context.dispatcher(), url,
                                                      locality_lb_endpoint, lb_endpoint));
     }

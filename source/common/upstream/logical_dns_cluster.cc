@@ -46,11 +46,7 @@ LogicalDnsCluster::LogicalDnsCluster(
   const envoy::api::v2::core::SocketAddress& socket_address =
       lbEndpoint().endpoint().address().socket_address();
 
-  if (!socket_address.resolver_name().empty()) {
-    throw EnvoyException("LOGICAL_DNS clusters must NOT have a custom resolver name set");
-  }
-
-  dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
+  dns_url_ = Network::Utility::urlFromSocketAddress(socket_address, "LOGICAL_DNS");
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 

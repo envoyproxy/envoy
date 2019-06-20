@@ -66,6 +66,15 @@ public:
   static bool urlIsUnixScheme(const std::string& url);
 
   /**
+   * Generates a TCP URL given a SocketAddress instance
+   * @param the SocketAddress to generate the TCP URL from
+   * @param the cluster implementation requesting the URL generation
+   * @return std::string the generated TCP URL
+   */
+  static std::string urlFromSocketAddress(const envoy::api::v2::core::SocketAddress& address,
+                                          const std::string& cluster_type);
+
+  /**
    * Parses the host from a TCP URL
    * @param the URL to parse host from
    * @return std::string the parsed host
