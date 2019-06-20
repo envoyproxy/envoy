@@ -7,6 +7,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/environment.h"
 
 using testing::AtLeast;
 using testing::DoAll;
@@ -171,7 +172,7 @@ TEST_F(ClusterTest, InvalidLbContext) {
 
 // Verify that using 'sni' causes a failure.
 TEST_F(ClusterTest, InvalidSNI) {
-  const std::string yaml_config = R"EOF(
+  const std::string yaml_config = TestEnvironment::substitute(R"EOF(
 name: name
 connect_timeout: 0.25s
 cluster_type:
@@ -184,8 +185,9 @@ tls_context:
   sni: api.lyft.com
   common_tls_context:
     validation_context:
-      trusted_ca: {filename: /etc/ssl/certs/ca-certificates.crt}
-)EOF";
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+)EOF");
 
   EXPECT_THROW_WITH_MESSAGE(
       initialize(yaml_config, true), EnvoyException,
@@ -194,7 +196,7 @@ tls_context:
 
 // Verify that using 'verify_subject_alt_name' causes a failure.
 TEST_F(ClusterTest, InvalidVerifySubjectAltName) {
-  const std::string yaml_config = R"EOF(
+  const std::string yaml_config = TestEnvironment::substitute(R"EOF(
 name: name
 connect_timeout: 0.25s
 cluster_type:
@@ -206,9 +208,10 @@ cluster_type:
 tls_context:
   common_tls_context:
     validation_context:
-      trusted_ca: {filename: /etc/ssl/certs/ca-certificates.crt}
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
       verify_subject_alt_name: [api.lyft.com]
-)EOF";
+)EOF");
 
   EXPECT_THROW_WITH_MESSAGE(
       initialize(yaml_config, true), EnvoyException,

@@ -8,7 +8,7 @@ HTTP dynamic forward proxy
   HTTP dynamic forward proxy support should be considered alpha and not production ready. Stats
   as well as circuit breakers are missing and will be added soon.
 
-Though the combination of both an :ref:`HTTP filter <config_http_filters_dynamic_forward_proxy>` and
+Through the combination of both an :ref:`HTTP filter <config_http_filters_dynamic_forward_proxy>` and
 :ref:`custom cluster <envoy_api_msg_config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig>`,
 Envoy supports HTTP dynamic forward proxy. This means that Envoy can perform the role of an HTTP
 proxy without prior knowledge of all configured DNS addresses, while still retaining the vast
