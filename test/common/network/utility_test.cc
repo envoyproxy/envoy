@@ -19,6 +19,91 @@ namespace Envoy {
 namespace Network {
 namespace {
 
+TEST(NetworkUtility, urlFromSocketAddress) {
+  {
+    envoy::api::v2::core::SocketAddress address;
+    address.set_address("127.0.0.1");
+    address.set_port_value(1234);
+    EXPECT_EQ("tcp://127.0.0.1:1234", Utility::urlFromSocketAddress(address, "TEST"));
+  }
+  {
+    envoy::api::v2::core::SocketAddress address;
+    address.set_address("foo");
+    address.set_port_value(1234);
+    EXPECT_EQ("tcp://foo:1234", Utility::urlFromSocketAddress(address, "TEST"));
+  }
+  {
+    envoy::api::v2::core::SocketAddress address;
+    address.set_address("127.0.0.1");
+    address.set_port_value(1234);
+    address.set_resolver_name("envoy.ip");
+    EXPECT_EQ("tcp://127.0.0.1:1234", Utility::urlFromSocketAddress(address, "TEST"));
+  }
+  {
+    envoy::api::v2::core::SocketAddress address;
+    address.set_address("foo");
+    address.set_port_value(1234);
+    address.set_resolver_name("envoy.ip");
+    EXPECT_EQ("tcp://foo:1234", Utility::urlFromSocketAddress(address, "TEST"));
+  }
+  {
+    envoy::api::v2::core::SocketAddress address;
+    address.set_address("127.0.0.1");
+    address.set_port_value(1234);
+    address.set_resolver_name("envoy.srv");
+    EXPECT_THROW(Utility::urlFromSocketAddress(address, "TEST"), EnvoyException);
+  }
+  {
+    envoy::api::v2::core::SocketAddress address;
+    address.set_address("foo");
+    address.set_port_value(1234);
+    address.set_resolver_name("envoy.srv");
+    EXPECT_THROW(Utility::urlFromSocketAddress(address, "TEST"), EnvoyException);
+  }
+  {
+    envoy::api::v2::core::SocketAddress address;
+    address.set_address("127.0.0.1");
+    address.set_named_port("srv");
+    address.set_resolver_name("envoy.srv");
+    EXPECT_EQ("tcp://127.0.0.1:srv", Utility::urlFromSocketAddress(address, "TEST"));
+  }
+  {
+    envoy::api::v2::core::SocketAddress address;
+    address.set_address("foo");
+    address.set_named_port("SRV");
+    address.set_resolver_name("envoy.srv");
+    EXPECT_EQ("tcp://foo:SRV", Utility::urlFromSocketAddress(address, "TEST"));
+  }
+  {
+    envoy::api::v2::core::SocketAddress address;
+    address.set_address("127.0.0.1");
+    address.set_named_port("invalid");
+    address.set_resolver_name("envoy.srv");
+    EXPECT_THROW(Utility::urlFromSocketAddress(address, "TEST"), EnvoyException);
+  }
+  {
+    envoy::api::v2::core::SocketAddress address;
+    address.set_address("foo");
+    address.set_named_port("invalid");
+    address.set_resolver_name("envoy.srv");
+    EXPECT_THROW(Utility::urlFromSocketAddress(address, "TEST"), EnvoyException);
+  }
+  {
+    envoy::api::v2::core::SocketAddress address;
+    address.set_address("127.0.0.1");
+    address.set_named_port("srv");
+    address.set_resolver_name("invalid");
+    EXPECT_THROW(Utility::urlFromSocketAddress(address, "TEST"), EnvoyException);
+  }
+  {
+    envoy::api::v2::core::SocketAddress address;
+    address.set_address("foo");
+    address.set_named_port("SRV");
+    address.set_resolver_name("invalid");
+    EXPECT_THROW(Utility::urlFromSocketAddress(address, "TEST"), EnvoyException);
+  }
+}
+
 TEST(NetworkUtility, Url) {
   EXPECT_EQ("foo", Utility::hostFromTcpUrl("tcp://foo:1234"));
   EXPECT_EQ(1234U, Utility::portFromTcpUrl("tcp://foo:1234"));
