@@ -21,19 +21,17 @@ DubboHessian2SerializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
   size_t total_size = 0, size;
   // TODO(zyfjeff): Add format checker
   std::string dubbo_version = HessianUtils::peekString(buffer, &size);
-  total_size = total_size + size;
+  total_size += size;
   std::string service_name = HessianUtils::peekString(buffer, &size, total_size);
-  total_size = total_size + size;
+  total_size += size;
   std::string service_version = HessianUtils::peekString(buffer, &size, total_size);
-  total_size = total_size + size;
+  total_size += size;
   std::string method_name = HessianUtils::peekString(buffer, &size, total_size);
-  total_size = total_size + size;
+  total_size += size;
 
-  ContextImpl* context_impl = static_cast<ContextImpl*>(context.get());
-  ASSERT(context_impl);
-  if (static_cast<uint64_t>(context_impl->body_size_) < total_size) {
+  if (static_cast<uint64_t>(context->body_size()) < total_size) {
     throw EnvoyException(fmt::format("RpcInvocation size({}) large than body size({})", total_size,
-                                     context_impl->body_size_));
+                                     context->body_size()));
   }
 
   auto invo = std::make_shared<RpcInvocationImpl>();
