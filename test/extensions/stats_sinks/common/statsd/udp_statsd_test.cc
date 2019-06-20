@@ -126,7 +126,7 @@ TEST(UdpStatsdSinkTest, CheckActualStats) {
   NiceMock<Stats::MockMetricSnapshot> snapshot;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
   NiceMock<ThreadLocal::MockInstance> tls_;
-  UdpStatsdSink sink(tls_, writer_ptr, false);
+  UdpStatsdSink sink(tls_, writer_ptr, false, false);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
@@ -182,7 +182,7 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   NiceMock<Stats::MockMetricSnapshot> snapshot;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
   NiceMock<ThreadLocal::MockInstance> tls_;
-  UdpStatsdSink sink(tls_, writer_ptr, true);
+  UdpStatsdSink sink(tls_, writer_ptr, true, false);
 
   std::vector<Stats::Tag> tags = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();

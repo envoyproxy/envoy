@@ -42,8 +42,7 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              Network::Address::InstanceConstSharedPtr address, const bool use_tag,
                              const bool exclude_zero_values, const std::string& prefix)
     : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag),
-      exclude_zero_values_(exclude_zero_values), 
-      prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix) {
+      exclude_zero_values_(exclude_zero_values), prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<Writer>(this->server_address_);
   });
@@ -99,9 +98,8 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              const std::string& cluster_name, ThreadLocal::SlotAllocator& tls,
                              Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                              const bool exclude_zero_values, const std::string& prefix)
-    : exclude_zero_values_(exclude_zero_values), 
-      prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix), tls_(tls.allocateSlot()),
-      cluster_manager_(cluster_manager), cx_overflow_stat_(scope.counter("statsd.cx_overflow")) {
+    : exclude_zero_values_(exclude_zero_values), prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix), 
+      tls_(tls.allocateSlot()), cluster_manager_(cluster_manager), cx_overflow_stat_(scope.counter("statsd.cx_overflow")) {
 
   Config::Utility::checkClusterAndLocalInfo("tcp statsd", cluster_name, cluster_manager,
                                             local_info);
