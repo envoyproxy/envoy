@@ -131,7 +131,8 @@ EXTENSIONS = {
 
     # Retry host predicates
     "envoy.retry_host_predicates.previous_hosts":          "//source/extensions/retry/host/previous_hosts:config",
-
+    "envoy.retry_host_predicates.omit_canary_hosts":            "//source/extensions/retry/host/omit_canary_hosts:config",
+    
     # Retry priorities
     "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/previous_priorities:config",
 }
