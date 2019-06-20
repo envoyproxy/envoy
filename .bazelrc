@@ -65,4 +65,4 @@ build:libc++ --define force_libcpp=enabled
 build:sizeopt -c opt --copt -Os
 
 # Test options
-test --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
+build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH

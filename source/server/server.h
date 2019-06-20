@@ -71,7 +71,7 @@ struct ServerStats {
  */
 class ComponentFactory {
 public:
-  virtual ~ComponentFactory() {}
+  virtual ~ComponentFactory() = default;
 
   /**
    * @return DrainManagerPtr a new drain manager for the server.
@@ -181,7 +181,7 @@ public:
   Runtime::RandomGenerator& random() override { return *random_generator_; }
   Runtime::Loader& runtime() override;
   void shutdown() override;
-  bool isShutdown() override final { return shutdown_; }
+  bool isShutdown() final { return shutdown_; }
   void shutdownAdmin() override;
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override;

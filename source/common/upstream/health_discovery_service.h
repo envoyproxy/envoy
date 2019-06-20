@@ -84,7 +84,7 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
-typedef std::shared_ptr<HdsCluster> HdsClusterPtr;
+using HdsClusterPtr = std::shared_ptr<HdsCluster>;
 
 /**
  * All hds stats. @see stats_macros.h
@@ -199,7 +199,7 @@ private:
   Api::Api& api_;
 };
 
-typedef std::unique_ptr<HdsDelegate> HdsDelegatePtr;
+using HdsDelegatePtr = std::unique_ptr<HdsDelegate>;
 
 } // namespace Upstream
 } // namespace Envoy

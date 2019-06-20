@@ -10,7 +10,7 @@ namespace Envoy {
  */
 class ListenerHooks {
 public:
-  virtual ~ListenerHooks() {}
+  virtual ~ListenerHooks() = default;
 
   /**
    * Called when a worker has added a listener and it is listening.

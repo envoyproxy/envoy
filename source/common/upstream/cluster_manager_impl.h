@@ -177,8 +177,8 @@ public:
                      Http::Context& http_context);
 
   // Upstream::ClusterManager
-  bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster, const std::string& version_info,
-                          ClusterWarmingCallback cluster_warming_cb) override;
+  bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
+                          const std::string& version_info) override;
   void setInitializedCb(std::function<void()> callback) override {
     init_helper_.setInitializedCb(callback);
   }
@@ -212,7 +212,7 @@ public:
     ads_mux_.reset();
     active_clusters_.clear();
     warming_clusters_.clear();
-    updateGauges();
+    updateClusterCounts();
   }
 
   const envoy::api::v2::core::BindConfig& bindConfig() const override { return bind_config_; }
@@ -248,7 +248,7 @@ private:
       ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
           : pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
 
-      typedef PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance> ConnPools;
+      using ConnPools = PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance>;
 
       // This is a shared_ptr so we can keep it alive while cleaning up.
       std::shared_ptr<ConnPools> pools_;
@@ -257,7 +257,7 @@ private:
     };
 
     struct TcpConnPoolsContainer {
-      typedef std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr> ConnPools;
+      using ConnPools = std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
 
       ConnPools pools_;
       uint64_t drains_remaining_{};
@@ -287,8 +287,8 @@ private:
       HostConstSharedPtr host_;
       Network::ClientConnection& connection_;
     };
-    typedef std::unordered_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>
-        TcpConnectionsMap;
+    using TcpConnectionsMap =
+        std::unordered_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>;
 
     struct ClusterEntry : public ThreadLocalCluster {
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
@@ -319,7 +319,7 @@ private:
       Http::AsyncClientImpl http_async_client_;
     };
 
-    typedef std::unique_ptr<ClusterEntry> ClusterEntryPtr;
+    using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;
 
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   const absl::optional<std::string>& local_cluster_name);
@@ -391,9 +391,9 @@ private:
         : RaiiListElement<ClusterUpdateCallbacks*>(parent, &cb) {}
   };
 
-  typedef std::unique_ptr<ClusterData> ClusterDataPtr;
+  using ClusterDataPtr = std::unique_ptr<ClusterData>;
   // This map is ordered so that config dumping is consistent.
-  typedef std::map<std::string, ClusterDataPtr> ClusterMap;
+  using ClusterMap = std::map<std::string, ClusterDataPtr>;
 
   struct PendingUpdates {
     ~PendingUpdates() { disableTimer(); }
@@ -424,6 +424,7 @@ private:
     // (the expected behavior).
     MonotonicTime last_updated_;
   };
+
   using PendingUpdatesPtr = std::unique_ptr<PendingUpdates>;
   using PendingUpdatesByPriorityMap = std::unordered_map<uint32_t, PendingUpdatesPtr>;
   using PendingUpdatesByPriorityMapPtr = std::unique_ptr<PendingUpdatesByPriorityMap>;
@@ -439,7 +440,7 @@ private:
                    bool added_via_api, ClusterMap& cluster_map);
   void onClusterInit(Cluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
-  void updateGauges();
+  void updateClusterCounts();
 
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;

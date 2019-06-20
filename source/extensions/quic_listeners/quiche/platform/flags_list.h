@@ -321,7 +321,7 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_ignore_tlpr_if_sending_ping, false,
             "If true, ignore TLPR for retransmission delay when sending pings from ping alarm.")
 
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_terminate_gquic_connection_as_ietf, false,
-            "If true, terminate Google QUIC connections similary as IETF QUIC.")
+            "If true, terminate Google QUIC connections similarly as IETF QUIC.")
 
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_disable_version_44, false,
             "If true, disable QUIC version 44.")

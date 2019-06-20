@@ -80,7 +80,7 @@ private:
   Zipkin::Tracer& tracer_;
 };
 
-typedef std::unique_ptr<ZipkinSpan> ZipkinSpanPtr;
+using ZipkinSpanPtr = std::unique_ptr<ZipkinSpan>;
 
 /**
  * Class for a Zipkin-specific Driver.

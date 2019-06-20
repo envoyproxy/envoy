@@ -30,8 +30,8 @@ struct DatadogTracerStats {
 };
 
 class TraceReporter;
-typedef std::unique_ptr<TraceReporter> TraceReporterPtr;
-typedef std::shared_ptr<datadog::opentracing::TraceEncoder> TraceEncoderSharedPtr;
+using TraceReporterPtr = std::unique_ptr<TraceReporter>;
+using TraceEncoderSharedPtr = std::shared_ptr<datadog::opentracing::TraceEncoder>;
 
 /**
  * Class for a Datadog-specific Driver.

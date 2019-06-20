@@ -258,6 +258,58 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "quic_platform_base",
+    hdrs = [
+        "quiche/quic/platform/api/quic_aligned.h",
+        "quiche/quic/platform/api/quic_arraysize.h",
+        "quiche/quic/platform/api/quic_bug_tracker.h",
+        "quiche/quic/platform/api/quic_client_stats.h",
+        "quiche/quic/platform/api/quic_containers.h",
+        "quiche/quic/platform/api/quic_endian.h",
+        "quiche/quic/platform/api/quic_error_code_wrappers.h",
+        "quiche/quic/platform/api/quic_estimate_memory_usage.h",
+        "quiche/quic/platform/api/quic_exported_stats.h",
+        "quiche/quic/platform/api/quic_fallthrough.h",
+        "quiche/quic/platform/api/quic_flag_utils.h",
+        "quiche/quic/platform/api/quic_flags.h",
+        "quiche/quic/platform/api/quic_iovec.h",
+        "quiche/quic/platform/api/quic_logging.h",
+        "quiche/quic/platform/api/quic_macros.h",
+        "quiche/quic/platform/api/quic_map_util.h",
+        "quiche/quic/platform/api/quic_mem_slice.h",
+        "quiche/quic/platform/api/quic_optional.h",
+        "quiche/quic/platform/api/quic_prefetch.h",
+        "quiche/quic/platform/api/quic_ptr_util.h",
+        "quiche/quic/platform/api/quic_reference_counted.h",
+        "quiche/quic/platform/api/quic_server_stats.h",
+        "quiche/quic/platform/api/quic_stack_trace.h",
+        "quiche/quic/platform/api/quic_str_cat.h",
+        "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
+        "quiche/quic/platform/api/quic_string_piece.h",
+        "quiche/quic/platform/api/quic_string_utils.h",
+        "quiche/quic/platform/api/quic_uint128.h",
+        "quiche/quic/platform/api/quic_text_utils.h",
+        # TODO: uncomment the following files as implementations are added.
+        # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
+        # "quiche/quic/platform/api/quic_test_loopback.h",
+    ],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_export",
+        ":quiche_common_lib",
+        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_platform_bbr2_sender",
+    hdrs = ["quiche/quic/platform/api/quic_bbr2_sender.h"],
+    repository = "@envoy",
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_bbr2_sender_impl_lib"],
+)
+
 envoy_cc_test_library(
     name = "quic_platform_epoll_lib",
     hdrs = ["quiche/quic/platform/api/quic_epoll.h"],
@@ -295,21 +347,10 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
+        ":quic_platform_base",
         ":quic_platform_export",
         ":quic_platform_ip_address_family",
-        ":quic_platform_logging",
     ],
-)
-
-envoy_cc_library(
-    name = "quic_platform_logging",
-    hdrs = [
-        "quiche/quic/platform/api/quic_bug_tracker.h",
-        "quiche/quic/platform/api/quic_logging.h",
-    ],
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
-    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_logging_impl_lib"],
 )
 
 envoy_cc_test_library(
@@ -331,6 +372,19 @@ envoy_cc_test_library(
     hdrs = ["quiche/quic/platform/api/quic_sleep.h"],
     repository = "@envoy",
     deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_sleep_impl_lib"],
+)
+
+envoy_cc_library(
+    name = "quic_platform_socket_address",
+    srcs = ["quiche/quic/platform/api/quic_socket_address.cc"],
+    hdrs = ["quiche/quic/platform/api/quic_socket_address.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_export",
+        ":quic_platform_ip_address",
+    ],
 )
 
 envoy_cc_test_library(
@@ -359,62 +413,6 @@ envoy_cc_test_library(
     hdrs = ["quiche/quic/platform/api/quic_thread.h"],
     repository = "@envoy",
     deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_thread_impl_lib"],
-)
-
-envoy_cc_library(
-    name = "quic_platform_base",
-    srcs = [
-        "quiche/quic/platform/api/quic_socket_address.cc",
-    ],
-    hdrs = [
-        "quiche/quic/platform/api/quic_aligned.h",
-        "quiche/quic/platform/api/quic_arraysize.h",
-        "quiche/quic/platform/api/quic_client_stats.h",
-        "quiche/quic/platform/api/quic_containers.h",
-        "quiche/quic/platform/api/quic_endian.h",
-        "quiche/quic/platform/api/quic_error_code_wrappers.h",
-        "quiche/quic/platform/api/quic_estimate_memory_usage.h",
-        "quiche/quic/platform/api/quic_exported_stats.h",
-        "quiche/quic/platform/api/quic_fallthrough.h",
-        "quiche/quic/platform/api/quic_flag_utils.h",
-        "quiche/quic/platform/api/quic_flags.h",
-        "quiche/quic/platform/api/quic_iovec.h",
-        "quiche/quic/platform/api/quic_macros.h",
-        "quiche/quic/platform/api/quic_map_util.h",
-        "quiche/quic/platform/api/quic_mem_slice.h",
-        "quiche/quic/platform/api/quic_optional.h",
-        "quiche/quic/platform/api/quic_prefetch.h",
-        "quiche/quic/platform/api/quic_ptr_util.h",
-        "quiche/quic/platform/api/quic_reference_counted.h",
-        "quiche/quic/platform/api/quic_server_stats.h",
-        "quiche/quic/platform/api/quic_socket_address.h",
-        "quiche/quic/platform/api/quic_stack_trace.h",
-        "quiche/quic/platform/api/quic_str_cat.h",
-        "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
-        "quiche/quic/platform/api/quic_string_piece.h",
-        "quiche/quic/platform/api/quic_string_utils.h",
-        "quiche/quic/platform/api/quic_uint128.h",
-        "quiche/quic/platform/api/quic_text_utils.h",
-        # TODO: uncomment the following files as implementations are added.
-        # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
-        # "quiche/quic/platform/api/quic_test_loopback.h",
-    ],
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
-    deps = [
-        ":quic_platform_export",
-        ":quic_platform_ip_address",
-        ":quic_platform_logging",
-        ":quiche_common_lib",
-        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "quic_platform_bbr2_sender",
-    hdrs = ["quiche/quic/platform/api/quic_bbr2_sender.h"],
-    repository = "@envoy",
-    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_bbr2_sender_impl_lib"],
 )
 
 #TODO(danzh) Figure out why using envoy_proto_library() fails.
@@ -696,8 +694,8 @@ envoy_cc_library(
         ":quic_core_bandwidth_lib",
         ":quic_core_packets_lib",
         ":quic_core_time_lib",
+        ":quic_platform_base",
         ":quic_platform_export",
-        ":quic_platform_logging",
     ],
 )
 
@@ -1251,6 +1249,7 @@ envoy_cc_library(
         ":quic_core_utils_lib",
         ":quic_core_versions_lib",
         ":quic_platform_base",
+        ":quic_platform_socket_address",
         ":spdy_core_priority_write_scheduler_lib",
     ],
 )
@@ -1449,7 +1448,10 @@ envoy_cc_library(
     srcs = ["quiche/quic/core/quic_socket_address_coder.cc"],
     hdrs = ["quiche/quic/core/quic_socket_address_coder.h"],
     repository = "@envoy",
-    deps = [":quic_platform_base"],
+    deps = [
+        ":quic_platform_base",
+        ":quic_platform_socket_address",
+    ],
 )
 
 envoy_cc_library(
@@ -1503,8 +1505,8 @@ envoy_cc_library(
     deps = [
         ":quic_core_bandwidth_lib",
         ":quic_core_time_lib",
+        ":quic_platform_base",
         ":quic_platform_export",
-        ":quic_platform_logging",
     ],
 )
 
@@ -1626,6 +1628,7 @@ envoy_cc_library(
         ":quic_core_types_lib",
         ":quic_core_versions_lib",
         ":quic_platform_base",
+        ":quic_platform_socket_address",
     ],
 )
 

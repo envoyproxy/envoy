@@ -19,8 +19,8 @@ class Histogram;
 class Scope;
 class NullGaugeImpl;
 
-typedef std::unique_ptr<Scope> ScopePtr;
-typedef std::shared_ptr<Scope> ScopeSharedPtr;
+using ScopePtr = std::unique_ptr<Scope>;
+using ScopeSharedPtr = std::shared_ptr<Scope>;
 
 /**
  * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
@@ -28,7 +28,7 @@ typedef std::shared_ptr<Scope> ScopeSharedPtr;
  */
 class Scope {
 public:
-  virtual ~Scope() {}
+  virtual ~Scope() = default;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes

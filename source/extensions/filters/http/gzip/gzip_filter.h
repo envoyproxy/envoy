@@ -107,7 +107,7 @@ private:
   GzipStats stats_;
   Runtime::Loader& runtime_;
 };
-typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;
+using GzipFilterConfigSharedPtr = std::shared_ptr<GzipFilterConfig>;
 
 /**
  * A filter that compresses data dispatched from the upstream upon client request.

@@ -130,7 +130,7 @@ struct ResponseCodeDetailValues {
   const std::string LateUpstreamReset = "upstream_reset_after_response_started";
 };
 
-typedef ConstSingleton<ResponseCodeDetailValues> ResponseCodeDetails;
+using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
 
 struct UpstreamTiming {
   /**
@@ -176,7 +176,7 @@ struct UpstreamTiming {
  */
 class StreamInfo {
 public:
-  virtual ~StreamInfo() {}
+  virtual ~StreamInfo() = default;
 
   /**
    * @param response_flag the response flag. Each filter can set independent response flags. The

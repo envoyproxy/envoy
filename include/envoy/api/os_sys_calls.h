@@ -21,7 +21,7 @@ namespace Api {
 
 class OsSysCalls {
 public:
-  virtual ~OsSysCalls() {}
+  virtual ~OsSysCalls() = default;
 
   /**
    * @see bind (man 2 bind)
@@ -109,7 +109,7 @@ public:
   virtual SysCallIntResult getsockname(int sockfd, sockaddr* addr, socklen_t* addrlen) PURE;
 };
 
-typedef std::unique_ptr<OsSysCalls> OsSysCallsPtr;
+using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;
 
 } // namespace Api
 } // namespace Envoy

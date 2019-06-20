@@ -15,7 +15,7 @@ namespace Common {
  */
 template <typename... CallbackArgs> class CallbackManager {
 public:
-  typedef std::function<void(CallbackArgs...)> Callback;
+  using Callback = std::function<void(CallbackArgs...)>;
 
   /**
    * Add a callback.

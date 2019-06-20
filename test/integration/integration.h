@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/server/process_context.h"
+
 #include "common/http/codec_client.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -20,6 +22,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 
+#include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -80,7 +83,7 @@ private:
   Http::StreamResetReason reset_reason_{};
 };
 
-typedef std::unique_ptr<IntegrationStreamDecoder> IntegrationStreamDecoderPtr;
+using IntegrationStreamDecoderPtr = std::unique_ptr<IntegrationStreamDecoder>;
 
 /**
  * TCP client used during integration testing.
@@ -119,7 +122,7 @@ private:
   MockWatermarkBuffer* client_write_buffer_;
 };
 
-typedef std::unique_ptr<IntegrationTcpClient> IntegrationTcpClientPtr;
+using IntegrationTcpClientPtr = std::unique_ptr<IntegrationTcpClient>;
 
 struct ApiFilesystemConfig {
   std::string bootstrap_path_;
@@ -150,7 +153,7 @@ public:
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
 
-  virtual ~BaseIntegrationTest() {}
+  virtual ~BaseIntegrationTest() = default;
 
   // TODO(jmarantz): Remove this once
   // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
@@ -322,6 +325,8 @@ protected:
   InstanceConstSharedPtrFn upstream_address_fn_;
   // The config for envoy start-up.
   ConfigHelper config_helper_;
+  // The ProcessObject to use when constructing the envoy server.
+  absl::optional<std::reference_wrapper<ProcessObject>> process_object_{absl::nullopt};
 
   // Steps that should be done in parallel with the envoy server starting. E.g., xDS
   // pre-init, control plane synchronization needed for server start.

@@ -100,7 +100,7 @@ public:
 
   struct ClusterSlotsRequest : public Extensions::NetworkFilters::Common::Redis::RespValue {
   public:
-    ClusterSlotsRequest() : Extensions::NetworkFilters::Common::Redis::RespValue() {
+    ClusterSlotsRequest() {
       type(Extensions::NetworkFilters::Common::Redis::RespType::Array);
       std::vector<NetworkFilters::Common::Redis::RespValue> values(2);
       values[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
@@ -155,10 +155,8 @@ private:
 
   // Resolves the discovery endpoint.
   struct DnsDiscoveryResolveTarget {
-    DnsDiscoveryResolveTarget(
-        RedisCluster& parent, const std::string& dns_address, const uint32_t port,
-        const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-        const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
+    DnsDiscoveryResolveTarget(RedisCluster& parent, const std::string& dns_address,
+                              const uint32_t port);
 
     ~DnsDiscoveryResolveTarget();
 
@@ -168,11 +166,9 @@ private:
     Network::ActiveDnsQuery* active_query_{};
     const std::string dns_address_;
     const uint32_t port_;
-    const envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
-    const envoy::api::v2::endpoint::LbEndpoint lb_endpoint_;
   };
 
-  typedef std::unique_ptr<DnsDiscoveryResolveTarget> DnsDiscoveryResolveTargetPtr;
+  using DnsDiscoveryResolveTargetPtr = std::unique_ptr<DnsDiscoveryResolveTarget>;
 
   struct RedisDiscoverySession;
 
@@ -189,7 +185,7 @@ private:
     Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client_;
   };
 
-  typedef std::unique_ptr<RedisDiscoveryClient> RedisDiscoveryClientPtr;
+  using RedisDiscoveryClientPtr = std::unique_ptr<RedisDiscoveryClient>;
 
   struct RedisDiscoverySession
       : public Extensions::NetworkFilters::Common::Redis::Client::Config,
@@ -197,7 +193,7 @@ private:
     RedisDiscoverySession(RedisCluster& parent,
                           NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
-    ~RedisDiscoverySession();
+    ~RedisDiscoverySession() override;
 
     void registerDiscoveryAddress(
         const std::list<Network::Address::InstanceConstSharedPtr>& address_list,

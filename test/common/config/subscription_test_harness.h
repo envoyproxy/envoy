@@ -18,7 +18,7 @@ namespace Config {
 class SubscriptionTestHarness {
 public:
   SubscriptionTestHarness() : stats_(Utility::generateStats(stats_store_)) {}
-  virtual ~SubscriptionTestHarness() {}
+  virtual ~SubscriptionTestHarness() = default;
 
   /**
    * Start subscription and set related expectations.

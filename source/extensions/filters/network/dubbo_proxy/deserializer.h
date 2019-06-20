@@ -26,8 +26,8 @@ public:
     template <typename T> std::size_t operator()(T t) const { return static_cast<std::size_t>(t); }
   };
 
-  typedef std::unordered_map<SerializationType, std::string, SerializationTypeHash>
-      DeserializerTypeNameMap;
+  using DeserializerTypeNameMap =
+      std::unordered_map<SerializationType, std::string, SerializationTypeHash>;
 
   const DeserializerTypeNameMap deserializerTypeNameMap = {
       {SerializationType::Hessian, "hessian"},
@@ -43,7 +43,7 @@ public:
   }
 };
 
-typedef ConstSingleton<DeserializerNameValues> DeserializerNames;
+using DeserializerNames = ConstSingleton<DeserializerNameValues>;
 
 /**
  * RpcInvocation represent an rpc call
@@ -58,7 +58,7 @@ public:
   virtual const std::string& getServiceVersion() const PURE;
 };
 
-typedef std::unique_ptr<RpcInvocation> RpcInvocationPtr;
+using RpcInvocationPtr = std::unique_ptr<RpcInvocation>;
 
 /**
  * RpcResult represent the result of an rpc call
@@ -71,7 +71,7 @@ public:
   virtual bool hasException() const PURE;
 };
 
-typedef std::unique_ptr<RpcResult> RpcResultPtr;
+using RpcResultPtr = std::unique_ptr<RpcResult>;
 
 class Deserializer {
 public:
@@ -121,7 +121,7 @@ public:
                                     RpcResponseType type) PURE;
 };
 
-typedef std::unique_ptr<Deserializer> DeserializerPtr;
+using DeserializerPtr = std::unique_ptr<Deserializer>;
 
 /**
  * Implemented by each Dubbo deserialize and registered via Registry::registerFactory or the

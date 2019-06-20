@@ -6,7 +6,7 @@ namespace Envoy {
  */
 class NonCopyable {
 protected:
-  NonCopyable() {}
+  NonCopyable() = default;
 
 private:
   NonCopyable(const NonCopyable&);

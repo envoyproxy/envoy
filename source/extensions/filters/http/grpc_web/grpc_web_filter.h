@@ -21,7 +21,7 @@ namespace GrpcWeb {
 class GrpcWebFilter : public Http::StreamFilter, NonCopyable {
 public:
   explicit GrpcWebFilter(Grpc::Context& context) : context_(context) {}
-  virtual ~GrpcWebFilter() {}
+  ~GrpcWebFilter() override = default;
 
   // Http::StreamFilterBase
   void onDestroy() override {}

@@ -209,13 +209,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "logical_host_lib",
+    srcs = ["logical_host.cc"],
+    hdrs = ["logical_host.h"],
+    deps = [
+        ":upstream_includes",
+    ],
+)
+
+envoy_cc_library(
     name = "logical_dns_cluster_lib",
     srcs = ["logical_dns_cluster.cc"],
     hdrs = ["logical_dns_cluster.h"],
     deps = [
         ":cluster_factory_lib",
+        ":logical_host_lib",
         ":upstream_includes",
-        "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_factory_interface",
         "//source/common/common:empty_string",
         "//source/common/config:utility_lib",

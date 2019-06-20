@@ -20,7 +20,7 @@ class UdpListenerImpl : public BaseListenerImpl,
 public:
   UdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, UdpListenerCallbacks& cb);
 
-  ~UdpListenerImpl();
+  ~UdpListenerImpl() override;
 
   // Network::Listener Interface
   void disable() override;

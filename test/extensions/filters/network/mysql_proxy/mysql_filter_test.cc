@@ -786,7 +786,7 @@ TEST_F(MySQLFilterTest, MySqlHandshake320WrongServerRespCode) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_ok_data, false));
   EXPECT_EQ(MySQLSession::State::MYSQL_NOT_HANDLED, filter_->getSession().getState());
 
-  std::string msg_data = "";
+  std::string msg_data;
   std::string mysql_msg = BufferHelper::encodeHdr(msg_data, 3);
   Buffer::InstancePtr client_query_data(new Buffer::OwnedImpl(mysql_msg));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_query_data, false));

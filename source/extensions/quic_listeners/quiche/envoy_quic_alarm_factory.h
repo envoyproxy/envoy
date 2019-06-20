@@ -22,7 +22,7 @@ public:
   EnvoyQuicAlarmFactory(Event::Scheduler& scheduler, quic::QuicClock& clock)
       : scheduler_(scheduler), clock_(clock) {}
 
-  ~EnvoyQuicAlarmFactory() override {}
+  ~EnvoyQuicAlarmFactory() override = default;
 
   // QuicAlarmFactory
   quic::QuicAlarm* CreateAlarm(quic::QuicAlarm::Delegate* delegate) override;

@@ -104,7 +104,6 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:stats_lib",
         "//source/common/thread_local:thread_local_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "//source/server:configuration_lib",
         "//source/server:server_lib",
         "//source/server/http:admin_lib",

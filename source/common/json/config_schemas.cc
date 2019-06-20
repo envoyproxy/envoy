@@ -352,7 +352,8 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
               "enum" : ["Subject", "SAN"]
           }
       },
-      "generate_request_id" : {"type" : "boolean"}
+      "generate_request_id" : {"type" : "boolean"},
+      "preserve_external_request_id" : {"type" : "boolean"}
     },
     "required" : ["codec_type", "stat_prefix", "filters"],
     "additionalProperties" : false
