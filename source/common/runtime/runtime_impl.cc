@@ -585,7 +585,8 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
       layers.emplace_back(std::make_unique<const ProtoLayer>(layer.name(), layer.static_layer()));
       break;
     case envoy::config::bootstrap::v2::RuntimeLayer::kDiskLayer: {
-      std::string path = layer.disk_layer().symlink_root();
+      std::string path =
+          layer.disk_layer().symlink_root() + "/" + layer.disk_layer().subdirectory();
       if (layer.disk_layer().append_service_cluster()) {
         path += "/" + service_cluster_;
       }

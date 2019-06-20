@@ -79,8 +79,9 @@ protected:
     EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([this] {
       Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
       EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
-          .WillRepeatedly(
-              Invoke([this](const std::string&, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+          .WillRepeatedly(Invoke(
+              [this](const std::string& path, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+                EXPECT_EQ(path, expected_watch_root_);
                 on_changed_cbs_.emplace_back(cb);
               }));
       return mock_watcher;
@@ -98,6 +99,7 @@ protected:
   Init::MockManager init_manager_;
   std::vector<Filesystem::Watcher::OnChangedCb> on_changed_cbs_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  std::string expected_watch_root_;
 };
 
 class DiskLoaderImplTest : public LoaderImplTest {
@@ -114,7 +116,8 @@ public:
   void run(const std::string& primary_dir, const std::string& override_dir) {
     envoy::config::bootstrap::v2::Runtime runtime;
     runtime.mutable_base()->MergeFrom(base_);
-    runtime.set_symlink_root(TestEnvironment::temporaryPath(primary_dir));
+    expected_watch_root_ = TestEnvironment::temporaryPath(primary_dir);
+    runtime.set_symlink_root(expected_watch_root_);
     runtime.set_subdirectory("envoy");
     runtime.set_override_subdirectory(override_dir);
 
