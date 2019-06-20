@@ -45,6 +45,7 @@ std::string makeTempDir(char* name_template) {
   std::filesystem::create_directories(dirname);
 #elifdef __cpp_lib_experimental_filesystem
   std::experimental::filesystem::create_directories(dirname);
+#endif
 #else
   char* dirname = ::mkdtemp(name_template);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
