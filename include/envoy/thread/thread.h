@@ -3,6 +3,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <string>
 
 #include "envoy/common/pure.h"
 
