@@ -2,13 +2,17 @@
 
 #include "envoy/api/v2/core/address.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
 #include "envoy/network/address.h"
 #include "envoy/network/resolver.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/well_known_names.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+
+#include "absl/strings/match.h"
+#include "absl/synchronization/blocking_counter.h"
 
 namespace Envoy {
 namespace Network {
@@ -42,6 +46,55 @@ public:
  * Static registration for the IP resolver. @see RegisterFactory.
  */
 static Registry::RegisterFactory<IpResolver, Resolver> ip_registered_;
+
+InstanceConstSharedPtr
+SrvResolver::resolve(const envoy::api::v2::core::SocketAddress& socket_address) {
+  switch (socket_address.port_specifier_case()) {
+  case envoy::api::v2::core::SocketAddress::kNamedPort:
+    if (!absl::EqualsIgnoreCase(socket_address.named_port(), "srv")) {
+      throw EnvoyException(
+          fmt::format("SRV resolver can't handle the named port {}", socket_address.named_port()));
+    }
+    return resolve(socket_address.address());
+
+  default:
+    throw EnvoyException(fmt::format("SRV resolver can't handle port specifier type {}",
+                                     socket_address.port_specifier_case()));
+  }
+}
+
+InstanceConstSharedPtr SrvResolver::resolve(std::string socket_address) {
+  bool timed_out;
+  InstanceConstSharedPtr address;
+  absl::BlockingCounter latch(1);
+
+  Network::ActiveDnsQuery* active_query = dns_resolver_->resolveSrv(
+      socket_address, DnsLookupFamily::Auto,
+      [&address, &timed_out, &latch](
+          const std::list<Network::Address::SrvInstanceConstSharedPtr>&& address_list) -> void {
+        address = address_list.front()->address();
+        timed_out = false;
+        latch.DecrementCount();
+      });
+
+  Event::TimerPtr dns_timeout = dispatcher_.createTimer([&timed_out, &latch]() -> void {
+    timed_out = true;
+    latch.DecrementCount();
+  });
+  dns_timeout->enableTimer(std::chrono::seconds(5));
+
+  latch.Wait();
+  dns_timeout->disableTimer();
+  dns_timeout.reset();
+  if (active_query) {
+    active_query->cancel();
+  }
+
+  if (timed_out) {
+    throw EnvoyException(fmt::format("SRV resolver timed out for address {}", socket_address));
+  }
+  return address;
+}
 
 InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::core::Address& address) {
   switch (address.address_case()) {

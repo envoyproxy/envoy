@@ -32,6 +32,7 @@
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
+#include "common/network/resolver_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
@@ -259,6 +260,11 @@ void InstanceImpl::initialize(const Options& options,
   ENVOY_LOG(info, "  transport_sockets.upstream: {}",
             Registry::FactoryRegistry<
                 Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
+
+  // Dynamically register the SrvResolver while injecting the necessary dependencies.
+  Network::Address::SrvResolver* srv_resolver =
+      new Network::Address::SrvResolver(dns_resolver_, *dispatcher_);
+  Registry::FactoryRegistry<Network::Address::Resolver>::registerFactory(*srv_resolver);
 
   // Enable the selected buffer implementation (old libevent evbuffer version or new native
   // version) early in the initialization, before any buffers can be created.

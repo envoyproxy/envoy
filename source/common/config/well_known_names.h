@@ -50,6 +50,8 @@ class AddressResolverNameValues {
 public:
   // Basic IP resolver
   const std::string IP = "envoy.ip";
+  // DNS SRV resolver
+  const std::string SRV = "envoy.srv";
 };
 
 using AddressResolverNames = ConstSingleton<AddressResolverNameValues>;

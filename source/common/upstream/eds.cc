@@ -273,7 +273,7 @@ EdsClusterFactory::createClusterImpl(
 }
 
 /**
- * Static registration for the strict dns cluster factory. @see RegisterFactory.
+ * Static registration for the EDS cluster factory. @see RegisterFactory.
  */
 REGISTER_FACTORY(EdsClusterFactory, ClusterFactory);
 

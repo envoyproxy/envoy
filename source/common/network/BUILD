@@ -192,7 +192,10 @@ envoy_cc_library(
     hdrs = ["resolver_impl.h"],
     deps = [
         ":utility_lib",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:timer_interface",
         "//include/envoy/network:address_interface",
+        "//include/envoy/network:dns_interface",
         "//include/envoy/network:resolver_interface",
         "//include/envoy/registry",
         "//source/common/config:well_known_names",
