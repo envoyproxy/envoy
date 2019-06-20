@@ -250,7 +250,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
 
   EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml", true));
 
-  // Validate that server is still in initializing state but stats flushed.
+  // Validate that server is still in initializing state but stats are flushed.
   EXPECT_LOG_CONTAINS("debug",
                       "Envoy is not fully initialized, skipping histogram merge and flushing stats",
                       flushStats());
