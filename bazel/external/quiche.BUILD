@@ -858,7 +858,7 @@ envoy_cc_library(
     deps = [
         ":quic_core_crypto_encryption_lib",
         ":quic_core_crypto_hkdf_lib",
-        ":quic_core_crypto_proof_source_lib",
+        ":quic_core_crypto_proof_source_interface_lib",
         ":quic_core_crypto_random_lib",
         ":quic_core_crypto_tls_handshake_lib",
         ":quic_core_data_lib",
@@ -952,7 +952,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_crypto_proof_source_lib",
+    name = "quic_core_crypto_proof_source_interface_lib",
     srcs = [
         "quiche/quic/core/crypto/proof_source.cc",
         "quiche/quic/core/crypto/quic_crypto_proof.cc",
