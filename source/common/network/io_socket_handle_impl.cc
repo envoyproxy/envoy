@@ -133,10 +133,10 @@ IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& re
            : Api::IoErrorPtr(new IoSocketError(result.errno_), IoSocketError::deleteIoError)));
 }
 
-Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cmsg,
+Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const struct cmsghdr& cmsg,
                                                              uint32_t self_port) {
-  if (cmsg->cmsg_type == IPV6_PKTINFO) {
-    struct in6_pktinfo* info = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
+  if (cmsg.cmsg_type == IPV6_PKTINFO) {
+    const struct in6_pktinfo* info = reinterpret_cast<const in6_pktinfo*>(CMSG_DATA(&cmsg));
     sockaddr_in6 ipv6_addr;
     memset(&ipv6_addr, 0, sizeof(sockaddr_in6));
     ipv6_addr.sin6_family = AF_INET6;
@@ -146,11 +146,11 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cms
                                         sizeof(sockaddr_in6), /*v6only=*/false);
   }
 #ifndef IP_RECVDSTADDR
-  if (cmsg->cmsg_type == IP_PKTINFO) {
-    struct in_pktinfo* info = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
+  if (cmsg.cmsg_type == IP_PKTINFO) {
+    const struct in_pktinfo* info = reinterpret_cast<const in_pktinfo*>(CMSG_DATA(&cmsg));
 #else
-  if (cmsg->cmsg_type == IP_RECVDSTADDR) {
-    struct in_addr* addr = reinterpret_cast<in_addr*>(CMSG_DATA(cmsg));
+  if (cmsg.cmsg_type == IP_RECVDSTADDR) {
+    const struct in_addr* addr = reinterpret_cast<const in_addr*>(CMSG_DATA(&cmsg));
 #endif
     sockaddr_in ipv4_addr;
     memset(&ipv4_addr, 0, sizeof(sockaddr_in));
@@ -170,12 +170,12 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(struct cmsghdr* cms
 
 absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(
 #ifdef SO_RXQ_OVFL
-    struct cmsghdr* cmsg) {
-  if (cmsg->cmsg_type == SO_RXQ_OVFL) {
-    return *reinterpret_cast<uint32_t*>(CMSG_DATA(cmsg));
+    const struct cmsghdr& cmsg) {
+  if (cmsg.cmsg_type == SO_RXQ_OVFL) {
+    return *reinterpret_cast<const uint32_t*>(CMSG_DATA(&cmsg));
   }
 #else
-    struct cmsghdr*) {
+    const struct cmsghdr&) {
 #endif
   return absl::nullopt;
 }
@@ -268,7 +268,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     output.peer_address_ =
         Address::addressFromSockAddr(peer_addr, hdr.msg_namelen, /*v6only=*/false);
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(critical, "Invalid remote address for fd: {}, error: {}", fd_, e.what());
+    PANIC(fmt::format("Invalid remote address for fd: {}, error: {}", fd_, e.what()));
   }
 
   // Get overflow, local and peer addresses from control message.
@@ -277,18 +277,18 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
       if (output.local_address_ == nullptr) {
         try {
-          Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(cmsg, self_port);
+          Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
           if (addr != nullptr) {
             // This is a IP packet info message.
             output.local_address_ = std::move(addr);
             continue;
           }
         } catch (const EnvoyException& e) {
-          ENVOY_LOG(critical, "Invalid destination address for fd: {}, error: {}", fd_, e.what());
+          PANIC(fmt::format("Invalid destination address for fd: {}, error: {}", fd_, e.what()));
         }
       }
       if (output.dropped_packets_ != nullptr) {
-        absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(cmsg);
+        absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
         if (maybe_dropped) {
           *output.dropped_packets_ = *maybe_dropped;
         }

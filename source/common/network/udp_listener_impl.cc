@@ -99,13 +99,12 @@ void UdpListenerImpl::handleReadCallback() {
     }
 
     if (result.rc_ == 0) {
-      // TODO(conqerAtapple): Is zero length packet interesting?
+      // TODO(conqerAtapple): Is zero length packet interesting? If so add stats
+      // for it. Otherwise remove the warning log below.
       ENVOY_UDP_LOG(warn, "received 0-length packet");
     }
 
-    if (output.local_address_ == nullptr) {
-      ENVOY_UDP_LOG(error, "fail to get local address from IP header");
-    }
+    RELEASE_ASSERT(output.local_address_ != nullptr, "fail to get local address from IP header");
 
     if (packets_dropped_ != old_packets_dropped) {
       // The kernel tracks SO_RXQ_OVFL as a uint32 which can overflow to a smaller
