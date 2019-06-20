@@ -124,8 +124,6 @@ UNOWNED_EXTENSIONS = {
   "extensions/common/tap",
   "extensions/transport_sockets/raw_buffer",
   "extensions/transport_sockets/tap",
-  "extensions/transport_sockets/tls",
-  "extensions/transport_sockets/tls/private_key",
   "extensions/tracers/zipkin",
   "extensions/tracers/dynamic_ot",
   "extensions/tracers/opencensus",
