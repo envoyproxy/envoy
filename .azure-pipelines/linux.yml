@@ -14,6 +14,7 @@ jobs:
   # as it builds faster, before Azure can provision larger VM or we can use RBE.
   - script: ci/do_ci.sh bazel.dev
     env:
+      ENVOY_SRCDIR: $(Build.SourcesDirectory)
       BUILD_DIR: $(Build.StagingDirectory)
       BAZEL_REMOTE_CACHE: remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance

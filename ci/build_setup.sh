@@ -57,7 +57,7 @@ rm -f "${SENTINEL}"
 
 # Environment setup.
 export USER=bazel
-export TEST_TMPDIR=/build/tmp
+export TEST_TMPDIR=${BUILD_DIR}/tmp
 export BAZEL="bazel"
 
 if [[ -f "/etc/redhat-release" ]]
