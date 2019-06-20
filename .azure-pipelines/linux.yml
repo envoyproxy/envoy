@@ -16,6 +16,7 @@ jobs:
     env:
       ENVOY_SRCDIR: $(Build.SourcesDirectory)
       BUILD_DIR: $(Build.StagingDirectory)
+      BAZEL_EXTRA_TEST_OPTIONS: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only"
       BAZEL_REMOTE_CACHE: remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
