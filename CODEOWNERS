@@ -36,5 +36,9 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/zookeeper_proxy @rgs1 @snowp
 # redis cluster extension
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
+# dynamic forward proxy
+/*/extensions/clusters/dynamic_forward_proxy @mattklein123 @alyssawilk
+/*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
+/*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @snowp
