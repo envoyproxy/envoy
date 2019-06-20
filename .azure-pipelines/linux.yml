@@ -4,7 +4,7 @@ resources:
     image: envoyproxy/envoy-build:ec38ecb88fd1abe55ab1daa2f6bd239ffccc9d98
 
 jobs:
-- job: Envoy fastbuild
+- job: EnvoyFullTest
   timeoutInMinutes: 360
   pool:
     vmImage: 'Ubuntu 16.04'
