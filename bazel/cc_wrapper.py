@@ -45,7 +45,7 @@ def modify_driver_args(input_driver_flags):
   # Either:
   # a) remove all occurrences of -lstdc++ (when statically linking against libstdc++),
   # b) replace all occurrences of -lstdc++ with -lc++ (when linking against libc++).
-  if "-l:libstdc++.a" in input_driver_flags or "-stdlib=libc++" in envoy_cxxflags:
+  if "-static-libstdc++" in input_driver_flags or "-stdlib=libc++" in envoy_cxxflags:
     for arg in input_driver_flags:
       if arg in ("-lstdc++", "-static-libstdc++"):
         pass
@@ -64,12 +64,11 @@ def modify_driver_args(input_driver_flags):
     argv += input_driver_flags
 
   # This flags should after all libraries
-  if "-lstdc++" in input_driver_flags:
-    if "-stdlib=libc++" in envoy_cxxflags:
-      argv.append("-l:libc++.a")
-      argv.append("-l:libc++abi.a")
-    else:
-      argv.append("-l:libstdc++.a")
+  if "-static-libstdc++" in input_driver_flags:
+    argv.append("-l:libstdc++.a")
+  if "-lstdc++" in input_driver_flags and "-stdlib=libc++" in envoy_cxxflags:
+    argv.append("-l:libc++.a")
+    argv.append("-l:libc++abi.a")
 
   # Bazel will add -fuse-ld=gold in some cases, gcc/clang will take the last -fuse-ld argument,
   # so whenever we see lld once, add it to the end.

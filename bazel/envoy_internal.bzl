@@ -78,7 +78,7 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
 def envoy_static_link_libstdcpp_linkopts():
     return envoy_select_force_libcpp(
         ["-stdlib=libc++", "-l:libc++.a", "-l:libc++abi.a", "-static-libgcc"],
-        ["-l:libstdc++.a", "-static-libgcc"],
+        ["-static-libstdc++", "-static-libgcc"],
     )
 
 # Dependencies on tcmalloc_and_profiler should be wrapped with this function.
