@@ -23,6 +23,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtMost;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -280,19 +281,26 @@ TEST_F(Http1ConnPoolImplTest, VerifyCancelInCallback) {
   // In this scenario, all connections must succeed, so when
   // one fails, the others are canceled.
   ConnPoolCallbacks callbacks1;
-  EXPECT_CALL(callbacks1.pool_failure_, ready()).Times(1).WillRepeatedly(Invoke([&]() -> void {
-    if (handle2 != nullptr) {
-      handle2->cancel();
-      handle2 = nullptr;
-    }
-  }));
+  uint32_t pool_failure_calls{};
+  EXPECT_CALL(callbacks1.pool_failure_, ready())
+      .Times(AtMost(1))
+      .WillRepeatedly(Invoke([&]() -> void {
+        ++pool_failure_calls;
+        if (handle2 != nullptr) {
+          handle2->cancel();
+          handle2 = nullptr;
+        }
+      }));
   ConnPoolCallbacks callbacks2;
-  EXPECT_CALL(callbacks2.pool_failure_, ready()).Times(1).WillRepeatedly(Invoke([&]() -> void {
-    if (handle1 != nullptr) {
-      handle1->cancel();
-      handle1 = nullptr;
-    }
-  }));
+  EXPECT_CALL(callbacks2.pool_failure_, ready())
+      .Times(AtMost(1))
+      .WillRepeatedly(Invoke([&]() -> void {
+        ++pool_failure_calls;
+        if (handle1 != nullptr) {
+          handle1->cancel();
+          handle1 = nullptr;
+        }
+      }));
 
   NiceMock<Http::MockStreamDecoder> outer_decoder;
   // Create the first client.
@@ -307,6 +315,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyCancelInCallback) {
   // Simulate connection failure.
   EXPECT_CALL(conn_pool_, onClientDestroy());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(1, pool_failure_calls);
   dispatcher_.clearDeferredDeleteList();
 }
 
