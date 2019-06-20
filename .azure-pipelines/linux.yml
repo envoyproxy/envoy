@@ -4,7 +4,7 @@ resources:
     image: envoyproxy/envoy-build:ec38ecb88fd1abe55ab1daa2f6bd239ffccc9d98
 
 jobs:
-- job: BuildEnvoy
+- job: Envoy fastbuild
   timeoutInMinutes: 360
   pool:
     vmImage: 'Ubuntu 16.04'
@@ -13,6 +13,7 @@ jobs:
   # bazel.dev isn't for CI purpose but we use it here to experiment with Azure Pipeline 
   # as it builds faster, before Azure can provision larger VM or we can use RBE.
   - script: ci/do_ci.sh bazel.dev
+    title: bazel.dev
     env:
       ENVOY_SRCDIR: $(Build.SourcesDirectory)
       BUILD_DIR: $(Build.StagingDirectory)
@@ -20,3 +21,9 @@ jobs:
       BAZEL_REMOTE_CACHE: remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+
+  - task: PublishTestResults
+    inputs:
+      testResultsFiles: '**/bazel-testlogs/**/test.xml'
+      testRunTitle: 'bazel.dev'
+    condition: always()
