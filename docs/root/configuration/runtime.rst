@@ -30,8 +30,8 @@ be:
   - static_layer:
       health_check:
         min_interval: 5
-  - disk_layer: { symlink_root: /srv/runtime/current/envoy }
-  - disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
+  - disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy }
+  - disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy_override, append_service_cluster: true }
   - admin_layer: {}
 
 In the deprecated :ref:`runtime <envoy_api_msg_config.bootstrap.v2.Runtime>` bootstrap
