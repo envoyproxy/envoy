@@ -15,14 +15,14 @@ namespace Singleton {
  */
 class ManagerImpl : public Manager {
 public:
-  ManagerImpl(Thread::ThreadIdPtr&& thread_id) : run_tid_(std::move(thread_id)) {}
+  ManagerImpl(Thread::ThreadId thread_id) : run_tid_(std::move(thread_id)) {}
 
   // Singleton::Manager
   InstanceSharedPtr get(const std::string& name, SingletonFactoryCb cb) override;
 
 private:
   std::unordered_map<std::string, std::weak_ptr<Instance>> singletons_;
-  Thread::ThreadIdPtr run_tid_;
+  Thread::ThreadId run_tid_;
 };
 
 } // namespace Singleton

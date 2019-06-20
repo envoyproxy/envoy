@@ -24,12 +24,6 @@ int64_t getCurrentThreadId() {
 
 } // namespace
 
-ThreadIdImplPosix::ThreadIdImplPosix(int64_t id) : id_(id) {}
-
-std::string ThreadIdImplPosix::debugString() const { return std::to_string(id_); }
-
-bool ThreadIdImplPosix::isCurrentThreadId() const { return id_ == getCurrentThreadId(); }
-
 ThreadImplPosix::ThreadImplPosix(std::function<void()> thread_routine)
     : thread_routine_(thread_routine) {
   RELEASE_ASSERT(Logger::Registry::initialized(), "");
@@ -52,8 +46,8 @@ ThreadPtr ThreadFactoryImplPosix::createThread(std::function<void()> thread_rout
   return std::make_unique<ThreadImplPosix>(thread_routine);
 }
 
-ThreadIdPtr ThreadFactoryImplPosix::currentThreadId() {
-  return std::make_unique<ThreadIdImplPosix>(getCurrentThreadId());
+ThreadId ThreadFactoryImplPosix::currentThreadId() {
+  return ThreadId(getCurrentThreadId());
 }
 
 } // namespace Thread
