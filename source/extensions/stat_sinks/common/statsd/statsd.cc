@@ -40,8 +40,9 @@ void Writer::write(const std::string& message) {
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              Network::Address::InstanceConstSharedPtr address, const bool use_tag,
-                             const std::string& prefix)
+                             const bool exclude_zero_values, const std::string& prefix)
     : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag),
+      exclude_zero_values_(exclude_zero_values), 
       prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<Writer>(this->server_address_);
@@ -51,14 +52,14 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
 void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
   Writer& writer = tls_->getTyped<Writer>();
   for (const auto& counter : snapshot.counters()) {
-    if (counter.counter_.get().used()) {
+    if (counter.counter_.get().used() && !(excludeZeroValues() && counter.delta_ == 0)) {
       writer.write(fmt::format("{}.{}:{}|c{}", prefix_, getName(counter.counter_.get()),
                                counter.delta_, buildTagStr(counter.counter_.get().tags())));
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
-    if (gauge.get().used()) {
+    if (gauge.get().used() && !(excludeZeroValues() && gauge.get().value() == 0)) {
       writer.write(fmt::format("{}.{}:{}|g{}", prefix_, getName(gauge.get()), gauge.get().value(),
                                buildTagStr(gauge.get().tags())));
     }
@@ -97,8 +98,9 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              const std::string& cluster_name, ThreadLocal::SlotAllocator& tls,
                              Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
-                             const std::string& prefix)
-    : prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix), tls_(tls.allocateSlot()),
+                             const bool exclude_zero_values, const std::string& prefix)
+    : exclude_zero_values_(exclude_zero_values), 
+      prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix), tls_(tls.allocateSlot()),
       cluster_manager_(cluster_manager), cx_overflow_stat_(scope.counter("statsd.cx_overflow")) {
 
   Config::Utility::checkClusterAndLocalInfo("tcp statsd", cluster_name, cluster_manager,
@@ -113,13 +115,13 @@ void TcpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
   TlsSink& tls_sink = tls_->getTyped<TlsSink>();
   tls_sink.beginFlush(true);
   for (const auto& counter : snapshot.counters()) {
-    if (counter.counter_.get().used()) {
+    if (counter.counter_.get().used() && !(excludeZeroValues() && counter.counter_.get().value() == 0)) {
       tls_sink.flushCounter(counter.counter_.get().name(), counter.delta_);
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
-    if (gauge.get().used()) {
+    if (gauge.get().used() && !(excludeZeroValues() && gauge.get().value() == 0)) {
       tls_sink.flushGauge(gauge.get().name(), gauge.get().value());
     }
   }

@@ -282,6 +282,9 @@ message StatsdSink {
   //   envoy.test_counter:1|c
   //   envoy.test_timer:5|ms
   string prefix = 3;
+
+  // Optional parameter to exclude all zero values from statsd logging.
+  bool exclude_zero_values = 4;
 }
 
 // Stats configuration proto schema for built-in *envoy.dog_statsd* sink.
@@ -303,6 +306,9 @@ message DogStatsdSink {
   // Optional custom metric name prefix. See :ref:`StatsdSink's prefix field
   // <envoy_api_field_config.metrics.v2.StatsdSink.prefix>` for more details.
   string prefix = 3;
+
+  // Optional parameter to exclude all zero values from statsd logging.
+  bool exclude_zero_values = 4;
 }
 
 // Stats configuration proto schema for built-in *envoy.stat_sinks.hystrix* sink.

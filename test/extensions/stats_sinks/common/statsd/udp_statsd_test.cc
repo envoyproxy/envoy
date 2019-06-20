@@ -40,7 +40,7 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   Network::Address::InstanceConstSharedPtr server_address =
       Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:8125", Network::Test::getLoopbackAddressUrlString(GetParam())));
-  UdpStatsdSink sink(tls_, server_address, false);
+  UdpStatsdSink sink(tls_, server_address, false, false);
   int fd = sink.getFdForTests();
   EXPECT_NE(fd, -1);
 
@@ -85,7 +85,7 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
   Network::Address::InstanceConstSharedPtr server_address =
       Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:8125", Network::Test::getLoopbackAddressUrlString(GetParam())));
-  UdpStatsdSink sink(tls_, server_address, true);
+  UdpStatsdSink sink(tls_, server_address, true, false);
   int fd = sink.getFdForTests();
   EXPECT_NE(fd, -1);
 

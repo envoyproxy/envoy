@@ -46,11 +46,13 @@ private:
 class UdpStatsdSink : public Stats::Sink {
 public:
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
-                const bool use_tag, const std::string& prefix = getDefaultPrefix());
+                const bool use_tag, const bool exclude_zero_values,
+                const std::string& prefix = getDefaultPrefix());
   // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
-                const bool use_tag, const std::string& prefix = getDefaultPrefix())
-      : tls_(tls.allocateSlot()), use_tag_(use_tag),
+                const bool use_tag, const bool exclude_zero_values,
+                const std::string& prefix = getDefaultPrefix())
+      : tls_(tls.allocateSlot()), use_tag_(use_tag), exclude_zero_values_(exclude_zero_values),
         prefix_(prefix.empty() ? getDefaultPrefix() : prefix) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
@@ -63,6 +65,7 @@ public:
   // Called in unit test to validate writer construction and address.
   int getFdForTests() { return tls_->getTyped<Writer>().getFdForTests(); }
   bool getUseTagForTest() { return use_tag_; }
+  bool excludeZeroValues() { return exclude_zero_values_; }
   const std::string& getPrefix() { return prefix_; }
 
 private:
@@ -72,6 +75,7 @@ private:
   ThreadLocal::SlotPtr tls_;
   Network::Address::InstanceConstSharedPtr server_address_;
   const bool use_tag_;
+  const bool exclude_zero_values_;
   // Prefix for all flushed stats.
   const std::string prefix_;
 };
@@ -83,7 +87,8 @@ class TcpStatsdSink : public Stats::Sink {
 public:
   TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
                 ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
-                Stats::Scope& scope, const std::string& prefix = getDefaultPrefix());
+                Stats::Scope& scope, const bool exclude_zero_values,
+                const std::string& prefix = getDefaultPrefix());
 
   // Stats::Sink
   void flush(Stats::MetricSnapshot& snapshot) override;
@@ -93,6 +98,7 @@ public:
                                                  std::chrono::milliseconds(value));
   }
 
+  bool excludeZeroValues() { return exclude_zero_values_; }
   const std::string& getPrefix() { return prefix_; }
 
 private:
@@ -129,6 +135,7 @@ private:
   // 16KiB intermediate buffer for flushing.
   static constexpr uint32_t FLUSH_SLICE_SIZE_BYTES = (1024 * 16);
 
+  const bool exclude_zero_values_;
   // Prefix for all flushed stats.
   const std::string prefix_;
 
