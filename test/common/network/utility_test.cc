@@ -51,14 +51,18 @@ TEST(NetworkUtility, urlFromSocketAddress) {
     address.set_address("127.0.0.1");
     address.set_port_value(1234);
     address.set_resolver_name("envoy.srv");
-    EXPECT_THROW(Utility::urlFromSocketAddress(address, "TEST"), EnvoyException);
+    EXPECT_THROW_WITH_MESSAGE(
+        Utility::urlFromSocketAddress(address, "TEST"), EnvoyException,
+        "named_port must be set to \"srv\" when using the envoy.srv resolver type");
   }
   {
     envoy::api::v2::core::SocketAddress address;
     address.set_address("foo");
     address.set_port_value(1234);
     address.set_resolver_name("envoy.srv");
-    EXPECT_THROW(Utility::urlFromSocketAddress(address, "TEST"), EnvoyException);
+    EXPECT_THROW_WITH_MESSAGE(
+        Utility::urlFromSocketAddress(address, "TEST"), EnvoyException,
+        "named_port must be set to \"srv\" when using the envoy.srv resolver type");
   }
   {
     envoy::api::v2::core::SocketAddress address;
@@ -79,28 +83,34 @@ TEST(NetworkUtility, urlFromSocketAddress) {
     address.set_address("127.0.0.1");
     address.set_named_port("invalid");
     address.set_resolver_name("envoy.srv");
-    EXPECT_THROW(Utility::urlFromSocketAddress(address, "TEST"), EnvoyException);
+    EXPECT_THROW_WITH_MESSAGE(
+        Utility::urlFromSocketAddress(address, "TEST"), EnvoyException,
+        "named_port must be set to \"srv\" when using the envoy.srv resolver type");
   }
   {
     envoy::api::v2::core::SocketAddress address;
     address.set_address("foo");
     address.set_named_port("invalid");
     address.set_resolver_name("envoy.srv");
-    EXPECT_THROW(Utility::urlFromSocketAddress(address, "TEST"), EnvoyException);
+    EXPECT_THROW_WITH_MESSAGE(
+        Utility::urlFromSocketAddress(address, "TEST"), EnvoyException,
+        "named_port must be set to \"srv\" when using the envoy.srv resolver type");
   }
   {
     envoy::api::v2::core::SocketAddress address;
     address.set_address("127.0.0.1");
     address.set_named_port("srv");
     address.set_resolver_name("invalid");
-    EXPECT_THROW(Utility::urlFromSocketAddress(address, "TEST"), EnvoyException);
+    EXPECT_THROW_WITH_MESSAGE(Utility::urlFromSocketAddress(address, "TEST"), EnvoyException,
+                              "TEST clusters only support envoy.ip and envoy.srv resolver types");
   }
   {
     envoy::api::v2::core::SocketAddress address;
     address.set_address("foo");
     address.set_named_port("SRV");
     address.set_resolver_name("invalid");
-    EXPECT_THROW(Utility::urlFromSocketAddress(address, "TEST"), EnvoyException);
+    EXPECT_THROW_WITH_MESSAGE(Utility::urlFromSocketAddress(address, "TEST"), EnvoyException,
+                              "TEST clusters only support envoy.ip and envoy.srv resolver types");
   }
 }
 
