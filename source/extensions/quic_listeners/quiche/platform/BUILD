@@ -105,7 +105,10 @@ envoy_cc_library(
         "quic_logging_impl.h",
     ],
     visibility = ["//visibility:public"],
-    deps = ["//source/common/common:assert_lib"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:stl_helpers",
+    ],
 )
 
 envoy_cc_library(
