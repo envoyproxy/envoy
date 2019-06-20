@@ -46,9 +46,7 @@ ThreadPtr ThreadFactoryImplPosix::createThread(std::function<void()> thread_rout
   return std::make_unique<ThreadImplPosix>(thread_routine);
 }
 
-ThreadId ThreadFactoryImplPosix::currentThreadId() {
-  return ThreadId(getCurrentThreadId());
-}
+ThreadId ThreadFactoryImplPosix::currentThreadId() { return ThreadId(getCurrentThreadId()); }
 
 } // namespace Thread
 } // namespace Envoy
