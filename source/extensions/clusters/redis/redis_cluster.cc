@@ -126,6 +126,8 @@ RedisCluster::DnsDiscoveryResolveTarget::~DnsDiscoveryResolveTarget() {
 void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
   ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
 
+  // TODO(venilnoronha): Wire this with the SRV resolver also?
+
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
       [this](std::list<Network::DnsResponse>&& response) -> void {
