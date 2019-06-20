@@ -65,7 +65,7 @@ namespace {
 
 std::string hostFromUrl(const std::string& url, const std::string& scheme,
                         const std::string& scheme_name) {
-  if (url.find(scheme) != 0) {
+  if (!absl::StartsWith(url, scheme)) {
     throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
@@ -80,7 +80,7 @@ std::string hostFromUrl(const std::string& url, const std::string& scheme,
 
 uint32_t portFromUrl(const std::string& url, const std::string& scheme,
                      const std::string& scheme_name) {
-  if (url.find(scheme) != 0) {
+  if (!absl::StartsWith(url, scheme)) {
     throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
@@ -163,7 +163,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
     return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
   }
   // Treat it as an IPv4 address followed by a port.
-  auto pos = ip_address.rfind(":");
+  auto pos = ip_address.rfind(':');
   if (pos == std::string::npos) {
     throwWithMalformedIp(ip_address);
   }

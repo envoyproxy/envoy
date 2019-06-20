@@ -7,6 +7,7 @@ api_proto_library_internal(
     srcs = ["common.proto"],
     visibility = ["//visibility:public"],
     deps = [
+        "//envoy/api/v2/core:config_source",
         "//envoy/service/tap/v2alpha:common",
     ],
 )

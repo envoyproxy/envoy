@@ -20,7 +20,7 @@ protected:
                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                  std::chrono::milliseconds refresh_interval,
                  std::chrono::milliseconds request_timeout);
-  ~RestApiFetcher();
+  ~RestApiFetcher() override;
 
   /**
    * Start the fetch sequence. This should be called once.

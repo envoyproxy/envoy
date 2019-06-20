@@ -36,7 +36,7 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   connection_->noDelay(true);
 }
 
-CodecClient::~CodecClient() {}
+CodecClient::~CodecClient() = default;
 
 void CodecClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 

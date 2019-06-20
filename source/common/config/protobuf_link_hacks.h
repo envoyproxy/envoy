@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/service/discovery/v2/ads.pb.h"
+#include "envoy/service/discovery/v2/rtds.pb.h"
 #include "envoy/service/discovery/v2/sds.pb.h"
-#include "envoy/service/discovery/v2/tds.pb.h"
 #include "envoy/service/ratelimit/v2/rls.pb.h"
 
 namespace Envoy {
@@ -12,5 +12,5 @@ namespace Envoy {
 const envoy::service::discovery::v2::AdsDummy _ads_dummy;
 const envoy::service::ratelimit::v2::RateLimitRequest _rls_dummy;
 const envoy::service::discovery::v2::SdsDummy _sds_dummy;
-const envoy::service::discovery::v2::TdsDummy _tds_dummy;
+const envoy::service::discovery::v2::RtdsDummy _tds_dummy;
 } // namespace Envoy
