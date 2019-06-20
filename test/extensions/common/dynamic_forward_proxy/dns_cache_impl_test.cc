@@ -84,8 +84,9 @@ TEST_F(DnsCacheImplTest, ResolveSuccess) {
   Event::MockTimer* resolve_timer = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  DnsCache::LoadDnsCacheHandlePtr handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
-  EXPECT_NE(handle, nullptr);
+  auto result = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
 
   checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
@@ -142,8 +143,9 @@ TEST_F(DnsCacheImplTest, TTL) {
   Event::MockTimer* resolve_timer = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  DnsCache::LoadDnsCacheHandlePtr handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
-  EXPECT_NE(handle, nullptr);
+  auto result = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
 
   checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
@@ -182,8 +184,9 @@ TEST_F(DnsCacheImplTest, TTL) {
   resolve_timer = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
-  EXPECT_NE(handle, nullptr);
+  result = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
   checkStats(3 /* attempt */, 2 /* success */, 0 /* failure */, 1 /* address changed */,
              2 /* added */, 1 /* removed */, 1 /* num hosts */);
 }
@@ -200,8 +203,9 @@ TEST_F(DnsCacheImplTest, TTLWithCustomParameters) {
   Event::MockTimer* resolve_timer = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  DnsCache::LoadDnsCacheHandlePtr handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
-  EXPECT_NE(handle, nullptr);
+  auto result = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
 
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.1:80")));
@@ -231,8 +235,9 @@ TEST_F(DnsCacheImplTest, InlineResolve) {
   MockLoadDnsCacheCallbacks callbacks;
   Event::PostCb post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
-  DnsCache::LoadDnsCacheHandlePtr handle = dns_cache_->loadDnsCache("localhost", 80, callbacks);
-  EXPECT_NE(handle, nullptr);
+  auto result = dns_cache_->loadDnsCache("localhost", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
 
   Event::MockTimer* resolve_timer = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*resolver_, resolve("localhost", _, _))
@@ -257,8 +262,9 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
   Network::DnsResolver::ResolveCb resolve_cb;
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  DnsCache::LoadDnsCacheHandlePtr handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
-  EXPECT_NE(handle, nullptr);
+  auto result = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
   checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
@@ -268,8 +274,9 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
   checkStats(1 /* attempt */, 0 /* success */, 1 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
-  handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
-  EXPECT_EQ(handle, nullptr);
+  result = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::InCache, result.status_);
+  EXPECT_EQ(result.handle_, nullptr);
 }
 
 // Cancel a cache load before the resolve completes.
@@ -281,10 +288,11 @@ TEST_F(DnsCacheImplTest, CancelResolve) {
   Network::DnsResolver::ResolveCb resolve_cb;
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  DnsCache::LoadDnsCacheHandlePtr handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
-  EXPECT_NE(handle, nullptr);
+  auto result = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
 
-  handle.reset();
+  result.handle_.reset();
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.1:80")));
   resolve_cb(makeAddressList({"10.0.0.1"}));
@@ -300,12 +308,14 @@ TEST_F(DnsCacheImplTest, MultipleResolveSameHost) {
   Network::DnsResolver::ResolveCb resolve_cb;
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  DnsCache::LoadDnsCacheHandlePtr handle1 = dns_cache_->loadDnsCache("foo.com", 80, callbacks1);
-  EXPECT_NE(handle1, nullptr);
+  auto result1 = dns_cache_->loadDnsCache("foo.com", 80, callbacks1);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Loading, result1.status_);
+  EXPECT_NE(result1.handle_, nullptr);
 
   MockLoadDnsCacheCallbacks callbacks2;
-  DnsCache::LoadDnsCacheHandlePtr handle2 = dns_cache_->loadDnsCache("foo.com", 80, callbacks2);
-  EXPECT_NE(handle2, nullptr);
+  auto result2 = dns_cache_->loadDnsCache("foo.com", 80, callbacks2);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Loading, result2.status_);
+  EXPECT_NE(result2.handle_, nullptr);
 
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.1:80")));
@@ -323,15 +333,17 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
   Network::DnsResolver::ResolveCb resolve_cb1;
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb1), Return(&resolver_->active_query_)));
-  DnsCache::LoadDnsCacheHandlePtr handle1 = dns_cache_->loadDnsCache("foo.com", 80, callbacks1);
-  EXPECT_NE(handle1, nullptr);
+  auto result1 = dns_cache_->loadDnsCache("foo.com", 80, callbacks1);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Loading, result1.status_);
+  EXPECT_NE(result1.handle_, nullptr);
 
   MockLoadDnsCacheCallbacks callbacks2;
   Network::DnsResolver::ResolveCb resolve_cb2;
   EXPECT_CALL(*resolver_, resolve("bar.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb2), Return(&resolver_->active_query_)));
-  DnsCache::LoadDnsCacheHandlePtr handle2 = dns_cache_->loadDnsCache("bar.com", 443, callbacks2);
-  EXPECT_NE(handle2, nullptr);
+  auto result2 = dns_cache_->loadDnsCache("bar.com", 443, callbacks2);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Loading, result2.status_);
+  EXPECT_NE(result2.handle_, nullptr);
 
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("bar.com", SharedAddressEquals("10.0.0.1:443")));
@@ -353,15 +365,18 @@ TEST_F(DnsCacheImplTest, CacheHit) {
   Network::DnsResolver::ResolveCb resolve_cb;
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  DnsCache::LoadDnsCacheHandlePtr handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
-  EXPECT_NE(handle, nullptr);
+  auto result = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
 
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.1:80")));
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete());
   resolve_cb(makeAddressList({"10.0.0.1"}));
 
-  EXPECT_EQ(nullptr, dns_cache_->loadDnsCache("foo.com", 80, callbacks));
+  result = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::InCache, result.status_);
+  EXPECT_EQ(result.handle_, nullptr);
 }
 
 // Make sure we destroy active queries if the cache goes away.
@@ -373,8 +388,9 @@ TEST_F(DnsCacheImplTest, CancelActiveQueriesOnDestroy) {
   Network::DnsResolver::ResolveCb resolve_cb;
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  DnsCache::LoadDnsCacheHandlePtr handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
-  EXPECT_NE(handle, nullptr);
+  auto result = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
 
   EXPECT_CALL(resolver_->active_query_, cancel());
   dns_cache_.reset();
@@ -389,12 +405,26 @@ TEST_F(DnsCacheImplTest, InvalidPort) {
   Network::DnsResolver::ResolveCb resolve_cb;
   EXPECT_CALL(*resolver_, resolve("foo.com:abc", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  DnsCache::LoadDnsCacheHandlePtr handle = dns_cache_->loadDnsCache("foo.com:abc", 80, callbacks);
-  EXPECT_NE(handle, nullptr);
+  auto result = dns_cache_->loadDnsCache("foo.com:abc", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
 
   EXPECT_CALL(update_callbacks_, onDnsHostAddOrUpdate(_, _)).Times(0);
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete());
   resolve_cb(makeAddressList({}));
+}
+
+// Max host overflow.
+TEST_F(DnsCacheImplTest, MaxHostOverflow) {
+  config_.mutable_max_hosts()->set_value(0);
+  initialize();
+  InSequence s;
+
+  MockLoadDnsCacheCallbacks callbacks;
+  auto result = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheStatus::Overflow, result.status_);
+  EXPECT_EQ(result.handle_, nullptr);
+  EXPECT_EQ(1, TestUtility::findCounter(store_, "dns_cache.foo.host_overflow")->value());
 }
 
 // DNS cache manager config tests.

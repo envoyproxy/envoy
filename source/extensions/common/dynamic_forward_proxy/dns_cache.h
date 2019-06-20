@@ -104,12 +104,26 @@ public:
    *             target ports.
    * @param default_port supplies the port to use if the host does not have a port embedded in it.
    * @param callbacks supplies the cache load callbacks to invoke if async processing is needed.
-   * @return a cache load handle, in which case the callbacks will be invoked at a later time,
-   *         or nullptr if the cache is already loaded. In this case, callbacks will never be
-   *         called.
+   * @return a cache load result which includes both a status and handle. If the handle is non-null
+   *         the callbacks will be invoked at a later time, otherwise consult the status for the
+   *         reason the cache is not loading. In this case, callbacks will never be called.
    */
-  virtual LoadDnsCacheHandlePtr loadDnsCache(absl::string_view host, uint16_t default_port,
-                                             LoadDnsCacheCallbacks& callbacks) PURE;
+  enum class LoadDnsCacheStatus {
+    // The cache is already loaded. Callbacks will not be called.
+    InCache,
+    // The cache is loading. Callbacks will be called at a later time unless cancelled.
+    Loading,
+    // The cache is full and the requested host is not in cache. Callbacks will not be called.
+    Overflow
+  };
+
+  struct LoadDnsCacheResult {
+    LoadDnsCacheStatus status_;
+    LoadDnsCacheHandlePtr handle_;
+  };
+
+  virtual LoadDnsCacheResult loadDnsCache(absl::string_view host, uint16_t default_port,
+                                          LoadDnsCacheCallbacks& callbacks) PURE;
 
   /**
    * Add update callbacks to the cache.

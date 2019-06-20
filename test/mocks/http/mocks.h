@@ -201,6 +201,18 @@ public:
   bool stream_destroyed_{};
 };
 
+// A version of MockStreamDecoderFilterCallbacks that mocks sendLocalReply()
+// TODO(mattklein123): Get rid of this and fix any tests to work with this function mocked in the
+//                     main class.
+class MockStreamDecoderFilterCallbacksWithMockedSendLocalReply
+    : public MockStreamDecoderFilterCallbacks {
+public:
+  MOCK_METHOD5(sendLocalReply, void(Code code, absl::string_view body,
+                                    std::function<void(HeaderMap& headers)> modify_headers,
+                                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                    absl::string_view details));
+};
+
 class MockStreamEncoderFilterCallbacks : public StreamEncoderFilterCallbacks,
                                          public MockStreamFilterCallbacksBase {
 public:

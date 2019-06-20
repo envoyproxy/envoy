@@ -14,13 +14,19 @@ public:
   MockDnsCache();
   ~MockDnsCache();
 
-  LoadDnsCacheHandlePtr loadDnsCache(absl::string_view host, uint16_t default_port,
-                                     LoadDnsCacheCallbacks& callbacks) override {
-    return LoadDnsCacheHandlePtr{loadDnsCache_(host, default_port, callbacks)};
+  struct MockLoadDnsCacheResult {
+    LoadDnsCacheStatus status_;
+    LoadDnsCacheHandle* handle_;
+  };
+
+  LoadDnsCacheResult loadDnsCache(absl::string_view host, uint16_t default_port,
+                                  LoadDnsCacheCallbacks& callbacks) override {
+    MockLoadDnsCacheResult result = loadDnsCache_(host, default_port, callbacks);
+    return {result.status_, LoadDnsCacheHandlePtr{result.handle_}};
   }
-  MOCK_METHOD3(loadDnsCache_,
-               DnsCache::LoadDnsCacheHandle*(absl::string_view host, uint16_t default_port,
-                                             LoadDnsCacheCallbacks& callbacks));
+  MOCK_METHOD3(loadDnsCache_, MockLoadDnsCacheResult(absl::string_view host, uint16_t default_port,
+                                                     LoadDnsCacheCallbacks& callbacks));
+
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override {
     return AddUpdateCallbacksHandlePtr{addUpdateCallbacks_(callbacks)};
   }

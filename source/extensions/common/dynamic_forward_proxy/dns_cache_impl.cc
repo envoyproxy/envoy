@@ -10,9 +10,6 @@ namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 
-// TODO(mattklein123): circuit breakers / maximums on the number of hosts that the cache can
-//                     contain.
-
 DnsCacheImpl::DnsCacheImpl(
     Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
     Stats::Scope& root_scope,
@@ -23,7 +20,8 @@ DnsCacheImpl::DnsCacheImpl(
       scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_{ALL_DNS_CACHE_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))},
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
-      host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)) {
+      host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
+      max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(); });
   updateTlsHostsMap();
 }
@@ -40,21 +38,28 @@ DnsCacheImpl::~DnsCacheImpl() {
   }
 }
 
-DnsCacheImpl::LoadDnsCacheHandlePtr DnsCacheImpl::loadDnsCache(absl::string_view host,
-                                                               uint16_t default_port,
-                                                               LoadDnsCacheCallbacks& callbacks) {
+DnsCacheImpl::LoadDnsCacheResult DnsCacheImpl::loadDnsCache(absl::string_view host,
+                                                            uint16_t default_port,
+                                                            LoadDnsCacheCallbacks& callbacks) {
   ENVOY_LOG(debug, "thread local lookup for host '{}'", host);
   auto& tls_host_info = tls_slot_->getTyped<ThreadLocalHostInfo>();
   auto tls_host = tls_host_info.host_map_->find(host);
   if (tls_host != tls_host_info.host_map_->end()) {
     ENVOY_LOG(debug, "thread local hit for host '{}'", host);
-    return nullptr;
+    return {LoadDnsCacheStatus::InCache, nullptr};
+  } else if (tls_host_info.host_map_->size() >= max_hosts_) {
+    // Given that we do this check in thread local context, it's possible for two threads to race
+    // and potentially go slightly above the configured max hosts. This is an OK given compromise
+    // given how much simpler the implementation is.
+    ENVOY_LOG(debug, "DNS cache overflow for host '{}'", host);
+    stats_.host_overflow_.inc();
+    return {LoadDnsCacheStatus::Overflow, nullptr};
   } else {
     ENVOY_LOG(debug, "thread local miss for host '{}', posting to main thread", host);
     main_thread_dispatcher_.post(
         [this, host = std::string(host), default_port]() { startCacheLoad(host, default_port); });
-    return std::make_unique<LoadDnsCacheHandleImpl>(tls_host_info.pending_resolutions_, host,
-                                                    callbacks);
+    return {LoadDnsCacheStatus::Loading, std::make_unique<LoadDnsCacheHandleImpl>(
+                                             tls_host_info.pending_resolutions_, host, callbacks)};
   }
 }
 

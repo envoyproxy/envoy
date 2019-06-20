@@ -23,6 +23,7 @@ namespace DynamicForwardProxy {
   COUNTER(dns_query_success)                                                                       \
   COUNTER(host_added)                                                                              \
   COUNTER(host_address_changed)                                                                    \
+  COUNTER(host_overflow)                                                                           \
   COUNTER(host_removed)                                                                            \
   GAUGE(num_hosts, NeverImport)
 
@@ -41,8 +42,8 @@ public:
   ~DnsCacheImpl();
 
   // DnsCache
-  LoadDnsCacheHandlePtr loadDnsCache(absl::string_view host, uint16_t default_port,
-                                     LoadDnsCacheCallbacks& callbacks) override;
+  LoadDnsCacheResult loadDnsCache(absl::string_view host, uint16_t default_port,
+                                  LoadDnsCacheCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
 
 private:
@@ -129,6 +130,7 @@ private:
   absl::flat_hash_map<std::string, PrimaryHostInfoPtr> primary_hosts_;
   const std::chrono::milliseconds refresh_interval_;
   const std::chrono::milliseconds host_ttl_;
+  const uint32_t max_hosts_;
 };
 
 } // namespace DynamicForwardProxy

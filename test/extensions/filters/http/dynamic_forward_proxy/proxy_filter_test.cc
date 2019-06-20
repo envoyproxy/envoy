@@ -15,6 +15,9 @@ namespace HttpFilters {
 namespace DynamicForwardProxy {
 namespace {
 
+using LoadDnsCacheStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheStatus;
+using MockLoadDnsCacheResult = Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheResult;
+
 class ProxyFilterTest : public testing::Test,
                         public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
 public:
@@ -31,6 +34,14 @@ public:
     // Allow for an otherwise strict mock.
     EXPECT_CALL(callbacks_, connection()).Times(AtLeast(0));
     EXPECT_CALL(callbacks_, streamId()).Times(AtLeast(0));
+
+    // Configure max pending to 1 so we can test circuit breaking.
+    cm_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 1, 0, 0, 0);
+  }
+
+  ~ProxyFilterTest() {
+    EXPECT_TRUE(
+        cm_.thread_local_cluster_.cluster_.info_->resource_manager_->pendingRequests().canCreate());
   }
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr get() override {
@@ -44,7 +55,7 @@ public:
   Upstream::MockClusterManager cm_;
   ProxyFilterConfigSharedPtr filter_config_;
   std::unique_ptr<ProxyFilter> filter_;
-  Http::MockStreamDecoderFilterCallbacks callbacks_;
+  Http::MockStreamDecoderFilterCallbacksWithMockedSendLocalReply callbacks_;
   Http::TestHeaderMapImpl request_headers_{{":authority", "foo"}};
 };
 
@@ -58,7 +69,7 @@ TEST_F(ProxyFilterTest, HttpDefaultPort) {
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCache_(Eq("foo"), 80, _))
-      .WillOnce(Return(handle));
+      .WillOnce(Return(MockLoadDnsCacheResult{LoadDnsCacheStatus::Loading, handle}));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -76,10 +87,59 @@ TEST_F(ProxyFilterTest, HttpsDefaultPort) {
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCache_(Eq("foo"), 443, _))
-      .WillOnce(Return(handle));
+      .WillOnce(Return(MockLoadDnsCacheResult{LoadDnsCacheStatus::Loading, handle}));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
+  EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
+}
+
+// Cache overflow.
+TEST_F(ProxyFilterTest, CacheOverflow) {
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCache_(Eq("foo"), 443, _))
+      .WillOnce(Return(MockLoadDnsCacheResult{LoadDnsCacheStatus::Overflow, nullptr}));
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, Eq("DNS cache overflow"),
+                                         _, _, Eq("DNS cache overflow")));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  filter_->onDestroy();
+}
+
+// Circuit breaker overflow
+TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
+  Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheHandle* handle =
+      new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCache_(Eq("foo"), 443, _))
+      .WillOnce(Return(MockLoadDnsCacheResult{LoadDnsCacheStatus::Loading, handle}));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  // Create a second filter for a 2nd request.
+  auto filter2 = std::make_unique<ProxyFilter>(filter_config_);
+  filter2->setDecoderFilterCallbacks(callbacks_);
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable,
+                                         Eq("Dynamic forward proxy pending request overflow"), _, _,
+                                         Eq("Dynamic forward proxy pending request overflow")));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter2->decodeHeaders(request_headers_, false));
+
+  EXPECT_EQ(1,
+            cm_.thread_local_cluster_.cluster_.info_->stats_.upstream_rq_pending_overflow_.value());
+  filter2->onDestroy();
   EXPECT_CALL(*handle, onDestroy());
   filter_->onDestroy();
 }

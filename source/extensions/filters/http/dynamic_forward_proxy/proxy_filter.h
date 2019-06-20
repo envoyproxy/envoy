@@ -44,6 +44,8 @@ public:
 
 private:
   const ProxyFilterConfigSharedPtr config_;
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+  Upstream::ResourceAutoIncDecPtr circuit_breaker_;
   Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheHandlePtr cache_load_handle_;
 };
 
