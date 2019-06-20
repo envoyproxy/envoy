@@ -72,7 +72,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
 
 Api::IoCallUint64Result IoSocketHandleImpl::sendto(const Buffer::RawSlice& slice, int flags,
                                                    const Address::Instance& address) {
-  const Address::InstanceBase* address_base = dynamic_cast<const Address::InstanceBase*>(&address);
+  const auto* address_base = dynamic_cast<const Address::InstanceBase*>(&address);
   sockaddr* sock_addr = const_cast<sockaddr*>(address_base->sockAddr());
 
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
@@ -84,7 +84,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendto(const Buffer::RawSlice& slice
 Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
                                                     uint64_t num_slice, int flags,
                                                     const Address::Instance& address) {
-  const Address::InstanceBase* address_base = dynamic_cast<const Address::InstanceBase*>(&address);
+  const auto* address_base = dynamic_cast<const Address::InstanceBase*>(&address);
   sockaddr* sock_addr = const_cast<sockaddr*>(address_base->sockAddr());
 
   STACK_ARRAY(iov, iovec, num_slice);

@@ -19,7 +19,7 @@ namespace {
 
 class LuaHeaderMapWrapperTest : public Filters::Common::Lua::LuaWrappersTestBase<HeaderMapWrapper> {
 public:
-  virtual void setup(const std::string& script) {
+  void setup(const std::string& script) override {
     Filters::Common::Lua::LuaWrappersTestBase<HeaderMapWrapper>::setup(script);
     state_->registerType<HeaderMapIterator>();
   }
@@ -220,7 +220,7 @@ TEST_F(LuaHeaderMapWrapperTest, IteratorAcrossYield) {
 class LuaStreamInfoWrapperTest
     : public Filters::Common::Lua::LuaWrappersTestBase<StreamInfoWrapper> {
 public:
-  virtual void setup(const std::string& script) {
+  void setup(const std::string& script) override {
     Filters::Common::Lua::LuaWrappersTestBase<StreamInfoWrapper>::setup(script);
     state_->registerType<DynamicMetadataMapWrapper>();
     state_->registerType<DynamicMetadataMapIterator>();

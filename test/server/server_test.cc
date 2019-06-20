@@ -362,6 +362,19 @@ TEST_P(ServerInstanceImplTest, InvalidBootstrapRuntime) {
                             EnvoyException, "Invalid runtime entry value for foo");
 }
 
+// Validate invalid layered runtime missing a name is rejected.
+TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapMissingName) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/invalid_layered_runtime_missing_name.yaml"),
+                          EnvoyException,
+                          "RuntimeLayerValidationError.Name: \\[\"value length must be at least");
+}
+
+// Validate invalid layered runtime with duplicate names is rejected.
+TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapDuplicateName) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/invalid_layered_runtime_duplicate_name.yaml"),
+                          EnvoyException, "Duplicate layer name: some_static_laye");
+}
+
 // Regression test for segfault when server initialization fails prior to
 // ClusterManager initialization.
 TEST_P(ServerInstanceImplTest, BootstrapClusterManagerInitializationFail) {

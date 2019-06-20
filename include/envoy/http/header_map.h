@@ -1,9 +1,8 @@
 #pragma once
 
-#include <string.h>
-
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -133,9 +132,7 @@ public:
    *
    * @return an absl::string_view.
    */
-  absl::string_view getStringView() const {
-    return absl::string_view(buffer_.ref_, string_length_);
-  }
+  absl::string_view getStringView() const { return {buffer_.ref_, string_length_}; }
 
   /**
    * Return the string to a default state. Reference strings are not touched. Both inline/dynamic
@@ -478,7 +475,7 @@ public:
    * @param context supplies the context passed to iterate().
    * @return Iterate::Continue to continue iteration.
    */
-  typedef Iterate (*ConstIterateCb)(const HeaderEntry& header, void* context);
+  using ConstIterateCb = Iterate (*)(const HeaderEntry&, void*);
 
   /**
    * Iterate over a constant header map.

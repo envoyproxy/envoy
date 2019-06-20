@@ -126,7 +126,7 @@ void IntegrationStreamDecoder::decodeTrailers(Http::HeaderMapPtr&& trailers) {
 
 void IntegrationStreamDecoder::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
   // Combines newly received metadata with the existing metadata.
-  for (const auto metadata : *metadata_map) {
+  for (const auto& metadata : *metadata_map) {
     duplicated_metadata_key_count_[metadata.first]++;
     metadata_map_->insert(metadata);
   }
@@ -409,7 +409,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
                                                        const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(bootstrap_path, version_, on_server_init_function_,
                                                deterministic_, timeSystem(), *api_,
-                                               defer_listener_finalization_);
+                                               defer_listener_finalization_, process_object_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 

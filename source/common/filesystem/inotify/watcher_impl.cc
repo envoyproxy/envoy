@@ -63,7 +63,7 @@ void WatcherImpl::onInotifyEvent() {
     const size_t event_count = rc;
     size_t index = 0;
     while (index < event_count) {
-      inotify_event* file_event = reinterpret_cast<inotify_event*>(&buffer[index]);
+      auto* file_event = reinterpret_cast<inotify_event*>(&buffer[index]);
       ASSERT(callback_map_.count(file_event->wd) == 1);
 
       std::string file;

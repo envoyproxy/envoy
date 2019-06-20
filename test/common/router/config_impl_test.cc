@@ -258,6 +258,20 @@ virtual_hosts:
       prefix_rewrite: "/oranGES"
       cluster: instant-server
   - match:
+      path: "/rewrite-host-with-header-value"
+    request_headers_to_add:
+    - header:
+        key: x-rewrite-host
+        value: rewrote
+    route:
+      cluster: ats
+      auto_host_rewrite_header: x-rewrite-host
+  - match:
+      path: "/do-not-rewrite-host-with-header-value"
+    route:
+      cluster: ats
+      auto_host_rewrite_header: x-rewrite-host
+  - match:
       prefix: "/"
     route:
       cluster: instant-server
@@ -416,6 +430,24 @@ virtual_hosts:
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("new_host", headers.get_(Http::Headers::get().Host));
+  }
+
+  // Rewrites host using supplied header.
+  {
+    Http::TestHeaderMapImpl headers =
+        genHeaders("api.lyft.com", "/rewrite-host-with-header-value", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("rewrote", headers.get_(Http::Headers::get().Host));
+  }
+
+  // Does not rewrite host because of missing header.
+  {
+    Http::TestHeaderMapImpl headers =
+        genHeaders("api.lyft.com", "/do-not-rewrite-host-with-header-value", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("api.lyft.com", headers.get_(Http::Headers::get().Host));
   }
 
   // Case sensitive rewrite matching test.
@@ -1061,6 +1093,44 @@ virtual_hosts:
       cluster: local_service
       host_rewrite: foo
       auto_host_rewrite: true
+  )EOF";
+
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+               EnvoyException);
+}
+
+TEST_F(RouteMatcherTest, NoHostRewriteAndAutoRewriteHeader) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: local_service
+      host_rewrite: foo
+      auto_host_rewrite_header: "dummy-header"
+  )EOF";
+
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+               EnvoyException);
+}
+
+TEST_F(RouteMatcherTest, NoAutoRewriteAndAutoRewriteHeader) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: local_service
+      auto_host_rewrite: true
+      auto_host_rewrite_header: "dummy-header"
   )EOF";
 
   EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
