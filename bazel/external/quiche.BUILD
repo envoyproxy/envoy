@@ -173,7 +173,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "spdy_core_headers_handler_interface",
+    name = "spdy_core_headers_handler_interface_lib",
     hdrs = ["quiche/spdy/core/spdy_headers_handler_interface.h"],
     copts = quiche_copt,
     repository = "@envoy",
@@ -227,7 +227,7 @@ envoy_cc_test_library(
     repository = "@envoy",
     deps = [
         ":spdy_core_header_block_lib",
-        ":spdy_core_headers_handler_interface",
+        ":spdy_core_headers_handler_interface_lib",
         ":spdy_core_protocol_lib",
         ":spdy_platform",
     ],
@@ -448,7 +448,7 @@ cc_proto_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_ack_listener_interface",
+    name = "quic_core_ack_listener_interface_lib",
     srcs = ["quiche/quic/core/quic_ack_listener_interface.cc"],
     hdrs = ["quiche/quic/core/quic_ack_listener_interface.h"],
     copts = quiche_copt,
@@ -462,7 +462,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_alarm_interface",
+    name = "quic_core_alarm_interface_lib",
     srcs = ["quiche/quic/core/quic_alarm.cc"],
     hdrs = ["quiche/quic/core/quic_alarm.h"],
     repository = "@envoy",
@@ -474,12 +474,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_alarm_factory_interface",
+    name = "quic_core_alarm_factory_interface_lib",
     hdrs = ["quiche/quic/core/quic_alarm_factory.h"],
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
-        ":quic_core_alarm_interface",
+        ":quic_core_alarm_interface_lib",
         ":quic_core_one_block_arena_lib",
     ],
 )
@@ -500,7 +500,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_blocked_writer_interface",
+    name = "quic_core_blocked_writer_interface_lib",
     hdrs = ["quiche/quic/core/quic_blocked_writer_interface.h"],
     repository = "@envoy",
     deps = [":quic_platform_export"],
@@ -574,7 +574,7 @@ envoy_cc_library(
     deps = [
         ":quic_core_bandwidth_lib",
         ":quic_core_congestion_control_bandwidth_sampler_lib",
-        ":quic_core_congestion_control_congestion_control_interface",
+        ":quic_core_congestion_control_congestion_control_interface_lib",
         ":quic_core_congestion_control_rtt_stats_lib",
         ":quic_core_congestion_control_windowed_filter_lib",
         ":quic_core_crypto_encryption_lib",
@@ -593,7 +593,7 @@ envoy_cc_library(
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
-        ":quic_core_congestion_control_congestion_control_interface",
+        ":quic_core_congestion_control_congestion_control_interface_lib",
         ":quic_core_congestion_control_rtt_stats_lib",
         ":quic_core_packets_lib",
         ":quic_core_time_lib",
@@ -603,7 +603,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_congestion_control_congestion_control_interface",
+    name = "quic_core_congestion_control_congestion_control_interface_lib",
     hdrs = [
         "quiche/quic/core/congestion_control/loss_detection_interface.h",
         "quiche/quic/core/congestion_control/send_algorithm_interface.h",
@@ -658,7 +658,7 @@ envoy_cc_library(
     deps = [
         ":quic_core_bandwidth_lib",
         ":quic_core_config_lib",
-        ":quic_core_congestion_control_congestion_control_interface",
+        ":quic_core_congestion_control_congestion_control_interface_lib",
         ":quic_core_packets_lib",
         ":quic_core_time_lib",
         ":quic_platform_base",
@@ -713,7 +713,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":quic_core_bandwidth_lib",
-        ":quic_core_congestion_control_congestion_control_interface",
+        ":quic_core_congestion_control_congestion_control_interface_lib",
         ":quic_core_congestion_control_rtt_stats_lib",
         ":quic_core_congestion_control_tcp_cubic_helper",
         ":quic_core_connection_stats_lib",
@@ -750,10 +750,10 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
-        ":quic_core_alarm_factory_interface",
-        ":quic_core_alarm_interface",
+        ":quic_core_alarm_factory_interface_lib",
+        ":quic_core_alarm_interface_lib",
         ":quic_core_bandwidth_lib",
-        ":quic_core_blocked_writer_interface",
+        ":quic_core_blocked_writer_interface_lib",
         ":quic_core_config_lib",
         ":quic_core_connection_stats_lib",
         ":quic_core_crypto_crypto_handshake_lib",
@@ -762,7 +762,7 @@ envoy_cc_library(
         ":quic_core_one_block_arena_lib",
         ":quic_core_packet_creator_lib",
         ":quic_core_packet_generator_lib",
-        ":quic_core_packet_writer_interface",
+        ":quic_core_packet_writer_interface_lib",
         ":quic_core_packets_lib",
         ":quic_core_pending_retransmission_lib",
         ":quic_core_proto_cached_network_parameters_proto_cc",
@@ -1211,7 +1211,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_packet_writer_interface",
+    name = "quic_core_packet_writer_interface_lib",
     srcs = ["quiche/quic/core/quic_packet_writer_wrapper.cc"],
     hdrs = [
         "quiche/quic/core/quic_packet_writer.h",
@@ -1239,7 +1239,7 @@ envoy_cc_library(
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
-        ":quic_core_ack_listener_interface",
+        ":quic_core_ack_listener_interface_lib",
         ":quic_core_bandwidth_lib",
         ":quic_core_constants_lib",
         ":quic_core_error_codes_lib",
@@ -1267,7 +1267,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_process_packet_interface",
+    name = "quic_core_process_packet_interface_lib",
     hdrs = ["quiche/quic/core/quic_process_packet_interface.h"],
     copts = quiche_copt,
     repository = "@envoy",
@@ -1345,16 +1345,16 @@ envoy_cc_library(
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
-        ":quic_core_alarm_factory_interface",
-        ":quic_core_alarm_interface",
-        ":quic_core_blocked_writer_interface",
+        ":quic_core_alarm_factory_interface_lib",
+        ":quic_core_alarm_interface_lib",
+        ":quic_core_blocked_writer_interface_lib",
         ":quic_core_connection_lib",
         ":quic_core_crypto_crypto_handshake_lib",
         ":quic_core_crypto_encryption_lib",
         ":quic_core_crypto_random_lib",
         ":quic_core_framer_lib",
         ":quic_core_packets_lib",
-        ":quic_core_process_packet_interface",
+        ":quic_core_process_packet_interface_lib",
         ":quic_core_session_lib",
         ":quic_core_time_lib",
         ":quic_core_time_wait_list_manager_lib",
@@ -1420,7 +1420,7 @@ envoy_cc_library(
         ":quic_core_packet_creator_lib",
         ":quic_core_packets_lib",
         ":quic_core_server_id_lib",
-        ":quic_core_session_notifier_interface",
+        ":quic_core_session_notifier_interface_lib",
         ":quic_core_stream_frame_data_producer_lib",
         ":quic_core_stream_send_buffer_lib",
         ":quic_core_stream_sequencer_buffer_lib",
@@ -1434,7 +1434,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_session_notifier_interface",
+    name = "quic_core_session_notifier_interface_lib",
     hdrs = ["quiche/quic/core/session_notifier_interface.h"],
     repository = "@envoy",
     deps = [
@@ -1536,10 +1536,10 @@ envoy_cc_library(
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
-        ":quic_core_blocked_writer_interface",
+        ":quic_core_blocked_writer_interface_lib",
         ":quic_core_crypto_encryption_lib",
         ":quic_core_framer_lib",
-        ":quic_core_packet_writer_interface",
+        ":quic_core_packet_writer_interface_lib",
         ":quic_core_packets_lib",
         ":quic_core_session_lib",
         ":quic_core_types_lib",
@@ -1555,7 +1555,7 @@ envoy_cc_library(
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
-        ":quic_core_ack_listener_interface",
+        ":quic_core_ack_listener_interface_lib",
         ":quic_core_frames_frames_lib",
         ":quic_core_types_lib",
         ":quic_platform_export",
@@ -1606,7 +1606,7 @@ envoy_cc_library(
     deps = [
         ":quic_core_connection_stats_lib",
         ":quic_core_packets_lib",
-        ":quic_core_session_notifier_interface",
+        ":quic_core_session_notifier_interface_lib",
         ":quic_core_transmission_info_lib",
         ":quic_core_utils_lib",
         ":quic_platform_base",
