@@ -12,6 +12,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -32,7 +33,6 @@ using testing::StrictMock;
 
 namespace Envoy {
 namespace Server {
-namespace {
 
 TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
@@ -162,71 +162,14 @@ public:
   Init::Manager& initManager() override { return init_manager_; }
 };
 
-// Class creates minimally viable server instance for testing and the initManager managed by it is
-// stuck in Initializing.
-class InitializingServerInstanceImplTest
-    : public testing::TestWithParam<Network::Address::IpVersion> {
-protected:
-  InitializingServerInstanceImplTest() : version_(GetParam()) {}
-
-  void initialize(const std::string& bootstrap_path) {
-    if (bootstrap_path.empty()) {
-      options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
-          "test/config/integration/server.json", {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
-    } else {
-      options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
-          bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
-    }
-    thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
-    if (process_object_ != nullptr) {
-      process_context_ = std::make_unique<ProcessContextImpl>(*process_object_);
-    }
-    server_ = std::make_unique<InitializingInstanceImpl>(
-        options_, test_time_.timeSystem(),
-        Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-        hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
-        std::move(process_context_));
-
-    EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
-  }
-  Network::Address::IpVersion version_;
-  testing::NiceMock<MockOptions> options_;
-  DefaultListenerHooks hooks_;
-  testing::NiceMock<MockHotRestart> restart_;
-  std::unique_ptr<ThreadLocal::InstanceImpl> thread_local_;
-  Stats::TestIsolatedStoreImpl stats_store_;
-  Thread::MutexBasicLockable fakelock_;
-  TestComponentFactory component_factory_;
-  DangerousDeprecatedTestTime test_time_;
-  ProcessObject* process_object_ = nullptr;
-  std::unique_ptr<ProcessContextImpl> process_context_;
-  std::unique_ptr<InstanceImpl> server_;
-};
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, InitializingServerInstanceImplTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
-// Validates that server stats are created even if the server is stuck with initialization.
-TEST_P(InitializingServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
-  options_.hot_restart_epoch_ = 3;
-
-  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
-
-  // Validate that server is still in initializing state but stats are created and flushed.
-  EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
-  EXPECT_EQ(1L, TestUtility::findGauge(stats_store_, "server.live")->value());
-  EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
-}
-
 // Class creates minimally viable server instance for testing.
 class ServerInstanceImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   ServerInstanceImplTest() : version_(GetParam()) {}
 
-  void initialize(const std::string& bootstrap_path) {
+  void initialize(const std::string& bootstrap_path) { initialize(bootstrap_path, false); }
+
+  void initialize(const std::string& bootstrap_path, const bool use_intializing_instance) {
     if (bootstrap_path.empty()) {
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           "test/config/integration/server.json", {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
@@ -238,13 +181,24 @@ protected:
     if (process_object_ != nullptr) {
       process_context_ = std::make_unique<ProcessContextImpl>(*process_object_);
     }
-    server_ = std::make_unique<InstanceImpl>(
-        options_, test_time_.timeSystem(),
-        Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-        hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
-        std::move(process_context_));
+    if (use_intializing_instance) {
+      server_ = std::make_unique<InitializingInstanceImpl>(
+          options_, test_time_.timeSystem(),
+          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+          hooks_, restart_, stats_store_, fakelock_, component_factory_,
+          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
+          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+          std::move(process_context_));
+
+    } else {
+      server_ = std::make_unique<InstanceImpl>(
+          options_, test_time_.timeSystem(),
+          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+          hooks_, restart_, stats_store_, fakelock_, component_factory_,
+          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
+          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+          std::move(process_context_));
+    }
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
@@ -267,6 +221,8 @@ protected:
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
 
+  void flushStats() { server_->flushStats(); }
+
   // Returns the server's tracer as a pointer, for use in dynamic_cast tests.
   Tracing::HttpTracer* tracer() { return &server_->httpContext().tracer(); };
 
@@ -287,6 +243,22 @@ protected:
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+// Validates that server stats are flushed even when server is stuck with initialization.
+TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
+  options_.hot_restart_epoch_ = 3;
+
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml", true));
+
+  // Validate that server is still in initializing state but stats flushed.
+  EXPECT_LOG_CONTAINS("debug",
+                      "Envoy is not fully initialized, skipping histogram merge and flushing stats",
+                      flushStats());
+
+  EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
+  EXPECT_EQ(1L, TestUtility::findGauge(stats_store_, "server.live")->value());
+  EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
+}
 
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   absl::Notification started;
@@ -650,6 +622,5 @@ TEST_P(ServerInstanceImplTest, WithProcessContext) {
   EXPECT_FALSE(object_from_context.boolean_flag_);
 }
 
-} // namespace
 } // namespace Server
 } // namespace Envoy
