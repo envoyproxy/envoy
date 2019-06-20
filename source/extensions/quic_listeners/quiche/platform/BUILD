@@ -136,7 +136,6 @@ envoy_cc_library(
         "quic_ptr_util_impl.h",
         "quic_reference_counted_impl.h",
         "quic_server_stats_impl.h",
-        "quic_socket_address_impl.h",
         "quic_stack_trace_impl.h",
         "quic_str_cat_impl.h",
         "quic_stream_buffer_allocator_impl.h",
