@@ -22,14 +22,14 @@
 namespace Envoy {
 namespace Quic {
 
-// A dummy implementation of quic::ProofSource which returns a dummy cert and
-// a fake signature for given QUIC server config.
+// A fake implementation of quic::ProofSource which returns a fake cert and
+// a fake signature for a given QUIC server config.
 class EnvoyQuicFakeProofSource : public quic::ProofSource {
 public:
   ~EnvoyQuicFakeProofSource() override = default;
 
   // quic::ProofSource
-  // Returns a fake certs chain and its dummy SCT "Dummy timestamp" and dummy TLS signature wrapped
+  // Returns a fake certs chain and its fake SCT "Fake timestamp" and fake TLS signature wrapped
   // in QuicCryptoProof.
   void GetProof(const quic::QuicSocketAddress& server_address, const std::string& hostname,
                 const std::string& server_config, quic::QuicTransportVersion /*transport_version*/,
@@ -42,27 +42,27 @@ public:
     auto signature_callback = std::make_unique<FakeSignatureCallback>(success, proof.signature);
     ComputeTlsSignature(server_address, hostname, 0, server_config, std::move(signature_callback));
     ASSERT(success);
-    proof.leaf_cert_scts = "Dummy timestamp";
+    proof.leaf_cert_scts = "Fake timestamp";
     callback->Run(true, chain, proof, nullptr /* details */);
   }
 
-  // Returns a certs chain with a dummy certificate "Dummy cert from [host_name]".
+  // Returns a certs chain with a fake certificate "Fake cert from [host_name]".
   quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
   GetCertChain(const quic::QuicSocketAddress& /*server_address*/,
                const std::string& hostname) override {
     std::vector<std::string> certs;
-    certs.push_back(absl::StrCat("Dummy cert from ", hostname));
+    certs.push_back(absl::StrCat("Fake cert from ", hostname));
     return quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>(
         new quic::ProofSource::Chain(certs));
   }
 
-  // Always call callback with a signature "Dummy signature for { [server_config] }".
+  // Always call callback with a signature "Fake signature for { [server_config] }".
   void
   ComputeTlsSignature(const quic::QuicSocketAddress& /*server_address*/,
                       const std::string& /*hostname*/, uint16_t /*signature_algorithm*/,
                       quic::QuicStringPiece in,
                       std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override {
-    callback->Run(true, absl::StrCat("Dummy signature for { ", in, " }"));
+    callback->Run(true, absl::StrCat("Fake signature for { ", in, " }"));
   }
 
 private:
