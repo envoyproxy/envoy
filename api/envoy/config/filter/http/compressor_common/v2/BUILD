@@ -3,7 +3,7 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal")
 licenses(["notice"])  # Apache 2
 
 api_proto_library_internal(
-    name = "gzip",
-    srcs = ["gzip.proto"],
-    deps = ["//envoy/config/filter/http/compressor_common/v2:compressor_common_proto"],
+    name = "compressor_common_proto",
+    srcs = ["compressor_common.proto"],
+    visibility = ["//visibility:public"],
 )

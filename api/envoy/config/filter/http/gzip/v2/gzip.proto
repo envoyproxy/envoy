@@ -11,6 +11,7 @@ import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
+import "envoy/config/filter/http/compressor_common/v2/compressor_common.proto";
 
 // [#protodoc-title: Gzip]
 // Gzip :ref:`configuration overview <config_http_filters_gzip>`.
@@ -72,4 +73,6 @@ message Gzip {
   // which will produce a 4096 bytes window. For more details about this parameter, please refer to
   // zlib manual > deflateInit2.
   google.protobuf.UInt32Value window_bits = 9 [(validate.rules).uint32 = {gte: 9, lte: 15}];
+
+  envoy.config.filter.http.compressor.v2.Compressor compressor = 10;
 }

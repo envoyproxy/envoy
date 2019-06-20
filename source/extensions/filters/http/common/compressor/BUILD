@@ -20,5 +20,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/config/filter/http/compressor_common/v2:compressor_common_proto_cc",
     ],
 )

@@ -1,5 +1,7 @@
 #include "extensions/filters/http/gzip/gzip_filter.h"
 
+#include "common/protobuf/protobuf.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -20,9 +22,8 @@ const uint64_t GzipHeaderValue = 16;
 GzipFilterConfig::GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip,
                                    const std::string& stats_prefix, Stats::Scope& scope,
                                    Runtime::Loader& runtime)
-    : CompressorFilterConfig(gzip.content_length().value(), gzip.content_type(),
-                             gzip.disable_on_etag_header(), gzip.remove_accept_encoding_header(),
-                             stats_prefix + "gzip.", scope, runtime, "gzip"),
+    : CompressorFilterConfig(compressorConfig(gzip), stats_prefix + "gzip.", scope, runtime,
+                             "gzip"),
       compression_level_(compressionLevelEnum(gzip.compression_level())),
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
       memory_level_(memoryLevelUint(gzip.memory_level().value())),
@@ -71,6 +72,23 @@ uint64_t GzipFilterConfig::memoryLevelUint(Protobuf::uint32 level) {
 
 uint64_t GzipFilterConfig::windowBitsUint(Protobuf::uint32 window_bits) {
   return (window_bits > 0 ? window_bits : DefaultWindowBits) | GzipHeaderValue;
+}
+
+const envoy::config::filter::http::compressor::v2::Compressor
+GzipFilterConfig::compressorConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip) {
+  if (gzip.has_compressor()) {
+    return gzip.compressor();
+  }
+  envoy::config::filter::http::compressor::v2::Compressor compressor = {};
+  if (gzip.has_content_length()) {
+    compressor.set_allocated_content_length(new Protobuf::UInt32Value(gzip.content_length()));
+  }
+  for (const auto& ctype : gzip.content_type()) {
+    compressor.add_content_type(ctype);
+  }
+  compressor.set_disable_on_etag_header(gzip.disable_on_etag_header());
+  compressor.set_remove_accept_encoding_header(gzip.remove_accept_encoding_header());
+  return compressor;
 }
 
 } // namespace Gzip

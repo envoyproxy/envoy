@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/compressor/compressor.h"
+#include "envoy/config/filter/http/compressor_common/v2/compressor_common.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -73,10 +74,7 @@ public:
   virtual ~CompressorFilterConfig();
 
 protected:
-  CompressorFilterConfig(const Protobuf::uint32 content_length,
-                         const Protobuf::RepeatedPtrField<std::string>& content_types,
-                         const bool disable_on_etag_header,
-                         const bool remove_accept_encoding_header,
+  CompressorFilterConfig(const envoy::config::filter::http::compressor::v2::Compressor& compressor,
                          const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
                          const std::string& content_encoding);
 
