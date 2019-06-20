@@ -28,6 +28,7 @@
 #include "common/common/version.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
+#include "common/config/well_known_names.h"
 #include "common/http/codes.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
@@ -261,10 +262,17 @@ void InstanceImpl::initialize(const Options& options,
             Registry::FactoryRegistry<
                 Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
 
-  // Dynamically register the SrvResolver while injecting the necessary dependencies.
-  Network::Address::SrvResolver* srv_resolver =
-      new Network::Address::SrvResolver(dns_resolver_, *dispatcher_);
-  Registry::FactoryRegistry<Network::Address::Resolver>::registerFactory(*srv_resolver);
+  // Dynamically register the SrvResolver while injecting the necessary dependencies. The nullptr
+  // check ensures that tests don't fail due to double registration of SrvResolver.
+  //
+  // TODO (venilnoronha): Create an abstraction for handling dynamic registration of factories by
+  // enabling dependency injection at runtime.
+  if (Registry::FactoryRegistry<Network::Address::Resolver>::getFactory(
+          Config::AddressResolverNames::get().SRV) == nullptr) {
+    Network::Address::SrvResolver* srv_resolver =
+        new Network::Address::SrvResolver(dns_resolver_, *dispatcher_);
+    Registry::FactoryRegistry<Network::Address::Resolver>::registerFactory(*srv_resolver);
+  }
 
   // Enable the selected buffer implementation (old libevent evbuffer version or new native
   // version) early in the initialization, before any buffers can be created.
