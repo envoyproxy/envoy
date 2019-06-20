@@ -34,8 +34,7 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
     ENVOY_LOG(debug, "statsd TCP cluster: {}", statsd_sink.tcp_cluster_name());
     return std::make_unique<Common::Statsd::TcpStatsdSink>(
         server.localInfo(), statsd_sink.tcp_cluster_name(), server.threadLocal(),
-        server.clusterManager(), server.stats(), statsd_sink.exclude_zero_values(), 
-        statsd_sink.prefix());
+        server.clusterManager(), server.stats(), statsd_sink.exclude_zero_values(), statsd_sink.prefix());
   default:
     // Verified by schema.
     NOT_REACHED_GCOVR_EXCL_LINE;

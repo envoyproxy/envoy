@@ -42,7 +42,8 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              Network::Address::InstanceConstSharedPtr address, const bool use_tag,
                              const bool exclude_zero_values, const std::string& prefix)
     : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag),
-      exclude_zero_values_(exclude_zero_values), prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix) {
+      exclude_zero_values_(exclude_zero_values), prefix_(prefix.empty() ? Statsd::getDefaultPrefix() 
+      : prefix) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<Writer>(this->server_address_);
   });
@@ -113,7 +114,8 @@ void TcpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
   TlsSink& tls_sink = tls_->getTyped<TlsSink>();
   tls_sink.beginFlush(true);
   for (const auto& counter : snapshot.counters()) {
-    if (counter.counter_.get().used() && !(excludeZeroValues() && counter.counter_.get().value() == 0)) {
+    if (counter.counter_.get().used() && !(excludeZeroValues() && 
+      counter.counter_.get().value() == 0)) {
       tls_sink.flushCounter(counter.counter_.get().name(), counter.delta_);
     }
   }
