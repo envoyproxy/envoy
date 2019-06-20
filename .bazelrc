@@ -59,6 +59,7 @@ build:libc++ --action_env=CC
 build:libc++ --action_env=CXX
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:libc++ --action_env=PATH
+build:libc++ --host_linkopt=-fuse-ld=lld
 build:libc++ --define force_libcpp=enabled
 
 # Optimize build for binary size reduction.
