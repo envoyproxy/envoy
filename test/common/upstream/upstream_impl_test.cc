@@ -883,7 +883,7 @@ TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
   EXPECT_THROW_WITH_MESSAGE(
       std::make_unique<StrictDnsClusterImpl>(cluster_config, runtime_, dns_resolver_,
                                              factory_context, std::move(scope), false),
-      EnvoyException, "STRICT_DNS clusters must NOT have a custom resolver name set");
+      EnvoyException, "STRICT_DNS clusters only support envoy.ip and envoy.srv resolver types");
 }
 
 TEST_F(StrictDnsClusterImplTest, RecordTtlAsDnsRefreshRate) {
