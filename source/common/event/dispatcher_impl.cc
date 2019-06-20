@@ -37,9 +37,17 @@ DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& 
       scheduler_(time_system.createScheduler(base_scheduler_)),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
-      current_to_delete_(&to_delete_1_) {}
+      current_to_delete_(&to_delete_1_) {
+#ifdef ENVOY_HANDLE_SIGNALS
+  SignalAction::registerCrashHandler(*this);
+#endif
+}
 
-DispatcherImpl::~DispatcherImpl() {}
+DispatcherImpl::~DispatcherImpl() {
+#ifdef ENVOY_HANDLE_SIGNALS
+  SignalAction::removeCrashHandler(*this);
+#endif
+}
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope, const std::string& prefix) {
   // This needs to be run in the dispatcher's thread, so that we have a thread id to log.

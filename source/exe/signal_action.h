@@ -4,12 +4,22 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <list>
 
 #include "common/common/non_copyable.h"
 
 #include "server/backtrace.h"
 
 namespace Envoy {
+
+// A simple class which allows registering functions to be called when Envoy
+// receives one of the fatal signals, documented below.
+class CrashHandlerInterface {
+public:
+  virtual ~CrashHandlerInterface() {}
+  virtual void crashHandler() const PURE;
+};
+
 /**
  * This class installs signal handlers for fatal signal types.
  *
@@ -71,6 +81,18 @@ public:
    */
   static void sigHandler(int sig, siginfo_t* info, void* context);
 
+  /**
+   * Add this handler to the list of functions which will be called if Envoy
+   * receives a fatal signal.
+   */
+  static void registerCrashHandler(const CrashHandlerInterface& handler);
+
+  /**
+   * Removes this handler from the list of functions which will be called if Envoy
+   * receives a fatal signal.
+   */
+  static void removeCrashHandler(const CrashHandlerInterface& handler);
+
 private:
   /**
    * Allocate this many bytes on each side of the area used for alt stack.
@@ -128,5 +150,7 @@ private:
   char* altstack_;
   std::array<struct sigaction, sizeof(FATAL_SIGS) / sizeof(int)> previous_handlers_;
   stack_t previous_altstack_;
+  std::list<const CrashHandlerInterface*> crash_handlers_;
 };
+
 } // namespace Envoy

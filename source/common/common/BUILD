@@ -185,6 +185,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "scope_tracker",
+    hdrs = ["scope_tracker.h"],
+    deps = [
+        "//include/envoy/common:scope_tracker_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "stl_helpers",
     hdrs = ["stl_helpers.h"],
 )

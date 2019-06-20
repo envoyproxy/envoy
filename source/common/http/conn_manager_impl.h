@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/scope_tracker.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -335,7 +336,8 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
-                        public Tracing::Config {
+                        public Tracing::Config,
+                        public ScopeTrackedObject {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
 
@@ -418,6 +420,20 @@ private:
     const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
     bool verbose() const override;
 
+    // ScopeTrackedObject
+    void logState(std::ostream& os, int indent_level = 0) const override {
+      const char* spaces = spacesForLevel(indent_level);
+      os << spaces << "ActiveStream " << this << LOG_MEMBER(stream_id_)
+         << LOG_MEMBER(has_continue_headers_) << LOG_MEMBER(is_head_request_)
+         << LOG_MEMBER(decoding_headers_only_) << LOG_MEMBER(encoding_headers_only_) << "\n";
+
+      LOG_DETAILS(request_headers_);
+      LOG_DETAILS(request_trailers_);
+      LOG_DETAILS(response_headers_);
+      LOG_DETAILS(response_trailers_);
+      LOG_DETAILS(&stream_info_);
+    }
+
     void traceRequest();
 
     void refreshCachedRoute();
@@ -494,19 +510,6 @@ private:
     void onRequestTimeout();
 
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
-
-    void logState(std::ostream& os, int indent_level = 0) const {
-      const char* spaces = spacesForLevel(indent_level);
-      os << spaces << "ActiveStream " << this << LOG_MEMBER(stream_id_)
-         << LOG_MEMBER(has_continue_headers_) << LOG_MEMBER(is_head_request_)
-         << LOG_MEMBER(decoding_headers_only_) << LOG_MEMBER(encoding_headers_only_) << "\n";
-
-      LOG_DETAILS(request_headers_);
-      LOG_DETAILS(request_trailers_);
-      LOG_DETAILS(response_headers_);
-      LOG_DETAILS(response_trailers_);
-      LOG_DETAILS(&stream_info_);
-    }
 
     friend std::ostream& operator<<(std::ostream& os, const ActiveStream& s) {
       s.logState(os);

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
@@ -18,13 +19,19 @@
 #include "common/event/libevent.h"
 #include "common/event/libevent_scheduler.h"
 
+#ifdef ENVOY_HANDLE_SIGNALS
+#include "exe/signal_action.h"
+#endif
+
 namespace Envoy {
 namespace Event {
 
 /**
  * libevent implementation of Event::Dispatcher.
  */
-class DispatcherImpl : Logger::Loggable<Logger::Id::main>, public Dispatcher {
+class DispatcherImpl : Logger::Loggable<Logger::Id::main>,
+                       public Dispatcher,
+                       public CrashHandlerInterface {
 public:
   DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system);
   DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
@@ -65,6 +72,20 @@ public:
   void post(std::function<void()> callback) override;
   void run(RunType type) override;
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
+  const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) override {
+    const ScopeTrackedObject* return_object = current_object_;
+    current_object_ = object;
+    return return_object;
+  }
+
+  // CrashHandlerInterface
+  void crashHandler() const override {
+    if (isThreadSafe()) {
+      if (current_object_) {
+        current_object_->logState(std::cerr);
+      }
+    }
+  }
 
 private:
   void runPostCallbacks();
@@ -88,6 +109,7 @@ private:
   std::vector<DeferredDeletablePtr>* current_to_delete_;
   Thread::MutexBasicLockable post_lock_;
   std::list<std::function<void()>> post_callbacks_ GUARDED_BY(post_lock_);
+  const ScopeTrackedObject* current_object_{};
   bool deferred_deleting_{};
 };
 

@@ -7,6 +7,28 @@
 #include "common/common/assert.h"
 
 namespace Envoy {
+
+ABSL_CONST_INIT static absl::Mutex failure_mutex(absl::kConstInit);
+using FailureFunctionList = std::list<const CrashHandlerInterface*>;
+ABSL_CONST_INIT std::atomic<FailureFunctionList*> crash_handlers{nullptr};
+
+void SignalAction::registerCrashHandler(const CrashHandlerInterface& handler) {
+  absl::MutexLock l(&failure_mutex);
+  FailureFunctionList* list = crash_handlers.exchange(nullptr, std::memory_order_relaxed);
+  if (list == nullptr) {
+    list = new FailureFunctionList;
+  }
+  list->push_back(&handler);
+  crash_handlers.store(list, std::memory_order_release);
+}
+
+void SignalAction::removeCrashHandler(const CrashHandlerInterface& handler) {
+  absl::MutexLock l(&failure_mutex);
+  FailureFunctionList* list = crash_handlers.exchange(nullptr, std::memory_order_relaxed);
+  list->remove(&handler);
+  crash_handlers.store(list, std::memory_order_release);
+}
+
 constexpr int SignalAction::FATAL_SIGS[];
 
 void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
@@ -19,6 +41,13 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
     tracer.capture();
   }
   tracer.logTrace();
+
+  FailureFunctionList* list = crash_handlers.exchange(nullptr, std::memory_order_relaxed);
+
+  // Finally after logging the stack trace, call any registered crash handlers.
+  for (const auto* handler : *list) {
+    handler->crashHandler();
+  }
 
   signal(sig, SIG_DFL);
   raise(sig);

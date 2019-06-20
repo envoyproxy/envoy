@@ -211,15 +211,10 @@ struct StreamInfoImpl : public StreamInfo {
 
   void logState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "StreamInfoImpl " << this
-       << LOG_OPTIONAL_MEMBER(protocol_)
-       << LOG_OPTIONAL_MEMBER(response_code_)
-       << LOG_OPTIONAL_MEMBER(response_code_details_)
-       << LOG_MEMBER(health_check_request_)
-       << LOG_MEMBER(route_name_)
-       << "\n";
+    os << spaces << "StreamInfoImpl " << this << LOG_OPTIONAL_MEMBER(protocol_)
+       << LOG_OPTIONAL_MEMBER(response_code_) << LOG_OPTIONAL_MEMBER(response_code_details_)
+       << LOG_MEMBER(health_check_request_) << LOG_MEMBER(route_name_) << "\n";
   }
-
 
   TimeSource& time_source_;
   const SystemTime start_time_;

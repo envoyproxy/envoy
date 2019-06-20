@@ -124,6 +124,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:non_copyable",
+        "//source/common/singleton:threadsafe_singleton",
         "//source/server:backtrace_lib",
     ],
 )

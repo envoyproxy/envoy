@@ -4294,6 +4294,5 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
   Buffer::OwnedImpl fake_input;
   conn_manager_->onData(fake_input, false);
 }
-
 } // namespace Http
 } // namespace Envoy

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sstream>
+
 namespace Envoy {
 
 #define LOG_MEMBER(member) ", " #member ": " << (member)
