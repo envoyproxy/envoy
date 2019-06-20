@@ -10,5 +10,11 @@ jobs:
     vmImage: 'Ubuntu 16.04'
   container: envoy-build
   steps:
-  - script: bazel build //source/exe:envoy-static
-
+  # bazel.dev isn't for CI purpose but we use it here to experiment with Azure Pipeline 
+  # as it builds faster, before Azure can provision larger VM or we can use RBE.
+  - script: ci/do_ci.sh bazel.dev
+    env:
+      BUILD_DIR: $(Build.StagingDirectory)
+      BAZEL_REMOTE_CACHE: remotebuildexecution.googleapis.com
+      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)

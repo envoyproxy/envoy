@@ -32,7 +32,7 @@ mkdir -p "${FAKE_HOME}"
 export HOME="${FAKE_HOME}"
 export PYTHONUSERBASE="${FAKE_HOME}"
 
-export BUILD_DIR=/build
+export BUILD_DIR=${BUILD_DIR:-/build}
 if [[ ! -d "${BUILD_DIR}" ]]
 then
   echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}? Creating."
