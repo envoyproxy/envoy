@@ -13,11 +13,12 @@ PermissiveSocket::PermissiveSocket(Network::TransportSocketPtr&& primary_transpo
       secondary_transport_socket_(std::move(secondary_transport_socket)) {}
 
 void PermissiveSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
-  callbacks_ = &callbacks;
+  callbacks_ = std::make_unique<ProxyTransportSocketCallbacks>(callbacks);
+
   if (is_fallback_) {
-    secondary_transport_socket_->setTransportSocketCallbacks(callbacks);
+    secondary_transport_socket_->setTransportSocketCallbacks(*callbacks_);
   } else {
-    primary_transport_socket_->setTransportSocketCallbacks(callbacks);
+    primary_transport_socket_->setTransportSocketCallbacks(*callbacks_);
   }
 }
 
@@ -25,6 +26,7 @@ Network::IoResult PermissiveSocket::doRead(Buffer::Instance& buffer) {
   if (is_fallback_) {
     return secondary_transport_socket_->doRead(buffer);
   } else {
+    callbacks_->clearEvents();
     Network::IoResult io_result = primary_transport_socket_->doRead(buffer);
     checkIoResult(io_result);
     return io_result;
@@ -35,6 +37,7 @@ Network::IoResult PermissiveSocket::doWrite(Buffer::Instance& buffer, bool end_s
   if (is_fallback_) {
     return secondary_transport_socket_->doWrite(buffer, end_stream);
   } else {
+    callbacks_->clearEvents();
     Network::IoResult io_result = primary_transport_socket_->doWrite(buffer, end_stream);
     checkIoResult(io_result);
     return io_result;
@@ -93,14 +96,11 @@ void PermissiveSocket::checkIoResult(Network::IoResult& io_result) {
   ASSERT(!is_fallback_);
 
   /**
-   * The function is for checking if the TLS handshake succeeded or not. If handshake failed,
-   * fallback to plaintext connection.
-   *  * check handshake_complete_. If handshake_complete_ is true, it means handshake
-   * completed. Since handshake_complete_ is private in ssl_socket, we can call canFlushClose()
-   * instead.
-   *  * check if the action is Network::PostIoAction::Close.
+   * Check if the event Network::ConnectionEvent::Connected was raised.
+   * Check if the action is Network::PostIoAction::Close.
    */
-  if (!canFlushClose() && io_result.action_ == Network::PostIoAction::Close) {
+  if (!callbacks_->eventRaised(Network::ConnectionEvent::Connected) &&
+      io_result.action_ == Network::PostIoAction::Close) {
     // TODO(crazyxy): add metrics
     is_fallback_ = true;
     ENVOY_CONN_LOG(trace, "Transport socket fallback", callbacks_->connection());

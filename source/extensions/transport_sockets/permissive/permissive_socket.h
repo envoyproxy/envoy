@@ -6,6 +6,8 @@
 
 #include "common/common/logger.h"
 
+#include "extensions/transport_sockets/permissive/proxy_transport_socket_callbacks.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -37,7 +39,7 @@ private:
   void checkIoResult(Network::IoResult& io_result);
 
   bool is_fallback_{};
-  Network::TransportSocketCallbacks* callbacks_{};
+  ProxyTransportSocketCallbacksPtr callbacks_;
   Network::TransportSocketPtr primary_transport_socket_;
   Network::TransportSocketPtr secondary_transport_socket_;
 };

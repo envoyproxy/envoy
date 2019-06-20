@@ -13,6 +13,7 @@ using testing::AtMost;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
+using testing::Unused;
 
 namespace Envoy {
 namespace Extensions {
@@ -67,8 +68,10 @@ protected:
   void fallback() {
     EXPECT_FALSE(permissive_transport_socket_->isFallback());
     Network::IoResult io_result = {Network::PostIoAction::Close, 0, false};
-    EXPECT_CALL(*ssl_transport_socket_, doRead(_)).WillOnce(Return(io_result));
-    EXPECT_CALL(*ssl_transport_socket_, canFlushClose()).WillOnce(Return(false));
+    EXPECT_CALL(*ssl_transport_socket_, doRead(_)).WillOnce(Invoke([io_result, this](Unused) {
+      ssl_transport_socket_->callbacks_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+      return io_result;
+    }));
 
     EXPECT_CALL(callbacks_, connection()).Times(AtMost(1));
     permissive_transport_socket_->doRead(read_buffer_);
@@ -93,8 +96,10 @@ TEST_F(PermissiveSocketTest, FallbackOnWrite) {
 
   Network::IoResult io_result = {Network::PostIoAction::Close, 0, false};
   EXPECT_CALL(*ssl_transport_socket_, doWrite(BufferStringEqual("hello"), false))
-      .WillOnce(Return(io_result));
-  EXPECT_CALL(*ssl_transport_socket_, canFlushClose()).WillOnce(Return(false));
+      .WillOnce(Invoke([io_result, this](Unused, Unused) {
+        ssl_transport_socket_->callbacks_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+        return io_result;
+      }));
 
   write_buffer_.add("hello");
   EXPECT_CALL(callbacks_, connection()).Times(AtMost(1));
@@ -105,6 +110,49 @@ TEST_F(PermissiveSocketTest, FallbackOnWrite) {
   EXPECT_TRUE(permissive_transport_socket_->isFallback());
 }
 
+TEST_F(PermissiveSocketTest, ConnectedEventWasRaisedOnWrite) {
+  InSequence s;
+
+  initialize();
+
+  EXPECT_FALSE(permissive_transport_socket_->isFallback());
+
+  Network::IoResult io_result = {Network::PostIoAction::Close, 0, false};
+  EXPECT_CALL(*ssl_transport_socket_, doWrite(BufferStringEqual("hello"), false))
+      .WillOnce(Invoke([io_result, this](Unused, Unused) {
+        ssl_transport_socket_->callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+        return io_result;
+      }));
+
+  write_buffer_.add("hello");
+  EXPECT_CALL(callbacks_, connection()).Times(AtMost(1));
+
+  io_result = permissive_transport_socket_->doWrite(write_buffer_, false);
+
+  EXPECT_EQ(Network::PostIoAction::Close, io_result.action_);
+  EXPECT_FALSE(permissive_transport_socket_->isFallback());
+}
+
+TEST_F(PermissiveSocketTest, IoKeepOpenOnWrite) {
+  InSequence s;
+
+  initialize();
+
+  EXPECT_FALSE(permissive_transport_socket_->isFallback());
+
+  Network::IoResult io_result = {Network::PostIoAction::KeepOpen, 0, false};
+  EXPECT_CALL(*ssl_transport_socket_, doWrite(BufferStringEqual("hello"), false))
+      .WillOnce(Return(io_result));
+
+  write_buffer_.add("hello");
+  EXPECT_CALL(callbacks_, connection()).Times(AtMost(1));
+
+  io_result = permissive_transport_socket_->doWrite(write_buffer_, false);
+
+  EXPECT_EQ(Network::PostIoAction::KeepOpen, io_result.action_);
+  EXPECT_FALSE(permissive_transport_socket_->isFallback());
+}
+
 TEST_F(PermissiveSocketTest, FallbackOnRead) {
   InSequence s;
 
@@ -113,8 +161,10 @@ TEST_F(PermissiveSocketTest, FallbackOnRead) {
   EXPECT_FALSE(permissive_transport_socket_->isFallback());
 
   Network::IoResult io_result = {Network::PostIoAction::Close, 0, false};
-  EXPECT_CALL(*ssl_transport_socket_, doRead(_)).WillOnce(Return(io_result));
-  EXPECT_CALL(*ssl_transport_socket_, canFlushClose()).WillOnce(Return(false));
+  EXPECT_CALL(*ssl_transport_socket_, doRead(_)).WillOnce(Invoke([io_result, this](Unused) {
+    ssl_transport_socket_->callbacks_->raiseEvent(Network::ConnectionEvent::LocalClose);
+    return io_result;
+  }));
 
   EXPECT_CALL(callbacks_, connection()).Times(AtMost(1));
   io_result = permissive_transport_socket_->doRead(read_buffer_);
@@ -123,26 +173,7 @@ TEST_F(PermissiveSocketTest, FallbackOnRead) {
   EXPECT_TRUE(permissive_transport_socket_->isFallback());
 }
 
-TEST_F(PermissiveSocketTest, DoNotFallbackWhenHandShakeNotCompleteSocketKeepOpen) {
-  InSequence s;
-
-  initialize();
-
-  EXPECT_FALSE(permissive_transport_socket_->isFallback());
-
-  Network::IoResult io_result = {Network::PostIoAction::KeepOpen, 0, false};
-
-  EXPECT_CALL(*ssl_transport_socket_, doRead(_)).WillOnce(Return(io_result));
-  EXPECT_CALL(*ssl_transport_socket_, canFlushClose()).WillOnce(Return(false));
-
-  EXPECT_CALL(callbacks_, connection()).Times(AtMost(1));
-  io_result = permissive_transport_socket_->doRead(read_buffer_);
-
-  EXPECT_EQ(Network::PostIoAction::KeepOpen, io_result.action_);
-  EXPECT_FALSE(permissive_transport_socket_->isFallback());
-}
-
-TEST_F(PermissiveSocketTest, DoNotFallbackWhenHandShakeCompleteSocketClosed) {
+TEST_F(PermissiveSocketTest, ConnectedEventWasRaisedOnRead) {
   InSequence s;
 
   initialize();
@@ -150,14 +181,32 @@ TEST_F(PermissiveSocketTest, DoNotFallbackWhenHandShakeCompleteSocketClosed) {
   EXPECT_FALSE(permissive_transport_socket_->isFallback());
 
   Network::IoResult io_result = {Network::PostIoAction::Close, 0, false};
-
-  EXPECT_CALL(*ssl_transport_socket_, doRead(_)).WillOnce(Return(io_result));
-  EXPECT_CALL(*ssl_transport_socket_, canFlushClose()).WillOnce(Return(true));
+  EXPECT_CALL(*ssl_transport_socket_, doRead(_)).WillOnce(Invoke([io_result, this](Unused) {
+    ssl_transport_socket_->callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+    return io_result;
+  }));
 
   EXPECT_CALL(callbacks_, connection()).Times(AtMost(1));
   io_result = permissive_transport_socket_->doRead(read_buffer_);
 
   EXPECT_EQ(Network::PostIoAction::Close, io_result.action_);
+  EXPECT_FALSE(permissive_transport_socket_->isFallback());
+}
+
+TEST_F(PermissiveSocketTest, IoKeepOpenOnRead) {
+  InSequence s;
+
+  initialize();
+
+  EXPECT_FALSE(permissive_transport_socket_->isFallback());
+
+  Network::IoResult io_result = {Network::PostIoAction::KeepOpen, 0, false};
+  EXPECT_CALL(*ssl_transport_socket_, doRead(_)).WillOnce(Return(io_result));
+
+  EXPECT_CALL(callbacks_, connection()).Times(AtMost(1));
+  io_result = permissive_transport_socket_->doRead(read_buffer_);
+
+  EXPECT_EQ(Network::PostIoAction::KeepOpen, io_result.action_);
   EXPECT_FALSE(permissive_transport_socket_->isFallback());
 }
 

@@ -31,8 +31,18 @@ envoy_cc_library(
     srcs = ["permissive_socket.cc"],
     hdrs = ["permissive_socket.h"],
     deps = [
+        ":proxy_transport_socket_callbacks_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "proxy_transport_socket_callbacks_lib",
+    hdrs = ["proxy_transport_socket_callbacks.h"],
+    deps = [
+        "//include/envoy/network:io_handle_interface",
+        "//include/envoy/network:transport_socket_interface",
     ],
 )
