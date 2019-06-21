@@ -41,10 +41,10 @@ private:
   void onOkHeaders(Http::HeaderMapPtr&& headers, std::vector<AdjustedByteRange>&& response_ranges,
                    uint64_t content_length, bool has_trailers);
   void onUnusableHeaders();
-  void onBody(Envoy::Buffer::InstancePtr&& body);
+  void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::HeaderMapPtr&& trailers);
   static void onHeadersAsync(const CacheFilterSharedPtr& self, LookupResult&& result);
-  static void onBodyAsync(const CacheFilterSharedPtr& self, Envoy::Buffer::InstancePtr&& body);
+  static void onBodyAsync(const CacheFilterSharedPtr& self, Buffer::InstancePtr&& body);
   static void onTrailersAsync(const CacheFilterSharedPtr& self, Http::HeaderMapPtr&& trailers);
   void post(std::function<void()> f) const;
 

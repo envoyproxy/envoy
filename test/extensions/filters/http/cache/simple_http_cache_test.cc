@@ -100,7 +100,7 @@ TEST_F(SimpleHttpCacheTest, PutGet) {
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status);
 
   Http::TestHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
-                                           {"cache-control", "public, max-age=3600"}};
+                                           {"cache-control", "public,max-age=3600"}};
 
   const std::string kBody1("Value");
   insert(move(name_lookup_context), response_headers, kBody1);
@@ -119,7 +119,7 @@ TEST_F(SimpleHttpCacheTest, PutGet) {
 TEST_F(SimpleHttpCacheTest, PrivateResponse) {
   Http::TestHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                            {"age", "2"},
-                                           {"cache-control", "private, max-age=3600"}};
+                                           {"cache-control", "private,max-age=3600"}};
   const std::string request_path("Name");
 
   LookupContextPtr name_lookup_context = lookup(request_path);
@@ -149,27 +149,21 @@ protected:
   }
 };
 
-TEST_P(SimpleHttpCacheTest1Response, Expired) {
+TEST_P(SimpleHttpCacheTest1Response, Basic) {
   Http::TestHeaderMapImpl response_headers = responseHeaders();
   // TODO(toddmgreer) Test with various date headers.
-  response_headers.addCopy("date", formatter_.fromTime(current_time_));
   insert("/", response_headers, "");
   lookup("/");
   EXPECT_EQ(expectedStatus(), lookup_result_.cache_entry_status);
 }
 
 const std::vector<Http::TestHeaderMapImpl> expired_headers = {
-    {{"date", "Thu, 01 Jan 2100 00:00:00 GMT"}, {"cache-control", "public, max-age=3600"}},
-    {{"cache-control", "public, s-max-age=-1"}},
-    {{"cache-control", "public, max-age=-1"}},
-    {{"date", "foo"}},
-    {{"date", kEpochDate}, {"expires", "foo"}},
-    {{"expires", kEpochDate}, {"cache-control", "public"}},
-    {{"age", "2"}, {"cache-control", "public"}},
-    {{"age", "6000"}}};
+    {{"date", "Thu, 01 Jan 2019 00:00:00 GMT"}, {"cache-control", "public, max-age=3600"}}};
 
 const std::vector<Http::TestHeaderMapImpl> ok_headers = {
-    {{"cache-control", "public, max-age=3600"}}};
+    {{"cache-control", "public, max-age=3600"}}
+    // TODO(toddmgreer) {{"expires", kEpochDate}, {"cache-control", "public"}}
+};
 
 INSTANTIATE_TEST_SUITE_P(Expired, SimpleHttpCacheTest1Response,
                          testing::Combine(testing::Values(CacheEntryStatus::RequiresValidation),

@@ -62,19 +62,19 @@ void eatDirectiveArgument(absl::string_view& s) {
 
 // If s is nonnull and begins with decimal digits, return Eat leading digits in
 // *s, if any
-absl::Duration eatLeadingDuration(absl::string_view* s) {
+SystemTime::duration eatLeadingDuration(absl::string_view* s) {
   const absl::string_view::iterator digits_end = c_find_if_not(*s, &absl::ascii_isdigit);
   const size_t digits_length = digits_end - s->begin();
   if (digits_length == 0) {
-    return absl::ZeroDuration();
+    return SystemTime::duration::zero();
   }
   const absl::string_view digits(s->begin(), digits_length);
   s->remove_prefix(digits_length);
   uint64_t num;
-  return absl::SimpleAtoi(digits, &num) ? absl::Seconds(num) : absl::InfiniteDuration();
+  return absl::SimpleAtoi(digits, &num) ? std::chrono::seconds(num) : SystemTime::duration::max();
 }
 
-absl::Duration effectiveMaxAge(absl::string_view cache_control) {
+SystemTime::duration effectiveMaxAge(absl::string_view cache_control) {
   // The grammar for This Cache-Control header value should be:
   // Cache-Control   = 1#cache-directive
   // cache-directive = token [ "=" ( token / quoted-string ) ]
@@ -86,7 +86,7 @@ absl::Duration effectiveMaxAge(absl::string_view cache_control) {
   // obs-text        = %x80-FF
   // quoted-pair     = "\" ( HTAB / SP / VCHAR / obs-text )
   // VCHAR           =  %x21-7E  ; visible (printing) characters
-  absl::Duration max_age = -absl::InfiniteDuration();
+  SystemTime::duration max_age = SystemTime::duration::zero();
   bool found_s_maxage = false;
   while (!cache_control.empty()) {
     // Each time through the loop, we eat one cache-directive. Each branch
@@ -100,7 +100,7 @@ absl::Duration effectiveMaxAge(absl::string_view cache_control) {
         }
       } else {
         // Found a no-cache directive, so validation is required.
-        return -absl::InfiniteDuration();
+        return SystemTime::duration::zero();
       }
     } else if (ConsumePrefix(&cache_control, "s-maxage=")) {
       max_age = eatLeadingDuration(&cache_control);
@@ -108,13 +108,13 @@ absl::Duration effectiveMaxAge(absl::string_view cache_control) {
       cache_control = StripLeadingAsciiWhitespace(cache_control);
       if (!cache_control.empty() && cache_control[0] != ',') {
         // Unexpected text at end of directive
-        return -absl::InfiniteDuration();
+        return SystemTime::duration::zero();
       }
     } else if (!found_s_maxage && ConsumePrefix(&cache_control, "max-age=")) {
       max_age = eatLeadingDuration(&cache_control);
       if (!cache_control.empty() && cache_control[0] != ',') {
         // Unexpected text at end of directive
-        return -absl::InfiniteDuration();
+        return SystemTime::duration::zero();
       }
     } else if (eatToken(cache_control)) {
       // Unknown directive--ignore.
@@ -123,7 +123,7 @@ absl::Duration effectiveMaxAge(absl::string_view cache_control) {
       }
     } else {
       // This directive starts with illegal characters. Require validation.
-      return -absl::InfiniteDuration();
+      return SystemTime::duration::zero();
     }
     // Whichever branch we took should have consumed the entire cache-directive,
     // so we just need to eat the delimiter and optional whitespace.
@@ -133,9 +133,9 @@ absl::Duration effectiveMaxAge(absl::string_view cache_control) {
   return max_age;
 }
 
-absl::Time httpTime(const Http::HeaderEntry* header_entry) {
+SystemTime httpTime(const Http::HeaderEntry* header_entry) {
   if (!header_entry) {
-    return absl::InfinitePast();
+    return SystemTime::min();
   }
   absl::Time time;
   const std::string input(header_entry->value().getStringView());
@@ -148,10 +148,10 @@ absl::Time httpTime(const Http::HeaderEntry* header_entry) {
       "%a, %d %b %Y %H:%M:%S GMT", "%A, %d-%b-%y %H:%M:%S GMT", "%a %b %e %H:%M:%S %Y"};
   for (const std::string& format : rfc7231_date_formats) {
     if (absl::ParseTime(format, input, &time, nullptr)) {
-      return time;
+      return ToChronoTime(time);
     }
   }
-  return absl::InfinitePast();
+  return SystemTime::min();
 }
 } // namespace Internal
 } // namespace Cache

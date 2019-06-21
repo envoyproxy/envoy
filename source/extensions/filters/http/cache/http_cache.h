@@ -167,7 +167,7 @@ public:
                                 uint64_t content_length) const;
 
 private:
-  bool fresh(const Http::HeaderMap& response_headers) const;
+  bool isFresh(const Http::HeaderMap& response_headers) const;
   bool adjustByteRangeSet(std::vector<AdjustedByteRange>& response_ranges,
                           uint64_t content_length) const;
 
@@ -193,7 +193,7 @@ using InsertCallback = std::function<void(bool success_ready_for_more)>;
 class InsertContext {
 public:
   // Accepts response_headers for caching. Only called once.
-  virtual void insertHeaders(const Http::HeaderMap& response_headers, bool end_stream) = 0;
+  virtual void insertHeaders(const Http::HeaderMap& response_headers, bool end_stream) PURE;
 
   // The insertion is streamed into the cache in chunks whose size is determined
   // by the client, but with a pace determined by the cache. To avoid streaming
@@ -204,10 +204,10 @@ public:
   // InsertContextPtr. A cache can abort the insertion by passing 'false' into
   // ready_for_next_chunk.
   virtual void insertBody(const Buffer::Instance& chunk, InsertCallback ready_for_next_chunk,
-                          bool end_stream) = 0;
+                          bool end_stream) PURE;
 
   // Inserts trailers into the cache.
-  virtual void insertTrailers(const Http::HeaderMap& trailers) = 0;
+  virtual void insertTrailers(const Http::HeaderMap& trailers) PURE;
 
   virtual ~InsertContext() = default;
 };
@@ -222,7 +222,7 @@ public:
 
   // Get the headers from the cache. It is a programming error to call this
   // twice.
-  virtual void getHeaders(LookupHeadersCallback&& cb) = 0;
+  virtual void getHeaders(LookupHeadersCallback&& cb) PURE;
 
   // Reads the next chunk from the cache, calling cb when the chunk is ready.
   //
@@ -240,11 +240,11 @@ public:
   // getBody requests bytes  0-23 .......... callback with bytes 0-9
   // getBody requests bytes 10-23 .......... callback with bytes 10-19
   // getBody requests bytes 20-23 .......... callback with bytes 20-23
-  virtual void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) = 0;
+  virtual void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) PURE;
 
   // Get the trailers from the cache. Only called if LookupResult::has_trailers
   // == true.
-  virtual void getTrailers(LookupTrailersCallback&& cb) = 0;
+  virtual void getTrailers(LookupTrailersCallback&& cb) PURE;
 };
 using LookupContextPtr = std::unique_ptr<LookupContext>;
 
@@ -254,12 +254,12 @@ class HttpCache {
 public:
   // Returns a LookupContextPtr to manage the state of a cache lookup. On a cache
   // miss, the returned LookupContext will be given to the insert call (if any).
-  virtual LookupContextPtr makeLookupContext(LookupRequest&& request) = 0;
+  virtual LookupContextPtr makeLookupContext(LookupRequest&& request) PURE;
 
   // Returns an InsertContextPtr to manage the state of a cache insertion.
   // Responses with a chunked transfer-encoding must be dechunked before
   // insertion.
-  virtual InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) = 0;
+  virtual InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) PURE;
 
   // Precondition: lookup_context represents a prior cache lookup that required
   // validation.
@@ -270,10 +270,10 @@ public:
   // This is called when an expired cache entry is successfully validated, to
   // update the cache entry.
   virtual void updateHeaders(LookupContextPtr&& lookup_context,
-                             Http::HeaderMapPtr&& response_headers) = 0;
+                             Http::HeaderMapPtr&& response_headers) PURE;
 
   // Returns statically known information about a cache.
-  virtual CacheInfo cacheInfo() const = 0;
+  virtual CacheInfo cacheInfo() const PURE;
 
   virtual ~HttpCache() = default;
 };
@@ -286,7 +286,7 @@ public:
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).
-  virtual HttpCache& getCache() = 0;
+  virtual HttpCache& getCache() PURE;
   virtual ~HttpCacheFactory() = default;
 
 private:

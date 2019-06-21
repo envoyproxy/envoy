@@ -44,6 +44,15 @@ TEST_F(LookupRequestTest, PrivateResponse) {
       << formatter_.fromTime(current_time_);
 }
 
+TEST_F(LookupRequestTest, Expired) {
+  Http::HeaderMapPtr response_headers = Http::makeHeaderMap(
+      {{"cache-control", "public, max-age=3600"}, {"date", "Thu, 01 Jan 2019 00:00:00 GMT"}});
+  const LookupResult lookup_response =
+      lookup_request_.makeLookupResult(std::move(response_headers), 0);
+
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status);
+}
+
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

@@ -67,6 +67,7 @@ envoy_cc_library(
     srcs = ["http_cache_utils.cc"],
     hdrs = ["http_cache_utils.h"],
     deps = [
+        "//include/envoy/common:time_interface",
         "//include/envoy/http:header_map_interface",
         "@com_google_absl//absl/algorithm:container",
         "@com_google_absl//absl/strings",

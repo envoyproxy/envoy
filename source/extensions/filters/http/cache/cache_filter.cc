@@ -17,8 +17,8 @@ bool isCacheableRequest(Http::HeaderMap& headers) {
   const Http::HeaderEntry* method = headers.Method();
   // TODO(toddmgreer) Also serve HEAD requests from cache.
   // TODO(toddmgreer) Check all the other cache-related headers.
-  return ((method != nullptr) &&
-          method->value().getStringView() == Http::Headers::get().MethodValues.Head);
+  return method && headers.Path() && headers.Host() &&
+         (method->value().getStringView() == Http::Headers::get().MethodValues.Get);
 }
 
 bool isCacheableResponse(Http::HeaderMap& headers) {

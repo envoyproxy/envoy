@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/cache/http_cache_utils.h"
@@ -18,15 +19,12 @@ LookupRequest::LookupRequest(const Http::HeaderMap& request_headers, SystemTime 
       request_cache_control_(request_headers.CacheControl() == nullptr
                                  ? ""
                                  : request_headers.CacheControl()->value().getStringView()) {
-  RELEASE_ASSERT(request_headers.Path(),
-                 "Can't form cache lookup key for malformed Http::HeaderMap "
-                 "with null Path.");
-  RELEASE_ASSERT(request_headers.Scheme(),
-                 "Can't form cache lookup key for malformed Http::HeaderMap "
-                 "with null Scheme.");
-  RELEASE_ASSERT(request_headers.Host(),
-                 "Can't form cache lookup key for malformed Http::HeaderMap "
-                 "with null Host.");
+  ASSERT(request_headers.Path(), "Can't form cache lookup key for malformed Http::HeaderMap "
+                                 "with null Path.");
+  ASSERT(request_headers.Scheme(), "Can't form cache lookup key for malformed Http::HeaderMap "
+                                   "with null Scheme.");
+  ASSERT(request_headers.Host(), "Can't form cache lookup key for malformed Http::HeaderMap "
+                                 "with null Host.");
   // TODO(toddmgreer) Let config determine whether to include scheme, host, and
   // query params.
   // TODO(toddmgreer) get cluster name.
@@ -35,8 +33,9 @@ LookupRequest::LookupRequest(const Http::HeaderMap& request_headers, SystemTime 
   key_.set_host(std::string(request_headers.Host()->value().getStringView()));
   key_.set_path(std::string(request_headers.Path()->value().getStringView()));
   const Http::HeaderString& scheme = request_headers.Scheme()->value();
-  ASSERT(scheme == "http" || scheme == "https");
-  key_.set_clear_http(scheme == "http");
+  ASSERT(scheme == Http::Headers::get().SchemeValues.Http ||
+         scheme == Http::Headers::get().SchemeValues.Https);
+  key_.set_clear_http(scheme == Http::Headers::get().SchemeValues.Http);
 }
 
 // Unless this API is still alpha, calls to stableHashKey() must always return
@@ -46,22 +45,16 @@ size_t stableHashKey(const Key& key) { return MessageUtil::hash(key); }
 size_t localHashKey(const Key& key) { return stableHashKey(key); }
 
 // Returns true if response_headers is fresh.
-bool LookupRequest::fresh(const Http::HeaderMap& response_headers) const {
-  const Http::HeaderEntry* cache_control_header =
-      response_headers.get(Http::LowerCaseString("cache-control"));
+bool LookupRequest::isFresh(const Http::HeaderMap& response_headers) const {
+  const Http::HeaderEntry* cache_control_header = response_headers.CacheControl();
   if (cache_control_header) {
-    const absl::Duration effective_max_age =
+    const SystemTime::duration effective_max_age =
         Internal::effectiveMaxAge(cache_control_header->value().getStringView());
-    if (effective_max_age >= absl::ZeroDuration()) {
-      return absl::FromChrono(timestamp_) - Internal::httpTime(response_headers.Date()) <
-             effective_max_age;
-    }
+    return timestamp_ - Internal::httpTime(response_headers.Date()) < effective_max_age;
   }
-
   // We didn't find a cache-control header with enough info to determine
   // freshness, so fall back to the expires header.
-  return absl::FromChrono(timestamp_) <=
-         Internal::httpTime(response_headers.get(Http::LowerCaseString("expires")));
+  return timestamp_ <= Internal::httpTime(response_headers.get(Http::LowerCaseString("expires")));
 }
 
 LookupResult LookupRequest::makeLookupResult(Http::HeaderMapPtr&& response_headers,
@@ -69,7 +62,7 @@ LookupResult LookupRequest::makeLookupResult(Http::HeaderMapPtr&& response_heade
   // TODO(toddmgreer) Implement all HTTP caching semantics.
   ASSERT(response_headers);
   LookupResult result;
-  if (!fresh(*response_headers)) {
+  if (!isFresh(*response_headers)) {
     result.cache_entry_status = CacheEntryStatus::RequiresValidation;
     return result;
   }
@@ -100,7 +93,7 @@ bool LookupRequest::adjustByteRangeSet(std::vector<AdjustedByteRange>& response_
     return false;
   }
 
-  for (const auto& spec : request_range_spec_) {
+  for (const RawByteRange& spec : request_range_spec_) {
     if (spec.isSuffix()) {
       // spec is a suffix-byte-range-spec
       if (spec.suffixLength() >= content_length) {
