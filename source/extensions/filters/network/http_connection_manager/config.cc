@@ -311,7 +311,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     processFilter(filters[i], i, "http", filter_factories_);
   }
 
-  for (auto upgrade_config : config.upgrade_configs()) {
+  for (const auto& upgrade_config : config.upgrade_configs()) {
     const std::string& name = upgrade_config.upgrade_type();
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
     if (findUpgradeCaseInsensitive(upgrade_filter_factories_, name) !=

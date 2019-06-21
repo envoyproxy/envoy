@@ -32,6 +32,7 @@ namespace Logger {
   FUNCTION(dubbo)                \
   FUNCTION(file)                 \
   FUNCTION(filter)               \
+  FUNCTION(forward_proxy)        \
   FUNCTION(grpc)                 \
   FUNCTION(hc)                   \
   FUNCTION(health_checker)       \
@@ -74,7 +75,7 @@ public:
    * but the method to log at err level is called LOGGER.error not LOGGER.err. All other level are
    * fine spdlog::info corresponds to LOGGER.info method.
    */
-  typedef enum {
+  using levels = enum {
     trace = spdlog::level::trace,
     debug = spdlog::level::debug,
     info = spdlog::level::info,
@@ -82,7 +83,7 @@ public:
     error = spdlog::level::err,
     critical = spdlog::level::critical,
     off = spdlog::level::off
-  } levels;
+  };
 
   spdlog::string_view_t levelString() const {
     return spdlog::level::level_string_views[logger_->level()];

@@ -37,7 +37,7 @@ public:
                     Server::Configuration::TransportSocketFactoryContext& factory_context,
                     Stats::ScopePtr&& stats_scope, bool added_via_api);
 
-  ~LogicalDnsCluster();
+  ~LogicalDnsCluster() override;
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
