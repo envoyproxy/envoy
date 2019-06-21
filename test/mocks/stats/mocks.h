@@ -80,10 +80,16 @@ private:
   std::unique_ptr<StatNameManagedStorage> tag_extracted_stat_name_;
 };
 
-class MockCounter : public Counter, public MockMetric {
+class MockCounter : public Counter, public MockMetric /*, public RefcountHelper*/ {
 public:
   MockCounter();
   ~MockCounter();
+
+  /*
+    void incRefCount() override { ++ref_count_; }
+    void free() override { if (--ref_count_ == 0) { delete this; } }
+    uint32_t use_count() const override { return ref_count_; }
+  */
 
   MOCK_METHOD1(add, void(uint64_t amount));
   MOCK_METHOD0(inc, void());
@@ -95,12 +101,21 @@ public:
   bool used_;
   uint64_t value_;
   uint64_t latch_;
+
+ private:
+  //std::atomic<uint32_t> ref_count_{0};
 };
 
-class MockGauge : public Gauge, public MockMetric {
+class MockGauge : public Gauge, public MockMetric /*, public RefcountHelper*/ {
 public:
   MockGauge();
   ~MockGauge();
+
+  /*
+    void incRefCount() override { ++ref_count_; }
+    void free() override { if (--ref_count_ == 0) { delete this; } }
+    uint32_t use_count() const override { return ref_count_; }
+  */
 
   MOCK_METHOD1(add, void(uint64_t amount));
   MOCK_METHOD0(dec, void());
@@ -116,6 +131,9 @@ public:
   bool used_;
   uint64_t value_;
   ImportMode import_mode_;
+
+ private:
+  //std::atomic<uint32_t> ref_count_{0};
 };
 
 class MockHistogram : public Histogram, public MockMetric {

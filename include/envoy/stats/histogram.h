@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -71,7 +72,7 @@ public:
  * class (Sinks, in particular) will need to explicitly differentiate between histograms
  * representing durations and histograms representing other types of data.
  */
-class Histogram : public virtual Metric {
+class Histogram : public virtual Metric, public RefcountHelper {
 public:
   ~Histogram() override = default;
 
@@ -79,9 +80,18 @@ public:
    * Records an unsigned value. If a timer, values are in units of milliseconds.
    */
   virtual void recordValue(uint64_t value) PURE;
+
+  /*
+    void incRefCount() { ++ref_count_; }
+    void free() { if (--ref_count_ == 0) { delete this; } }
+    uint32_t use_count() const { return ref_count_; }
+  */
+
+ private:
+  //std::atomic<uint32_t> ref_count_{0};
 };
 
-using HistogramSharedPtr = std::shared_ptr<Histogram>;
+using HistogramSharedPtr = RefcountPtr<Histogram>;
 
 /**
  * A histogram that is stored in main thread and provides summary view of the histogram.
@@ -117,7 +127,7 @@ public:
   virtual const std::string bucketSummary() const PURE;
 };
 
-using ParentHistogramSharedPtr = std::shared_ptr<ParentHistogram>;
+using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;
 
 } // namespace Stats
 } // namespace Envoy

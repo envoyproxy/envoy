@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/symbol_table.h"
 
 #include "absl/strings/string_view.h"
@@ -109,9 +110,13 @@ public:
  * global counter as well as periodic counter. Calling latch() returns the periodic counter and
  * clears it.
  */
-class Counter : public virtual Metric {
+class Counter : public virtual Metric, public RefcountHelper {
 public:
   ~Counter() override = default;
+
+  //virtual void free() PURE;
+  //virtual void incRefCount() PURE;
+  //virtual uint32_t use_count() const PURE;
   virtual void add(uint64_t amount) PURE;
   virtual void inc() PURE;
   virtual uint64_t latch() PURE;
@@ -119,12 +124,12 @@ public:
   virtual uint64_t value() const PURE;
 };
 
-using CounterSharedPtr = std::shared_ptr<Counter>;
+using CounterSharedPtr = RefcountPtr<Counter>;
 
 /**
  * A gauge that can both increment and decrement.
  */
-class Gauge : public virtual Metric {
+class Gauge : public virtual Metric, public RefcountHelper {
 public:
   enum class ImportMode {
     Uninitialized, // Gauge was discovered during hot-restart transfer.
@@ -134,6 +139,9 @@ public:
 
   ~Gauge() override = default;
 
+  //virtual void free() PURE;
+  //virtual void incRefCount() PURE;
+  //virtual uint32_t use_count() const PURE;
   virtual void add(uint64_t amount) PURE;
   virtual void dec() PURE;
   virtual void inc() PURE;
@@ -158,7 +166,7 @@ public:
   virtual void mergeImportMode(ImportMode import_mode) PURE;
 };
 
-using GaugeSharedPtr = std::shared_ptr<Gauge>;
+using GaugeSharedPtr = RefcountPtr<Gauge>;
 
 } // namespace Stats
 } // namespace Envoy

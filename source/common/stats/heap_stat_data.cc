@@ -73,7 +73,7 @@ void HeapStatDataAllocator::debugPrint() {
 }
 #endif
 
-class CounterImpl : public Counter, public MetricImpl {
+class CounterImpl : public Counter, public MetricImpl /*, public RefcountHelper*/ {
 public:
   CounterImpl(HeapStatData& data, HeapStatDataAllocator& alloc,
               absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
@@ -103,12 +103,19 @@ public:
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   StatName statName() const override { return data_.statName(); }
 
+  /*
+    void incRefCount() override { ++ref_count_; }
+    void free() override { if (--ref_count_ == 0) { delete this; } }
+    uint32_t use_count() const override { return ref_count_; }
+  */
+
 private:
   HeapStatData& data_;
   HeapStatDataAllocator& alloc_;
+  //std::atomic<uint32_t> ref_count_{0};
 };
 
-class GaugeImpl : public Gauge, public MetricImpl {
+class GaugeImpl : public Gauge, public MetricImpl /*, public RefcountHelper*/ {
 public:
   GaugeImpl(HeapStatData& data, HeapStatDataAllocator& alloc, absl::string_view tag_extracted_name,
             const std::vector<Tag>& tags, ImportMode import_mode)
@@ -196,21 +203,28 @@ public:
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   StatName statName() const override { return data_.statName(); }
 
+  /*
+    void incRefCount() override { ++ref_count_; }
+    void free() override { if (--ref_count_ == 0) { delete this; } }
+    uint32_t use_count() const override { return ref_count_; }
+  */
+
 private:
   HeapStatData& data_;
   HeapStatDataAllocator& alloc_;
+  //std::atomic<uint32_t> ref_count_{0};
 };
 
 CounterSharedPtr HeapStatDataAllocator::makeCounter(StatName name,
                                                     absl::string_view tag_extracted_name,
                                                     const std::vector<Tag>& tags) {
-  return std::make_shared<CounterImpl>(alloc(name), *this, tag_extracted_name, tags);
+  return CounterSharedPtr(new CounterImpl(alloc(name), *this, tag_extracted_name, tags));
 }
 
 GaugeSharedPtr HeapStatDataAllocator::makeGauge(StatName name, absl::string_view tag_extracted_name,
                                                 const std::vector<Tag>& tags,
                                                 Gauge::ImportMode import_mode) {
-  return std::make_shared<GaugeImpl>(alloc(name), *this, tag_extracted_name, tags, import_mode);
+  return GaugeSharedPtr(new GaugeImpl(alloc(name), *this, tag_extracted_name, tags, import_mode));
 }
 
 } // namespace Stats
