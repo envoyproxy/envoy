@@ -140,7 +140,8 @@ void RdsJson::translateRouteConfiguration(const Json::Object& json_route_config,
     route_config.add_response_headers_to_remove(header);
   }
 
-  for (const auto& header_value : json_route_config.getObjectArray("request_headers_to_add", true)) {
+  for (const auto& header_value :
+       json_route_config.getObjectArray("request_headers_to_add", true)) {
     auto* header_value_option = route_config.mutable_request_headers_to_add()->Add();
     BaseJson::translateHeaderValueOption(*header_value, *header_value_option);
   }
@@ -180,7 +181,8 @@ void RdsJson::translateVirtualHost(const Json::Object& json_virtual_host,
     translateRateLimit(*json_rate_limit, *rate_limit);
   }
 
-  for (const auto& header_value : json_virtual_host.getObjectArray("request_headers_to_add", true)) {
+  for (const auto& header_value :
+       json_virtual_host.getObjectArray("request_headers_to_add", true)) {
     auto* header_value_option = virtual_host.mutable_request_headers_to_add()->Add();
     BaseJson::translateHeaderValueOption(*header_value, *header_value_option);
   }
