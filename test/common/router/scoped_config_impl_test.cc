@@ -51,7 +51,7 @@ TEST(HeaderValueExtractorImplDeathTest, InvalidConfig) {
   ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config;
   // Type not set, ASSERT only fails in debug mode.
 #if !defined(NDEBUG)
-  EXPECT_DEBUG_DEATH(HeaderValueExtractorImpl{config}, "header_value_extractor is not set.");
+  EXPECT_DEATH(HeaderValueExtractorImpl{config}, "header_value_extractor is not set.");
 #else
   EXPECT_THROW_WITH_REGEX(HeaderValueExtractorImpl{config}, ProtoValidationException,
                           "HeaderValueExtractor extract_type not set.+");
@@ -218,9 +218,7 @@ ScopeKey makeKey(const std::vector<const char*>& parts) {
 
 TEST(ScopeKeyDeathTest, AddNullFragment) {
   ScopeKey key;
-#if !defined(NDEBUG)
-  EXPECT_DEATH(key.addFragment(nullptr), "null fragment not allowed in ScopeKey.");
-#endif // !defined(NDEBUG)
+  EXPECT_DEBUG_DEATH(key.addFragment(nullptr), "null fragment not allowed in ScopeKey.");
 }
 
 TEST(ScopeKeyTest, Unmatches) {
