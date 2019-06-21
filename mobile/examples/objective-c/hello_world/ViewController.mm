@@ -4,7 +4,7 @@
 #pragma mark - Constants
 
 NSString* _CELL_ID = @"cell-id";
-NSString* _ENDPOINT = @"http://0.0.0.0:9001/api.lyft.com/static/demo/hello_world.txt";
+NSString* _ENDPOINT = @"http://localhost:9001/api.lyft.com/static/demo/hello_world.txt";
 
 #pragma mark - ResponseValue
 
