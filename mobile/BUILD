@@ -47,7 +47,7 @@ kt_android_library(
     deps = ["java_cc_alias"],
 )
 
-# Work around for transtive dependencies related to not including cc_libraries for kt_jvm_library
+# Work around for transitive dependencies related to not including cc_libraries for kt_jvm_library
 # Related to: https://github.com/bazelbuild/rules_kotlin/issues/132
 #
 # This work around is to use an empty java_library to include the cc_library dependencies needed
