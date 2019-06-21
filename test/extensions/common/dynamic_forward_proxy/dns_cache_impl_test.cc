@@ -5,6 +5,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 using testing::InSequence;
 using testing::Return;
@@ -15,15 +16,6 @@ namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 namespace {
-
-std::list<Network::Address::InstanceConstSharedPtr>
-makeAddressList(const std::list<std::string> address_list) {
-  std::list<Network::Address::InstanceConstSharedPtr> ret;
-  for (const auto& address : address_list) {
-    ret.emplace_back(Network::Utility::parseInternetAddress(address));
-  }
-  return ret;
-}
 
 class DnsCacheImplTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
@@ -69,7 +61,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccess) {
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.1:80")));
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete());
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000)));
-  resolve_cb(makeAddressList({"10.0.0.1"}));
+  resolve_cb(TestUtility::makeDnsResponse({"10.0.0.1"}));
 
   // Re-resolve timer.
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
@@ -78,13 +70,13 @@ TEST_F(DnsCacheImplTest, ResolveSuccess) {
 
   // Address does not change.
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000)));
-  resolve_cb(makeAddressList({"10.0.0.1"}));
+  resolve_cb(TestUtility::makeDnsResponse({"10.0.0.1"}));
 
   // Address does change.
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.2:80")));
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000)));
-  resolve_cb(makeAddressList({"10.0.0.2"}));
+  resolve_cb(TestUtility::makeDnsResponse({"10.0.0.2"}));
 }
 
 // TTL purge test.
@@ -104,7 +96,7 @@ TEST_F(DnsCacheImplTest, TTL) {
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.1:80")));
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete());
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000)));
-  resolve_cb(makeAddressList({"10.0.0.1"}));
+  resolve_cb(TestUtility::makeDnsResponse({"10.0.0.1"}, std::chrono::seconds(0)));
 
   // Re-resolve with ~60s passed. TTL should still be OK at default of 5 minutes.
   simTime().sleep(std::chrono::milliseconds(60001));
@@ -112,7 +104,7 @@ TEST_F(DnsCacheImplTest, TTL) {
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
   resolve_timer->invokeCallback();
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000)));
-  resolve_cb(makeAddressList({"10.0.0.1"}));
+  resolve_cb(TestUtility::makeDnsResponse({"10.0.0.1"}));
 
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
@@ -147,7 +139,7 @@ TEST_F(DnsCacheImplTest, TTLWithCustomParameters) {
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.1:80")));
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete());
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(30000)));
-  resolve_cb(makeAddressList({"10.0.0.1"}));
+  resolve_cb(TestUtility::makeDnsResponse({"10.0.0.1"}, std::chrono::seconds(0)));
 
   // Re-resolve with ~30s passed. TTL should still be OK at 60s.
   simTime().sleep(std::chrono::milliseconds(30001));
@@ -155,7 +147,7 @@ TEST_F(DnsCacheImplTest, TTLWithCustomParameters) {
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
   resolve_timer->invokeCallback();
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(30000)));
-  resolve_cb(makeAddressList({"10.0.0.1"}));
+  resolve_cb(TestUtility::makeDnsResponse({"10.0.0.1"}));
 
   // Re-resolve with ~30s passed. TTL should expire.
   simTime().sleep(std::chrono::milliseconds(30001));
@@ -178,7 +170,7 @@ TEST_F(DnsCacheImplTest, InlineResolve) {
   EXPECT_CALL(*resolver_, resolve("localhost", _, _))
       .WillOnce(Invoke([](const std::string&, Network::DnsLookupFamily,
                           Network::DnsResolver::ResolveCb callback) {
-        callback(makeAddressList({"127.0.0.1"}));
+        callback(TestUtility::makeDnsResponse({"127.0.0.1"}));
         return nullptr;
       }));
   EXPECT_CALL(update_callbacks_,
@@ -202,7 +194,7 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
 
   EXPECT_CALL(update_callbacks_, onDnsHostAddOrUpdate(_, _)).Times(0);
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete());
-  resolve_cb(makeAddressList({}));
+  resolve_cb(TestUtility::makeDnsResponse({}));
 
   handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
   EXPECT_EQ(handle, nullptr);
@@ -223,7 +215,7 @@ TEST_F(DnsCacheImplTest, CancelResolve) {
   handle.reset();
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.1:80")));
-  resolve_cb(makeAddressList({"10.0.0.1"}));
+  resolve_cb(TestUtility::makeDnsResponse({"10.0.0.1"}));
 }
 
 // Two cache loads that are trying to resolve the same host. Make sure we only do a single resolve
@@ -247,7 +239,7 @@ TEST_F(DnsCacheImplTest, MultipleResolveSameHost) {
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.1:80")));
   EXPECT_CALL(callbacks2, onLoadDnsCacheComplete());
   EXPECT_CALL(callbacks1, onLoadDnsCacheComplete());
-  resolve_cb(makeAddressList({"10.0.0.1"}));
+  resolve_cb(TestUtility::makeDnsResponse({"10.0.0.1"}));
 }
 
 // Two cache loads that are resolving different hosts.
@@ -272,12 +264,12 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("bar.com", SharedAddressEquals("10.0.0.1:443")));
   EXPECT_CALL(callbacks2, onLoadDnsCacheComplete());
-  resolve_cb2(makeAddressList({"10.0.0.1"}));
+  resolve_cb2(TestUtility::makeDnsResponse({"10.0.0.1"}));
 
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.2:80")));
   EXPECT_CALL(callbacks1, onLoadDnsCacheComplete());
-  resolve_cb1(makeAddressList({"10.0.0.2"}));
+  resolve_cb1(TestUtility::makeDnsResponse({"10.0.0.2"}));
 }
 
 // A successful resolve followed by a cache hit.
@@ -295,7 +287,7 @@ TEST_F(DnsCacheImplTest, CacheHit) {
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.1:80")));
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete());
-  resolve_cb(makeAddressList({"10.0.0.1"}));
+  resolve_cb(TestUtility::makeDnsResponse({"10.0.0.1"}));
 
   EXPECT_EQ(nullptr, dns_cache_->loadDnsCache("foo.com", 80, callbacks));
 }
@@ -330,7 +322,7 @@ TEST_F(DnsCacheImplTest, InvalidPort) {
 
   EXPECT_CALL(update_callbacks_, onDnsHostAddOrUpdate(_, _)).Times(0);
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete());
-  resolve_cb(makeAddressList({}));
+  resolve_cb(TestUtility::makeDnsResponse({}));
 }
 
 // DNS cache manager config tests.

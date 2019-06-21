@@ -126,11 +126,16 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
   ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}'", host,
             host_info.host_to_resolve_, host_info.port_);
   ASSERT(host_info.active_query_ == nullptr);
-  host_info.active_query_ = resolver_->resolve(
-      host_info.host_to_resolve_, dns_lookup_family_,
-      [this, host](const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) {
-        finishResolve(host, address_list);
-      });
+  host_info.active_query_ =
+      resolver_->resolve(host_info.host_to_resolve_, dns_lookup_family_,
+                         [this, host](const std::list<Network::DnsResponse>&& response) {
+                           std::list<Network::Address::InstanceConstSharedPtr> address_list;
+                           for (const auto& res : response) {
+                             address_list.emplace_back(res.address_);
+                           }
+
+                           finishResolve(host, address_list);
+                         });
 }
 
 void DnsCacheImpl::finishResolve(

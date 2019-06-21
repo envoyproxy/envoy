@@ -50,7 +50,7 @@ public:
    * @param response supplies the list of resolved IP addresses and TTLs. The list will be empty if
    *                     the resolution failed.
    */
-  using ResolveCb = std::function<void(const std::list<DnsResponse>& response)>;
+  using ResolveCb = std::function<void(std::list<DnsResponse>&& response)>;
 
   /**
    * Initiate an async DNS resolution.
