@@ -36,36 +36,32 @@ aar_with_jni(
     visibility = ["//visibility:public"],
 )
 
-kt_android_library(
-    name = "android_lib",
-    srcs = [
-        "library/java/io/envoyproxy/envoymobile/Envoy.java",
-        "library/java/io/envoyproxy/envoymobile/EnvoyEmptyClass.kt",
-    ],
-    custom_package = "io.envoyproxy.envoymobile",
-    manifest = "library/EnvoyManifest.xml",
-    deps = ["java_cc_alias"],
-)
-
-# Work around for transitive dependencies related to not including cc_libraries for kt_jvm_library
-# Related to: https://github.com/bazelbuild/rules_kotlin/issues/132
-#
-# This work around is to use an empty java_library to include the cc_library dependencies needed
-# for the kotlin jni layer
 android_library(
-    name = "java_cc_alias",
-    srcs = ["library/kotlin/io/envoyproxy/envoymobile/EnvoyKotlinEmptyClass.java"],
+    name = "envoy_engine_lib",
+    srcs = ["library/java/io/envoyproxy/envoymobile/EnvoyEngine.java"],
     custom_package = "io.envoyproxy.envoymobile",
     manifest = "library/EnvoyManifest.xml",
     deps = ["//library/common:envoy_jni_interface_lib"],
 )
 
+# Work around for transitive dependencies related to not including cc_libraries for kt_jvm_library
+# Related to: https://github.com/bazelbuild/rules_kotlin/issues/132
+#
+# Android library drops exported dependencies from dependent rules. The kt_android_library
+#  internally is just a macro which wraps two rules into one:
+#  https://github.com/bazelbuild/rules_kotlin/blob/326661e7e705d14e754abc2765837aa61bddf205/kotlin/internal/jvm/android.bzl#L28.
+#  This causes the sources to be exported and dropped due to it being a transitive dependency.
+#  To get around this, we have to redeclare the sources from envoy_engine_lib here in order to be pulled into the
+#  kotlin jar.
 kt_android_library(
-    name = "android_lib_kotlin",
-    srcs = ["library/kotlin/io/envoyproxy/envoymobile/Envoy.kt"],
+    name = "android_lib",
+    srcs = [
+        "library/java/io/envoyproxy/envoymobile/EnvoyEngine.java",
+        "library/kotlin/io/envoyproxy/envoymobile/Envoy.kt",
+    ],
     custom_package = "io.envoyproxy.envoymobile",
     manifest = "library/EnvoyManifest.xml",
-    deps = ["java_cc_alias"],
+    deps = ["envoy_engine_lib"],
 )
 
 genrule(
