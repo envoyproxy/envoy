@@ -73,11 +73,6 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
     delete this;
-
-    if (addrinfo) {
-      ares_freeaddrinfo(addrinfo);
-    }
-
     return;
   }
   if (!fallback_if_failed_) {

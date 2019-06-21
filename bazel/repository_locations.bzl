@@ -27,10 +27,13 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/c6/b4/510617906f8e0c5660e7d96fbc5585113f83ad547a3989b80297ac72a74c/thrift-0.11.0.tar.gz"],
     ),
     com_github_c_ares_c_ares = dict(
-        sha256 = "ac174f104e2f25526c82759352369fe7db0945753bf71647533c103661f15a96",
-        strip_prefix = "c-ares-c5bfbe0dc3086b39218a4d9a8ef2ce4f538673da",
+        sha256 = "96edccdb19d79f6bc48c2c0e5916346c8f0507efa72e76bd146a1b9d05f93c2a",
+        strip_prefix = "c-ares-5dd3629bc93449840c36dd635ea6cce606b8c366",
         # 2019-06-19
-        urls = ["https://github.com/c-ares/c-ares/archive/c5bfbe0dc3086b39218a4d9a8ef2ce4f538673da.tar.gz"],
+        # 21 new commits from release-1.15.0. Upgrade for commit 7d3591ee8a1a63e7748e68e6d880bd1763a32885 "getaddrinfo enhancements"
+        # Use getaddrinfo to query DNS record and TTL.
+        # TODO(crazyxy): Update to release-1.16.0 when it is released.
+        urls = ["https://github.com/c-ares/c-ares/archive/5dd3629bc93449840c36dd635ea6cce606b8c366.tar.gz"],
     ),
     com_github_circonus_labs_libcircllhist = dict(
         sha256 = "8165aa25e529d7d4b9ae849d3bf30371255a99d6db0421516abcff23214cdc2c",

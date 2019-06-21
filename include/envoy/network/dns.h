@@ -32,8 +32,8 @@ struct DnsResponse {
   DnsResponse(Address::InstanceConstSharedPtr address, const std::chrono::seconds ttl)
       : address_(address), ttl_(ttl) {}
 
-  Address::InstanceConstSharedPtr address_;
-  std::chrono::seconds ttl_;
+  const Address::InstanceConstSharedPtr address_;
+  const std::chrono::seconds ttl_;
 };
 
 enum class DnsLookupFamily { V4Only, V6Only, Auto };
