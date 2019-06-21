@@ -433,7 +433,7 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
           all_stats[gauge->name()] = gauge->value();
         }
 
-        for (auto stat : all_stats) {
+        for (const auto& stat : all_stats) {
           response.add(fmt::format("{}::{}::{}::{}\n", cluster.second.get().info()->name(),
                                    host->address()->asString(), stat.first, stat.second));
         }
@@ -757,7 +757,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
       rc = Http::Code::NotFound;
     }
   } else { // Display plain stats if format query param is not there.
-    for (auto stat : all_stats) {
+    for (const auto& stat : all_stats) {
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
     }
     // TODO(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
@@ -769,7 +769,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
         all_histograms.emplace(histogram->name(), histogram->quantileSummary());
       }
     }
-    for (auto histogram : all_histograms) {
+    for (const auto& histogram : all_histograms) {
       response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
     }
   }
@@ -894,7 +894,7 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-  for (auto stat : all_stats) {
+  for (const auto& stat : all_stats) {
     Value stat_obj;
     stat_obj.SetObject();
     Value stat_name;
