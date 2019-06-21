@@ -187,8 +187,9 @@ void Span::setSampled(bool sampled) { span_.AddAnnotation("setSampled", {{"sampl
 
 } // namespace
 
-Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config)
-    : oc_config_(oc_config) {
+Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
+               const LocalInfo::LocalInfo& localinfo)
+    : oc_config_(oc_config), local_info_(localinfo) {
   if (oc_config.has_trace_config()) {
     applyTraceConfig(oc_config.trace_config());
   }
@@ -202,7 +203,7 @@ Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config)
   }
   if (oc_config.zipkin_exporter_enabled()) {
     ::opencensus::exporters::trace::ZipkinExporterOptions opts(oc_config.zipkin_url());
-    opts.service_name = oc_config.zipkin_service_name();
+    opts.service_name = local_info_.clusterName();
     ::opencensus::exporters::trace::ZipkinExporter::Register(opts);
   }
 }
