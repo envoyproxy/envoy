@@ -87,14 +87,14 @@ void eatDirectiveArgument(absl::string_view& s) {
 // If s is null or doesn't begin with digits, returns
 // SystemTime::duration::zero(). If parsing overflows, returns
 // SystemTime::duration::max().
-SystemTime::duration eatLeadingDuration(absl::string_view* s) {
-  const absl::string_view::iterator digits_end = c_find_if_not(*s, &absl::ascii_isdigit);
-  const size_t digits_length = digits_end - s->begin();
+SystemTime::duration eatLeadingDuration(absl::string_view& s) {
+  const absl::string_view::iterator digits_end = c_find_if_not(s, &absl::ascii_isdigit);
+  const size_t digits_length = digits_end - s.begin();
   if (digits_length == 0) {
     return SystemTime::duration::zero();
   }
-  const absl::string_view digits(s->begin(), digits_length);
-  s->remove_prefix(digits_length);
+  const absl::string_view digits(s.begin(), digits_length);
+  s.remove_prefix(digits_length);
   uint64_t num;
   return absl::SimpleAtoi(digits, &num) ? std::chrono::seconds(num) : SystemTime::duration::max();
 }
@@ -102,6 +102,9 @@ SystemTime::duration eatLeadingDuration(absl::string_view* s) {
 // Returns the effective max-age represented by cache-control. If the result is
 // SystemTime::duration::zero(), or is less than the response's, the response
 // should be validated.
+//
+// TODO(toddmgreer) Write a CacheControl class to fully parse the cache-control
+// header value. Consider sharing with the gzip filter.
 SystemTime::duration effectiveMaxAge(absl::string_view cache_control) {
   // The grammar for This Cache-Control header value should be:
   // Cache-Control   = 1#cache-directive
@@ -131,7 +134,7 @@ SystemTime::duration effectiveMaxAge(absl::string_view cache_control) {
         return SystemTime::duration::zero();
       }
     } else if (ConsumePrefix(&cache_control, "s-maxage=")) {
-      max_age = eatLeadingDuration(&cache_control);
+      max_age = eatLeadingDuration(cache_control);
       found_s_maxage = true;
       cache_control = StripLeadingAsciiWhitespace(cache_control);
       if (!cache_control.empty() && cache_control[0] != ',') {
@@ -139,7 +142,7 @@ SystemTime::duration effectiveMaxAge(absl::string_view cache_control) {
         return SystemTime::duration::zero();
       }
     } else if (!found_s_maxage && ConsumePrefix(&cache_control, "max-age=")) {
-      max_age = eatLeadingDuration(&cache_control);
+      max_age = eatLeadingDuration(cache_control);
       if (!cache_control.empty() && cache_control[0] != ',') {
         // Unexpected text at end of directive
         return SystemTime::duration::zero();
