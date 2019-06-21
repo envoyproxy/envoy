@@ -74,7 +74,7 @@ private:
  */
 class Filter : public Http::StreamFilter, public AccessLog::Instance {
 public:
-  Filter(FilterConfigSharedPtr config) : config_(std::move(config)) {}
+  Filter(FilterConfigSharedPtr config) : Instance(nullptr), config_(std::move(config)) {}
 
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
@@ -102,12 +102,12 @@ public:
   }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
 
+private:
   // AccessLog::Instance
   void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
            const Http::HeaderMap* response_trailers,
            const StreamInfo::StreamInfo& stream_info) override;
 
-private:
   FilterConfigSharedPtr config_;
   HttpPerRequestTapperPtr tapper_;
 };

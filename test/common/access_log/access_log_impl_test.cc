@@ -85,7 +85,7 @@ TEST_F(AccessLogImplTest, LogMoreData) {
   request_headers_.addCopy(Http::Headers::get().Host, "host");
   request_headers_.addCopy(Http::Headers::get().ForwardedFor, "x.x.x.x");
 
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF 1 2 3 - \"x.x.x.x\" "
             "\"user-agent-set\" \"id\" \"host\" \"-\"\n",
             output_);
@@ -106,7 +106,7 @@ TEST_F(AccessLogImplTest, DownstreamDisconnect) {
   stream_info_.upstream_host_ = Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234");
   stream_info_.response_flags_ = StreamInfo::ResponseFlag::DownstreamConnectionTermination;
 
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 DC 1 2 3 - \"-\" \"-\" \"-\" \"-\" "
             "\"10.0.0.5:1234\"\n",
             output_);
@@ -130,7 +130,7 @@ TEST_F(AccessLogImplTest, RouteName) {
   request_headers_.addCopy(Http::Headers::get().Host, "host");
   request_headers_.addCopy(Http::Headers::get().ForwardedFor, "x.x.x.x");
 
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   EXPECT_EQ(
       "[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF route-test-name 1 2 3 - \"x.x.x.x\" "
       "\"user-agent-set\" \"id\"  \"host\"\n",
@@ -149,7 +149,7 @@ TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
   EXPECT_CALL(*file_, write(_));
   response_headers_.addCopy(Http::Headers::get().EnvoyUpstreamServiceTime, "999");
 
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 - 1 2 3 999 \"-\" \"-\" \"-\" \"-\" "
             "\"-\"\n",
             output_);
@@ -165,7 +165,7 @@ TEST_F(AccessLogImplTest, NoFilter) {
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
 
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   EXPECT_EQ(
       "[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 - 1 2 3 - \"-\" \"-\" \"-\" \"-\" \"-\"\n",
       output_);
@@ -184,7 +184,7 @@ TEST_F(AccessLogImplTest, UpstreamHost) {
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
 
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 - 1 2 3 - \"-\" \"-\" \"-\" \"-\" "
             "\"10.0.0.5:1234\"\n",
             output_);
@@ -205,10 +205,10 @@ TEST_F(AccessLogImplTest, WithFilterMiss) {
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   stream_info_.response_code_ = 200;
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, WithFilterHit) {
@@ -227,15 +227,15 @@ TEST_F(AccessLogImplTest, WithFilterHit) {
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(3);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   stream_info_.response_code_ = 500;
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   stream_info_.response_code_ = 200;
   stream_info_.end_time_ =
       stream_info_.startTimeMonotonic() + std::chrono::microseconds(1001000000000000);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, RuntimeFilter) {
@@ -253,25 +253,25 @@ TEST_F(AccessLogImplTest, RuntimeFilter) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 42, 100))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 43, 100))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   // Value is taken from x-request-id.
   request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 55, 100))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 55, 100))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, RuntimeFilterV2) {
@@ -294,25 +294,25 @@ config:
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 42, 10000))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 43, 10000))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   // Value is taken from x-request-id.
   request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 255, 10000))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 255, 10000))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, RuntimeFilterV2IndependentRandomness) {
@@ -337,13 +337,13 @@ config:
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 42, 1000000))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 43, 1000000))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, PathRewrite) {
@@ -359,7 +359,7 @@ TEST_F(AccessLogImplTest, PathRewrite) {
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
 
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET /bar HTTP/1.1\" 0 - 1 2 3 - \"-\" \"-\" \"-\" \"-\" "
             "\"-\"\n",
             output_);
@@ -379,7 +379,7 @@ TEST_F(AccessLogImplTest, healthCheckTrue) {
   stream_info_.health_check_request_ = true;
   EXPECT_CALL(*file_, write(_)).Times(0);
 
-  log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&header_map, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, healthCheckFalse) {
@@ -395,7 +395,7 @@ TEST_F(AccessLogImplTest, healthCheckFalse) {
   Http::TestHeaderMapImpl header_map{};
   EXPECT_CALL(*file_, write(_));
 
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, requestTracing) {
@@ -420,19 +420,19 @@ TEST_F(AccessLogImplTest, requestTracing) {
   {
     Http::TestHeaderMapImpl forced_header{{"x-request-id", force_tracing_guid}};
     EXPECT_CALL(*file_, write(_));
-    log->log(&forced_header, &response_headers_, &response_trailers_, stream_info_);
+    log->maybeLog(&forced_header, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
     Http::TestHeaderMapImpl not_traceable{{"x-request-id", not_traceable_guid}};
     EXPECT_CALL(*file_, write(_)).Times(0);
-    log->log(&not_traceable, &response_headers_, &response_trailers_, stream_info_);
+    log->maybeLog(&not_traceable, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
     Http::TestHeaderMapImpl sampled_header{{"x-request-id", sample_tracing_guid}};
     EXPECT_CALL(*file_, write(_)).Times(0);
-    log->log(&sampled_header, &response_headers_, &response_trailers_, stream_info_);
+    log->maybeLog(&sampled_header, &response_headers_, &response_trailers_, stream_info_);
   }
 }
 
@@ -483,14 +483,14 @@ TEST_F(AccessLogImplTest, andFilter) {
     EXPECT_CALL(*file_, write(_));
     Http::TestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
 
-    log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
+    log->maybeLog(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
     Http::TestHeaderMapImpl header_map{};
     stream_info_.health_check_request_ = true;
-    log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
+    log->maybeLog(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 }
 
@@ -513,13 +513,13 @@ TEST_F(AccessLogImplTest, orFilter) {
     EXPECT_CALL(*file_, write(_));
     Http::TestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
 
-    log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
+    log->maybeLog(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
     EXPECT_CALL(*file_, write(_));
     Http::TestHeaderMapImpl header_map{{"user-agent", "Envoy/HC"}};
-    log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
+    log->maybeLog(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 }
 
@@ -546,7 +546,7 @@ TEST_F(AccessLogImplTest, multipleOperators) {
     EXPECT_CALL(*file_, write(_));
     Http::TestHeaderMapImpl header_map{};
 
-    log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
+    log->maybeLog(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
@@ -554,7 +554,7 @@ TEST_F(AccessLogImplTest, multipleOperators) {
     Http::TestHeaderMapImpl header_map{};
     stream_info_.health_check_request_ = true;
 
-    log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
+    log->maybeLog(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 }
 
@@ -643,12 +643,12 @@ config:
   stream_info_.response_code_ = 499;
   EXPECT_CALL(runtime_.snapshot_, getInteger("hello", 499)).WillOnce(Return(499));
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   stream_info_.response_code_ = 500;
   EXPECT_CALL(runtime_.snapshot_, getInteger("hello", 499)).WillOnce(Return(499));
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, HeaderPresence) {
@@ -665,11 +665,11 @@ config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   request_headers_.addCopy("test-header", "present");
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, HeaderExactMatch) {
@@ -688,16 +688,16 @@ config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   request_headers_.addCopy("test-header", "exact-match-value");
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   request_headers_.remove("test-header");
   request_headers_.addCopy("test-header", "not-exact-match-value");
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, HeaderRegexMatch) {
@@ -715,21 +715,21 @@ config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   request_headers_.addCopy("test-header", "123");
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   request_headers_.remove("test-header");
   request_headers_.addCopy("test-header", "1234");
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   request_headers_.remove("test-header");
   request_headers_.addCopy("test-header", "123.456");
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, HeaderRangeMatch) {
@@ -749,31 +749,31 @@ config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   request_headers_.addCopy("test-header", "-1");
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   request_headers_.remove("test-header");
   request_headers_.addCopy("test-header", "0");
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   request_headers_.remove("test-header");
   request_headers_.addCopy("test-header", "somestring");
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   request_headers_.remove("test-header");
   request_headers_.addCopy("test-header", "10.9");
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   request_headers_.remove("test-header");
   request_headers_.addCopy("test-header", "-1somestring");
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, ResponseFlagFilterAnyFlag) {
@@ -788,11 +788,11 @@ config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   stream_info_.setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, ResponseFlagFilterSpecificFlag) {
@@ -809,15 +809,15 @@ config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   stream_info_.setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, ResponseFlagFilterSeveralFlags) {
@@ -835,15 +835,15 @@ config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   stream_info_.setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
   stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, ResponseFlagFilterAllFlagsInPGV) {
@@ -902,7 +902,7 @@ config:
     TestStreamInfo stream_info;
     stream_info.setResponseFlag(response_flag);
     EXPECT_CALL(*file_, write(_));
-    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
+    log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info);
   }
 }
 
@@ -976,7 +976,7 @@ config:
     EXPECT_CALL(*file_, write(_));
 
     response_trailers_.addCopy(Http::Headers::get().GrpcStatus, std::to_string(i));
-    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+    log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
     response_trailers_.remove(Http::Headers::get().GrpcStatus);
   }
 }
@@ -1013,7 +1013,7 @@ config:
   response_trailers_.addCopy(Http::Headers::get().GrpcStatus, "1");
 
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterHttpCodes) {
@@ -1043,7 +1043,7 @@ config:
         parseAccessLogFromV2Yaml(fmt::format(yaml_template, pair.first)), context_);
 
     EXPECT_CALL(*file_, write(_));
-    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+    log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   }
 }
 
@@ -1062,7 +1062,7 @@ config:
       AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterExclude) {
@@ -1084,7 +1084,7 @@ config:
     EXPECT_CALL(*file_, write(_)).Times(i == 0 ? 0 : 1);
 
     response_trailers_.addCopy(Http::Headers::get().GrpcStatus, std::to_string(i));
-    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+    log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
     response_trailers_.remove(Http::Headers::get().GrpcStatus);
   }
 }
@@ -1107,7 +1107,7 @@ config:
   response_trailers_.addCopy(Http::Headers::get().GrpcStatus, "0");
 
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterHeader) {
@@ -1127,7 +1127,7 @@ config:
   EXPECT_CALL(*file_, write(_));
 
   response_headers_.addCopy(Http::Headers::get().GrpcStatus, "0");
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  log->maybeLog(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 } // namespace

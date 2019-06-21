@@ -10,7 +10,7 @@ namespace File {
 FileAccessLog::FileAccessLog(const std::string& access_log_path, AccessLog::FilterPtr&& filter,
                              AccessLog::FormatterPtr&& formatter,
                              AccessLog::AccessLogManager& log_manager)
-    : filter_(std::move(filter)), formatter_(std::move(formatter)) {
+    : Instance(std::move(filter)), formatter_(std::move(formatter)) {
   log_file_ = log_manager.createAccessLog(access_log_path);
 }
 
@@ -28,13 +28,6 @@ void FileAccessLog::log(const Http::HeaderMap* request_headers,
   if (!response_trailers) {
     response_trailers = &empty_headers;
   }
-
-  if (filter_) {
-    if (!filter_->evaluate(stream_info, *request_headers, *response_headers, *response_trailers)) {
-      return;
-    }
-  }
-
   log_file_->write(
       formatter_->format(*request_headers, *response_headers, *response_trailers, stream_info));
 }

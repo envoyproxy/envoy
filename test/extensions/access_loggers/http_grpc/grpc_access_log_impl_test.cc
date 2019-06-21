@@ -165,7 +165,7 @@ public:
         response: {{}}
     )EOF",
                           request_method, request_method.length() + 7));
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+    access_log_->maybeLog(&request_headers, nullptr, nullptr, stream_info);
   }
 
   AccessLog::MockFilter* filter_{new NiceMock<AccessLog::MockFilter>()};
@@ -208,7 +208,7 @@ http_logs:
     request: {}
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->maybeLog(nullptr, nullptr, nullptr, stream_info);
   }
 
   {
@@ -236,7 +236,7 @@ http_logs:
     request: {}
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->maybeLog(nullptr, nullptr, nullptr, stream_info);
   }
 
   {
@@ -336,7 +336,7 @@ http_logs:
       response_body_bytes: 20
       response_code_details: "via_upstream"
 )EOF");
-    access_log_->log(&request_headers, &response_headers, nullptr, stream_info);
+    access_log_->maybeLog(&request_headers, &response_headers, nullptr, stream_info);
   }
 
   {
@@ -369,7 +369,7 @@ http_logs:
       request_headers_bytes: 16
     response: {}
 )EOF");
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+    access_log_->maybeLog(&request_headers, nullptr, nullptr, stream_info);
   }
 
   {
@@ -429,7 +429,7 @@ http_logs:
       request_headers_bytes: 16
     response: {}
 )EOF");
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+    access_log_->maybeLog(&request_headers, nullptr, nullptr, stream_info);
   }
 
   // TLSv1.2
@@ -472,7 +472,7 @@ http_logs:
       request_method: "METHOD_UNSPECIFIED"
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->maybeLog(nullptr, nullptr, nullptr, stream_info);
   }
 
   // TLSv1.1
@@ -515,7 +515,7 @@ http_logs:
       request_method: "METHOD_UNSPECIFIED"
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->maybeLog(nullptr, nullptr, nullptr, stream_info);
   }
 
   // TLSv1
@@ -558,7 +558,7 @@ http_logs:
       request_method: "METHOD_UNSPECIFIED"
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->maybeLog(nullptr, nullptr, nullptr, stream_info);
   }
 
   // Unknown TLS version (TLSv1.4)
@@ -601,7 +601,7 @@ http_logs:
       request_method: "METHOD_UNSPECIFIED"
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->maybeLog(nullptr, nullptr, nullptr, stream_info);
   }
 }
 
@@ -686,7 +686,7 @@ http_logs:
         "x-logged-trailer": "value"
         "x-empty-trailer": ""
 )EOF");
-    access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info);
+    access_log_->maybeLog(&request_headers, &response_headers, &response_trailers, stream_info);
   }
 }
 

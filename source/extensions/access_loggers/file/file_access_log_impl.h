@@ -15,14 +15,15 @@ public:
   FileAccessLog(const std::string& access_log_path, AccessLog::FilterPtr&& filter,
                 AccessLog::FormatterPtr&& formatter, AccessLog::AccessLogManager& log_manager);
 
+private:
   // AccessLog::Instance
   void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
            const Http::HeaderMap* response_trailers,
            const StreamInfo::StreamInfo& stream_info) override;
 
-private:
+  // Envoy::AccessLog::FilterPtr filter_;  // AccessLog::Instance
+
   AccessLog::AccessLogFileSharedPtr log_file_;
-  AccessLog::FilterPtr filter_;
   AccessLog::FormatterPtr formatter_;
 };
 

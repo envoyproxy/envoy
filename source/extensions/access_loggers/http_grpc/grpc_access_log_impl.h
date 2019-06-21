@@ -125,13 +125,13 @@ public:
       envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
       const StreamInfo::StreamInfo& stream_info);
 
+private:
   // AccessLog::Instance
   void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
            const Http::HeaderMap* response_trailers,
            const StreamInfo::StreamInfo& stream_info) override;
 
-private:
-  AccessLog::FilterPtr filter_;
+  Envoy::AccessLog::FilterPtr filter_; // AccessLog::Instance
   const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
   GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer_;
   std::vector<Http::LowerCaseString> request_headers_to_log_;

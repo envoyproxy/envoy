@@ -74,8 +74,24 @@ using FilterPtr = std::unique_ptr<Filter>;
  */
 class Instance {
 public:
+  Instance(AccessLog::FilterPtr filter) : filter_(std::move(filter)) {}
+
   virtual ~Instance() = default;
 
+  /**
+   * Log a completed request if the underlying AccessLog `filter_` allows it.
+   */
+  virtual void maybeLog(const Http::HeaderMap* request_headers,
+                        const Http::HeaderMap* response_headers,
+                        const Http::HeaderMap* response_trailers,
+                        const StreamInfo::StreamInfo& stream_info) {
+    if (filter_ &&
+        !filter_->evaluate(stream_info, *request_headers, *response_headers, *response_trailers))
+      return;
+    return log(request_headers, response_headers, response_trailers, stream_info);
+  }
+
+private:
   /**
    * Log a completed request.
    * @param request_headers supplies the incoming request headers after filtering.
@@ -87,6 +103,8 @@ public:
   virtual void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
                    const Http::HeaderMap* response_trailers,
                    const StreamInfo::StreamInfo& stream_info) PURE;
+
+  Envoy::AccessLog::FilterPtr filter_;
 };
 
 using InstanceSharedPtr = std::shared_ptr<Instance>;

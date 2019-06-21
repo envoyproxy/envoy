@@ -1276,8 +1276,8 @@ Filter::UpstreamRequest::~UpstreamRequest() {
   stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
-    upstream_log->log(parent_.downstream_headers_, upstream_headers_.get(),
-                      upstream_trailers_.get(), stream_info_);
+    upstream_log->maybeLog(parent_.downstream_headers_, upstream_headers_.get(),
+                           upstream_trailers_.get(), stream_info_);
   }
 }
 
