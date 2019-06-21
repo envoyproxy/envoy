@@ -286,7 +286,7 @@ public:
 
       return true;
     }
-    typedef std::list<std::unique_ptr<const Protobuf::Message>> ProtoList;
+    using ProtoList = std::list<std::unique_ptr<const Protobuf::Message>>;
     // Iterate through using protoEqual as ignore_ordering is true, and fields
     // in the sub-protos may also be out of order.
     ProtoList lhs_list =
