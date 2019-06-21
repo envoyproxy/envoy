@@ -289,8 +289,6 @@ private:
 
   absl::node_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
   absl::node_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
-
-  friend class ServerInstanceImplTest;
 };
 
 // Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could

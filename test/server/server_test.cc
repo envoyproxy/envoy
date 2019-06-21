@@ -12,7 +12,6 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/logging.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -221,8 +220,6 @@ protected:
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
 
-  void flushStats() { server_->flushStats(); }
-
   // Returns the server's tracer as a pointer, for use in dynamic_cast tests.
   Tracing::HttpTracer* tracer() { return &server_->httpContext().tracer(); };
 
@@ -240,24 +237,72 @@ protected:
   std::unique_ptr<InstanceImpl> server_;
 };
 
+// Custom StatsSink that just increments a counter when flush is called.
+class CustomStatsSink : public Stats::Sink {
+public:
+  CustomStatsSink(Stats::Scope& scope) : stats_flushed_(scope.counter("stats.flushed")) {}
+
+  // Stats::Sink
+  void flush(Stats::MetricSnapshot&) override { stats_flushed_.inc(); }
+
+  void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
+
+private:
+  Stats::Counter& stats_flushed_;
+};
+
+// Custom StatsSinFactory that creates CustomStatsSink.
+class CustomStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
+public:
+  // StatsSinkFactory
+  Stats::SinkPtr createStatsSink(const Protobuf::Message&, Server::Instance& server) override {
+    return std::make_unique<CustomStatsSink>(server.stats());
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  }
+
+  std::string name() override { return "envoy.custom_stats_sink"; }
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+/**
+ * Static registration for the custom sink factory. @see RegisterFactory.
+ */
+REGISTER_FACTORY(CustomStatsSinkFactory, Server::Configuration::StatsSinkFactory);
+
 // Validates that server stats are flushed even when server is stuck with initialization.
 TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
-  options_.hot_restart_epoch_ = 3;
+  absl::Notification started;
 
-  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml", true));
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    initialize("test/server/stats_sink_bootstrap.yaml", true);
+    auto startup_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
+                                                    [&] { started.Notify(); });
+    auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                                                     [&](Event::PostCb) { FAIL(); });
+    shutdown_handle = nullptr; // unregister callback
+    server_->run();
+    startup_handle = nullptr;
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
 
-  // Validate that server is still in initializing state but stats are flushed.
-  EXPECT_LOG_CONTAINS("debug",
-                      "Envoy is not fully initialized, skipping histogram merge and flushing stats",
-                      flushStats());
+  started.WaitForNotification();
 
-  EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
-  EXPECT_EQ(1L, TestUtility::findGauge(stats_store_, "server.live")->value());
-  EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
+  // Wait till stats are flushed to custom sink and validate its value.
+  while (TestUtility::findCounter(stats_store_, "stats.flushed") == nullptr ||
+         TestUtility::findCounter(stats_store_, "stats.flushed")->value() != 1) {
+    test_time_.timeSystem().sleep(std::chrono::milliseconds(10));
+  }
+  EXPECT_EQ(1L, TestUtility::findCounter(stats_store_, "stats.flushed")->value());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
 }
 
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
