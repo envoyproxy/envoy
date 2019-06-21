@@ -16,6 +16,11 @@ namespace Internal {
 
 namespace {
 
+// True for characters defined as tchars by
+// https://tools.ietf.org/html/rfc7230#section-3.2.6
+//
+// tchar           = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+"
+//                 / "-" / "." / "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
 bool tchar(char c) {
   switch (c) {
   case '!':
@@ -37,6 +42,11 @@ bool tchar(char c) {
   return absl::ascii_isalnum(c);
 }
 
+// Removes an initial HTTP header field value token, as defined by
+// https://tools.ietf.org/html/rfc7230#section-3.2.6. Returns true if an initial
+// token was present.
+//
+// token           = 1*tchar
 bool eatToken(absl::string_view& s) {
   const absl::string_view::iterator token_end = c_find_if_not(s, &tchar);
   if (token_end == s.begin()) {
@@ -46,6 +56,18 @@ bool eatToken(absl::string_view& s) {
   return true;
 }
 
+// Removes an initial token or quoted-string (if present), as defined by
+// https://tools.ietf.org/html/rfc7234#section-5.2. If a cache-control directive
+// has an argument (as indicated by '='), it should be in this form.
+//
+// quoted-string   = DQUOTE *( qdtext / quoted-pair ) DQUOTE
+// qdtext          = HTAB / SP /%x21 / %x23-5B / %x5D-7E / obs-text
+// obs-text        = %x80-FF
+// quoted-pair     = "\" ( HTAB / SP / VCHAR / obs-text )
+// VCHAR           =  %x21-7E  ; visible (printing) characters
+//
+// For example, the directive "my-extension=42" has an argument of "42", so an
+// input of "public, my-extension=42, max-age=999"
 void eatDirectiveArgument(absl::string_view& s) {
   if (s.empty()) {
     return;
@@ -60,8 +82,11 @@ void eatDirectiveArgument(absl::string_view& s) {
 }
 } // namespace
 
-// If s is nonnull and begins with decimal digits, return Eat leading digits in
-// *s, if any
+// If s is nonnull and begins with a decimal number ([0-9]+), removes it from
+// the input and returns a SystemTime::duration representing that many seconds.
+// If s is null or doesn't begin with digits, returns
+// SystemTime::duration::zero(). If parsing overflows, returns
+// SystemTime::duration::max().
 SystemTime::duration eatLeadingDuration(absl::string_view* s) {
   const absl::string_view::iterator digits_end = c_find_if_not(*s, &absl::ascii_isdigit);
   const size_t digits_length = digits_end - s->begin();
@@ -74,6 +99,9 @@ SystemTime::duration eatLeadingDuration(absl::string_view* s) {
   return absl::SimpleAtoi(digits, &num) ? std::chrono::seconds(num) : SystemTime::duration::max();
 }
 
+// Returns the effective max-age represented by cache-control. If the result is
+// SystemTime::duration::zero(), or is less than the response's, the response
+// should be validated.
 SystemTime::duration effectiveMaxAge(absl::string_view cache_control) {
   // The grammar for This Cache-Control header value should be:
   // Cache-Control   = 1#cache-directive
@@ -140,7 +168,9 @@ SystemTime httpTime(const Http::HeaderEntry* header_entry) {
   absl::Time time;
   const std::string input(header_entry->value().getStringView());
 
-  // RFC 7231 7.1.1.1: Acceptable Date/Time Formats:
+  // Acceptable Date/Time Formats per
+  // https://tools.ietf.org/html/rfc7231#section-7.1.1.1
+  //
   // Sun, 06 Nov 1994 08:49:37 GMT    ; IMF-fixdate
   // Sunday, 06-Nov-94 08:49:37 GMT   ; obsolete RFC 850 format
   // Sun Nov  6 08:49:37 1994         ; ANSI C's asctime() format
