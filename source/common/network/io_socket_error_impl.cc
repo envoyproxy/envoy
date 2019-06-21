@@ -19,6 +19,8 @@ Api::IoError::IoErrorCode IoSocketError::getErrorCode() const {
     return IoErrorCode::InProgress;
   case EPERM:
     return IoErrorCode::Permission;
+  case EMSGSIZE:
+    return IoErrorCode::MessageSize;
   default:
     return IoErrorCode::UnknownError;
   }

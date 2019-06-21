@@ -1219,6 +1219,7 @@ envoy_cc_library(
     ],
     copts = quiche_copt,
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_packets_lib",
         ":quic_core_types_lib",

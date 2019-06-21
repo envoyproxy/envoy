@@ -25,6 +25,8 @@ public:
     InProgress,
     // Permission denied.
     Permission,
+    // Message too big to send.
+    MessageSize,
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };
