@@ -5,8 +5,8 @@ HTTP dynamic forward proxy
 
 .. attention::
 
-  HTTP dynamic forward proxy support should be considered alpha and not production ready. Stats
-  as well as circuit breakers are missing and will be added soon.
+  HTTP dynamic forward proxy support should be considered alpha and not production ready. Circuit
+  breakers are missing and will be added soon.
 
 Through the combination of both an :ref:`HTTP filter <config_http_filters_dynamic_forward_proxy>` and
 :ref:`custom cluster <envoy_api_msg_config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig>`,

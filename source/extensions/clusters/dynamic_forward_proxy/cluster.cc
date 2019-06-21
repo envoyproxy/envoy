@@ -147,7 +147,7 @@ ClusterFactory::createClusterWithConfig(
     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context.singletonManager(), context.dispatcher(), context.tls());
+      context.singletonManager(), context.dispatcher(), context.tls(), context.stats());
   auto new_cluster = std::make_shared<Cluster>(
       cluster, proto_config, context.runtime(), cache_manager_factory, context.localInfo(),
       socket_factory_context, std::move(stats_scope), context.addedViaApi());

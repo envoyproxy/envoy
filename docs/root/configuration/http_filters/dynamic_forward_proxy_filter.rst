@@ -5,12 +5,12 @@ Dynamic forward proxy
 
 .. attention::
 
-  HTTP dynamic forward proxy support should be considered alpha and not production ready. Stats
-  as well as circuit breakers are missing and will be added soon.
+  HTTP dynamic forward proxy support should be considered alpha and not production ready. Circuit
+  breakers are missing and will be added soon.
 
 * HTTP dynamic forward proxy :ref:`architecture overview <arch_overview_http_dynamic_forward_proxy>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig>`
-* This filter should be configured with the name *envoy.filters.http.dynamic_forward_proxy*.
+* This filter should be configured with the name *envoy.filters.http.dynamic_forward_proxy*
 
 The following is a complete configuration that configures both the
 :ref:`dynamic forward proxy HTTP filter
@@ -92,3 +92,21 @@ HTTP dynamic forward proxy.
         common_tls_context:
           validation_context:
             trusted_ca: {filename: /etc/ssl/certs/ca-certificates.crt}
+
+Statistics
+----------
+
+The dynamic forward proxy DNS cache outputs statistics in the dns_cache.<dns_cache_name>.*
+namespace.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  dns_query_attempt, Counter, Number of DNS query attempts.
+  dns_query_success, Counter, Number of DNS query successes.
+  dns_query_failure, Counter, Number of DNS query failures.
+  host_address_changed, Counter, Number of DNS queries that resulted in a host address change.
+  host_added, Counter, Number of hosts that have been added to the cache.
+  host_removed, Counter, Number of hosts that have been removed from the cache.
+  num_hosts, Gauge, Number of hosts that are currently in the cache.

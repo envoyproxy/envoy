@@ -28,17 +28,39 @@ makeAddressList(const std::list<std::string> address_list) {
 class DnsCacheImplTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
   void initialize() {
+    config_.set_name("foo");
     config_.set_dns_lookup_family(envoy::api::v2::Cluster::V4_ONLY);
 
     EXPECT_CALL(dispatcher_, createDnsResolver(_)).WillOnce(Return(resolver_));
-    dns_cache_ = std::make_unique<DnsCacheImpl>(dispatcher_, tls_, config_);
+    dns_cache_ = std::make_unique<DnsCacheImpl>(dispatcher_, tls_, store_, config_);
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
+  }
+
+  ~DnsCacheImplTest() {
+    dns_cache_.reset();
+    EXPECT_EQ(0, TestUtility::findGauge(store_, "dns_cache.foo.num_hosts")->value());
+  }
+
+  void checkStats(uint64_t query_attempt, uint64_t query_success, uint64_t query_failure,
+                  uint64_t address_changed, uint64_t added, uint64_t removed, uint64_t num_hosts) {
+    const auto counter_value = [this](const std::string& name) {
+      return TestUtility::findCounter(store_, "dns_cache.foo." + name)->value();
+    };
+
+    EXPECT_EQ(query_attempt, counter_value("dns_query_attempt"));
+    EXPECT_EQ(query_success, counter_value("dns_query_success"));
+    EXPECT_EQ(query_failure, counter_value("dns_query_failure"));
+    EXPECT_EQ(address_changed, counter_value("host_address_changed"));
+    EXPECT_EQ(added, counter_value("host_added"));
+    EXPECT_EQ(removed, counter_value("host_removed"));
+    EXPECT_EQ(num_hosts, TestUtility::findGauge(store_, "dns_cache.foo.num_hosts")->value());
   }
 
   envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig config_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::IsolatedStoreImpl store_;
   std::unique_ptr<DnsCache> dns_cache_;
   MockUpdateCallbacks update_callbacks_;
   DnsCache::AddUpdateCallbacksHandlePtr update_callbacks_handle_;
@@ -65,26 +87,49 @@ TEST_F(DnsCacheImplTest, ResolveSuccess) {
   DnsCache::LoadDnsCacheHandlePtr handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
   EXPECT_NE(handle, nullptr);
 
+  checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.1:80")));
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete());
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000)));
   resolve_cb(makeAddressList({"10.0.0.1"}));
 
+  checkStats(1 /* attempt */, 1 /* success */, 0 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
   // Re-resolve timer.
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
   resolve_timer->invokeCallback();
 
+  checkStats(2 /* attempt */, 1 /* success */, 0 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
   // Address does not change.
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000)));
   resolve_cb(makeAddressList({"10.0.0.1"}));
+
+  checkStats(2 /* attempt */, 2 /* success */, 0 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
+  // Re-resolve timer.
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  resolve_timer->invokeCallback();
+
+  checkStats(3 /* attempt */, 2 /* success */, 0 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
   // Address does change.
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.2:80")));
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000)));
   resolve_cb(makeAddressList({"10.0.0.2"}));
+
+  checkStats(3 /* attempt */, 3 /* success */, 0 /* failure */, 2 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
 }
 
 // TTL purge test.
@@ -100,25 +145,38 @@ TEST_F(DnsCacheImplTest, TTL) {
   DnsCache::LoadDnsCacheHandlePtr handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
   EXPECT_NE(handle, nullptr);
 
+  checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", SharedAddressEquals("10.0.0.1:80")));
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete());
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000)));
   resolve_cb(makeAddressList({"10.0.0.1"}));
 
+  checkStats(1 /* attempt */, 1 /* success */, 0 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
   // Re-resolve with ~60s passed. TTL should still be OK at default of 5 minutes.
   simTime().sleep(std::chrono::milliseconds(60001));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
   resolve_timer->invokeCallback();
+  checkStats(2 /* attempt */, 1 /* success */, 0 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000)));
   resolve_cb(makeAddressList({"10.0.0.1"}));
+  checkStats(2 /* attempt */, 2 /* success */, 0 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
   simTime().sleep(std::chrono::milliseconds(300000));
   EXPECT_CALL(update_callbacks_, onDnsHostRemove("foo.com"));
   resolve_timer->invokeCallback();
+  checkStats(2 /* attempt */, 2 /* success */, 0 /* failure */, 1 /* address changed */,
+             1 /* added */, 1 /* removed */, 0 /* num hosts */);
 
   // Make sure we don't get a cache hit the next time the host is requested.
   resolve_timer = new Event::MockTimer(&dispatcher_);
@@ -126,6 +184,8 @@ TEST_F(DnsCacheImplTest, TTL) {
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
   handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
   EXPECT_NE(handle, nullptr);
+  checkStats(3 /* attempt */, 2 /* success */, 0 /* failure */, 1 /* address changed */,
+             2 /* added */, 1 /* removed */, 1 /* num hosts */);
 }
 
 // TTL purge test with different refresh/TTL parameters.
@@ -199,10 +259,14 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
   DnsCache::LoadDnsCacheHandlePtr handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
   EXPECT_NE(handle, nullptr);
+  checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
   EXPECT_CALL(update_callbacks_, onDnsHostAddOrUpdate(_, _)).Times(0);
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete());
   resolve_cb(makeAddressList({}));
+  checkStats(1 /* attempt */, 0 /* success */, 1 /* failure */, 0 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
   handle = dns_cache_->loadDnsCache("foo.com", 80, callbacks);
   EXPECT_EQ(handle, nullptr);
@@ -337,7 +401,8 @@ TEST_F(DnsCacheImplTest, InvalidPort) {
 TEST(DnsCacheManagerImplTest, LoadViaConfig) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
-  DnsCacheManagerImpl cache_manager(dispatcher, tls);
+  Stats::IsolatedStoreImpl store;
+  DnsCacheManagerImpl cache_manager(dispatcher, tls, store);
 
   envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig config1;
   config1.set_name("foo");
