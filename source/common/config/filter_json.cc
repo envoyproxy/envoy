@@ -284,14 +284,14 @@ void FilterJson::translateFaultFilter(
     JSON_UTIL_SET_DURATION_FROM_FIELD(*json_config_delay, *delay, fixed_delay, fixed_duration);
   }
 
-  for (const auto json_header_matcher : json_config.getObjectArray("headers", true)) {
+  for (const auto& json_header_matcher : json_config.getObjectArray("headers", true)) {
     auto* header_matcher = proto_config.mutable_headers()->Add();
     RdsJson::translateHeaderMatcher(*json_header_matcher, *header_matcher);
   }
 
   JSON_UTIL_SET_STRING(json_config, proto_config, upstream_cluster);
 
-  for (auto json_downstream_node : json_config.getStringArray("downstream_nodes", true)) {
+  for (const auto& json_downstream_node : json_config.getStringArray("downstream_nodes", true)) {
     auto* downstream_node = proto_config.mutable_downstream_nodes()->Add();
     *downstream_node = json_downstream_node;
   }
