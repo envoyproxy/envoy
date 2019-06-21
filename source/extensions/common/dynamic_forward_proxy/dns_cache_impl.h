@@ -19,12 +19,12 @@ namespace DynamicForwardProxy {
  */
 #define ALL_DNS_CACHE_STATS(COUNTER, GAUGE)                                                        \
   COUNTER(dns_query_attempt)                                                                       \
-  COUNTER(dns_query_success)                                                                       \
   COUNTER(dns_query_failure)                                                                       \
-  COUNTER(host_address_changed)                                                                    \
+  COUNTER(dns_query_success)                                                                       \
   COUNTER(host_added)                                                                              \
+  COUNTER(host_address_changed)                                                                    \
   COUNTER(host_removed)                                                                            \
-  GAUGE(num_hosts, Accumulate)
+  GAUGE(num_hosts, NeverImport)
 
 /**
  * Struct definition for all DNS cache stats. @see stats_macros.h

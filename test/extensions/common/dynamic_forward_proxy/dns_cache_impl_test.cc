@@ -43,16 +43,16 @@ public:
 
   void checkStats(uint64_t query_attempt, uint64_t query_success, uint64_t query_failure,
                   uint64_t address_changed, uint64_t added, uint64_t removed, uint64_t num_hosts) {
-    EXPECT_EQ(query_attempt,
-              TestUtility::findCounter(store_, "dns_cache.foo.dns_query_attempt")->value());
-    EXPECT_EQ(query_success,
-              TestUtility::findCounter(store_, "dns_cache.foo.dns_query_success")->value());
-    EXPECT_EQ(query_failure,
-              TestUtility::findCounter(store_, "dns_cache.foo.dns_query_failure")->value());
-    EXPECT_EQ(address_changed,
-              TestUtility::findCounter(store_, "dns_cache.foo.host_address_changed")->value());
-    EXPECT_EQ(added, TestUtility::findCounter(store_, "dns_cache.foo.host_added")->value());
-    EXPECT_EQ(removed, TestUtility::findCounter(store_, "dns_cache.foo.host_removed")->value());
+    const auto counter_value = [this](const std::string& name) {
+      return TestUtility::findCounter(store_, "dns_cache.foo." + name)->value();
+    };
+
+    EXPECT_EQ(query_attempt, counter_value("dns_query_attempt"));
+    EXPECT_EQ(query_success, counter_value("dns_query_success"));
+    EXPECT_EQ(query_failure, counter_value("dns_query_failure"));
+    EXPECT_EQ(address_changed, counter_value("host_address_changed"));
+    EXPECT_EQ(added, counter_value("host_added"));
+    EXPECT_EQ(removed, counter_value("host_removed"));
     EXPECT_EQ(num_hosts, TestUtility::findGauge(store_, "dns_cache.foo.num_hosts")->value());
   }
 
