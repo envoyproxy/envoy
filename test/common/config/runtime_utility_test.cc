@@ -41,7 +41,8 @@ TEST(RuntimeUtility, TranslateSubdirOnly) {
   {
     auto* layer = expected_runtime_config.add_layers();
     layer->set_name("root");
-    layer->mutable_disk_layer()->set_symlink_root("foo/bar");
+    layer->mutable_disk_layer()->set_symlink_root("foo");
+    layer->mutable_disk_layer()->set_subdirectory("bar");
   }
   {
     auto* layer = expected_runtime_config.add_layers();
@@ -67,12 +68,14 @@ TEST(RuntimeUtility, TranslateSubdirOverride) {
   {
     auto* layer = expected_runtime_config.add_layers();
     layer->set_name("root");
-    layer->mutable_disk_layer()->set_symlink_root("foo/bar");
+    layer->mutable_disk_layer()->set_symlink_root("foo");
+    layer->mutable_disk_layer()->set_subdirectory("bar");
   }
   {
     auto* layer = expected_runtime_config.add_layers();
     layer->set_name("override");
-    layer->mutable_disk_layer()->set_symlink_root("foo/baz");
+    layer->mutable_disk_layer()->set_symlink_root("foo");
+    layer->mutable_disk_layer()->set_subdirectory("baz");
     layer->mutable_disk_layer()->set_append_service_cluster(true);
   }
   {

@@ -32,6 +32,7 @@ namespace Logger {
   FUNCTION(dubbo)                \
   FUNCTION(file)                 \
   FUNCTION(filter)               \
+  FUNCTION(forward_proxy)        \
   FUNCTION(grpc)                 \
   FUNCTION(hc)                   \
   FUNCTION(health_checker)       \

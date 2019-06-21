@@ -105,7 +105,10 @@ envoy_cc_library(
         "quic_logging_impl.h",
     ],
     visibility = ["//visibility:public"],
-    deps = ["//source/common/common:assert_lib"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:stl_helpers",
+    ],
 )
 
 envoy_cc_library(
@@ -133,7 +136,6 @@ envoy_cc_library(
         "quic_ptr_util_impl.h",
         "quic_reference_counted_impl.h",
         "quic_server_stats_impl.h",
-        "quic_socket_address_impl.h",
         "quic_stack_trace_impl.h",
         "quic_str_cat_impl.h",
         "quic_stream_buffer_allocator_impl.h",
@@ -225,6 +227,13 @@ envoy_cc_library(
         "@com_googlesource_quiche//:quic_core_utils_lib",
         "@com_googlesource_quiche//:quic_platform_mem_slice_span",
     ],
+)
+
+envoy_cc_library(
+    name = "quic_platform_bbr2_sender_impl_lib",
+    hdrs = ["quic_bbr2_sender_impl.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@com_googlesource_quiche//:quic_core_congestion_control_bbr_lib"],
 )
 
 envoy_cc_library(
