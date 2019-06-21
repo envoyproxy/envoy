@@ -61,7 +61,7 @@ enum ResponseFlag {
   UpstreamRetryLimitExceeded = 0x8000,
   // Request hit the stream idle timeout, triggering a 408.
   StreamIdleTimeout = 0x10000,
-  // Request specified headers that were invalid under strict header checking
+  // Request specified x-envoy-* header values that failed strict header checks.
   InvalidEnvoyRequestHeaders = 0x20000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
   LastFlag = InvalidEnvoyRequestHeaders

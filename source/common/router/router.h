@@ -77,19 +77,21 @@ public:
     static const HeaderCheckResult test(Http::HeaderMap& headers,
                                         const Http::LowerCaseString& target_header);
 
+    using ParseRetryFlagsFunc = std::function<uint32_t(absl::string_view)>;
+
   private:
-    static HeaderCheckResult has_valid_retry_fields(Http::HeaderEntry* header_entry,
-                                                    uint32_t (*parseFn)(absl::string_view)) {
+    static HeaderCheckResult hasValidRetryFields(Http::HeaderEntry* header_entry,
+                                                 ParseRetryFlagsFunc parseFn) {
       HeaderCheckResult r;
       if (header_entry) {
-        auto flags = parseFn(header_entry->value().getStringView());
+        const auto flags = parseFn(header_entry->value().getStringView());
         r.valid_ = (flags & RetryPolicy::RETRY_UNKNOWN_FIELD_ERROR) == 0;
         r.entry_ = header_entry;
       }
       return r;
     }
 
-    static HeaderCheckResult is_integral(Http::HeaderEntry* header_entry) {
+    static HeaderCheckResult isInteger(Http::HeaderEntry* header_entry) {
       HeaderCheckResult r;
       if (header_entry) {
         uint64_t out;

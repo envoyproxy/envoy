@@ -192,7 +192,7 @@ message ResponseFlags {
       // The request was denied by the external authorization service.
       EXTERNAL_SERVICE = 1;
       // The request was denied because a header value failed a :ref:`strict header check
-      // <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>` failed
+      // <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>` failed.
       STRICT_HEADER_CHECK_FAILED = 2;
     }
 
