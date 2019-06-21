@@ -2,7 +2,7 @@ import UIKit
 
 private let kCellID = "cell-id"
 // swiftlint:disable:next force_unwrapping
-private let kURL = URL(string: "http://0.0.0.0:9001/api.lyft.com/static/demo/hello_world.txt")!
+private let kURL = URL(string: "http://localhost:9001/api.lyft.com/static/demo/hello_world.txt")!
 
 final class ViewController: UITableViewController {
   private var responses = [Response]()
