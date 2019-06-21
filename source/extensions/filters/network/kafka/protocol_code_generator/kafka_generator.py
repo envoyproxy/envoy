@@ -357,7 +357,7 @@ class Array(TypeSpecification):
                                           self.underlying.deserializer_name_in_version(version))
 
   def default_value(self):
-    return '{}'
+    return 'std::vector<%s>{}' % (self.underlying.name)
 
   def example_value_for_test(self, version):
     return 'std::vector<%s>{ %s }' % (self.underlying.name,
