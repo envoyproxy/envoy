@@ -15,10 +15,14 @@ namespace {
 
 bool isCacheableRequest(Http::HeaderMap& headers) {
   const Http::HeaderEntry* method = headers.Method();
+  const Http::HeaderEntry* scheme = headers.Scheme();
+  const Http::HeaderValues& header_values = Http::Headers::get();
   // TODO(toddmgreer) Also serve HEAD requests from cache.
   // TODO(toddmgreer) Check all the other cache-related headers.
-  return method && headers.Path() && headers.Host() &&
-         (method->value().getStringView() == Http::Headers::get().MethodValues.Get);
+  return method && scheme && headers.Path() && headers.Host() &&
+         (method->value() == Http::Headers::get().MethodValues.Get) &&
+         (scheme->value() == header_values.SchemeValues.Http ||
+          scheme->value() == header_values.SchemeValues.Https);
 }
 
 bool isCacheableResponse(Http::HeaderMap& headers) {

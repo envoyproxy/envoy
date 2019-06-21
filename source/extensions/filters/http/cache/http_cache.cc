@@ -25,6 +25,9 @@ LookupRequest::LookupRequest(const Http::HeaderMap& request_headers, SystemTime 
                                    "with null Scheme.");
   ASSERT(request_headers.Host(), "Can't form cache lookup key for malformed Http::HeaderMap "
                                  "with null Host.");
+  const Http::HeaderString& scheme = request_headers.Scheme()->value();
+  const auto& scheme_values = Http::Headers::get().SchemeValues;
+  ASSERT(scheme == scheme_values.Http || scheme == scheme_values.Https);
   // TODO(toddmgreer) Let config determine whether to include scheme, host, and
   // query params.
   // TODO(toddmgreer) get cluster name.
@@ -32,10 +35,7 @@ LookupRequest::LookupRequest(const Http::HeaderMap& request_headers, SystemTime 
   key_.set_cluster_name("cluster_name_goes_here");
   key_.set_host(std::string(request_headers.Host()->value().getStringView()));
   key_.set_path(std::string(request_headers.Path()->value().getStringView()));
-  const Http::HeaderString& scheme = request_headers.Scheme()->value();
-  ASSERT(scheme == Http::Headers::get().SchemeValues.Http ||
-         scheme == Http::Headers::get().SchemeValues.Https);
-  key_.set_clear_http(scheme == Http::Headers::get().SchemeValues.Http);
+  key_.set_clear_http(scheme == scheme_values.Http);
 }
 
 // Unless this API is still alpha, calls to stableHashKey() must always return
