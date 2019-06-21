@@ -1,8 +1,10 @@
+#include "extensions/filters/http/cache/simple_http_cache.h"
+
+#include "envoy/registry/registry.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/http/header_map_impl.h"
-#include "envoy/registry/registry.h"
-#include "extensions/filters/http/cache/simple_http_cache.h"
 
 namespace Envoy {
 namespace Extensions {

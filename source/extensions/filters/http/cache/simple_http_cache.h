@@ -1,10 +1,12 @@
 #pragma once
 
-#include "absl/base/thread_annotations.h"
-#include "absl/container/flat_hash_map.h"
 #include "common/common/thread.h"
 #include "common/protobuf/utility.h"
+
 #include "extensions/filters/http/cache/http_cache.h"
+
+#include "absl/base/thread_annotations.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,8 +33,7 @@ public:
   void insert(const Key& key, Http::HeaderMapPtr&& response_headers, std::string&& body);
 
   mutable Thread::MutexBasicLockable mutex_;
-  absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_
-      GUARDED_BY(mutex_);
+  absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_ GUARDED_BY(mutex_);
 };
 
 } // namespace Cache

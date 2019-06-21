@@ -295,6 +295,7 @@ qdtext
 satisfiable
 sendto
 tchar
+tchars
 unsatisfiable
 vip
 xDSes
