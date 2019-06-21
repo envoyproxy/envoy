@@ -15,7 +15,7 @@ envoy_cc_library(
     external_deps = ["quiche_quic_platform"],
     deps = [
         "//include/envoy/event:timer_interface",
-        "@com_googlesource_quiche//:quic_core_alarm_interface",
+        "@com_googlesource_quiche//:quic_core_alarm_interface_lib",
     ],
 )
 
@@ -26,7 +26,7 @@ envoy_cc_library(
     external_deps = ["quiche_quic_platform"],
     deps = [
         ":envoy_quic_alarm_lib",
-        "@com_googlesource_quiche//:quic_core_alarm_factory_interface",
+        "@com_googlesource_quiche//:quic_core_alarm_factory_interface_lib",
         "@com_googlesource_quiche//:quic_core_arena_scoped_ptr_lib",
         "@com_googlesource_quiche//:quic_core_one_block_arena_lib",
     ],
