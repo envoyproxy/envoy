@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 
-def generate_files():
+def main():
   """
   Serialization composite generator script
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -69,9 +69,10 @@ class RenderingHelper:
   def get_template(template):
     import jinja2
     import os
-    import sys
-    # Templates are resolved relatively to main start script, due to main & test templates being
-    # stored in different directories.
     env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(searchpath=os.path.dirname(os.path.abspath(sys.argv[0]))))
+        loader=jinja2.FileSystemLoader(searchpath=os.path.dirname(os.path.abspath(__file__))))
     return env.get_template(template)
+
+
+if __name__ == "__main__":
+  main()

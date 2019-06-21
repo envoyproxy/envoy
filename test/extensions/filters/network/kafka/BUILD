@@ -55,26 +55,15 @@ envoy_extension_cc_test(
 )
 
 genrule(
-    name = "serialization_composite_generated_tests",
+    name = "serialization_composite_test_generator",
     srcs = [],
     outs = ["external/serialization_composite_test.cc"],
     cmd = """
-        ./$(location :serialization_composite_test_generator_bin) \
+        ./$(location //source/extensions/filters/network/kafka:serialization_composite_generator) \
         generate-test $(location external/serialization_composite_test.cc)
     """,
     tools = [
-        ":serialization_composite_test_generator_bin",
-    ],
-)
-
-py_binary(
-    name = "serialization_composite_test_generator_bin",
-    srcs = ["serialization_code_generator/launcher.py"],
-    data = glob(["serialization_code_generator/*.j2"]),
-    main = "serialization_code_generator/launcher.py",
-    deps = [
-        "//source/extensions/filters/network/kafka:serialization_composite_generator_lib",
-        "@com_github_pallets_jinja//:jinja2",
+        "//source/extensions/filters/network/kafka:serialization_composite_generator",
     ],
 )
 
@@ -137,7 +126,7 @@ envoy_extension_cc_test(
 )
 
 genrule(
-    name = "request_generated_tests",
+    name = "request_test_generator",
     srcs = [
         "@kafka_source//:request_protocol_files",
     ],
@@ -146,12 +135,13 @@ genrule(
         "external/request_codec_request_test.cc",
     ],
     cmd = """
-        ./$(location :kafka_test_generator_bin) request \
+        ./$(location //source/extensions/filters/network/kafka:kafka_code_generator) \
+        generate-test request \
         $(location external/requests_test.cc) $(location external/request_codec_request_test.cc) \
         $(SRCS)
     """,
     tools = [
-        ":kafka_test_generator_bin",
+        "//source/extensions/filters/network/kafka:kafka_code_generator",
     ],
 )
 
@@ -214,7 +204,7 @@ envoy_extension_cc_test(
 )
 
 genrule(
-    name = "response_generated_tests",
+    name = "response_test_generator",
     srcs = [
         "@kafka_source//:response_protocol_files",
     ],
@@ -223,22 +213,12 @@ genrule(
         "external/response_codec_response_test.cc",
     ],
     cmd = """
-        ./$(location :kafka_test_generator_bin) response \
+        ./$(location //source/extensions/filters/network/kafka:kafka_code_generator) \
+        generate-test response \
         $(location external/responses_test.cc) $(location external/response_codec_response_test.cc) \
         $(SRCS)
     """,
     tools = [
-        ":kafka_test_generator_bin",
-    ],
-)
-
-py_binary(
-    name = "kafka_test_generator_bin",
-    srcs = ["protocol_code_generator/launcher.py"],
-    data = glob(["protocol_code_generator/*.j2"]),
-    main = "protocol_code_generator/launcher.py",
-    deps = [
-        "//source/extensions/filters/network/kafka:kafka_code_generator_lib",
-        "@com_github_pallets_jinja//:jinja2",
+        "//source/extensions/filters/network/kafka:kafka_code_generator",
     ],
 )
