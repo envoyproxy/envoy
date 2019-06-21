@@ -33,7 +33,8 @@ public:
                                  const Address::Instance& address) override;
 
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
-                                  const Address::Instance& address) override;
+                                  const Address::Ip* self_ip,
+                                  const Address::Instance& peer_address) override;
 
 private:
   // Converts a SysCallSizeResult to IoCallUint64Result.

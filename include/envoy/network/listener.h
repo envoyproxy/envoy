@@ -133,7 +133,9 @@ struct UdpRecvData {
  * Encapsulates the information needed to send a udp packet to a target
  */
 struct UdpSendData {
-  Address::InstanceConstSharedPtr send_address_;
+  const Address::Ip* local_ip_;
+  Address::InstanceConstSharedPtr& peer_address_;
+
   // The buffer is a reference so that it can be reused by the sender to send different
   // messages
   Buffer::Instance& buffer_;

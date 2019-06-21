@@ -11,6 +11,7 @@ struct RawSlice;
 namespace Network {
 namespace Address {
 class Instance;
+class Ip;
 } // namespace Address
 
 /**
@@ -76,7 +77,8 @@ public:
    * err_ = nullptr and rc_ = the bytes written for success.
    */
   virtual Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice,
-                                          int flags, const Address::Instance& address) PURE;
+                                          int flags, const Address::Ip* self_ip,
+                                          const Address::Instance& peer_address) PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

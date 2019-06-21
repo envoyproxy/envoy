@@ -164,8 +164,8 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
   buffer.getRawSlices(slices.begin(), num_slices);
-  Api::IoCallUint64Result send_result =
-      socket_.ioHandle().sendmsg(slices.begin(), num_slices, 0, *send_data.send_address_);
+  Api::IoCallUint64Result send_result = socket_.ioHandle().sendmsg(
+      slices.begin(), num_slices, 0, send_data.local_ip_, *send_data.peer_address_);
 
   if (send_result.ok()) {
     ASSERT(send_result.rc_ == buffer.length());

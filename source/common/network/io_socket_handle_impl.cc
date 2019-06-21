@@ -83,8 +83,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendto(const Buffer::RawSlice& slice
 
 Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
                                                     uint64_t num_slice, int flags,
-                                                    const Address::Instance& address) {
-  const auto* address_base = dynamic_cast<const Address::InstanceBase*>(&address);
+                                                    const Address::Ip* self_ip,
+                                                    const Address::Instance& peer_address) {
+  const auto* address_base = dynamic_cast<const Address::InstanceBase*>(&peer_address);
   sockaddr* sock_addr = const_cast<sockaddr*>(address_base->sockAddr());
 
   STACK_ARRAY(iov, iovec, num_slice);
@@ -105,10 +106,41 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   message.msg_namelen = address_base->sockAddrLen();
   message.msg_iov = iov.begin();
   message.msg_iovlen = num_slices_to_write;
-  message.msg_control = nullptr;
-  message.msg_controllen = 0;
   message.msg_flags = 0;
-
+  if (self_ip == nullptr) {
+    message.msg_control = nullptr;
+    message.msg_controllen = 0;
+  } else {
+#ifndef __APPLE__
+    constexpr int kSpaceForIpv4 = CMSG_SPACE(sizeof(in_pktinfo));
+    constexpr int kSpaceForIpv6 = CMSG_SPACE(sizeof(in6_pktinfo));
+    // kSpaceForIp should be big enough to hold both IPv4 and IPv6 packet info.
+    constexpr int kSpaceForIp = (kSpaceForIpv4 < kSpaceForIpv6) ? kSpaceForIpv6 : kSpaceForIpv4;
+    std::cerr << "size of in_pktinfo " << kSpaceForIpv4 << " size of in6_pktinfo " << kSpaceForIpv6
+              << "\n";
+    char cbuf[kSpaceForIp]{0};
+#else
+    char cbuf[16]{0};
+#endif
+    message.msg_control = cbuf;
+    cmsghdr* cmsg = CMSG_FIRSTHDR(&message);
+    if (self_ip->version() == Address::IpVersion::v4) {
+      cmsg->cmsg_len = CMSG_LEN(sizeof(in_pktinfo));
+      cmsg->cmsg_level = IPPROTO_IP;
+      cmsg->cmsg_type = IP_PKTINFO;
+      in_pktinfo* pktinfo = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
+      pktinfo->ipi_ifindex = 0;
+      pktinfo->ipi_spec_dst.s_addr = self_ip->ipv4()->address();
+    } else if (self_ip->version() == Address::IpVersion::v6) {
+      cmsg->cmsg_len = CMSG_LEN(sizeof(in6_pktinfo));
+      cmsg->cmsg_level = IPPROTO_IPV6;
+      cmsg->cmsg_type = IPV6_PKTINFO;
+      in6_pktinfo* pktinfo = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
+      pktinfo->ipi6_ifindex = 0;
+      *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) = self_ip->ipv6()->address();
+    }
+    message.msg_controllen = cmsg->cmsg_len;
+  }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
 
