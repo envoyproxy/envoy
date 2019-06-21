@@ -115,7 +115,7 @@ void UdpListenerImpl::handleReadCallback() {
                            : (packets_dropped_ +
                               (std::numeric_limits<uint32_t>::max() - old_packets_dropped) + 1);
       // TODO(danzh) add stats for this.
-      ENVOY_UDP_LOG(warn, "Kernel dropped {} more packets. Consider increase receive buffer size.",
+      ENVOY_UDP_LOG(debug, "Kernel dropped {} more packets. Consider increase receive buffer size.",
                     delta);
     }
 
