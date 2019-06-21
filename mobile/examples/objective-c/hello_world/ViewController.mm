@@ -55,7 +55,7 @@ NSString* _ENDPOINT = @"http://0.0.0.0:9001/api.lyft.com/static/demo/hello_world
                                                        target:self
                                                      selector:@selector(performRequest)
                                                      userInfo:nil
-                                                      repeats:true];
+                                                      repeats:YES];
 }
 
 - (void)performRequest {
