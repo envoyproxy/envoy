@@ -34,8 +34,13 @@ public:
   ImportMode importMode() const override { return ImportMode::NeverImport; }
   void mergeImportMode(ImportMode /* import_mode */) override {}
 
+  // RefcountInterface
+  void incRefCount() override { refcount_helper_.incRefCount(); }
+  bool decRefCount() override { return refcount_helper_.decRefCount(); }
+  uint32_t use_count() const override { return refcount_helper_.use_count(); }
+
  private:
-  std::atomic<uint32_t> ref_count_{0};
+  RefcountHelper refcount_helper_;
 };
 
 } // namespace Stats

@@ -387,7 +387,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
 
   ScopePtr scope2 = scope1->createScope("foo.");
   Counter& c2 = scope2->counter("bar");
-  EXPECT_NE(&c1, &c2);
+  EXPECT_EQ(&c1, &c2);
   EXPECT_EQ("scope1.foo.bar", c2.name());
   StatNameManagedStorage c2_name("scope1.foo.bar", symbol_table_);
   auto found_counter2 = store_->findCounter(c2_name.statName());
@@ -417,7 +417,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   // We will call alloc twice, but they should point to the same backing storage.
   Counter& c1 = scope1->counter("c");
   Counter& c2 = scope2->counter("c");
-  EXPECT_NE(&c1, &c2);
+  EXPECT_EQ(&c1, &c2);
   c1.inc();
   EXPECT_EQ(1UL, c1.value());
   EXPECT_EQ(1UL, c2.value());
@@ -431,7 +431,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   // Gauges should work the same way.
   Gauge& g1 = scope1->gauge("g", Gauge::ImportMode::Accumulate);
   Gauge& g2 = scope2->gauge("g", Gauge::ImportMode::Accumulate);
-  EXPECT_NE(&g1, &g2);
+  EXPECT_EQ(&g1, &g2);
   g1.set(5);
   EXPECT_EQ(5UL, g1.value());
   EXPECT_EQ(5UL, g2.value());

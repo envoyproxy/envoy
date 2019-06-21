@@ -20,7 +20,10 @@
 namespace Envoy {
 namespace Stats {
 
-HeapStatDataAllocator::~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
+HeapStatDataAllocator::~HeapStatDataAllocator() {
+  ASSERT(counters_.empty());
+  ASSERT(gauges_.empty());
+}
 
 HeapStatData* HeapStatData::alloc(StatName stat_name, SymbolTable& symbol_table) {
   symbol_table.incRefCount(stat_name);
@@ -32,6 +35,7 @@ void HeapStatData::free(SymbolTable& symbol_table) {
   delete this;
 }
 
+/*
 HeapStatData& HeapStatDataAllocator::alloc(StatName name) {
   using HeapStatDataFreeFn = std::function<void(HeapStatData * d)>;
   std::unique_ptr<HeapStatData, HeapStatDataFreeFn> data_ptr(
@@ -48,32 +52,31 @@ HeapStatData& HeapStatDataAllocator::alloc(StatName name) {
   ++existing_data->ref_count_;
   return *existing_data;
 }
+*/
 
 void HeapStatDataAllocator::free(HeapStatData& data) {
-  ASSERT(data.ref_count_ > 0);
-  if (--data.ref_count_ > 0) {
-    return;
-  }
-
+  ASSERT(data.ref_count_ == 0);
   {
     Thread::LockGuard lock(mutex_);
-    size_t key_removed = stats_.erase(&data);
-    ASSERT(key_removed == 1);
+    int count = counters_.erase(data.statName()) + gauges_.erase(data.statName());
+    ASSERT(count == 1);
   }
-
   data.free(symbolTable());
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
 void HeapStatDataAllocator::debugPrint() {
   Thread::LockGuard lock(mutex_);
-  for (HeapStatData* heap_stat_data : stats_) {
-    ENVOY_LOG_MISC(info, "{}", symbolTable().toString(heap_stat_data->statName()));
+  for (Counter* counter : counters_) {
+    ENVOY_LOG_MISC(info, "counter: {}", symbolTable().toString(counter->statName()));
+  }
+  for (Gauge* gauge : gauges_) {
+    ENVOY_LOG_MISC(info, "gauge: {}", symbolTable().toString(gauge->statName()));
   }
 }
 #endif
 
-class CounterImpl : public Counter, public MetricImpl /*, public RefcountHelper*/ {
+class CounterImpl : public Counter, public MetricImpl {
 public:
   CounterImpl(HeapStatData& data, HeapStatDataAllocator& alloc,
               absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
@@ -103,16 +106,14 @@ public:
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   StatName statName() const override { return data_.statName(); }
 
-  /*
-    void incRefCount() override { ++ref_count_; }
-    void free() override { if (--ref_count_ == 0) { delete this; } }
-    uint32_t use_count() const override { return ref_count_; }
-  */
+  // RefcountInterface
+  void incRefCount() override { ++data_.ref_count_; }
+  bool decRefCount() override { return --data_.ref_count_ == 0; }
+  uint32_t use_count() const override { return data_.ref_count_; }
 
 private:
   HeapStatData& data_;
   HeapStatDataAllocator& alloc_;
-  //std::atomic<uint32_t> ref_count_{0};
 };
 
 class GaugeImpl : public Gauge, public MetricImpl /*, public RefcountHelper*/ {
@@ -203,28 +204,42 @@ public:
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   StatName statName() const override { return data_.statName(); }
 
-  /*
-    void incRefCount() override { ++ref_count_; }
-    void free() override { if (--ref_count_ == 0) { delete this; } }
-    uint32_t use_count() const override { return ref_count_; }
-  */
+  // RefcountInterface
+  void incRefCount() override { ++data_.ref_count_; }
+  bool decRefCount() override { return --data_.ref_count_ == 0; }
+  uint32_t use_count() const override { return data_.ref_count_; }
 
 private:
   HeapStatData& data_;
   HeapStatDataAllocator& alloc_;
-  //std::atomic<uint32_t> ref_count_{0};
 };
 
 CounterSharedPtr HeapStatDataAllocator::makeCounter(StatName name,
                                                     absl::string_view tag_extracted_name,
                                                     const std::vector<Tag>& tags) {
-  return CounterSharedPtr(new CounterImpl(alloc(name), *this, tag_extracted_name, tags));
+  Thread::LockGuard lock(mutex_);
+  auto iter = counters_.find(name);
+  if (iter != counters_.end()) {
+    return CounterSharedPtr(*iter);
+  }
+  Counter* counter = new CounterImpl(*HeapStatData::alloc(name, symbolTable()), *this,
+                                     tag_extracted_name, tags);
+  counters_.insert(counter);
+  return CounterSharedPtr(counter);
 }
 
 GaugeSharedPtr HeapStatDataAllocator::makeGauge(StatName name, absl::string_view tag_extracted_name,
                                                 const std::vector<Tag>& tags,
                                                 Gauge::ImportMode import_mode) {
-  return GaugeSharedPtr(new GaugeImpl(alloc(name), *this, tag_extracted_name, tags, import_mode));
+  Thread::LockGuard lock(mutex_);
+  auto iter = gauges_.find(name);
+  if (iter != gauges_.end()) {
+    return GaugeSharedPtr(*iter);
+  }
+  Gauge* gauge = new GaugeImpl(*HeapStatData::alloc(name, symbolTable()), *this, tag_extracted_name,
+                               tags, import_mode);
+  gauges_.insert(gauge);
+  return GaugeSharedPtr(gauge);
 }
 
 } // namespace Stats

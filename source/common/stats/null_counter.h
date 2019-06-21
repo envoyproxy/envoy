@@ -31,8 +31,13 @@ public:
   void reset() override {}
   uint64_t value() const override { return 0; }
 
+  // RefcountInterface
+  void incRefCount() override { refcount_helper_.incRefCount(); }
+  bool decRefCount() override { return refcount_helper_.decRefCount(); }
+  uint32_t use_count() const override { return refcount_helper_.use_count(); }
+
  private:
-  std::atomic<uint32_t> ref_count_{0};
+  RefcountHelper refcount_helper_;
 };
 
 } // namespace Stats

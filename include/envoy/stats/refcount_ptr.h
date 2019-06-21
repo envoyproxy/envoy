@@ -6,14 +6,24 @@
 namespace Envoy {
 namespace Stats {
 
+class RefcountInterface {
+ public:
+  virtual ~RefcountInterface() = default;
+  virtual void incRefCount() PURE;
+  virtual bool decRefCount() PURE;
+  virtual uint32_t use_count() const PURE;
+};
+
 struct RefcountHelper {
   //static constexpr uint32_t Unmanaged = 0xffffffff;
 
-  void assignRefCount() {
+  /*
+    void assignRefCount() {
     incRefCount();
-    /*ref_count_ += 2;
-      assert(ref_count_ == (Unmanaged + 2));*/
-  }
+    ref_count_ += 2;
+    assert(ref_count_ == (Unmanaged + 2));
+    }
+  */
 
   void incRefCount() {
     //assert(ref_count_ > 0);
@@ -31,6 +41,18 @@ struct RefcountHelper {
   std::atomic<uint32_t> ref_count_{0 /*Unmanaged*/};
 };
 
+/*
+class RefcountImpl : public RefcountInterface {
+ public:
+  void incRefCount() override { helper_.incRefCount(); }
+  bool decRefCount() override { return helper_.decRefCount(); }
+  uint32_t use_count() const override { return helper_.use_count(); }
+
+ private:
+  RefcountHelper helper_;
+};
+*/
+
 // Alternate implementation of shared_ptr, where the class itself
 // contains the reference-count, and supplies incRefCount() call to
 // increase, and free() to destruct.
@@ -39,7 +61,7 @@ public:
   RefcountPtr() : ptr_(nullptr) {}
   RefcountPtr(T* ptr) : ptr_(ptr) {
     if (ptr_ != nullptr) {
-      ptr_->assignRefCount();
+      ptr_->incRefCount();
     }
   }
 
