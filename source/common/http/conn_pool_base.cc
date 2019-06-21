@@ -28,10 +28,10 @@ void ConnPoolImplBase::purgePendingRequests(
     absl::string_view failure_reason) {
   // NOTE: We move the existing pending requests to a temporary list. This is done so that
   //       if retry logic submits a new request to the pool, we don't fail it inline.
-  pending_requests_to_purge_ = std::move(pending_requests_);
-  while (!pending_requests_to_purge_.empty()) {
+  std::list<PendingRequestPtr> pending_requests_to_purge(std::move(pending_requests_));
+  while (!pending_requests_to_purge.empty()) {
     PendingRequestPtr request =
-        pending_requests_to_purge_.front()->removeFromList(pending_requests_to_purge_);
+        pending_requests_to_purge.front()->removeFromList(pending_requests_to_purge);
     host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
     request->callbacks_.onPoolFailure(ConnectionPool::PoolFailureReason::ConnectionFailure,
                                       failure_reason, host_description);
@@ -40,11 +40,7 @@ void ConnPoolImplBase::purgePendingRequests(
 
 void ConnPoolImplBase::onPendingRequestCancel(PendingRequest& request) {
   ENVOY_LOG(debug, "cancelling pending request");
-  if (!pending_requests_to_purge_.empty()) {
-    request.removeFromList(pending_requests_to_purge_);
-  } else {
-    request.removeFromList(pending_requests_);
-  }
+  request.removeFromList(pending_requests_);
 
   host_->cluster().stats().upstream_rq_cancelled_.inc();
   checkForDrained();

@@ -48,7 +48,6 @@ protected:
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
   std::list<PendingRequestPtr> pending_requests_;
-  std::list<PendingRequestPtr> pending_requests_to_purge_;
 };
 } // namespace Http
 } // namespace Envoy
