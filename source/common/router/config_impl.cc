@@ -462,7 +462,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     cors_policy_ =
         std::make_unique<CorsPolicyImpl>(route.route().cors(), factory_context.runtime());
   }
-  for (const auto upgrade_config : route.route().upgrade_configs()) {
+  for (const auto& upgrade_config : route.route().upgrade_configs()) {
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
     const bool success =
         upgrade_map_
