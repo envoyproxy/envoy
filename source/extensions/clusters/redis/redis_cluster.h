@@ -100,7 +100,7 @@ public:
 
   struct ClusterSlotsRequest : public Extensions::NetworkFilters::Common::Redis::RespValue {
   public:
-    ClusterSlotsRequest() : Extensions::NetworkFilters::Common::Redis::RespValue() {
+    ClusterSlotsRequest() {
       type(Extensions::NetworkFilters::Common::Redis::RespType::Array);
       std::vector<NetworkFilters::Common::Redis::RespValue> values(2);
       values[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
@@ -193,7 +193,7 @@ private:
     RedisDiscoverySession(RedisCluster& parent,
                           NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
-    ~RedisDiscoverySession();
+    ~RedisDiscoverySession() override;
 
     void registerDiscoveryAddress(
         const std::list<Network::Address::InstanceConstSharedPtr>& address_list,

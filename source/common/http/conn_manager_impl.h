@@ -53,7 +53,7 @@ public:
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
                         Server::OverloadManager* overload_manager, TimeSource& time_system);
-  ~ConnectionManagerImpl();
+  ~ConnectionManagerImpl() override;
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
   static ConnectionManagerTracingStats generateTracingStats(const std::string& prefix,

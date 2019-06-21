@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "envoy/runtime/runtime.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"
 
@@ -61,6 +62,7 @@ public:
   MockLoader();
   ~MockLoader();
 
+  MOCK_METHOD1(initialize, void(Upstream::ClusterManager& cm));
   MOCK_METHOD0(snapshot, Snapshot&());
   MOCK_METHOD1(mergeValues, void(const std::unordered_map<std::string, std::string>&));
 

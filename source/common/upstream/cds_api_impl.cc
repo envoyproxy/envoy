@@ -81,7 +81,7 @@ void CdsApiImpl::onConfigUpdate(
       exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what()));
     }
   }
-  for (auto resource_name : removed_resources) {
+  for (const auto& resource_name : removed_resources) {
     if (cm_.removeCluster(resource_name)) {
       any_applied = true;
       ENVOY_LOG(debug, "cds: remove cluster '{}'", resource_name);
