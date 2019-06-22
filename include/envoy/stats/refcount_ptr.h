@@ -98,7 +98,7 @@ public:
   /**
    * Decrements the reference count.
    * @return true if the reference count has gone to zero, so the object should be freed.
-   *
+   */
   virtual bool decRefCount() PURE;
 
   /**
