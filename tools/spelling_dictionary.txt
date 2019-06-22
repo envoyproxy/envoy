@@ -179,6 +179,7 @@ OSS
 OSX
 OT
 OU
+OVFL
 PB
 PC
 PCC
@@ -198,6 +199,8 @@ QUIC
 RAII
 RANLUX
 RBAC
+RECVDSTADDR
+RECVPKTINFO
 RCU
 RDN
 RDS
@@ -217,12 +220,14 @@ RTDS
 RTTI
 RW
 RX
+RXQ
 Runn
 SA
 SAN
 SANs
 SDK
 SDS
+SENDSRCADDR
 SHA
 SHM
 SIBABRT
@@ -386,6 +391,7 @@ cstring
 ctor
 ctrl
 customizations
+darwin
 dbg
 de
 dechunking

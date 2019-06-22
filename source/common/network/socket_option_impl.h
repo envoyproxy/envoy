@@ -82,6 +82,21 @@ namespace Network {
 #define ENVOY_SOCKET_TCP_FASTOPEN Network::SocketOptionName()
 #endif
 
+// Linux uses IP_PKTINFO for both sending source address and receiving destination
+// address.
+// FreeBSD uses IP_RECVDSTADDR for receiving destination address and IP_SENDSRCADDR for sending
+// source address.
+#ifdef IP_RECVDSTADDR
+#define ENVOY_RECV_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_RECVDSTADDR))
+#elif IP_PKTINFO
+#define ENVOY_RECV_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_PKTINFO))
+#endif
+
+// Both Linux and FreeBSD use IPV6_RECVPKTINFO for both sending source address and
+// receiving destination address.
+#define ENVOY_RECV_IPV6_PKT_INFO                                                                   \
+  Network::SocketOptionName(std::make_pair(IPPROTO_IPV6, IPV6_RECVPKTINFO))
+
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
   SocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
