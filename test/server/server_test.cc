@@ -32,6 +32,7 @@ using testing::StrictMock;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
@@ -220,6 +221,27 @@ protected:
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
 
+  Thread::ThreadPtr startTestServer(const std::string& bootstrap_path,
+                                    const bool use_intializing_instance) {
+    absl::Notification started;
+
+    auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+      initialize(bootstrap_path, use_intializing_instance);
+      auto startup_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
+                                                      [&] { started.Notify(); });
+      auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                                                       [&](Event::PostCb) { FAIL(); });
+      shutdown_handle = nullptr; // unregister callback
+      server_->run();
+      startup_handle = nullptr;
+      server_ = nullptr;
+      thread_local_ = nullptr;
+    });
+
+    started.WaitForNotification();
+    return server_thread;
+  }
+
   // Returns the server's tracer as a pointer, for use in dynamic_cast tests.
   Tracing::HttpTracer* tracer() { return &server_->httpContext().tracer(); };
 
@@ -277,51 +299,18 @@ REGISTER_FACTORY(CustomStatsSinkFactory, Server::Configuration::StatsSinkFactory
 
 // Validates that server stats are flushed even when server is stuck with initialization.
 TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
-  absl::Notification started;
+  auto server_thread = startTestServer("test/server/stats_sink_bootstrap.yaml", true);
 
-  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
-    initialize("test/server/stats_sink_bootstrap.yaml", true);
-    auto startup_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
-                                                    [&] { started.Notify(); });
-    auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
-                                                     [&](Event::PostCb) { FAIL(); });
-    shutdown_handle = nullptr; // unregister callback
-    server_->run();
-    startup_handle = nullptr;
-    server_ = nullptr;
-    thread_local_ = nullptr;
-  });
-
-  started.WaitForNotification();
-
-  // Wait till stats are flushed to custom sink and validate its value.
-  while (TestUtility::findCounter(stats_store_, "stats.flushed") == nullptr ||
-         TestUtility::findCounter(stats_store_, "stats.flushed")->value() != 1) {
-    test_time_.timeSystem().sleep(std::chrono::milliseconds(10));
-  }
-  EXPECT_EQ(1L, TestUtility::findCounter(stats_store_, "stats.flushed")->value());
+  // Wait till stats are flushed to custom sink and validate that the actual flush happens.
+  TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, test_time_.timeSystem());
+  EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
 }
 
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
-  absl::Notification started;
-
-  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
-    initialize("test/server/node_bootstrap.yaml");
-    auto startup_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
-                                                    [&] { started.Notify(); });
-    auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
-                                                     [&](Event::PostCb) { FAIL(); });
-    shutdown_handle = nullptr; // unregister callback
-    server_->run();
-    startup_handle = nullptr;
-    server_ = nullptr;
-    thread_local_ = nullptr;
-  });
-
-  started.WaitForNotification();
+  auto server_thread = startTestServer("test/server/node_bootstrap.yaml", false);
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
 }
@@ -667,5 +656,6 @@ TEST_P(ServerInstanceImplTest, WithProcessContext) {
   EXPECT_FALSE(object_from_context.boolean_flag_);
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

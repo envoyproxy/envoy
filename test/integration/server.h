@@ -257,9 +257,7 @@ public:
              absl::optional<std::reference_wrapper<ProcessObject>> process_object);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
-    while (counter(name) == nullptr || counter(name)->value() != value) {
-      time_system_.sleep(std::chrono::milliseconds(10));
-    }
+    TestUtility::waitForCounterEq(stat_store(), name, value, time_system_);
   }
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
