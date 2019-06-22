@@ -24,6 +24,7 @@
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time_system.h"
 #include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/time/time.h"
@@ -177,6 +178,16 @@ public:
    * @return Stats::GaugeSharedPtr the gauge or nullptr if there is none.
    */
   static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
+
+  /**
+   * Wait till Counter value is equal to the passed ion value.
+   * @param store supplies the stats store.
+   * @param name supplies the name of the counter to wait for.
+   * @param value supplies the value of the counter.
+   * @param time_system the time system to use for waiting.
+   */
+  static void waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
+                               Event::TestTimeSystem& time_system);
 
   /**
    * Convert a string list of IP addresses into a list of network addresses usable for DNS

@@ -166,27 +166,38 @@ void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
 
 void InstanceImpl::flushStats() {
   ENVOY_LOG(debug, "flushing stats");
-  // A shutdown initiated before this callback may prevent this from being called as per
-  // the semantics documented in ThreadLocal's runOnAllThreads method.
-  stats_store_.mergeHistograms([this]() -> void {
-    // mergeParentStatsIfAny() does nothing and returns a struct of 0s if there is no parent.
-    HotRestart::ServerStatsFromParent parent_stats = restarter_.mergeParentStatsIfAny(stats_store_);
+  // If Envoy is not fully initialized, workers will not be started and mergeHistograms
+  // completion callback is not called immediately. As a result of this server stats will
+  // not be updated and flushed to stat sinks. So skip mergeHistograms call if workers are
+  // not started yet.
+  if (initManager().state() == Init::Manager::State::Initialized) {
+    // A shutdown initiated before this callback may prevent this from being called as per
+    // the semantics documented in ThreadLocal's runOnAllThreads method.
+    stats_store_.mergeHistograms([this]() -> void { flushStatsInternal(); });
+  } else {
+    ENVOY_LOG(debug, "Envoy is not fully initialized, skipping histogram merge and flushing stats");
+    flushStatsInternal();
+  }
+}
 
-    server_stats_->uptime_.set(time(nullptr) - original_start_time_);
-    server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
-                                         parent_stats.parent_memory_allocated_);
-    server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
-    server_stats_->parent_connections_.set(parent_stats.parent_connections_);
-    server_stats_->total_connections_.set(listener_manager_->numConnections() +
-                                          parent_stats.parent_connections_);
-    server_stats_->days_until_first_cert_expiring_.set(
-        sslContextManager().daysUntilFirstCertExpires());
-    InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
-    // TODO(ramaraochavali): consider adding different flush interval for histograms.
-    if (stat_flush_timer_ != nullptr) {
-      stat_flush_timer_->enableTimer(config_.statsFlushInterval());
-    }
-  });
+void InstanceImpl::flushStatsInternal() {
+  // mergeParentStatsIfAny() does nothing and returns a struct of 0s if there is no parent.
+  HotRestart::ServerStatsFromParent parent_stats = restarter_.mergeParentStatsIfAny(stats_store_);
+
+  server_stats_->uptime_.set(time(nullptr) - original_start_time_);
+  server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
+                                       parent_stats.parent_memory_allocated_);
+  server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
+  server_stats_->parent_connections_.set(parent_stats.parent_connections_);
+  server_stats_->total_connections_.set(listener_manager_->numConnections() +
+                                        parent_stats.parent_connections_);
+  server_stats_->days_until_first_cert_expiring_.set(
+      sslContextManager().daysUntilFirstCertExpires());
+  InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
+  // TODO(ramaraochavali): consider adding different flush interval for histograms.
+  if (stat_flush_timer_ != nullptr) {
+    stat_flush_timer_->enableTimer(config_.statsFlushInterval());
+  }
 }
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }

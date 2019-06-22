@@ -673,22 +673,16 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
 }
 
 envoy::admin::v2alpha::ServerInfo::State AdminImpl::serverState() {
-  envoy::admin::v2alpha::ServerInfo::State state;
-
   switch (server_.initManager().state()) {
   case Init::Manager::State::Uninitialized:
-    state = envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;
-    break;
+    return envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;
   case Init::Manager::State::Initializing:
-    state = envoy::admin::v2alpha::ServerInfo::INITIALIZING;
-    break;
+    return envoy::admin::v2alpha::ServerInfo::INITIALIZING;
   case Init::Manager::State::Initialized:
-    state = server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
-                                        : envoy::admin::v2alpha::ServerInfo::LIVE;
-    break;
+    return server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
+                                       : envoy::admin::v2alpha::ServerInfo::LIVE;
   }
-
-  return state;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
