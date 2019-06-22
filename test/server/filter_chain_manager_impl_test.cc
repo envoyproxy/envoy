@@ -49,9 +49,10 @@ namespace Envoy {
 namespace Server {
 
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
+
   std::unique_ptr<Network::FilterChain>
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain&) const override {
-    // A place holder to be found
+    // Wont dereference but require not nullptr.
     return std::make_unique<Network::MockFilterChain>();
   }
 };
@@ -128,8 +129,7 @@ public:
 
   // Test target
   FilterChainManagerImpl filter_chain_manager_{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
-      ProtobufMessage::getNullValidationVisitor()};
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
 };
 
 TEST_F(FilterChainManagerImplTest, FilterChainMatchNothing) {

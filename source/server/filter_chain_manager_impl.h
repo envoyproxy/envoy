@@ -28,9 +28,8 @@ public:
 class FilterChainManagerImpl : public Network::FilterChainManager,
                                Logger::Loggable<Logger::Id::config> {
 public:
-  FilterChainManagerImpl(Network::Address::InstanceConstSharedPtr address,
-                         ProtobufMessage::ValidationVisitor& visitor)
-      : address_(address), validation_visitor_(visitor) {}
+  explicit FilterChainManagerImpl(Network::Address::InstanceConstSharedPtr address)
+      : address_(address) {}
 
   // Network::FilterChainManager
   const Network::FilterChain*
@@ -129,7 +128,6 @@ private:
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
   Network::Address::InstanceConstSharedPtr address_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 class FilterChainImpl : public Network::FilterChain {

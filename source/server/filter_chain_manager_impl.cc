@@ -33,7 +33,7 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
 
 void FilterChainManagerImpl::addFilterChain(
     absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
-    FilterChainFactoryBuilder& b) {
+    FilterChainFactoryBuilder& filter_chain_factory_builder) {
   std::unordered_set<envoy::api::v2::listener::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
   for (const auto& filter_chain : filter_chain_span) {
@@ -50,45 +50,12 @@ void FilterChainManagerImpl::addFilterChain(
     }
     filter_chains.insert(filter_chain_match);
 
-    // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
-    // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
-    // We copy by value first then override if necessary.
-    auto transport_socket = filter_chain->transport_socket();
-    if (!filter_chain->has_transport_socket()) {
-      if (filter_chain->has_tls_context()) {
-        transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-        MessageUtil::jsonConvert(filter_chain->tls_context(), *transport_socket.mutable_config());
-      } else {
-        transport_socket.set_name(
-            Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
-      }
-    }
-
-    auto& config_factory = Config::Utility::getAndCheckFactory<
-        Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        transport_socket, validation_visitor_, config_factory);
-
     // Validate IP addresses.
     std::vector<std::string> destination_ips;
     destination_ips.reserve(filter_chain_match.prefix_ranges().size());
     for (const auto& destination_ip : filter_chain_match.prefix_ranges()) {
       const auto& cidr_range = Network::Address::CidrRange::create(destination_ip);
       destination_ips.push_back(cidr_range.asString());
-    }
-
-    std::vector<std::string> server_names(filter_chain_match.server_names().begin(),
-                                          filter_chain_match.server_names().end());
-
-    // Reject partial wildcards, we don't match on them.
-    for (const auto& server_name : server_names) {
-      if (server_name.find('*') != std::string::npos &&
-          !FilterChainManagerImpl::isWildcardServerName(server_name)) {
-        throw EnvoyException(
-            fmt::format("error adding listener '{}': partial wildcards are not supported in "
-                        "\"server_names\"",
-                        address_->asString()));
-      }
     }
 
     std::vector<std::string> source_ips;
@@ -98,15 +65,32 @@ void FilterChainManagerImpl::addFilterChain(
       source_ips.push_back(cidr_range.asString());
     }
 
+    // Reject partial wildcards, we don't match on them.
+    for (const auto& server_name : filter_chain_match.server_names()) {
+      if (server_name.find('*') != std::string::npos &&
+          !FilterChainManagerImpl::isWildcardServerName(server_name)) {
+        throw EnvoyException(
+            fmt::format("error adding listener '{}': partial wildcards are not supported in "
+                        "\"server_names\"",
+                        address_->asString()));
+      }
+    }
+
+    std::vector<std::string> server_names(filter_chain_match.server_names().begin(),
+                                          filter_chain_match.server_names().end());
+
     std::vector<std::string> application_protocols(
         filter_chain_match.application_protocols().begin(),
         filter_chain_match.application_protocols().end());
+
+    // TODO(silentdai): use absl::Span to avoid vector construction at server_names and alpn
     addFilterChainForDestinationPorts(
         destination_ports_map_,
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
         server_names, filter_chain_match.transport_protocol(), application_protocols,
         filter_chain_match.source_type(), source_ips, filter_chain_match.source_ports(),
-        std::shared_ptr<Network::FilterChain>(b.buildFilterChain(*filter_chain)));
+        std::shared_ptr<Network::FilterChain>(
+            filter_chain_factory_builder.buildFilterChain(*filter_chain)));
   }
   convertIPsToTries();
 }
