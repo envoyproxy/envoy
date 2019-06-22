@@ -97,7 +97,7 @@ private:
   HeapStatDataAllocator& alloc_;
 };
 
-class GaugeImpl : public Gauge, public MetricImpl /*, public RefcountHelper*/ {
+class GaugeImpl : public Gauge, public MetricImpl {
 public:
   GaugeImpl(HeapStatData& data, HeapStatDataAllocator& alloc, absl::string_view tag_extracted_name,
             const std::vector<Tag>& tags, ImportMode import_mode)

@@ -207,8 +207,9 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/06/03  7199     49393               absl update
   // 2019/06/06  7208     49650               make memory targets approximate
   // 2019/06/17  7243     49412       49700   macros for exact/upper-bound memory checks
+  // 2019/06/22  7364     45685       49700   combine 2 levels of stat ref-counting into 1
 
-  EXPECT_MEMORY_EQ(m_per_cluster, 45749);
+  EXPECT_MEMORY_EQ(m_per_cluster, 45685); // 64 bytes smaller in CI 'release' than during dev.
   EXPECT_MEMORY_LE(m_per_cluster, 46000);
 }
 

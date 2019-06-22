@@ -2,6 +2,8 @@
 
 #include <atomic>
 
+#include "envoy/common/pure.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -81,25 +83,36 @@ private:
 };
 
 // Helper interface for classes to derive from, enabling implementation of the
-// three methods as part of derived classes.
+// three methods as part of derived classes. It is not necessary to inherit from
+// this interface to wrap a class in RefcountPtr; instead the class can just
+// implement the same method.
 class RefcountInterface {
 public:
   virtual ~RefcountInterface() = default;
+
+  /**
+   * Increments the reference count.
+   */
   virtual void incRefCount() PURE;
+
+  /**
+   * Decrements the reference count.
+   * @return true if the reference count has gone to zero, so the object should be freed.
+   *
   virtual bool decRefCount() PURE;
+
+  /**
+   * @return the number of references to the object.
+   */
   virtual uint32_t use_count() const PURE;
 };
 
 // Delegation helper for RefcountPtr. This can be instantiated in a class, but
 // explicit delegation will be needed for each of the three methods.
 struct RefcountHelper {
+  // Implements the RefcountInterface API.
   void incRefCount() { ++ref_count_; }
-
-  bool decRefCount() {
-    --ref_count_;
-    return ref_count_ == 0;
-  }
-
+  bool decRefCount() { return --ref_count_ == 0; }
   uint32_t use_count() const { return ref_count_; }
 
   std::atomic<uint32_t> ref_count_{0};

@@ -73,7 +73,7 @@ private:
     if (stat == stats_.end()) {
       return absl::nullopt;
     }
-    return std::cref(*stat->second.get());
+    return std::cref(*stat->second);
   }
 
   StatNameHashMap<RefcountPtr<Base>> stats_;

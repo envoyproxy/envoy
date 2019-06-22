@@ -85,12 +85,6 @@ public:
   MockCounter();
   ~MockCounter();
 
-  /*
-    void incRefCount() override { ++ref_count_; }
-    void free() override { if (--ref_count_ == 0) { delete this; } }
-    uint32_t use_count() const override { return ref_count_; }
-  */
-
   MOCK_METHOD1(add, void(uint64_t amount));
   MOCK_METHOD0(inc, void());
   MOCK_METHOD0(latch, uint64_t());
@@ -115,12 +109,6 @@ class MockGauge : public Gauge, public MockMetric, public RefcountHelper {
 public:
   MockGauge();
   ~MockGauge();
-
-  /*
-    void incRefCount() override { ++ref_count_; }
-    void free() override { if (--ref_count_ == 0) { delete this; } }
-    uint32_t use_count() const override { return ref_count_; }
-  */
 
   MOCK_METHOD1(add, void(uint64_t amount));
   MOCK_METHOD0(dec, void());
