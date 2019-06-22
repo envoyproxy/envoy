@@ -23,6 +23,7 @@ jobs:
 
   - task: PublishTestResults@2
     inputs:
-      testResultsFiles: '**/bazel-testlogs/**/test.xml'
+      testResultsFiles: '**/testlogs/**/test.xml'
       testRunTitle: 'bazel.dev'
+      searchFolder: $(Build.StagingDirectory)
     condition: always()
