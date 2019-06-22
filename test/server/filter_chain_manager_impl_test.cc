@@ -52,7 +52,7 @@ class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 
   std::unique_ptr<Network::FilterChain>
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain&) const override {
-    // Wont dereference but require not nullptr.
+    // Won't dereference but requires not nullptr.
     return std::make_unique<Network::MockFilterChain>();
   }
 };
@@ -67,7 +67,6 @@ public:
         filter_chain_template_);
   }
 
-  // Helper for test
   const Network::FilterChain*
   findFilterChainHelper(uint16_t destination_port, const std::string& destination_address,
                         const std::string& server_name, const std::string& transport_protocol,
@@ -106,12 +105,12 @@ public:
         filter_chain_factory_builder_);
   }
 
-  // Intermedia state
+  // Intermedia states.
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
   std::vector<std::shared_ptr<Network::MockConnectionSocket>> sockets_;
 
-  // Reuseable template
+  // Reuseable template.
   const std::string filter_chain_yaml = R"EOF(
       filter_chain_match:
         destination_port: 10000
@@ -127,7 +126,7 @@ public:
   envoy::api::v2::listener::FilterChain filter_chain_template_;
   MockFilterChainFactoryBuilder filter_chain_factory_builder_;
 
-  // Test target
+  // Test target.
   FilterChainManagerImpl filter_chain_manager_{
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
 };
