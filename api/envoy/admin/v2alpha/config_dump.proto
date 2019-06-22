@@ -6,6 +6,7 @@ option java_outer_classname = "ConfigDumpProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.admin.v2alpha";
 
+import "envoy/api/v2/auth/cert.proto";
 import "envoy/api/v2/cds.proto";
 import "envoy/api/v2/lds.proto";
 import "envoy/api/v2/rds.proto";
@@ -218,4 +219,27 @@ message ScopedRoutesConfigDump {
   // The dynamically loaded scoped route configs.
   repeated DynamicScopedRouteConfigs dynamic_scoped_route_configs = 2
       [(gogoproto.nullable) = false];
+}
+
+// Config dump for SDS.
+message SecretsConfigDump {
+  // TODO: does it make sense to include a veresion_info here? what criteria we aggregated on?
+  // string version_info;
+
+  message DynamicSecret {
+    // The name assigned to the secret.
+    string name = 1;
+
+    // Per resource version information.
+    string version_info = 2;
+
+    // The timestamp when the Cluster was last updated.
+    google.protobuf.Timestamp last_updated = 3;
+
+    // Security sensitive information should be stripped.
+    envoy.api.v2.auth.Secret secret = 4;
+  }
+
+  // List of all the secrets fetched via SDS.
+  repeated DynamicSecret dynamic_secrets = 1;
 }
