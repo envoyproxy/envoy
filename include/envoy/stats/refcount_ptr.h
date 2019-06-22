@@ -87,6 +87,13 @@ private:
   T* ptr_;
 };
 
+template <class T> static bool operator==(std::nullptr_t a, const RefcountPtr<T>& b) {
+  return a == b.get();
+}
+template <class T> static bool operator!=(std::nullptr_t a, const RefcountPtr<T>& b) {
+  return a != b.get();
+}
+
 // Helper interface for classes to derive from, enabling implementation of the
 // three methods as part of derived classes. It is not necessary to inherit from
 // this interface to wrap a class in RefcountPtr; instead the class can just
