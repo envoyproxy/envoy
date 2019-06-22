@@ -208,8 +208,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/06/06  7208     49650               make memory targets approximate
   // 2019/06/17  7243     49412       49700   macros for exact/upper-bound memory checks
 
-  EXPECT_MEMORY_EQ(m_per_cluster, 49412);
-  EXPECT_MEMORY_LE(m_per_cluster, 49700);
+  EXPECT_MEMORY_EQ(m_per_cluster, 45749);
+  EXPECT_MEMORY_LE(m_per_cluster, 46000);
 }
 
 } // namespace

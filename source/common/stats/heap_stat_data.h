@@ -73,19 +73,15 @@ private:
     bool operator()(const Metric* a, const Metric* b) const {
       return a->statName() == b->statName();
     }
-    bool operator()(StatName a, const Metric* b) const {
-      return a == b->statName();
-    }
-    bool operator()(const Metric* a, StatName b) const {
-      return a->statName() == b;
-    }
+    bool operator()(StatName a, const Metric* b) const { return a == b->statName(); }
+    bool operator()(const Metric* a, StatName b) const { return a->statName() == b; }
   };
 
   // An unordered set of HeapStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher, which key off of the
   // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
-  template<class StatType> using StatSet = absl::flat_hash_set<
-      StatType*, HeapStatHash, HeapStatCompare>;
+  template <class StatType>
+  using StatSet = absl::flat_hash_set<StatType*, HeapStatHash, HeapStatCompare>;
   StatSet<Counter> counters_ GUARDED_BY(mutex_);
   StatSet<Gauge> gauges_ GUARDED_BY(mutex_);
 

@@ -35,25 +35,6 @@ void HeapStatData::free(SymbolTable& symbol_table) {
   delete this;
 }
 
-/*
-HeapStatData& HeapStatDataAllocator::alloc(StatName name) {
-  using HeapStatDataFreeFn = std::function<void(HeapStatData * d)>;
-  std::unique_ptr<HeapStatData, HeapStatDataFreeFn> data_ptr(
-      HeapStatData::alloc(name, symbolTable()),
-      [this](HeapStatData* d) { d->free(symbolTable()); });
-  Thread::ReleasableLockGuard lock(mutex_);
-  auto ret = stats_.insert(data_ptr.get());
-  HeapStatData* existing_data = *ret.first;
-  lock.release();
-
-  if (ret.second) {
-    return *data_ptr.release();
-  }
-  ++existing_data->ref_count_;
-  return *existing_data;
-}
-*/
-
 void HeapStatDataAllocator::free(HeapStatData& data) {
   ASSERT(data.ref_count_ == 0);
   {
@@ -222,8 +203,8 @@ CounterSharedPtr HeapStatDataAllocator::makeCounter(StatName name,
   if (iter != counters_.end()) {
     return CounterSharedPtr(*iter);
   }
-  Counter* counter = new CounterImpl(*HeapStatData::alloc(name, symbolTable()), *this,
-                                     tag_extracted_name, tags);
+  Counter* counter =
+      new CounterImpl(*HeapStatData::alloc(name, symbolTable()), *this, tag_extracted_name, tags);
   counters_.insert(counter);
   return CounterSharedPtr(counter);
 }

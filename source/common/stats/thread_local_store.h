@@ -279,8 +279,8 @@ private:
 
     template <class StatType>
     using MakeStatFn = std::function<RefcountPtr<StatType>(StatDataAllocator&, StatName name,
-                                                               absl::string_view tag_extracted_name,
-                                                               const std::vector<Tag>& tags)>;
+                                                           absl::string_view tag_extracted_name,
+                                                           const std::vector<Tag>& tags)>;
 
     /**
      * Makes a stat either by looking it up in the central cache,

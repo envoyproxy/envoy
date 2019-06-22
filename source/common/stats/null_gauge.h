@@ -22,9 +22,9 @@ public:
     MetricImpl::clear();
   }
 
-  //void incRefCount() override { ++ref_count_; }
-  //void free() override { if (--ref_count_ == 0) { delete this; } }
-  //uint32_t use_count() const override { return ref_count_; }
+  // void incRefCount() override { ++ref_count_; }
+  // void free() override { if (--ref_count_ == 0) { delete this; } }
+  // uint32_t use_count() const override { return ref_count_; }
   void add(uint64_t) override {}
   void inc() override {}
   void dec() override {}
@@ -39,7 +39,7 @@ public:
   bool decRefCount() override { return refcount_helper_.decRefCount(); }
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
- private:
+private:
   RefcountHelper refcount_helper_;
 };
 

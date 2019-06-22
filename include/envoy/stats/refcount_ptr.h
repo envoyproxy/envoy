@@ -1,62 +1,19 @@
 #pragma once
 
-#include <cassert>
 #include <atomic>
 
 namespace Envoy {
 namespace Stats {
 
-class RefcountInterface {
- public:
-  virtual ~RefcountInterface() = default;
-  virtual void incRefCount() PURE;
-  virtual bool decRefCount() PURE;
-  virtual uint32_t use_count() const PURE;
-};
-
-struct RefcountHelper {
-  //static constexpr uint32_t Unmanaged = 0xffffffff;
-
-  /*
-    void assignRefCount() {
-    incRefCount();
-    ref_count_ += 2;
-    assert(ref_count_ == (Unmanaged + 2));
-    }
-  */
-
-  void incRefCount() {
-    //assert(ref_count_ > 0);
-    ++ref_count_;
-  }
-
-  bool decRefCount() {
-    assert(ref_count_ > 0);
-    --ref_count_;
-    return ref_count_ == 0;
-  }
-
-  uint32_t use_count() const { return ref_count_; }
-
-  std::atomic<uint32_t> ref_count_{0 /*Unmanaged*/};
-};
-
-/*
-class RefcountImpl : public RefcountInterface {
- public:
-  void incRefCount() override { helper_.incRefCount(); }
-  bool decRefCount() override { return helper_.decRefCount(); }
-  uint32_t use_count() const override { return helper_.use_count(); }
-
- private:
-  RefcountHelper helper_;
-};
-*/
-
-// Alternate implementation of shared_ptr, where the class itself
-// contains the reference-count, and supplies incRefCount() call to
-// increase, and free() to destruct.
-template<class T> class RefcountPtr {
+// Implements a reference-counted pointer to a class, so that its external usage
+// model is identical to std::shared_ptr, but the reference count itself is held
+// in the class. The class is expected to implement three methods:
+//    void incRefCount()
+//    bool decRefCount()  -- returns true if the reference count goes to zero.
+//    uint32_t use_count()
+// It may implement them by delegating to RefcountHelper (see below), or by
+// inheriting from RefcountInterface (see below).
+template <class T> class RefcountPtr {
 public:
   RefcountPtr() : ptr_(nullptr) {}
   RefcountPtr(T* ptr) : ptr_(ptr) {
@@ -65,19 +22,14 @@ public:
     }
   }
 
-  RefcountPtr(const RefcountPtr& src) {
-    set(src.get());
-  }
+  RefcountPtr(const RefcountPtr& src) { set(src.get()); }
 
-  template <class U> RefcountPtr(const RefcountPtr<U>& src) {
-    set(src.get());
-  }
+  // Allows RefcountPtr<BaseClass> foo = RefcountPtr<DerivedClass>.
+  template <class U> RefcountPtr(const RefcountPtr<U>& src) { set(src.get()); }
 
-  RefcountPtr(RefcountPtr&& src) : ptr_(src.ptr_) {
-    src.ptr_ = nullptr;
-  }
+  // Move-construction is used by absl::flat_hash_map during resizes.
+  RefcountPtr(RefcountPtr&& src) : ptr_(src.ptr_) { src.ptr_ = nullptr; }
 
-  //template<class U> RefcountPtr& operator=(const RefcountPtr<U>& src) {
   RefcountPtr& operator=(const RefcountPtr& src) {
     if (&src != this && src.ptr_ != ptr_) {
       resetInternal();
@@ -86,6 +38,7 @@ public:
     return *this;
   }
 
+  // Move-assignment is used during std::vector resizes.
   RefcountPtr& operator=(RefcountPtr&& src) {
     if (&src != this && src.ptr_ != ptr_) {
       resetInternal();
@@ -94,16 +47,6 @@ public:
     }
     return *this;
   }
-
-  /*
-  RefcountPtr& operator=(T* ptr) {
-    if (ptr_ != ptr) {
-      resetInternal();
-      set(ptr);
-    }
-    return *this;
-  }
-  */
 
   ~RefcountPtr() { resetInternal(); }
 
@@ -135,6 +78,31 @@ private:
   }
 
   T* ptr_;
+};
+
+// Helper interface for classes to derive from, enabling implementation of the
+// three methods as part of derived classes.
+class RefcountInterface {
+public:
+  virtual ~RefcountInterface() = default;
+  virtual void incRefCount() PURE;
+  virtual bool decRefCount() PURE;
+  virtual uint32_t use_count() const PURE;
+};
+
+// Delegation helper for RefcountPtr. This can be instantiated in a class, but
+// explicit delegation will be needed for each of the three methods.
+struct RefcountHelper {
+  void incRefCount() { ++ref_count_; }
+
+  bool decRefCount() {
+    --ref_count_;
+    return ref_count_ == 0;
+  }
+
+  uint32_t use_count() const { return ref_count_; }
+
+  std::atomic<uint32_t> ref_count_{0};
 };
 
 } // namespace Stats

@@ -555,8 +555,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
   std::vector<Tag> tags;
   std::string tag_extracted_name =
       parent_.tagProducer().produceTags(symbolTable().toString(name), tags);
-  TlsHistogramSharedPtr hist_tls_ptr(new ThreadLocalHistogramImpl(
-      name, tag_extracted_name, tags, symbolTable()));
+  TlsHistogramSharedPtr hist_tls_ptr(
+      new ThreadLocalHistogramImpl(name, tag_extracted_name, tags, symbolTable()));
 
   parent.addTlsHistogram(hist_tls_ptr);
 

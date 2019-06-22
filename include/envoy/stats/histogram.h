@@ -1,11 +1,11 @@
 #pragma once
 
-#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/stats.h"
 
 namespace Envoy {
@@ -80,15 +80,6 @@ public:
    * Records an unsigned value. If a timer, values are in units of milliseconds.
    */
   virtual void recordValue(uint64_t value) PURE;
-
-  /*
-    void incRefCount() { ++ref_count_; }
-    void free() { if (--ref_count_ == 0) { delete this; } }
-    uint32_t use_count() const { return ref_count_; }
-  */
-
- private:
-  //std::atomic<uint32_t> ref_count_{0};
 };
 
 using HistogramSharedPtr = RefcountPtr<Histogram>;

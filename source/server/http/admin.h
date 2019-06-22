@@ -218,7 +218,7 @@ private:
   void writeListenersAsJson(Buffer::Instance& response);
   void writeListenersAsText(Buffer::Instance& response);
 
-  template<class StatType>
+  template <class StatType>
   static bool shouldShowMetric(const Stats::RefcountPtr<StatType>& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {
     return ((!used_only || metric->used()) &&
@@ -445,7 +445,7 @@ private:
    * Determine whether a metric has never been emitted and choose to
    * not show it if we only wanted used metrics.
    */
-  template<class StatType>
+  template <class StatType>
   static bool shouldShowMetric(const Stats::RefcountPtr<StatType>& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {
     return ((!used_only || metric->used()) &&

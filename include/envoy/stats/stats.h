@@ -114,9 +114,6 @@ class Counter : public virtual Metric, public RefcountInterface {
 public:
   ~Counter() override = default;
 
-  //virtual void free() PURE;
-  //virtual void incRefCount() PURE;
-  //virtual uint32_t use_count() const PURE;
   virtual void add(uint64_t amount) PURE;
   virtual void inc() PURE;
   virtual uint64_t latch() PURE;
@@ -139,9 +136,6 @@ public:
 
   ~Gauge() override = default;
 
-  //virtual void free() PURE;
-  //virtual void incRefCount() PURE;
-  //virtual uint32_t use_count() const PURE;
   virtual void add(uint64_t amount) PURE;
   virtual void dec() PURE;
   virtual void inc() PURE;
