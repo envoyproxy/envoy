@@ -223,9 +223,8 @@ message ScopedRoutesConfigDump {
 
 // Config dump for SDS.
 message SecretsConfigDump {
-  // TODO: does it make sense to include a veresion_info here? what criteria we aggregated on?
-  // string version_info;
-
+  // DynamicSecret contains secret information fetched via SDS.
+  // The security sensitive information will trimmed, for example, private key.
   message DynamicSecret {
     // The name assigned to the secret.
     string name = 1;
