@@ -130,9 +130,6 @@ public:
   ServerContextConfigImpl(
       const envoy::api::v2::auth::DownstreamTlsContext& config,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
-  ServerContextConfigImpl(
-      const Json::Object& config,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
 
   // Ssl::ServerContextConfig
   bool requireClientCertificate() const override { return require_client_certificate_; }

@@ -843,7 +843,6 @@ public:
    */
   virtual absl::optional<std::string> eds_service_name() const PURE;
 
-protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.
    * @param name std::string containing the well-known name of the extension for which protocol
