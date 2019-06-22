@@ -4,6 +4,7 @@ namespace Envoy {
 namespace {
 
 class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                   public Event::TestUsingSimulatedTime,
                                    public HttpIntegrationTest {
 public:
   ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
@@ -73,15 +74,38 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   auto response =
       sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
   checkSimpleRequestSuccess(1024, 1024, response.get());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 
   // Now send another request. This should hit the DNS cache.
-  // TODO(mattklein123): Verify this with stats once stats are added.
   response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
   checkSimpleRequestSuccess(512, 512, response.get());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }
 
-// TODO(mattklein123): Add a test for host expiration. We can do this both with simulated time
-// and by checking stats.
+// Verify that we expire hosts.
+TEST_P(ProxyFilterIntegrationTest, RemoveHostViaTTL) {
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+  EXPECT_EQ(1, test_server_->gauge("dns_cache.foo.num_hosts")->value());
+
+  // > 5m
+  simTime().sleep(std::chrono::milliseconds(300001));
+  test_server_->waitForGaugeEq("dns_cache.foo.num_hosts", 0);
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_removed")->value());
+}
 
 } // namespace
 } // namespace Envoy
