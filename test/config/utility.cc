@@ -267,7 +267,7 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
 }
 
 void ConfigHelper::applyConfigModifiers() {
-  for (auto config_modifier : config_modifiers_) {
+  for (const auto& config_modifier : config_modifiers_) {
     config_modifier(bootstrap_);
   }
   config_modifiers_.clear();

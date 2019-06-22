@@ -287,7 +287,7 @@ std::string TestUtility::convertTime(const std::string& input, const std::string
 }
 
 // static
-bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr> gauges) {
+bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges) {
   // Returns true if all gauges are 0 except the circuit_breaker remaining resource
   // gauges which default to the resource max.
   std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
@@ -357,11 +357,10 @@ const uint32_t Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
 const uint32_t Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
 const uint32_t Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE;
 
-TestHeaderMapImpl::TestHeaderMapImpl() : HeaderMapImpl() {}
+TestHeaderMapImpl::TestHeaderMapImpl() = default;
 
 TestHeaderMapImpl::TestHeaderMapImpl(
-    const std::initializer_list<std::pair<std::string, std::string>>& values)
-    : HeaderMapImpl() {
+    const std::initializer_list<std::pair<std::string, std::string>>& values) {
   for (auto& value : values) {
     addCopy(value.first, value.second);
   }

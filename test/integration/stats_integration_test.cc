@@ -111,7 +111,7 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithRegex) {
     bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
     auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
     tag_specifier->set_tag_name("my.http_conn_manager_prefix");
-    tag_specifier->set_regex("^(?:|listener(?=\\.).*?\\.)http\\.((.*?)\\.)");
+    tag_specifier->set_regex(R"(^(?:|listener(?=\.).*?\.)http\.((.*?)\.))");
   });
   initialize();
 

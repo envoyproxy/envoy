@@ -34,7 +34,7 @@ public:
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options);
 
-  ~ConnPoolImpl();
+  ~ConnPoolImpl() override;
 
   // ConnectionPool::Instance
   Http::Protocol protocol() const override { return Http::Protocol::Http11; }
@@ -55,7 +55,7 @@ protected:
                          public StreamDecoderWrapper,
                          public StreamCallbacks {
     StreamWrapper(StreamDecoder& response_decoder, ActiveClient& parent);
-    ~StreamWrapper();
+    ~StreamWrapper() override;
 
     // StreamEncoderWrapper
     void onEncodeComplete() override;
@@ -84,7 +84,7 @@ protected:
                         public Network::ConnectionCallbacks,
                         public Event::DeferredDeletable {
     ActiveClient(ConnPoolImpl& parent);
-    ~ActiveClient();
+    ~ActiveClient() override;
 
     void onConnectTimeout();
 

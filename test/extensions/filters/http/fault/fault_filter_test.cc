@@ -1015,6 +1015,23 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitDisabled) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(request_headers_));
 }
 
+// Make sure we destroy the rate limiter if we are reset.
+TEST_F(FaultFilterRateLimitTest, DestroyWithResponseRateLimitEnabled) {
+  setupRateLimitTest(true);
+
+  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  // The timer is consumed but not used by this test.
+  new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+
+  EXPECT_EQ(1UL, config_->stats().response_rl_injected_.value());
+  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+}
+
 TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   setupRateLimitTest(true);
 
