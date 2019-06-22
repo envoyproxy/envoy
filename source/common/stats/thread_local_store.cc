@@ -140,7 +140,7 @@ std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   // less confusing for users who have such configs.
   for (ScopeImpl* scope : scopes_) {
     for (const auto& name_histogram_pair : scope->central_cache_.histograms_) {
-      const ParentHistogramSharedPtr& parent_hist = name_histogram_pair.second.get(); ////// JOSH
+      const ParentHistogramSharedPtr& parent_hist = name_histogram_pair.second;
       ret.push_back(parent_hist);
     }
   }
@@ -186,7 +186,7 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
 
 void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
   if (!shutting_down_) {
-    for (ParentHistogramSharedPtr& histogram : histograms()) {
+    for (const ParentHistogramSharedPtr& histogram : histograms()) {
       histogram->merge();
     }
     merge_complete_cb();
@@ -532,7 +532,7 @@ ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
   }
 
   RefcountPtr<Histogram> histogram_ref(iter->second);
-  return std::cref(*histogram_ref);
+  return std::cref(*histogram_ref.get());
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,

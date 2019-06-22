@@ -52,22 +52,27 @@ public:
 
   ~RefcountPtr() { resetInternal(); }
 
+  // Implements required subset of the shared_ptr API;
+  // see https://en.cppreference.com/w/cpp/memory/shared_ptr for details.
   T* operator->() const { return ptr_; }
   T* get() const { return ptr_; }
   T& operator*() const { return *ptr_; }
-  operator T*() const { return ptr_; }
+  operator bool() const { return ptr_ != nullptr; }
+  bool operator==(const T* ptr) const { return ptr_ == ptr; }
+  bool operator!=(const T* ptr) const { return ptr_ != ptr; }
   uint32_t use_count() const { return ptr_->use_count(); }
-
   void reset() {
-    resetInternal();
-    ptr_ = nullptr;
+    if (ptr_ != nullptr && ptr_->decRefCount()) {
+      delete ptr_;
+      ptr_ = nullptr;
+    }
   }
 
 private:
-  // like reset() but does not bother to clear ptr_, as it is about to be
+  // Like reset() but does not bother to clear ptr_, as it is about to be
   // set or destroyed.
   void resetInternal() {
-    if ((ptr_ != nullptr) && ptr_->decRefCount()) {
+    if (ptr_ != nullptr && ptr_->decRefCount()) {
       delete ptr_;
     }
   }
