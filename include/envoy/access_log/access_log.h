@@ -86,8 +86,9 @@ public:
                         const Http::HeaderMap* response_trailers,
                         const StreamInfo::StreamInfo& stream_info) {
     if (filter_ &&
-        !filter_->evaluate(stream_info, *request_headers, *response_headers, *response_trailers))
+        !filter_->evaluate(stream_info, *request_headers, *response_headers, *response_trailers)) {
       return;
+    }
     return log(request_headers, response_headers, response_trailers, stream_info);
   }
 
