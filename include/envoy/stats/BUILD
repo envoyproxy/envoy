@@ -8,12 +8,16 @@ load(
 
 envoy_package()
 
+envoy_cc_library(
+    name = "refcount_ptr_interface",
+    hdrs = ["refcount_ptr.h"],
+)
+
 # TODO(jmarantz): atomize the build rules to match the include files.
 envoy_cc_library(
     name = "stats_interface",
     hdrs = [
         "histogram.h",
-        "refcount_ptr.h",
         "scope.h",
         "sink.h",
         "stat_data_allocator.h",
@@ -25,6 +29,7 @@ envoy_cc_library(
         "tag_producer.h",
     ],
     deps = [
+        ":refcount_ptr_interface",
         ":symbol_table_interface",
         "//include/envoy/common:interval_set_interface",
     ],

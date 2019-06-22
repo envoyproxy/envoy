@@ -532,7 +532,7 @@ ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
   }
 
   RefcountPtr<Histogram> histogram_ref(iter->second);
-  return std::cref(*histogram_ref.get());
+  return std::cref(*histogram_ref);
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,

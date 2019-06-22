@@ -39,8 +39,7 @@ public:
     }
 
     RefcountPtr<Base> new_stat = alloc_(name);
-    auto& ref = stats_[new_stat->statName()];
-    ref = new_stat;
+    stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
 
@@ -51,7 +50,7 @@ public:
     }
 
     RefcountPtr<Base> new_stat = alloc_import_(name, import_mode);
-    stats_[new_stat->statName()] = new_stat;
+    stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
 

@@ -30,7 +30,7 @@ public:
   template <class U> RefcountPtr(const RefcountPtr<U>& src) { set(src.get()); }
 
   // Move-construction is used by absl::flat_hash_map during resizes.
-  RefcountPtr(RefcountPtr&& src) : ptr_(src.ptr_) { src.ptr_ = nullptr; }
+  RefcountPtr(RefcountPtr&& src) noexcept : ptr_(src.ptr_) { src.ptr_ = nullptr; }
 
   RefcountPtr& operator=(const RefcountPtr& src) {
     if (&src != this && src.ptr_ != ptr_) {
@@ -41,7 +41,7 @@ public:
   }
 
   // Move-assignment is used during std::vector resizes.
-  RefcountPtr& operator=(RefcountPtr&& src) {
+  RefcountPtr& operator=(RefcountPtr&& src) noexcept {
     if (&src != this && src.ptr_ != ptr_) {
       resetInternal();
       ptr_ = src.ptr_;
@@ -60,17 +60,21 @@ public:
   operator bool() const { return ptr_ != nullptr; }
   bool operator==(const T* ptr) const { return ptr_ == ptr; }
   bool operator!=(const T* ptr) const { return ptr_ != ptr; }
+  bool operator==(const RefcountPtr& a) const { return ptr_ == a.ptr_; }
+  bool operator!=(const RefcountPtr& a) const { return ptr_ != a.ptr_; }
   uint32_t use_count() const { return ptr_->use_count(); }
   void reset() {
-    if (ptr_ != nullptr && ptr_->decRefCount()) {
-      delete ptr_;
+    if (ptr_ != nullptr) {
+      if (ptr_->decRefCount()) {
+        delete ptr_;
+      }
       ptr_ = nullptr;
     }
   }
 
 private:
   // Like reset() but does not bother to clear ptr_, as it is about to be
-  // set or destroyed.
+  // overwritten or destroyed.
   void resetInternal() {
     if (ptr_ != nullptr && ptr_->decRefCount()) {
       delete ptr_;
@@ -87,11 +91,11 @@ private:
   T* ptr_;
 };
 
-template <class T> static bool operator==(std::nullptr_t a, const RefcountPtr<T>& b) {
-  return a == b.get();
+template <class T> static bool operator==(std::nullptr_t, const RefcountPtr<T>& a) {
+  return a == nullptr;
 }
-template <class T> static bool operator!=(std::nullptr_t a, const RefcountPtr<T>& b) {
-  return a != b.get();
+template <class T> static bool operator!=(std::nullptr_t, const RefcountPtr<T>& a) {
+  return a != nullptr;
 }
 
 // Helper interface for classes to derive from, enabling implementation of the

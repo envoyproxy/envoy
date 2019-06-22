@@ -39,7 +39,7 @@ void HeapStatDataAllocator::free(HeapStatData& data) {
   ASSERT(data.ref_count_ == 0);
   {
     Thread::LockGuard lock(mutex_);
-    int count = counters_.erase(data.statName()) + gauges_.erase(data.statName());
+    size_t count = counters_.erase(data.statName()) + gauges_.erase(data.statName());
     ASSERT(count == 1);
   }
   data.free(symbolTable());

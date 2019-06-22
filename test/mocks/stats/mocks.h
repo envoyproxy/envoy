@@ -29,7 +29,7 @@ namespace Stats {
 class MockMetric : public virtual Metric {
 public:
   MockMetric();
-  ~MockMetric();
+  ~MockMetric() override;
 
   // This bit of C++ subterfuge allows us to support the wealth of tests that
   // do metric->name_ = "foo" even though names are more complex now. Note
@@ -83,7 +83,7 @@ private:
 class MockCounter : public Counter, public MockMetric {
 public:
   MockCounter();
-  ~MockCounter();
+  ~MockCounter() override;
 
   MOCK_METHOD1(add, void(uint64_t amount));
   MOCK_METHOD0(inc, void());
@@ -108,7 +108,7 @@ private:
 class MockGauge : public Gauge, public MockMetric, public RefcountHelper {
 public:
   MockGauge();
-  ~MockGauge();
+  ~MockGauge() override;
 
   MOCK_METHOD1(add, void(uint64_t amount));
   MOCK_METHOD0(dec, void());
@@ -137,7 +137,7 @@ private:
 class MockHistogram : public Histogram, public MockMetric {
 public:
   MockHistogram();
-  ~MockHistogram();
+  ~MockHistogram() override;
 
   MOCK_METHOD1(recordValue, void(uint64_t value));
   MOCK_CONST_METHOD0(used, bool());
@@ -148,7 +148,7 @@ public:
 class MockParentHistogram : public ParentHistogram, public MockMetric {
 public:
   MockParentHistogram();
-  ~MockParentHistogram();
+  ~MockParentHistogram() override;
 
   void merge() override {}
   const std::string quantileSummary() const override { return ""; };
@@ -168,7 +168,7 @@ public:
 class MockMetricSnapshot : public MetricSnapshot {
 public:
   MockMetricSnapshot();
-  ~MockMetricSnapshot();
+  ~MockMetricSnapshot() override;
 
   MOCK_METHOD0(counters, const std::vector<CounterSnapshot>&());
   MOCK_METHOD0(gauges, const std::vector<std::reference_wrapper<const Gauge>>&());
@@ -182,7 +182,7 @@ public:
 class MockSink : public Sink {
 public:
   MockSink();
-  ~MockSink();
+  ~MockSink() override;
 
   MOCK_METHOD1(flush, void(MetricSnapshot& snapshot));
   MOCK_METHOD2(onHistogramComplete, void(const Histogram& histogram, uint64_t value));
@@ -196,7 +196,7 @@ public:
 class MockStore : public SymbolTableProvider, public StoreImpl {
 public:
   MockStore();
-  ~MockStore();
+  ~MockStore() override;
 
   ScopePtr createScope(const std::string& name) override { return ScopePtr{createScope_(name)}; }
 
@@ -238,7 +238,7 @@ class MockIsolatedStatsStore : private Test::Global<Stats::FakeSymbolTableImpl>,
                                public IsolatedStoreImpl {
 public:
   MockIsolatedStatsStore();
-  ~MockIsolatedStatsStore();
+  ~MockIsolatedStatsStore() override;
 
   MOCK_METHOD2(deliverHistogramToSinks, void(const Histogram& histogram, uint64_t value));
 };
@@ -246,7 +246,7 @@ public:
 class MockStatsMatcher : public StatsMatcher {
 public:
   MockStatsMatcher();
-  ~MockStatsMatcher();
+  ~MockStatsMatcher() override;
   MOCK_CONST_METHOD1(rejects, bool(const std::string& name));
   bool acceptsAll() const override { return accepts_all_; }
   bool rejectsAll() const override { return rejects_all_; }
