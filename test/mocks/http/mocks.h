@@ -152,22 +152,11 @@ public:
   MOCK_CONST_METHOD0(getUpstreamSocketOptions, Network::Socket::OptionsSharedPtr());
 
   // Http::StreamDecoderFilterCallbacks
-  void sendLocalReply(Code code, absl::string_view body,
-                      std::function<void(HeaderMap& headers)> modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                      absl::string_view details) override {
-    details_ = std::string(details);
-    Utility::sendLocalReply(
-        is_grpc_request_,
-        [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
-          if (modify_headers != nullptr) {
-            modify_headers(*headers);
-          }
-          encodeHeaders(std::move(headers), end_stream);
-        },
-        [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
-        stream_destroyed_, code, body, grpc_status, is_head_request_);
-  }
+  void sendLocalReply_(Code code, absl::string_view body,
+                       std::function<void(HeaderMap& headers)> modify_headers,
+                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                       absl::string_view details);
+
   void encode100ContinueHeaders(HeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);
   }
@@ -190,6 +179,10 @@ public:
   MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers_, void(HeaderMap& trailers));
   MOCK_METHOD1(encodeMetadata_, void(MetadataMapPtr metadata_map));
+  MOCK_METHOD5(sendLocalReply, void(Code code, absl::string_view body,
+                                    std::function<void(HeaderMap& headers)> modify_headers,
+                                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                    absl::string_view details));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
@@ -199,18 +192,6 @@ public:
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool stream_destroyed_{};
-};
-
-// A version of MockStreamDecoderFilterCallbacks that mocks sendLocalReply()
-// TODO(mattklein123): Get rid of this and fix any tests to work with this function mocked in the
-//                     main class.
-class MockStreamDecoderFilterCallbacksWithMockedSendLocalReply
-    : public MockStreamDecoderFilterCallbacks {
-public:
-  MOCK_METHOD5(sendLocalReply, void(Code code, absl::string_view body,
-                                    std::function<void(HeaderMap& headers)> modify_headers,
-                                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                                    absl::string_view details));
 };
 
 class MockStreamEncoderFilterCallbacks : public StreamEncoderFilterCallbacks,

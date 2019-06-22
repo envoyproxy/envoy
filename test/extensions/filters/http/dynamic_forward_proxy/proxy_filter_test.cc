@@ -55,7 +55,7 @@ public:
   Upstream::MockClusterManager cm_;
   ProxyFilterConfigSharedPtr filter_config_;
   std::unique_ptr<ProxyFilter> filter_;
-  Http::MockStreamDecoderFilterCallbacksWithMockedSendLocalReply callbacks_;
+  Http::MockStreamDecoderFilterCallbacks callbacks_;
   Http::TestHeaderMapImpl request_headers_{{":authority", "foo"}};
 };
 
@@ -106,6 +106,8 @@ TEST_F(ProxyFilterTest, CacheOverflow) {
       .WillOnce(Return(MockLoadDnsCacheResult{LoadDnsCacheStatus::Overflow, nullptr}));
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, Eq("DNS cache overflow"),
                                          _, _, Eq("DNS cache overflow")));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -134,6 +136,8 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable,
                                          Eq("Dynamic forward proxy pending request overflow"), _, _,
                                          Eq("Dynamic forward proxy pending request overflow")));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter2->decodeHeaders(request_headers_, false));
 
