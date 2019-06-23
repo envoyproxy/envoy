@@ -130,7 +130,7 @@ RequestParser::getTableNameFromTransactItem(const Json::Object& transact_item) {
     Json::ObjectSharedPtr item = transact_item.getObject(operation, true);
     table_name = item->getString("TableName");
     if (table_name.has_value()) {
-      return absl::make_optional<std::string>(table_name);
+      return absl::make_optional(std::move(table_name));
     }
   }
   return absl::nullopt;
