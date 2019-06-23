@@ -55,6 +55,7 @@ namespace Server {
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
   GAUGE(hot_restart_epoch, NeverImport)                                                            \
   GAUGE(live, NeverImport)                                                                         \
+  GAUGE(state, NeverImport)                                                                        \
   GAUGE(memory_allocated, Accumulate)                                                              \
   GAUGE(memory_heap_size, Accumulate)                                                              \
   GAUGE(parent_connections, Accumulate)                                                            \
