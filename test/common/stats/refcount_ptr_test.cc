@@ -33,11 +33,11 @@ TEST(RefcountPtr, Constructors) {
   SharedString rp3(std::move(rp2)); // Move-constructor.
   EXPECT_EQ(2, rp3.use_count());
   EXPECT_EQ("Hello, World!", *rp3);
-  EXPECT_NE(rp2, rp3);
-  EXPECT_EQ(nullptr, rp2);
-  EXPECT_NE(rp1, rp2);
+  EXPECT_NE(rp2, rp3);     // NOLINT -- intentionally testing what happens to a variable post-move.
+  EXPECT_EQ(nullptr, rp2); // NOLINT -- ditto
+  EXPECT_NE(rp1, rp2);     // NOLINT -- ditto
   EXPECT_EQ(rp1, rp3);
-  EXPECT_FALSE(rp2);
+  EXPECT_FALSE(rp2); // NOLINT -- ditto
   EXPECT_TRUE(rp3);
   EXPECT_TRUE(rp1);
   SharedString rp4(new RefcountedString("Hello, World!")); // Construct from pointer.
@@ -47,8 +47,8 @@ TEST(RefcountPtr, Constructors) {
   EXPECT_EQ(rp5, rp4);
   EXPECT_EQ(*rp5, *rp4);
   SharedString rp6;
-  rp6 = std::move(rp4); // move-assign.
-  EXPECT_EQ(nullptr, rp4);
+  rp6 = std::move(rp4);    // move-assign.
+  EXPECT_EQ(nullptr, rp4); // NOLINT -- intentionally testing what happens to a variable post-move.
   EXPECT_EQ(rp5, rp6);
 }
 
