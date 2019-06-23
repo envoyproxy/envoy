@@ -190,6 +190,36 @@ public:
                                Event::TestTimeSystem& time_system);
 
   /**
+   * Wait for a counter to >= a given value.
+   * @param store supplies the stats store.
+   * @param name counter name.
+   * @param value target value.
+   * @param time_system the time system to use for waiting.
+   */
+  static void waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
+                               Event::TestTimeSystem& time_system);
+
+  /**
+   * Wait for a gauge to >= a given value.
+   * @param store supplies the stats store.
+   * @param name gauge name.
+   * @param value target value.
+   * @param time_system the time system to use for waiting.
+   */
+  static void waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
+                             Event::TestTimeSystem& time_system);
+
+  /**
+   * Wait for a gauge to == a given value.
+   * @param store supplies the stats store.
+   * @param name gauge name.
+   * @param value target value.
+   * @param time_system the time system to use for waiting.
+   */
+  static void waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
+                             Event::TestTimeSystem& time_system);
+
+  /**
    * Convert a string list of IP addresses into a list of network addresses usable for DNS
    * response testing.
    */
