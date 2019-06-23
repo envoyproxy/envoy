@@ -303,6 +303,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
 
   // Wait till stats are flushed to custom sink and validate that the actual flush happens.
   TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, test_time_.timeSystem());
+  EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.live")->value());
   EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
 
   server_->dispatcher().post([&] { server_->shutdown(); });
@@ -311,6 +312,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
 
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   auto server_thread = startTestServer("test/server/node_bootstrap.yaml", false);
+  EXPECT_EQ(1L, TestUtility::findGauge(stats_store_, "server.live")->value());
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
 }
