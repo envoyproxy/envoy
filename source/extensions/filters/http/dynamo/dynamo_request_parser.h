@@ -61,7 +61,8 @@ public:
   /**
    * @return string name of table in transaction object, or empty string if none
    */
-  static std::string getTableNameFromTransactItem(const Json::Object& transact_item);
+  static absl::optional<std::string>
+  getTableNameFromTransactItem(const Json::Object& transact_item);
 
   /**
    * Parse error details which might be provided for a given response code.

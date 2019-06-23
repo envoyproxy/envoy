@@ -103,18 +103,17 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
              TRANSACT_OPERATIONS.end()) {
     std::vector<Json::ObjectSharedPtr> transact_items =
         json_data.getObjectArray("TransactItems", true);
-    std::string next_table_name = "";
     for (const Json::ObjectSharedPtr& transact_item : transact_items) {
-      next_table_name = getTableNameFromTransactItem(*transact_item);
-      if (next_table_name.empty()) {
+      auto next_table_name = getTableNameFromTransactItem(*transact_item);
+      if (!next_table_name.has_value()) {
         // if an operation is missing a table name, we want to throw the normal set of errors
         table.table_name = "";
         table.is_single_table = true;
         break;
       }
       if (table.table_name.empty()) {
-        table.table_name = next_table_name;
-      } else if (table.table_name != next_table_name) {
+        table.table_name = next_table_name.value();
+      } else if (table.table_name != next_table_name.value()) {
         table.table_name = "";
         table.is_single_table = false;
         break;
@@ -124,16 +123,17 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
   return table;
 }
 
-std::string RequestParser::getTableNameFromTransactItem(const Json::Object& transact_item) {
-  std::string table_name = "";
+absl::optional<std::string>
+RequestParser::getTableNameFromTransactItem(const Json::Object& transact_item) {
+  std::string table_name;
   for (const std::string& operation : TRANSACT_ITEM_OPERATIONS) {
     Json::ObjectSharedPtr item = transact_item.getObject(operation, true);
-    table_name = item->getString("TableName", "");
-    if (!table_name.empty()) {
-      return table_name;
+    table_name = item->getString("TableName");
+    if (table_name.has_value()) {
+      return absl::make_optional<std::string>(table_name);
     }
   }
-  return table_name;
+  return absl::nullopt;
 }
 
 std::vector<std::string> RequestParser::parseBatchUnProcessedKeys(const Json::Object& json_data) {
