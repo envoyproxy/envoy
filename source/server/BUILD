@@ -378,7 +378,6 @@ envoy_cc_library(
         "//source/common/upstream:health_discovery_service_lib",
         "//source/server:overload_manager_lib",
         "//source/server/http:admin_lib",
-        "@envoy_api//envoy/admin/v2alpha:server_info_cc",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )

@@ -7,7 +7,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
