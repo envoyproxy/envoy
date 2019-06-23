@@ -233,11 +233,13 @@ FilterUtility::StrictHeaderChecker::test(Http::HeaderMap& headers,
   } else if (target_header == Http::Headers::get().EnvoyMaxRetries) {
     return isInteger(headers.EnvoyMaxRetries());
   } else if (target_header == Http::Headers::get().EnvoyRetryOn) {
-    return hasValidRetryFields(headers.EnvoyRetryOn(),
-                                  &Router::RetryStateImpl::parseRetryOnStrict);
+    return hasValidRetryFields(headers.EnvoyRetryOn(), &Router::RetryStateImpl::parseRetryOn);
   } else if (target_header == Http::Headers::get().EnvoyRetryGrpcOn) {
     return hasValidRetryFields(headers.EnvoyRetryGrpcOn(),
-                                  &Router::RetryStateImpl::parseRetryGrpcOnStrict);
+                               &Router::RetryStateImpl::parseRetryGrpcOn);
+  } else {
+    // Should only validate headers for which we have implemented a validator
+    ASSERT(false);
   }
 
   return r;
@@ -409,8 +411,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
         callbacks_->streamInfo().setResponseFlag(
             StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders);
         const std::string body = fmt::format("invalid header '{}' with value '{}'",
-                                       std::string(res.entry_->key().getStringView()),
-                                       std::string(res.entry_->value().getStringView()));
+                                             std::string(res.entry_->key().getStringView()),
+                                             std::string(res.entry_->value().getStringView()));
         const std::string details =
             absl::StrCat(StreamInfo::ResponseCodeDetails::get().InvalidEnvoyRequestHeaders, "{",
                          res.entry_->key().getStringView(), "}");

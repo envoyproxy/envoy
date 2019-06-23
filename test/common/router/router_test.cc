@@ -4188,8 +4188,6 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
       "x-envoy-max-retries",
       "x-envoy-retry-on",
       "x-envoy-retry-grpc-on",
-      "unchecked-header",
-      "unset-header",
   };
 
   for (const auto& target : target_headers) {

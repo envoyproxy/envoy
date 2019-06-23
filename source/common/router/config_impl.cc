@@ -72,6 +72,12 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
   retry_on_ = RetryStateImpl::parseRetryOn(retry_policy.retry_on());
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(retry_policy.retry_on());
+  // NB: parseRetryOn and parseRetryGrpcOn will return a value with
+  // RetryPolicy::RETRY_UNKNOWN_FIELD_ERROR set unless the input only contains
+  // supported values for `x-envoy-retry-on` and `x-envoy-retry-grpc-on`,
+  // respectively. Clear this flag here, since the `retry_on` config option is
+  // intended to contain retry policies from both.
+  retry_on_ &= ~RetryPolicy::RETRY_UNKNOWN_FIELD_ERROR;
 
   for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(

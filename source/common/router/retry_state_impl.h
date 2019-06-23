@@ -34,9 +34,6 @@ public:
   // Returns the RetryPolicy extracted from the x-envoy-retry-grpc-on header.
   static uint32_t parseRetryGrpcOn(absl::string_view retry_grpc_on_header);
 
-  static uint32_t parseRetryGrpcOnStrict(absl::string_view config);
-  static uint32_t parseRetryOnStrict(absl::string_view config);
-
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }
   RetryStatus shouldRetryHeaders(const Http::HeaderMap& response_headers,
