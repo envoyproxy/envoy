@@ -81,7 +81,7 @@ public:
 
   private:
     static HeaderCheckResult hasValidRetryFields(Http::HeaderEntry* header_entry,
-                                                 ParseRetryFlagsFunc parseFn) {
+                                                 const ParseRetryFlagsFunc& parseFn) {
       HeaderCheckResult r;
       if (header_entry) {
         const auto flags = parseFn(header_entry->value().getStringView());
@@ -150,7 +150,7 @@ public:
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
-               const Protobuf::RepeatedPtrField<std::string> strict_check_headers,
+               const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context)
       : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
@@ -160,7 +160,7 @@ public:
         zone_name_(stat_name_pool_.add(local_info_.zoneName())),
         empty_stat_name_(stat_name_pool_.add("")), shadow_writer_(std::move(shadow_writer)),
         time_source_(time_source) {
-    if (strict_check_headers.size() > 0) {
+    if (!strict_check_headers.empty()) {
       strict_check_headers_ = std::make_unique<std::vector<Http::LowerCaseString>>();
       for (const auto& header : strict_check_headers) {
         strict_check_headers_->emplace_back(Http::LowerCaseString(header));

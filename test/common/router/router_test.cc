@@ -85,7 +85,7 @@ public:
       : http_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
         config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
                 ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
-                strict_headers_to_check, test_time_.timeSystem(), http_context_),
+                std::move(strict_headers_to_check), test_time_.timeSystem(), http_context_),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
     upstream_locality_.set_zone("to_az");
@@ -4085,7 +4085,7 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
   encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 }
 
-Protobuf::RepeatedPtrField<std::string> protobufStrList(std::vector<std::string> v) {
+Protobuf::RepeatedPtrField<std::string> protobufStrList(const std::vector<std::string>& v) {
   Protobuf::RepeatedPtrField<std::string> res;
   for (auto& field : v) {
     *res.Add() = field;
@@ -4182,7 +4182,7 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
        "cancelled,internal,deadline-exceeded,resource-exhausted,unavailable"},
   };
 
-  std::string target_headers[] = {
+  std::array<std::string, 5> target_headers = {
       "X-ENVOY-UPSTREAM-RQ-TIMEOUT-MS",
       "x-envoy-upstream-rq-per-try-timeout-ms",
       "x-envoy-max-retries",
@@ -4204,7 +4204,7 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
       {"x-envoy-retry-grpc-on", "cancelled, internal"}, // spaces are considered errors
   };
 
-  std::string fail_targets[] = {
+  std::array<std::string, 5> fail_targets = {
       "X-ENVOY-UPSTREAM-RQ-TIMEOUT-MS",
       "x-envoy-upstream-rq-per-try-timeout-ms",
       "x-envoy-max-retries",
