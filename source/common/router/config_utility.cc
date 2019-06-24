@@ -82,7 +82,7 @@ std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::route::
     return EMPTY_STRING;
   }
   const auto& body = route.direct_response().body();
-  const std::string filename = body.filename();
+  const std::string& filename = body.filename();
   if (!filename.empty()) {
     if (!api.fileSystem().fileExists(filename)) {
       throw EnvoyException(fmt::format("response body file {} does not exist", filename));

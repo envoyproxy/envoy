@@ -82,7 +82,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
           message);
   HandshakeValidator validator = createHandshakeValidator(config);
 
-  const std::string handshaker_service = config.handshaker_service();
+  const std::string& handshaker_service = config.handshaker_service();
   HandshakerFactory factory =
       [handshaker_service, is_upstream,
        alts_shared_state](Event::Dispatcher& dispatcher,
