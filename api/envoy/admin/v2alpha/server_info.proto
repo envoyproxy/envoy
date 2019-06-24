@@ -17,10 +17,10 @@ message ServerInfo {
   string version = 1;
 
   enum State {
-    // Server is draining listeners in response to external health checks failing.
-    DRAINING = 0;
     // Server is live and serving traffic.
-    LIVE = 1;
+    LIVE = 0;
+    // Server is draining listeners in response to external health checks failing.
+    DRAINING = 1;
     // Server has not yet completed cluster manager initialization.
     PRE_INITIALIZING = 2;
     // Server is running the cluster manager initialization callbacks (e.g., RDS).

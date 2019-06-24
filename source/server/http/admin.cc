@@ -1423,7 +1423,7 @@ void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
 }
 
 envoy::admin::v2alpha::ServerInfo::State Utility::serverState(Init::Manager::State state,
-                                                              const bool health_check_failed) {
+                                                              bool health_check_failed) {
   switch (state) {
   case Init::Manager::State::Uninitialized:
     return envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;

@@ -40,7 +40,7 @@ namespace Server {
 
 namespace Utility {
 envoy::admin::v2alpha::ServerInfo::State serverState(Init::Manager::State state,
-                                                     const bool health_check_failed);
+                                                     bool health_check_failed);
 } // namespace Utility
 
 class AdminInternalAddressConfig : public Http::InternalAddressConfig {
