@@ -38,6 +38,11 @@
 namespace Envoy {
 namespace Server {
 
+namespace Utility {
+envoy::admin::v2alpha::ServerInfo::State serverState(Init::Manager::State state,
+                                                     bool health_check_failed);
+} // namespace Utility
+
 class AdminInternalAddressConfig : public Http::InternalAddressConfig {
   bool isInternalAddress(const Network::Address::Instance&) const override { return false; }
 };
