@@ -109,9 +109,9 @@ public:
    *         reason the cache is not loading. In this case, callbacks will never be called.
    */
   enum class LoadDnsCacheStatus {
-    // The cache is already loaded. Callbacks will not be called.
+    // The cache entry is already loaded. Callbacks will not be called.
     InCache,
-    // The cache is loading. Callbacks will be called at a later time unless cancelled.
+    // The cache entry is loading. Callbacks will be called at a later time unless cancelled.
     Loading,
     // The cache is full and the requested host is not in cache. Callbacks will not be called.
     Overflow
