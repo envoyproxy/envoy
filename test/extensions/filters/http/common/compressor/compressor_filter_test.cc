@@ -5,6 +5,7 @@
 #include "extensions/filters/http/common/compressor/compressor.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
@@ -82,7 +83,7 @@ protected:
   // CompressorFilterTest Helpers
   void setUpFilter(std::string&& json) {
     envoy::config::filter::http::compressor::v2::Compressor compressor;
-    MessageUtil::loadFromJson(json, compressor);
+    TestUtility::loadFromJson(json, compressor);
     config_.reset(new MockCompressorFilterConfig(compressor, "test.", stats_, runtime_, "test"));
     filter_ = std::make_unique<CompressorFilter>(config_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -346,7 +347,7 @@ TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
     Stats::IsolatedStoreImpl stats;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::config::filter::http::compressor::v2::Compressor compressor;
-    MessageUtil::loadFromJson("{}", compressor);
+    TestUtility::loadFromJson("{}", compressor);
     CompressorFilterConfigSharedPtr config2;
     config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "test2"));
     std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
@@ -368,7 +369,7 @@ TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
     Stats::IsolatedStoreImpl stats;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::config::filter::http::compressor::v2::Compressor compressor;
-    MessageUtil::loadFromJson("{}", compressor);
+    TestUtility::loadFromJson("{}", compressor);
     CompressorFilterConfigSharedPtr config2;
     config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "gzip"));
     std::unique_ptr<CompressorFilter> gzip_filter = std::make_unique<CompressorFilter>(config2);

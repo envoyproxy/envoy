@@ -15,6 +15,7 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common/compressor:compressor_lib",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/filter/http/compressor_common/v2:compressor_common_proto_cc",
