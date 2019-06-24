@@ -353,6 +353,7 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         envoy::admin::v2alpha::HostStatus& host_status = *cluster_status.add_host_statuses();
         Network::Utility::addressToProtobufAddress(*host->address(),
                                                    *host_status.mutable_address());
+        host_status.set_hostname(host->hostname());
         std::vector<Stats::CounterSharedPtr> sorted_counters;
         for (const Stats::CounterSharedPtr& counter : host->counters()) {
           sorted_counters.push_back(counter);
@@ -433,11 +434,13 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
           all_stats[gauge->name()] = gauge->value();
         }
 
-        for (auto stat : all_stats) {
+        for (const auto& stat : all_stats) {
           response.add(fmt::format("{}::{}::{}::{}\n", cluster.second.get().info()->name(),
                                    host->address()->asString(), stat.first, stat.second));
         }
 
+        response.add(fmt::format("{}::{}::hostname::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->hostname()));
         response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second.get().info()->name(),
                                  host->address()->asString(),
                                  Upstream::HostUtility::healthFlagsToString(*host)));
@@ -673,22 +676,16 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
 }
 
 envoy::admin::v2alpha::ServerInfo::State AdminImpl::serverState() {
-  envoy::admin::v2alpha::ServerInfo::State state;
-
   switch (server_.initManager().state()) {
   case Init::Manager::State::Uninitialized:
-    state = envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;
-    break;
+    return envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;
   case Init::Manager::State::Initializing:
-    state = envoy::admin::v2alpha::ServerInfo::INITIALIZING;
-    break;
+    return envoy::admin::v2alpha::ServerInfo::INITIALIZING;
   case Init::Manager::State::Initialized:
-    state = server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
-                                        : envoy::admin::v2alpha::ServerInfo::LIVE;
-    break;
+    return server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
+                                       : envoy::admin::v2alpha::ServerInfo::LIVE;
   }
-
-  return state;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
@@ -757,7 +754,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
       rc = Http::Code::NotFound;
     }
   } else { // Display plain stats if format query param is not there.
-    for (auto stat : all_stats) {
+    for (const auto& stat : all_stats) {
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
     }
     // TODO(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
@@ -769,7 +766,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
         all_histograms.emplace(histogram->name(), histogram->quantileSummary());
       }
     }
-    for (auto histogram : all_histograms) {
+    for (const auto& histogram : all_histograms) {
       response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
     }
   }
@@ -894,7 +891,7 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-  for (auto stat : all_stats) {
+  for (const auto& stat : all_stats) {
     Value stat_obj;
     stat_obj.SetObject();
     Value stat_name;

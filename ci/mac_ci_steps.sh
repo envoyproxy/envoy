@@ -23,5 +23,11 @@ BAZEL_BUILD_OPTIONS="--curses=no --show_task_finish --verbose_failures \
 # is somewhat more deterministic (rather than interleaving the build
 # and test steps).
 
-bazel build ${BAZEL_BUILD_OPTIONS} //source/... //test/...
-bazel test ${BAZEL_BUILD_OPTIONS} //test/...
+if [[ $# -gt 0 ]]; then
+  TEST_TARGETS=$*
+else
+  TEST_TARGETS=//test/...
+fi
+
+bazel build ${BAZEL_BUILD_OPTIONS} //source/... ${TEST_TARGETS}
+bazel test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}
