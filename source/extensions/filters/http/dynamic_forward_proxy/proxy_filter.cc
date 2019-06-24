@@ -92,6 +92,8 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
     return Http::FilterHeadersStatus::StopIteration;
   }
   }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void ProxyFilter::onLoadDnsCacheComplete() {
