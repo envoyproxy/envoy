@@ -140,13 +140,24 @@ jobs:
              ci/do_circle_ci.sh bazel.clang_tidy
            no_output_timeout: 60m
 
-   format:
+   format_python2:
      executor: ubuntu-build
      resource_class: small
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: pip install -r tools/requirements.txt
+       - run: ci/do_circle_ci.sh check_format
+       - run: ci/do_circle_ci.sh check_repositories
+       - run: ci/do_circle_ci.sh check_spelling
+       - run: ci/do_circle_ci.sh check_spelling_pedantic
+   format_python3:
+     executor: ubuntu-build
+     resource_class: small
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: pip3 install -r tools/requirements.txt
        - run: ci/do_circle_ci.sh check_format
        - run: ci/do_circle_ci.sh check_repositories
        - run: ci/do_circle_ci.sh check_spelling
@@ -196,7 +207,8 @@ workflows:
       - filter_example_mirror
       - ipv6_tests
       - coverage
-      - format
+      - format_python2
+      - format_python3
       - clang_tidy
       - build_image
       - docs:
