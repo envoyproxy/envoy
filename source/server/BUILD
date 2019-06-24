@@ -269,7 +269,6 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/listener:well_known_names",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
@@ -289,9 +288,6 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:lc_trie_lib",
-        "//source/extensions/filters/listener:well_known_names",
-        "//source/extensions/filters/network:well_known_names",
-        "//source/extensions/transport_sockets:well_known_names",
         "//source/server:configuration_lib",
     ],
 )

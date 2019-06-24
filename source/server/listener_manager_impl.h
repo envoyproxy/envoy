@@ -19,10 +19,6 @@
 #include "server/filter_chain_manager_impl.h"
 #include "server/lds_api.h"
 
-#include "extensions/filters/listener/well_known_names.h"
-#include "extensions/filters/network/well_known_names.h"
-#include "extensions/transport_sockets/well_known_names.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -372,7 +368,7 @@ private:
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
-  // to access ListenerManagerImpl::factory_
+  // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
 };
 

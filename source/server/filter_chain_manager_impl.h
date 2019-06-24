@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/api/v2/listener/listener.pb.h"
-#include "envoy/protobuf/message_validator.h"
 #include "envoy/server/transport_socket_config.h"
 
 #include "common/common/logger.h"
@@ -19,7 +18,7 @@ class FilterChainFactoryBuilder {
 public:
   virtual ~FilterChainFactoryBuilder() = default;
   virtual std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const = 0;
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const PURE;
 };
 
 /**
@@ -28,7 +27,7 @@ public:
 class FilterChainManagerImpl : public Network::FilterChainManager,
                                Logger::Loggable<Logger::Id::config> {
 public:
-  explicit FilterChainManagerImpl(Network::Address::InstanceConstSharedPtr address)
+  explicit FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address)
       : address_(address) {}
 
   // Network::FilterChainManager
@@ -127,7 +126,7 @@ private:
   // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
-  Network::Address::InstanceConstSharedPtr address_;
+  const Network::Address::InstanceConstSharedPtr address_;
 };
 
 class FilterChainImpl : public Network::FilterChain {

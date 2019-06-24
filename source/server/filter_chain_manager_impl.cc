@@ -7,10 +7,6 @@
 
 #include "server/configuration_impl.h"
 
-#include "extensions/filters/listener/well_known_names.h"
-#include "extensions/filters/network/well_known_names.h"
-#include "extensions/transport_sockets/well_known_names.h"
-
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
