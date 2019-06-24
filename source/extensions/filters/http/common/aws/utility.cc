@@ -94,9 +94,9 @@ static size_t curlCallback(char* ptr, size_t, size_t nmemb, void* data) {
   return nmemb;
 }
 
-absl::optional<std::string>
-Utility::metadataFetcher(const std::string& host, const std::string& path,
-                         const absl::optional<std::string>& auth_token) {
+absl::optional<std::string> Utility::metadataFetcher(const std::string& host,
+                                                     const std::string& path,
+                                                     const std::string& auth_token) {
   static const size_t MAX_RETRIES = 4;
   static const std::chrono::milliseconds RETRY_DELAY{1000};
   static const std::chrono::seconds TIMEOUT{5};
@@ -116,8 +116,8 @@ Utility::metadataFetcher(const std::string& host, const std::string& path,
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curlCallback);
 
   struct curl_slist* headers = nullptr;
-  if (auth_token) {
-    const std::string auth = fmt::format("Authorization: {}", *auth_token);
+  if (!auth_token.empty()) {
+    const std::string auth = fmt::format("Authorization: {}", auth_token);
     headers = curl_slist_append(headers, auth.c_str());
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   }

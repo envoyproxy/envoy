@@ -138,9 +138,9 @@ TEST_F(AwsMetadataIntegrationTestTimeout, Timeout) {
 
   EXPECT_FALSE(response.has_value());
 
-  // Verify correct number of retries
-  ASSERT_NE(nullptr, test_server_->counter("http.metadata_test.downstream_rq_completed"));
-  EXPECT_EQ(0, test_server_->counter("http.metadata_test.downstream_rq_completed")->value());
+  // We do now check http.metadata_test.downstream_rq_completed value here because it's
+  // behavior is different between Linux and Mac when Curl disconnects on timeout. On Mac it is
+  // incremented, while on Linux it is not.
 
   // Verify correct sleep time between retries: 4 * 5000 = 20000
   EXPECT_LE(20000,
