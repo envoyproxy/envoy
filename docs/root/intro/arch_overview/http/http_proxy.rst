@@ -53,3 +53,6 @@ Memory usage detail's for Envoy's dynamic forward proxy support are as follows:
   <envoy_api_field_cluster.CircuitBreakers.Thresholds.max_pending_requests>` circuit breaker can
   be used to limit the number of requests that are pending waiting for the DNS cache to load
   a host.
+* Long lived upstream connections can have the underlying logical host expire via TTL while the
+  connection is still open. Upstream requests and connections are still bound by other cluster circuit breakers
+  such as :ref:`max_requests <envoy_api_field_cluster.CircuitBreakers.Thresholds.max_requests>`.

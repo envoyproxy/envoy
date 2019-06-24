@@ -106,6 +106,7 @@ TEST_P(ProxyFilterIntegrationTest, RemoveHostViaTTL) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
   EXPECT_EQ(1, test_server_->gauge("dns_cache.foo.num_hosts")->value());
+  cleanupUpstreamAndDownstream();
 
   // > 5m
   simTime().sleep(std::chrono::milliseconds(300001));
