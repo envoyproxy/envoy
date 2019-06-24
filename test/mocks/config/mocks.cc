@@ -17,8 +17,6 @@ MockSubscriptionFactory::MockSubscriptionFactory() {
         auto ret = std::make_unique<testing::NiceMock<MockSubscription>>();
         subscription_ = ret.get();
         callbacks_ = &callbacks;
-        // uint64_t hash = MessageUtil::hash(config);
-        // callbacks_map_[hash] = &callbacks;
         return ret;
       }));
   ON_CALL(*this, messageValidationVisitor())

@@ -60,9 +60,6 @@ public:
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
 
   MockSubscription* subscription_{};
-
-  // map from the config hash to the callbacks.
-  // std::unordered_map<uint64_t, SubscriptionCallbacks*> callbacks_map_;
   SubscriptionCallbacks* callbacks_{};
 };
 

@@ -340,10 +340,11 @@ public:
   MockInstance();
   ~MockInstance();
 
+  Secret::SecretManager& secretManager() override { return secret_manager_; }
+
   MOCK_METHOD0(admin, Admin&());
   MOCK_METHOD0(api, Api::Api&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
-  MOCK_METHOD0(secretManager, Secret::SecretManager&());
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(dnsResolver, Network::DnsResolverSharedPtr());
@@ -488,10 +489,9 @@ public:
   MockTransportSocketFactoryContext();
   ~MockTransportSocketFactoryContext();
 
-  // Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
+  Secret::SecretManager& secretManager() override { return secret_manager_; }
 
   MOCK_METHOD0(admin, Server::Admin&());
-  MOCK_METHOD0(secretManager, Secret::SecretManager&());
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
