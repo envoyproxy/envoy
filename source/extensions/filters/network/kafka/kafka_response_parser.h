@@ -47,7 +47,7 @@ struct ResponseContext {
   int32_t correlation_id_;
 };
 
-typedef std::shared_ptr<ResponseContext> ResponseContextSharedPtr;
+using ResponseContextSharedPtr = std::shared_ptr<ResponseContext>;
 
 /**
  * Response decoder configuration object.

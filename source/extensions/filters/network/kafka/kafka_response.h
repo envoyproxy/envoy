@@ -26,7 +26,7 @@ struct ResponseMetadata {
   const int32_t correlation_id_;
 };
 
-typedef std::shared_ptr<ResponseMetadata> ResponseMetadataSharedPtr;
+using ResponseMetadataSharedPtr = std::shared_ptr<ResponseMetadata>;
 
 /**
  * Abstract response object, carrying data related to every response.
@@ -60,7 +60,7 @@ public:
   const ResponseMetadata metadata_;
 };
 
-typedef std::shared_ptr<AbstractResponse> AbstractResponseSharedPtr;
+using AbstractResponseSharedPtr = std::shared_ptr<AbstractResponse>;
 
 /**
  * Concrete response that carries data particular to given response type.

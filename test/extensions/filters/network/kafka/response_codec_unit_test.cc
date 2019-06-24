@@ -24,14 +24,14 @@ public:
   MOCK_METHOD1(create, ResponseParserSharedPtr(const ResponseParserResolver&));
 };
 
-typedef std::shared_ptr<MockResponseInitialParserFactory> MockResponseInitialParserFactorySharedPtr;
+using MockResponseInitialParserFactorySharedPtr = std::shared_ptr<MockResponseInitialParserFactory>;
 
 class MockParser : public ResponseParser {
 public:
   MOCK_METHOD1(parse, ResponseParseResponse(absl::string_view&));
 };
 
-typedef std::shared_ptr<MockParser> MockParserSharedPtr;
+using MockParserSharedPtr = std::shared_ptr<MockParser>;
 
 class MockResponseParserResolver : public ResponseParserResolver {
 public:
@@ -45,7 +45,7 @@ public:
   MOCK_METHOD1(onFailedParse, void(ResponseMetadataSharedPtr));
 };
 
-typedef std::shared_ptr<MockResponseCallback> MockResponseCallbackSharedPtr;
+using MockResponseCallbackSharedPtr = std::shared_ptr<MockResponseCallback>;
 
 class ResponseCodecUnitTest : public testing::Test, public BufferBasedTest {
 protected:

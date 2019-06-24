@@ -30,10 +30,10 @@ public:
   virtual void onFailedParse(ResponseMetadataSharedPtr failure_data) PURE;
 };
 
-typedef std::shared_ptr<ResponseCallback> ResponseCallbackSharedPtr;
+using ResponseCallbackSharedPtr = std::shared_ptr<ResponseCallback>;
 
 // Helper container for data stored in ResponseInitialParserFactory.
-typedef std::pair<int16_t, int16_t> ExpectedResponseSpec;
+using ExpectedResponseSpec = std::pair<int16_t, int16_t>;
 
 /**
  * Provides initial parser for responses.
