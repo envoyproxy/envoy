@@ -12,28 +12,28 @@ namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
-static const char AWS_ACCESS_KEY_ID[] = "AWS_ACCESS_KEY_ID";
-static const char AWS_SECRET_ACCESS_KEY[] = "AWS_SECRET_ACCESS_KEY";
-static const char AWS_SESSION_TOKEN[] = "AWS_SESSION_TOKEN";
+constexpr static char AWS_ACCESS_KEY_ID[] = "AWS_ACCESS_KEY_ID";
+constexpr static char AWS_SECRET_ACCESS_KEY[] = "AWS_SECRET_ACCESS_KEY";
+constexpr static char AWS_SESSION_TOKEN[] = "AWS_SESSION_TOKEN";
 
-static const char ACCESS_KEY_ID[] = "AccessKeyId";
-static const char SECRET_ACCESS_KEY[] = "SecretAccessKey";
-static const char TOKEN[] = "Token";
-static const char EXPIRATION[] = "Expiration";
-static const char EXPIRATION_FORMAT[] = "%E4Y%m%dT%H%M%S%z";
-static const char TRUE[] = "true";
+constexpr static char ACCESS_KEY_ID[] = "AccessKeyId";
+constexpr static char SECRET_ACCESS_KEY[] = "SecretAccessKey";
+constexpr static char TOKEN[] = "Token";
+constexpr static char EXPIRATION[] = "Expiration";
+constexpr static char EXPIRATION_FORMAT[] = "%E4Y%m%dT%H%M%S%z";
+constexpr static char TRUE[] = "true";
 
-static const char AWS_CONTAINER_CREDENTIALS_RELATIVE_URI[] =
+constexpr static char AWS_CONTAINER_CREDENTIALS_RELATIVE_URI[] =
     "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI";
-static const char AWS_CONTAINER_CREDENTIALS_FULL_URI[] = "AWS_CONTAINER_CREDENTIALS_FULL_URI";
-static const char AWS_CONTAINER_AUTHORIZATION_TOKEN[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN";
-static const char AWS_EC2_METADATA_DISABLED[] = "AWS_EC2_METADATA_DISABLED";
+constexpr static char AWS_CONTAINER_CREDENTIALS_FULL_URI[] = "AWS_CONTAINER_CREDENTIALS_FULL_URI";
+constexpr static char AWS_CONTAINER_AUTHORIZATION_TOKEN[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN";
+constexpr static char AWS_EC2_METADATA_DISABLED[] = "AWS_EC2_METADATA_DISABLED";
 
-static const std::chrono::hours REFRESH_INTERVAL{1};
-static const std::chrono::seconds REFRESH_GRACE_PERIOD{5};
-static const char EC2_METADATA_HOST[] = "169.254.169.254:80";
-static const char CONTAINER_METADATA_HOST[] = "169.254.170.2:80";
-static const char SECURITY_CREDENTIALS_PATH[] = "/latest/meta-data/iam/security-credentials";
+constexpr static std::chrono::hours REFRESH_INTERVAL{1};
+constexpr static std::chrono::seconds REFRESH_GRACE_PERIOD{5};
+constexpr static char EC2_METADATA_HOST[] = "169.254.169.254:80";
+constexpr static char CONTAINER_METADATA_HOST[] = "169.254.170.2:80";
+constexpr static char SECURITY_CREDENTIALS_PATH[] = "/latest/meta-data/iam/security-credentials";
 
 Credentials EnvironmentCredentialsProvider::getCredentials() {
   ENVOY_LOG(debug, "Getting AWS credentials from the environment");
@@ -50,7 +50,7 @@ Credentials EnvironmentCredentialsProvider::getCredentials() {
             AWS_ACCESS_KEY_ID, access_key_id ? access_key_id : "", AWS_SECRET_ACCESS_KEY,
             secret_access_key ? "*****" : "", AWS_SESSION_TOKEN, session_token ? "*****" : "");
 
-  return Credentials::fromCString(access_key_id, secret_access_key, session_token);
+  return Credentials(access_key_id, secret_access_key, session_token);
 }
 
 void MetadataCredentialsProviderBase::refreshIfNeeded() {
@@ -69,7 +69,7 @@ void InstanceProfileCredentialsProvider::refresh() {
 
   // First discover the Role of this instance
   const auto instance_role_string =
-      metadata_fetcher_(EC2_METADATA_HOST, SECURITY_CREDENTIALS_PATH, absl::nullopt);
+      metadata_fetcher_(EC2_METADATA_HOST, SECURITY_CREDENTIALS_PATH, "");
   if (!instance_role_string) {
     ENVOY_LOG(error, "Could not retrieve credentials listing from the instance metadata");
     return;
@@ -91,8 +91,7 @@ void InstanceProfileCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "AWS credentials path: {}", credential_path);
 
   // Then fetch and parse the credentials
-  const auto credential_document =
-      metadata_fetcher_(EC2_METADATA_HOST, credential_path, absl::nullopt);
+  const auto credential_document = metadata_fetcher_(EC2_METADATA_HOST, credential_path, "");
   if (!credential_document) {
     ENVOY_LOG(error, "Could not load AWS credentials document from the instance metadata");
     return;
@@ -115,7 +114,7 @@ void InstanceProfileCredentialsProvider::refresh() {
             secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
             session_token.empty() ? "" : "*****");
 
-  cached_credentials_ = Credentials::fromString(access_key_id, secret_access_key, session_token);
+  cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
   last_updated_ = api_.timeSource().systemTime();
 }
 
@@ -128,12 +127,12 @@ bool TaskRoleCredentialsProvider::needsRefresh() {
 void TaskRoleCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the task role at URI: {}", credential_uri_);
 
-  absl::string_view host_view;
-  absl::string_view path_view;
-  Http::Utility::extractHostPathFromUri(credential_uri_, host_view, path_view);
+  absl::string_view host;
+  absl::string_view path;
+  Http::Utility::extractHostPathFromUri(credential_uri_, host, path);
   const auto credential_document =
-      metadata_fetcher_(std::string(host_view.data(), host_view.size()),
-                        std::string(path_view.data(), path_view.size()), authorization_token_);
+      metadata_fetcher_(std::string(host.data(), host.size()),
+                        std::string(path.data(), path.size()), authorization_token_);
   if (!credential_document) {
     ENVOY_LOG(error, "Could not load AWS credentials document from the task role");
     return;
@@ -166,7 +165,7 @@ void TaskRoleCredentialsProvider::refresh() {
   }
 
   last_updated_ = api_.timeSource().systemTime();
-  cached_credentials_ = Credentials::fromString(access_key_id, secret_access_key, session_token);
+  cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
 }
 
 Credentials CredentialsProviderChain::getCredentials() {
@@ -194,8 +193,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
   if (relative_uri != nullptr) {
     const auto uri = std::string(CONTAINER_METADATA_HOST) + relative_uri;
     ENVOY_LOG(debug, "Using task role credentials provider with URI: {}", uri);
-    add(factories.createTaskRoleCredentialsProvider(api, metadata_fetcher, uri,
-                                                    absl::optional<std::string>()));
+    add(factories.createTaskRoleCredentialsProvider(api, metadata_fetcher, uri));
   } else if (full_uri != nullptr) {
     const auto authorization_token = std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN);
     if (authorization_token != nullptr) {
@@ -207,8 +205,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
                                                       authorization_token));
     } else {
       ENVOY_LOG(debug, "Using task role credentials provider with URI: {}", full_uri);
-      add(factories.createTaskRoleCredentialsProvider(api, metadata_fetcher, full_uri,
-                                                      absl::optional<std::string>()));
+      add(factories.createTaskRoleCredentialsProvider(api, metadata_fetcher, full_uri));
     }
   } else if (metadata_disabled == nullptr || strncmp(metadata_disabled, TRUE, strlen(TRUE)) != 0) {
     ENVOY_LOG(debug, "Using instance profile credentials provider");

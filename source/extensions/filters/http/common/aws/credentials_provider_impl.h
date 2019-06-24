@@ -31,10 +31,8 @@ public:
 class MetadataCredentialsProviderBase : public CredentialsProvider,
                                         public Logger::Loggable<Logger::Id::aws> {
 public:
-  typedef std::function<absl::optional<std::string>(const std::string& host,
-                                                    const std::string& path,
-                                                    const absl::optional<std::string>& auth_token)>
-      MetadataFetcher;
+  using MetadataFetcher = std::function<absl::optional<std::string>(
+      const std::string& host, const std::string& path, const std::string& auth_token)>;
 
   MetadataCredentialsProviderBase(Api::Api& api, const MetadataFetcher& metadata_fetcher)
       : api_(api), metadata_fetcher_(metadata_fetcher) {}
@@ -79,16 +77,16 @@ private:
  */
 class TaskRoleCredentialsProvider : public MetadataCredentialsProviderBase {
 public:
-  TaskRoleCredentialsProvider(
-      Api::Api& api, const MetadataFetcher& metadata_fetcher, const std::string& credential_uri,
-      const absl::optional<std::string>& authorization_token = absl::optional<std::string>())
+  TaskRoleCredentialsProvider(Api::Api& api, const MetadataFetcher& metadata_fetcher,
+                              const std::string& credential_uri,
+                              const std::string& authorization_token = std::string())
       : MetadataCredentialsProviderBase(api, metadata_fetcher), credential_uri_(credential_uri),
         authorization_token_(authorization_token) {}
 
 private:
   SystemTime expiration_time_;
   std::string credential_uri_;
-  absl::optional<std::string> authorization_token_;
+  std::string authorization_token_;
 
   bool needsRefresh() override;
   void refresh() override;
@@ -121,7 +119,7 @@ public:
   virtual CredentialsProviderSharedPtr createTaskRoleCredentialsProvider(
       Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
       const std::string& credential_uri,
-      const absl::optional<std::string>& authorization_token) const PURE;
+      const std::string& authorization_token = std::string()) const PURE;
 
   virtual CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api,
@@ -153,7 +151,7 @@ private:
   CredentialsProviderSharedPtr createTaskRoleCredentialsProvider(
       Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
       const std::string& credential_uri,
-      const absl::optional<std::string>& authorization_token) const override {
+      const std::string& authorization_token = std::string()) const override {
     return std::make_shared<TaskRoleCredentialsProvider>(api, metadata_fetcher, credential_uri,
                                                          authorization_token);
   }
