@@ -62,9 +62,9 @@ public:
    * Evaluate whether an access log should be written based on request and response data.
    * @return TRUE if the log should be written.
    */
-  virtual bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                        const Http::HeaderMap& response_headers,
-                        const Http::HeaderMap& response_trailers) PURE;
+  virtual bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap* request_headers,
+                        const Http::HeaderMap* response_headers,
+                        const Http::HeaderMap* response_trailers) PURE;
 };
 
 using FilterPtr = std::unique_ptr<Filter>;
@@ -86,7 +86,7 @@ public:
                         const Http::HeaderMap* response_trailers,
                         const StreamInfo::StreamInfo& stream_info) {
     if (filter_ &&
-        !filter_->evaluate(stream_info, *request_headers, *response_headers, *response_trailers)) {
+        !filter_->evaluate(stream_info, request_headers, response_headers, response_trailers)) {
       return;
     }
     return log(request_headers, response_headers, response_trailers, stream_info);
