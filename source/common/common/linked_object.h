@@ -6,6 +6,7 @@
 #include "common/common/assert.h"
 
 namespace Envoy {
+
 /**
  * Mixin class that allows an object contained in a unique pointer to be easily linked and unlinked
  * from lists.
@@ -13,6 +14,15 @@ namespace Envoy {
 template <class T> class LinkedObject {
 public:
   using ListType = std::list<std::unique_ptr<T>>;
+  static void moveIntoFrontHelper(std::unique_ptr<T>&& item,
+                                  typename LinkedObject<T>::ListType& list) {
+    item->moveIntoList(std::move(item), list);
+  }
+
+  static void moveIntoBackHelper(std::unique_ptr<T>&& item,
+                                 typename LinkedObject<T>::ListType& list) {
+    item->moveIntoListBack(std::move(item), list);
+  }
 
   /**
    * @return the list iterator for the object.
@@ -40,6 +50,24 @@ public:
   }
 
   /**
+   * Remove this item from a list.
+   * @param list supplies the list to remove from. This item should be in this list.
+   */
+  std::unique_ptr<T> removeFromList(ListType& list) {
+    ASSERT(inserted_);
+    ASSERT(std::find(list.begin(), list.end(), *entry_) != list.end());
+
+    std::unique_ptr<T> removed = std::move(*entry_);
+    list.erase(entry_);
+    inserted_ = false;
+    return removed;
+  }
+
+protected:
+  LinkedObject() = default;
+
+private:
+  /**
    * Move an item into a linked list at the front.
    * @param item supplies the item to move in.
    * @param list supplies the list to move the item into.
@@ -60,27 +88,20 @@ public:
     inserted_ = true;
     entry_ = list.emplace(list.end(), std::move(item));
   }
-
-  /**
-   * Remove this item from a list.
-   * @param list supplies the list to remove from. This item should be in this list.
-   */
-  std::unique_ptr<T> removeFromList(ListType& list) {
-    ASSERT(inserted_);
-    ASSERT(std::find(list.begin(), list.end(), *entry_) != list.end());
-
-    std::unique_ptr<T> removed = std::move(*entry_);
-    list.erase(entry_);
-    inserted_ = false;
-    return removed;
-  }
-
-protected:
-  LinkedObject() = default;
-
-private:
   typename ListType::iterator entry_;
   bool inserted_{false}; // iterators do not have any "invalid" value so we need this boolean for
                          // sanity checking.
+};
+
+class LinkedObjectUtil {
+public:
+  template <typename T>
+  static void moveIntoFront(std::unique_ptr<T>&& item, typename LinkedObject<T>::ListType& list) {
+    T::moveIntoFrontHelper(std::move(item), list);
+  }
+  template <typename T>
+  static void moveIntoBack(std::unique_ptr<T>&& item, typename LinkedObject<T>::ListType& list) {
+    T::moveIntoBackHelper(std::move(item), list);
+  }
 };
 } // namespace Envoy

@@ -411,7 +411,7 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
   connection.readDisable(true);
   auto connection_wrapper =
       std::make_unique<QueuedConnectionWrapper>(connection, allow_unexpected_disconnects_);
-  connection_wrapper->moveIntoListBack(std::move(connection_wrapper), new_connections_);
+  LinkedObjectUtil::moveIntoBack(std::move(connection_wrapper), new_connections_);
   new_connection_event_.notifyOne();
   return true;
 }

@@ -81,7 +81,7 @@ public:
     TestListener* listener =
         new TestListener(*this, tag, bind_to_port, hand_off_restored_destination_connections, name,
                          socket_type, listener_filters_timeout);
-    listener->moveIntoListBack(TestListenerPtr{listener}, listeners_);
+    LinkedObjectUtil::moveIntoBack(TestListenerPtr{listener}, listeners_);
     return listener;
   }
 

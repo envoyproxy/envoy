@@ -397,7 +397,7 @@ void ActiveMessage::addDecoderFilter(DubboFilters::DecoderFilterSharedPtr filter
   ActiveMessageDecoderFilterPtr wrapper =
       std::make_unique<ActiveMessageDecoderFilter>(*this, filter);
   filter->setDecoderFilterCallbacks(*wrapper);
-  wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
+  LinkedObjectUtil::moveIntoBack(std::move(wrapper), decoder_filters_);
 }
 
 void ActiveMessage::onReset() { parent_.deferredMessage(*this); }

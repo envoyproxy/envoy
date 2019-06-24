@@ -81,7 +81,7 @@ void ConnPoolImpl::checkForDrained() {
 void ConnPoolImpl::createNewConnection() {
   ENVOY_LOG(debug, "creating a new connection");
   ActiveConnPtr conn(new ActiveConn(*this));
-  conn->moveIntoList(std::move(conn), pending_conns_);
+  LinkedObjectUtil::moveIntoFront(std::move(conn), pending_conns_);
 }
 
 ConnectionPool::Cancellable* ConnPoolImpl::newConnection(ConnectionPool::Callbacks& callbacks) {
@@ -107,7 +107,7 @@ ConnectionPool::Cancellable* ConnPoolImpl::newConnection(ConnectionPool::Callbac
 
     ENVOY_LOG(debug, "queueing request due to no available connections");
     PendingRequestPtr pending_request(new PendingRequest(*this, callbacks));
-    pending_request->moveIntoList(std::move(pending_request), pending_requests_);
+    LinkedObjectUtil::moveIntoFront(std::move(pending_request), pending_requests_);
     return pending_requests_.front().get();
   } else {
     ENVOY_LOG(debug, "max pending requests overflow");

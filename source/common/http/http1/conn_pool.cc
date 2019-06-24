@@ -87,7 +87,7 @@ void ConnPoolImpl::checkForDrained() {
 void ConnPoolImpl::createNewConnection() {
   ENVOY_LOG(debug, "creating a new connection");
   ActiveClientPtr client(new ActiveClient(*this));
-  client->moveIntoList(std::move(client), busy_clients_);
+  LinkedObjectUtil::moveIntoFront(std::move(client), busy_clients_);
 }
 
 ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_decoder,

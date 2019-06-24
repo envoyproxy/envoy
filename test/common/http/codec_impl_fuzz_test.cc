@@ -404,7 +404,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         }
         auto stream_ptr = pending_streams.front()->removeFromList(pending_streams);
         HttpStream* const stream = stream_ptr.get();
-        stream_ptr->moveIntoListBack(std::move(stream_ptr), streams);
+        LinkedObjectUtil::moveIntoBack(std::move(stream_ptr), streams);
         stream->response_.encoder_ = &encoder;
         encoder.getStream().addCallbacks(stream->response_.stream_callbacks_);
         stream->stream_index_ = streams.size() - 1;
@@ -436,7 +436,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         HttpStreamPtr stream = std::make_unique<HttpStream>(
             *client, fromSanitizedHeaders(action.new_stream().request_headers()),
             action.new_stream().end_stream());
-        stream->moveIntoListBack(std::move(stream), pending_streams);
+        LinkedObjectUtil::moveIntoBack(std::move(stream), pending_streams);
         break;
       }
       case test::common::http::Action::kStreamAction: {

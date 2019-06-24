@@ -56,7 +56,7 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
 
   // The request may get immediately failed. If so, we will return nullptr.
   if (!new_request->remote_closed_) {
-    new_request->moveIntoList(std::move(new_request), active_streams_);
+    LinkedObjectUtil::moveIntoFront(std::move(new_request), active_streams_);
     return async_request;
   } else {
     new_request->cleanup();
@@ -67,7 +67,7 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
 AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
                                             const AsyncClient::StreamOptions& options) {
   std::unique_ptr<AsyncStreamImpl> new_stream{new AsyncStreamImpl(*this, callbacks, options)};
-  new_stream->moveIntoList(std::move(new_stream), active_streams_);
+  LinkedObjectUtil::moveIntoFront(std::move(new_stream), active_streams_);
   return active_streams_.front().get();
 }
 

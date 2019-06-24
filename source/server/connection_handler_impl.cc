@@ -242,7 +242,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAccept(
   // Otherwise we let active_socket be destructed when it goes out of scope.
   if (active_socket->iter_ != active_socket->accept_filters_.end()) {
     active_socket->startTimer();
-    active_socket->moveIntoListBack(std::move(active_socket), sockets_);
+    LinkedObjectUtil::moveIntoBack(std::move(active_socket), sockets_);
   }
 }
 
@@ -283,7 +283,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::onNewConnection(
   if (new_connection->state() != Network::Connection::State::Closed) {
     ActiveConnectionPtr active_connection(
         new ActiveConnection(*this, std::move(new_connection), parent_.dispatcher_.timeSource()));
-    active_connection->moveIntoList(std::move(active_connection), connections_);
+    LinkedObjectUtil::moveIntoFront(std::move(active_connection), connections_);
     parent_.num_connections_++;
   }
 }

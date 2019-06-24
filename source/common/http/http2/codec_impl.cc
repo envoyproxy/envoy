@@ -906,7 +906,7 @@ Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
   if (connection_.aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }
-  stream->moveIntoList(std::move(stream), active_streams_);
+  LinkedObjectUtil::moveIntoFront(std::move(stream), active_streams_);
   return *active_streams_.front();
 }
 
@@ -965,7 +965,7 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   }
   stream->decoder_ = &callbacks_.newStream(*stream);
   stream->stream_id_ = frame->hd.stream_id;
-  stream->moveIntoList(std::move(stream), active_streams_);
+  LinkedObjectUtil::moveIntoFront(std::move(stream), active_streams_);
   nghttp2_session_set_stream_user_data(session_, frame->hd.stream_id,
                                        active_streams_.front().get());
   return 0;

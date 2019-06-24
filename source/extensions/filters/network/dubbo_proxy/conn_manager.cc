@@ -84,7 +84,7 @@ DecoderEventHandler* ConnectionManager::newDecoderEventHandler() {
 
   ActiveMessagePtr new_message(std::make_unique<ActiveMessage>(*this));
   new_message->createFilterChain();
-  new_message->moveIntoList(std::move(new_message), active_message_list_);
+  LinkedObjectUtil::moveIntoFront(std::move(new_message), active_message_list_);
   return (*active_message_list_.begin()).get();
 }
 

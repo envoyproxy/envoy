@@ -109,7 +109,7 @@ GoogleAsyncClientImpl::sendRaw(absl::string_view service_full_name, absl::string
     return nullptr;
   }
 
-  grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
+  LinkedObjectUtil::moveIntoFront(std::move(grpc_stream), active_streams_);
   return async_request;
 }
 
@@ -125,7 +125,7 @@ RawAsyncStream* GoogleAsyncClientImpl::startRaw(absl::string_view service_full_n
     return nullptr;
   }
 
-  grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
+  LinkedObjectUtil::moveIntoFront(std::move(grpc_stream), active_streams_);
   return active_streams_.front().get();
 }
 
