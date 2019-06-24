@@ -81,7 +81,7 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
     retry_host_predicate_configs_.emplace_back(host_predicate.name(), std::move(config));
   }
 
-  const auto retry_priority = retry_policy.retry_priority();
+  const auto& retry_priority = retry_policy.retry_priority();
   if (!retry_priority.name().empty()) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
         retry_priority.name());
