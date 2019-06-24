@@ -21,8 +21,7 @@ envoy_cc_test(
     ],
     external_deps = ["ssl"],
     deps = [
-        ":ecdsa_private_key_method_provider_test_lib",
-        ":rsa_private_key_method_provider_test_lib",
+        ":test_private_key_method_provider_test_lib",
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
@@ -113,32 +112,12 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "rsa_private_key_method_provider_test_lib",
+    name = "test_private_key_method_provider_test_lib",
     srcs = [
-        "rsa_private_key_method_provider.cc",
+        "test_private_key_method_provider.cc",
     ],
     hdrs = [
-        "rsa_private_key_method_provider.h",
-    ],
-    external_deps = ["ssl"],
-    deps = [
-        "//include/envoy/api:api_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/server:transport_socket_config_interface",
-        "//include/envoy/ssl/private_key:private_key_config_interface",
-        "//include/envoy/ssl/private_key:private_key_interface",
-        "//source/common/config:utility_lib",
-        "//source/common/protobuf:utility_lib",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "ecdsa_private_key_method_provider_test_lib",
-    srcs = [
-        "ecdsa_private_key_method_provider.cc",
-    ],
-    hdrs = [
-        "ecdsa_private_key_method_provider.h",
+        "test_private_key_method_provider.h",
     ],
     external_deps = ["ssl"],
     deps = [

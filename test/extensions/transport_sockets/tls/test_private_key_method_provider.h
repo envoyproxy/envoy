@@ -12,37 +12,54 @@ namespace Envoy {
 namespace Extensions {
 namespace PrivateKeyMethodProvider {
 
-struct EcdsaPrivateKeyConnectionTestOptions {
+struct TestPrivateKeyConnectionTestOptions {
+  // Return private key method value directly without asynchronous operation.
+  bool sync_mode_{};
+
+  // The "decrypt" private key method is expected to he called.
+  bool decrypt_expected_{};
+
+  // The "sign" private key method is expected to he called.
+  bool sign_expected_{};
+
+  // Add a cryptographic error (invalid signature, incorrect decryption).
+  bool crypto_error_{};
+
+  // Return an error from the private key method.
+  bool method_error_{};
+
   // Return an error from the private key method completion function.
   bool async_method_error_{};
 };
 
-// An example ECDSA private key method provider for testing the decrypt() and sign()
+// An example private key method provider for testing the decrypt() and sign()
 // functionality.
-class EcdsaPrivateKeyConnection {
+class TestPrivateKeyConnection {
 public:
-  EcdsaPrivateKeyConnection(Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher,
-                            bssl::UniquePtr<EVP_PKEY> pkey,
-                            EcdsaPrivateKeyConnectionTestOptions& test_options);
-  EC_KEY* getPrivateKey() { return EVP_PKEY_get1_EC_KEY(pkey_.get()); }
+  TestPrivateKeyConnection(Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher,
+                           bssl::UniquePtr<EVP_PKEY> pkey,
+                           TestPrivateKeyConnectionTestOptions& test_options);
+  EVP_PKEY* getPrivateKey() { return pkey_.get(); }
   void delayed_op();
-
   // Store the output data temporarily.
   std::vector<uint8_t> output_;
-  // Is the operation finished?
+  // The complete callback can return other value than "retry" only after
+  // onPrivateKeyMethodComplete() function has been called. This is controlled by "finished"
+  // variable.
   bool finished_{};
-  EcdsaPrivateKeyConnectionTestOptions& test_options_;
+  TestPrivateKeyConnectionTestOptions& test_options_;
 
 private:
   Ssl::PrivateKeyConnectionCallbacks& cb_;
   Event::Dispatcher& dispatcher_;
   bssl::UniquePtr<EVP_PKEY> pkey_;
+  // A zero-length timer controls the callback.
   Event::TimerPtr timer_;
 };
 
-class EcdsaPrivateKeyMethodProvider : public virtual Ssl::PrivateKeyMethodProvider {
+class TestPrivateKeyMethodProvider : public virtual Ssl::PrivateKeyMethodProvider {
 public:
-  EcdsaPrivateKeyMethodProvider(
+  TestPrivateKeyMethodProvider(
       const ProtobufWkt::Struct& config,
       Server::Configuration::TransportSocketFactoryContext& factory_context);
   // Ssl::PrivateKeyMethodProvider
@@ -52,26 +69,28 @@ public:
   bool checkFips() override;
   Ssl::BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() override;
 
-  static int ssl_ecdsa_connection_index;
+  static int rsaConnectionIndex();
+  static int ecdsaConnectionIndex();
 
 private:
   Ssl::BoringSslPrivateKeyMethodSharedPtr method_{};
   bssl::UniquePtr<EVP_PKEY> pkey_;
-  EcdsaPrivateKeyConnectionTestOptions test_options_;
+  TestPrivateKeyConnectionTestOptions test_options_;
+  std::string mode_;
 };
 
-class EcdsaPrivateKeyMethodFactory : public Ssl::PrivateKeyMethodProviderInstanceFactory {
+class TestPrivateKeyMethodFactory : public Ssl::PrivateKeyMethodProviderInstanceFactory {
 public:
   // Ssl::PrivateKeyMethodProviderInstanceFactory
   Ssl::PrivateKeyMethodProviderSharedPtr
   createPrivateKeyMethodProviderInstance(const envoy::api::v2::auth::PrivateKeyMethod& message,
                                          Server::Configuration::TransportSocketFactoryContext&
                                              private_key_method_provider_context) override {
-    return std::make_shared<EcdsaPrivateKeyMethodProvider>(message.config(),
-                                                           private_key_method_provider_context);
+    return std::make_shared<TestPrivateKeyMethodProvider>(message.config(),
+                                                          private_key_method_provider_context);
   }
 
-  std::string name() const override { return std::string("ecdsa_test"); };
+  std::string name() const override { return std::string("test"); };
 };
 
 } // namespace PrivateKeyMethodProvider
