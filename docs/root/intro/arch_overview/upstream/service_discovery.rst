@@ -42,7 +42,7 @@ upstream host.
 If :ref:`respect_dns_ttl <envoy_api_field_Cluster.respect_dns_ttl>` is enabled, DNS record TTLs and 
 :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` are used to control DNS refresh rate. 
 For strict DNS cluster, if the minimum of all record TTLs is 0, :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
- will be used as the cluster's DNS refresh rate. :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
+will be used as the cluster's DNS refresh rate. :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
 defaults to 5000ms if not specified.
 
 .. _arch_overview_service_discovery_types_logical_dns:
