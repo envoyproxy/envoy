@@ -221,7 +221,7 @@ message ScopedRoutesConfigDump {
       [(gogoproto.nullable) = false];
 }
 
-// Config dump for SDS.
+// Envoys SDS implementation fills this message with all secrets fetched dynamically via SDS.
 message SecretsConfigDump {
   // DynamicSecret contains secret information fetched via SDS.
   // The security sensitive information will trimmed, for example, private key.
@@ -229,13 +229,14 @@ message SecretsConfigDump {
     // The name assigned to the secret.
     string name = 1;
 
-    // Per resource version information.
+    // This is the per-resource version information.
     string version_info = 2;
 
-    // The timestamp when the Cluster was last updated.
+    // The timestamp when the secret was last updated.
     google.protobuf.Timestamp last_updated = 3;
 
-    // Security sensitive information should be stripped.
+    // The actual secret information. Security sensitive information is stripped.
+    // For example, private key in a TLS cert.
     envoy.api.v2.auth.Secret secret = 4;
   }
 

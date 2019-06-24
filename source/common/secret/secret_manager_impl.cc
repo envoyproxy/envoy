@@ -107,6 +107,10 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     }
     auto tls_certificate = secret->mutable_tls_certificate();
     tls_certificate->MergeFrom(*tls_cert);
+
+    // We clear private key and password to avoid information leaking.j
+    // TODO(incfly): switch to more generic scrubbing mechanism once
+    // https://github.com/envoyproxy/envoy/issues/4757 is resolved.
     tls_certificate->clear_private_key();
     tls_certificate->clear_password();
   }
