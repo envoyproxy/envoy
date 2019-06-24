@@ -84,10 +84,6 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     if (addrinfo != nullptr && addrinfo->nodes != nullptr) {
       if (addrinfo->nodes->ai_family == AF_INET) {
         for (const ares_addrinfo_node* ai = addrinfo->nodes; ai != nullptr; ai = ai->ai_next) {
-          if (ai->ai_family != AF_INET) {
-            continue;
-          }
-
           sockaddr_in address;
           memset(&address, 0, sizeof(address));
           address.sin_family = AF_INET;
@@ -100,10 +96,6 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
         }
       } else if (addrinfo->nodes->ai_family == AF_INET6) {
         for (const ares_addrinfo_node* ai = addrinfo->nodes; ai != nullptr; ai = ai->ai_next) {
-          if (ai->ai_family != AF_INET6) {
-            continue;
-          }
-
           sockaddr_in6 address;
           memset(&address, 0, sizeof(address));
           address.sin6_family = AF_INET6;

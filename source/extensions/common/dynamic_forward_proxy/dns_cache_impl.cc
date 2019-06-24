@@ -132,21 +132,14 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
   stats_.dns_query_attempt_.inc();
   host_info.active_query_ =
       resolver_->resolve(host_info.host_to_resolve_, dns_lookup_family_,
-                         [this, host](const std::list<Network::DnsResponse>&& response) {
-                           std::list<Network::Address::InstanceConstSharedPtr> address_list;
-                           for (const auto& res : response) {
-                             address_list.emplace_back(res.address_);
-                           }
-
-                           finishResolve(host, address_list);
+                         [this, host](std::list<Network::DnsResponse>&& response) {
+                           finishResolve(host, std::move(response));
                          });
 }
 
-void DnsCacheImpl::finishResolve(
-    const std::string& host,
-    const std::list<Network::Address::InstanceConstSharedPtr>& address_list) {
-  ENVOY_LOG(debug, "main thread resolve complete for host '{}'. {} results", host,
-            address_list.size());
+void DnsCacheImpl::finishResolve(const std::string& host,
+                                 std::list<Network::DnsResponse>&& response) {
+  ENVOY_LOG(debug, "main thread resolve complete for host '{}'. {} results", host, response.size());
   const auto primary_host_it = primary_hosts_.find(host);
   ASSERT(primary_host_it != primary_hosts_.end());
 
@@ -158,12 +151,12 @@ void DnsCacheImpl::finishResolve(
         std::make_shared<DnsHostInfoImpl>(main_thread_dispatcher_.timeSource());
   }
 
-  const auto new_address =
-      !address_list.empty()
-          ? Network::Utility::getAddressWithPort(*address_list.front(), primary_host_info.port_)
-          : nullptr;
+  const auto new_address = !response.empty()
+                               ? Network::Utility::getAddressWithPort(*(response.front().address_),
+                                                                      primary_host_info.port_)
+                               : nullptr;
 
-  if (address_list.empty()) {
+  if (response.empty()) {
     stats_.dns_query_failure_.inc();
   } else {
     stats_.dns_query_success_.inc();

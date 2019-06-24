@@ -29,7 +29,7 @@ public:
  * DNS response.
  */
 struct DnsResponse {
-  DnsResponse(Address::InstanceConstSharedPtr address, const std::chrono::seconds ttl)
+  DnsResponse(const Address::InstanceConstSharedPtr& address, const std::chrono::seconds ttl)
       : address_(address), ttl_(ttl) {}
 
   const Address::InstanceConstSharedPtr address_;
