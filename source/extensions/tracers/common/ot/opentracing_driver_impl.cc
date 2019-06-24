@@ -39,9 +39,8 @@ public:
   explicit OpenTracingHTTPHeadersReader(const Http::HeaderMap& request_headers)
       : request_headers_(request_headers) {}
 
-  typedef std::function<opentracing::expected<void>(opentracing::string_view,
-                                                    opentracing::string_view)>
-      OpenTracingCb;
+  using OpenTracingCb = std::function<opentracing::expected<void>(opentracing::string_view,
+                                                                  opentracing::string_view)>;
 
   // opentracing::HTTPHeadersReader
   opentracing::expected<opentracing::string_view>
@@ -71,7 +70,7 @@ private:
 
   static Http::HeaderMap::Iterate headerMapCallback(const Http::HeaderEntry& header,
                                                     void* context) {
-    OpenTracingCb* callback = static_cast<OpenTracingCb*>(context);
+    auto* callback = static_cast<OpenTracingCb*>(context);
     opentracing::string_view key{header.key().getStringView().data(),
                                  header.key().getStringView().length()};
     opentracing::string_view value{header.value().getStringView().data(),

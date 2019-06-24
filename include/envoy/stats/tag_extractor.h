@@ -18,7 +18,7 @@ namespace Stats {
  */
 class TagExtractor {
 public:
-  virtual ~TagExtractor() {}
+  virtual ~TagExtractor() = default;
 
   /**
    * Identifier for the tag extracted by this object.
@@ -58,7 +58,7 @@ public:
   virtual absl::string_view prefixToken() const PURE;
 };
 
-typedef std::unique_ptr<const TagExtractor> TagExtractorPtr;
+using TagExtractorPtr = std::unique_ptr<const TagExtractor>;
 
 } // namespace Stats
 } // namespace Envoy

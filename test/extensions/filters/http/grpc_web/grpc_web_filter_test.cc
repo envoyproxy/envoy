@@ -107,7 +107,7 @@ public:
   }
 
   Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
-  Grpc::Common grpc_context_;
+  Grpc::ContextImpl grpc_context_;
   GrpcWebFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;

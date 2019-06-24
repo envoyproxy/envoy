@@ -6,7 +6,7 @@
 #include "common/common/base64.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
@@ -21,7 +21,7 @@ struct RcDetailsValues {
   // The grpc web filter couldn't decode the data provided.
   const std::string GrpcDecodeFailedDueToData = "grpc_base_64_decode_failed";
 };
-typedef ConstSingleton<RcDetailsValues> RcDetails;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 // Bit mask denotes a trailers frame of gRPC-Web.
 const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;
@@ -234,7 +234,7 @@ void GrpcWebFilter::setupStatTracking(const Http::HeaderMap& headers) {
 }
 
 void GrpcWebFilter::chargeStat(const Http::HeaderMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::Common::Protocol::GrpcWeb, *request_names_,
+  context_.chargeStat(*cluster_, Grpc::Context::Protocol::GrpcWeb, *request_names_,
                       headers.GrpcStatus());
 }
 

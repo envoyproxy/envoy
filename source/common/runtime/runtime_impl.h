@@ -8,16 +8,21 @@
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/subscription.h"
+#include "envoy/init/manager.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/service/discovery/v2/rtds.pb.validate.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/type/percent.pb.validate.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
+#include "common/init/target_impl.h"
 #include "common/singleton/threadsafe_singleton.h"
 
 #include "spdlog/spdlog.h"
@@ -121,7 +126,7 @@ private:
  */
 class OverrideLayerImpl : public Snapshot::OverrideLayer {
 public:
-  explicit OverrideLayerImpl(const std::string& name) : name_{name} {}
+  explicit OverrideLayerImpl(absl::string_view name) : name_{name} {}
   const Snapshot::EntryMap& values() const override { return values_; }
   const std::string& name() const override { return name_; }
 
@@ -137,11 +142,12 @@ protected:
  */
 class AdminLayer : public OverrideLayerImpl {
 public:
-  explicit AdminLayer(RuntimeStats& stats) : OverrideLayerImpl{"admin"}, stats_{stats} {}
+  explicit AdminLayer(absl::string_view name, RuntimeStats& stats)
+      : OverrideLayerImpl{name}, stats_{stats} {}
   /**
    * Copy-constructible so that it can snapshotted.
    */
-  AdminLayer(const AdminLayer& admin_layer) : AdminLayer{admin_layer.stats_} {
+  AdminLayer(const AdminLayer& admin_layer) : AdminLayer{admin_layer.name_, admin_layer.stats_} {
     values_ = admin_layer.values();
   }
 
@@ -155,12 +161,14 @@ private:
   RuntimeStats& stats_;
 };
 
+using AdminLayerPtr = std::unique_ptr<AdminLayer>;
+
 /**
  * Extension of OverrideLayerImpl that loads values from the file system upon construction.
  */
 class DiskLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
-  DiskLayer(const std::string& name, const std::string& path, Api::Api& api);
+  DiskLayer(absl::string_view name, const std::string& path, Api::Api& api);
 
 private:
   void walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
@@ -177,11 +185,47 @@ private:
  */
 class ProtoLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
-  ProtoLayer(const ProtobufWkt::Struct& proto);
+  ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto);
 
 private:
   void walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix);
 };
+
+class LoaderImpl;
+
+struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger::Id::runtime> {
+  RtdsSubscription(LoaderImpl& parent,
+                   const envoy::config::bootstrap::v2::RuntimeLayer::RtdsLayer& rtds_layer,
+                   Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);
+
+  // Config::SubscriptionCallbacks
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string&) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string&) override;
+
+  void onConfigUpdateFailed(const EnvoyException* e) override;
+  std::string resourceName(const ProtobufWkt::Any& resource) override {
+    return MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(resource,
+                                                                           validation_visitor_)
+        .name();
+  }
+
+  void start();
+  void validateUpdateSize(uint32_t num_resources);
+
+  LoaderImpl& parent_;
+  const envoy::api::v2::core::ConfigSource config_source_;
+  Stats::Store& store_;
+  Config::SubscriptionPtr subscription_;
+  std::string resource_name_;
+  Init::TargetImpl init_target_;
+  ProtobufWkt::Struct proto_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+};
+
+using RtdsSubscriptionPtr = std::unique_ptr<RtdsSubscription>;
 
 /**
  * Implementation of Loader that provides Snapshots of values added via mergeValues().
@@ -193,12 +237,17 @@ class LoaderImpl : public Loader, Logger::Loggable<Logger::Id::runtime> {
 public:
   LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
              const envoy::config::bootstrap::v2::LayeredRuntime& config,
-             absl::string_view service_cluster, Stats::Store& store, RandomGenerator& generator,
-             Api::Api& api);
+             const LocalInfo::LocalInfo& local_info, Init::Manager& init_manager,
+             Stats::Store& store, RandomGenerator& generator,
+             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Runtime::Loader
+  void initialize(Upstream::ClusterManager& cm) override;
   Snapshot& snapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
+
+private:
+  friend RtdsSubscription;
 
   // Create a new Snapshot
   virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
@@ -206,16 +255,16 @@ public:
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
 
-  bool config_has_admin_layer_{};
   RandomGenerator& generator_;
   RuntimeStats stats_;
-  AdminLayer admin_layer_;
-  const ProtobufWkt::Struct base_;
+  AdminLayerPtr admin_layer_;
   ThreadLocal::SlotPtr tls_;
   const envoy::config::bootstrap::v2::LayeredRuntime config_;
   const std::string service_cluster_;
   Filesystem::WatcherPtr watcher_;
   Api::Api& api_;
+  std::vector<RtdsSubscriptionPtr> subscriptions_;
+  Upstream::ClusterManager* cm_{};
 };
 
 } // namespace Runtime

@@ -285,24 +285,24 @@ public:
 
           if (use_eds_) {
             addHeader(route_config->mutable_response_headers_to_add(), "x-routeconfig-dynamic",
-                      "%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
+                      R"(%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
 
             // Iterate over VirtualHosts, nested Routes and WeightedClusters, adding a dynamic
             // response header.
             for (auto& vhost : *route_config->mutable_virtual_hosts()) {
               addHeader(vhost.mutable_response_headers_to_add(), "x-vhost-dynamic",
-                        "vhost:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
+                        R"(vhost:%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
 
               for (auto& route : *vhost.mutable_routes()) {
                 addHeader(route.mutable_response_headers_to_add(), "x-route-dynamic",
-                          "route:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
+                          R"(route:%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
 
                 if (route.has_route()) {
                   auto* route_action = route.mutable_route();
                   if (route_action->has_weighted_clusters()) {
                     for (auto& c : *route_action->mutable_weighted_clusters()->mutable_clusters()) {
                       addHeader(c.mutable_response_headers_to_add(), "x-weighted-cluster-dynamic",
-                                "weighted:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%",
+                                R"(weighted:%UPSTREAM_METADATA(["test.namespace", "key"])%)",
                                 append);
                     }
                   }

@@ -23,7 +23,7 @@ public:
   virtual void sign(Http::Message& message, bool sign_body) PURE;
 };
 
-typedef std::unique_ptr<Signer> SignerPtr;
+using SignerPtr = std::unique_ptr<Signer>;
 
 } // namespace Aws
 } // namespace Common

@@ -15,10 +15,10 @@ namespace Envoy {
 namespace Upstream {
 
 class Host;
-typedef std::shared_ptr<Host> HostSharedPtr;
+using HostSharedPtr = std::shared_ptr<Host>;
 
 class HostDescription;
-typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
+using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;
 
 namespace Outlier {
 
@@ -55,7 +55,7 @@ public:
   // Types of Success Rate monitors.
   enum class SuccessRateMonitorType { ExternalOrigin, LocalOrigin };
 
-  virtual ~DetectorHostMonitor() {}
+  virtual ~DetectorHostMonitor() = default;
 
   /**
    * @return the number of times this host has been ejected.
@@ -112,7 +112,7 @@ public:
   virtual double successRate(SuccessRateMonitorType type) PURE;
 };
 
-typedef std::unique_ptr<DetectorHostMonitor> DetectorHostMonitorPtr;
+using DetectorHostMonitorPtr = std::unique_ptr<DetectorHostMonitor>;
 
 /**
  * Interface for an outlier detection engine. Uses per host data to determine which hosts in a
@@ -120,12 +120,12 @@ typedef std::unique_ptr<DetectorHostMonitor> DetectorHostMonitorPtr;
  */
 class Detector {
 public:
-  virtual ~Detector() {}
+  virtual ~Detector() = default;
 
   /**
    * Outlier detection change state callback.
    */
-  typedef std::function<void(const HostSharedPtr& host)> ChangeStateCb;
+  using ChangeStateCb = std::function<void(const HostSharedPtr& host)>;
 
   /**
    * Add a changed state callback to the detector. The callback will be called whenever any host
@@ -152,14 +152,14 @@ public:
       successRateEjectionThreshold(DetectorHostMonitor::SuccessRateMonitorType) const PURE;
 };
 
-typedef std::shared_ptr<Detector> DetectorSharedPtr;
+using DetectorSharedPtr = std::shared_ptr<Detector>;
 
 /**
  * Sink for outlier detection event logs.
  */
 class EventLogger {
 public:
-  virtual ~EventLogger() {}
+  virtual ~EventLogger() = default;
 
   /**
    * Log an ejection event.
@@ -179,7 +179,7 @@ public:
   virtual void logUneject(const HostDescriptionConstSharedPtr& host) PURE;
 };
 
-typedef std::shared_ptr<EventLogger> EventLoggerSharedPtr;
+using EventLoggerSharedPtr = std::shared_ptr<EventLogger>;
 
 } // namespace Outlier
 } // namespace Upstream

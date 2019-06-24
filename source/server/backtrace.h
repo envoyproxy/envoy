@@ -35,7 +35,7 @@ namespace Envoy {
  */
 class BackwardsTrace : Logger::Loggable<Logger::Id::backtrace> {
 public:
-  BackwardsTrace() {}
+  BackwardsTrace() = default;
 
   /**
    * Capture a stack trace.

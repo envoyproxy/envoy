@@ -451,7 +451,7 @@ protected:
 
 TEST_P(MixedAddressTest, Equality) {
   TestCase lhs_case = ::testing::get<0>(GetParam());
-  TestCase rhs_case = ::testing::get<1>(GetParam());
+  const TestCase& rhs_case = ::testing::get<1>(GetParam());
   InstanceConstSharedPtr lhs = testCaseToInstance(lhs_case);
   InstanceConstSharedPtr rhs = testCaseToInstance(rhs_case);
   if (lhs_case == rhs_case) {

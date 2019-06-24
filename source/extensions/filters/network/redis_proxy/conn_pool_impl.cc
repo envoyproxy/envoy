@@ -188,13 +188,13 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
     return nullptr;
   }
 
-  auto colon_pos = host_address.rfind(":");
+  auto colon_pos = host_address.rfind(':');
   if ((colon_pos == std::string::npos) || (colon_pos == (host_address.size() - 1))) {
     return nullptr;
   }
 
   const std::string ip_address = host_address.substr(0, colon_pos);
-  const bool ipv6 = (ip_address.find(":") != std::string::npos);
+  const bool ipv6 = (ip_address.find(':') != std::string::npos);
   std::string host_address_map_key;
   Network::Address::InstanceConstSharedPtr address_ptr;
 

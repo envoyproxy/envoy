@@ -35,7 +35,7 @@ namespace Server {
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   /**
    * @return Admin& the global HTTP admin endpoint for the server.

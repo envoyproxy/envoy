@@ -26,7 +26,7 @@ private:
   const uint32_t max_;
 };
 
-typedef std::list<PortRange> PortRangeList;
+using PortRangeList = std::list<PortRange>;
 
 /**
  * Common network utility routines.

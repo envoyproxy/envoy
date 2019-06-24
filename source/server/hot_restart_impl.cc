@@ -1,10 +1,10 @@
 #include "server/hot_restart_impl.h"
 
-#include <signal.h>
 #include <sys/prctl.h>
 #include <sys/types.h>
 #include <sys/un.h>
 
+#include <csignal>
 #include <cstdint>
 #include <memory>
 #include <string>

@@ -1,5 +1,3 @@
-#include <stdlib.h>
-
 #include <cstdlib>
 
 #include "common/protobuf/protobuf.h"
@@ -21,7 +19,7 @@ class SquashFilterIntegrationTest : public testing::TestWithParam<Network::Addre
 public:
   SquashFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
-  ~SquashFilterIntegrationTest() {
+  ~SquashFilterIntegrationTest() override {
     if (fake_squash_connection_) {
       AssertionResult result = fake_squash_connection_->close();
       RELEASE_ASSERT(result, result.message());

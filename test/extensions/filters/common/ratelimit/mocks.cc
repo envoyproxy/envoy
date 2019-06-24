@@ -6,8 +6,8 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-MockClient::MockClient() {}
-MockClient::~MockClient() {}
+MockClient::MockClient() = default;
+MockClient::~MockClient() = default;
 
 } // namespace RateLimit
 } // namespace Common

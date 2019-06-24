@@ -54,10 +54,9 @@ public:
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
-    return std::make_unique<LdsApiImpl>(
-        lds_config, server_.clusterManager(), server_.dispatcher(), server_.random(),
-        server_.initManager(), server_.localInfo(), server_.stats(), server_.listenerManager(),
-        server_.messageValidationVisitor(), server_.api());
+    return std::make_unique<LdsApiImpl>(lds_config, server_.clusterManager(), server_.initManager(),
+                                        server_.stats(), server_.listenerManager(),
+                                        server_.messageValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -87,7 +86,7 @@ private:
 };
 
 class ListenerImpl;
-typedef std::unique_ptr<ListenerImpl> ListenerImplPtr;
+using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
 
 /**
  * All listener manager stats. @see stats_macros.h
@@ -138,7 +137,7 @@ public:
   ListenerComponentFactory& factory_;
 
 private:
-  typedef std::list<ListenerImplPtr> ListenerList;
+  using ListenerList = std::list<ListenerImplPtr>;
 
   struct DrainingListener {
     DrainingListener(ListenerImplPtr&& listener, uint64_t workers_pending_removal)

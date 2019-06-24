@@ -484,7 +484,7 @@ TEST(HeaderMapImplTest, SetRemovesAllValues) {
   headers.addReference(key1, ref_value3);
   headers.addReference(key1, ref_value4);
 
-  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
 
   {
     MockCb cb;
@@ -682,7 +682,7 @@ TEST(HeaderMapImplTest, Iterate) {
   LowerCaseString foo_key("foo");
   headers.setReferenceKey(foo_key, "bar"); // set moves key to end
 
-  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
   MockCb cb;
 
   InSequence seq;
@@ -705,7 +705,7 @@ TEST(HeaderMapImplTest, IterateReverse) {
   LowerCaseString world_key("world");
   headers.setReferenceKey(world_key, "hello");
 
-  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
   MockCb cb;
 
   InSequence seq;
@@ -819,7 +819,7 @@ TEST(HeaderMapImplDeathTest, TestHeaderLengthChecks) {
 }
 
 TEST(HeaderMapImplTest, PseudoHeaderOrder) {
-  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
   MockCb cb;
 
   {

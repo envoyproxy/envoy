@@ -257,7 +257,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) {
 }
 
 void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string> keys) {
-  for (const auto key : keys) {
+  for (const auto& key : keys) {
     // keys are the same as their corresponding values.
     EXPECT_EQ(metadata_map.find(key)->second, key);
   }
@@ -429,6 +429,23 @@ TEST_P(Http2IntegrationTest, GrpcRouterNotFound) {
 }
 
 TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
+
+// Verify the case where there is an HTTP/2 codec/protocol error with an active stream.
+TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Sends a request.
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  waitForNextUpstreamRequest();
+
+  // Send bogus raw data on the connection.
+  Buffer::OwnedImpl bogus_data("some really bogus data");
+  codec_client_->rawConnection().write(bogus_data, false);
+
+  // Verifies reset is received.
+  response->waitForReset();
+}
 
 TEST_P(Http2IntegrationTest, BadMagic) {
   initialize();

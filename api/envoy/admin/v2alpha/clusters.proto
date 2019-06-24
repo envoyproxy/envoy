@@ -97,6 +97,8 @@ message HostStatus {
   // The host's weight. If not configured, the value defaults to 1.
   uint32 weight = 5;
 
+  // The hostname of the host, if applicable.
+  string hostname = 6;
   // Request success rate for this host over the last calculated
   // interval when only locally originated errors are taken into account and externally originated
   // errors were treated as success.
@@ -109,7 +111,7 @@ message HostStatus {
   // Note: the message will not be present if host did not have enough request volume to calculate
   // success rate or the cluster did not have enough hosts to run through success rate outlier
   // ejection.
-  envoy.type.Percent local_origin_success_rate = 6;
+  envoy.type.Percent local_origin_success_rate = 7;
 }
 
 // Health status for a host.

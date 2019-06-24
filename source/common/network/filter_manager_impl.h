@@ -21,7 +21,7 @@ struct StreamBuffer {
  */
 class ReadBufferSource {
 public:
-  virtual ~ReadBufferSource() {}
+  virtual ~ReadBufferSource() = default;
 
   /**
    * Fetch the read buffer for the source.
@@ -34,7 +34,7 @@ public:
  */
 class WriteBufferSource {
 public:
-  virtual ~WriteBufferSource() {}
+  virtual ~WriteBufferSource() = default;
 
   /**
    * Fetch the write buffer for the source.
@@ -81,7 +81,7 @@ class FilterManagerConnection : public virtual Connection,
                                 public ReadBufferSource,
                                 public WriteBufferSource {
 public:
-  virtual ~FilterManagerConnection() {}
+  ~FilterManagerConnection() override = default;
 
   /**
    * Write data to the connection bypassing filter chain.
@@ -132,11 +132,11 @@ private:
     bool initialized_{};
   };
 
-  typedef std::unique_ptr<ActiveReadFilter> ActiveReadFilterPtr;
+  using ActiveReadFilterPtr = std::unique_ptr<ActiveReadFilter>;
 
   struct ActiveWriteFilter : public WriteFilterCallbacks, LinkedObject<ActiveWriteFilter> {
     ActiveWriteFilter(FilterManagerImpl& parent, WriteFilterSharedPtr filter)
-        : parent_(parent), filter_(filter) {}
+        : parent_(parent), filter_(std::move(filter)) {}
 
     Connection& connection() override { return parent_.connection_; }
     void injectWriteDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
@@ -148,7 +148,7 @@ private:
     WriteFilterSharedPtr filter_;
   };
 
-  typedef std::unique_ptr<ActiveWriteFilter> ActiveWriteFilterPtr;
+  using ActiveWriteFilterPtr = std::unique_ptr<ActiveWriteFilter>;
 
   void onContinueReading(ActiveReadFilter* filter, ReadBufferSource& buffer_source);
 

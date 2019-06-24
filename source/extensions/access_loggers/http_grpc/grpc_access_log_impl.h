@@ -28,7 +28,7 @@ namespace HttpGrpc {
  */
 class GrpcAccessLogStreamer {
 public:
-  virtual ~GrpcAccessLogStreamer() {}
+  virtual ~GrpcAccessLogStreamer() = default;
 
   /**
    * Send an access log.
@@ -39,7 +39,7 @@ public:
                     const std::string& log_name) PURE;
 };
 
-typedef std::shared_ptr<GrpcAccessLogStreamer> GrpcAccessLogStreamerSharedPtr;
+using GrpcAccessLogStreamerSharedPtr = std::shared_ptr<GrpcAccessLogStreamer>;
 
 /**
  * Production implementation of GrpcAccessLogStreamer that supports per-thread and per-log
@@ -69,7 +69,7 @@ private:
     const LocalInfo::LocalInfo& local_info_;
   };
 
-  typedef std::shared_ptr<SharedState> SharedStateSharedPtr;
+  using SharedStateSharedPtr = std::shared_ptr<SharedState>;
 
   struct ThreadLocalStreamer;
 
