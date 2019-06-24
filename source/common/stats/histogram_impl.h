@@ -92,7 +92,7 @@ private:
 class NullHistogramImpl : public Histogram, NullMetricImpl {
 public:
   explicit NullHistogramImpl(SymbolTable& symbol_table) : NullMetricImpl(symbol_table) {}
-  ~NullHistogramImpl() {
+  ~NullHistogramImpl() override {
     // MetricImpl must be explicitly cleared() before destruction, otherwise it
     // will not be able to access the SymbolTable& to free the symbols. An RAII
     // alternative would be to store the SymbolTable reference in the

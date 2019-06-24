@@ -34,18 +34,18 @@ MockProtocol::MockProtocol() {
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, type()).WillByDefault(Return(type_));
 }
-MockProtocol::~MockProtocol() {}
+MockProtocol::~MockProtocol() = default;
 
 MockDeserializer::MockDeserializer() {
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, type()).WillByDefault(Return(type_));
 }
-MockDeserializer::~MockDeserializer() {}
+MockDeserializer::~MockDeserializer() = default;
 
 namespace DubboFilters {
 
-MockFilterChainFactoryCallbacks::MockFilterChainFactoryCallbacks() {}
-MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() {}
+MockFilterChainFactoryCallbacks::MockFilterChainFactoryCallbacks() = default;
+MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() = default;
 
 MockDecoderFilter::MockDecoderFilter() {
   ON_CALL(*this, transportBegin()).WillByDefault(Return(Network::FilterStatus::Continue));
@@ -63,7 +63,7 @@ MockDecoderFilter::MockDecoderFilter() {
         return Network::FilterStatus::Continue;
       }));
 }
-MockDecoderFilter::~MockDecoderFilter() {}
+MockDecoderFilter::~MockDecoderFilter() = default;
 
 MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
   route_.reset(new NiceMock<Router::MockRoute>());
@@ -73,16 +73,16 @@ MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
   ON_CALL(*this, route()).WillByDefault(Return(route_));
   ON_CALL(*this, streamInfo()).WillByDefault(ReturnRef(stream_info_));
 }
-MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() {}
+MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() = default;
 
-MockDirectResponse::MockDirectResponse() {}
-MockDirectResponse::~MockDirectResponse() {}
+MockDirectResponse::MockDirectResponse() = default;
+MockDirectResponse::~MockDirectResponse() = default;
 
 MockFilterConfigFactory::MockFilterConfigFactory()
     : MockFactoryBase("envoy.filters.dubbo.mock_filter"),
       mock_filter_(std::make_shared<NiceMock<MockDecoderFilter>>()) {}
 
-MockFilterConfigFactory::~MockFilterConfigFactory() {}
+MockFilterConfigFactory::~MockFilterConfigFactory() = default;
 
 FilterFactoryCb
 MockFilterConfigFactory::createFilterFactoryFromProtoTyped(const ProtobufWkt::Struct& proto_config,
@@ -103,10 +103,10 @@ namespace Router {
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
 }
-MockRouteEntry::~MockRouteEntry() {}
+MockRouteEntry::~MockRouteEntry() = default;
 
 MockRoute::MockRoute() { ON_CALL(*this, routeEntry()).WillByDefault(Return(&route_entry_)); }
-MockRoute::~MockRoute() {}
+MockRoute::~MockRoute() = default;
 
 } // namespace Router
 

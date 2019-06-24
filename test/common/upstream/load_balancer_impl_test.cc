@@ -1175,7 +1175,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
   HostsPerLocalitySharedPtr upstream_hosts_per_locality = makeHostsPerLocality(
       {{makeTestHost(info_, "tcp://127.0.0.1:80")}, {makeTestHost(info_, "tcp://127.0.0.1:81")}},
       true);
-  HostsPerLocalitySharedPtr local_hosts_per_locality = upstream_hosts_per_locality;
+  const HostsPerLocalitySharedPtr& local_hosts_per_locality = upstream_hosts_per_locality;
 
   hostSet().healthy_hosts_ = *upstream_hosts;
   hostSet().hosts_ = *upstream_hosts;
@@ -1398,7 +1398,7 @@ TEST(LoadBalancerSubsetInfoImplTest, DefaultConfigIsDiabled) {
   EXPECT_FALSE(subset_info.isEnabled());
   EXPECT_TRUE(subset_info.fallbackPolicy() == envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK);
   EXPECT_EQ(subset_info.defaultSubset().fields_size(), 0);
-  EXPECT_EQ(subset_info.subsetKeys().size(), 0);
+  EXPECT_EQ(subset_info.subsetSelectors().size(), 0);
 }
 
 TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
@@ -1408,8 +1408,12 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
   subset_config.set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
   subset_config.mutable_default_subset()->mutable_fields()->insert({"key", subset_value});
-  auto subset_selector = subset_config.mutable_subset_selectors()->Add();
-  subset_selector->add_keys("selector_key");
+  auto subset_selector1 = subset_config.mutable_subset_selectors()->Add();
+  subset_selector1->add_keys("selector_key1");
+  auto subset_selector2 = subset_config.mutable_subset_selectors()->Add();
+  subset_selector2->add_keys("selector_key2");
+  subset_selector2->set_fallback_policy(
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
 
   auto subset_info = LoadBalancerSubsetInfoImpl(subset_config);
 
@@ -1419,8 +1423,15 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   EXPECT_EQ(subset_info.defaultSubset().fields_size(), 1);
   EXPECT_EQ(subset_info.defaultSubset().fields().at("key").string_value(),
             std::string("the value"));
-  EXPECT_EQ(subset_info.subsetKeys().size(), 1);
-  EXPECT_EQ(subset_info.subsetKeys()[0], std::set<std::string>({"selector_key"}));
+  EXPECT_EQ(subset_info.subsetSelectors().size(), 2);
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->selector_keys_,
+            std::set<std::string>({"selector_key1"}));
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallback_policy_,
+            envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED);
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->selector_keys_,
+            std::set<std::string>({"selector_key2"}));
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallback_policy_,
+            envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
 }
 
 } // namespace

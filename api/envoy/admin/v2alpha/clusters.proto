@@ -66,8 +66,11 @@ message HostStatus {
   // The host's weight. If not configured, the value defaults to 1.
   uint32 weight = 5;
 
+  // The hostname of the host, if applicable.
+  string hostname = 6;
+
   // The host's priority. If not configured, the value defaults to 0 (highest priority).
-  uint32 priority = 6;
+  uint32 priority = 7;
 }
 
 // Health status for a host.

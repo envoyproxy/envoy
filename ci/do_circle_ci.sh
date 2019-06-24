@@ -29,4 +29,4 @@ trap finish EXIT
 echo "disk space at beginning of build:"
 df -h
 
-ci/do_ci.sh "$1"
+ci/do_ci.sh $*

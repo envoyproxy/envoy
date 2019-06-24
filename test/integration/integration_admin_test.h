@@ -30,7 +30,7 @@ public:
     Json::ObjectSharedPtr statsjson = Json::Factory::loadFromString(stats_json);
     EXPECT_TRUE(statsjson->hasObject("stats"));
     uint64_t histogram_count = 0;
-    for (Json::ObjectSharedPtr obj_ptr : statsjson->getObjectArray("stats")) {
+    for (const Json::ObjectSharedPtr& obj_ptr : statsjson->getObjectArray("stats")) {
       if (obj_ptr->hasObject("histograms")) {
         histogram_count++;
         const Json::ObjectSharedPtr& histograms_ptr = obj_ptr->getObject("histograms");

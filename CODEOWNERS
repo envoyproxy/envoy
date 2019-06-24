@@ -10,6 +10,8 @@
 /*/extensions/filters/http/original_src @snowp @klarose
 # original_src listener filter extension
 /*/extensions/filters/listener/original_src @snowp @klarose
+# original_src common extension
+extensions/filters/common/original_src @snowp @klarose
 # dubbo_proxy extension
 /*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan
 # thrift_proxy extension
@@ -34,3 +36,9 @@
 /*/extensions/filters/network/zookeeper_proxy @rgs1 @snowp
 # redis cluster extension
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
+# dynamic forward proxy
+/*/extensions/clusters/dynamic_forward_proxy @mattklein123 @alyssawilk
+/*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
+/*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
+# omit_canary_hosts retry predicate
+/*/extensions/retry/host/omit_canary_hosts @sriduth @snowp
