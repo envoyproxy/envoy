@@ -552,6 +552,30 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
   expectHealthyHosts(std::get<3>(GetParam()));
 }
 
+TEST_F(RedisClusterTest, EmptyDnsResponse) {
+  Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  setupFromV2Yaml(BasicConfig);
+
+  EXPECT_CALL(*dns_timer, enableTimer(_));
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", {});
+
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1U, cluster_->info()->stats().update_empty_.value());
+
+  // Does not recreate the timer on subsequent DNS resolve calls.
+  EXPECT_CALL(*dns_timer, enableTimer(_));
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", {});
+  dns_timer->invokeCallback();
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(2U, cluster_->info()->stats().update_empty_.value());
+}
+
 TEST_F(RedisClusterTest, Basic) {
   // Using load assignment.
   const std::string basic_yaml_load_assignment = R"EOF(

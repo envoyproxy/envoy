@@ -131,8 +131,19 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolve() {
       [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
-        parent_.redis_discovery_session_.registerDiscoveryAddress(address_list, port_);
-        parent_.redis_discovery_session_.startResolve();
+        if (address_list.empty()) {
+          parent_.info_->stats().update_empty_.inc();
+          if (!resolve_timer_) {
+            resolve_timer_ = parent_.dispatcher_.createTimer([this]() -> void { startResolve(); });
+          }
+          // if the initial dns resolved to empty, we'll skip the redis discovery phase and treat it
+          // as an empty cluster.
+          parent_.onPreInitComplete();
+          resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+        } else {
+          parent_.redis_discovery_session_.registerDiscoveryAddress(address_list, port_);
+          parent_.redis_discovery_session_.startResolve();
+        }
       });
 }
 

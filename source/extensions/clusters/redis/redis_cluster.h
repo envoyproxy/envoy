@@ -166,6 +166,7 @@ private:
     Network::ActiveDnsQuery* active_query_{};
     const std::string dns_address_;
     const uint32_t port_;
+    Event::TimerPtr resolve_timer_;
   };
 
   using DnsDiscoveryResolveTargetPtr = std::unique_ptr<DnsDiscoveryResolveTarget>;
