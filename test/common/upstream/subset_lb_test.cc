@@ -38,7 +38,7 @@ public:
   using MetadataVector = std::vector<std::pair<std::string, ProtobufWkt::Value>>;
 
   void test(std::string expected, const MetadataVector& metadata) {
-    SubsetLoadBalancer::SubsetMetadata subset_metadata(metadata);
+    const SubsetLoadBalancer::SubsetMetadata& subset_metadata(metadata);
     EXPECT_EQ(expected, lb_.get()->describeMetadata(subset_metadata));
   }
 

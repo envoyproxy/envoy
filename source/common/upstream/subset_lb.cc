@@ -486,7 +486,7 @@ SubsetLoadBalancer::extractSubsetMetadata(const std::set<std::string>& subset_ke
   }
 
   const auto& fields = filter_it->second.fields();
-  for (const auto key : subset_keys) {
+  for (const auto& key : subset_keys) {
     const auto it = fields.find(key);
     if (it == fields.end()) {
       all_kvs.clear();

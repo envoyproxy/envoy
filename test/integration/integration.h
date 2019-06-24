@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/server/process_context.h"
+
 #include "common/http/codec_client.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -20,6 +22,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 
+#include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -322,6 +325,8 @@ protected:
   InstanceConstSharedPtrFn upstream_address_fn_;
   // The config for envoy start-up.
   ConfigHelper config_helper_;
+  // The ProcessObject to use when constructing the envoy server.
+  absl::optional<std::reference_wrapper<ProcessObject>> process_object_{absl::nullopt};
 
   // Steps that should be done in parallel with the envoy server starting. E.g., xDS
   // pre-init, control plane synchronization needed for server start.

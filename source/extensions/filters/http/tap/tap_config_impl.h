@@ -42,10 +42,10 @@ public:
   bool onDestroyLog() override;
 
 private:
-  typedef envoy::data::tap::v2alpha::Body* (
-      envoy::data::tap::v2alpha::HttpStreamedTraceSegment::*MutableBodyChunk)();
-  typedef envoy::data::tap::v2alpha::HttpBufferedTrace::Message* (
-      envoy::data::tap::v2alpha::HttpBufferedTrace::*MutableMessage)();
+  using MutableBodyChunk =
+      envoy::data::tap::v2alpha::Body* (envoy::data::tap::v2alpha::HttpStreamedTraceSegment::*)();
+  using MutableMessage = envoy::data::tap::v2alpha::HttpBufferedTrace::Message* (
+      envoy::data::tap::v2alpha::HttpBufferedTrace::*)();
 
   void onBody(const Buffer::Instance& data,
               Extensions::Common::Tap::TraceWrapperPtr& buffered_streamed_body,

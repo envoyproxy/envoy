@@ -238,7 +238,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
       pos += 1;
       int command_end_position = pos + token.length();
 
-      if (token.find("REQ(") == 0) {
+      if (absl::StartsWith(token, "REQ(")) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
@@ -246,7 +246,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
 
         formatters.emplace_back(FormatterProviderPtr{
             new RequestHeaderFormatter(main_header, alternative_header, max_length)});
-      } else if (token.find("RESP(") == 0) {
+      } else if (absl::StartsWith(token, "RESP(")) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
@@ -254,7 +254,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
 
         formatters.emplace_back(FormatterProviderPtr{
             new ResponseHeaderFormatter(main_header, alternative_header, max_length)});
-      } else if (token.find("TRAILER(") == 0) {
+      } else if (absl::StartsWith(token, "TRAILER(")) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
@@ -262,7 +262,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
 
         formatters.emplace_back(FormatterProviderPtr{
             new ResponseTrailerFormatter(main_header, alternative_header, max_length)});
-      } else if (token.find(DYNAMIC_META_TOKEN) == 0) {
+      } else if (absl::StartsWith(token, DYNAMIC_META_TOKEN)) {
         std::string filter_namespace;
         absl::optional<size_t> max_length;
         std::vector<std::string> path;
@@ -271,7 +271,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
         parseCommand(token, start, ":", filter_namespace, path, max_length);
         formatters.emplace_back(
             FormatterProviderPtr{new DynamicMetadataFormatter(filter_namespace, path, max_length)});
-      } else if (token.find("START_TIME") == 0) {
+      } else if (absl::StartsWith(token, "START_TIME")) {
         const size_t parameters_length = pos + StartTimeParamStart + 1;
         const size_t parameters_end = command_end_position - parameters_length;
 

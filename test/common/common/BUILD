@@ -203,3 +203,11 @@ envoy_cc_test(
         "//source/common/common:thread_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "stl_helpers_test",
+    srcs = ["stl_helpers_test.cc"],
+    deps = [
+        "//source/common/common:stl_helpers",
+    ],
+)

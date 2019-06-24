@@ -10,7 +10,7 @@ namespace Http {
 class MockStream : public Stream {
 public:
   MockStream();
-  ~MockStream();
+  ~MockStream() override;
 
   // Http::Stream
   MOCK_METHOD1(addCallbacks, void(StreamCallbacks& callbacks));

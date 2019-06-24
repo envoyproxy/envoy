@@ -11,6 +11,8 @@
 #include "common/common/hash.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/histogram_impl.h"
+#include "common/stats/null_counter.h"
+#include "common/stats/null_gauge.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
 
@@ -46,7 +48,7 @@ public:
 
   // Stats::Histogram
   void recordValue(uint64_t value) override;
-  bool used() const override { return flags_ & Flags::Used; }
+  bool used() const override { return used_; }
 
   // Stats::Metric
   StatName statName() const override { return name_.statName(); }
@@ -56,7 +58,7 @@ private:
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
   uint64_t current_active_;
   histogram_t* histograms_[2];
-  std::atomic<uint16_t> flags_;
+  std::atomic<bool> used_;
   std::thread::id created_thread_id_;
   StatNameStorage name_;
   SymbolTable& symbol_table_;

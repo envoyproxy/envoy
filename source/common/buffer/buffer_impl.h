@@ -507,7 +507,7 @@ public:
 
   // LibEventInstance
   Event::Libevent::BufferPtr& buffer() override { return buffer_; }
-  virtual void postProcess() override;
+  void postProcess() override;
 
   /**
    * Create a new slice at the end of the buffer, and copy the supplied content into it.

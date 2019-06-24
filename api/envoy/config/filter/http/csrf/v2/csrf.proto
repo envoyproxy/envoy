@@ -8,6 +8,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.csrf.v2";
 option go_package = "v2";
 
 import "envoy/api/v2/core/base.proto";
+import "envoy/type/matcher/string.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
@@ -17,7 +18,7 @@ import "gogoproto/gogo.proto";
 
 // CSRF filter config.
 message CsrfPolicy {
-  // Specify if CSRF is enabled.
+  // Specifies if CSRF is enabled.
   //
   // More information on how this can be controlled via runtime can be found
   // :ref:`here <csrf-runtime>`.
@@ -40,4 +41,11 @@ message CsrfPolicy {
   //   This field defaults to 100/:ref:`HUNDRED
   //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
   envoy.api.v2.core.RuntimeFractionalPercent shadow_enabled = 2;
+
+  // Specifies additional source origins that will be allowed in addition to
+  // the destination origin.
+  //
+  // More information on how this can be configured via runtime can be found
+  // :ref:`here <csrf-configuration>`.
+  repeated envoy.type.matcher.StringMatcher additional_origins = 3;
 }

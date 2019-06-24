@@ -81,7 +81,7 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
     retry_host_predicate_configs_.emplace_back(host_predicate.name(), std::move(config));
   }
 
-  const auto retry_priority = retry_policy.retry_priority();
+  const auto& retry_priority = retry_policy.retry_priority();
   if (!retry_priority.name().empty()) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
         retry_priority.name());
@@ -462,7 +462,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     cors_policy_ =
         std::make_unique<CorsPolicyImpl>(route.route().cors(), factory_context.runtime());
   }
-  for (const auto upgrade_config : route.route().upgrade_configs()) {
+  for (const auto& upgrade_config : route.route().upgrade_configs()) {
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
     const bool success =
         upgrade_map_
@@ -664,7 +664,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::route::Route& route)
     if (filter_metadata == route.metadata().filter_metadata().end()) {
       return ret;
     }
-    for (auto it : filter_metadata->second.fields()) {
+    for (const auto& it : filter_metadata->second.fields()) {
       if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
         ret.emplace(it.first, it.second.string_value());
       }
