@@ -23,6 +23,7 @@ envoy_py_test_binary(
     srcs = [
         "socket_passing.py",
     ],
+    python_version = "PY3",
 )
 
 envoy_cc_binary(
