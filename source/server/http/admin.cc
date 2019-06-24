@@ -675,25 +675,13 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-envoy::admin::v2alpha::ServerInfo::State AdminImpl::serverState() {
-  switch (server_.initManager().state()) {
-  case Init::Manager::State::Uninitialized:
-    return envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;
-  case Init::Manager::State::Initializing:
-    return envoy::admin::v2alpha::ServerInfo::INITIALIZING;
-  case Init::Manager::State::Initialized:
-    return server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
-                                       : envoy::admin::v2alpha::ServerInfo::LIVE;
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
   time_t current_time = time(nullptr);
   envoy::admin::v2alpha::ServerInfo server_info;
   server_info.set_version(VersionInfo::version());
-  server_info.set_state(serverState());
+  server_info.set_state(
+      Utility::serverState(server_.initManager().state(), server_.healthCheckFailed()));
 
   server_info.mutable_uptime_current_epoch()->set_seconds(current_time -
                                                           server_.startTimeCurrentEpoch());
@@ -709,7 +697,8 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
 
 Http::Code AdminImpl::handlerReady(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
                                    AdminStream&) {
-  const envoy::admin::v2alpha::ServerInfo::State state = serverState();
+  const envoy::admin::v2alpha::ServerInfo::State state =
+      Utility::serverState(server_.initManager().state(), server_.healthCheckFailed());
 
   response.add(envoy::admin::v2alpha::ServerInfo_State_Name(state) + "\n");
   Http::Code code = state == envoy::admin::v2alpha::ServerInfo_State_LIVE
@@ -1434,6 +1423,20 @@ void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
     handler->addListener(*listener_);
   }
+}
+
+envoy::admin::v2alpha::ServerInfo::State Utility::serverState(Init::Manager::State state,
+                                                              bool health_check_failed) {
+  switch (state) {
+  case Init::Manager::State::Uninitialized:
+    return envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;
+  case Init::Manager::State::Initializing:
+    return envoy::admin::v2alpha::ServerInfo::INITIALIZING;
+  case Init::Manager::State::Initialized:
+    return health_check_failed ? envoy::admin::v2alpha::ServerInfo::DRAINING
+                               : envoy::admin::v2alpha::ServerInfo::LIVE;
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Server

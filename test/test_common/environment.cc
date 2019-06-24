@@ -43,7 +43,7 @@ std::string makeTempDir(char* name_template) {
                                                  name_template, strerror(errno)));
 #ifdef __cpp_lib_filesystem
   std::filesystem::create_directories(dirname);
-#elifdef __cpp_lib_experimental_filesystem
+#elif defined __cpp_lib_experimental_filesystem
   std::experimental::filesystem::create_directories(dirname);
 #endif
 #else
@@ -88,7 +88,7 @@ void TestEnvironment::createPath(const std::string& path) {
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
   std::filesystem::create_directories(std::filesystem::path(path));
-#elifdef __cpp_lib_experimental_filesystem
+#elif defined __cpp_lib_experimental_filesystem
   std::experimental::filesystem::create_directories(std::experimental::filesystem::path(path));
 #else
   // No support on this system for std::filesystem or std::experimental::filesystem.
@@ -101,7 +101,7 @@ void TestEnvironment::createParentPath(const std::string& path) {
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
   std::filesystem::create_directories(std::filesystem::path(path).parent_path());
-#elifdef __cpp_lib_experimental_filesystem
+#elif defined __cpp_lib_experimental_filesystem
   std::experimental::filesystem::create_directories(
       std::experimental::filesystem::path(path).parent_path());
 #else
@@ -119,7 +119,7 @@ void TestEnvironment::removePath(const std::string& path) {
     return;
   }
   std::filesystem::remove_all(std::filesystem::path(path));
-#elifdef __cpp_lib_experimental_filesystem
+#elif defined __cpp_lib_experimental_filesystem
   if (!std::experimental::filesystem::exists(path)) {
     return;
   }
