@@ -225,6 +225,7 @@ envoy_cc_test(
         ":node_bootstrap_without_access_log.yaml",
         ":runtime_bootstrap.yaml",
         ":runtime_test_data",
+        ":stats_sink_bootstrap.yaml",
         ":zipkin_tracing.yaml",
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",

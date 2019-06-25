@@ -153,6 +153,34 @@ Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::str
   return findByName(store.gauges(), name);
 }
 
+void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
+                                   Event::TestTimeSystem& time_system) {
+  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+void TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
+                                   Event::TestTimeSystem& time_system) {
+  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+void TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
+                                 Event::TestTimeSystem& time_system) {
+  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+void TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
+                                 Event::TestTimeSystem& time_system) {
+  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
 std::list<Network::DnsResponse>
 TestUtility::makeDnsResponse(const std::list<std::string>& addresses,
                              const std::chrono::seconds ttl) {
@@ -162,7 +190,7 @@ TestUtility::makeDnsResponse(const std::list<std::string>& addresses,
     ret.emplace_back(Network::DnsResponse(Network::Utility::parseInternetAddress(address), ttl));
   }
   return ret;
-}
+} // namespace Envoy
 
 std::vector<std::string> TestUtility::listFiles(const std::string& path, bool recursive) {
   std::vector<std::string> file_names;
