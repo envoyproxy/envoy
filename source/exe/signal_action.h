@@ -8,17 +8,11 @@
 
 #include "common/common/non_copyable.h"
 
+#include "exe/crash_handler.h"
+
 #include "server/backtrace.h"
 
 namespace Envoy {
-
-// A simple class which allows registering functions to be called when Envoy
-// receives one of the fatal signals, documented below.
-class CrashHandlerInterface {
-public:
-  virtual ~CrashHandlerInterface() {}
-  virtual void crashHandler() const PURE;
-};
 
 /**
  * This class installs signal handlers for fatal signal types.

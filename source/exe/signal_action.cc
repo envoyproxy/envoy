@@ -43,10 +43,11 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
   tracer.logTrace();
 
   FailureFunctionList* list = crash_handlers.exchange(nullptr, std::memory_order_relaxed);
-
-  // Finally after logging the stack trace, call any registered crash handlers.
-  for (const auto* handler : *list) {
-    handler->crashHandler();
+  if (list) {
+    // Finally after logging the stack trace, call any registered crash handlers.
+    for (const auto* handler : *list) {
+      handler->crashHandler();
+    }
   }
 
   signal(sig, SIG_DFL);

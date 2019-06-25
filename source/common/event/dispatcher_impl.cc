@@ -25,6 +25,10 @@
 
 #include "event2/event.h"
 
+#ifdef ENVOY_HANDLE_SIGNALS
+#include "exe/signal_action.h"
+#endif
+
 namespace Envoy {
 namespace Event {
 

@@ -19,9 +19,7 @@
 #include "common/event/libevent.h"
 #include "common/event/libevent_scheduler.h"
 
-#ifdef ENVOY_HANDLE_SIGNALS
-#include "exe/signal_action.h"
-#endif
+#include "exe/crash_handler.h"
 
 namespace Envoy {
 namespace Event {
