@@ -129,8 +129,7 @@ MockInstance::MockInstance()
       singleton_manager_(
           new Singleton::ManagerImpl(Thread::threadFactoryForTest().currentThreadId())),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()) {
-  secret_manager_.reset(new Secret::SecretManagerImpl(admin_.getConfigTracker())),
-      ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
+  ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, grpcContext()).WillByDefault(ReturnRef(grpc_context_));
   ON_CALL(*this, httpContext()).WillByDefault(ReturnRef(http_context_));
