@@ -35,5 +35,5 @@ public class EnvoyEngine {
 
   private static native boolean isAresInitialized();
 
-  public static native int run(String config);
+  public static native int run(String config, String logLevel);
 }

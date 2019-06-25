@@ -4,9 +4,10 @@ import android.content.Context
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 
 // Wrapper class that allows for easy calling of Envoy's JNI interface in native Java.
-class Envoy(
+class Envoy @JvmOverloads constructor(
     context: Context,
-    config: String
+    config: String,
+    logLevel: String = "info"
 ) {
 
   // Dedicated thread for running this instance of Envoy.
@@ -21,7 +22,7 @@ class Envoy(
     load(context)
 
     runner = Thread(Runnable {
-      EnvoyEngine.run(config.trim())
+      EnvoyEngine.run(config.trim(), logLevel)
     })
 
     runner.start()

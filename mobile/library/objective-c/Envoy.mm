@@ -2,6 +2,8 @@
 
 #import "library/common/main_interface.h"
 
+static NSString *const kConfig = @"config";
+static NSString *const kLogLevel = @"logLevel";
 
 @interface Envoy ()
 @property (nonatomic, strong) NSThread *runner;
@@ -12,9 +14,18 @@
 @synthesize runner;
 
 - (instancetype)initWithConfig:(NSString *)config {
+  self = [self initWithConfig:config logLevel:@"info"];
+  return self;
+}
+
+- (instancetype)initWithConfig:(NSString *)config logLevel:(NSString *) logLevel {
   self = [super init];
   if (self) {
-    self.runner = [[NSThread alloc] initWithTarget:self selector:@selector(run:) object:config];
+    NSDictionary *args = @{
+      kConfig: config,
+      kLogLevel: logLevel,
+    };
+    self.runner = [[NSThread alloc] initWithTarget:self selector:@selector(run:) object:args];
     [self.runner start];
   }
   return self;
@@ -30,9 +41,9 @@
 
 #pragma mark private
 
-- (void)run:(NSString *)config {
+- (void)run:(NSDictionary *)args {
   try {
-    run_envoy(config.UTF8String);
+    run_envoy([args[kConfig] UTF8String], [args[kLogLevel] UTF8String]);
   } catch (NSException *e) {
     NSLog(@"Envoy exception: %@", e);
     NSDictionary *userInfo = @{ @"exception": e};
