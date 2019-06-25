@@ -46,7 +46,9 @@ static inline bool validHeaderString(absl::string_view s) {
  */
 class LowerCaseString {
 public:
-  LowerCaseString(LowerCaseString&& rhs) noexcept : string_(std::move(rhs.string_)) { ASSERT(valid()); }
+  LowerCaseString(LowerCaseString&& rhs) noexcept : string_(std::move(rhs.string_)) {
+    ASSERT(valid());
+  }
   LowerCaseString(const LowerCaseString& rhs) : string_(rhs.string_) { ASSERT(valid()); }
   explicit LowerCaseString(const std::string& new_string) : string_(new_string) {
     ASSERT(valid());
