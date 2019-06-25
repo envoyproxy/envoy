@@ -20,6 +20,15 @@ namespace Stats {
 template <class T> class RefcountPtr {
 public:
   RefcountPtr() : ptr_(nullptr) {}
+
+  // Constructing a reference-counted object from a pointer; this is safe to
+  // do when the reference-count is held in the object. For example, this code
+  // crashes:
+  //   {
+  //     std::shared_ptr<std::string> a = std::make_shared<std::string>("x");
+  //     std::shared_ptr<std::string> b(a.get());
+  //   }
+  // whereas the analogous code for RefcountPtr works fine.
   RefcountPtr(T* ptr) : ptr_(ptr) {
     if (ptr_ != nullptr) {
       ptr_->incRefCount();
@@ -28,8 +37,13 @@ public:
 
   RefcountPtr(const RefcountPtr& src) { set(src.get()); }
 
-  // Allows RefcountPtr<BaseClass> foo = RefcountPtr<DerivedClass>.
-  template <class U> RefcountPtr(const RefcountPtr<U>& src) { set(src.get()); }
+  // Constructor for up-casting reference-counted pointers. This doesn't change
+  // the underlying object; it just upcasts the DerivedClass* in src.ptr_ to a
+  // BaseClass* for assignment to this->ptr_. For usage of this to compile,
+  // DerivedClass* must be assignable to BaseClass* without explicit casts.
+  template <class DerivedClass> RefcountPtr(const RefcountPtr<DerivedClass>& src) {
+    set(src.get());
+  }
 
   // Move-construction is used by absl::flat_hash_map during resizes.
   RefcountPtr(RefcountPtr&& src) noexcept : ptr_(src.ptr_) { src.ptr_ = nullptr; }
