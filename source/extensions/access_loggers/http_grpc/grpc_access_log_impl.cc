@@ -89,7 +89,7 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
     AccessLog::FilterPtr&& filter,
     const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
     GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer)
-    : Instance(std::move(filter)), config_(config),
+    : AccessLog::InstanceImpl(std::move(filter)), config_(config),
       grpc_access_log_streamer_(grpc_access_log_streamer) {
   for (const auto& header : config_.additional_request_headers_to_log()) {
     request_headers_to_log_.emplace_back(header);
