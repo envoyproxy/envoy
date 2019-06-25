@@ -13,9 +13,17 @@
 #include <string>
 
 #include "common/common/logger.h"
+#include "common/common/stl_helpers.h"
 
 #include "absl/base/optimization.h"
 #include "absl/synchronization/mutex.h"
+
+// This implementation is only used by Quiche code, use macros provided by
+// assert.h and logger.h in Envoy code instead. See QUIC platform API
+// dependency model described in
+// https://quiche.googlesource.com/quiche/+/refs/heads/master/quic/platform/api/README.md
+//
+// The implementation is backed by Envoy::Logger.
 
 // If |condition| is true, use |logstream| to stream the log message and send it to spdlog.
 // If |condition| is false, |logstream| will not be instantiated.

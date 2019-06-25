@@ -25,7 +25,7 @@ TEST(OriginalSrcHttpConfigFactoryTest, TestCreateFactory) {
 
   OriginalSrcConfigFactory factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  MessageUtil::loadFromYaml(yaml, *proto_config);
+  TestUtility::loadFromYaml(yaml, *proto_config);
 
   Server::Configuration::MockFactoryContext context;
 

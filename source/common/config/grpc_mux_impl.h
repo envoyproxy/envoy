@@ -25,7 +25,7 @@ class GrpcMuxImpl : public GrpcMux,
                     public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
                     public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
+  GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Runtime::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings);
@@ -36,6 +36,7 @@ public:
                             GrpcMuxCallbacks& callbacks) override;
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
+  bool paused(const std::string& type_url) const override;
 
   void sendDiscoveryRequest(const std::string& type_url);
 
@@ -122,6 +123,7 @@ public:
   }
   void pause(const std::string&) override {}
   void resume(const std::string&) override {}
+  bool paused(const std::string&) const override { NOT_REACHED_GCOVR_EXCL_LINE; }
 };
 
 } // namespace Config

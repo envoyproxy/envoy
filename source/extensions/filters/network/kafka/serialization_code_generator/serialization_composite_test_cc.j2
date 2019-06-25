@@ -26,7 +26,7 @@ struct CompositeResultWith0Fields {
   bool operator==(const CompositeResultWith0Fields&) const { return true; }
 };
 
-typedef CompositeDeserializerWith0Delegates<CompositeResultWith0Fields> TestCompositeDeserializer0;
+using TestCompositeDeserializer0 = CompositeDeserializerWith0Delegates<CompositeResultWith0Fields>;
 
 // Composite with 0 delegates is special case: it's always ready.
 TEST(CompositeDeserializerWith0Delegates, EmptyBufferShouldBeReady) {

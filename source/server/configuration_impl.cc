@@ -44,6 +44,16 @@ bool FilterChainUtility::buildFilterChain(
   return true;
 }
 
+bool FilterChainUtility::buildUdpFilterChain(
+    Network::UdpListenerFilterManager& filter_manager, Network::UdpReadFilterCallbacks& callbacks,
+    const std::vector<Network::UdpListenerFilterFactoryCb>& factories) {
+  for (const Network::UdpListenerFilterFactoryCb& factory : factories) {
+    factory(filter_manager, callbacks);
+  }
+
+  return true;
+}
+
 void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
@@ -96,8 +106,8 @@ void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& config
 
   // Now see if there is a factory that will accept the config.
   auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(type);
-  ProtobufTypes::MessagePtr message =
-      Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), server.messageValidationVisitor(), factory);
   http_tracer_ = factory.createHttpTracer(*message, server);
 }
 
@@ -108,8 +118,8 @@ void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstra
   for (const envoy::config::metrics::v2::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config
     auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object.name());
-    ProtobufTypes::MessagePtr message =
-        Config::Utility::translateToFactoryConfig(sink_object, factory);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        sink_object, server.messageValidationVisitor(), factory);
 
     stats_sinks_.emplace_back(factory.createStatsSink(*message, server));
   }

@@ -16,7 +16,7 @@ namespace Configuration {
  */
 class TracerFactory {
 public:
-  virtual ~TracerFactory() {}
+  virtual ~TracerFactory() = default;
 
   /**
    * Create a particular HttpTracer implementation. If the implementation is unable to produce an

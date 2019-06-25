@@ -10,6 +10,7 @@ EXTENSIONS = {
     #
     # Clusters
     #
+    "envoy.clusters.dynamic_forward_proxy":             "//source/extensions/clusters/dynamic_forward_proxy:cluster",
     "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",
 
     #
@@ -31,6 +32,7 @@ EXTENSIONS = {
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
+    "envoy.filters.http.dynamic_forward_proxy":         "//source/extensions/filters/http/dynamic_forward_proxy:config",
     "envoy.filters.http.dynamo":                        "//source/extensions/filters/http/dynamo:config",
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
@@ -120,6 +122,7 @@ EXTENSIONS = {
     "envoy.tracers.lightstep":                          "//source/extensions/tracers/lightstep:config",
     "envoy.tracers.datadog":                            "//source/extensions/tracers/datadog:config",
     "envoy.tracers.zipkin":                             "//source/extensions/tracers/zipkin:config",
+    "envoy.tracers.opencensus":                         "//source/extensions/tracers/opencensus:config",
 
     #
     # Transport sockets
@@ -130,7 +133,8 @@ EXTENSIONS = {
 
     # Retry host predicates
     "envoy.retry_host_predicates.previous_hosts":          "//source/extensions/retry/host/previous_hosts:config",
-
+    "envoy.retry_host_predicates.omit_canary_hosts":            "//source/extensions/retry/host/omit_canary_hosts:config",
+    
     # Retry priorities
     "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/previous_priorities:config",
 }

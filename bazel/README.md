@@ -40,7 +40,7 @@ for how to update or override dependencies.
 
     On Fedora (maybe also other red hat distros), run the following:
     ```
-    dnf install cmake libtool libstdc++ ninja-build lld patch
+    dnf install cmake libtool libstdc++ ninja-build lld patch aspell-en
     ```
 
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
@@ -454,12 +454,13 @@ then log back in and it should start working.
 The latest coverage report for master is available
 [here](https://s3.amazonaws.com/lyft-envoy/coverage/report-master/coverage.html).
 
-It's also possible to specialize the coverage build to a single test target. This is useful
-when doing things like exploring the coverage of a fuzzer over its corpus. This can be done with
-the `COVERAGE_TARGET` and `VALIDATE_COVERAGE` environment variables, e.g.:
+It's also possible to specialize the coverage build to a specified test or test dir. This is useful
+when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by
+passing coverage targets as the command-line arguments and using the `VALIDATE_COVERAGE` environment
+variable, e.g.:
 
 ```
-COVERAGE_TARGET=//test/common/common:base64_fuzz_test VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh
+VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh //test/common/common:base64_fuzz_test
 ```
 
 # Cleaning the build and test artifacts
@@ -529,19 +530,20 @@ to run clang-format scripts on your workstation directly:
  * It's possible there is a speed advantage
  * Docker itself can sometimes go awry and you then have to deal with that
  * Type-ahead doesn't always work when waiting running a command through docker
+
 To run the tools directly, you must install the correct version of clang. This
-may change over time but as of January 2019,
-[clang+llvm-7.0.0](https://releases.llvm.org/download.html) works well. You must
+may change over time but as of June 2019,
+[clang+llvm-8.0.0](https://releases.llvm.org/download.html) works well. You must
 also have 'buildifier' installed from the bazel distribution.
 
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-8.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
 
-Once this is set up, you can run clang-tidy without docker:
+Once this is set up, you can run clang-format without docker:
 
 ```shell
 ./tools/check_format.py check

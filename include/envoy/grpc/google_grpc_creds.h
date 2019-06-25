@@ -16,7 +16,7 @@ namespace Grpc {
  */
 class GoogleGrpcCredentialsFactory {
 public:
-  virtual ~GoogleGrpcCredentialsFactory() {}
+  virtual ~GoogleGrpcCredentialsFactory() = default;
 
   /**
    * Get a ChannelCredentials to be used for authentication of a gRPC channel.

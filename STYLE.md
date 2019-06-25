@@ -39,9 +39,9 @@
 * 100 columns is the line limit.
 * Use your GitHub name in TODO comments, e.g. `TODO(foobar): blah`.
 * Smart pointers are type aliased:
-  * `typedef std::unique_ptr<Foo> FooPtr;`
-  * `typedef std::shared_ptr<Bar> BarSharedPtr;`
-  * `typedef std::shared_ptr<const Blah> BlahConstSharedPtr;`
+  * `using FooPtr = std::unique_ptr<Foo>;`
+  * `using BarSharedPtr = std::shared_ptr<Bar>;`
+  * `using BlahConstSharedPtr = std::shared_ptr<const Blah>;`
   * Regular pointers (e.g. `int* foo`) should not be type aliased.
 * If move semantics are intended, prefer specifying function arguments with `&&`.
   E.g., `void onHeaders(Http::HeaderMapPtr&& headers, ...)`. The rationale for this is that it

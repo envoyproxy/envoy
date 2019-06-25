@@ -20,7 +20,7 @@ namespace Secret {
  */
 class SecretManager {
 public:
-  virtual ~SecretManager() {}
+  virtual ~SecretManager() = default;
 
   /**
    * @param add a static secret from envoy::api::v2::auth::Secret.

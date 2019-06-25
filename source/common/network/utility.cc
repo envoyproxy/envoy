@@ -65,7 +65,7 @@ namespace {
 
 std::string hostFromUrl(const std::string& url, const std::string& scheme,
                         const std::string& scheme_name) {
-  if (url.find(scheme) != 0) {
+  if (!absl::StartsWith(url, scheme)) {
     throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
@@ -80,7 +80,7 @@ std::string hostFromUrl(const std::string& url, const std::string& scheme,
 
 uint32_t portFromUrl(const std::string& url, const std::string& scheme,
                      const std::string& scheme_name) {
-  if (url.find(scheme) != 0) {
+  if (!absl::StartsWith(url, scheme)) {
     throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
@@ -163,7 +163,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
     return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
   }
   // Treat it as an IPv4 address followed by a port.
-  auto pos = ip_address.rfind(":");
+  auto pos = ip_address.rfind(':');
   if (pos == std::string::npos) {
     throwWithMalformedIp(ip_address);
   }
@@ -332,27 +332,30 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
 }
 
 Address::InstanceConstSharedPtr Utility::getCanonicalIpv4LoopbackAddress() {
-  // Initialized on first call in a thread-safe manner.
-  static Address::InstanceConstSharedPtr loopback(new Address::Ipv4Instance("127.0.0.1", 0));
-  return loopback;
+  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
+                         new Address::Ipv4Instance("127.0.0.1", 0));
 }
 
 Address::InstanceConstSharedPtr Utility::getIpv6LoopbackAddress() {
-  // Initialized on first call in a thread-safe manner.
-  static Address::InstanceConstSharedPtr loopback(new Address::Ipv6Instance("::1", 0));
-  return loopback;
+  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr, new Address::Ipv6Instance("::1", 0));
 }
 
 Address::InstanceConstSharedPtr Utility::getIpv4AnyAddress() {
-  // Initialized on first call in a thread-safe manner.
-  static Address::InstanceConstSharedPtr any(new Address::Ipv4Instance(static_cast<uint32_t>(0)));
-  return any;
+  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
+                         new Address::Ipv4Instance(static_cast<uint32_t>(0)));
 }
 
 Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress() {
-  // Initialized on first call in a thread-safe manner.
-  static Address::InstanceConstSharedPtr any(new Address::Ipv6Instance(static_cast<uint32_t>(0)));
-  return any;
+  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
+                         new Address::Ipv6Instance(static_cast<uint32_t>(0)));
+}
+
+const std::string& Utility::getIpv4CidrCatchAllAddress() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "0.0.0.0/0");
+}
+
+const std::string& Utility::getIpv6CidrCatchAllAddress() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "::/0");
 }
 
 Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Instance& address,

@@ -1,7 +1,6 @@
 #pragma once
 
-#include <stdint.h>
-
+#include <cstdint>
 #include <vector>
 
 #include "common/common/phantom.h"
@@ -17,7 +16,7 @@ struct Load {};
 // and 20% to P2.
 //
 // This should either sum to 100 or consist of all zeros.
-typedef Phantom<std::vector<uint32_t>, Load> PriorityLoad;
+using PriorityLoad = Phantom<std::vector<uint32_t>, Load>;
 
 // PriorityLoad specific to degraded hosts.
 struct DegradedLoad : PriorityLoad {
@@ -39,7 +38,7 @@ struct Availability {};
 
 // Mapping from a priority how available the given priority is, eg. the ratio of healthy host to
 // total hosts.
-typedef Phantom<std::vector<uint32_t>, Availability> PriorityAvailability;
+using PriorityAvailability = Phantom<std::vector<uint32_t>, Availability>;
 
 // Availability specific to degraded hosts.
 struct DegradedAvailability : PriorityAvailability {

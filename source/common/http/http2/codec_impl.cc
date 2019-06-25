@@ -511,6 +511,7 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "sent frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
   switch (frame->hd.type) {
   case NGHTTP2_GOAWAY: {
+    ENVOY_CONN_LOG(debug, "sent goaway code={}", connection_, frame->goaway.error_code);
     if (frame->goaway.error_code != NGHTTP2_NO_ERROR) {
       return NGHTTP2_ERR_CALLBACK_FAILURE;
     }
@@ -737,7 +738,7 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings, bool disa
     ASSERT(rc == 0);
   } else {
     // nghttp2_submit_settings need to be called at least once
-    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, 0, 0);
+    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, nullptr, 0);
     ASSERT(rc == 0);
   }
 

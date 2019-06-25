@@ -120,6 +120,7 @@ envoy_cc_library(
     hdrs = ["conn_manager_config.h"],
     deps = [
         ":date_provider_lib",
+        "//include/envoy/config:config_provider_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/router:rds_interface",
         "//source/common/network:utility_lib",
@@ -159,6 +160,7 @@ envoy_cc_library(
         "//include/envoy/network:drain_decision_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/router:rds_interface",
+        "//include/envoy/router:scopes_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:overload_manager_interface",
         "//include/envoy/ssl:connection_interface",

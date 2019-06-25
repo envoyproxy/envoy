@@ -162,6 +162,34 @@ parsePerRequestStateField(absl::string_view param_str) {
   };
 }
 
+// Helper that handles the case when the ConnectionInfo is missing or if the desired value is
+// empty.
+StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringHeaderExtractor(
+    std::function<std::string(const Ssl::ConnectionInfo& connection_info)> string_extractor) {
+  return [string_extractor](const StreamInfo::StreamInfo& stream_info) {
+    if (stream_info.downstreamSslConnection() == nullptr) {
+      return std::string();
+    }
+
+    return string_extractor(*stream_info.downstreamSslConnection());
+  };
+}
+
+// Helper that handles the case when the desired time field is empty.
+StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringTimeHeaderExtractor(
+    std::function<absl::optional<SystemTime>(const Ssl::ConnectionInfo& connection_info)>
+        time_extractor) {
+  return sslConnectionInfoStringHeaderExtractor(
+      [time_extractor](const Ssl::ConnectionInfo& connection_info) {
+        absl::optional<SystemTime> time = time_extractor(connection_info);
+        if (!time.has_value()) {
+          return std::string();
+        }
+
+        return AccessLogDateTimeFormatter::fromTime(time.value());
+      });
+}
+
 } // namespace
 
 StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_name, bool append)
@@ -183,6 +211,74 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
       return StreamInfo::Utility::formatDownstreamAddressNoPort(
           *stream_info.downstreamLocalAddress());
+    };
+  } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return absl::StrJoin(connection_info.uriSanPeerCertificate(), ",");
+        });
+  } else if (field_name == "DOWNSTREAM_LOCAL_URI_SAN") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return absl::StrJoin(connection_info.uriSanLocalCertificate(), ",");
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_ISSUER") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.issuerPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_SUBJECT") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.subjectPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_LOCAL_SUBJECT") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.subjectLocalCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_TLS_SESSION_ID") {
+    field_extractor_ = sslConnectionInfoStringHeaderExtractor(
+        [](const Ssl::ConnectionInfo& connection_info) { return connection_info.sessionId(); });
+  } else if (field_name == "DOWNSTREAM_TLS_CIPHER") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.ciphersuiteString();
+        });
+  } else if (field_name == "DOWNSTREAM_TLS_VERSION") {
+    field_extractor_ = sslConnectionInfoStringHeaderExtractor(
+        [](const Ssl::ConnectionInfo& connection_info) { return connection_info.tlsVersion(); });
+  } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_256") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.sha256PeerCertificateDigest();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_SERIAL") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.serialNumberPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_CERT") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.urlEncodedPemEncodedPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_START") {
+    field_extractor_ =
+        sslConnectionInfoStringTimeHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.validFromPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_END") {
+    field_extractor_ =
+        sslConnectionInfoStringTimeHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.expirationPeerCertificate();
+        });
+  } else if (field_name == "UPSTREAM_REMOTE_ADDRESS") {
+    field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
+      if (stream_info.upstreamHost()) {
+        return stream_info.upstreamHost()->address()->asString();
+      }
+      return "";
     };
   } else if (field_name.find("START_TIME") == 0) {
     const std::string pattern = fmt::format("%{}%", field_name);

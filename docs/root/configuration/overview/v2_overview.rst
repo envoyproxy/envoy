@@ -496,6 +496,12 @@ is set in the :ref:`rds
 <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.rds>` field of the :ref:`HttpConnectionManager
 <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>` config.
 
+.. note::
+
+    The management server responding to these endpoints must respond with a :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
+    along with a HTTP status of 200. Additionally, if the configuration that would be supplied has not changed (as indicated by the version
+    supplied by the Envoy client) then the management server can respond with an empty body and a HTTP status of 304.
+
 .. _config_overview_v2_ads:
 
 Aggregated Discovery Service

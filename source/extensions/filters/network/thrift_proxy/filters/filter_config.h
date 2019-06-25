@@ -19,7 +19,7 @@ namespace ThriftFilters {
  */
 class NamedThriftFilterConfigFactory {
 public:
-  virtual ~NamedThriftFilterConfigFactory() {}
+  virtual ~NamedThriftFilterConfigFactory() = default;
 
   /**
    * Create a particular thrift filter factory implementation. If the implementation is unable to

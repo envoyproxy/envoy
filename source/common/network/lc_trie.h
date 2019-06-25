@@ -227,18 +227,18 @@ private:
   }
 
   // IP addresses are stored in host byte order to simplify
-  typedef uint32_t Ipv4;
-  typedef absl::uint128 Ipv6;
+  using Ipv4 = uint32_t;
+  using Ipv6 = absl::uint128;
 
-  typedef std::unordered_set<T> DataSet;
-  typedef std::shared_ptr<DataSet> DataSetSharedPtr;
+  using DataSet = std::unordered_set<T>;
+  using DataSetSharedPtr = std::shared_ptr<DataSet>;
 
   /**
    * Structure to hold a CIDR range and the data associated with it.
    */
   template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)> struct IpPrefix {
 
-    IpPrefix() {}
+    IpPrefix() = default;
 
     IpPrefix(const IpType& ip, uint32_t length, const T& data) : ip_(ip), length_(length) {
       data_.insert(data);
@@ -392,7 +392,7 @@ private:
       std::unique_ptr<Node> children[2];
       DataSetSharedPtr data;
     };
-    typedef std::unique_ptr<Node> NodePtr;
+    using NodePtr = std::unique_ptr<Node>;
     NodePtr root_;
     bool exclusive_;
   };

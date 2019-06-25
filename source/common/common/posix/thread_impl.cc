@@ -15,7 +15,7 @@ int64_t getCurrentThreadId() {
   return static_cast<int64_t>(syscall(SYS_gettid));
 #elif defined(__APPLE__)
   uint64_t tid;
-  pthread_threadid_np(NULL, &tid);
+  pthread_threadid_np(nullptr, &tid);
   return tid;
 #else
 #error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"

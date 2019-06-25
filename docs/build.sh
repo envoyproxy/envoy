@@ -48,7 +48,7 @@ pip install -r "${SCRIPT_DIR}"/requirements.txt
 
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED \
-  --action_env=ENVOY_BLOB_SHA --spawn_strategy=standalone
+  --action_env=ENVOY_BLOB_SHA --spawn_strategy=standalone --host_force_python=PY2
 
 # These are the protos we want to put in docs, this list will grow.
 # TODO(htuch): Factor this out of this script.
@@ -56,6 +56,7 @@ PROTO_RST="
   /envoy/admin/v2alpha/certs/envoy/admin/v2alpha/certs.proto.rst
   /envoy/admin/v2alpha/clusters/envoy/admin/v2alpha/clusters.proto.rst
   /envoy/admin/v2alpha/config_dump/envoy/admin/v2alpha/config_dump.proto.rst
+  /envoy/admin/v2alpha/listeners/envoy/admin/v2alpha/listeners.proto.rst
   /envoy/admin/v2alpha/memory/envoy/admin/v2alpha/memory.proto.rst
   /envoy/admin/v2alpha/clusters/envoy/admin/v2alpha/metrics.proto.rst
   /envoy/admin/v2alpha/mutex_stats/envoy/admin/v2alpha/mutex_stats.proto.rst
@@ -84,7 +85,9 @@ PROTO_RST="
   /envoy/config/accesslog/v2/als/envoy/config/accesslog/v2/als.proto.rst
   /envoy/config/accesslog/v2/file/envoy/config/accesslog/v2/file.proto.rst
   /envoy/config/bootstrap/v2/bootstrap/envoy/config/bootstrap/v2/bootstrap.proto.rst
+  /envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster/envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.proto.rst
   /envoy/config/cluster/redis/redis_cluster/envoy/config/cluster/redis/redis_cluster.proto.rst
+  /envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache/envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.proto.rst
   /envoy/config/common/tap/v2alpha/common/envoy/config/common/tap/v2alpha/common.proto.rst
   /envoy/config/ratelimit/v2/rls/envoy/config/ratelimit/v2/rls.proto.rst
   /envoy/config/metrics/v2/metrics_service/envoy/config/metrics/v2/metrics_service.proto.rst
@@ -94,6 +97,7 @@ PROTO_RST="
   /envoy/config/filter/fault/v2/fault/envoy/config/filter/fault/v2/fault.proto.rst
   /envoy/config/filter/http/buffer/v2/buffer/envoy/config/filter/http/buffer/v2/buffer.proto.rst
   /envoy/config/filter/http/csrf/v2/csrf/envoy/config/filter/http/csrf/v2/csrf.proto.rst
+  /envoy/config/filter/http/dynamic_forward_proxy/v2alpha/dynamic_forward_proxy/envoy/config/filter/http/dynamic_forward_proxy/v2alpha/dynamic_forward_proxy.proto.rst
   /envoy/config/filter/http/ext_authz/v2/ext_authz/envoy/config/filter/http/ext_authz/v2/ext_authz.proto.rst
   /envoy/config/filter/http/fault/v2/fault/envoy/config/filter/http/fault/v2/fault.proto.rst
   /envoy/config/filter/http/gzip/v2/gzip/envoy/config/filter/http/gzip/v2/gzip.proto.rst
@@ -141,6 +145,7 @@ PROTO_RST="
   /envoy/service/accesslog/v2/als/envoy/service/accesslog/v2/als.proto.rst
   /envoy/service/auth/v2/external_auth/envoy/service/auth/v2/attribute_context.proto.rst
   /envoy/service/auth/v2/external_auth/envoy/service/auth/v2/external_auth.proto.rst
+  /envoy/service/discovery/v2/rtds/envoy/service/discovery/v2/rtds.proto.rst
   /envoy/service/ratelimit/v2/rls/envoy/service/ratelimit/v2/rls.proto.rst
   /envoy/service/tap/v2alpha/common/envoy/service/tap/v2alpha/common.proto.rst
   /envoy/type/http_status/envoy/type/http_status.proto.rst

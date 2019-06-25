@@ -39,7 +39,7 @@ enum class ConnectionBufferType { Read, Write };
  */
 class ConnectionCallbacks {
 public:
-  virtual ~ConnectionCallbacks() {}
+  virtual ~ConnectionCallbacks() = default;
 
   /**
    * Callback for connection events.
@@ -80,7 +80,7 @@ public:
    * Callback function for when bytes have been sent by a connection.
    * @param bytes_sent supplies the number of bytes written to the connection.
    */
-  typedef std::function<void(uint64_t bytes_sent)> BytesSentCb;
+  using BytesSentCb = std::function<void(uint64_t bytes_sent)>;
 
   struct ConnectionStats {
     Stats::Counter& read_total_;
@@ -93,7 +93,7 @@ public:
     Stats::Counter* delayed_close_timeouts_;
   };
 
-  virtual ~Connection() {}
+  ~Connection() override = default;
 
   /**
    * Register callbacks that fire when connection events occur.
@@ -191,7 +191,7 @@ public:
   };
 
   /**
-   * @return The unix socket peer credentials of the the remote client. Note that this is only
+   * @return The unix socket peer credentials of the remote client. Note that this is only
    * supported for unix socket connections.
    */
   virtual absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;
@@ -301,7 +301,7 @@ public:
   virtual absl::string_view transportFailureReason() const PURE;
 };
 
-typedef std::unique_ptr<Connection> ConnectionPtr;
+using ConnectionPtr = std::unique_ptr<Connection>;
 
 /**
  * Connections capable of outbound connects.
@@ -315,7 +315,7 @@ public:
   virtual void connect() PURE;
 };
 
-typedef std::unique_ptr<ClientConnection> ClientConnectionPtr;
+using ClientConnectionPtr = std::unique_ptr<ClientConnection>;
 
 } // namespace Network
 } // namespace Envoy

@@ -28,7 +28,7 @@ public:
   virtual void startParentShutdownSequence() PURE;
 };
 
-typedef std::unique_ptr<DrainManager> DrainManagerPtr;
+using DrainManagerPtr = std::unique_ptr<DrainManager>;
 
 } // namespace Server
 } // namespace Envoy

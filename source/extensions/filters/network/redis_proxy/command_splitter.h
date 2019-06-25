@@ -25,7 +25,7 @@ public:
   virtual void cancel() PURE;
 };
 
-typedef std::unique_ptr<SplitRequest> SplitRequestPtr;
+using SplitRequestPtr = std::unique_ptr<SplitRequest>;
 
 /**
  * Split request callbacks.

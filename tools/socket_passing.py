@@ -30,7 +30,7 @@ def GenerateNewConfig(original_yaml, admin_address, updated_json):
     sys.stdout.write('Admin address is ' + admin_address + '\n')
     try:
       admin_conn = httplib.HTTPConnection(admin_address)
-      admin_conn.request('GET', '/listeners')
+      admin_conn.request('GET', '/listeners?format=json')
       admin_response = admin_conn.getresponse()
       if not admin_response.status == 200:
         return False
@@ -41,17 +41,18 @@ def GenerateNewConfig(original_yaml, admin_address, updated_json):
     else:
       raw_yaml = original_file.readlines()
       index = 0
-      for discovered in discovered_listeners:
+      for discovered in discovered_listeners['listener_statuses']:
         replaced = False
-        if discovered.startswith('/'):
+        if 'pipe' in discovered['local_address']:
+          path = discovered['local_address']['pipe']['path']
           for index in range(index + 1, len(raw_yaml) - 1):
             if 'pipe:' in raw_yaml[index] and 'path:' in raw_yaml[index + 1]:
-              raw_yaml[index + 1] = re.sub('path:.*', 'path: "' + discovered + '"',
-                                           raw_yaml[index + 1])
+              raw_yaml[index + 1] = re.sub('path:.*', 'path: "' + path + '"', raw_yaml[index + 1])
               replaced = True
               break
         else:
-          addr, _, port = discovered.rpartition(':')
+          addr = discovered['local_address']['socket_address']['address']
+          port = str(discovered['local_address']['socket_address']['port_value'])
           if addr[0] == '[':
             addr = addr[1:-1]  # strip [] from ipv6 address.
           for index in range(index + 1, len(raw_yaml) - 2):
@@ -64,9 +65,10 @@ def GenerateNewConfig(original_yaml, admin_address, updated_json):
               replaced = True
               break
         if replaced:
-          sys.stderr.write('replaced listener at line ' + str(index) + ' with ' + discovered + '\n')
+          sys.stderr.write('replaced listener at line ' + str(index) + ' with ' + str(discovered) +
+                           '\n')
         else:
-          sys.stderr.write('Failed to replace a discovered listener ' + discovered + '\n')
+          sys.stderr.write('Failed to replace a discovered listener ' + str(discovered) + '\n')
           return False
       with open(updated_json, 'w') as outfile:
         outfile.writelines(raw_yaml)

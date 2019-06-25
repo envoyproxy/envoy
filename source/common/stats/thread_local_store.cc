@@ -118,9 +118,11 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   StatNameHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
-    for (auto& gauge : scope->central_cache_.gauges_) {
-      if (names.insert(gauge.first).second) {
-        ret.push_back(gauge.second);
+    for (auto& gauge_iter : scope->central_cache_.gauges_) {
+      const GaugeSharedPtr& gauge = gauge_iter.second;
+      if (gauge->importMode() != Gauge::ImportMode::Uninitialized &&
+          names.insert(gauge_iter.first).second) {
+        ret.push_back(gauge);
       }
     }
   }
@@ -204,7 +206,7 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // contents into a local that we can hold onto until the TLS cache is cleared
   // of all references.
   //
-  // We use a raw pointer here as it's easier to capture it in in the lambda.
+  // We use a raw pointer here as it's easier to capture it in the lambda.
   auto rejected_stats = new StatNameStorageSet;
   rejected_stats->swap(scope->central_cache_.rejected_stats_);
 
@@ -421,7 +423,8 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
   }
 }
 
-Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name) {
+Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
+                                                          Gauge::ImportMode import_mode) {
   if (parent_.rejectsAll()) {
     return parent_.null_gauge_;
   }
@@ -445,13 +448,16 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name) {
     tls_rejected_stats = &entry.rejected_stats_;
   }
 
-  return safeMakeStat<Gauge>(
+  Gauge& gauge = safeMakeStat<Gauge>(
       final_stat_name, central_cache_.gauges_, central_cache_.rejected_stats_,
-      [](StatDataAllocator& allocator, StatName name, absl::string_view tag_extracted_name,
-         const std::vector<Tag>& tags) -> GaugeSharedPtr {
-        return allocator.makeGauge(name, tag_extracted_name, tags);
+      [import_mode](StatDataAllocator& allocator, StatName name,
+                    absl::string_view tag_extracted_name,
+                    const std::vector<Tag>& tags) -> GaugeSharedPtr {
+        return allocator.makeGauge(name, tag_extracted_name, tags, import_mode);
       },
       tls_cache, tls_rejected_stats, parent_.null_gauge_);
+  gauge.mergeImportMode(import_mode);
+  return gauge;
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name) {
@@ -563,7 +569,7 @@ ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name,
                                                    absl::string_view tag_extracted_name,
                                                    const std::vector<Tag>& tags,
                                                    SymbolTable& symbol_table)
-    : MetricImpl(tag_extracted_name, tags, symbol_table), current_active_(0), flags_(0),
+    : MetricImpl(tag_extracted_name, tags, symbol_table), current_active_(0), used_(false),
       created_thread_id_(std::this_thread::get_id()), name_(name, symbol_table),
       symbol_table_(symbol_table) {
   histograms_[0] = hist_alloc();
@@ -580,7 +586,7 @@ ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
 void ThreadLocalHistogramImpl::recordValue(uint64_t value) {
   ASSERT(std::this_thread::get_id() == created_thread_id_);
   hist_insert_intscale(histograms_[current_active_], value, 0, 1);
-  flags_ |= Flags::Used;
+  used_ = true;
 }
 
 void ThreadLocalHistogramImpl::merge(histogram_t* target) {

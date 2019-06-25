@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/admin/v2alpha/clusters.pb.h"
+#include "envoy/admin/v2alpha/listeners.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -27,6 +28,7 @@
 #include "common/http/default_server_string.h"
 #include "common/http/utility.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/router/scoped_config_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "server/http/config_tracker_impl.h"
@@ -35,6 +37,11 @@
 
 namespace Envoy {
 namespace Server {
+
+namespace Utility {
+envoy::admin::v2alpha::ServerInfo::State serverState(Init::Manager::State state,
+                                                     bool health_check_failed);
+} // namespace Utility
 
 class AdminInternalAddressConfig : public Http::InternalAddressConfig {
   bool isInternalAddress(const Network::Address::Instance&) const override { return false; }
@@ -81,6 +88,10 @@ public:
   createNetworkFilterChain(Network::Connection& connection,
                            const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager&) override { return true; }
+  bool createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
+                                    Network::UdpReadFilterCallbacks&) override {
+    return true;
+  }
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -98,12 +109,16 @@ public:
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return false; }
+  bool preserveExternalRequestId() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
   std::chrono::milliseconds requestTimeout() const override { return {}; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
-  Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
+  Router::RouteConfigProvider* routeConfigProvider() override { return &route_config_provider_; }
+  Config::ConfigProvider* scopedRouteConfigProvider() override {
+    return &scoped_route_config_provider_;
+  }
   const std::string& serverName() override { return Http::DefaultServerString::get(); }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
@@ -160,6 +175,28 @@ private:
     TimeSource& time_source_;
   };
 
+  /**
+   * Implementation of ScopedRouteConfigProvider that returns a null scoped route config.
+   */
+  struct NullScopedRouteConfigProvider : public Config::ConfigProvider {
+    NullScopedRouteConfigProvider(TimeSource& time_source)
+        : config_(std::make_shared<const Router::NullScopedConfigImpl>()),
+          time_source_(time_source) {}
+
+    ~NullScopedRouteConfigProvider() override = default;
+
+    // Config::ConfigProvider
+    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
+    const Protobuf::Message* getConfigProto() const override { return nullptr; }
+    std::string getConfigVersion() const override { return ""; }
+    ConfigConstSharedPtr getConfig() const override { return config_; }
+    ApiType apiType() const override { return ApiType::Full; }
+    ConfigProtoVector getConfigProtos() const override { return {}; }
+
+    Router::ScopedConfigConstSharedPtr config_;
+    TimeSource& time_source_;
+  };
+
   friend class AdminStatsTest;
 
   /**
@@ -180,6 +217,12 @@ private:
   void writeClustersAsJson(Buffer::Instance& response);
   void writeClustersAsText(Buffer::Instance& response);
 
+  /**
+   * Helper methods for the /listeners url handler.
+   */
+  void writeListenersAsJson(Buffer::Instance& response);
+  void writeListenersAsText(Buffer::Instance& response);
+
   static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {
     return ((!used_only || metric->used()) &&
@@ -190,6 +233,7 @@ private:
                                  bool used_only,
                                  const absl::optional<std::regex> regex = absl::nullopt,
                                  bool pretty_print = false);
+
   static std::string
   runtimeAsJson(const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries);
   std::vector<const UrlHandler*> sortedHandlers() const;
@@ -310,6 +354,7 @@ private:
   Stats::IsolatedStoreImpl no_op_store_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
+  NullScopedRouteConfigProvider scoped_route_config_provider_;
   std::list<UrlHandler> handlers_;
   const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
@@ -382,7 +427,8 @@ public:
   static uint64_t statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
                                     const std::vector<Stats::GaugeSharedPtr>& gauges,
                                     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                                    Buffer::Instance& response, const bool used_only);
+                                    Buffer::Instance& response, const bool used_only,
+                                    const absl::optional<std::regex>& regex);
   /**
    * Format the given tags, returning a string as a comma-separated list
    * of <tag_name>="<tag_value>" pairs.
@@ -403,8 +449,10 @@ private:
    * Determine whether a metric has never been emitted and choose to
    * not show it if we only wanted used metrics.
    */
-  static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only) {
-    return !used_only || metric->used();
+  static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only,
+                               const absl::optional<std::regex>& regex) {
+    return ((!used_only || metric->used()) &&
+            (!regex.has_value() || std::regex_search(metric->name(), regex.value())));
   }
 };
 

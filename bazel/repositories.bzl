@@ -148,6 +148,9 @@ def envoy_dependencies(skip_targets = []):
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
+    _io_opencensus_cpp()
+    _com_github_curl()
+    _com_github_envoyproxy_sqlparser()
     _com_googlesource_quiche()
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
@@ -339,10 +342,13 @@ def _io_opentracing_cpp():
     )
 
 def _com_lightstep_tracer_cpp():
+    location = REPOSITORY_LOCATIONS["com_lightstep_tracer_cpp"]
     _repository_impl("com_lightstep_tracer_cpp")
-    _repository_impl(
-        name = "lightstep_vendored_googleapis",
-        build_file = "@com_lightstep_tracer_cpp//:lightstep-tracer-common/third_party/googleapis/BUILD",
+    http_archive(
+        name = "com_lightstep_tracer_cpp",
+        patch_args = ["-p0"],
+        patches = ["@envoy//bazel/foreign_cc:com_lightstep_tracer_cpp.patch"],
+        **location
     )
     native.bind(
         name = "lightstep",
@@ -509,6 +515,58 @@ def _com_google_protobuf():
     native.bind(
         name = "python_headers",
         actual = "@com_google_protobuf//util/python:python_headers",
+    )
+
+def _io_opencensus_cpp():
+    location = REPOSITORY_LOCATIONS["io_opencensus_cpp"]
+    http_archive(
+        name = "io_opencensus_cpp",
+        patch_args = ["-p0"],
+        patches = ["@envoy//bazel/foreign_cc:io_opencensus_cpp.patch"],
+        **location
+    )
+    native.bind(
+        name = "opencensus_trace",
+        actual = "@io_opencensus_cpp//opencensus/trace",
+    )
+    native.bind(
+        name = "opencensus_trace_cloud_trace_context",
+        actual = "@io_opencensus_cpp//opencensus/trace:cloud_trace_context",
+    )
+    native.bind(
+        name = "opencensus_trace_grpc_trace_bin",
+        actual = "@io_opencensus_cpp//opencensus/trace:grpc_trace_bin",
+    )
+    native.bind(
+        name = "opencensus_trace_trace_context",
+        actual = "@io_opencensus_cpp//opencensus/trace:trace_context",
+    )
+    native.bind(
+        name = "opencensus_exporter_stdout",
+        actual = "@io_opencensus_cpp//opencensus/exporters/trace/stdout:stdout_exporter",
+    )
+    native.bind(
+        name = "opencensus_exporter_stackdriver",
+        actual = "@io_opencensus_cpp//opencensus/exporters/trace/stackdriver:stackdriver_exporter",
+    )
+    native.bind(
+        name = "opencensus_exporter_zipkin",
+        actual = "@io_opencensus_cpp//opencensus/exporters/trace/zipkin:zipkin_exporter",
+    )
+
+def _com_github_curl():
+    # Used by OpenCensus Zipkin exporter.
+    location = REPOSITORY_LOCATIONS["com_github_curl"]
+    http_archive(
+        name = "com_github_curl",
+        build_file_content = BUILD_ALL_CONTENT + """
+cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
+""",
+        **location
+    )
+    native.bind(
+        name = "curl",
+        actual = "@envoy//bazel/foreign_cc:curl",
     )
 
 def _com_googlesource_quiche():

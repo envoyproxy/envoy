@@ -174,7 +174,7 @@ void SymbolTableImpl::incRefCount(const StatName& stat_name) {
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
 
-    auto encode_search = encode_map_.find(*decode_search->second);
+    auto encode_search = encode_map_.find(decode_search->second->toStringView());
     ASSERT(encode_search != encode_map_.end());
 
     ++encode_search->second.ref_count_;
@@ -190,7 +190,7 @@ void SymbolTableImpl::free(const StatName& stat_name) {
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
 
-    auto encode_search = encode_map_.find(*decode_search->second);
+    auto encode_search = encode_map_.find(decode_search->second->toStringView());
     ASSERT(encode_search != encode_map_.end());
 
     // If that was the last remaining client usage of the symbol, erase the
@@ -215,8 +215,8 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
     // a string_view pointing to it in the encode_map_. This allows us to only
     // store the string once. We use unique_ptr so copies are not made as
     // flat_hash_map moves values around.
-    auto str = std::make_unique<std::string>(std::string(sv));
-    auto encode_insert = encode_map_.insert({*str, SharedSymbol(next_symbol_)});
+    InlineStringPtr str = InlineString::create(sv);
+    auto encode_insert = encode_map_.insert({str->toStringView(), SharedSymbol(next_symbol_)});
     ASSERT(encode_insert.second);
     auto decode_insert = decode_map_.insert({next_symbol_, std::move(str)});
     ASSERT(decode_insert.second);
@@ -236,7 +236,7 @@ absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const
     EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
   RELEASE_ASSERT(search != decode_map_.end(), "no such symbol");
-  return {*search->second};
+  return search->second->toStringView();
 }
 
 void SymbolTableImpl::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
@@ -279,9 +279,9 @@ void SymbolTableImpl::debugPrint() const {
   }
   std::sort(symbols.begin(), symbols.end());
   for (Symbol symbol : symbols) {
-    const std::string& token = *decode_map_.find(symbol)->second;
-    const SharedSymbol& shared_symbol = encode_map_.find(token)->second;
-    ENVOY_LOG_MISC(info, "{}: '{}' ({})", symbol, token, shared_symbol.ref_count_);
+    const InlineString& token = *decode_map_.find(symbol)->second;
+    const SharedSymbol& shared_symbol = encode_map_.find(token.toStringView())->second;
+    ENVOY_LOG_MISC(info, "{}: '{}' ({})", symbol, token.toStringView(), shared_symbol.ref_count_);
   }
 }
 #endif

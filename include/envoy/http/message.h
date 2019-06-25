@@ -14,7 +14,7 @@ namespace Http {
  */
 class Message {
 public:
-  virtual ~Message() {}
+  virtual ~Message() = default;
 
   /**
    * @return HeaderMap& the message headers.
@@ -44,7 +44,7 @@ public:
   virtual std::string bodyAsString() const PURE;
 };
 
-typedef std::unique_ptr<Message> MessagePtr;
+using MessagePtr = std::unique_ptr<Message>;
 
 } // namespace Http
 } // namespace Envoy

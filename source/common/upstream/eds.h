@@ -3,6 +3,7 @@
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/subscription_factory.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/stats/scope.h"
@@ -20,7 +21,6 @@ namespace Upstream {
  * Cluster implementation that reads host information from the Endpoint Discovery Service.
  */
 class EdsClusterImpl : public BaseDynamicClusterImpl, Config::SubscriptionCallbacks {
-
 public:
   EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                  Server::Configuration::TransportSocketFactoryContext& factory_context,
@@ -29,6 +29,7 @@ public:
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Secondary; }
 
+private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
@@ -36,10 +37,11 @@ public:
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource,
+                                                                          validation_visitor_)
+        .cluster_name();
   }
 
-private:
   using LocalityWeightsMap =
       std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
@@ -75,6 +77,7 @@ private:
   std::vector<LocalityWeightsMap> locality_weights_map_;
   HostMap all_hosts_;
   Event::TimerPtr assignment_timeout_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 class EdsClusterFactory : public ClusterFactoryImplBase {

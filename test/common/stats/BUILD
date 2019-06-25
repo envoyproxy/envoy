@@ -58,13 +58,17 @@ envoy_cc_test_library(
     external_deps = [
         "abseil_strings",
     ],
-    deps = ["//source/common/memory:stats_lib"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/memory:stats_lib",
+    ],
 )
 
 envoy_cc_test(
     name = "stats_matcher_impl_test",
     srcs = ["stats_matcher_impl_test.cc"],
     deps = [
+        "//source/common/memory:stats_lib",
         "//source/common/stats:stats_matcher_lib",
         "//test/test_common:utility_lib",
     ],

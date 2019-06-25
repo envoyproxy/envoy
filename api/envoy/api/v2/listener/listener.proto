@@ -7,6 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v2.listener";
 option go_package = "listener";
 option csharp_namespace = "Envoy.Api.V2.ListenerNS";
+option ruby_package = "Envoy::Api::V2::ListenerNS";
 
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/auth/cert.proto";
@@ -25,17 +26,8 @@ option (gogoproto.equal_all) = true;
 // Listener :ref:`configuration overview <config_listeners>`
 
 message Filter {
-  // The name of the filter to instantiate. The name must match a supported
-  // filter. The built-in filters are:
-  //
-  // [#comment:TODO(mattklein123): Auto generate the following list]
-  // * :ref:`envoy.client_ssl_auth<config_network_filters_client_ssl_auth>`
-  // * :ref:`envoy.echo <config_network_filters_echo>`
-  // * :ref:`envoy.http_connection_manager <config_http_conn_man>`
-  // * :ref:`envoy.mongo_proxy <config_network_filters_mongo_proxy>`
-  // * :ref:`envoy.ratelimit <config_network_filters_rate_limit>`
-  // * :ref:`envoy.redis_proxy <config_network_filters_redis_proxy>`
-  // * :ref:`envoy.tcp_proxy <config_network_filters_tcp_proxy>`
+  // The name of the filter to instantiate. The name must match a
+  // :ref:`supported filter <config_network_filters>`.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Filter specific configuration which depends on the filter being
@@ -64,6 +56,8 @@ message Filter {
 // 4. Transport protocol.
 // 5. Application protocols (e.g. ALPN for TLS protocol).
 // 6. Source type (e.g. any, local or external network).
+// 7. Source IP address.
+// 8. Source port.
 //
 // For criteria that allow ranges or wildcards, the most specific value in any
 // of the configured filter chains that matches the incoming connection is going
@@ -108,14 +102,12 @@ message FilterChainMatch {
   // connection is contained in at least one of the specified subnets. If the
   // parameter is not specified or the list is empty, the source IP address is
   // ignored.
-  // [#not-implemented-hide:]
   repeated core.CidrRange source_prefix_ranges = 6;
 
   // The criteria is satisfied if the source port of the downstream connection
   // is contained in at least one of the specified ports. If the parameter is
   // not specified, the source port is ignored.
-  // [#not-implemented-hide:]
-  repeated google.protobuf.UInt32Value source_ports = 7;
+  repeated uint32 source_ports = 7 [(validate.rules).repeated .items.uint32 = {gte: 1, lte: 65535}];
 
   // If non-empty, a list of server names (e.g. SNI for TLS protocol) to consider when determining
   // a filter chain match. Those values will be compared against the server names of a new
@@ -199,12 +191,8 @@ message FilterChain {
 }
 
 message ListenerFilter {
-  // The name of the filter to instantiate. The name must match a supported
-  // filter. The built-in filters are:
-  //
-  // [#comment:TODO(mattklein123): Auto generate the following list]
-  // * :ref:`envoy.listener.original_dst <config_listener_filters_original_dst>`
-  // * :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
+  // The name of the filter to instantiate. The name must match a
+  // :ref:`supported filter <config_listener_filters>`.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Filter specific configuration which depends on the filter being instantiated.

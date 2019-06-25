@@ -53,7 +53,7 @@ public:
     proto_opts.set_protocol(upstream_protocol_proto);
 
     ProtobufWkt::Struct struct_opts;
-    MessageUtil::jsonConvert(proto_opts, struct_opts);
+    TestUtility::jsonConvert(proto_opts, struct_opts);
 
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* opts = bootstrap.mutable_static_resources()

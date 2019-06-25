@@ -30,6 +30,13 @@ std::string getSerialNumberFromCertificate(X509& cert);
 std::vector<std::string> getSubjectAltNames(X509& cert, int type);
 
 /**
+ * Retrieves the issuer from certificate.
+ * @param cert the certificate
+ * @return std::string the issuer field for the certificate.
+ */
+std::string getIssuerFromCertificate(X509& cert);
+
+/**
  * Retrieves the subject from certificate.
  * @param cert the certificate
  * @return std::string the subject field for the certificate.
