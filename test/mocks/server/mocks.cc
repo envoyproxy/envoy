@@ -124,7 +124,8 @@ MockWorker::MockWorker() {
 MockWorker::~MockWorker() = default;
 
 MockInstance::MockInstance()
-    : cluster_manager_(timeSource()), ssl_context_manager_(timeSource()),
+    : secret_manager_(std::make_unique<Secret::SecretManagerImpl>(admin_.getConfigTracker())),
+      cluster_manager_(timeSource()), ssl_context_manager_(timeSource()),
       singleton_manager_(
           new Singleton::ManagerImpl(Thread::threadFactoryForTest().currentThreadId())),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()) {
@@ -198,12 +199,12 @@ MockFactoryContext::MockFactoryContext()
 
 MockFactoryContext::~MockFactoryContext() = default;
 
-MockTransportSocketFactoryContext::MockTransportSocketFactoryContext() {
+MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
+    : secret_manager_(std::make_unique<Secret::SecretManagerImpl>(config_tracker_)) {
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
-  secret_manager_.reset(new Secret::SecretManagerImpl(config_tracker_));
 }
 
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() = default;
