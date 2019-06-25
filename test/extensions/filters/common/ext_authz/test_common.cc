@@ -71,7 +71,7 @@ Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_cod
 
 HeaderValueOptionVector TestCommon::makeHeaderValueOption(KeyValueOptionVector&& headers) {
   HeaderValueOptionVector header_option_vector{};
-  for (auto header : headers) {
+  for (const auto& header : headers) {
     envoy::api::v2::core::HeaderValueOption header_value_option;
     auto* mutable_header = header_value_option.mutable_header();
     mutable_header->set_key(header.key);

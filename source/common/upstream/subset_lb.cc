@@ -32,7 +32,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       subset_selectors_(subsets.subsetSelectors()), original_priority_set_(priority_set),
       original_local_priority_set_(local_priority_set),
       locality_weight_aware_(subsets.localityWeightAware()),
-      scale_locality_weight_(subsets.scaleLocalityWeight()) {
+      scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()) {
   ASSERT(subsets.isEnabled());
 
   if (fallback_policy_ != envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK) {
@@ -360,23 +360,25 @@ void SubsetLoadBalancer::processSubsets(
         const auto& keys = subset_selector->selector_keys_;
         // For each host, for each subset key, attempt to extract the metadata corresponding to the
         // key from the host.
-        SubsetMetadata kvs = extractSubsetMetadata(keys, *host);
-        if (!kvs.empty()) {
+        std::vector<SubsetMetadata> all_kvs = extractSubsetMetadata(keys, *host);
+        for (const auto& kvs : all_kvs) {
           // The host has metadata for each key, find or create its subset.
-          LbSubsetEntryPtr entry = findOrCreateSubset(subsets_, kvs, 0);
-          if (subsets_modified.find(entry) != subsets_modified.end()) {
-            // We've already invoked the callback for this entry.
-            continue;
-          }
-          subsets_modified.emplace(entry);
+          auto entry = findOrCreateSubset(subsets_, kvs, 0);
+          if (entry != nullptr) {
+            if (subsets_modified.find(entry) != subsets_modified.end()) {
+              // We've already invoked the callback for this entry.
+              continue;
+            }
+            subsets_modified.emplace(entry);
 
-          if (entry->initialized()) {
-            update_cb(entry);
-          } else {
-            HostPredicate predicate = [this, kvs](const Host& host) -> bool {
-              return hostMatches(kvs, host);
-            };
-            new_cb(entry, predicate, kvs, adding_hosts);
+            if (entry->initialized()) {
+              update_cb(entry);
+            } else {
+              HostPredicate predicate = [this, kvs](const Host& host) -> bool {
+                return hostMatches(kvs, host);
+              };
+              new_cb(entry, predicate, kvs, adding_hosts);
+            }
           }
         }
       }
@@ -450,7 +452,19 @@ bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host
       return false;
     }
 
-    if (!ValueUtil::equal(entry_it->second, kv.second)) {
+    if (list_as_any_ && entry_it->second.kind_case() == ProtobufWkt::Value::kListValue) {
+      bool any_match = false;
+      for (const auto& v : entry_it->second.list_value().values()) {
+        if (ValueUtil::equal(v, kv.second)) {
+          any_match = true;
+          break;
+        }
+      }
+
+      if (!any_match) {
+        return false;
+      }
+    } else if (!ValueUtil::equal(entry_it->second, kv.second)) {
       return false;
     }
   }
@@ -460,31 +474,63 @@ bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host
 
 // Iterates over subset_keys looking up values from the given host's metadata. Each key-value pair
 // is appended to kvs. Returns a non-empty value if the host has a value for each key.
-SubsetLoadBalancer::SubsetMetadata
+std::vector<SubsetLoadBalancer::SubsetMetadata>
 SubsetLoadBalancer::extractSubsetMetadata(const std::set<std::string>& subset_keys,
                                           const Host& host) {
-  SubsetMetadata kvs;
+  std::vector<SubsetMetadata> all_kvs;
 
   const envoy::api::v2::core::Metadata& metadata = *host.metadata();
   const auto& filter_it = metadata.filter_metadata().find(Config::MetadataFilters::get().ENVOY_LB);
   if (filter_it == metadata.filter_metadata().end()) {
-    return kvs;
+    return all_kvs;
   }
 
   const auto& fields = filter_it->second.fields();
-  for (const auto key : subset_keys) {
+  for (const auto& key : subset_keys) {
     const auto it = fields.find(key);
     if (it == fields.end()) {
+      all_kvs.clear();
       break;
     }
-    kvs.emplace_back(std::pair<std::string, ProtobufWkt::Value>(key, it->second));
+
+    if (list_as_any_ && it->second.kind_case() == ProtobufWkt::Value::kListValue) {
+      // If the list of kvs is empty, we initialize one kvs for each value in the list.
+      // Otherwise, we branch the list of kvs by generating one new kvs per old kvs per
+      // new value.
+      //
+      // For example, two kvs (<a=1>, <a=2>) joined with the kv foo=[bar,baz] results in four kvs:
+      //   <a=1,foo=bar>
+      //   <a=1,foo=baz>
+      //   <a=2,foo=bar>
+      //   <a=2,foo=baz>
+      if (all_kvs.empty()) {
+        for (const auto& v : it->second.list_value().values()) {
+          all_kvs.emplace_back(SubsetMetadata({make_pair(key, v)}));
+        }
+      } else {
+        std::vector<SubsetMetadata> new_kvs;
+        for (const auto& kvs : all_kvs) {
+          for (const auto& v : it->second.list_value().values()) {
+            auto kv_copy = kvs;
+            kv_copy.emplace_back(make_pair(key, v));
+            new_kvs.emplace_back(kv_copy);
+          }
+        }
+        all_kvs = new_kvs;
+      }
+
+    } else {
+      if (all_kvs.empty()) {
+        all_kvs.emplace_back(SubsetMetadata({std::make_pair(key, it->second)}));
+      } else {
+        for (auto& kvs : all_kvs) {
+          kvs.emplace_back(std::make_pair(key, it->second));
+        }
+      }
+    }
   }
 
-  if (kvs.size() != subset_keys.size()) {
-    kvs.clear();
-  }
-
-  return kvs;
+  return all_kvs;
 }
 
 std::string SubsetLoadBalancer::describeMetadata(const SubsetLoadBalancer::SubsetMetadata& kvs) {
@@ -517,9 +563,11 @@ SubsetLoadBalancer::findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadat
   const std::string& name = kvs[idx].first;
   const ProtobufWkt::Value& pb_value = kvs[idx].second;
   const HashedValue value(pb_value);
+
   LbSubsetEntryPtr entry;
 
   const auto& kv_it = subsets.find(name);
+
   if (kv_it != subsets.end()) {
     ValueSubsetMap& value_subset_map = kv_it->second;
     const auto vs_it = value_subset_map.find(value);
@@ -711,8 +759,8 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     }
   }
 
-  // Since the removed hosts would not be present in the list of all hosts, we need to evaluate the
-  // predicate directly for these hosts.
+  // Since the removed hosts would not be present in the list of all hosts, we need to evaluate
+  // the predicate directly for these hosts.
   HostVector filtered_removed;
   for (const auto& host : hosts_removed) {
     if (predicate(*host)) {

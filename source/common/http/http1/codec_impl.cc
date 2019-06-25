@@ -315,7 +315,7 @@ http_parser_settings ConnectionImpl::settings_{
 };
 
 const ToLowerTable& ConnectionImpl::toLowerTable() {
-  static ToLowerTable* table = new ToLowerTable();
+  static auto* table = new ToLowerTable();
   return *table;
 }
 

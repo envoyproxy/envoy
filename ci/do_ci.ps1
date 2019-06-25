@@ -15,10 +15,10 @@ function bazel_binary_build($type) {
 
 function bazel_test($type, $test) {
   if ($test -ne "") {
-    bazel $env:BAZEL_BASE_OPTIONS.Split(" ") test $env:BAZEL_TEST_OPTIONS.Split(" ") -c $type $test
+    bazel $env:BAZEL_BASE_OPTIONS.Split(" ") test $env:BAZEL_BUILD_OPTIONS.Split(" ") -c $type $test
   } else {
     echo "running windows tests"
-    bazel $env:BAZEL_BASE_OPTIONS.Split(" ") test $env:BAZEL_TEST_OPTIONS.Split(" ") -c $type "//test/..."
+    bazel $env:BAZEL_BASE_OPTIONS.Split(" ") test $env:BAZEL_BUILD_OPTIONS.Split(" ") -c $type "//test/..."
   }
   exit $LASTEXITCODE
 }
