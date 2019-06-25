@@ -27,6 +27,8 @@ public:
     Permission,
     // Message too big to send.
     MessageSize,
+    // Kernel interrupt.
+    Interrupt,
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };

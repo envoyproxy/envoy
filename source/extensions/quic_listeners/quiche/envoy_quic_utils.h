@@ -10,9 +10,14 @@ namespace Quic {
 
 inline Network::Address::InstanceConstSharedPtr
 quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address) {
+  ASSERT(quic_address.host().address_family() != quic::IpAddressFamily::IP_UNSPEC);
   return quic_address.IsInitialized()
              ? Network::Address::addressFromSockAddr(quic_address.generic_address(),
-                                                     sizeof(sockaddr_storage), false)
+                                                     quic_address.host().address_family() ==
+                                                             quic::IpAddressFamily::IP_V4
+                                                         ? sizeof(sockaddr_in)
+                                                         : sizeof(sockaddr_in6),
+                                                     false)
              : nullptr;
 }
 

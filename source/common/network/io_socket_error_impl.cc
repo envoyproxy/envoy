@@ -21,6 +21,8 @@ Api::IoError::IoErrorCode IoSocketError::getErrorCode() const {
     return IoErrorCode::Permission;
   case EMSGSIZE:
     return IoErrorCode::MessageSize;
+  case EINTR:
+    return IoErrorCode::Interrupt;
   default:
     return IoErrorCode::UnknownError;
   }

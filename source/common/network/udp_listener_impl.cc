@@ -166,6 +166,12 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   buffer.getRawSlices(slices.begin(), num_slices);
   Api::IoCallUint64Result send_result = socket_.ioHandle().sendmsg(
       slices.begin(), num_slices, 0, send_data.local_ip_, *send_data.peer_address_);
+  while (!send_result.ok() &&
+         send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt) {
+    // Send again if interrupted.
+    send_result = socket_.ioHandle().sendmsg(slices.begin(), num_slices, 0, send_data.local_ip_,
+                                             *send_data.peer_address_);
+  }
 
   if (send_result.ok()) {
     ASSERT(send_result.rc_ == buffer.length());
@@ -173,7 +179,7 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   } else {
     ENVOY_UDP_LOG(debug, "sendmsg failed with error code {}: {}",
                   static_cast<int>(send_result.err_->getErrorCode()),
-                  send_result.err_->getErrorCode());
+                  send_result.err_->getErrorDetails());
   }
 
   // The send_result normalizes the rc_ value to 0 in error conditions.

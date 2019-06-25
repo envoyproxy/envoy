@@ -146,7 +146,7 @@ MockConnectionSocket::MockConnectionSocket()
 }
 
 MockListener::MockListener() {}
-MockListener::~MockListener() { onDestroy(); }
+MockListener::~MockListener() {}
 
 MockConnectionHandler::MockConnectionHandler() {}
 MockConnectionHandler::~MockConnectionHandler() {}
@@ -171,7 +171,7 @@ MockTransportSocketCallbacks::MockTransportSocketCallbacks() {
 MockTransportSocketCallbacks::~MockTransportSocketCallbacks() {}
 
 MockUdpListener::MockUdpListener() {}
-MockUdpListener::~MockUdpListener() { onDestroy(); }
+MockUdpListener::~MockUdpListener() {}
 
 MockUdpReadFilterCallbacks::MockUdpReadFilterCallbacks() {
   ON_CALL(*this, udpListener()).WillByDefault(ReturnRef(udp_listener_));

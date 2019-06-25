@@ -54,6 +54,7 @@ genrule(
 # Use #pragma GCC diagnostic ignored in integration code to suppress these errors.
 quiche_copt = [
     "-Wno-unused-parameter",
+    "-Wno-type-limits",
     # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
     "-Wno-invalid-offsetof",
 ]
@@ -195,6 +196,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "spdy_core_protocol_lib",
+    srcs = ["quiche/spdy/core/spdy_protocol.cc"],
     hdrs = [
         "quiche/spdy/core/spdy_bitmasks.h",
         "quiche/spdy/core/spdy_protocol.h",

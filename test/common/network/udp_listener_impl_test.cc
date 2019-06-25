@@ -412,7 +412,8 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvFromError) {
 /**
  * Tests UDP listener for sending datagrams to destination.
  *  1. Setup a udp listener and client socket
- *  2. Send the data from the udp listener to the client socket and validate the contents
+ *  2. Send the data from the udp listener to the client socket and validate the contents and source
+ * address.
  */
 TEST_P(UdpListenerImplTest, SendData) {
   // Setup server socket
@@ -450,17 +451,23 @@ TEST_P(UdpListenerImplTest, SendData) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   Buffer::InstancePtr result_buffer(new Buffer::OwnedImpl());
-  const uint64_t bytes_to_read = 11;
+  constexpr uint64_t bytes_to_read = 11;
   uint64_t bytes_read = 0;
   int retry = 0;
 
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+  sockaddr_storage peer_addr;
+  socklen_t addr_len = sizeof(sockaddr_storage);
+  char recv_buf[bytes_to_read];
   do {
-    Api::IoCallUint64Result result =
-        result_buffer->read(client_socket->ioHandle(), bytes_to_read - bytes_read);
-
-    if (result.ok()) {
+    Api::SysCallSizeResult result = os_syscalls.recvfrom(
+        client_socket->ioHandle().fd(), recv_buf + bytes_read, bytes_to_read - bytes_read, 0,
+        reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
+    if (result.rc_ >= 0) {
       bytes_read += result.rc_;
-    } else if (retry == 10 || result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+      Address::InstanceConstSharedPtr peer_address =
+          Address::addressFromSockAddr(peer_addr, addr_len, false);
+    } else if (retry == 10 || result.errno_ != EAGAIN) {
       break;
     }
 

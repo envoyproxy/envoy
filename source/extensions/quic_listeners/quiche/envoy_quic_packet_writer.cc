@@ -22,7 +22,7 @@ quic::WriteResult EnvoyQuicPacketWriter::WritePacket(const char* buffer, size_t 
                                                      const quic::QuicSocketAddress& peer_address,
                                                      quic::PerPacketOptions* options) {
   ASSERT(options == nullptr, "Per packet option is not supported yet.");
-  ASSERT(!write_blocked_);
+  ASSERT(!write_blocked_, "Cannot write while IO handle is blocked.");
 
   Buffer::BufferFragmentImpl fragment(buffer, buf_len, nullptr);
   Buffer::OwnedImpl buffer_wrapper;
