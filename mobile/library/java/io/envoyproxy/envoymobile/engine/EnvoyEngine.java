@@ -1,4 +1,4 @@
-package io.envoyproxy.envoymobile;
+package io.envoyproxy.envoymobile.engine;
 
 import android.content.Context;
 import android.net.ConnectivityManager;

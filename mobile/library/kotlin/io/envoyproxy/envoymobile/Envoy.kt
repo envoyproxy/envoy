@@ -1,7 +1,7 @@
 package io.envoyproxy.envoymobile
 
 import android.content.Context
-import io.envoyproxy.envoymobile.EnvoyEngine
+import io.envoyproxy.envoymobile.engine.EnvoyEngine
 
 // Wrapper class that allows for easy calling of Envoy's JNI interface in native Java.
 class Envoy(
