@@ -18,4 +18,8 @@ build \
 # https://github.com/envoyproxy/envoy/tree/master/bazel#enabling-optional-features
 build:ios --define=manual_stamp=manual_stamp
 
-build:android --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
+build:android --fat_apk_cpu=x86,x86_64
+
+build:device --ios_multi_cpus=armv7,arm64 --fat_apk_cpu=armeabi-v7a,arm64-v8a
+
+build:fat --ios_multi_cpus=i386,x86_64,armv7,arm64 --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
