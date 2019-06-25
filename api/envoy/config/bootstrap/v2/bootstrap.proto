@@ -248,6 +248,11 @@ message RuntimeLayer {
     // treated.
     string symlink_root = 1;
 
+    // Specifies the subdirectory to load within the root directory. This is
+    // useful if multiple systems share the same delivery mechanism. Envoy
+    // configuration elements can be contained in a dedicated subdirectory.
+    string subdirectory = 3;
+
     // :ref:`Append <config_runtime_local_disk_service_cluster_subdirs>` the
     // service cluster to the path under symlink root.
     bool append_service_cluster = 2;

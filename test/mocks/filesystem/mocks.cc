@@ -40,11 +40,11 @@ Api::IoCallBoolResult MockFile::close() {
   return result;
 }
 
-MockInstance::MockInstance() {}
-MockInstance::~MockInstance() {}
+MockInstance::MockInstance() = default;
+MockInstance::~MockInstance() = default;
 
-MockWatcher::MockWatcher() {}
-MockWatcher::~MockWatcher() {}
+MockWatcher::MockWatcher() = default;
+MockWatcher::~MockWatcher() = default;
 
 } // namespace Filesystem
 } // namespace Envoy

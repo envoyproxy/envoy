@@ -18,7 +18,7 @@ namespace Envoy {
 namespace Stats {
 
 MockMetric::MockMetric() : name_(*this), tag_pool_(*symbol_table_) {}
-MockMetric::~MockMetric() {}
+MockMetric::~MockMetric() = default;
 
 MockMetric::MetricName::~MetricName() {
   if (stat_name_storage_ != nullptr) {
@@ -73,14 +73,14 @@ MockCounter::MockCounter() {
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
   ON_CALL(*this, latch()).WillByDefault(ReturnPointee(&latch_));
 }
-MockCounter::~MockCounter() {}
+MockCounter::~MockCounter() = default;
 
 MockGauge::MockGauge() : used_(false), value_(0), import_mode_(ImportMode::Accumulate) {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
   ON_CALL(*this, importMode()).WillByDefault(ReturnPointee(&import_mode_));
 }
-MockGauge::~MockGauge() {}
+MockGauge::~MockGauge() = default;
 
 MockHistogram::MockHistogram() {
   ON_CALL(*this, recordValue(_)).WillByDefault(Invoke([this](uint64_t value) {
@@ -89,7 +89,7 @@ MockHistogram::MockHistogram() {
     }
   }));
 }
-MockHistogram::~MockHistogram() {}
+MockHistogram::~MockHistogram() = default;
 
 MockParentHistogram::MockParentHistogram() {
   ON_CALL(*this, recordValue(_)).WillByDefault(Invoke([this](uint64_t value) {
@@ -101,7 +101,7 @@ MockParentHistogram::MockParentHistogram() {
   ON_CALL(*this, cumulativeStatistics()).WillByDefault(ReturnRef(*histogram_stats_));
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
 }
-MockParentHistogram::~MockParentHistogram() {}
+MockParentHistogram::~MockParentHistogram() = default;
 
 MockMetricSnapshot::MockMetricSnapshot() {
   ON_CALL(*this, counters()).WillByDefault(ReturnRef(counters_));
@@ -109,10 +109,10 @@ MockMetricSnapshot::MockMetricSnapshot() {
   ON_CALL(*this, histograms()).WillByDefault(ReturnRef(histograms_));
 }
 
-MockMetricSnapshot::~MockMetricSnapshot() {}
+MockMetricSnapshot::~MockMetricSnapshot() = default;
 
-MockSink::MockSink() {}
-MockSink::~MockSink() {}
+MockSink::MockSink() = default;
+MockSink::~MockSink() = default;
 
 MockStore::MockStore() : StoreImpl(*fake_symbol_table_) {
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
@@ -124,14 +124,14 @@ MockStore::MockStore() : StoreImpl(*fake_symbol_table_) {
     return *histogram;
   }));
 }
-MockStore::~MockStore() {}
+MockStore::~MockStore() = default;
 
 MockIsolatedStatsStore::MockIsolatedStatsStore()
     : IsolatedStoreImpl(Test::Global<Stats::FakeSymbolTableImpl>::get()) {}
-MockIsolatedStatsStore::~MockIsolatedStatsStore() {}
+MockIsolatedStatsStore::~MockIsolatedStatsStore() = default;
 
-MockStatsMatcher::MockStatsMatcher() {}
-MockStatsMatcher::~MockStatsMatcher() {}
+MockStatsMatcher::MockStatsMatcher() = default;
+MockStatsMatcher::~MockStatsMatcher() = default;
 
 } // namespace Stats
 } // namespace Envoy

@@ -6,3 +6,4 @@ Security
 
   ssl
   ext_authz_filter
+  rbac_filter

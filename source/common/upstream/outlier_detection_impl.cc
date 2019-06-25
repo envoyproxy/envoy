@@ -140,7 +140,7 @@ DetectorImpl::DetectorImpl(const Cluster& cluster,
 }
 
 DetectorImpl::~DetectorImpl() {
-  for (auto host : host_monitors_) {
+  for (const auto& host : host_monitors_) {
     if (host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
       ASSERT(stats_.ejections_active_.value() > 0);
       stats_.ejections_active_.dec();

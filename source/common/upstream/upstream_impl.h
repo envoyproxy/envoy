@@ -820,9 +820,11 @@ protected:
 };
 
 /**
- * Utility function to get Dns from cluster.
+ * Utility function to get Dns from cluster/enum.
  */
 Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Cluster& cluster);
+Network::DnsLookupFamily
+getDnsLookupFamilyFromEnum(envoy::api::v2::Cluster::DnsLookupFamily family);
 
 /**
  * Utility function to report upstream cx destroy metrics

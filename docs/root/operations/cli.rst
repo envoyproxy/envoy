@@ -214,12 +214,6 @@ following are the command line options that Envoy supports.
   during a hot restart. See the :ref:`hot restart overview <arch_overview_hot_restart>` for more
   information. Defaults to 900 seconds (15 minutes).
 
-  .. attention::
-
-    This setting affects the output of :option:`--hot-restart-version`. If you started Envoy with this
-    option set to a non default value, you should use the same option (and same value) for subsequent hot
-    restarts.
-
 .. option:: --disable-hot-restart
 
   *(optional)* This flag disables Envoy hot restart for builds that have it enabled. By default, hot

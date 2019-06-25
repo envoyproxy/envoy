@@ -72,7 +72,10 @@ FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
 
-FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
+FaultFilter::~FaultFilter() {
+  ASSERT(delay_timer_ == nullptr);
+  ASSERT(response_limiter_ == nullptr || response_limiter_->destroyed());
+}
 
 // Delays and aborts are independent events. One can inject a delay
 // followed by an abort or inject just a delay or abort. In this callback,
@@ -323,6 +326,9 @@ void FaultFilter::maybeIncActiveFaults() {
 
 void FaultFilter::onDestroy() {
   resetTimerState();
+  if (response_limiter_ != nullptr) {
+    response_limiter_->destroy();
+  }
   if (fault_active_) {
     config_->stats().active_faults_.dec();
   }
