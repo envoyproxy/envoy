@@ -278,7 +278,7 @@ dynamic_secrets:
 )EOF";
   checkConfigDump(expected_secrets_config_dump);
 
-  // Add a dynamic tls validatoin context provider.
+  // Add a dynamic tls validation context provider.
   time_system_.setSystemTime(std::chrono::milliseconds(1234567899000));
   auto context_secret_provider = secret_manager->findOrCreateCertificateValidationContextProvider(
       config_source, "abc.com.validation", secret_context);
