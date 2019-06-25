@@ -8,10 +8,13 @@
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/init/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -30,6 +33,16 @@ namespace Http1 {
 
 class Http1ServerConnectionImplTest : public testing::Test {
 public:
+  Http1ServerConnectionImplTest() {
+    envoy::config::bootstrap::v2::LayeredRuntime config;
+    config.add_layers()->mutable_admin_layer();
+
+    // Create a runtime loader, so that tests can manually manipulate runtime
+    // guarded features.
+    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(Runtime::LoaderPtr{
+        new Runtime::LoaderImpl(dispatcher_, tls_, config, "", store_, generator_, *api_)});
+  }
+
   void initialize() {
     codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_,
                                                     max_request_headers_kb_);
@@ -46,6 +59,13 @@ public:
 
 protected:
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
+
+  Event::MockDispatcher dispatcher_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::IsolatedStoreImpl store_;
+  Runtime::MockRandomGenerator generator_;
+  Api::ApiPtr api_;
+  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
 };
 
 void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_url,
@@ -331,6 +351,43 @@ TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHOST: hello\r\n\r\n");
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
+}
+
+// Ensures that requests with invalid HTTP header values are not rejected
+// when the runtime guard is not enabled for the feature.
+TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRuntimeGuard) {
+  initialize();
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  // When the runtime-guarded feature is NOT enabled, invalid header values
+  // should be accepted by the codec.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.validate_header_values", "false"}});
+
+  Buffer::OwnedImpl buffer(
+      absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n"));
+  codec_->dispatch(buffer);
+}
+
+// Ensures that requests with invalid HTTP header values are properly rejected
+// when the runtime guard is enabled for the feature.
+TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
+  initialize();
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  // When the runtime-guarded feature is enabled, invalid header values
+  // should result in a rejection.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.validate_header_values", "true"}});
+
+  Buffer::OwnedImpl buffer(
+      absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n"));
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error: header value contains invalid chars");
 }
 
 // Regression test for http-parser allowing embedded NULs in header values,
