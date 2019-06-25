@@ -314,4 +314,12 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+filegroup(
+    name = "response_protocol_files",
+    srcs = glob([
+        "*Response.json",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
 """
