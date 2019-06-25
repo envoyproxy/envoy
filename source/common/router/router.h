@@ -161,7 +161,7 @@ public:
         empty_stat_name_(stat_name_pool_.add("")), shadow_writer_(std::move(shadow_writer)),
         time_source_(time_source) {
     if (!strict_check_headers.empty()) {
-      strict_check_headers_ = std::make_unique<std::vector<Http::LowerCaseString>>();
+      strict_check_headers_ = std::make_unique<HeaderVector>();
       for (const auto& header : strict_check_headers) {
         strict_check_headers_->emplace_back(Http::LowerCaseString(header));
       }
@@ -181,6 +181,8 @@ public:
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
   }
+  using HeaderVector = std::vector<Http::LowerCaseString>;
+  using StrictCheckHeadersPtr = std::unique_ptr<HeaderVector>;
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
   TimeSource& timeSource() { return time_source_; }
@@ -194,7 +196,8 @@ public:
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
   const bool suppress_envoy_headers_;
-  std::unique_ptr<std::vector<Http::LowerCaseString>> strict_check_headers_;
+  // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down
+  StrictCheckHeadersPtr strict_check_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
   Stats::StatNamePool stat_name_pool_;
