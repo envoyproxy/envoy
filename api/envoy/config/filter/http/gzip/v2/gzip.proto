@@ -22,6 +22,7 @@ message Gzip {
   google.protobuf.UInt32Value memory_level = 1 [(validate.rules).uint32 = {gte: 1, lte: 9}];
 
   // Minimum response length, in bytes, which will trigger compression. The default value is 30.
+  // This field is deprecated. Use `compressor` instead.
   google.protobuf.UInt32Value content_length = 2 [(validate.rules).uint32.gte = 30];
 
   message CompressionLevel {
@@ -58,14 +59,17 @@ message Gzip {
   // application/json, text/html, etc. When this field is not defined, compression will be applied
   // to the following mime-types: "application/javascript", "application/json",
   // "application/xhtml+xml", "image/svg+xml", "text/css", "text/html", "text/plain", "text/xml".
+  // This field is deprecated. Use `compressor` instead.
   repeated string content_type = 6 [(validate.rules).repeated = {max_items: 50}];
 
   // If true, disables compression when the response contains an etag header. When it is false, the
   // filter will preserve weak etags and remove the ones that require strong validation.
+  // This field is deprecated. Use `compressor` instead.
   bool disable_on_etag_header = 7;
 
   // If true, removes accept-encoding from the request headers before dispatching it to the upstream
   // so that responses do not get compressed before reaching the filter.
+  // This field is deprecated. Use `compressor` instead.
   bool remove_accept_encoding_header = 8;
 
   // Value from 9 to 15 that represents the base two logarithmic of the compressor's window size.
@@ -74,5 +78,8 @@ message Gzip {
   // zlib manual > deflateInit2.
   google.protobuf.UInt32Value window_bits = 9 [(validate.rules).uint32 = {gte: 9, lte: 15}];
 
+  // Set of configuration parameters common for all compression filters. For details see
+  // :ref:`Compressor API reference
+  // <envoy_api_msg_config.filter.http.compressor_common.v2.Compressor>`.
   envoy.config.filter.http.compressor.v2.Compressor compressor = 10;
 }
