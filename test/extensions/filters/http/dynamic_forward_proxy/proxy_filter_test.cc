@@ -15,8 +15,9 @@ namespace HttpFilters {
 namespace DynamicForwardProxy {
 namespace {
 
-using LoadDnsCacheStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheStatus;
-using MockLoadDnsCacheResult = Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheResult;
+using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
+using MockLoadDnsCacheEntryResult =
+    Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult;
 
 class ProxyFilterTest : public testing::Test,
                         public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
@@ -66,10 +67,10 @@ TEST_F(ProxyFilterTest, HttpDefaultPort) {
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
-  Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheHandle* handle =
-      new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheHandle();
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCache_(Eq("foo"), 80, _))
-      .WillOnce(Return(MockLoadDnsCacheResult{LoadDnsCacheStatus::Loading, handle}));
+  Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _))
+      .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle}));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -84,10 +85,10 @@ TEST_F(ProxyFilterTest, HttpsDefaultPort) {
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
-  Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheHandle* handle =
-      new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheHandle();
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCache_(Eq("foo"), 443, _))
-      .WillOnce(Return(MockLoadDnsCacheResult{LoadDnsCacheStatus::Loading, handle}));
+  Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
+      .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle}));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -102,8 +103,8 @@ TEST_F(ProxyFilterTest, CacheOverflow) {
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCache_(Eq("foo"), 443, _))
-      .WillOnce(Return(MockLoadDnsCacheResult{LoadDnsCacheStatus::Overflow, nullptr}));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
+      .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr}));
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, Eq("DNS cache overflow"),
                                          _, _, Eq("DNS cache overflow")));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
@@ -121,10 +122,10 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
-  Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheHandle* handle =
-      new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheHandle();
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCache_(Eq("foo"), 443, _))
-      .WillOnce(Return(MockLoadDnsCacheResult{LoadDnsCacheStatus::Loading, handle}));
+  Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
+      .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle}));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 

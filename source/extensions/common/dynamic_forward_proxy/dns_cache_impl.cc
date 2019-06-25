@@ -38,28 +38,29 @@ DnsCacheImpl::~DnsCacheImpl() {
   }
 }
 
-DnsCacheImpl::LoadDnsCacheResult DnsCacheImpl::loadDnsCache(absl::string_view host,
-                                                            uint16_t default_port,
-                                                            LoadDnsCacheCallbacks& callbacks) {
+DnsCacheImpl::LoadDnsCacheEntryResult
+DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
+                                LoadDnsCacheEntryCallbacks& callbacks) {
   ENVOY_LOG(debug, "thread local lookup for host '{}'", host);
   auto& tls_host_info = tls_slot_->getTyped<ThreadLocalHostInfo>();
   auto tls_host = tls_host_info.host_map_->find(host);
   if (tls_host != tls_host_info.host_map_->end()) {
     ENVOY_LOG(debug, "thread local hit for host '{}'", host);
-    return {LoadDnsCacheStatus::InCache, nullptr};
+    return {LoadDnsCacheEntryStatus::InCache, nullptr};
   } else if (tls_host_info.host_map_->size() >= max_hosts_) {
     // Given that we do this check in thread local context, it's possible for two threads to race
     // and potentially go slightly above the configured max hosts. This is an OK given compromise
     // given how much simpler the implementation is.
     ENVOY_LOG(debug, "DNS cache overflow for host '{}'", host);
     stats_.host_overflow_.inc();
-    return {LoadDnsCacheStatus::Overflow, nullptr};
+    return {LoadDnsCacheEntryStatus::Overflow, nullptr};
   } else {
     ENVOY_LOG(debug, "thread local miss for host '{}', posting to main thread", host);
     main_thread_dispatcher_.post(
         [this, host = std::string(host), default_port]() { startCacheLoad(host, default_port); });
-    return {LoadDnsCacheStatus::Loading, std::make_unique<LoadDnsCacheHandleImpl>(
-                                             tls_host_info.pending_resolutions_, host, callbacks)};
+    return {LoadDnsCacheEntryStatus::Loading,
+            std::make_unique<LoadDnsCacheEntryHandleImpl>(tls_host_info.pending_resolutions_, host,
+                                                          callbacks)};
   }
 }
 

@@ -49,12 +49,11 @@ void Cluster::onDnsHostAddOrUpdate(
   // We should never get a host with no address from the cache.
   ASSERT(host_info->address() != nullptr);
 
-  // TODO(mattklein123): Right now we allow a DNS cache to be shared between multiple clusters.
-  // Though we have connection/request circuit breakers on the cluster, we don't have any way to
-  // control the maximum hosts on a cluster. It's possible we want to move to a model where the
-  // DNS cache is shared globally, but there is a per-cluster cache wrapper that can use the
-  // global DNS cache, but can have its own individual host limits with TTL to avoid excessive
-  // per-cluster memory use in a multi-tenant environment.
+  // NOTE: Right now we allow a DNS cache to be shared between multiple clusters. Though we have
+  // connection/request circuit breakers on the cluster, we don't have any way to control the
+  // maximum hosts on a cluster. We currently assume that host data shared via shared pointer is a
+  // marginal memory cost above that already used by connections and requests, so relying on
+  // connection/request circuit breakers is sufficient. We may have to revisit this in the future.
 
   HostInfoMapSharedPtr current_map = getCurrentHostMap();
   const auto host_map_it = current_map->find(host);

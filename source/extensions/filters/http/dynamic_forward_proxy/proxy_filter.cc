@@ -14,7 +14,7 @@ struct ResponseStringValues {
 
 using ResponseStrings = ConstSingleton<ResponseStringValues>;
 
-using LoadDnsCacheStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheStatus;
+using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 
 ProxyFilterConfig::ProxyFilterConfig(
     const envoy::config::filter::http::dynamic_forward_proxy::v2alpha::FilterConfig& proto_config,
@@ -60,30 +60,30 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
     default_port = 443;
   }
 
-  // See the comments in dns_cache.h for how loadDnsCache() handles hosts with embedded ports.
+  // See the comments in dns_cache.h for how loadDnsCacheEntry() handles hosts with embedded ports.
   // TODO(mattklein123): Because the filter and cluster have independent configuration, it is
   //                     not obvious to the user if something is misconfigured. We should see if
   //                     we can do better here, perhaps by checking the cache to see if anything
   //                     else is attached to it or something else?
-  auto result =
-      config_->cache().loadDnsCache(headers.Host()->value().getStringView(), default_port, *this);
+  auto result = config_->cache().loadDnsCacheEntry(headers.Host()->value().getStringView(),
+                                                   default_port, *this);
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
     circuit_breaker_.reset();
   }
 
   switch (result.status_) {
-  case LoadDnsCacheStatus::InCache: {
+  case LoadDnsCacheEntryStatus::InCache: {
     ASSERT(cache_load_handle_ == nullptr);
-    ENVOY_STREAM_LOG(debug, "DNS cache already loaded, continuing", *decoder_callbacks_);
+    ENVOY_STREAM_LOG(debug, "DNS cache entry already loaded, continuing", *decoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
   }
-  case LoadDnsCacheStatus::Loading: {
+  case LoadDnsCacheEntryStatus::Loading: {
     ASSERT(cache_load_handle_ != nullptr);
-    ENVOY_STREAM_LOG(debug, "waiting to load DNS cache", *decoder_callbacks_);
+    ENVOY_STREAM_LOG(debug, "waiting to load DNS cache entry", *decoder_callbacks_);
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   }
-  case LoadDnsCacheStatus::Overflow: {
+  case LoadDnsCacheEntryStatus::Overflow: {
     ASSERT(cache_load_handle_ == nullptr);
     ENVOY_STREAM_LOG(debug, "DNS cache overflow", *decoder_callbacks_);
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,

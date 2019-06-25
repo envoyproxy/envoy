@@ -54,5 +54,8 @@ Memory usage detail's for Envoy's dynamic forward proxy support are as follows:
   be used to limit the number of requests that are pending waiting for the DNS cache to load
   a host.
 * Long lived upstream connections can have the underlying logical host expire via TTL while the
-  connection is still open. Upstream requests and connections are still bound by other cluster circuit breakers
-  such as :ref:`max_requests <envoy_api_field_cluster.CircuitBreakers.Thresholds.max_requests>`.
+  connection is still open. Upstream requests and connections are still bound by other cluster
+  circuit breakers such as :ref:`max_requests
+  <envoy_api_field_cluster.CircuitBreakers.Thresholds.max_requests>`. The current assumption is that
+  host data shared between connections uses a marginal amount of memory compared to the connections
+  and requests themselves, making it not worth controlling independently.
