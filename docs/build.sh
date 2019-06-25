@@ -85,6 +85,7 @@ done
 mkdir -p ${GENERATED_RST_DIR}/api-docs
 
 cp -f $API_DIR/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
+cp -f $API_DIR/ondemand_vhds_rds_protocol.rst "${GENERATED_RST_DIR}/api-docs/ondemand_vhds_rds_protocol.rst"
 
 rsync -rav  $API_DIR/diagrams "${GENERATED_RST_DIR}/api-docs"
 

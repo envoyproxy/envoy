@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/PR-SVG-20010719/DTD/svg10.dtd">
+<svg width="41cm" height="31cm" viewBox="169 80 815 619" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="169.2" y="92.6">
+    <tspan x="169.2" y="92.6">Envoy</tspan>
+  </text>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="823.2" y="94.6">
+    <tspan x="823.2" y="94.6">xDS Management Server</tspan>
+  </text>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="901.4" y1="110.3" x2="900.2" y2="698"/>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="198.604" y1="99.3043" x2="199" y2="686"/>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="200" y1="184" x2="896.528" y2="183.006"/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="888.771,188.017 898.764,183.003 888.757,178.017 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="897.528" y1="222.783" x2="200" y2="220.795"/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="889.75,227.761 899.764,222.789 889.778,217.761 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="201.472" y1="259.597" x2="904" y2="260.591"/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="209.243,254.608 199.236,259.594 209.229,264.608 "/>
+  </g>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="334.2" y="174.792">
+    <tspan x="334.2" y="174.792">http:post:: AggregatedDiscoveryService/DeltaAggregatedResources</tspan>
+  </text>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="260.2" y="214.881">
+    <tspan x="260.2" y="214.881">Envoy makes first request to the xDS Management Server (DeltaDiscoveryRequest)</tspan>
+  </text>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="272.2" y="250.191">
+    <tspan x="272.2" y="250.191">xDS Management Server respods with filtered resources (DeltaDiscoveryResponse)</tspan>
+  </text>
+  <text font-size="12.9145" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:700" x="204" y="298.712">
+    <tspan x="204" y="298.712">Request for Unknown Resource</tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="196.07" y1="340.744" x2="896.528" y2="338.725"/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="888.778,343.747 898.764,338.719 888.75,333.747 "/>
+  </g>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="334.2" y="331.676">
+    <tspan x="334.2" y="331.676">DeltaDiscoveryRequest with resource_names_subscribe set</tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="200.313" y1="423.476" x2="898.705" y2="422.773"/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="890.946,427.781 900.941,422.771 890.936,417.781 "/>
+  </g>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="335.6" y="421.235">
+    <tspan x="335.6" y="421.235">Ack/Nack DeltaDiscoveryRequest</tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="199.835" y1="383.873" x2="900.348" y2="383.171"/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="207.594,378.866 197.599,383.876 207.604,388.866 "/>
+  </g>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="315.629" y="376.371">
+    <tspan x="315.629" y="376.371">DeltaDiscoveryResponse with new resources</tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:700" x="203.141" y="456.533">
+    <tspan x="203.141" y="456.533">Resource requested above later changes. The xDS management server detects the change and </tspan>
+    <tspan x="203.141" y="472.533">sends an update.</tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="199.563" y1="519.564" x2="900.077" y2="518.861"/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="207.322,514.556 197.327,519.566 207.332,524.556 "/>
+  </g>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="315.358" y="512.061">
+    <tspan x="315.358" y="512.061">DeltaDiscoveryResponse with updated resources</tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="200.748" y1="560.971" x2="899.14" y2="560.268"/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="891.381,565.276 901.376,560.266 891.371,555.276 "/>
+  </g>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="336.035" y="558.731">
+    <tspan x="336.035" y="558.731">Ack/Nack DeltaDiscoveryRequest</tspan>
+  </text>
+</svg>

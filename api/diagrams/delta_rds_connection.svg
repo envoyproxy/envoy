@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/PR-SVG-20010719/DTD/svg10.dtd">
+<svg width="41cm" height="12cm" viewBox="117 174 815 230" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="118" y="187">
+    <tspan x="118" y="187">Envoy</tspan>
+  </text>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="772" y="189">
+    <tspan x="772" y="189">xDS Management Server</tspan>
+  </text>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="840.2" y1="199.7" x2="841" y2="397"/>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="138.404" y1="201.704" x2="137" y2="403"/>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="139.201" y1="280.808" x2="835.729" y2="279.814"/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="827.972,284.825 837.965,279.811 827.958,274.825 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="836.729" y1="319.59" x2="139.201" y2="317.603"/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="828.951,324.568 838.965,319.597 828.98,314.568 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="140.674" y1="356.405" x2="843.201" y2="357.398"/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="148.445,351.416 138.437,356.402 148.43,361.416 "/>
+  </g>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="273.401" y="271.6">
+    <tspan x="273.401" y="271.6">http:post:: AggregatedDiscoveryService/DeltaAggregatedResources</tspan>
+  </text>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="199.401" y="311.688">
+    <tspan x="199.401" y="311.688">Envoy makes first request to the xDS Management Server (DeltaDiscoveryRequest)</tspan>
+  </text>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="211.401" y="346.998">
+    <tspan x="211.401" y="346.998">xDS Management Server respods with filtered resources (DeltaDiscoveryResponse)</tspan>
+  </text>
+</svg>
