@@ -22,6 +22,12 @@
 namespace Envoy {
 namespace Server {
 
+namespace Configuration {
+class TransportSocketFactoryContextImpl;
+}
+
+class ListenerFilterChainFactoryBuilder;
+
 /**
  * Prod implementation of ListenerComponentFactory that creates real sockets and attempts to fetch
  * sockets from the parent process via the hot restarter. The filter factory list is created from
@@ -331,8 +337,9 @@ public:
 
 private:
   ListenerManagerImpl& parent_;
-  FilterChainManagerImpl filter_chain_manager_;
   Network::Address::InstanceConstSharedPtr address_;
+  FilterChainManagerImpl filter_chain_manager_;
+
   Network::Address::SocketType socket_type_;
   Network::SocketSharedPtr socket_;
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
@@ -361,6 +368,20 @@ private:
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
+  // to access ListenerManagerImpl::factory_.
+  friend class ListenerFilterChainFactoryBuilder;
+};
+
+class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
+public:
+  ListenerFilterChainFactoryBuilder(
+      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
+  std::unique_ptr<Network::FilterChain>
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const override;
+
+private:
+  ListenerImpl& parent_;
+  Configuration::TransportSocketFactoryContextImpl& factory_context_;
 };
 
 } // namespace Server
