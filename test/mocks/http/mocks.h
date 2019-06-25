@@ -489,7 +489,7 @@ public:
   explicit IsSubsetOfHeadersMatcherImpl(const HeaderMap& expected_headers)
       : expected_headers_(expected_headers) {}
 
-  IsSubsetOfHeadersMatcherImpl(IsSubsetOfHeadersMatcherImpl&& other)
+  IsSubsetOfHeadersMatcherImpl(IsSubsetOfHeadersMatcherImpl&& other) noexcept
       : expected_headers_(other.expected_headers_) {}
 
   IsSubsetOfHeadersMatcherImpl(const IsSubsetOfHeadersMatcherImpl& other)
@@ -522,7 +522,7 @@ public:
   IsSubsetOfHeadersMatcher(const HeaderMap& expected_headers)
       : expected_headers_(expected_headers) {}
 
-  IsSubsetOfHeadersMatcher(IsSubsetOfHeadersMatcher&& other)
+  IsSubsetOfHeadersMatcher(IsSubsetOfHeadersMatcher&& other) noexcept
       : expected_headers_(static_cast<const HeaderMap&>(other.expected_headers_)) {}
 
   IsSubsetOfHeadersMatcher(const IsSubsetOfHeadersMatcher& other)
@@ -544,7 +544,7 @@ public:
   explicit IsSupersetOfHeadersMatcherImpl(const HeaderMap& expected_headers)
       : expected_headers_(expected_headers) {}
 
-  IsSupersetOfHeadersMatcherImpl(IsSupersetOfHeadersMatcherImpl&& other)
+  IsSupersetOfHeadersMatcherImpl(IsSupersetOfHeadersMatcherImpl&& other) noexcept
       : expected_headers_(other.expected_headers_) {}
 
   IsSupersetOfHeadersMatcherImpl(const IsSupersetOfHeadersMatcherImpl& other)
@@ -578,7 +578,7 @@ public:
   IsSupersetOfHeadersMatcher(const HeaderMap& expected_headers)
       : expected_headers_(expected_headers) {}
 
-  IsSupersetOfHeadersMatcher(IsSupersetOfHeadersMatcher&& other)
+  IsSupersetOfHeadersMatcher(IsSupersetOfHeadersMatcher&& other) noexcept
       : expected_headers_(static_cast<const HeaderMap&>(other.expected_headers_)) {}
 
   IsSupersetOfHeadersMatcher(const IsSupersetOfHeadersMatcher& other)
