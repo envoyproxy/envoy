@@ -53,10 +53,11 @@ genrule(
 # These options are only used to suppress errors in brought-in QUICHE tests.
 # Use #pragma GCC diagnostic ignored in integration code to suppress these errors.
 quiche_copt = [
+    # Remove these after upstream fix.
     "-Wno-unused-parameter",
+    "-Wno-type-limits",
     # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
     "-Wno-invalid-offsetof",
-    "-Wno-type-limits",
 ]
 
 envoy_cc_test_library(
@@ -537,6 +538,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_config.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_core_constants_lib",
@@ -750,6 +752,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_connection.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_core_alarm_factory_interface_lib",
@@ -848,7 +851,10 @@ envoy_cc_library(
         "zlib",
     ],
     repository = "@envoy",
-    tags = ["pg3"],
+    tags = [
+        "nofips",
+        "pg3",
+    ],
     textual_hdrs = [
         "quiche/quic/core/crypto/common_cert_set_2.c",
         "quiche/quic/core/crypto/common_cert_set_2a.inc",
@@ -932,6 +938,7 @@ envoy_cc_library(
     copts = quiche_copt,
     external_deps = ["ssl"],
     repository = "@envoy",
+    tags = ["nofips"],
     deps = [
         ":quic_core_crypto_hkdf_lib",
         ":quic_core_data_lib",
@@ -949,6 +956,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/crypto/quic_hkdf.h"],
     external_deps = ["ssl"],
     repository = "@envoy",
+    tags = ["nofips"],
     deps = [
         ":quic_platform_base",
     ],
@@ -966,6 +974,7 @@ envoy_cc_library(
     ],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_core_packets_lib",
@@ -982,6 +991,7 @@ envoy_cc_library(
     copts = quiche_copt,
     external_deps = ["ssl"],
     repository = "@envoy",
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [":quic_platform_base"],
 )
@@ -1001,6 +1011,7 @@ envoy_cc_library(
     copts = quiche_copt,
     external_deps = ["ssl"],
     repository = "@envoy",
+    tags = ["nofips"],
     deps = [
         ":quic_core_types_lib",
         ":quic_platform_base",
@@ -1019,6 +1030,7 @@ envoy_cc_library(
     ],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_core_constants_lib",
@@ -1045,6 +1057,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_framer.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     deps = [
         ":quic_core_constants_lib",
         ":quic_core_crypto_crypto_handshake_lib",
@@ -1170,6 +1183,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_packet_creator.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     deps = [
         ":quic_core_constants_lib",
         ":quic_core_crypto_encryption_lib",
@@ -1190,6 +1204,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_packet_generator.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     deps = [
         ":quic_core_crypto_random_lib",
         ":quic_core_packet_creator_lib",
@@ -1286,6 +1301,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_received_packet_manager.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     deps = [
         ":quic_core_config_lib",
         ":quic_core_congestion_control_rtt_stats_lib",
@@ -1303,6 +1319,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_sent_packet_manager.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     deps = [
         ":quic_core_congestion_control_congestion_control_lib",
         ":quic_core_congestion_control_general_loss_algorithm_lib",
@@ -1347,6 +1364,7 @@ envoy_cc_library(
     ],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     deps = [
         ":quic_core_alarm_factory_interface_lib",
         ":quic_core_alarm_interface_lib",
@@ -1411,6 +1429,7 @@ envoy_cc_library(
     copts = quiche_copt,
     external_deps = ["ssl"],
     repository = "@envoy",
+    tags = ["nofips"],
     deps = [
         ":quic_core_config_lib",
         ":quic_core_connection_lib",
@@ -1538,6 +1557,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_time_wait_list_manager.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     deps = [
         ":quic_core_blocked_writer_interface_lib",
         ":quic_core_crypto_encryption_lib",
@@ -1593,6 +1613,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/uber_received_packet_manager.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     deps = [
         ":quic_core_received_packet_manager_lib",
         ":quic_core_utils_lib",
@@ -1606,6 +1627,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_unacked_packet_map.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     deps = [
         ":quic_core_connection_stats_lib",
         ":quic_core_packets_lib",
@@ -1622,6 +1644,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_utils.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_core_constants_lib",

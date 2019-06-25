@@ -28,6 +28,7 @@ envoy_cc_test(
     name = "envoy_quic_proof_source_test",
     srcs = ["envoy_quic_proof_source_test.cc"],
     external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
     deps = [
         "//source/extensions/quic_listeners/quiche:envoy_quic_proof_source_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_proof_verifier_lib",

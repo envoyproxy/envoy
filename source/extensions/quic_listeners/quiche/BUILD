@@ -46,6 +46,7 @@ envoy_cc_library(
     name = "envoy_quic_proof_verifier_lib",
     hdrs = ["envoy_quic_fake_proof_verifier.h"],
     external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
     deps = [
         "@com_googlesource_quiche//:quic_core_crypto_crypto_handshake_lib",
         "@com_googlesource_quiche//:quic_core_versions_lib",
