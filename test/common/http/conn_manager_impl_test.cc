@@ -1095,7 +1095,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
         callbacks.addAccessLogHandler(handler);
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, maybeLog(_, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_TRUE(stream_info.responseCode());
@@ -1145,7 +1145,7 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamDisconnectAccessLog) {
         callbacks.addAccessLogHandler(handler);
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, maybeLog(_, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_FALSE(stream_info.responseCode());
@@ -1182,7 +1182,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
         callbacks.addAccessLogHandler(handler);
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, maybeLog(_, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_TRUE(stream_info.responseCode());
@@ -1230,7 +1230,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
         callbacks.addAccessLogHandler(handler);
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, maybeLog(_, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_TRUE(stream_info.responseCode());
@@ -1269,7 +1269,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
         callbacks.addAccessLogHandler(handler);
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, maybeLog(_, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_TRUE(stream_info.responseCode());
@@ -1499,7 +1499,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
   std::string response_body;
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, maybeLog(_, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_TRUE(stream_info.responseCode());
