@@ -14,10 +14,11 @@
 /**
  * External entrypoint for library.
  */
-extern "C" int run_envoy(const char* config) {
+extern "C" int run_envoy(const char* config, const char* log_level) {
   std::unique_ptr<Envoy::MainCommon> main_common;
 
-  char* envoy_argv[] = {strdup("envoy"), strdup("--config-yaml"), strdup(config), nullptr};
+  char* envoy_argv[] = {strdup("envoy"), strdup("--config-yaml"), strdup(config),
+                        strdup("-l"),    strdup(log_level),       nullptr};
 
   // Ensure static factory registration occurs on time.
   // Envoy's static factory registration happens when main is run.
@@ -41,7 +42,7 @@ extern "C" int run_envoy(const char* config) {
   // This is a known problem, and will be addressed by:
   // https://github.com/lyft/envoy-mobile/issues/34
   try {
-    main_common = std::make_unique<Envoy::MainCommon>(3, envoy_argv);
+    main_common = std::make_unique<Envoy::MainCommon>(5, envoy_argv);
   } catch (const Envoy::NoServingException& e) {
     return EXIT_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {

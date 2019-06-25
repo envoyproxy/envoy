@@ -10,5 +10,10 @@
 
 /// Create a new Envoy instance. The Envoy runner NSThread is started as part of instance
 /// initialization with the configuration provided.
-- (instancetype)initWithConfig:(NSString*)config;
+- (instancetype)initWithConfig:(NSString *)config;
+
+/// Create a new Envoy instance. The Envoy runner NSThread is started as part of instance
+/// initialization with the configuration provided.
+- (instancetype)initWithConfig:(NSString *)config logLevel:(NSString *)logLevel;
+
 @end

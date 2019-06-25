@@ -26,7 +26,7 @@ IndentWidth: 2
 ObjCBlockIndentWidth: 2
 ObjCSpaceAfterProperty: true
 ObjCSpaceBeforeProtocolList: true
-PointerAlignment: Left
+PointerAlignment: Right
 SortIncludes: false
 ...
 
