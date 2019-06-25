@@ -47,8 +47,7 @@ public:
   MOCK_METHOD1(updateResources, void(const std::set<std::string>& update_to_these_names));
 };
 
-class MockSubscriptionFactory : public SubscriptionFactory,
-                                public Logger::Loggable<Logger::Id::secret> {
+class MockSubscriptionFactory : public SubscriptionFactory {
 public:
   MockSubscriptionFactory();
   ~MockSubscriptionFactory() override;
