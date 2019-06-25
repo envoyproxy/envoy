@@ -73,7 +73,7 @@ public:
 
   MOCK_METHOD2(
       createPrivateKeyMethodProvider,
-      PrivateKeyMethodProviderSharedPtr(const envoy::api::v2::auth::PrivateKeyMethod& message,
+      PrivateKeyMethodProviderSharedPtr(const envoy::api::v2::auth::PrivateKeyProvider& message,
                                         Envoy::Server::Configuration::TransportSocketFactoryContext&
                                             private_key_method_provider_context));
 };

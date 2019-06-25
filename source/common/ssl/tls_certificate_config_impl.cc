@@ -26,14 +26,14 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
       password_path_(Config::DataSource::getPath(config.password())
                          .value_or(password_.empty() ? EMPTY_STRING : INLINE_STRING)),
       private_key_method_(
-          factory_context != nullptr && config.has_private_key_method()
+          factory_context != nullptr && config.has_private_key_provider()
               ? factory_context->sslContextManager()
                     .privateKeyMethodManager()
-                    .createPrivateKeyMethodProvider(config.private_key_method(), *factory_context)
+                    .createPrivateKeyMethodProvider(config.private_key_provider(), *factory_context)
               : nullptr) {
-  if (config.has_private_key_method() && config.has_private_key()) {
+  if (config.has_private_key_provider() && config.has_private_key()) {
     throw EnvoyException(fmt::format(
-        "Certificate configuration can't have both private_key and private_key_method"));
+        "Certificate configuration can't have both private_key and private_key_provider"));
   }
   if (certificate_chain_.empty() || (private_key_.empty() && private_key_method_ == nullptr)) {
     throw EnvoyException(fmt::format("Failed to load incomplete certificate from {}, {}",

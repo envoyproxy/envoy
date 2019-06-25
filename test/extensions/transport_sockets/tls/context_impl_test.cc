@@ -1190,7 +1190,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProvider) {
     tls_certificates:
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: mock_provider
         typed_config:
           "@type": type.googleapis.com/google.protobuf.Struct
@@ -1223,7 +1223,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
     tls_certificates:
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: mock_provider
         typed_config:
           "@type": type.googleapis.com/google.protobuf.Struct
@@ -1254,7 +1254,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {
     tls_certificates:
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: mock_provider
         typed_config:
           "@type": type.googleapis.com/google.protobuf.Struct
@@ -1283,7 +1283,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureBothKeyAndMethod)
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: mock_provider
         typed_config:
           "@type": type.googleapis.com/google.protobuf.Struct
@@ -1293,7 +1293,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureBothKeyAndMethod)
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
-      "Certificate configuration can't have both private_key and private_key_method");
+      "Certificate configuration can't have both private_key and private_key_provider");
 }
 
 } // namespace Tls

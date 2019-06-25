@@ -83,7 +83,7 @@ class TestPrivateKeyMethodFactory : public Ssl::PrivateKeyMethodProviderInstance
 public:
   // Ssl::PrivateKeyMethodProviderInstanceFactory
   Ssl::PrivateKeyMethodProviderSharedPtr
-  createPrivateKeyMethodProviderInstance(const envoy::api::v2::auth::PrivateKeyMethod& message,
+  createPrivateKeyMethodProviderInstance(const envoy::api::v2::auth::PrivateKeyProvider& message,
                                          Server::Configuration::TransportSocketFactoryContext&
                                              private_key_method_provider_context) override {
     return std::make_shared<TestPrivateKeyMethodProvider>(message.config(),

@@ -13,7 +13,7 @@ class PrivateKeyMethodProviderInstanceFactory {
 public:
   virtual ~PrivateKeyMethodProviderInstanceFactory() = default;
   virtual PrivateKeyMethodProviderSharedPtr
-  createPrivateKeyMethodProviderInstance(const envoy::api::v2::auth::PrivateKeyMethod& message,
+  createPrivateKeyMethodProviderInstance(const envoy::api::v2::auth::PrivateKeyProvider& message,
                                          Server::Configuration::TransportSocketFactoryContext&
                                              private_key_method_provider_context) PURE;
   virtual std::string name() const PURE;

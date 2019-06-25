@@ -4139,7 +4139,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
     tls_certificates:
       certificate_chain:
         filename: "{{ test_tmpdir }}/unittestcert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
@@ -4171,7 +4171,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptSuccess) {
     tls_certificates:
       certificate_chain:
         filename: "{{ test_tmpdir }}/unittestcert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
@@ -4203,7 +4203,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignSuccess) {
     tls_certificates:
       certificate_chain:
         filename: "{{ test_tmpdir }}/unittestcert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
@@ -4235,7 +4235,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncDecryptSuccess) {
     tls_certificates:
       certificate_chain:
         filename: "{{ test_tmpdir }}/unittestcert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
@@ -4267,7 +4267,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignFailure) {
     tls_certificates:
       certificate_chain:
         filename: "{{ test_tmpdir }}/unittestcert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
@@ -4300,7 +4300,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignFailure) {
     tls_certificates:
       certificate_chain:
         filename: "{{ test_tmpdir }}/unittestcert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
@@ -4333,7 +4333,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSignFailure) {
     tls_certificates:
       certificate_chain:
         filename: "{{ test_tmpdir }}/unittestcert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
@@ -4365,7 +4365,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderDecryptFailure) {
     tls_certificates:
       certificate_chain:
         filename: "{{ test_tmpdir }}/unittestcert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
@@ -4397,7 +4397,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignCompleteFailure) {
     tls_certificates:
       certificate_chain:
         filename: "{{ test_tmpdir }}/unittestcert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
@@ -4430,7 +4430,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptCompleteFailure) {
     tls_certificates:
       certificate_chain:
         filename: "{{ test_tmpdir }}/unittestcert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
@@ -4476,7 +4476,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertSuccess) {
     tls_certificates:
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
@@ -4514,7 +4514,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertFail) {
     tls_certificates:
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
@@ -4523,7 +4523,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertFail) {
           mode: rsa
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
@@ -4555,7 +4555,7 @@ TEST_P(SslSocketTest, EcdsaPrivateKeyProviderSuccess) {
     tls_certificates:
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
@@ -4588,7 +4588,7 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertSuccess) {
     tls_certificates:
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
@@ -4598,7 +4598,7 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertSuccess) {
           mode: rsa
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
@@ -4628,7 +4628,7 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertFail) {
     tls_certificates:
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
@@ -4637,7 +4637,7 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertFail) {
           mode: rsa
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
-      private_key_method:
+      private_key_provider:
         provider_name: test
         config:
           private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
