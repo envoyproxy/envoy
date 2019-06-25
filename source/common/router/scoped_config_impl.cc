@@ -6,11 +6,11 @@ namespace Router {
 bool ScopeKey::operator!=(const ScopeKey& other) const { return !(*this == other); }
 
 bool ScopeKey::operator==(const ScopeKey& other) const {
-  if (this->fragments_.empty() || other.fragments_.empty()) {
+  if (fragments_.empty() || other.fragments_.empty()) {
     // An empty key equals to nothing, "NULL" != "NULL".
     return false;
   }
-  return std::equal(this->fragments_.begin(), this->fragments_.end(), other.fragments_.begin(),
+  return std::equal(fragments_.begin(), fragments_.end(), other.fragments_.begin(),
                     other.fragments_.end(),
                     [](const std::unique_ptr<ScopeKeyFragmentBase>& left,
                        const std::unique_ptr<ScopeKeyFragmentBase>& right) -> bool {
@@ -20,7 +20,7 @@ bool ScopeKey::operator==(const ScopeKey& other) const {
 }
 
 HeaderValueExtractorImpl::HeaderValueExtractorImpl(
-    ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config)
+    ScopedRoutes::ScopeKeyBuilder::FragmentBuilder&& config)
     : FragmentBuilderBase(std::move(config)),
       header_value_extractor_config_(config_.header_value_extractor()) {
   ASSERT(config_.type_case() ==
@@ -29,9 +29,8 @@ HeaderValueExtractorImpl::HeaderValueExtractorImpl(
   if (header_value_extractor_config_.extract_type_case() ==
       ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::HeaderValueExtractor::kIndex) {
     if (header_value_extractor_config_.index() != 0 &&
-        header_value_extractor_config_.element_separator().length() == 0) {
-      throw ProtoValidationException("when element separator is set to an empty string, index "
-                                     "should be set to 0 in HeaderValueExtractor.",
+        header_value_extractor_config_.element_separator().empty()) {
+      throw ProtoValidationException("Index > 0 for empty string element separator.",
                                      header_value_extractor_config_);
     }
   }
@@ -77,12 +76,13 @@ HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const 
   return nullptr;
 }
 
-ScopeKeyBuilderImpl::ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder config)
-    : ScopeKeyBuilderBase(config) {
+ScopeKeyBuilderImpl::ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder&& config)
+    : ScopeKeyBuilderBase(std::move(config)) {
   for (const auto& fragment_builder : config_.fragments()) {
     switch (fragment_builder.type_case()) {
     case ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::kHeaderValueExtractor:
-      fragment_builders_.emplace_back(std::make_unique<HeaderValueExtractorImpl>(fragment_builder));
+      fragment_builders_.emplace_back(std::make_unique<HeaderValueExtractorImpl>(
+          ScopedRoutes::ScopeKeyBuilder::FragmentBuilder(fragment_builder)));
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;

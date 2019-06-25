@@ -73,7 +73,7 @@ private:
     return value_ == static_cast<const StringKeyFragment&>(other).value_;
   }
 
-  std::string value_;
+  const std::string value_;
 };
 
 /**
@@ -81,7 +81,7 @@ private:
  */
 class FragmentBuilderBase {
 public:
-  explicit FragmentBuilderBase(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config)
+  explicit FragmentBuilderBase(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder&& config)
       : config_(std::move(config)) {}
   virtual ~FragmentBuilderBase() = default;
 
@@ -96,7 +96,7 @@ protected:
 
 class HeaderValueExtractorImpl : public FragmentBuilderBase {
 public:
-  explicit HeaderValueExtractorImpl(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config);
+  explicit HeaderValueExtractorImpl(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder&& config);
 
   std::unique_ptr<ScopeKeyFragmentBase>
   computeFragment(const Http::HeaderMap& headers) const override;
@@ -111,19 +111,19 @@ private:
  */
 class ScopeKeyBuilderBase {
 public:
-  explicit ScopeKeyBuilderBase(ScopedRoutes::ScopeKeyBuilder config) : config_(std::move(config)) {}
+  explicit ScopeKeyBuilderBase(ScopedRoutes::ScopeKeyBuilder&& config) : config_(config) {}
   virtual ~ScopeKeyBuilderBase() = default;
 
   // Computes scope key for given headers, returns nullptr if a key can't be computed.
   virtual std::unique_ptr<ScopeKey> computeScopeKey(const Http::HeaderMap& headers) const PURE;
 
 protected:
-  ScopedRoutes::ScopeKeyBuilder config_;
+  const ScopedRoutes::ScopeKeyBuilder config_;
 };
 
 class ScopeKeyBuilderImpl : public ScopeKeyBuilderBase {
 public:
-  explicit ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder config);
+  explicit ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder&& config);
 
   std::unique_ptr<ScopeKey> computeScopeKey(const Http::HeaderMap& headers) const override;
 
@@ -143,9 +143,9 @@ private:
 class ThreadLocalScopedConfigImpl : public ScopedConfig, public ThreadLocal::ThreadLocalObject {
 public:
   ThreadLocalScopedConfigImpl(
-      envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
+      envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder&&
           scope_key_builder)
-      : scope_key_builder_(std::move(scope_key_builder)) {}
+      : scope_key_builder_(scope_key_builder) {}
 
   void addOrUpdateRoutingScope(const ScopedRouteInfoConstSharedPtr& scoped_route_info);
   void removeRoutingScope(const std::string& scope_name);

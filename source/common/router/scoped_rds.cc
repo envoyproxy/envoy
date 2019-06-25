@@ -159,7 +159,7 @@ ScopedRdsConfigProvider::ScopedRdsConfigProvider(
           MutableConfigProviderCommonBase::subscription_.get())),
       rds_config_source_(std::move(rds_config_source)) {
   initialize([scope_key_builder](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalScopedConfigImpl>(scope_key_builder);
+    return std::make_shared<ThreadLocalScopedConfigImpl>(std::move(scope_key_builder));
   });
 }
 

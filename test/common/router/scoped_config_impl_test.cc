@@ -51,9 +51,9 @@ TEST(HeaderValueExtractorImplDeathTest, InvalidConfig) {
   ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config;
   // Type not set, ASSERT only fails in debug mode.
 #if !defined(NDEBUG)
-  EXPECT_DEATH(HeaderValueExtractorImpl{config}, "header_value_extractor is not set.");
+  EXPECT_DEATH(HeaderValueExtractorImpl(std::move(config)), "header_value_extractor is not set.");
 #else
-  EXPECT_THROW_WITH_REGEX(HeaderValueExtractorImpl{config}, ProtoValidationException,
+  EXPECT_THROW_WITH_REGEX(HeaderValueExtractorImpl(std::move(config)), ProtoValidationException,
                           "HeaderValueExtractor extract_type not set.+");
 #endif // !defined(NDEBUG)
 
@@ -66,9 +66,8 @@ TEST(HeaderValueExtractorImplDeathTest, InvalidConfig) {
 )EOF";
   TestUtility::loadFromYaml(yaml_plain, config);
 
-  EXPECT_THROW_WITH_REGEX(HeaderValueExtractorImpl{config}, ProtoValidationException,
-                          "when element separator is set to an empty string, index should be set "
-                          "to 0 in HeaderValueExtractor.+");
+  EXPECT_THROW_WITH_REGEX(HeaderValueExtractorImpl(std::move(config)), ProtoValidationException,
+                          "Index > 0 for empty string element separator.");
   // extract_type not set.
   yaml_plain = R"EOF(
   header_value_extractor:
@@ -77,7 +76,7 @@ TEST(HeaderValueExtractorImplDeathTest, InvalidConfig) {
 )EOF";
   TestUtility::loadFromYaml(yaml_plain, config);
 
-  EXPECT_THROW_WITH_REGEX(HeaderValueExtractorImpl{config}, ProtoValidationException,
+  EXPECT_THROW_WITH_REGEX(HeaderValueExtractorImpl(std::move(config)), ProtoValidationException,
                           "HeaderValueExtractor extract_type not set.+");
 }
 
@@ -91,7 +90,7 @@ TEST(HeaderValueExtractorImplTest, HeaderExtractionByIndex) {
 )EOF";
 
   TestUtility::loadFromYaml(yaml_plain, config);
-  HeaderValueExtractorImpl extractor(config);
+  HeaderValueExtractorImpl extractor(std::move(config));
   std::unique_ptr<ScopeKeyFragmentBase> fragment =
       extractor.computeFragment(TestHeaderMapImpl{{"foo_header", "part-0,part-1:value_bluh"}});
 
@@ -134,7 +133,7 @@ TEST(HeaderValueExtractorImplTest, HeaderExtractionByKey) {
 )EOF";
 
   TestUtility::loadFromYaml(yaml_plain, config);
-  HeaderValueExtractorImpl extractor(config);
+  HeaderValueExtractorImpl extractor(std::move(config));
   std::unique_ptr<ScopeKeyFragmentBase> fragment = extractor.computeFragment(TestHeaderMapImpl{
       {"foo_header", "part-0;bar=>bluh;foo=>foo_value"},
   });
@@ -194,7 +193,7 @@ TEST(HeaderValueExtractorImplTest, ElementSeparatorEmpty) {
 )EOF";
 
   TestUtility::loadFromYaml(yaml_plain, config);
-  HeaderValueExtractorImpl extractor(config);
+  HeaderValueExtractorImpl extractor(std::move(config));
   std::unique_ptr<ScopeKeyFragmentBase> fragment = extractor.computeFragment(TestHeaderMapImpl{
       {"foo_header", "bar=b;c=d;e=f"},
   });
@@ -265,7 +264,7 @@ TEST(ScopeKeyBuilderImplTest, Parse) {
 
   ScopedRoutes::ScopeKeyBuilder config;
   TestUtility::loadFromYaml(yaml_plain, config);
-  ScopeKeyBuilderImpl key_builder(config);
+  ScopeKeyBuilderImpl key_builder(std::move(config));
 
   std::unique_ptr<ScopeKey> key = key_builder.computeScopeKey(TestHeaderMapImpl{
       {"foo_header", "a=b,bar=bar_value,e=f"},
