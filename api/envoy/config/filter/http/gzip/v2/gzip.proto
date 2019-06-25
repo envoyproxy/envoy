@@ -87,7 +87,7 @@ message Gzip {
   google.protobuf.UInt32Value window_bits = 9 [(validate.rules).uint32 = {gte: 9, lte: 15}];
 
   // Set of configuration parameters common for all compression filters. If this field is set then
-  // the fields `content_length`, `content_type`, `disable_on_etag_header` and `remove_accept_encoding_header`
-  // are ignored.
+  // the fields `content_length`, `content_type`, `disable_on_etag_header` and
+  // `remove_accept_encoding_header` are ignored.
   envoy.config.filter.http.compressor.v2.Compressor compressor = 10;
 }
