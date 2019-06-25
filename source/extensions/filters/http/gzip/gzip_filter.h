@@ -42,7 +42,7 @@ private:
   static uint64_t memoryLevelUint(Protobuf::uint32 level);
   static uint64_t windowBitsUint(Protobuf::uint32 window_bits);
 
-  // TODO(rojkov): this is going to be deprectated when the old configuration fields are dropped.
+  // TODO(rojkov): this is going to be deprecated when the old configuration fields are dropped.
   static const envoy::config::filter::http::compressor::v2::Compressor
   compressorConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip);
 
