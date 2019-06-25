@@ -30,7 +30,7 @@ struct JwtConstValueStruct {
   // The default query parameter name to extract JWT token
   const std::string AccessTokenParam{"access_token"};
 };
-typedef ConstSingleton<JwtConstValueStruct> JwtConstValues;
+using JwtConstValues = ConstSingleton<JwtConstValueStruct>;
 
 // A base JwtLocation object to store token and specified_issuers.
 class JwtLocationBase : public JwtLocation {
@@ -118,7 +118,7 @@ private:
     // Issuers that specified this header.
     std::unordered_set<std::string> specified_issuers_;
   };
-  typedef std::unique_ptr<HeaderLocationSpec> HeaderLocationSpecPtr;
+  using HeaderLocationSpecPtr = std::unique_ptr<HeaderLocationSpec>;
   // The map of (header + value_prefix) to HeaderLocationSpecPtr
   std::map<std::string, HeaderLocationSpecPtr> header_locations_;
 

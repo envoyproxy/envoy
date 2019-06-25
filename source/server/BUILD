@@ -233,12 +233,12 @@ envoy_cc_library(
     srcs = ["lds_api.cc"],
     hdrs = ["lds_api.h"],
     deps = [
+        "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/init:manager_interface",
         "//include/envoy/server:listener_manager_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/config:resources_lib",
-        "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
@@ -311,7 +311,7 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2:srds_cc",
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
         "@envoy_api//envoy/service/discovery/v2:hds_cc",
-        "@envoy_api//envoy/service/discovery/v2:tds_cc",
+        "@envoy_api//envoy/service/discovery/v2:rtds_cc",
         "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )

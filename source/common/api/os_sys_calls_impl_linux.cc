@@ -4,8 +4,9 @@
 
 #include "common/api/os_sys_calls_impl_linux.h"
 
-#include <errno.h>
 #include <sched.h>
+
+#include <cerrno>
 
 namespace Envoy {
 namespace Api {

@@ -37,7 +37,7 @@ As an example, consider adding the following interface in `include/envoy/foo/bar
 
 class Bar {
 public:
-  virtual ~Bar() {}
+  virtual ~Bar() = default;
 
   virtual void someThing() PURE;
   ...

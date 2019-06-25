@@ -20,8 +20,8 @@ namespace TransportSockets {
 namespace Alts {
 
 // smart pointer for grpc_alts_credentials_options that will be automatically freed.
-typedef CSmartPtr<grpc_alts_credentials_options, grpc_alts_credentials_options_destroy>
-    GrpcAltsCredentialsOptionsPtr;
+using GrpcAltsCredentialsOptionsPtr =
+    CSmartPtr<grpc_alts_credentials_options, grpc_alts_credentials_options_destroy>;
 
 namespace {
 
@@ -82,7 +82,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
           message);
   HandshakeValidator validator = createHandshakeValidator(config);
 
-  const std::string handshaker_service = config.handshaker_service();
+  const std::string& handshaker_service = config.handshaker_service();
   HandshakerFactory factory =
       [handshaker_service, is_upstream,
        alts_shared_state](Event::Dispatcher& dispatcher,

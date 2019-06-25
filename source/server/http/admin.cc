@@ -13,6 +13,7 @@
 #include "envoy/admin/v2alpha/certs.pb.h"
 #include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/admin/v2alpha/listeners.pb.h"
 #include "envoy/admin/v2alpha/memory.pb.h"
 #include "envoy/admin/v2alpha/mutex_stats.pb.h"
 #include "envoy/admin/v2alpha/server_info.pb.h"
@@ -160,6 +161,12 @@ absl::optional<std::regex> filterParam(Http::Utility::QueryParams params) {
   return (params.find("filter") != params.end())
              ? absl::optional<std::regex>{std::regex(params.at("filter"))}
              : absl::nullopt;
+}
+
+// Helper method to get the format parameter
+absl::optional<std::string> formatParam(Http::Utility::QueryParams params) {
+  return (params.find("format") != params.end()) ? absl::optional<std::string>{params.at("format")}
+                                                 : absl::nullopt;
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the
@@ -346,6 +353,7 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         envoy::admin::v2alpha::HostStatus& host_status = *cluster_status.add_host_statuses();
         Network::Utility::addressToProtobufAddress(*host->address(),
                                                    *host_status.mutable_address());
+        host_status.set_hostname(host->hostname());
         std::vector<Stats::CounterSharedPtr> sorted_counters;
         for (const Stats::CounterSharedPtr& counter : host->counters()) {
           sorted_counters.push_back(counter);
@@ -426,11 +434,13 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
           all_stats[gauge->name()] = gauge->value();
         }
 
-        for (auto stat : all_stats) {
+        for (const auto& stat : all_stats) {
           response.add(fmt::format("{}::{}::{}::{}\n", cluster.second.get().info()->name(),
                                    host->address()->asString(), stat.first, stat.second));
         }
 
+        response.add(fmt::format("{}::{}::hostname::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->hostname()));
         response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second.get().info()->name(),
                                  host->address()->asString(),
                                  Upstream::HostUtility::healthFlagsToString(*host)));
@@ -452,12 +462,30 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
   }
 }
 
+void AdminImpl::writeListenersAsJson(Buffer::Instance& response) {
+  envoy::admin::v2alpha::Listeners listeners;
+  for (const auto& listener : server_.listenerManager().listeners()) {
+    envoy::admin::v2alpha::ListenerStatus& listener_status = *listeners.add_listener_statuses();
+    listener_status.set_name(listener.get().name());
+    Network::Utility::addressToProtobufAddress(*listener.get().socket().localAddress(),
+                                               *listener_status.mutable_local_address());
+  }
+  response.add(MessageUtil::getJsonStringFromMessage(listeners, true)); // pretty-print
+}
+
+void AdminImpl::writeListenersAsText(Buffer::Instance& response) {
+  for (const auto& listener : server_.listenerManager().listeners()) {
+    response.add(fmt::format("{}::{}\n", listener.get().name(),
+                             listener.get().socket().localAddress()->asString()));
+  }
+}
+
 Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  auto it = query_params.find("format");
+  const auto format_value = formatParam(query_params);
 
-  if (it != query_params.end() && it->second == "json") {
+  if (format_value.has_value() && format_value.value() == "json") {
     writeClustersAsJson(response);
     response_headers.insertContentType().value().setReference(
         Http::Headers::get().ContentTypeValues.Json);
@@ -647,31 +675,13 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-envoy::admin::v2alpha::ServerInfo::State AdminImpl::serverState() {
-  envoy::admin::v2alpha::ServerInfo::State state;
-
-  switch (server_.initManager().state()) {
-  case Init::Manager::State::Uninitialized:
-    state = envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;
-    break;
-  case Init::Manager::State::Initializing:
-    state = envoy::admin::v2alpha::ServerInfo::INITIALIZING;
-    break;
-  case Init::Manager::State::Initialized:
-    state = server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
-                                        : envoy::admin::v2alpha::ServerInfo::LIVE;
-    break;
-  }
-
-  return state;
-}
-
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
   time_t current_time = time(nullptr);
   envoy::admin::v2alpha::ServerInfo server_info;
   server_info.set_version(VersionInfo::version());
-  server_info.set_state(serverState());
+  server_info.set_state(
+      Utility::serverState(server_.initManager().state(), server_.healthCheckFailed()));
 
   server_info.mutable_uptime_current_epoch()->set_seconds(current_time -
                                                           server_.startTimeCurrentEpoch());
@@ -687,7 +697,8 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
 
 Http::Code AdminImpl::handlerReady(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
                                    AdminStream&) {
-  const envoy::admin::v2alpha::ServerInfo::State state = serverState();
+  const envoy::admin::v2alpha::ServerInfo::State state =
+      Utility::serverState(server_.initManager().state(), server_.healthCheckFailed());
 
   response.add(envoy::admin::v2alpha::ServerInfo_State_Name(state) + "\n");
   Http::Code code = state == envoy::admin::v2alpha::ServerInfo_State_LIVE
@@ -702,7 +713,6 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
 
   const bool used_only = params.find("usedonly") != params.end();
-  const bool has_format = !(params.find("format") == params.end());
   const absl::optional<std::regex> regex = filterParam(params);
 
   std::map<std::string, uint64_t> all_stats;
@@ -719,14 +729,13 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     }
   }
 
-  if (has_format) {
-    const std::string format_value = params.at("format");
-    if (format_value == "json") {
+  if (const auto format_value = formatParam(params)) {
+    if (format_value.value() == "json") {
       response_headers.insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Json);
       response.add(
           AdminImpl::statsAsJson(all_stats, server_.stats().histograms(), used_only, regex));
-    } else if (format_value == "prometheus") {
+    } else if (format_value.value() == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response, admin_stream);
     } else {
       response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
@@ -734,7 +743,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
       rc = Http::Code::NotFound;
     }
   } else { // Display plain stats if format query param is not there.
-    for (auto stat : all_stats) {
+    for (const auto& stat : all_stats) {
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
     }
     // TODO(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
@@ -746,7 +755,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
         all_histograms.emplace(histogram->name(), histogram->quantileSummary());
       }
     }
-    for (auto histogram : all_histograms) {
+    for (const auto& histogram : all_histograms) {
       response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
     }
   }
@@ -871,7 +880,7 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-  for (auto stat : all_stats) {
+  for (const auto& stat : all_stats) {
     Value stat_obj;
     stat_obj.SetObject();
     Value stat_name;
@@ -959,15 +968,18 @@ Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerListenerInfo(absl::string_view, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerListenerInfo(absl::string_view url, Http::HeaderMap& response_headers,
                                           Buffer::Instance& response, AdminStream&) {
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Json);
-  std::list<std::string> listeners;
-  for (auto listener : server_.listenerManager().listeners()) {
-    listeners.push_back(listener.get().socket().localAddress()->asString());
+  const Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  const auto format_value = formatParam(query_params);
+
+  if (format_value.has_value() && format_value.value() == "json") {
+    writeListenersAsJson(response);
+    response_headers.insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.Json);
+  } else {
+    writeListenersAsText(response);
   }
-  response.add(Json::Factory::listAsJsonString(listeners));
   return Http::Code::OK;
 }
 
@@ -1207,7 +1219,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
           {"/stats/prometheus", "print server stats in prometheus format",
            MAKE_ADMIN_HANDLER(handlerPrometheusStats), false, false},
-          {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
+          {"/listeners", "print listener info", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
@@ -1411,6 +1423,20 @@ void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
     handler->addListener(*listener_);
   }
+}
+
+envoy::admin::v2alpha::ServerInfo::State Utility::serverState(Init::Manager::State state,
+                                                              bool health_check_failed) {
+  switch (state) {
+  case Init::Manager::State::Uninitialized:
+    return envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;
+  case Init::Manager::State::Initializing:
+    return envoy::admin::v2alpha::ServerInfo::INITIALIZING;
+  case Init::Manager::State::Initialized:
+    return health_check_failed ? envoy::admin::v2alpha::ServerInfo::DRAINING
+                               : envoy::admin::v2alpha::ServerInfo::LIVE;
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Server

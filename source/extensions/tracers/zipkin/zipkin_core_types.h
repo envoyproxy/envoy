@@ -28,7 +28,7 @@ public:
   /**
    * Destructor.
    */
-  virtual ~ZipkinBase() {}
+  virtual ~ZipkinBase() = default;
 
   /**
    * All classes defining Zipkin abstractions need to implement this method to convert
@@ -288,10 +288,10 @@ private:
   std::string key_;
   std::string value_;
   absl::optional<Endpoint> endpoint_;
-  AnnotationType annotation_type_;
+  AnnotationType annotation_type_{};
 };
 
-typedef std::unique_ptr<Span> SpanPtr;
+using SpanPtr = std::unique_ptr<Span>;
 
 /**
  * Represents a Zipkin span. This class is based on Zipkin's Thrift definition of a span.

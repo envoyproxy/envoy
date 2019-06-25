@@ -13,14 +13,14 @@ namespace Event {
 /**
  * Callback invoked when a timer event fires.
  */
-typedef std::function<void()> TimerCb;
+using TimerCb = std::function<void()>;
 
 /**
  * An abstract timer event. Free the timer to unregister any pending timeouts.
  */
 class Timer {
 public:
-  virtual ~Timer() {}
+  virtual ~Timer() = default;
 
   /**
    * Disable a pending timeout without destroying the underlying timer.
@@ -38,11 +38,11 @@ public:
   virtual bool enabled() PURE;
 };
 
-typedef std::unique_ptr<Timer> TimerPtr;
+using TimerPtr = std::unique_ptr<Timer>;
 
 class Scheduler {
 public:
-  virtual ~Scheduler() {}
+  virtual ~Scheduler() = default;
 
   /**
    * Creates a timer.
@@ -50,7 +50,7 @@ public:
   virtual TimerPtr createTimer(const TimerCb& cb) PURE;
 };
 
-typedef std::unique_ptr<Scheduler> SchedulerPtr;
+using SchedulerPtr = std::unique_ptr<Scheduler>;
 
 /**
  * Interface providing a mechanism to measure time and set timers that run callbacks
@@ -58,7 +58,7 @@ typedef std::unique_ptr<Scheduler> SchedulerPtr;
  */
 class TimeSystem : public TimeSource {
 public:
-  virtual ~TimeSystem() = default;
+  ~TimeSystem() override = default;
 
   using Duration = MonotonicTime::duration;
 

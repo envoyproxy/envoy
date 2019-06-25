@@ -25,7 +25,7 @@ namespace MetricsService {
 class GrpcMetricsStreamer
     : public Grpc::AsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse> {
 public:
-  virtual ~GrpcMetricsStreamer() {}
+  ~GrpcMetricsStreamer() override = default;
 
   /**
    * Send Metrics Message.
@@ -43,7 +43,7 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override{};
 };
 
-typedef std::shared_ptr<GrpcMetricsStreamer> GrpcMetricsStreamerSharedPtr;
+using GrpcMetricsStreamerSharedPtr = std::shared_ptr<GrpcMetricsStreamer>;
 
 /**
  * Production implementation of GrpcMetricsStreamer

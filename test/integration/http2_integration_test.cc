@@ -257,7 +257,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) {
 }
 
 void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string> keys) {
-  for (const auto key : keys) {
+  for (const auto& key : keys) {
     // keys are the same as their corresponding values.
     EXPECT_EQ(metadata_map.find(key)->second, key);
   }

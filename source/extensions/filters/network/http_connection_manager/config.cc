@@ -30,8 +30,8 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 namespace {
 
-typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
-typedef std::map<std::string, HttpConnectionManagerConfig::FilterConfig> FilterFactoryMap;
+using FilterFactoriesList = std::list<Http::FilterFactoryCb>;
+using FilterFactoryMap = std::map<std::string, HttpConnectionManagerConfig::FilterConfig>;
 
 HttpConnectionManagerConfig::UpgradeMap::const_iterator
 findUpgradeBoolCaseInsensitive(const HttpConnectionManagerConfig::UpgradeMap& upgrade_map,
@@ -155,6 +155,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
+      preserve_external_request_id_(config.preserve_external_request_id()),
       date_provider_(date_provider),
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
@@ -162,9 +163,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)),
       normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, normalize_path,
-          // TODO(htuch): we should have a
-          // boolean variant of featureEnabled()
-          // here.
+          // TODO(htuch): we should have a boolean variant of featureEnabled() here.
           context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
 #ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
                                                       100
@@ -310,7 +309,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     processFilter(filters[i], i, "http", filter_factories_);
   }
 
-  for (auto upgrade_config : config.upgrade_configs()) {
+  for (const auto& upgrade_config : config.upgrade_configs()) {
     const std::string& name = upgrade_config.upgrade_type();
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
     if (findUpgradeCaseInsensitive(upgrade_filter_factories_, name) !=

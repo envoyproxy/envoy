@@ -51,7 +51,7 @@ struct RcDetailsValues {
   // This will generally be accompanied by details about the transcoder failure.
   const std::string GrpcTranscodeFailed = "grpc_json_transcode_failure";
 };
-typedef ConstSingleton<RcDetailsValues> RcDetails;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
 // Transcoder:
@@ -154,7 +154,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
       Protobuf::util::NewTypeResolverForDescriptorPool(Grpc::Common::typeUrlPrefix(),
                                                        &descriptor_pool_));
 
-  const auto print_config = proto_config.print_options();
+  const auto& print_config = proto_config.print_options();
   print_options_.add_whitespace = print_config.add_whitespace();
   print_options_.always_print_primitive_fields = print_config.always_print_primitive_fields();
   print_options_.always_print_enums_as_ints = print_config.always_print_enums_as_ints();

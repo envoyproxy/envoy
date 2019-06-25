@@ -168,8 +168,8 @@ protected:
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
     void resetStream(StreamResetReason reason) override;
-    virtual void readDisable(bool disable) override;
-    virtual uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
+    void readDisable(bool disable) override;
+    uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
 
     void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
       pending_recv_data_.setWatermarks(low_watermark, high_watermark);
@@ -227,7 +227,7 @@ protected:
     bool reset_due_to_messaging_error_ : 1;
   };
 
-  typedef std::unique_ptr<StreamImpl> StreamImplPtr;
+  using StreamImplPtr = std::unique_ptr<StreamImpl>;
 
   /**
    * Client side stream (request).

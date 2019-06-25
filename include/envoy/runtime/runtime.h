@@ -16,6 +16,11 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+
+namespace Upstream {
+class ClusterManager;
+}
+
 namespace Runtime {
 
 /**
@@ -23,7 +28,7 @@ namespace Runtime {
  */
 class RandomGenerator {
 public:
-  virtual ~RandomGenerator() {}
+  virtual ~RandomGenerator() = default;
 
   /**
    * @return uint64_t a new random number.
@@ -37,14 +42,14 @@ public:
   virtual std::string uuid() PURE;
 };
 
-typedef std::unique_ptr<RandomGenerator> RandomGeneratorPtr;
+using RandomGeneratorPtr = std::unique_ptr<RandomGenerator>;
 
 /**
  * A snapshot of runtime data.
  */
 class Snapshot {
 public:
-  virtual ~Snapshot() {}
+  virtual ~Snapshot() = default;
 
   struct Entry {
     std::string raw_string_value_;
@@ -53,7 +58,7 @@ public:
     absl::optional<bool> bool_value_;
   };
 
-  typedef absl::flat_hash_map<std::string, Entry> EntryMap;
+  using EntryMap = absl::flat_hash_map<std::string, Entry>;
 
   /**
    * A provider of runtime values. One or more of these compose the snapshot's source of values,
@@ -61,7 +66,7 @@ public:
    */
   class OverrideLayer {
   public:
-    virtual ~OverrideLayer() {}
+    virtual ~OverrideLayer() = default;
 
     /**
      * @return const absl::flat_hash_map<std::string, Entry>& the values in this layer.
@@ -74,7 +79,7 @@ public:
     virtual const std::string& name() const PURE;
   };
 
-  typedef std::unique_ptr<const OverrideLayer> OverrideLayerConstPtr;
+  using OverrideLayerConstPtr = std::unique_ptr<const OverrideLayer>;
 
   // Returns true if a deprecated feature is allowed.
   //
@@ -204,7 +209,15 @@ public:
  */
 class Loader {
 public:
-  virtual ~Loader() {}
+  virtual ~Loader() = default;
+
+  /**
+   * Post-construction initialization. Runtime will be generally available after
+   * the constructor is finished, with the exception of dynamic RTDS layers,
+   * which require ClusterManager.
+   * @param cm cluster manager reference.
+   */
+  virtual void initialize(Upstream::ClusterManager& cm) PURE;
 
   /**
    * @return Snapshot& the current snapshot. This reference is safe to use for the duration of

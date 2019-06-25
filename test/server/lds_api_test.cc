@@ -2,11 +2,11 @@
 
 #include "envoy/api/v2/lds.pb.h"
 
-#include "common/http/message_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "server/lds_api.h"
 
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
@@ -27,44 +27,20 @@ namespace {
 
 class LdsApiTest : public testing::Test {
 public:
-  LdsApiTest()
-      : request_(&cluster_manager_.async_client_), api_(Api::createApiForTest(store_)),
-        lds_version_(
-            store_.gauge("listener_manager.lds.version", Stats::Gauge::ImportMode::NeverImport)) {
+  LdsApiTest() {
     ON_CALL(init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
     }));
   }
 
   void setup() {
-    const std::string config_yaml = R"EOF(
-api_config_source:
-  api_type: REST
-  cluster_names:
-  - foo_cluster
-  refresh_delay: 1s
-    )EOF";
-
     envoy::api::v2::core::ConfigSource lds_config;
-    TestUtility::loadFromYaml(config_yaml, lds_config);
-    lds_config.mutable_api_config_source()->set_api_type(
-        envoy::api::v2::core::ApiConfigSource::REST);
-    Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockClusterMockPrioritySet cluster;
-    cluster_map.emplace("foo_cluster", cluster);
-    EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
-    EXPECT_CALL(cluster, info());
-    EXPECT_CALL(*cluster.info_, addedViaApi());
-    EXPECT_CALL(cluster, info());
-    EXPECT_CALL(*cluster.info_, type());
-    interval_timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(init_manager_, add(_));
-    lds_ = std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, dispatcher_, random_,
-                                        init_manager_, local_info_, store_, listener_manager_,
-                                        validation_visitor_, *api_);
-
-    expectRequest();
+    lds_ = std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, init_manager_, store_,
+                                        listener_manager_, validation_visitor_);
+    EXPECT_CALL(*cluster_manager_.subscription_factory_.subscription_, start(_));
     init_target_handle_->initialize(init_watcher_);
+    lds_callbacks_ = cluster_manager_.subscription_factory_.callbacks_;
   }
 
   void expectAdd(const std::string& listener_name, absl::optional<std::string> version,
@@ -84,26 +60,6 @@ api_config_source:
             return updated;
           }));
     }
-  }
-
-  void expectRequest() {
-    EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("foo_cluster"));
-    EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
-        .WillOnce(
-            Invoke([&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-              EXPECT_EQ(
-                  (Http::TestHeaderMapImpl{
-                      {":method", "POST"},
-                      {":path", "/v2/discovery:listeners"},
-                      {":authority", "foo_cluster"},
-                      {"content-type", "application/json"},
-                      {"content-length",
-                       request->body() ? fmt::format_int(request->body()->length()).str() : "0"}}),
-                  request->headers());
-              callbacks_ = &callbacks;
-              return &request_;
-            }));
   }
 
   void makeListenersAndExpectCall(const std::vector<std::string>& listener_names) {
@@ -129,21 +85,14 @@ api_config_source:
   }
 
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  Event::MockDispatcher dispatcher_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
   Init::MockManager init_manager_;
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl store_;
   MockListenerManager listener_manager_;
-  Http::MockAsyncClientRequest request_;
+  Config::SubscriptionCallbacks* lds_callbacks_{};
   std::unique_ptr<LdsApiImpl> lds_;
-  Event::MockTimer* interval_timer_{};
-  Http::AsyncClient::Callbacks* callbacks_{};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  Api::ApiPtr api_;
-  Stats::Gauge& lds_version_;
 
 private:
   std::list<NiceMock<Network::MockListenerConfig>> listeners_;
@@ -162,30 +111,7 @@ TEST_F(LdsApiTest, ValidateFail) {
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
   EXPECT_CALL(init_watcher_, ready());
 
-  EXPECT_THROW(lds_->onConfigUpdate(listeners, ""), EnvoyException);
-  EXPECT_CALL(request_, cancel());
-}
-
-TEST_F(LdsApiTest, UnknownCluster) {
-  const std::string config_yaml = R"EOF(
-api_config_source:
-  api_type: REST
-  cluster_names:
-  - foo_cluster
-  refresh_delay: 1s
-  )EOF";
-
-  envoy::api::v2::core::ConfigSource lds_config;
-  TestUtility::loadFromYaml(config_yaml, lds_config);
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
-  EXPECT_THROW_WITH_MESSAGE(
-      LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_manager_, local_info_,
-                 store_, listener_manager_, validation_visitor_, *api_),
-      EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS "
-      "cluster: 'foo_cluster' does not exist, was added via api, or is an "
-      "EDS cluster");
+  EXPECT_THROW(lds_callbacks_->onConfigUpdate(listeners, ""), EnvoyException);
 }
 
 TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
@@ -212,9 +138,8 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
 
   listeners.Add()->PackFrom(listener);
   EXPECT_THROW_WITH_MESSAGE(
-      lds_->onConfigUpdate(listeners, ""), EnvoyException,
+      lds_callbacks_->onConfigUpdate(listeners, ""), EnvoyException,
       "Error adding/updating listener(s) invalid-listener: something is wrong");
-  EXPECT_CALL(request_, cancel());
 }
 
 TEST_F(LdsApiTest, EmptyListenersUpdate) {
@@ -226,11 +151,9 @@ TEST_F(LdsApiTest, EmptyListenersUpdate) {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
 
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
-
   EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(request_, cancel());
 
-  lds_->onConfigUpdate(listeners, "");
+  lds_callbacks_->onConfigUpdate(listeners, "");
 }
 
 TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
@@ -257,10 +180,9 @@ TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
 
   EXPECT_CALL(init_watcher_, ready());
 
-  EXPECT_THROW_WITH_MESSAGE(lds_->onConfigUpdate(listeners, ""), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(lds_callbacks_->onConfigUpdate(listeners, ""), EnvoyException,
                             "Error adding/updating listener(s) invalid-listener-1: something is "
                             "wrong, invalid-listener-2: something else is wrong");
-  EXPECT_CALL(request_, cancel());
 }
 
 // Validate onConfigUpdate throws EnvoyException with duplicate listeners.
@@ -280,38 +202,9 @@ TEST_F(LdsApiTest, ValidateDuplicateListeners) {
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true)).WillOnce(Return(true));
   EXPECT_CALL(init_watcher_, ready());
 
-  EXPECT_THROW_WITH_MESSAGE(lds_->onConfigUpdate(listeners, ""), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(lds_callbacks_->onConfigUpdate(listeners, ""), EnvoyException,
                             "Error adding/updating listener(s) duplicate_listener: duplicate "
                             "listener duplicate_listener found");
-  EXPECT_CALL(request_, cancel());
-}
-
-TEST_F(LdsApiTest, BadLocalInfo) {
-  interval_timer_ = new Event::MockTimer(&dispatcher_);
-  const std::string config_yaml = R"EOF(
-api_config_source:
-  api_type: REST
-  cluster_names:
-  - foo_cluster
-  refresh_delay: 1s
-  )EOF";
-
-  envoy::api::v2::core::ConfigSource lds_config;
-  TestUtility::loadFromYaml(config_yaml, lds_config);
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockClusterMockPrioritySet cluster;
-  cluster_map.emplace("foo_cluster", cluster);
-  EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
-  EXPECT_CALL(cluster, info()).Times(2);
-  EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(*cluster.info_, type());
-  ON_CALL(local_info_, clusterName()).WillByDefault(ReturnRef(EMPTY_STRING));
-  EXPECT_THROW_WITH_MESSAGE(
-      LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_manager_, local_info_,
-                 store_, listener_manager_, validation_visitor_, *api_),
-      EnvoyException,
-      "lds: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
-      "--service-node and --service-cluster options.");
 }
 
 TEST_F(LdsApiTest, Basic) {
@@ -338,22 +231,15 @@ TEST_F(LdsApiTest, Basic) {
   ]
 }
 )EOF";
-
-  Http::MessagePtr message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
+  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_json);
 
   makeListenersAndExpectCall({});
   expectAdd("listener1", "0", true);
   expectAdd("listener2", "0", true);
   EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  callbacks_->onSuccess(std::move(message));
+  lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
 
   EXPECT_EQ("0", lds_->versionInfo());
-  EXPECT_EQ(7148434200721666028U, lds_version_.value());
-  expectRequest();
-  interval_timer_->callback_();
 
   const std::string response2_json = R"EOF(
 {
@@ -374,22 +260,14 @@ TEST_F(LdsApiTest, Basic) {
   ]
 }
   )EOF";
-
-  message = std::make_unique<Http::ResponseMessageImpl>(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
-  message->body() = std::make_unique<Buffer::OwnedImpl>(response2_json);
+  auto response2 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response2_json);
 
   makeListenersAndExpectCall({"listener1", "listener2"});
   EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
   expectAdd("listener1", "1", false);
   expectAdd("listener3", "1", true);
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  callbacks_->onSuccess(std::move(message));
+  lds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info());
   EXPECT_EQ("1", lds_->versionInfo());
-
-  EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
-  EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
-  EXPECT_EQ(13237225503670494420U, lds_version_.value());
 }
 
 // Regression test against only updating versionInfo() if at least one listener
@@ -412,20 +290,14 @@ TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
   ]
 }
 )EOF";
-
-  Http::MessagePtr message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
+  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_json);
 
   makeListenersAndExpectCall({});
   expectAdd("listener1", "0", true);
   EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  callbacks_->onSuccess(std::move(message));
+  lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
 
   EXPECT_EQ("0", lds_->versionInfo());
-  expectRequest();
-  interval_timer_->callback_();
 
   const std::string response2_json = R"EOF(
 {
@@ -433,22 +305,12 @@ TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
   "resources": []
 }
   )EOF";
-
-  message = std::make_unique<Http::ResponseMessageImpl>(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
-  message->body() = std::make_unique<Buffer::OwnedImpl>(response2_json);
+  auto response2 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response2_json);
 
   makeListenersAndExpectCall({"listener1"});
   EXPECT_CALL(listener_manager_, removeListener("listener1")).WillOnce(Return(true));
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  callbacks_->onSuccess(std::move(message));
+  lds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info());
   EXPECT_EQ("1", lds_->versionInfo());
-
-  EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
-  EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
-  EXPECT_EQ(
-      13237225503670494420U,
-      store_.gauge("listener_manager.lds.version", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
 // Regression test issue #2188 where an empty ca_cert_file field was created and caused the LDS
@@ -471,19 +333,12 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
   ]
 }
   )EOF";
-
-  Http::MessagePtr message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
+  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_json);
 
   makeListenersAndExpectCall({"listener0"});
   expectAdd("listener0", {}, true);
   EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  callbacks_->onSuccess(std::move(message));
-
-  expectRequest();
-  interval_timer_->callback_();
+  lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
 
   std::string response2_basic = R"EOF(
 {{
@@ -511,26 +366,24 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
       fmt::format(response2_basic,
                   TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"),
                   TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+  auto response2 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response2_json);
 
-  message = std::make_unique<Http::ResponseMessageImpl>(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
-  message->body() = std::make_unique<Buffer::OwnedImpl>(response2_json);
   makeListenersAndExpectCall({
       "listener-8080",
   });
   // Can't check version here because of bazel sandbox paths for the certs.
   expectAdd("listener-8080", {}, true);
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  EXPECT_NO_THROW(callbacks_->onSuccess(std::move(message)));
+  EXPECT_NO_THROW(lds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info()));
 }
 
-TEST_F(LdsApiTest, Failure) {
+// Validate behavior when the config is delivered but it fails PGV validation.
+TEST_F(LdsApiTest, FailureInvalidConfig) {
   InSequence s;
 
   setup();
 
   // To test the case of valid JSON with invalid config, create a listener with no address.
-  const std::string response_json = R"EOF(
+  const std::string response1_json = R"EOF(
 {
   "version_info": "1",
   "resources": [
@@ -542,30 +395,25 @@ TEST_F(LdsApiTest, Failure) {
   ]
 }
   )EOF";
-
-  Http::MessagePtr message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
+  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_json);
 
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_THROW(lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info()),
+               EnvoyException);
+  EXPECT_EQ("", lds_->versionInfo());
+}
+
+// Validate behavior when the config fails delivery at the subscription level.
+TEST_F(LdsApiTest, FailureSubscription) {
+  InSequence s;
+
+  setup();
 
   EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  callbacks_->onSuccess(std::move(message));
-
-  expectRequest();
-  interval_timer_->callback_();
-
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
+  lds_callbacks_->onConfigUpdateFailed({});
   EXPECT_EQ("", lds_->versionInfo());
-
-  EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
-  EXPECT_EQ(1UL, store_.counter("listener_manager.lds.update_failure").value());
-  // Validate that the schema error increments update_rejected stat.
-  EXPECT_EQ(1UL, store_.counter("listener_manager.lds.update_failure").value());
-  EXPECT_EQ(0UL, lds_version_.value());
 }
 
 TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
@@ -592,22 +440,15 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   ]
 }
 )EOF";
-
-  Http::MessagePtr message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
+  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_json);
 
   makeListenersAndExpectCall({});
   expectAdd("listener1", "0", true);
   expectAdd("listener2", "0", true);
   EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  callbacks_->onSuccess(std::move(message));
+  lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
 
   EXPECT_EQ("0", lds_->versionInfo());
-  EXPECT_EQ(7148434200721666028U, lds_version_.value());
-  expectRequest();
-  interval_timer_->callback_();
 
   const std::string response2_json = R"EOF(
 {
@@ -628,22 +469,13 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   ]
 }
 )EOF";
-
-  message = std::make_unique<Http::ResponseMessageImpl>(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
-  message->body() = std::make_unique<Buffer::OwnedImpl>(response2_json);
+  auto response2 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response2_json);
 
   makeListenersAndExpectCall({"listener1", "listener2"});
   EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
   expectAdd("listener1", "1", false);
   expectAdd("listener3", "1", true);
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  callbacks_->onSuccess(std::move(message));
-
-  EXPECT_EQ("1", lds_->versionInfo());
-  EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
-  EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
-  EXPECT_EQ(13237225503670494420U, lds_version_.value());
+  lds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info());
 }
 
 } // namespace

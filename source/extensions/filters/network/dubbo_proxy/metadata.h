@@ -20,10 +20,10 @@ namespace DubboProxy {
 class MessageMetadata {
 public:
   // TODO(gengleilei) Add parameter data types and implement Dubbo data type mapping.
-  typedef std::unordered_map<uint32_t, std::string> ParameterValueMap;
-  typedef std::unique_ptr<ParameterValueMap> ParameterValueMapPtr;
+  using ParameterValueMap = std::unordered_map<uint32_t, std::string>;
+  using ParameterValueMapPtr = std::unique_ptr<ParameterValueMap>;
 
-  typedef std::unique_ptr<Http::HeaderMapImpl> HeaderMapPtr;
+  using HeaderMapPtr = std::unique_ptr<Http::HeaderMapImpl>;
 
   void setServiceName(const std::string& name) { service_name_ = name; }
   const std::string& service_name() const { return service_name_; }
@@ -119,7 +119,7 @@ private:
   HeaderMapPtr headers_; // attachment
 };
 
-typedef std::shared_ptr<MessageMetadata> MessageMetadataSharedPtr;
+using MessageMetadataSharedPtr = std::shared_ptr<MessageMetadata>;
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

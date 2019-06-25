@@ -85,7 +85,7 @@ public:
       const Protobuf::RepeatedPtrField<::io::prometheus::client::MetricFamily>& envoy_metrics =
           request_msg.envoy_metrics();
 
-      for (::io::prometheus::client::MetricFamily metrics_family : envoy_metrics) {
+      for (const ::io::prometheus::client::MetricFamily& metrics_family : envoy_metrics) {
         if (metrics_family.name() == "cluster.cluster_0.membership_change" &&
             metrics_family.type() == ::io::prometheus::client::MetricType::COUNTER) {
           known_counter_exists = true;

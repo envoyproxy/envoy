@@ -137,7 +137,7 @@ private:
   std::vector<RequestParseFailureSharedPtr> parse_failures_;
 };
 
-typedef std::shared_ptr<CapturingRequestCallback> CapturingRequestCallbackSharedPtr;
+using CapturingRequestCallbackSharedPtr = std::shared_ptr<CapturingRequestCallback>;
 
 } // namespace Kafka
 } // namespace NetworkFilters

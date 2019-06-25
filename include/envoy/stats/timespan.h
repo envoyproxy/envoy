@@ -15,7 +15,7 @@ namespace Stats {
  */
 class CompletableTimespan {
 public:
-  virtual ~CompletableTimespan() {}
+  virtual ~CompletableTimespan() = default;
 
   /**
    * Complete the timespan.
@@ -37,7 +37,7 @@ public:
   /**
    * Complete the timespan and send the time to the histogram.
    */
-  void complete() { histogram_.recordValue(getRawDuration().count()); }
+  void complete() override { histogram_.recordValue(getRawDuration().count()); }
 
   /**
    * Get duration in the time unit since the creation of the span.
@@ -52,9 +52,9 @@ private:
   const MonotonicTime start_;
 };
 
-typedef TimespanWithUnit<std::chrono::milliseconds> Timespan;
-typedef std::unique_ptr<Timespan> TimespanPtr;
-typedef std::unique_ptr<CompletableTimespan> CompletableTimespanPtr;
+using Timespan = TimespanWithUnit<std::chrono::milliseconds>;
+using TimespanPtr = std::unique_ptr<Timespan>;
+using CompletableTimespanPtr = std::unique_ptr<CompletableTimespan>;
 
 } // namespace Stats
 } // namespace Envoy

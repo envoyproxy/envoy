@@ -40,7 +40,7 @@ private:
     HostMap all_hosts_;
   };
 
-  typedef std::unique_ptr<ResolveTarget> ResolveTargetPtr;
+  using ResolveTargetPtr = std::unique_ptr<ResolveTarget>;
 
   void updateAllHosts(const HostVector& hosts_added, const HostVector& hosts_removed,
                       uint32_t priority);

@@ -15,7 +15,7 @@ namespace Stats {
  */
 class HistogramStatistics {
 public:
-  virtual ~HistogramStatistics() {}
+  virtual ~HistogramStatistics() = default;
 
   /**
    * Returns quantile summary representation of the histogram.
@@ -73,7 +73,7 @@ public:
  */
 class Histogram : public virtual Metric {
 public:
-  virtual ~Histogram() {}
+  ~Histogram() override = default;
 
   /**
    * Records an unsigned value. If a timer, values are in units of milliseconds.
@@ -81,14 +81,14 @@ public:
   virtual void recordValue(uint64_t value) PURE;
 };
 
-typedef std::shared_ptr<Histogram> HistogramSharedPtr;
+using HistogramSharedPtr = std::shared_ptr<Histogram>;
 
 /**
  * A histogram that is stored in main thread and provides summary view of the histogram.
  */
 class ParentHistogram : public virtual Histogram {
 public:
-  virtual ~ParentHistogram() {}
+  ~ParentHistogram() override = default;
 
   /**
    * This method is called during the main stats flush process for each of the histograms and used
@@ -117,7 +117,7 @@ public:
   virtual const std::string bucketSummary() const PURE;
 };
 
-typedef std::shared_ptr<ParentHistogram> ParentHistogramSharedPtr;
+using ParentHistogramSharedPtr = std::shared_ptr<ParentHistogram>;
 
 } // namespace Stats
 } // namespace Envoy
