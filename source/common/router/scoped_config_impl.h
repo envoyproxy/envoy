@@ -111,7 +111,8 @@ private:
  */
 class ScopeKeyBuilderBase {
 public:
-  explicit ScopeKeyBuilderBase(ScopedRoutes::ScopeKeyBuilder&& config) : config_(config) {}
+  explicit ScopeKeyBuilderBase(ScopedRoutes::ScopeKeyBuilder&& config)
+      : config_(std::move(config)) {}
   virtual ~ScopeKeyBuilderBase() = default;
 
   // Computes scope key for given headers, returns nullptr if a key can't be computed.
@@ -142,10 +143,8 @@ private:
  */
 class ThreadLocalScopedConfigImpl : public ScopedConfig, public ThreadLocal::ThreadLocalObject {
 public:
-  ThreadLocalScopedConfigImpl(
-      envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder&&
-          scope_key_builder)
-      : scope_key_builder_(scope_key_builder) {}
+  ThreadLocalScopedConfigImpl(ScopedRoutes::ScopeKeyBuilder&& scope_key_builder)
+      : scope_key_builder_(std::move(scope_key_builder)) {}
 
   void addOrUpdateRoutingScope(const ScopedRouteInfoConstSharedPtr& scoped_route_info);
   void removeRoutingScope(const std::string& scope_name);
