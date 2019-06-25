@@ -580,19 +580,23 @@ duration_filter:
 
   stream_info.end_time_ = stream_info.startTimeMonotonic() + std::chrono::microseconds(100000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1));
-  EXPECT_TRUE(filter.evaluate(stream_info, &request_headers, &response_headers, &response_trailers));
+  EXPECT_TRUE(
+      filter.evaluate(stream_info, &request_headers, &response_headers, &response_trailers));
 
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1000));
-  EXPECT_FALSE(filter.evaluate(stream_info, &request_headers, &response_headers, &response_trailers));
+  EXPECT_FALSE(
+      filter.evaluate(stream_info, &request_headers, &response_headers, &response_trailers));
 
   stream_info.end_time_ =
       stream_info.startTimeMonotonic() + std::chrono::microseconds(100000001000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
-  EXPECT_TRUE(filter.evaluate(stream_info, &request_headers, &response_headers, &response_trailers));
+  EXPECT_TRUE(
+      filter.evaluate(stream_info, &request_headers, &response_headers, &response_trailers));
 
   stream_info.end_time_ = stream_info.startTimeMonotonic() + std::chrono::microseconds(10000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
-  EXPECT_FALSE(filter.evaluate(stream_info, &request_headers, &response_headers, &response_trailers));
+  EXPECT_FALSE(
+      filter.evaluate(stream_info, &request_headers, &response_headers, &response_trailers));
 }
 
 TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
