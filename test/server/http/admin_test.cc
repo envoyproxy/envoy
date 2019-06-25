@@ -1092,6 +1092,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 
   ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
   ON_CALL(*host, weight()).WillByDefault(Return(5));
+  ON_CALL(*host, priority()).WillByDefault(Return(6));
 
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
@@ -1155,7 +1156,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       "value": 43.2
      },
      "weight": 5,
-     "hostname": "foo.com"
+     "hostname": "foo.com",
+     "priority": 6
     }
    ]
   }
@@ -1196,6 +1198,7 @@ fake_cluster::1.2.3.4:80::zone::test_zone
 fake_cluster::1.2.3.4:80::sub_zone::test_sub_zone
 fake_cluster::1.2.3.4:80::canary::false
 fake_cluster::1.2.3.4:80::success_rate::43.2
+fake_cluster::1.2.3.4:80::priority::6
 )EOF";
   EXPECT_EQ(expected_text, response2.toString());
 }
