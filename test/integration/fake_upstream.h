@@ -189,7 +189,7 @@ private:
   bool received_data_{false};
 };
 
-typedef std::unique_ptr<FakeStream> FakeStreamPtr;
+using FakeStreamPtr = std::unique_ptr<FakeStream>;
 
 // Encapsulates various state and functionality related to sharing a Connection object across
 // threads. With FakeUpstream fabricated objects, we have a Connection that is associated with a
@@ -298,10 +298,10 @@ private:
   const bool allow_unexpected_disconnects_;
 };
 
-typedef std::unique_ptr<SharedConnectionWrapper> SharedConnectionWrapperPtr;
+using SharedConnectionWrapperPtr = std::unique_ptr<SharedConnectionWrapper>;
 
 class QueuedConnectionWrapper;
-typedef std::unique_ptr<QueuedConnectionWrapper> QueuedConnectionWrapperPtr;
+using QueuedConnectionWrapperPtr = std::unique_ptr<QueuedConnectionWrapper>;
 
 /**
  * Wraps a raw Network::Connection in a safe way, such that the connection can
@@ -444,7 +444,7 @@ private:
   std::list<FakeStreamPtr> new_streams_;
 };
 
-typedef std::unique_ptr<FakeHttpConnection> FakeHttpConnectionPtr;
+using FakeHttpConnectionPtr = std::unique_ptr<FakeHttpConnection>;
 
 /**
  * Fake raw connection for integration testing.
@@ -453,7 +453,7 @@ class FakeRawConnection : public FakeConnectionBase {
 public:
   FakeRawConnection(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
       : FakeConnectionBase(shared_connection, time_system) {}
-  typedef const std::function<bool(const std::string&)> ValidatorFunction;
+  using ValidatorFunction = const std::function<bool(const std::string&)>;
 
   // Writes to data. If data is nullptr, discards the received data.
   ABSL_MUST_USE_RESULT
@@ -509,7 +509,7 @@ private:
   std::string data_;
 };
 
-typedef std::unique_ptr<FakeRawConnection> FakeRawConnectionPtr;
+using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;
 
 /**
  * Provides a fake upstream server for integration testing.
@@ -633,6 +633,6 @@ private:
   const Network::FilterChainSharedPtr filter_chain_;
 };
 
-typedef std::unique_ptr<FakeUpstream> FakeUpstreamPtr;
+using FakeUpstreamPtr = std::unique_ptr<FakeUpstream>;
 
 } // namespace Envoy

@@ -32,7 +32,7 @@ enum class HealthTransition {
  */
 class HealthChecker {
 public:
-  virtual ~HealthChecker() {}
+  virtual ~HealthChecker() = default;
 
   /**
    * Called when a host has been health checked.
@@ -40,8 +40,8 @@ public:
    * @param changed_state supplies whether the health check resulted in a host moving from healthy
    *                       to not healthy or vice versa.
    */
-  typedef std::function<void(const HostSharedPtr& host, HealthTransition changed_state)>
-      HostStatusCb;
+  using HostStatusCb =
+      std::function<void(const HostSharedPtr& host, HealthTransition changed_state)>;
 
   /**
    * Install a callback that will be invoked every time a health check round is completed for
@@ -56,7 +56,7 @@ public:
   virtual void start() PURE;
 };
 
-typedef std::shared_ptr<HealthChecker> HealthCheckerSharedPtr;
+using HealthCheckerSharedPtr = std::shared_ptr<HealthChecker>;
 
 std::ostream& operator<<(std::ostream& out, HealthState state);
 std::ostream& operator<<(std::ostream& out, HealthTransition changed_state);
@@ -66,7 +66,7 @@ std::ostream& operator<<(std::ostream& out, HealthTransition changed_state);
  */
 class HealthCheckEventLogger {
 public:
-  virtual ~HealthCheckEventLogger() {}
+  virtual ~HealthCheckEventLogger() = default;
 
   /**
    * Log an unhealthy host ejection event.
@@ -118,7 +118,7 @@ public:
                       const HostDescriptionConstSharedPtr& host) PURE;
 };
 
-typedef std::unique_ptr<HealthCheckEventLogger> HealthCheckEventLoggerPtr;
+using HealthCheckEventLoggerPtr = std::unique_ptr<HealthCheckEventLogger>;
 
 } // namespace Upstream
 } // namespace Envoy

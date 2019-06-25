@@ -18,7 +18,7 @@ namespace Filesystem {
  */
 class File {
 public:
-  virtual ~File() {}
+  virtual ~File() = default;
 
   /**
    * Open the file with O_RDWR | O_APPEND | O_CREAT
@@ -60,7 +60,7 @@ using FilePtr = std::unique_ptr<File>;
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   /**
    *  @param path The path of the File
@@ -128,7 +128,7 @@ class DirectoryIteratorImpl;
 class DirectoryIterator {
 public:
   DirectoryIterator() : entry_({"", FileType::Other}) {}
-  virtual ~DirectoryIterator() {}
+  virtual ~DirectoryIterator() = default;
 
   const DirectoryEntry& operator*() const { return entry_; }
 

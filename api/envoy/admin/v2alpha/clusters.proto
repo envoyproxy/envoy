@@ -65,6 +65,9 @@ message HostStatus {
 
   // The host's weight. If not configured, the value defaults to 1.
   uint32 weight = 5;
+
+  // The hostname of the host, if applicable.
+  string hostname = 6;
 }
 
 // Health status for a host.

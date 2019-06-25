@@ -129,7 +129,7 @@ public:
   IpList(const std::vector<std::string>& subnets);
   IpList(const Json::Object& config, const std::string& member_name);
   IpList(const Protobuf::RepeatedPtrField<envoy::api::v2::core::CidrRange>& cidrs);
-  IpList(){};
+  IpList() = default;
 
   bool contains(const Instance& address) const;
   bool empty() const { return ip_list_.empty(); }

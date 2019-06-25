@@ -80,7 +80,7 @@ std::string getFilterConfig(bool use_local_jwks) {
   return getAuthFilterConfig(ExampleConfig, use_local_jwks);
 }
 
-typedef HttpProtocolIntegrationTest LocalJwksIntegrationTest;
+using LocalJwksIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LocalJwksIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),

@@ -21,7 +21,7 @@ namespace Filesystem {
 class WatcherImpl : public Watcher, Logger::Loggable<Logger::Id::file> {
 public:
   WatcherImpl(Event::Dispatcher& dispatcher);
-  ~WatcherImpl();
+  ~WatcherImpl() override;
 
   // Filesystem::Watcher
   void addWatch(const std::string& path, uint32_t events, OnChangedCb cb) override;

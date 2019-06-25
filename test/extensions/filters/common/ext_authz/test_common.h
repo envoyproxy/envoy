@@ -20,9 +20,9 @@ struct KeyValueOption {
   bool append;
 };
 
-typedef std::vector<KeyValueOption> KeyValueOptionVector;
-typedef std::vector<envoy::api::v2::core::HeaderValueOption> HeaderValueOptionVector;
-typedef std::unique_ptr<envoy::service::auth::v2::CheckResponse> CheckResponsePtr;
+using KeyValueOptionVector = std::vector<KeyValueOption>;
+using HeaderValueOptionVector = std::vector<envoy::api::v2::core::HeaderValueOption>;
+using CheckResponsePtr = std::unique_ptr<envoy::service::auth::v2::CheckResponse>;
 
 class TestCommon {
 public:

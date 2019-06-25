@@ -191,7 +191,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   if (config.certificateValidationContext() != nullptr &&
       !config.certificateValidationContext()->verifyCertificateSpkiList().empty()) {
-    for (auto hash : config.certificateValidationContext()->verifyCertificateSpkiList()) {
+    for (const auto& hash : config.certificateValidationContext()->verifyCertificateSpkiList()) {
       const auto decoded = Base64::decode(hash);
       if (decoded.size() != SHA256_DIGEST_LENGTH) {
         throw EnvoyException(fmt::format("Invalid base64-encoded SHA-256 {}", hash));

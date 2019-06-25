@@ -449,6 +449,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:clear_route_cache_filter_lib",
+        "//test/integration/filters:process_context_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -596,6 +597,16 @@ envoy_cc_test(
         "//source/extensions/filters/http/ratelimit:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
+    ],
+)
+
+envoy_cc_test(
+    name = "rtds_integration_test",
+    srcs = ["rtds_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "@envoy_api//envoy/service/discovery/v2:rtds_cc",
     ],
 )
 

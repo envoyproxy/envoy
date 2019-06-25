@@ -53,7 +53,7 @@ public:
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
                         Server::OverloadManager* overload_manager, TimeSource& time_system);
-  ~ConnectionManagerImpl();
+  ~ConnectionManagerImpl() override;
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
   static ConnectionManagerTracingStats generateTracingStats(const std::string& prefix,
@@ -96,9 +96,10 @@ private:
    */
   struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks {
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
-        : iteration_state_(IterationState::Continue), iterate_from_current_filter_(false),
-          parent_(parent), headers_continued_(false), continue_headers_continued_(false),
-          end_stream_(false), dual_filter_(dual_filter), decode_headers_called_(false) {}
+        : parent_(parent), iteration_state_(IterationState::Continue),
+          iterate_from_current_filter_(false), headers_continued_(false),
+          continue_headers_continued_(false), end_stream_(false), dual_filter_(dual_filter),
+          decode_headers_called_(false) {}
 
     // Functions in the following block are called after the filter finishes processing
     // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -181,13 +182,13 @@ private:
       StopAllWatermark,    // Iteration has stopped for all frame types, and following data should
                            // be buffered until high watermark is reached.
     };
+    ActiveStream& parent_;
     IterationState iteration_state_;
     // If the filter resumes iteration from a StopAllBuffer/Watermark state, the current filter
     // hasn't parsed data and trailers. As a result, the filter iteration should start with the
     // current filter instead of the next one. If true, filter iteration starts with the current
     // filter. Otherwise, starts with the next filter in the chain.
-    bool iterate_from_current_filter_;
-    ActiveStream& parent_;
+    bool iterate_from_current_filter_ : 1;
     bool headers_continued_ : 1;
     bool continue_headers_continued_ : 1;
     // If true, end_stream is called for this filter.
@@ -305,7 +306,7 @@ private:
     bool is_grpc_request_{};
   };
 
-  typedef std::unique_ptr<ActiveStreamDecoderFilter> ActiveStreamDecoderFilterPtr;
+  using ActiveStreamDecoderFilterPtr = std::unique_ptr<ActiveStreamDecoderFilter>;
 
   /**
    * Wrapper for a stream encoder filter.
@@ -367,7 +368,7 @@ private:
     StreamEncoderFilterSharedPtr handle_;
   };
 
-  typedef std::unique_ptr<ActiveStreamEncoderFilter> ActiveStreamEncoderFilterPtr;
+  using ActiveStreamEncoderFilterPtr = std::unique_ptr<ActiveStreamEncoderFilter>;
 
   /**
    * Wraps a single active stream on the connection. These are either full request/response pairs
@@ -597,7 +598,7 @@ private:
     Network::Socket::OptionsSharedPtr upstream_options_;
   };
 
-  typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
+  using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
 
   /**
    * Check to see if the connection can be closed after gracefully waiting to send pending codec

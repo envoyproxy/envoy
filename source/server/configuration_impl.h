@@ -31,7 +31,7 @@ namespace Configuration {
  */
 class StatsSinkFactory {
 public:
-  virtual ~StatsSinkFactory() {}
+  virtual ~StatsSinkFactory() = default;
 
   /**
    * Create a particular Stats::Sink implementation. If the implementation is unable to produce a

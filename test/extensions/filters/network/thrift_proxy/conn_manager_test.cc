@@ -83,7 +83,7 @@ public:
     // Destroy any existing filter first.
     filter_ = nullptr;
 
-    for (auto counter : store_.counters()) {
+    for (const auto& counter : store_.counters()) {
       counter->reset();
     }
 

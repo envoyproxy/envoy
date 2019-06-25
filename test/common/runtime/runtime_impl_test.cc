@@ -7,8 +7,12 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
+#include "test/mocks/init/mocks.h"
+#include "test/mocks/local_info/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 
 #include "gmock/gmock.h"
@@ -20,6 +24,7 @@ using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnNew;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Runtime {
@@ -68,8 +73,37 @@ TEST(UUID, SanityCheckOfUniqueness) {
 
 class LoaderImplTest : public testing::Test {
 protected:
-  LoaderImplTest() : api_(Api::createApiForTest(store_)) {}
+  LoaderImplTest() : api_(Api::createApiForTest(store_)) { local_info_.node_.set_cluster(""); }
 
+  virtual void setup() {
+    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([this] {
+      Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
+      EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
+          .WillRepeatedly(Invoke(
+              [this](const std::string& path, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+                EXPECT_EQ(path, expected_watch_root_);
+                on_changed_cbs_.emplace_back(cb);
+              }));
+      return mock_watcher;
+    }));
+  }
+
+  Event::MockDispatcher dispatcher_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::IsolatedStoreImpl store_;
+  MockRandomGenerator generator_;
+  std::unique_ptr<LoaderImpl> loader_;
+  Api::ApiPtr api_;
+  Upstream::MockClusterManager cm_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Init::MockManager init_manager_;
+  std::vector<Filesystem::Watcher::OnChangedCb> on_changed_cbs_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  std::string expected_watch_root_;
+};
+
+class DiskLoaderImplTest : public LoaderImplTest {
+public:
   static void SetUpTestSuite() {
     TestEnvironment::exec(
         {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
@@ -79,29 +113,19 @@ protected:
     TestEnvironment::removePath(TestEnvironment::temporaryPath("test/common/runtime/test_data"));
   }
 
-  virtual void setup() {
-    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([this] {
-      Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
-      EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
-          .WillRepeatedly(
-              Invoke([this](const std::string&, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-                on_changed_cbs_.emplace_back(cb);
-              }));
-      return mock_watcher;
-    }));
-  }
-
   void run(const std::string& primary_dir, const std::string& override_dir) {
     envoy::config::bootstrap::v2::Runtime runtime;
     runtime.mutable_base()->MergeFrom(base_);
-    runtime.set_symlink_root(TestEnvironment::temporaryPath(primary_dir));
+    expected_watch_root_ = TestEnvironment::temporaryPath(primary_dir);
+    runtime.set_symlink_root(expected_watch_root_);
     runtime.set_subdirectory("envoy");
     runtime.set_override_subdirectory(override_dir);
 
     envoy::config::bootstrap::v2::LayeredRuntime layered_runtime;
     Config::translateRuntime(runtime, layered_runtime);
-    loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, "", store_,
-                                           generator_, *api_);
+    loader_ =
+        std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, init_manager_,
+                                     store_, generator_, validation_visitor_, *api_);
   }
 
   void write(const std::string& path, const std::string& value) {
@@ -113,18 +137,10 @@ protected:
     on_changed_cbs_[layer](Filesystem::Watcher::Events::MovedTo);
   }
 
-  Event::MockDispatcher dispatcher_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
-
-  std::vector<Filesystem::Watcher::OnChangedCb> on_changed_cbs_;
-  Stats::IsolatedStoreImpl store_;
-  MockRandomGenerator generator_;
-  std::unique_ptr<LoaderImpl> loader_;
-  Api::ApiPtr api_;
   ProtobufWkt::Struct base_;
 };
 
-TEST_F(LoaderImplTest, All) {
+TEST_F(DiskLoaderImplTest, All) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
 
@@ -138,10 +154,16 @@ TEST_F(LoaderImplTest, All) {
   EXPECT_EQ(2UL, loader_->snapshot().getInteger("file3", 1));
   EXPECT_EQ(123UL, loader_->snapshot().getInteger("file4", 1));
 
-  // Boolean getting.
   bool value;
   SnapshotImpl* snapshot = reinterpret_cast<SnapshotImpl*>(&loader_->snapshot());
 
+  // Validate that the layer name is set properly for static layers.
+  EXPECT_EQ("base", snapshot->getLayers()[0]->name());
+  EXPECT_EQ("root", snapshot->getLayers()[1]->name());
+  EXPECT_EQ("override", snapshot->getLayers()[2]->name());
+  EXPECT_EQ("admin", snapshot->getLayers()[3]->name());
+
+  // Boolean getting.
   EXPECT_EQ(true, snapshot->getBoolean("file11", value));
   EXPECT_EQ(true, value);
   EXPECT_EQ(true, snapshot->getBoolean("file12", value));
@@ -222,7 +244,7 @@ TEST_F(LoaderImplTest, All) {
   EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
-TEST_F(LoaderImplTest, GetLayers) {
+TEST_F(DiskLoaderImplTest, GetLayers) {
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
     foo: whatevs
   )EOF");
@@ -246,7 +268,7 @@ TEST_F(LoaderImplTest, GetLayers) {
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
 }
 
-TEST_F(LoaderImplTest, BadDirectory) {
+TEST_F(DiskLoaderImplTest, BadDirectory) {
   setup();
   run("/baddir", "/baddir");
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
@@ -257,7 +279,7 @@ TEST_F(LoaderImplTest, BadDirectory) {
 }
 
 // Validate that an error in a layer will results in appropriate stats tracking.
-TEST_F(LoaderImplTest, DiskLayerFailure) {
+TEST_F(DiskLoaderImplTest, DiskLayerFailure) {
   setup();
   // Symlink loopy configuration will result in an error.
   run("test/common/runtime/test_data", "loop");
@@ -268,7 +290,7 @@ TEST_F(LoaderImplTest, DiskLayerFailure) {
   EXPECT_EQ(1, store_.counter("runtime.override_dir_not_exists").value());
 }
 
-TEST_F(LoaderImplTest, OverrideFolderDoesNotExist) {
+TEST_F(DiskLoaderImplTest, OverrideFolderDoesNotExist) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override_does_not_exist");
 
@@ -280,7 +302,7 @@ TEST_F(LoaderImplTest, OverrideFolderDoesNotExist) {
   EXPECT_EQ(1, store_.counter("runtime.override_dir_not_exists").value());
 }
 
-TEST_F(LoaderImplTest, PercentHandling) {
+TEST_F(DiskLoaderImplTest, PercentHandling) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
 
@@ -347,7 +369,7 @@ void testNewOverrides(Loader& loader, Stats::Store& store) {
   EXPECT_EQ(0, admin_overrides_active.value());
 }
 
-TEST_F(LoaderImplTest, MergeValues) {
+TEST_F(DiskLoaderImplTest, MergeValues) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
   testNewOverrides(*loader_, store_);
@@ -391,7 +413,7 @@ TEST_F(LoaderImplTest, MergeValues) {
 }
 
 // Validate that admin overrides disk, disk overrides bootstrap.
-TEST_F(LoaderImplTest, LayersOverride) {
+TEST_F(DiskLoaderImplTest, LayersOverride) {
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
     some: thing
     other: thang
@@ -422,31 +444,50 @@ TEST_F(LoaderImplTest, LayersOverride) {
 }
 
 // Validate that multiple admin layers leads to a configuration load failure.
-TEST_F(LoaderImplTest, MultipleAdminLayersFail) {
+TEST_F(DiskLoaderImplTest, MultipleAdminLayersFail) {
   setup();
   envoy::config::bootstrap::v2::LayeredRuntime layered_runtime;
-  layered_runtime.add_layers()->mutable_admin_layer();
-  layered_runtime.add_layers()->mutable_admin_layer();
+  {
+    auto* layer = layered_runtime.add_layers();
+    layer->set_name("admin_0");
+    layer->mutable_admin_layer();
+  }
+  {
+    auto* layer = layered_runtime.add_layers();
+    layer->set_name("admin_1");
+    layer->mutable_admin_layer();
+  }
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, "", store_, generator_,
-                                   *api_),
+      std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, init_manager_,
+                                   store_, generator_, validation_visitor_, *api_),
       EnvoyException,
       "Too many admin layers specified in LayeredRuntime, at most one may be specified");
 }
 
-class DisklessLoaderImplTest : public LoaderImplTest {
+class StaticLoaderImplTest : public LoaderImplTest {
 protected:
   void setup() override {
     LoaderImplTest::setup();
     envoy::config::bootstrap::v2::LayeredRuntime layered_runtime;
-    layered_runtime.add_layers()->mutable_static_layer()->MergeFrom(base_);
-    layered_runtime.add_layers()->mutable_admin_layer();
-    loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, "", store_,
-                                           generator_, *api_);
+    {
+      auto* layer = layered_runtime.add_layers();
+      layer->set_name("base");
+      layer->mutable_static_layer()->MergeFrom(base_);
+    }
+    {
+      auto* layer = layered_runtime.add_layers();
+      layer->set_name("admin");
+      layer->mutable_admin_layer();
+    }
+    loader_ =
+        std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, init_manager_,
+                                     store_, generator_, validation_visitor_, *api_);
   }
+
+  ProtobufWkt::Struct base_;
 };
 
-TEST_F(DisklessLoaderImplTest, All) {
+TEST_F(StaticLoaderImplTest, All) {
   setup();
   EXPECT_EQ("", loader_->snapshot().get("foo"));
   EXPECT_EQ(1UL, loader_->snapshot().getInteger("foo", 1));
@@ -456,7 +497,7 @@ TEST_F(DisklessLoaderImplTest, All) {
 }
 
 // Validate proto parsing sanity.
-TEST_F(DisklessLoaderImplTest, ProtoParsing) {
+TEST_F(StaticLoaderImplTest, ProtoParsing) {
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
     file1: hello override
     file2: world
@@ -609,6 +650,282 @@ TEST(NoRuntime, FeatureEnabled) {
   // Feature defaults should still work.
   EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
   EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+}
+
+// Test RTDS layer(s).
+class RtdsLoaderImplTest : public LoaderImplTest {
+public:
+  void setup() override {
+    LoaderImplTest::setup();
+
+    envoy::config::bootstrap::v2::LayeredRuntime config;
+    *config.add_layers()->mutable_static_layer() =
+        TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    foo: whatevs
+    bar: yar
+  )EOF");
+    for (const auto& layer_resource_name : layers_) {
+      auto* layer = config.add_layers();
+      layer->set_name(layer_resource_name);
+      auto* rtds_layer = layer->mutable_rtds_layer();
+      rtds_layer->set_name(layer_resource_name);
+      rtds_layer->mutable_rtds_config();
+    }
+    EXPECT_CALL(cm_, subscriptionFactory()).Times(layers_.size());
+    EXPECT_CALL(init_manager_, add(_)).WillRepeatedly(Invoke([this](const Init::Target& target) {
+      init_target_handles_.emplace_back(target.createHandle("test"));
+    }));
+    ON_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _))
+        .WillByDefault(testing::Invoke(
+            [this](const envoy::api::v2::core::ConfigSource&, absl::string_view, Stats::Scope&,
+                   Config::SubscriptionCallbacks& callbacks) -> Config::SubscriptionPtr {
+              auto ret = std::make_unique<testing::NiceMock<Config::MockSubscription>>();
+              rtds_subscriptions_.push_back(ret.get());
+              rtds_callbacks_.push_back(&callbacks);
+              return ret;
+            }));
+    loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, config, local_info_, init_manager_,
+                                           store_, generator_, validation_visitor_, *api_);
+    loader_->initialize(cm_);
+    for (auto* sub : rtds_subscriptions_) {
+      EXPECT_CALL(*sub, start(_));
+    }
+    for (auto& handle : init_target_handles_) {
+      handle->initialize(init_watcher_);
+    }
+
+    // Validate that the layer name is set properly for dynamic layers.
+    EXPECT_EQ(layers_[0], loader_->snapshot().getLayers()[1]->name());
+
+    EXPECT_EQ("whatevs", loader_->snapshot().get("foo"));
+    EXPECT_EQ("yar", loader_->snapshot().get("bar"));
+    EXPECT_EQ("", loader_->snapshot().get("baz"));
+
+    EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+    EXPECT_EQ(1, store_.counter("runtime.load_success").value());
+    EXPECT_EQ(2, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+    EXPECT_EQ(1 + layers_.size(),
+              store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+  }
+
+  void addLayer(absl::string_view name) { layers_.emplace_back(name); }
+
+  void doOnConfigUpdateVerifyNoThrow(const envoy::service::discovery::v2::Runtime& runtime,
+                                     uint32_t callback_index = 0) {
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+    resources.Add()->PackFrom(runtime);
+    VERBOSE_EXPECT_NO_THROW(rtds_callbacks_[callback_index]->onConfigUpdate(resources, ""));
+  }
+
+  void doDeltaOnConfigUpdateVerifyNoThrow(const envoy::service::discovery::v2::Runtime& runtime) {
+    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resources;
+    auto* resource = resources.Add();
+    resource->mutable_resource()->PackFrom(runtime);
+    resource->set_version("");
+    VERBOSE_EXPECT_NO_THROW(rtds_callbacks_[0]->onConfigUpdate(resources, {}, ""));
+  }
+
+  std::vector<std::string> layers_{"some_resource"};
+  std::vector<Config::SubscriptionCallbacks*> rtds_callbacks_;
+  std::vector<Config::MockSubscription*> rtds_subscriptions_;
+  Init::ExpectableWatcherImpl init_watcher_;
+  std::vector<Init::TargetHandlePtr> init_target_handles_;
+};
+
+// Empty resource lists are rejected.
+TEST_F(RtdsLoaderImplTest, UnexpectedSizeEmpty) {
+  setup();
+
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> runtimes;
+
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate(runtimes, ""), EnvoyException,
+                            "Unexpected RTDS resource length: 0");
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(1, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+// > 1 length lists are rejected.
+TEST_F(RtdsLoaderImplTest, UnexpectedSizeTooMany) {
+  setup();
+
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> runtimes;
+  runtimes.Add();
+  runtimes.Add();
+
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate(runtimes, ""), EnvoyException,
+                            "Unexpected RTDS resource length: 2");
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(1, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+// Validate behavior when the config fails delivery at the subscription level.
+TEST_F(RtdsLoaderImplTest, FailureSubscription) {
+  setup();
+
+  EXPECT_CALL(init_watcher_, ready());
+  rtds_callbacks_[0]->onConfigUpdateFailed({});
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(1, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+// Unexpected runtime resource name.
+TEST_F(RtdsLoaderImplTest, WrongResourceName) {
+  setup();
+
+  auto runtime = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
+    name: other_resource
+    layer:
+      foo: bar
+      baz: meh
+  )EOF");
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+  resources.Add()->PackFrom(runtime);
+  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate(resources, ""), EnvoyException,
+                            "Unexpected RTDS runtime (expecting some_resource): other_resource");
+
+  EXPECT_EQ("whatevs", loader_->snapshot().get("foo"));
+  EXPECT_EQ("yar", loader_->snapshot().get("bar"));
+  EXPECT_EQ("", loader_->snapshot().get("baz"));
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(1, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+// Successful update.
+TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
+  setup();
+
+  auto runtime = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      foo: bar
+      baz: meh
+  )EOF");
+  EXPECT_CALL(init_watcher_, ready());
+  doOnConfigUpdateVerifyNoThrow(runtime);
+
+  EXPECT_EQ("bar", loader_->snapshot().get("foo"));
+  EXPECT_EQ("yar", loader_->snapshot().get("bar"));
+  EXPECT_EQ("meh", loader_->snapshot().get("baz"));
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(2, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+
+  runtime = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      baz: saz
+  )EOF");
+  doOnConfigUpdateVerifyNoThrow(runtime);
+
+  EXPECT_EQ("whatevs", loader_->snapshot().get("foo"));
+  EXPECT_EQ("yar", loader_->snapshot().get("bar"));
+  EXPECT_EQ("saz", loader_->snapshot().get("baz"));
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(3, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+// Delta style successful update.
+TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateSuccess) {
+  setup();
+
+  auto runtime = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      foo: bar
+      baz: meh
+  )EOF");
+  EXPECT_CALL(init_watcher_, ready());
+  doDeltaOnConfigUpdateVerifyNoThrow(runtime);
+
+  EXPECT_EQ("bar", loader_->snapshot().get("foo"));
+  EXPECT_EQ("yar", loader_->snapshot().get("bar"));
+  EXPECT_EQ("meh", loader_->snapshot().get("baz"));
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(2, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+
+  runtime = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      baz: saz
+  )EOF");
+  doDeltaOnConfigUpdateVerifyNoThrow(runtime);
+
+  EXPECT_EQ("whatevs", loader_->snapshot().get("foo"));
+  EXPECT_EQ("yar", loader_->snapshot().get("bar"));
+  EXPECT_EQ("saz", loader_->snapshot().get("baz"));
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(3, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+// Updates with multiple RTDS layers.
+TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
+  addLayer("another_resource");
+  setup();
+
+  EXPECT_EQ("whatevs", loader_->snapshot().get("foo"));
+  EXPECT_EQ("yar", loader_->snapshot().get("bar"));
+  EXPECT_EQ("", loader_->snapshot().get("baz"));
+
+  auto runtime = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      foo: bar
+      baz: meh
+  )EOF");
+  EXPECT_CALL(init_watcher_, ready()).Times(2);
+  doOnConfigUpdateVerifyNoThrow(runtime, 0);
+
+  EXPECT_EQ("bar", loader_->snapshot().get("foo"));
+  EXPECT_EQ("yar", loader_->snapshot().get("bar"));
+  EXPECT_EQ("meh", loader_->snapshot().get("baz"));
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(2, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+
+  runtime = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
+    name: another_resource
+    layer:
+      baz: saz
+  )EOF");
+  doOnConfigUpdateVerifyNoThrow(runtime, 1);
+
+  // Unlike in OnConfigUpdateSuccess, foo latches onto bar as the some_resource
+  // layer still applies.
+  EXPECT_EQ("bar", loader_->snapshot().get("foo"));
+  EXPECT_EQ("yar", loader_->snapshot().get("bar"));
+  EXPECT_EQ("saz", loader_->snapshot().get("baz"));
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(3, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
 } // namespace

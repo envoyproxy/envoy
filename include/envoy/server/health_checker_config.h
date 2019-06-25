@@ -9,7 +9,7 @@ namespace Configuration {
 
 class HealthCheckerFactoryContext {
 public:
-  virtual ~HealthCheckerFactoryContext() {}
+  virtual ~HealthCheckerFactoryContext() = default;
 
   /**
    * @return Upstream::Cluster& the owning cluster.
@@ -51,7 +51,7 @@ public:
  */
 class CustomHealthCheckerFactory {
 public:
-  virtual ~CustomHealthCheckerFactory() {}
+  virtual ~CustomHealthCheckerFactory() = default;
 
   /**
    * Creates a particular custom health checker factory implementation.
