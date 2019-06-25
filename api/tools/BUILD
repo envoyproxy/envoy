@@ -18,6 +18,7 @@ py_test(
         "data/tap2pcap_h2_ipv4.pb_text",
         "data/tap2pcap_h2_ipv4.txt",
     ],
+    python_version = "PY2",
     # Don't run this by default, since we don't want to force local dependency on Wireshark/tshark,
     # will explicitly invoke in CI.
     tags = ["manual"],
