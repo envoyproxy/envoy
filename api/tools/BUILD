@@ -4,6 +4,7 @@ py_binary(
     name = "tap2pcap",
     srcs = ["tap2pcap.py"],
     licenses = ["notice"],  # Apache 2
+    python_version = "PY2",
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/data/tap/v2alpha:wrapper_py",
