@@ -23,6 +23,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/access_log:access_log_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/network:utility_lib",

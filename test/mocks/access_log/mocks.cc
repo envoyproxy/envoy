@@ -22,7 +22,7 @@ MockAccessLogManager::MockAccessLogManager() {
 
 MockAccessLogManager::~MockAccessLogManager() {}
 
-MockInstance::MockInstance() : Instance(nullptr) {}
+MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}
 
 } // namespace AccessLog
