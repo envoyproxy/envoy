@@ -13,6 +13,8 @@
 #include "common/protobuf/utility.h"
 #include "common/singleton/manager_impl.h"
 
+#include "server/ssl_context_manager.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -91,9 +93,7 @@ void ValidationInstance::initialize(const Options& options,
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>();
-  auto& factory = Envoy::Config::Utility::getAndCheckFactory<Ssl::ContextManagerFactory>(
-      Ssl::ContextManagerFactory::name());
-  ssl_context_manager_ = factory.createContextManager(api_->timeSource());
+  ssl_context_manager_ = createContextManager(api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
       dispatcher(), localInfo(), *secret_manager_, messageValidationVisitor(), *api_, http_context_,

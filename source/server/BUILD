@@ -336,6 +336,7 @@ envoy_cc_library(
         ":guarddog_lib",
         ":listener_hooks_lib",
         ":listener_manager_lib",
+        ":ssl_context_manager_lib",
         ":worker_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:signal_interface",
@@ -377,6 +378,16 @@ envoy_cc_library(
         "//source/server:overload_manager_lib",
         "//source/server/http:admin_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "ssl_context_manager_lib",
+    srcs = ["ssl_context_manager.cc"],
+    hdrs = ["ssl_context_manager.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/ssl:context_manager_interface",
     ],
 )
 
