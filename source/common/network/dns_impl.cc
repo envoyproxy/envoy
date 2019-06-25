@@ -102,14 +102,14 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
         }
       }
     }
-  }
 
-  if (!address_list.empty()) {
-    completed_ = true;
-  }
+    if (!address_list.empty()) {
+      completed_ = true;
+    }
 
-  if (addrinfo) {
-    ares_freeaddrinfo(addrinfo);
+    if (addrinfo) {
+      ares_freeaddrinfo(addrinfo);
+    }
   }
 
   if (timeouts > 0) {
@@ -223,6 +223,13 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
 void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
   struct ares_addrinfo_hints hints = {};
   hints.ai_family = family;
+
+  /**
+   * ARES_AI_CANONNAME the ares_addrinfo structure will return a canonical names list
+   * ARES_AI_ENVHOSTS read hosts file path from the environment variable
+   * ARES_AI_NOSORT result addresses will not be sorted and no connections to resolved addresses
+   * will be attempted
+   */
   hints.ai_flags = ARES_AI_CANONNAME | ARES_AI_ENVHOSTS | ARES_AI_NOSORT;
 
   ares_getaddrinfo(
