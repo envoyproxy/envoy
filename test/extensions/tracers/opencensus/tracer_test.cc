@@ -166,9 +166,11 @@ TEST(OpenCensusTracerTest, PropagateTraceContext) {
   // The test calls the helper with each kind of incoming context in turn.
   auto helper = [](const std::string& header, const std::string& value) {
     OpenCensusConfig oc_config;
+    oc_config.add_incoming_trace_context(OpenCensusConfig::NONE);
     oc_config.add_incoming_trace_context(OpenCensusConfig::TRACE_CONTEXT);
     oc_config.add_incoming_trace_context(OpenCensusConfig::GRPC_TRACE_BIN);
     oc_config.add_incoming_trace_context(OpenCensusConfig::CLOUD_TRACE_CONTEXT);
+    oc_config.add_outgoing_trace_context(OpenCensusConfig::NONE);
     oc_config.add_outgoing_trace_context(OpenCensusConfig::TRACE_CONTEXT);
     oc_config.add_outgoing_trace_context(OpenCensusConfig::GRPC_TRACE_BIN);
     oc_config.add_outgoing_trace_context(OpenCensusConfig::CLOUD_TRACE_CONTEXT);
