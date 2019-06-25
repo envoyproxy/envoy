@@ -138,40 +138,27 @@ TEST_F(SimpleHttpCacheTest, Miss) {
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status);
 }
 
-class SimpleHttpCacheTest1Response
-    : public SimpleHttpCacheTest,
-      public testing::WithParamInterface<
-          testing::tuple<CacheEntryStatus, Http::TestHeaderMapImpl>> {
-protected:
-  CacheEntryStatus expectedStatus() const { return testing::get<CacheEntryStatus>(GetParam()); }
-  const Http::TestHeaderMapImpl& responseHeaders() const {
-    return testing::get<Http::TestHeaderMapImpl>(GetParam());
-  }
-};
-
-TEST_P(SimpleHttpCacheTest1Response, Basic) {
-  Http::TestHeaderMapImpl response_headers = responseHeaders();
+TEST_F(SimpleHttpCacheTest, Fresh) {
+  const Http::TestHeaderMapImpl response_headers = {
+      {"date", formatter_.fromTime(current_time_)},
+      {"cache-control", "public, max-age=3600"}};
   // TODO(toddmgreer) Test with various date headers.
   insert("/", response_headers, "");
+  time_source_.sleep(std::chrono::seconds(3600));
   lookup("/");
-  EXPECT_EQ(expectedStatus(), lookup_result_.cache_entry_status);
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status);
 }
 
-const std::vector<Http::TestHeaderMapImpl> expired_headers = {
-    {{"date", "Thu, 01 Jan 2019 00:00:00 GMT"}, {"cache-control", "public, max-age=3600"}}};
-
-const std::vector<Http::TestHeaderMapImpl> ok_headers = {
-    {{"cache-control", "public, max-age=3600"}}
-    // TODO(toddmgreer) {{"expires", kEpochDate}, {"cache-control", "public"}}
-};
-
-INSTANTIATE_TEST_SUITE_P(Expired, SimpleHttpCacheTest1Response,
-                         testing::Combine(testing::Values(CacheEntryStatus::RequiresValidation),
-                                          testing::ValuesIn(expired_headers)));
-
-INSTANTIATE_TEST_SUITE_P(Ok, SimpleHttpCacheTest1Response,
-                         testing::Combine(testing::Values(CacheEntryStatus::Ok),
-                                          testing::ValuesIn(ok_headers)));
+TEST_F(SimpleHttpCacheTest, Stale) {
+  const Http::TestHeaderMapImpl response_headers = {
+      {"date", formatter_.fromTime(current_time_)},
+      {"cache-control", "public, max-age=3600"}};
+  // TODO(toddmgreer) Test with various date headers.
+  insert("/", response_headers, "");
+  time_source_.sleep(std::chrono::seconds(3601));
+  lookup("/");
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status);
+}
 
 TEST_F(SimpleHttpCacheTest, RequestSmallMinFresh) {
   request_headers_.setReferenceKey(Http::Headers::get().CacheControl, "min-fresh=1000");

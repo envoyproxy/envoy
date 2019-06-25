@@ -17,7 +17,7 @@ namespace Internal {
 // s-maxage is malformed.
 SystemTime::duration effectiveMaxAge(absl::string_view cache_control);
 
-// Parses header_entry as an HTTP time. Returns SystemTime::max() if
+// Parses header_entry as an HTTP time. Returns SystemTime() if
 // header_entry is null or malformed.
 SystemTime httpTime(const Http::HeaderEntry* header_entry);
 } // namespace Internal

@@ -33,9 +33,7 @@ TEST_P(HttpTimeTest, Ok) {
   EXPECT_STREQ(ctime(&time), "Sun Nov  6 08:49:37 1994\n");
 }
 
-TEST(HttpTime, Null) { EXPECT_EQ(httpTime(nullptr), SystemTime::min()); }
-
-TEST(HttpTime, Ok) { EXPECT_EQ(httpTime(nullptr), SystemTime::min()); }
+TEST(HttpTime, Null) { EXPECT_EQ(httpTime(nullptr), SystemTime()); }
 
 TEST(EffectiveMaxAge, Ok) {
   EXPECT_EQ(std::chrono::seconds(3600), effectiveMaxAge("public, max-age=3600"));
