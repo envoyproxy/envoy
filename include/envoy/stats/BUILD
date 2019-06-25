@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_library(
     name = "refcount_ptr_interface",
     hdrs = ["refcount_ptr.h"],
+    deps = ["//source/common/common:assert_lib"],
 )
 
 # TODO(jmarantz): atomize the build rules to match the include files.

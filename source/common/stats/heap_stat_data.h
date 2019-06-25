@@ -47,7 +47,8 @@ public:
   ~HeapStatDataAllocator() override;
 
   HeapStatData& alloc(StatName name);
-  void free(HeapStatData& data);
+  void removeCounterFromSet(Counter* counter);
+  void removeGaugeFromSet(Gauge* gauge);
 
   // StatDataAllocator
   CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,

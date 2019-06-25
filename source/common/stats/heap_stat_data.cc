@@ -31,18 +31,21 @@ HeapStatData* HeapStatData::alloc(StatName stat_name, SymbolTable& symbol_table)
 }
 
 void HeapStatData::free(SymbolTable& symbol_table) {
+  ASSERT(ref_count_ == 0);
   symbol_table.free(statName());
   delete this;
 }
 
-void HeapStatDataAllocator::free(HeapStatData& data) {
-  ASSERT(data.ref_count_ == 0);
-  {
-    Thread::LockGuard lock(mutex_);
-    size_t count = counters_.erase(data.statName()) + gauges_.erase(data.statName());
-    ASSERT(count == 1);
-  }
-  data.free(symbolTable());
+void HeapStatDataAllocator::removeCounterFromSet(Counter* counter) {
+  Thread::LockGuard lock(mutex_);
+  const size_t count = counters_.erase(counter->statName());
+  ASSERT(count == 1);
+}
+
+void HeapStatDataAllocator::removeGaugeFromSet(Gauge* gauge) {
+  Thread::LockGuard lock(mutex_);
+  const size_t count = gauges_.erase(gauge->statName());
+  ASSERT(count == 1);
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
@@ -69,7 +72,8 @@ public:
     // alternative would be to store the SymbolTable reference in the
     // MetricImpl, costing 8 bytes per stat.
     MetricImpl::clear();
-    alloc_.free(data_);
+    alloc_.removeCounterFromSet(this);
+    data_.free(symbolTable());
   }
 
   // Stats::Counter
@@ -124,7 +128,8 @@ public:
     // alternative would be to store the SymbolTable reference in the
     // MetricImpl, costing 8 bytes per stat.
     MetricImpl::clear();
-    alloc_.free(data_);
+    alloc_.removeGaugeFromSet(this);
+    data_.free(symbolTable());
   }
 
   // Stats::Gauge
@@ -203,10 +208,10 @@ CounterSharedPtr HeapStatDataAllocator::makeCounter(StatName name,
   if (iter != counters_.end()) {
     return CounterSharedPtr(*iter);
   }
-  Counter* counter =
-      new CounterImpl(*HeapStatData::alloc(name, symbolTable()), *this, tag_extracted_name, tags);
-  counters_.insert(counter);
-  return CounterSharedPtr(counter);
+  auto counter = CounterSharedPtr(
+      new CounterImpl(*HeapStatData::alloc(name, symbolTable()), *this, tag_extracted_name, tags));
+  counters_.insert(counter.get());
+  return counter;
 }
 
 GaugeSharedPtr HeapStatDataAllocator::makeGauge(StatName name, absl::string_view tag_extracted_name,
@@ -217,10 +222,10 @@ GaugeSharedPtr HeapStatDataAllocator::makeGauge(StatName name, absl::string_view
   if (iter != gauges_.end()) {
     return GaugeSharedPtr(*iter);
   }
-  Gauge* gauge = new GaugeImpl(*HeapStatData::alloc(name, symbolTable()), *this, tag_extracted_name,
-                               tags, import_mode);
-  gauges_.insert(gauge);
-  return GaugeSharedPtr(gauge);
+  auto gauge = GaugeSharedPtr(new GaugeImpl(*HeapStatData::alloc(name, symbolTable()), *this,
+                                            tag_extracted_name, tags, import_mode));
+  gauges_.insert(gauge.get());
+  return gauge;
 }
 
 } // namespace Stats

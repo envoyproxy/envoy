@@ -4,6 +4,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -64,12 +66,8 @@ public:
   bool operator!=(const RefcountPtr& a) const { return ptr_ != a.ptr_; }
   uint32_t use_count() const { return ptr_->use_count(); }
   void reset() {
-    if (ptr_ != nullptr) {
-      if (ptr_->decRefCount()) {
-        delete ptr_;
-      }
-      ptr_ = nullptr;
-    }
+    resetInternal();
+    ptr_ = nullptr;
   }
 
 private:
@@ -128,7 +126,10 @@ public:
 struct RefcountHelper {
   // Implements the RefcountInterface API.
   void incRefCount() { ++ref_count_; }
-  bool decRefCount() { return --ref_count_ == 0; }
+  bool decRefCount() {
+    ASSERT(ref_count_ >= 1);
+    return --ref_count_ == 0;
+  }
   uint32_t use_count() const { return ref_count_; }
 
   std::atomic<uint32_t> ref_count_{0};
