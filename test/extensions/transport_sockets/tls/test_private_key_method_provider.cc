@@ -129,6 +129,11 @@ static ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t
     return ssl_private_key_failure;
   }
 
+  if (ops->test_options_.crypto_error_) {
+    // Flip the bits in the first byte of the digest the handshake to fail.
+    hash[0] ^= hash[0];
+  }
+
   // Perform RSA signing.
   if (SSL_is_signature_algorithm_rsa_pss(signature_algorithm)) {
     RSA_sign_pss_mgf1(rsa, out_len, out, max_out, hash, hash_len, md, nullptr, -1);
@@ -141,11 +146,6 @@ static ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t
       return ssl_private_key_failure;
     }
     *out_len = out_len_unsigned;
-  }
-
-  if (ops->test_options_.crypto_error_) {
-    // Flip the bits in the first byte to cause the handshake to fail.
-    out[0] ^= out[0];
   }
 
   if (ops->test_options_.sync_mode_) {
