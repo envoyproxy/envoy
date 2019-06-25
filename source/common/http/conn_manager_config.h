@@ -353,12 +353,6 @@ public:
    * @return if the HttpConnectionManager should normalize url following RFC3986
    */
   virtual bool shouldNormalizePath() const PURE;
-
-  /**
-   * @return if the HttpConnectionManager should validate the values of HTTP headers
-   * when decoding
-   */
-  virtual bool validateHeaders() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

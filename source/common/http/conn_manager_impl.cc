@@ -27,7 +27,6 @@
 #include "common/http/conn_manager_utility.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
@@ -604,17 +603,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // header only, the stream will be marked as done once a subsequent decodeData/decodeTrailers is
   // called with end_stream=true.
   maybeEndDecode(end_stream);
-
-  if (connection_manager_.config_.validateHeaders()) {
-    ENVOY_STREAM_LOG(trace, "validating header values\n{}", *this, *request_headers_);
-    if (!Http::HeaderUtility::validateHeaders(*request_headers_)) {
-      ENVOY_STREAM_LOG(debug, "found an invalid header value\n", *this);
-      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
-                     nullptr, is_head_request_, absl::nullopt,
-                     StreamInfo::ResponseCodeDetails::get().InvalidHeader);
-      return;
-    }
-  }
 
   // Drop new requests when overloaded as soon as we have decoded the headers.
   if (connection_manager_.overload_stop_accepting_requests_ref_ ==

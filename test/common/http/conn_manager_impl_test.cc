@@ -279,7 +279,6 @@ public:
   bool proxy100Continue() const override { return proxy_100_continue_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
-  bool validateHeaders() const override { return validate_headers_; }
 
   DangerousDeprecatedTestTime test_time_;
   ConnectionManagerImplHelper::RouteConfigProvider route_config_provider_;
@@ -328,7 +327,6 @@ public:
   bool preserve_external_request_id_ = false;
   Http::Http1Settings http1_settings_;
   bool normalize_path_ = false;
-  bool validate_headers_ = false;
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
 
@@ -4133,60 +4131,6 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenOverloaded) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
   EXPECT_EQ(1U, stats_.named_.downstream_cx_overload_disable_keepalive_.value());
-}
-
-TEST_F(HttpConnectionManagerImplTest, InvalidHeadersRejectedIfConfigured) {
-  // Test ensures that if configured to do so, the conn manager will reject
-  // requests that contain invalid HTTP header values.
-  validate_headers_ = true;
-  setup(false, "");
-
-  std::string response_code;
-  std::string response_body;
-  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
-    HeaderMapPtr headers{
-        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-    headers->addCopy(LowerCaseString("Foo"),
-                     std::string(10, 1)); // invalid ASCII char in header value
-
-    EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-        .WillOnce(Invoke([&response_code](const HeaderMap& headers, bool) -> void {
-          response_code = std::string(headers.Status()->value().getStringView());
-        }));
-    decoder->decodeHeaders(std::move(headers), true);
-    conn_manager_->newStream(response_encoder_);
-  }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false); // kick off request
-
-  EXPECT_EQ("400", response_code);
-  EXPECT_EQ("", response_body);
-}
-
-TEST_F(HttpConnectionManagerImplTest, InvalidHeadersAccepted) {
-  // This test ensures that the default end-user behavior of allowing invalid (per RFC) header
-  // values is allowed.
-
-  setup(false, "");
-
-  std::string response_code;
-  std::string response_body;
-  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
-    HeaderMapPtr headers{
-        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-    headers->addCopy(LowerCaseString("Foo"),
-                     std::string(10, 1)); // invalid ASCII char in header value
-
-    EXPECT_CALL(response_encoder_, encodeHeaders(_, _)).Times(0);
-    decoder->decodeHeaders(std::move(headers), true);
-    conn_manager_->newStream(response_encoder_);
-  }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false); // kick off request
 }
 
 TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersRejected) {

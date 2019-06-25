@@ -424,12 +424,6 @@ message HttpConnectionManager {
   // Note that Envoy does not perform
   // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`
   google.protobuf.BoolValue normalize_path = 30;
-
-  // If present and set to true, the connection manager will validate the values of each HTTP
-  // header, returning a 400 response if any of the headers contain an invalid
-  // value. See `Header Fields <https://tools.ietf.org/html/rfc7230#section-3.2>`
-  // for more details regarding the validity of HTTP headers.
-  bool validate_headers = 33;
 }
 
 message Rds {

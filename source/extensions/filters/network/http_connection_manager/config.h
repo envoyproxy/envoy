@@ -138,7 +138,6 @@ public:
   bool proxy100Continue() const override { return proxy_100_continue_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
-  bool validateHeaders() const override { return validate_headers_; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
 
 private:
@@ -183,7 +182,6 @@ private:
   const bool proxy_100_continue_;
   std::chrono::milliseconds delayed_close_timeout_;
   const bool normalize_path_;
-  const bool validate_headers_;
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
