@@ -14,9 +14,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
-#include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -555,9 +553,9 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
 TEST_F(RedisClusterTest, EmptyDnsResponse) {
   Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   setupFromV2Yaml(BasicConfig);
-
+  const std::list<std::string> resolved_addresses{};
   EXPECT_CALL(*dns_timer, enableTimer(_));
-  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", {});
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
 
   EXPECT_CALL(initialized_, ready());
   cluster_->initialize([&]() -> void { initialized_.ready(); });
@@ -568,7 +566,7 @@ TEST_F(RedisClusterTest, EmptyDnsResponse) {
 
   // Does not recreate the timer on subsequent DNS resolve calls.
   EXPECT_CALL(*dns_timer, enableTimer(_));
-  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", {});
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
   dns_timer->invokeCallback();
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
