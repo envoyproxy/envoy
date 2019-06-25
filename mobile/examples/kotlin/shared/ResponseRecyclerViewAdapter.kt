@@ -1,4 +1,4 @@
-package io.envoyproxy.envoymobile.helloenvoykotlin
+package io.envoyproxy.envoymobile.shared
 
 import android.support.v7.widget.RecyclerView
 import android.view.LayoutInflater
@@ -6,6 +6,7 @@ import android.view.ViewGroup
 
 class ResponseRecyclerViewAdapter : RecyclerView.Adapter<ResponseViewHolder>() {
   private val data = mutableListOf<Response>()
+  private var count = 1
 
   override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ResponseViewHolder {
     val context = parent.context
@@ -15,7 +16,7 @@ class ResponseRecyclerViewAdapter : RecyclerView.Adapter<ResponseViewHolder>() {
   }
 
   override fun onBindViewHolder(holder: ResponseViewHolder, position: Int) {
-    holder.setResult(data[position])
+    holder.setResult(count++, data[position])
   }
 
   override fun getItemCount(): Int {

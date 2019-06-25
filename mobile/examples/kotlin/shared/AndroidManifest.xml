@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="io.envoyproxy.envoymobile.shared"
+          android:versionCode="1"
+          android:versionName="0.1">
+</manifest>

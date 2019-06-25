@@ -9,14 +9,16 @@ import android.support.v7.widget.DividerItemDecoration
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.util.Log
-
+import io.envoyproxy.envoymobile.Envoy
+import io.envoyproxy.envoymobile.shared.Failure
+import io.envoyproxy.envoymobile.shared.Response
+import io.envoyproxy.envoymobile.shared.ResponseRecyclerViewAdapter
+import io.envoyproxy.envoymobile.shared.Success
 import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.TimeUnit
-
-import io.envoyproxy.envoymobile.Envoy
 
 private const val REQUEST_HANDLER_THREAD_NAME = "hello_envoy_kt"
 private const val ENDPOINT = "http://0.0.0.0:9001/api.lyft.com/static/demo/hello_world.txt"
@@ -32,7 +34,7 @@ class MainActivity : Activity() {
     setContentView(R.layout.activity_main)
 
     Envoy.load(baseContext)
- 
+
     // Create Envoy instance with config.
     envoy = Envoy(baseContext, loadEnvoyConfig(baseContext, R.raw.config))
 
@@ -51,7 +53,7 @@ class MainActivity : Activity() {
       override fun run() {
         try {
           val response = makeRequest()
-          recyclerView.post({ adapter.add(response) })
+          recyclerView.post { adapter.add(response) }
         } catch (e: IOException) {
           Log.d("MainActivity", "exception making request.", e)
         }
@@ -68,19 +70,23 @@ class MainActivity : Activity() {
   }
 
   private fun makeRequest(): Response {
-    val url = URL(ENDPOINT)
-    // Open connection to the envoy thread listening locally on port 9001
-    val connection = url.openConnection() as HttpURLConnection
-    val status = connection.responseCode
-    if (status != 200) {
-      throw IOException("non 200 status: $status")
+    return  try {
+      val url = URL(ENDPOINT)
+      // Open connection to the envoy thread listening locally on port 9001
+      val connection = url.openConnection() as HttpURLConnection
+      val status = connection.responseCode
+      if (status == 200) {
+        val serverHeaderField = connection.headerFields[ENVOY_SERVER_HEADER]
+        val inputStream = connection.inputStream
+        val body = deserialize(inputStream)
+        inputStream.close()
+        Success(body, serverHeaderField?.joinToString(separator = ", ") ?: "")
+      } else {
+        Failure("failed with status: $status")
+      }
+    } catch (e: IOException) {
+      Failure(e.message ?: "failed with exception")
     }
-
-    val serverHeaderField = connection.headerFields[ENVOY_SERVER_HEADER]
-    val inputStream = connection.inputStream
-    val body = deserialize(inputStream)
-    inputStream.close()
-    return Response(body, serverHeaderField?.joinToString(separator = ", ") ?: "")
   }
 
   private fun deserialize(inputStream: InputStream): String {
