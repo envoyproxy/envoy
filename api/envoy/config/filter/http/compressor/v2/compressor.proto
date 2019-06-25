@@ -13,7 +13,6 @@ import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Compressor]
-// Compressor :ref:`configuration overview <config_http_filters_compressor>`.
 
 message Compressor {
 

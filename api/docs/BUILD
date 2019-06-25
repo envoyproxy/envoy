@@ -41,6 +41,7 @@ proto_library(
         "//envoy/config/filter/accesslog/v2:accesslog",
         "//envoy/config/filter/dubbo/router/v2alpha1:router",
         "//envoy/config/filter/http/buffer/v2:buffer",
+        "//envoy/config/filter/http/compressor/v2:compressor_proto",
         "//envoy/config/filter/http/csrf/v2:csrf",
         "//envoy/config/filter/http/dynamic_forward_proxy/v2alpha:dynamic_forward_proxy",
         "//envoy/config/filter/http/ext_authz/v2:ext_authz",

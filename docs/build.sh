@@ -96,6 +96,7 @@ PROTO_RST="
   /envoy/config/filter/accesslog/v2/accesslog/envoy/config/filter/accesslog/v2/accesslog.proto.rst
   /envoy/config/filter/fault/v2/fault/envoy/config/filter/fault/v2/fault.proto.rst
   /envoy/config/filter/http/buffer/v2/buffer/envoy/config/filter/http/buffer/v2/buffer.proto.rst
+  /envoy/config/filter/http/compressor/v2/compressor_proto/envoy/config/filter/http/compressor/v2/compressor.proto.rst
   /envoy/config/filter/http/csrf/v2/csrf/envoy/config/filter/http/csrf/v2/csrf.proto.rst
   /envoy/config/filter/http/dynamic_forward_proxy/v2alpha/dynamic_forward_proxy/envoy/config/filter/http/dynamic_forward_proxy/v2alpha/dynamic_forward_proxy.proto.rst
   /envoy/config/filter/http/ext_authz/v2/ext_authz/envoy/config/filter/http/ext_authz/v2/ext_authz.proto.rst
