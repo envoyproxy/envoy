@@ -25,8 +25,7 @@ public:
   bool isEmpty() const { return *this == ThreadId(); }
   friend bool operator==(ThreadId lhs, ThreadId rhs) { return lhs.id_ == rhs.id_; }
   friend bool operator!=(ThreadId lhs, ThreadId rhs) { return lhs.id_ != rhs.id_; }
-  template <typename H>
-  friend H AbslHashValue(H h, ThreadId id) {
+  template <typename H> friend H AbslHashValue(H h, ThreadId id) {
     return H::combine(std::move(h), id.id_);
   }
 
