@@ -18,6 +18,6 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/filter/http/compressor_common/v2:compressor_common_proto_cc",
+        "@envoy_api//envoy/config/filter/http/compressor/v2:compressor_proto_cc",
     ],
 )

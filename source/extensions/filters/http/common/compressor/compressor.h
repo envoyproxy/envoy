@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/compressor/compressor.h"
-#include "envoy/config/filter/http/compressor_common/v2/compressor_common.pb.h"
+#include "envoy/config/filter/http/compressor/v2/compressor.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"

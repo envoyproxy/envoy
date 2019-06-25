@@ -11,7 +11,7 @@ import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
-import "envoy/config/filter/http/compressor_common/v2/compressor_common.proto";
+import "envoy/config/filter/http/compressor/v2/compressor.proto";
 
 // [#protodoc-title: Gzip]
 // Gzip :ref:`configuration overview <config_http_filters_gzip>`.
@@ -78,8 +78,6 @@ message Gzip {
   // zlib manual > deflateInit2.
   google.protobuf.UInt32Value window_bits = 9 [(validate.rules).uint32 = {gte: 9, lte: 15}];
 
-  // Set of configuration parameters common for all compression filters. For details see
-  // :ref:`Compressor API reference
-  // <envoy_api_msg_config.filter.http.compressor_common.v2.Compressor>`.
+  // Set of configuration parameters common for all compression filters.
   envoy.config.filter.http.compressor.v2.Compressor compressor = 10;
 }

@@ -1,4 +1,4 @@
-#include "envoy/config/filter/http/compressor_common/v2/compressor_common.pb.h"
+#include "envoy/config/filter/http/compressor/v2/compressor.pb.h"
 
 #include "common/protobuf/utility.h"
 
