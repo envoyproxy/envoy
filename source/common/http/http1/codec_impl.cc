@@ -13,8 +13,10 @@
 #include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/exception.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -421,12 +423,24 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     // Ignore trailers.
     return;
   }
+
+  const absl::string_view header_value = absl::string_view(data, length);
+
   // http-parser should filter for this
   // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
   // have an invariant that they must not contain embedded zero characters
   // (NUL, ASCII 0x0).
-  if (absl::string_view(data, length).find('\0') != absl::string_view::npos) {
+  if (header_value.find('\0') != absl::string_view::npos) {
     throw CodecProtocolException("http/1.1 protocol error: header value contains NUL");
+  }
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_header_values")) {
+    if (!Http::HeaderUtility::headerIsValid(header_value)) {
+      ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
+      error_code_ = Http::Code::BadRequest;
+      sendProtocolError();
+      throw CodecProtocolException("http/1.1 protocol error: header value contains invalid chars");
+    }
   }
 
   header_parsing_state_ = HeaderParsingState::Value;
