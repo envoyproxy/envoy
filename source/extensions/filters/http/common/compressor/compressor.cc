@@ -127,7 +127,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
     return false;
   }
 
-  typedef std::pair<absl::string_view, float> encPair; // pair of {encoding, q_value}
+  using encPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
   std::vector<encPair> pairs;
 
   std::vector<std::string> allowed_compressors = config_->registeredCompressors();
