@@ -118,24 +118,9 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
   return match != header_data.invert_match_;
 }
 
-bool HeaderUtility::validateHeaders(const Http::HeaderMap& headers) {
-  bool headers_are_valid = true;
-
-  headers.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        const absl::string_view header_value = header.value().getStringView();
-        if (nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                       header_value.size()) == 0) {
-          bool* valid = static_cast<bool*>(context);
-          *valid = false;
-          return Http::HeaderMap::Iterate::Break;
-        }
-
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &headers_are_valid);
-
-  return headers_are_valid;
+bool HeaderUtility::headerIsValid(const absl::string_view header_value) {
+  return (nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
+                                     header_value.size()) != 0);
 }
 
 void HeaderUtility::addHeaders(Http::HeaderMap& headers, const Http::HeaderMap& headers_to_add) {
