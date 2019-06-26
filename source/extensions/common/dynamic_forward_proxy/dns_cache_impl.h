@@ -23,6 +23,7 @@ namespace DynamicForwardProxy {
   COUNTER(dns_query_success)                                                                       \
   COUNTER(host_added)                                                                              \
   COUNTER(host_address_changed)                                                                    \
+  COUNTER(host_overflow)                                                                           \
   COUNTER(host_removed)                                                                            \
   GAUGE(num_hosts, NeverImport)
 
@@ -41,23 +42,23 @@ public:
   ~DnsCacheImpl();
 
   // DnsCache
-  LoadDnsCacheHandlePtr loadDnsCache(absl::string_view host, uint16_t default_port,
-                                     LoadDnsCacheCallbacks& callbacks) override;
+  LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
+                                            LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
 
 private:
   using TlsHostMap = absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>;
   using TlsHostMapSharedPtr = std::shared_ptr<TlsHostMap>;
 
-  struct LoadDnsCacheHandleImpl : public LoadDnsCacheHandle,
-                                  RaiiListElement<LoadDnsCacheHandleImpl*> {
-    LoadDnsCacheHandleImpl(std::list<LoadDnsCacheHandleImpl*>& parent, absl::string_view host,
-                           LoadDnsCacheCallbacks& callbacks)
-        : RaiiListElement<LoadDnsCacheHandleImpl*>(parent, this), host_(host),
+  struct LoadDnsCacheEntryHandleImpl : public LoadDnsCacheEntryHandle,
+                                       RaiiListElement<LoadDnsCacheEntryHandleImpl*> {
+    LoadDnsCacheEntryHandleImpl(std::list<LoadDnsCacheEntryHandleImpl*>& parent,
+                                absl::string_view host, LoadDnsCacheEntryCallbacks& callbacks)
+        : RaiiListElement<LoadDnsCacheEntryHandleImpl*>(parent, this), host_(host),
           callbacks_(callbacks) {}
 
     const std::string host_;
-    LoadDnsCacheCallbacks& callbacks_;
+    LoadDnsCacheEntryCallbacks& callbacks_;
   };
 
   // Per-thread DNS cache info including the currently known hosts as well as any pending callbacks.
@@ -66,7 +67,7 @@ private:
     void updateHostMap(const TlsHostMapSharedPtr& new_host_map);
 
     TlsHostMapSharedPtr host_map_;
-    std::list<LoadDnsCacheHandleImpl*> pending_resolutions_;
+    std::list<LoadDnsCacheEntryHandleImpl*> pending_resolutions_;
   };
 
   struct DnsHostInfoImpl : public DnsHostInfo {
@@ -129,6 +130,7 @@ private:
   absl::flat_hash_map<std::string, PrimaryHostInfoPtr> primary_hosts_;
   const std::chrono::milliseconds refresh_interval_;
   const std::chrono::milliseconds host_ttl_;
+  const uint32_t max_hosts_;
 };
 
 } // namespace DynamicForwardProxy

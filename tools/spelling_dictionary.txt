@@ -542,6 +542,7 @@ keepalives
 ketama
 kqueue
 kubernetes
+kv
 kvs
 lala
 latencies

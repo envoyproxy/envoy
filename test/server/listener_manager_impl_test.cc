@@ -2352,7 +2352,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappi
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
                             EnvoyException,
-                            "error adding listener: multiple filter chains with "
+                            "error adding listener '127.0.0.1:1234': multiple filter chains with "
                             "overlapping matching rules are defined");
 }
 

@@ -9,114 +9,126 @@ def main():
   Can generate both main source code, as well as test code.
 
   Usage:
-    kafka_generator.py COMMAND OUTPUT FILES INPUT_FILES
+    kafka_generator.py COMMAND MESSAGE_TYPE OUTPUT_FILES INPUT_FILES
   where:
   COMMAND : 'generate-source', to generate source files,
             'generate-test', to generate test files.
-  OUTPUT_FILES : if generate-source: location of 'requests.h' and 'kafka_request_resolver.cc',
-                 if generate-test: location of 'requests_test.cc', 'request_codec_request_test.cc'.
+  MESSAGE_TYPE : 'request' or 'response'
+  OUTPUT_FILES : if generate-source: location of 'requests.h'/'responses.h' and
+                 'kafka_request_resolver.cc' / 'kafka_response_resolver.cc',
+                 if generate-test: location of 'requests_test.cc'/'responses_test.cc',
+                 'request_codec_request_test.cc' / 'response_codec_response_test.cc'.
   INPUT_FILES: Kafka protocol json files to be processed.
 
   Kafka spec files are provided in Kafka clients jar file.
   When generating source code, it creates:
-    - requests.h - definition of all the structures/deserializers/parsers related to Kafka requests,
-    - kafka_request_resolver.cc - resolver that binds api_key & api_version to parsers from
-                                  requests.h.
+    - ${MESSAGE_TYPE}s.h - definition of all the structures/deserializers/parsers related to Kafka
+      requests/responses,
+    - kafka_${MESSAGE_TYPE}_resolver.cc - resolver that is responsible for creation of parsers
+      defined in ${MESSAGE_TYPE}s.h.
   When generating test code, it creates:
-    - requests_test.cc - serialization/deserialization tests for kafka structures,
-    - request_codec_request_test.cc - test for all request operations using the codec API.
+    - ${MESSAGE_TYPE}s_test.cc - serialization/deserialization tests for kafka structures,
+    - ${MESSAGE_TYPE}_codec_${MESSAGE_TYPE}_test.cc - test for all request/response operations
+      using the codec API.
 
   Templates used are:
-  - to create 'requests.h': requests_h.j2, complex_type_template.j2, request_parser.j2,
-  - to create 'kafka_request_resolver.cc': kafka_request_resolver_cc.j2,
-  - to create 'requests_test.cc': requests_test_cc.j2,
-  - to create 'request_codec_request_test.cc' - request_codec_request_test_cc.j2.
+  - to create '${MESSAGE_TYPE}.h': ${MESSAGE_TYPE}_h.j2, complex_type_template.j2,
+    request_parser.j2,
+  - to create 'kafka_${MESSAGE_TYPE}_resolver.cc': kafka_${MESSAGE_TYPE}_resolver_cc.j2,
+  - to create '${MESSAGE_TYPE}s_test.cc': ${MESSAGE_TYPE}s_test_cc.j2,
+  - to create '${MESSAGE_TYPE}_codec_${MESSAGE_TYPE}_test.cc' -
+      ${MESSAGE_TYPE}_codec_${MESSAGE_TYPE}_test_cc.j2.
   """
 
   import sys
   import os
 
   command = sys.argv[1]
+  type = sys.argv[2]
+
   if 'generate-source' == command:
-    requests_h_file = os.path.abspath(sys.argv[2])
-    kafka_request_resolver_cc_file = os.path.abspath(sys.argv[3])
-    input_files = sys.argv[4:]
+    main_header_file = os.path.abspath(sys.argv[3])
+    resolver_cc_file = os.path.abspath(sys.argv[4])
+    input_files = sys.argv[5:]
   elif 'generate-test' == command:
-    requests_test_cc_file = os.path.abspath(sys.argv[2])
-    request_codec_request_test_cc_file = os.path.abspath(sys.argv[3])
-    input_files = sys.argv[4:]
+    header_test_cc_file = os.path.abspath(sys.argv[3])
+    codec_test_cc_file = os.path.abspath(sys.argv[4])
+    input_files = sys.argv[5:]
   else:
     raise ValueError('invalid command: ' + command)
 
   import re
   import json
 
-  requests = []
+  messages = []
 
-  # For each request specification file, remove comments, and parse the remains.
+  # For each specification file, remove comments, and parse the remains.
   for input_file in input_files:
     with open(input_file, 'r') as fd:
       raw_contents = fd.read()
       without_comments = re.sub(r'//.*\n', '', raw_contents)
-      request_spec = json.loads(without_comments)
-      request = parse_request(request_spec)
-      requests.append(request)
+      message_spec = json.loads(without_comments)
+      message = parse_top_level_element(message_spec)
+      messages.append(message)
 
-  # Sort requests by api_key.
-  requests.sort(key=lambda x: x.get_extra('api_key'))
+  # Sort messages by api_key.
+  messages.sort(key=lambda x: x.get_extra('api_key'))
 
   # Generate main source code.
   if 'generate-source' == command:
     complex_type_template = RenderingHelper.get_template('complex_type_template.j2')
-    request_parsers_template = RenderingHelper.get_template('request_parser.j2')
+    parsers_template = RenderingHelper.get_template("%s_parser.j2" % type)
 
-    requests_h_contents = ''
+    main_header_contents = ''
 
-    for request in requests:
-      # For each child structure that is used by request, render its corresponding C++ code.
-      for dependency in request.declaration_chain:
-        requests_h_contents += complex_type_template.render(complex_type=dependency)
-      # Each top-level structure (e.g. FetchRequest) is going to have corresponding parsers.
-      requests_h_contents += request_parsers_template.render(complex_type=request)
+    for message in messages:
+      # For each child structure that is used by request/response, render its matching C++ code.
+      for dependency in message.declaration_chain:
+        main_header_contents += complex_type_template.render(complex_type=dependency)
+      # Each top-level structure (e.g. FetchRequest/FetchResponse) needs corresponding parsers.
+      main_header_contents += parsers_template.render(complex_type=message)
 
     # Full file with headers, namespace declaration etc.
-    template = RenderingHelper.get_template('requests_h.j2')
-    contents = template.render(contents=requests_h_contents)
+    template = RenderingHelper.get_template("%ss_h.j2" % type)
+    contents = template.render(contents=main_header_contents)
 
-    with open(requests_h_file, 'w') as fd:
+    # Generate main header file.
+    with open(main_header_file, 'w') as fd:
       fd.write(contents)
 
-    template = RenderingHelper.get_template('kafka_request_resolver_cc.j2')
-    contents = template.render(request_types=requests)
+    template = RenderingHelper.get_template("kafka_%s_resolver_cc.j2" % type)
+    contents = template.render(message_types=messages)
 
-    with open(kafka_request_resolver_cc_file, 'w') as fd:
+    # Generate ...resolver.cc file.
+    with open(resolver_cc_file, 'w') as fd:
       fd.write(contents)
 
   # Generate test code.
   if 'generate-test' == command:
-    template = RenderingHelper.get_template('requests_test_cc.j2')
-    contents = template.render(request_types=requests)
+    template = RenderingHelper.get_template("%ss_test_cc.j2" % type)
+    contents = template.render(message_types=messages)
 
-    with open(requests_test_cc_file, 'w') as fd:
+    # Generate header-test file.
+    with open(header_test_cc_file, 'w') as fd:
       fd.write(contents)
 
-    template = RenderingHelper.get_template('request_codec_request_test_cc.j2')
-    contents = template.render(request_types=requests)
+    template = RenderingHelper.get_template("%s_codec_%s_test_cc.j2" % (type, type))
+    contents = template.render(message_types=messages)
 
-    with open(request_codec_request_test_cc_file, 'w') as fd:
+    # Generate codec-test file.
+    with open(codec_test_cc_file, 'w') as fd:
       fd.write(contents)
 
 
-def parse_request(spec):
+def parse_top_level_element(spec):
   """
-  Parse a given structure into a request.
-  Request is just a complex type, that has name & version information kept in differently named
-  fields, compared to sub-structures in a request.
+  Parse a given structure into a request/response.
+  Request/response is just a complex type, that has name & version information kept in differently
+  named fields, compared to sub-structures in a message.
   """
-  request_type_name = spec['name']
-  request_versions = Statics.parse_version_string(spec['validVersions'], 2 << 16 - 1)
-  return parse_complex_type(request_type_name, spec, request_versions).with_extra(
-      'api_key', spec['apiKey'])
+  type_name = spec['name']
+  versions = Statics.parse_version_string(spec['validVersions'], 2 << 16 - 1)
+  return parse_complex_type(type_name, spec, versions).with_extra('api_key', spec['apiKey'])
 
 
 def parse_complex_type(type_name, field_spec, versions):
@@ -182,7 +194,7 @@ class Statics:
 
 class FieldList:
   """
-  List of fields used by given entity (request or child structure) in given request version
+  List of fields used by given entity (request or child structure) in given message version
   (as fields get added or removed across versions).
   """
 
@@ -308,7 +320,7 @@ class TypeSpecification:
 
   def deserializer_name_in_version(self, version):
     """
-    Renders the deserializer name of given type, in request with given version.
+    Renders the deserializer name of given type, in message with given version.
     """
     raise NotImplementedError()
 
@@ -345,7 +357,7 @@ class Array(TypeSpecification):
                                           self.underlying.deserializer_name_in_version(version))
 
   def default_value(self):
-    return '{}'
+    return 'std::vector<%s>{}' % (self.underlying.name)
 
   def example_value_for_test(self, version):
     return 'std::vector<%s>{ %s }' % (self.underlying.name,
