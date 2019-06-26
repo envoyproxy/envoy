@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_fuzz_test", "envoy_cc_test", "envoy_package")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_fuzz_test", "envoy_cc_test", "envoy_cc_test_library", "envoy_package", "envoy_proto_library")
 load(
     "//source/extensions:all_extensions.bzl",
     "envoy_all_extensions",
@@ -95,4 +95,33 @@ envoy_cc_fuzz_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
     ] + envoy_all_extensions(),
+)
+
+envoy_proto_library(
+    name = "xds_fuzz_proto",
+    srcs = ["xds_fuzz.proto"],
+    deps = [],
+)
+
+envoy_cc_test_library(
+    name = "xds_fuzz_lib",
+    srcs = ["xds_fuzz.cc"],
+    hdrs = ["xds_fuzz.h"],
+    deps = [
+        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
+        "//test/integration:http_integration_lib",
+        ":xds_fuzz_proto_cc",
+        "//test/integration:integration_lib",
+        "//include/envoy/event:dispatcher_interface",
+        "//test/fuzz:fuzz_runner_lib",
+    ] + envoy_all_extensions(),
+)
+
+envoy_cc_fuzz_test(
+    name = "xds_fuzz_test",
+    srcs = ["xds_fuzz_test.cc"],
+    corpus = "//test/server/config_validation:xds_corpus",
+    deps = [
+        ":xds_fuzz_lib",
+    ],
 )
