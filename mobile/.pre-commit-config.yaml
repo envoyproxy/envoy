@@ -10,3 +10,7 @@ repos:
     - id: check-yaml
     - id: detect-private-key
     - id: mixed-line-ending
+- repo: https://github.com/codespell-project/codespell
+  rev: v1.15.0
+  hooks:
+    - id: codespell
