@@ -150,6 +150,7 @@ envoy_cc_library(
         ":process_context_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
+        "//include/envoy/grpc:context_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:context_interface",
         "//include/envoy/http:filter_interface",

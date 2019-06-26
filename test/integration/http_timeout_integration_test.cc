@@ -47,6 +47,53 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
   EXPECT_EQ("504", response->headers().Status()->value().getStringView());
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/7154 in which
+// resetStream() was only called after a response timeout for upstream requests
+// that had not received headers yet. This meant that decodeData might be
+// called on a destroyed UpstreamRequest.
+TEST_P(HttpTimeoutIntegrationTest, GlobalTimeoutAfterHeadersBeforeBodyResetsUpstream) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"x-forwarded-for", "10.0.0.1"},
+                                          {"x-envoy-upstream-rq-timeout-ms", "100"}};
+  std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
+      codec_client_->startRequest(request_headers);
+
+  auto response = std::move(encoder_decoder.second);
+  request_encoder_ = &encoder_decoder.first;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  codec_client_->sendData(*request_encoder_, 100, true);
+
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Respond with headers, not end of stream.
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+
+  response->waitForHeaders();
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  // Trigger global timeout.
+  timeSystem().sleep(std::chrono::milliseconds(200));
+
+  ASSERT_TRUE(upstream_request_->waitForReset(std::chrono::seconds(15)));
+
+  response->waitForReset();
+
+  codec_client_->close();
+
+  EXPECT_TRUE(upstream_request_->complete());
+}
+
 // Sends a request with a global timeout and per try timeout specified, sleeps
 // for longer than the per try but slightly less than the global timeout.
 // Ensures that two requests are attempted and a timeout is returned

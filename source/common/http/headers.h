@@ -246,7 +246,7 @@ public:
   } AccessControlAllowOriginValue;
 };
 
-typedef ConstSingleton<HeaderValues> Headers;
+using Headers = ConstSingleton<HeaderValues>;
 
 } // namespace Http
 } // namespace Envoy

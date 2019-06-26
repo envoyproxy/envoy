@@ -20,7 +20,7 @@ public:
   const std::string Tls = "tls";
 };
 
-typedef ConstSingleton<TransportSocketNameValues> TransportSocketNames;
+using TransportSocketNames = ConstSingleton<TransportSocketNameValues>;
 
 } // namespace TransportSockets
 } // namespace Extensions

@@ -16,10 +16,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-docs/fips/boringssl-66005f41fbc3529ffe8d007708756720529da20d.tar.xz"],
     ),
     com_google_absl = dict(
-        sha256 = "e35082e88b9da04f4d68094c05ba112502a5063712f3021adfa465306d238c76",
-        strip_prefix = "abseil-cpp-cc8dcd307b76a575d2e3e0958a4fe4c7193c2f68",
-        # 2018-10-31
-        urls = ["https://github.com/abseil/abseil-cpp/archive/cc8dcd307b76a575d2e3e0958a4fe4c7193c2f68.tar.gz"],
+        sha256 = "7ddf863ddced6fa5bf7304103f9c7aa619c20a2fcf84475512c8d3834b9d14fa",
+        strip_prefix = "abseil-cpp-61c9bf3e3e1c28a4aa6d7f1be4b37fd473bb5529",
+        # 2019-06-05
+        urls = ["https://github.com/abseil/abseil-cpp/archive/61c9bf3e3e1c28a4aa6d7f1be4b37fd473bb5529.tar.gz"],
     ),
     com_github_apache_thrift = dict(
         sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",
@@ -63,9 +63,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gabime/spdlog/archive/v1.3.1.tar.gz"],
     ),
     com_github_gcovr_gcovr = dict(
-        sha256 = "8a60ba6242d67a58320e9e16630d80448ef6d5284fda5fb3eff927b63c8b04a2",
-        strip_prefix = "gcovr-3.3",
-        urls = ["https://github.com/gcovr/gcovr/archive/3.3.tar.gz"],
+        sha256 = "1c52a71f245adfe1b45e30fbe5015337fe66546f17f40038b3969b7b42acceed",
+        strip_prefix = "gcovr-3.4",
+        urls = ["https://github.com/gcovr/gcovr/archive/3.4.tar.gz"],
     ),
     com_github_google_libprotobuf_mutator = dict(
         sha256 = "97b3639630040f41c45f45838ab00b78909e6b4cb69c8028e01302bea5b79495",
@@ -237,13 +237,13 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/1145dd77ffb7a2845c71c8e6ca188ef55e4ff607.tar.gz"],
     ),
     com_github_curl = dict(
-        sha256 = "d483b89062832e211c887d7cf1b65c902d591b48c11fe7d174af781681580b41",
-        strip_prefix = "curl-7.63.0",
-        urls = ["https://github.com/curl/curl/releases/download/curl-7_63_0/curl-7.63.0.tar.gz"],
+        sha256 = "821aeb78421375f70e55381c9ad2474bf279fc454b791b7e95fc83562951c690",
+        strip_prefix = "curl-7.65.1",
+        urls = ["https://github.com/curl/curl/releases/download/curl-7_65_1/curl-7.65.1.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/7bf7c3c358eb954e463bde14ea27444f4bd8ea05.tar.gz
-        sha256 = "36fe180d532a9ccb18cd32328af5231636c7408104523f9ed5eebbad75f1e039",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/7bf7c3c358eb954e463bde14ea27444f4bd8ea05.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/77ae31cbfb5bf41299c8c10a06a205a8a0d37cae.tar.gz
+        sha256 = "20542b8f3df505e4850c8538d747ce21275b1fde64106ccae49a19a3fd7a1ac5",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/77ae31cbfb5bf41299c8c10a06a205a8a0d37cae.tar.gz"],
     ),
 )

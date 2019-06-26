@@ -67,7 +67,7 @@ public:
   GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config, Api::Api& api,
                std::unique_ptr<TestInterlockHook>&& test_interlock);
   GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config, Api::Api& api);
-  ~GuardDogImpl();
+  ~GuardDogImpl() override;
 
   /**
    * Exposed for testing purposes only (but harmless to call):

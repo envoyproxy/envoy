@@ -81,7 +81,7 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
     retry_host_predicate_configs_.emplace_back(host_predicate.name(), std::move(config));
   }
 
-  const auto retry_priority = retry_policy.retry_priority();
+  const auto& retry_priority = retry_policy.retry_priority();
   if (!retry_priority.name().empty()) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
         retry_priority.name());
@@ -366,6 +366,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       prefix_rewrite_(route.route().prefix_rewrite()), host_rewrite_(route.route().host_rewrite()),
       vhost_(vhost),
       auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
+      auto_host_rewrite_header_(!route.route().auto_host_rewrite_header().empty()
+                                    ? absl::optional<Http::LowerCaseString>(Http::LowerCaseString(
+                                          route.route().auto_host_rewrite_header()))
+                                    : absl::nullopt),
       cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
@@ -458,7 +462,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     cors_policy_ =
         std::make_unique<CorsPolicyImpl>(route.route().cors(), factory_context.runtime());
   }
-  for (const auto upgrade_config : route.route().upgrade_configs()) {
+  for (const auto& upgrade_config : route.route().upgrade_configs()) {
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
     const bool success =
         upgrade_map_
@@ -513,6 +517,14 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
   vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, stream_info);
   if (!host_rewrite_.empty()) {
     headers.Host()->value(host_rewrite_);
+  } else if (auto_host_rewrite_header_) {
+    Http::HeaderEntry* header = headers.get(*auto_host_rewrite_header_);
+    if (header != nullptr) {
+      absl::string_view header_value = header->value().getStringView();
+      if (!header_value.empty()) {
+        headers.Host()->value(header_value);
+      }
+    }
   }
 
   // Handle path rewrite
@@ -652,7 +664,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::route::Route& route)
     if (filter_metadata == route.metadata().filter_metadata().end()) {
       return ret;
     }
-    for (auto it : filter_metadata->second.fields()) {
+    for (const auto& it : filter_metadata->second.fields()) {
       if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
         ret.emplace(it.first, it.second.string_value());
       }

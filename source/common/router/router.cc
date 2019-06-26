@@ -667,10 +667,10 @@ void Filter::onResponseTimeout() {
       if (!upstream_request->outlier_detection_timeout_recorded_) {
         updateOutlierDetection(timeout_response_code_, *upstream_request);
       }
-      upstream_request->resetStream();
 
       chargeUpstreamAbort(timeout_response_code_, false, *upstream_request);
     }
+    upstream_request->resetStream();
   }
 
   onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout,

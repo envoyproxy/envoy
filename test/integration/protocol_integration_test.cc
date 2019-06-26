@@ -83,7 +83,7 @@ protected:
 
 // Tests for ProtocolIntegrationTest will be run with the full mesh of H1/H2
 // downstream and H1/H2 upstreams.
-typedef HttpProtocolIntegrationTest ProtocolIntegrationTest;
+using ProtocolIntegrationTest = HttpProtocolIntegrationTest;
 
 TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   auto response = makeHeaderOnlyRequest(nullptr, 0);
@@ -520,7 +520,7 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   auto downstream_request = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  Buffer::OwnedImpl data("{\"TableName\":\"locations\"}");
+  Buffer::OwnedImpl data(R"({"TableName":"locations"})");
   codec_client_->sendData(*downstream_request, data, true);
   waitForNextUpstreamRequest();
 

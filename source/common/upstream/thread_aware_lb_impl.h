@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Upstream {
 
-typedef std::vector<std::pair<HostConstSharedPtr, double>> NormalizedHostWeightVector;
+using NormalizedHostWeightVector = std::vector<std::pair<HostConstSharedPtr, double>>;
 
 class ThreadAwareLoadBalancerBase : public LoadBalancerBase, public ThreadAwareLoadBalancer {
 public:
@@ -21,10 +21,10 @@ public:
    */
   class HashingLoadBalancer {
   public:
-    virtual ~HashingLoadBalancer() {}
+    virtual ~HashingLoadBalancer() = default;
     virtual HostConstSharedPtr chooseHost(uint64_t hash) const PURE;
   };
-  typedef std::shared_ptr<HashingLoadBalancer> HashingLoadBalancerSharedPtr;
+  using HashingLoadBalancerSharedPtr = std::shared_ptr<HashingLoadBalancer>;
 
   // Upstream::ThreadAwareLoadBalancer
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
@@ -47,7 +47,7 @@ private:
     std::shared_ptr<HashingLoadBalancer> current_lb_;
     bool global_panic_{};
   };
-  typedef std::unique_ptr<PerPriorityState> PerPriorityStatePtr;
+  using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
 
   struct LoadBalancerImpl : public LoadBalancer {
     LoadBalancerImpl(ClusterStats& stats, Runtime::RandomGenerator& random)

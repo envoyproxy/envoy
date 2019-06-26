@@ -4,13 +4,15 @@
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/network/io_handle.h"
 
+#include "common/common/logger.h"
+
 namespace Envoy {
 namespace Network {
 
 /**
  * IoHandle derivative for sockets
  */
-class IoSocketHandleImpl : public IoHandle {
+class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
   explicit IoSocketHandleImpl(int fd = -1) : fd_(fd) {}
 
@@ -34,6 +36,9 @@ public:
 
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Address::Instance& address) override;
+
+  Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
+                                  uint32_t self_port, RecvMsgOutput& output) override;
 
 private:
   // Converts a SysCallSizeResult to IoCallUint64Result.

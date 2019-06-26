@@ -20,7 +20,7 @@ public:
   const std::string HttpGrpc = "envoy.http_grpc_access_log";
 };
 
-typedef ConstSingleton<AccessLogNameValues> AccessLogNames;
+using AccessLogNames = ConstSingleton<AccessLogNameValues>;
 
 } // namespace AccessLoggers
 } // namespace Extensions

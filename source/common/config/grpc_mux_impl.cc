@@ -114,6 +114,14 @@ void GrpcMuxImpl::resume(const std::string& type_url) {
   }
 }
 
+bool GrpcMuxImpl::paused(const std::string& type_url) const {
+  auto entry = api_state_.find(type_url);
+  if (entry == api_state_.end()) {
+    return false;
+  }
+  return entry->second.paused_;
+}
+
 void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();
@@ -167,7 +175,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
         continue;
       }
       Protobuf::RepeatedPtrField<ProtobufWkt::Any> found_resources;
-      for (auto watched_resource_name : watch->resources_) {
+      for (const auto& watched_resource_name : watch->resources_) {
         auto it = resources.find(watched_resource_name);
         if (it != resources.end()) {
           found_resources.Add()->MergeFrom(it->second);
@@ -197,7 +205,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
 void GrpcMuxImpl::onWriteable() { drainRequests(); }
 
 void GrpcMuxImpl::onStreamEstablished() {
-  for (const auto type_url : subscriptions_) {
+  for (const auto& type_url : subscriptions_) {
     queueDiscoveryRequest(type_url);
   }
 }

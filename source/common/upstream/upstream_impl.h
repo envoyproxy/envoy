@@ -135,8 +135,6 @@ public:
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     return health_check_address_;
   }
-  // Setting health check address is usually done at initialization. This is NOP by default.
-  void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr) override {}
   const envoy::api::v2::core::Locality& locality() const override { return locality_; }
   Stats::StatName localityZoneStatName() const override {
     return locality_zone_stat_name_.statName();
@@ -419,7 +417,7 @@ private:
   std::unique_ptr<EdfScheduler<LocalityEntry>> degraded_locality_scheduler_;
 };
 
-typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
+using HostSetImplPtr = std::unique_ptr<HostSetImpl>;
 
 /**
  * A class for management of the set of hosts in a given cluster.
@@ -586,7 +584,7 @@ private:
                                 const std::string& cluster_name, Stats::Scope& stats_scope,
                                 const envoy::api::v2::core::RoutingPriority& priority);
 
-    typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;
+    using Managers = std::array<ResourceManagerImplPtr, NumResourcePriorities>;
 
     Managers managers_;
   };
@@ -791,7 +789,7 @@ private:
   PrioritySet::HostUpdateCb* update_cb_;
 };
 
-typedef std::unique_ptr<PriorityStateManager> PriorityStateManagerPtr;
+using PriorityStateManagerPtr = std::unique_ptr<PriorityStateManager>;
 
 /**
  * Base for all dynamic cluster types.
@@ -822,9 +820,23 @@ protected:
 };
 
 /**
- * Utility function to get Dns from cluster.
+ * Utility function to get Dns from cluster/enum.
  */
 Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Cluster& cluster);
+Network::DnsLookupFamily
+getDnsLookupFamilyFromEnum(envoy::api::v2::Cluster::DnsLookupFamily family);
+
+/**
+ * Utility function to report upstream cx destroy metrics
+ */
+void reportUpstreamCxDestroy(const Upstream::HostDescriptionConstSharedPtr& host,
+                             Network::ConnectionEvent event);
+
+/**
+ * Utility function to report upstream cx destroy active request metrics
+ */
+void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSharedPtr& host,
+                                          Network::ConnectionEvent event);
 
 } // namespace Upstream
 } // namespace Envoy

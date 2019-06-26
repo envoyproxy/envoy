@@ -69,7 +69,7 @@ TEST(DynamoRequestParser, parseTableNameSingleOperation) {
   }
 
   {
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString("{\"TableName\":\"Pets\"}");
+    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(R"({"TableName":"Pets"})");
     EXPECT_EQ("Pets", RequestParser::parseTable("GetItem", *json_data).table_name);
   }
 }
@@ -197,7 +197,7 @@ TEST(DynamoRequestParser, parseBatchUnProcessedKeys) {
 
   {
     std::vector<std::string> unprocessed_tables = RequestParser::parseBatchUnProcessedKeys(
-        *Json::Factory::loadFromString("{\"UnprocessedKeys\":{\"table_1\" :{}}}"));
+        *Json::Factory::loadFromString(R"({"UnprocessedKeys":{"table_1" :{}}})"));
     EXPECT_EQ("table_1", unprocessed_tables[0]);
     EXPECT_EQ(1u, unprocessed_tables.size());
   }
@@ -236,7 +236,7 @@ TEST(DynamoRequestParser, parsePartitionIds) {
   }
   {
     std::vector<RequestParser::PartitionDescriptor> partitions = RequestParser::parsePartitions(
-        *Json::Factory::loadFromString("{\"ConsumedCapacity\":{ \"Partitions\":{}}}"));
+        *Json::Factory::loadFromString(R"({"ConsumedCapacity":{ "Partitions":{}}})"));
     EXPECT_EQ(0u, partitions.size());
   }
   {

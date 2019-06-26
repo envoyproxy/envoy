@@ -25,7 +25,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 32]
+// [#comment:next free field: 33]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -287,6 +287,12 @@ message HttpConnectionManager {
   // is not desired it can be disabled.
   google.protobuf.BoolValue generate_request_id = 15;
 
+  // Whether the connection manager will keep the :ref:`x-request-id
+  // <config_http_conn_man_headers_x-request-id>` header if passed for a request that is edge
+  // (Edge request is the request from external clients to front Envoy) and not reset it, which
+  // is the current Envoy behaviour. This defaults to false.
+  bool preserve_external_request_id = 32;
+
   // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP
   // header.
   enum ForwardClientCertDetails {
@@ -317,6 +323,7 @@ message HttpConnectionManager {
   ForwardClientCertDetails forward_client_cert_details = 16
       [(validate.rules).enum.defined_only = true];
 
+  // [#comment:next free field: 7]
   message SetCurrentClientCertDetails {
     // Whether to forward the subject of the client cert. Defaults to false.
     google.protobuf.BoolValue subject = 1;
@@ -327,6 +334,12 @@ message HttpConnectionManager {
     // XFCC header comma separated from other values with the value Cert="PEM".
     // Defaults to false.
     bool cert = 3;
+
+    // Whether to forward the entire client cert chain (including the leaf cert) in URL encoded PEM
+    // format. This will appear in the XFCC header comma separated from other values with the value
+    // Chain="PEM".
+    // Defaults to false.
+    bool chain = 6;
 
     // Whether to forward the DNS type Subject Alternative Names of the client cert.
     // Defaults to false.
@@ -477,6 +490,10 @@ message ScopedRoutes {
         // Specifies a header field's key value pair to match on.
         message KvElement {
           // The separator between key and value (e.g., '=' separates 'k=v;...').
+          // If an element is an empty string, the element is ignored.
+          // If an element contains no separator, the whole element is parsed as key and the
+          // fragment value is an empty string.
+          // If there are multiple values for a matched key, the first value is returned.
           string separator = 1 [(validate.rules).string.min_bytes = 1];
 
           // The key to match on.
@@ -485,6 +502,8 @@ message ScopedRoutes {
 
         oneof extract_type {
           // Specifies the zero based index of the element to extract.
+          // Note Envoy concatenates multiple values of the same header key into a comma separated
+          // string, the splitting always happens after the concatenation.
           uint32 index = 3;
 
           // Specifies the key value pair to extract the value from.
@@ -539,32 +558,8 @@ message ScopedRds {
 }
 
 message HttpFilter {
-  // The name of the filter to instantiate. The name must match a supported
-  // filter. The built-in filters are:
-  //
-  // [#comment:TODO(mattklein123): Auto generate the following list]
-  // * :ref:`envoy.buffer <config_http_filters_buffer>`
-  // * :ref:`envoy.cors <config_http_filters_cors>`
-  // * :ref:`envoy.ext_authz <config_http_filters_ext_authz>`
-  // * :ref:`envoy.fault <config_http_filters_fault_injection>`
-  // * :ref:`envoy.filters.http.csrf <config_http_filters_csrf>`
-  // * :ref:`envoy.filters.http.header_to_metadata <config_http_filters_header_to_metadata>`
-  // * :ref:`envoy.filters.http.grpc_http1_reverse_bridge \
-  //   <config_http_filters_grpc_http1_reverse_bridge>`
-  // * :ref:`envoy.filters.http.jwt_authn <config_http_filters_jwt_authn>`
-  // * :ref:`envoy.filters.http.rbac <config_http_filters_rbac>`
-  // * :ref:`envoy.filters.http.tap <config_http_filters_tap>`
-  // * :ref:`envoy.gzip <config_http_filters_gzip>`
-  // * :ref:`envoy.http_dynamo_filter <config_http_filters_dynamo>`
-  // * :ref:`envoy.grpc_http1_bridge <config_http_filters_grpc_bridge>`
-  // * :ref:`envoy.grpc_json_transcoder <config_http_filters_grpc_json_transcoder>`
-  // * :ref:`envoy.grpc_web <config_http_filters_grpc_web>`
-  // * :ref:`envoy.health_check <config_http_filters_health_check>`
-  // * :ref:`envoy.ip_tagging <config_http_filters_ip_tagging>`
-  // * :ref:`envoy.lua <config_http_filters_lua>`
-  // * :ref:`envoy.rate_limit <config_http_filters_rate_limit>`
-  // * :ref:`envoy.router <config_http_filters_router>`
-  // * :ref:`envoy.squash <config_http_filters_squash>`
+  // The name of the filter to instantiate. The name must match a
+  // :ref:`supported filter <config_http_filters>`.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported

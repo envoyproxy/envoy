@@ -6,7 +6,7 @@
 
 namespace Envoy {
 
-DangerousDeprecatedTestTime::DangerousDeprecatedTestTime() {}
+DangerousDeprecatedTestTime::DangerousDeprecatedTestTime() = default;
 
 namespace Event {
 

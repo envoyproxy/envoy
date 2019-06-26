@@ -40,8 +40,7 @@ RedisCluster::RedisCluster(
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& host = lb_endpoint.endpoint().address();
       dns_discovery_resolve_targets_.emplace_back(new DnsDiscoveryResolveTarget(
-          *this, host.socket_address().address(), host.socket_address().port_value(),
-          locality_lb_endpoint, lb_endpoint));
+          *this, host.socket_address().address(), host.socket_address().port_value()));
     }
   }
 
@@ -113,12 +112,10 @@ void RedisCluster::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots) {
 }
 
 // DnsDiscoveryResolveTarget
-RedisCluster::DnsDiscoveryResolveTarget::DnsDiscoveryResolveTarget(
-    RedisCluster& parent, const std::string& dns_address, const uint32_t port,
-    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint)
-    : parent_(parent), dns_address_(dns_address), port_(port),
-      locality_lb_endpoint_(locality_lb_endpoint), lb_endpoint_(lb_endpoint) {}
+RedisCluster::DnsDiscoveryResolveTarget::DnsDiscoveryResolveTarget(RedisCluster& parent,
+                                                                   const std::string& dns_address,
+                                                                   const uint32_t port)
+    : parent_(parent), dns_address_(dns_address), port_(port) {}
 
 RedisCluster::DnsDiscoveryResolveTarget::~DnsDiscoveryResolveTarget() {
   if (active_query_) {
@@ -131,7 +128,7 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolve() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+      [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
         parent_.redis_discovery_session_.registerDiscoveryAddress(address_list, port_);
@@ -163,7 +160,7 @@ ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value) {
   }
 
   std::string address = array[0].asString();
-  bool ipv6 = (address.find(":") != std::string::npos);
+  bool ipv6 = (address.find(':') != std::string::npos);
   if (ipv6) {
     return std::make_shared<Network::Address::Ipv6Instance>(address, array[1].asInteger());
   }
