@@ -39,11 +39,11 @@ using DnsHostInfoSharedPtr = std::shared_ptr<DnsHostInfo>;
 class DnsCache {
 public:
   /**
-   * Callbacks used in the loadDnsCache() method.
+   * Callbacks used in the loadDnsCacheEntry() method.
    */
-  class LoadDnsCacheCallbacks {
+  class LoadDnsCacheEntryCallbacks {
   public:
-    virtual ~LoadDnsCacheCallbacks() = default;
+    virtual ~LoadDnsCacheEntryCallbacks() = default;
 
     /**
      * Called when the DNS cache load is complete (or failed).
@@ -52,14 +52,15 @@ public:
   };
 
   /**
-   * Handle returned from loadDnsCache(). Destruction of the handle will cancel any future callback.
+   * Handle returned from loadDnsCacheEntry(). Destruction of the handle will cancel any future
+   * callback.
    */
-  class LoadDnsCacheHandle {
+  class LoadDnsCacheEntryHandle {
   public:
-    virtual ~LoadDnsCacheHandle() = default;
+    virtual ~LoadDnsCacheEntryHandle() = default;
   };
 
-  using LoadDnsCacheHandlePtr = std::unique_ptr<LoadDnsCacheHandle>;
+  using LoadDnsCacheEntryHandlePtr = std::unique_ptr<LoadDnsCacheEntryHandle>;
 
   /**
    * Update callbacks that can be registered in the addUpdateCallbacks() method.
@@ -104,12 +105,26 @@ public:
    *             target ports.
    * @param default_port supplies the port to use if the host does not have a port embedded in it.
    * @param callbacks supplies the cache load callbacks to invoke if async processing is needed.
-   * @return a cache load handle, in which case the callbacks will be invoked at a later time,
-   *         or nullptr if the cache is already loaded. In this case, callbacks will never be
-   *         called.
+   * @return a cache load result which includes both a status and handle. If the handle is non-null
+   *         the callbacks will be invoked at a later time, otherwise consult the status for the
+   *         reason the cache is not loading. In this case, callbacks will never be called.
    */
-  virtual LoadDnsCacheHandlePtr loadDnsCache(absl::string_view host, uint16_t default_port,
-                                             LoadDnsCacheCallbacks& callbacks) PURE;
+  enum class LoadDnsCacheEntryStatus {
+    // The cache entry is already loaded. Callbacks will not be called.
+    InCache,
+    // The cache entry is loading. Callbacks will be called at a later time unless cancelled.
+    Loading,
+    // The cache is full and the requested host is not in cache. Callbacks will not be called.
+    Overflow
+  };
+
+  struct LoadDnsCacheEntryResult {
+    LoadDnsCacheEntryStatus status_;
+    LoadDnsCacheEntryHandlePtr handle_;
+  };
+
+  virtual LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
+                                                    LoadDnsCacheEntryCallbacks& callbacks) PURE;
 
   /**
    * Add update callbacks to the cache.
