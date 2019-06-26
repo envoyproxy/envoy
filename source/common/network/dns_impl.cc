@@ -225,12 +225,11 @@ void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
   hints.ai_family = family;
 
   /**
-   * ARES_AI_CANONNAME the ares_addrinfo structure will return a canonical names list
    * ARES_AI_ENVHOSTS read hosts file path from the environment variable
    * ARES_AI_NOSORT result addresses will not be sorted and no connections to resolved addresses
    * will be attempted
    */
-  hints.ai_flags = ARES_AI_CANONNAME | ARES_AI_ENVHOSTS | ARES_AI_NOSORT;
+  hints.ai_flags = ARES_AI_ENVHOSTS | ARES_AI_NOSORT;
 
   ares_getaddrinfo(
       channel_, dns_name_.c_str(), /* service */ nullptr, &hints,
