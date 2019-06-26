@@ -23,7 +23,12 @@ Api::IoError::IoErrorCode IoSocketError::getErrorCode() const {
     return IoErrorCode::MessageSize;
   case EINTR:
     return IoErrorCode::Interrupt;
+  case EINVAL:
+    return IoErrorCode::InvalidValue;
+  case EADDRNOTAVAIL:
+    return IoErrorCode::AddressNotAvailable;
   default:
+    ENVOY_LOG_MISC(error, "Unknown error code {} details {}", errno_, ::strerror(errno_));
     return IoErrorCode::UnknownError;
   }
 }
@@ -37,7 +42,7 @@ IoSocketError* IoSocketError::getIoSocketEagainInstance() {
 
 void IoSocketError::deleteIoError(Api::IoError* err) {
   ASSERT(err != nullptr);
-  if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+  if (err != getIoSocketEagainInstance()) {
     delete err;
   }
 }
