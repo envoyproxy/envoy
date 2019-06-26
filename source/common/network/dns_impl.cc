@@ -107,9 +107,8 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
       completed_ = true;
     }
 
-    if (addrinfo) {
-      ares_freeaddrinfo(addrinfo);
-    }
+    ASSERT(addrinfo != nullptr);
+    ares_freeaddrinfo(addrinfo);
   }
 
   if (timeouts > 0) {
