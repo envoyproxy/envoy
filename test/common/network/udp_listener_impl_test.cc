@@ -40,10 +40,10 @@ public:
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());
     server_socket_->addOptions(SocketOptionFactory::buildRxQueueOverFlowOptions());
 
-     std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
-  options->push_back(std::make_shared<Network::SocketOptionImpl>(
-      envoy::api::v2::core::SocketOption::STATE_BOUND,
-      Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_FREEBIND)), 1));
+    std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+    options->push_back(std::make_shared<Network::SocketOptionImpl>(
+        envoy::api::v2::core::SocketOption::STATE_BOUND,
+        Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_FREEBIND)), 1));
     server_socket_->addOptions(std::move(options));
 
     listener_ = std::make_unique<UdpListenerImpl>(
@@ -366,16 +366,16 @@ TEST_P(UdpListenerImplTest, SendData) {
   Address::InstanceConstSharedPtr send_from_addr;
   if (version_ == Address::IpVersion::v4) {
     // Kernel regards any 127.x.x.x as local address.
-    send_from_addr.reset(new Address::Ipv4Instance("127.1.2.3",
-                                       server_socket_->localAddress()->ip()->port()));
+    send_from_addr.reset(
+        new Address::Ipv4Instance("127.1.2.3", server_socket_->localAddress()->ip()->port()));
   } else {
     // IPv6 doesn't allow any nonlocal source address for sendmsg. And the only
     // local address guaranteed in tests in loopback. Unfortunately, even if it's not
     // specified, kernel will pick this address as source address. So this test
     // only checks if IoSocketHandle::sendmsg() sets up CMSG_DATA correctly,
     // i.e. cmsg_len is big enough when that code path is executed.
-    send_from_addr.reset(new Address::Ipv6Instance("::1",
-                                     server_socket_->localAddress()->ip()->port()));
+    send_from_addr.reset(
+        new Address::Ipv6Instance("::1", server_socket_->localAddress()->ip()->port()));
   }
 
   UdpSendData send_data{send_from_addr->ip(), client_socket_->localAddress(), *buffer};

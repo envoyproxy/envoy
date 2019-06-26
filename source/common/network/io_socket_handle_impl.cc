@@ -118,11 +118,11 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     constexpr int kSpaceForIpv6 = CMSG_SPACE(sizeof(in6_pktinfo));
     // kSpaceForIp should be big enough to hold both IPv4 and IPv6 packet info.
     constexpr int kSpaceForIp = (kSpaceForIpv4 < kSpaceForIpv6) ? kSpaceForIpv6 : kSpaceForIpv4;
-    std::cerr << "size of in_pktinfo " << kSpaceForIpv4 << " size of in6_pktinfo " << kSpaceForIpv6
-              << "\n";
     char cbuf[kSpaceForIp]{0};
 #else
-    char cbuf[16]{0};
+    // Currently CMSG_SPACE is not constexpr in MAC OS. 48 bytes should be
+    // enough for in_pktinfo or in6_pktinfo.
+    char cbuf[48]{0};
 #endif
     message.msg_control = cbuf;
     cmsghdr* cmsg = CMSG_FIRSTHDR(&message);
