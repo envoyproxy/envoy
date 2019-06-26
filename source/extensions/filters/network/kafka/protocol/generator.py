@@ -2,6 +2,7 @@
 
 # Main library file containing all the protocol generation logic.
 
+
 def generate_main_code(type, main_header_file, resolver_cc_file, input_files):
   """
   Main code generator.

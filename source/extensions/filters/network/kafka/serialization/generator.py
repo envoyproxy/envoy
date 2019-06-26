@@ -2,6 +2,7 @@
 
 # Main library file containing all the composite deserializer logic.
 
+
 def generate_main_code(serialization_composite_h_file):
   """
   Main code generator.
