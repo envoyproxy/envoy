@@ -26,6 +26,16 @@ stages:
             submodules: true
           - script: ./tools/check_format.sh
             displayName: 'Run formatters'
+      - job: precommit_lint
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'macos-10.14'
+        steps:
+          - checkout: self
+          - script: brew install pre-commit
+            displayName: 'Install pre-commit'
+          - script: pre-commit run --all-files
+            displayName: 'Running pre-commit'
       - job: swift_lint
         timeoutInMinutes: 60
         pool:
