@@ -84,14 +84,14 @@ bool ParameterRouteEntryImpl::matchParameter(absl::string_view request_data,
 RouteConstSharedPtr ParameterRouteEntryImpl::matches(const MessageMetadata& metadata,
                                                      uint64_t random_value) const {
   ASSERT(metadata.hasInvocationInfo());
-  const auto invocation = static_cast<const RpcInvocationImpl*>(&metadata.invocation_info());
-  if (!invocation->hasParameters()) {
+  const auto& invocation = static_cast<const RpcInvocationImpl&>(metadata.invocation_info());
+  if (!invocation.hasParameters()) {
     return nullptr;
   }
 
   ENVOY_LOG(debug, "dubbo route matcher: parameter name match");
   for (auto& config_data : parameter_data_list_) {
-    const std::string& data = invocation->getParameterValue(config_data.index_);
+    const std::string& data = invocation.getParameterValue(config_data.index_);
     if (data.empty()) {
       ENVOY_LOG(debug,
                 "dubbo route matcher: parameter matching failed, there are no parameters in the "
@@ -142,21 +142,21 @@ MethodRouteEntryImpl::~MethodRouteEntryImpl() {}
 RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadata,
                                                   uint64_t random_value) const {
   ASSERT(metadata.hasInvocationInfo());
-  const auto invocation = static_cast<const RpcInvocationImpl*>(&metadata.invocation_info());
+  const auto& invocation = static_cast<const RpcInvocationImpl&>(metadata.invocation_info());
 
-  if (invocation->hasHeaders() && !RouteEntryImplBase::headersMatch(invocation->headers())) {
+  if (invocation.hasHeaders() && !RouteEntryImplBase::headersMatch(invocation.headers())) {
     ENVOY_LOG(error, "dubbo route matcher: headers not match");
     return nullptr;
   }
 
-  if (!invocation->method_name().has_value()) {
+  if (!invocation.method_name().has_value()) {
     ENVOY_LOG(error, "dubbo route matcher: there is no method name in the metadata");
     return nullptr;
   }
 
-  if (!method_name_.match(invocation->method_name().value())) {
+  if (!method_name_.match(invocation.method_name().value())) {
     ENVOY_LOG(debug, "dubbo route matcher: method matching failed, input method '{}'",
-              invocation->method_name().value());
+              invocation.method_name().value());
     return nullptr;
   }
 

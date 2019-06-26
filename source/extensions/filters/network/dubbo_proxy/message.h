@@ -100,7 +100,7 @@ public:
   virtual size_t header_size() const PURE;
 
 protected:
-  Context() {}
+  Context() = default;
   virtual ~Context() { attachments_.clear(); }
 
   AttachmentMap attachments_;

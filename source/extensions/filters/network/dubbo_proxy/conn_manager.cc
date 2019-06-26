@@ -137,10 +137,16 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata,
     return;
   }
 
-  Buffer::OwnedImpl buffer;
-  const DubboFilters::DirectResponse::ResponseType result =
-      response.encode(metadata, *protocol_, buffer);
-  read_callbacks_->connection().write(buffer, end_stream);
+  DubboFilters::DirectResponse::ResponseType result =
+      DubboFilters::DirectResponse::ResponseType::ErrorReply;
+
+  try {
+    Buffer::OwnedImpl buffer;
+    result = response.encode(metadata, *protocol_, buffer);
+    read_callbacks_->connection().write(buffer, end_stream);
+  } catch (const EnvoyException& ex) {
+    ENVOY_CONN_LOG(error, "dubbo error: {}", read_callbacks_->connection(), ex.what());
+  }
 
   if (end_stream) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);

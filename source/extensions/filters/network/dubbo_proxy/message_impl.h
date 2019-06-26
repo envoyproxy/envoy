@@ -8,7 +8,7 @@ namespace NetworkFilters {
 namespace DubboProxy {
 
 struct ContextBase : public Context {
-  ContextBase() : Context() {}
+  ContextBase() = default;
   ~ContextBase() override {}
 
   // Override from Context
@@ -20,7 +20,7 @@ struct ContextBase : public Context {
 };
 
 struct ContextImpl : public ContextBase {
-  ContextImpl() : ContextBase() {}
+  ContextImpl() = default;
   ~ContextImpl() override {}
 
   bool is_heartbeat_{false};
