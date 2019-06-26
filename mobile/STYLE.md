@@ -1,3 +1,13 @@
+## General file style
+
+- General style guidelines -- like newlines at the end of file -- are linted
+for using [pre-commit](https://pre-commit.com/)
+- The rules enforced are available in the
+repo's [.pre-commit-config.yaml file](.pre-commit-config.yaml).
+- You can install pre-commit locally with these [instructions](https://pre-commit.com/#install).
+- The linter may be run locally using `pre-commit run --all-files`.
+Additionally it can be installed as a commit hook with `pre-commit install`.
+
 ## C++ coding style
 
 - C++ code uses the [Envoy style guide](https://github.com/envoyproxy/envoy/blob/master/STYLE.md)
@@ -13,8 +23,11 @@
 
 ## Kotlin coding style
 
-- Kotlin code style is validated using [detekt](https://github.com/arturbosch/detekt)
-- The rules enforced are available in the repo's [.kotlinlint.yml file](./.kotlinlint.yml). We build upon the default config provided by [`detekt`](https://github.com/arturbosch/detekt/blob/master/detekt-cli/src/main/resources/default-detekt-config.yml)
+- Kotlin code style is validated using
+  [detekt](https://github.com/arturbosch/detekt)
+- The rules enforced are available in the repo's [.kotlinlint.yml file](./.kotlinlint.yml).
+  We build upon the default config provided by
+  [`detekt`](https://github.com/arturbosch/detekt/blob/master/detekt-cli/src/main/resources/default-detekt-config.yml)
 
 ## Swift coding style
 

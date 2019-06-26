@@ -98,4 +98,3 @@ class MainActivity : Activity() {
     return inputStream.bufferedReader().use { reader -> reader.readText() }
   }
 }
-

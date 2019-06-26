@@ -11,6 +11,3 @@ sealed class Response {
 data class Success(val title: String, val header: String) : Response()
 
 data class Failure(val message: String) : Response()
-
-
-
