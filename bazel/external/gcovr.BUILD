@@ -9,8 +9,8 @@ load("@subpar//:subpar.bzl", "par_binary")
 par_binary(
     name = "gcovr",
     srcs = [":renamed_gcovr.py"],
-    default_python_version = "PY2",
     main = ":renamed_gcovr.py",
+    python_version = "PY2",
     visibility = ["//visibility:public"],
 )
 
