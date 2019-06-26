@@ -7,7 +7,7 @@ namespace Envoy {
 #define LOG_MEMBER(member) ", " #member ": " << (member)
 
 #define LOG_OPTIONAL_MEMBER(member)                                                                \
-  ", " #member ": " << (member.has_value() ? absl::StrCat(member.value()) : "null")
+  ", " #member ": " << ((member).has_value() ? absl::StrCat((member).value()) : "null")
 
 // Macro assumes local member variables
 // os (ostream)
@@ -15,7 +15,7 @@ namespace Envoy {
 #define LOG_DETAILS(member)                                                                        \
   do {                                                                                             \
     os << spaces << #member ": ";                                                                  \
-    if (member != nullptr) {                                                                       \
+    if ((member) != nullptr) {                                                                     \
       os << "\n";                                                                                  \
       (member)->logState(os, indent_level + 1);                                                    \
     } else {                                                                                       \

@@ -26,7 +26,11 @@ void SignalAction::removeCrashHandler(const CrashHandlerInterface& handler) {
   absl::MutexLock l(&failure_mutex);
   FailureFunctionList* list = crash_handlers.exchange(nullptr, std::memory_order_relaxed);
   list->remove(&handler);
-  crash_handlers.store(list, std::memory_order_release);
+  if (list->empty()) {
+    delete list;
+  } else {
+    crash_handlers.store(list, std::memory_order_release);
+  }
 }
 
 constexpr int SignalAction::FATAL_SIGS[];

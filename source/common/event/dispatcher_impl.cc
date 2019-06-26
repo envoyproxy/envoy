@@ -39,8 +39,8 @@ DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& 
                                Event::TimeSystem& time_system)
     : api_(api), buffer_factory_(std::move(factory)),
       scheduler_(time_system.createScheduler(base_scheduler_)),
-      deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
-      post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
+      deferred_delete_timer_(createTimerInternal([this]() -> void { clearDeferredDeleteList(); })),
+      post_timer_(createTimerInternal([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
 #ifdef ENVOY_HANDLE_SIGNALS
   SignalAction::registerCrashHandler(*this);
@@ -145,7 +145,9 @@ Network::ListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
   return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb, timeSource())};
 }
 
-TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
+TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return createTimerInternal(cb); }
+
+TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
   ASSERT(isThreadSafe());
   return scheduler_->createTimer(cb);
 }

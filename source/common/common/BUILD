@@ -189,6 +189,7 @@ envoy_cc_library(
     hdrs = ["scope_tracker.h"],
     deps = [
         "//include/envoy/common:scope_tracker_interface",
+        "//include/envoy/event:dispatcher_interface",
     ],
 )
 

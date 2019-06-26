@@ -13,7 +13,7 @@ namespace Envoy {
  */
 class ScopeTrackedObject {
 public:
-  virtual ~ScopeTrackedObject() {}
+  virtual ~ScopeTrackedObject() = default;
 
   /**
    * Dump debug state of the object in question to the provided ostream

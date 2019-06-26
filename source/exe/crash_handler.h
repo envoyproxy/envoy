@@ -11,7 +11,7 @@ namespace Envoy {
 // builds.
 class CrashHandlerInterface {
 public:
-  virtual ~CrashHandlerInterface() {}
+  virtual ~CrashHandlerInterface() = default;
   virtual void crashHandler() const PURE;
 };
 

@@ -339,7 +339,7 @@ private:
                         public Tracing::Config,
                         public ScopeTrackedObject {
     ActiveStream(ConnectionManagerImpl& connection_manager);
-    ~ActiveStream();
+    ~ActiveStream() override;
 
     // Indicates which filter to start the iteration with.
     enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };

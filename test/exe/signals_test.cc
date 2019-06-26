@@ -34,6 +34,33 @@ TEST(SignalsDeathTest, InvalidAddressDeathTest) {
       "backtrace.*Segmentation fault");
 }
 
+class TestCrashHandler : public CrashHandlerInterface {
+  virtual void crashHandler() const override { std::cerr << "HERE!"; }
+};
+
+TEST(SignalsDeathTest, RegisteredHandlerTest) {
+  TestCrashHandler handler;
+  SignalAction::registerCrashHandler(handler);
+  SignalAction actions;
+  EXPECT_DEATH_LOG_TO_STDERR(
+      []() -> void {
+        // Oops!
+        volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
+        *(nasty_ptr) = 0;
+      }(),
+      "backtrace.*Segmentation fault");
+  SignalAction::removeCrashHandler(handler);
+
+  /*  SignalAction actions;
+    EXPECT_DEATH_LOG_TO_STDERR(
+        []() -> void {
+          // Oops!
+          volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
+          *(nasty_ptr) = 0;
+        }(),
+        "HERE!");*/
+}
+
 TEST(SignalsDeathTest, BusDeathTest) {
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR(
@@ -90,6 +117,7 @@ TEST(SignalsDeathTest, RestoredPreviousHandlerDeathTest) {
   // Outer SignalAction should be active again:
   EXPECT_DEATH_LOG_TO_STDERR([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
 }
+
 #endif
 
 TEST(SignalsDeathTest, IllegalStackAccessDeathTest) {

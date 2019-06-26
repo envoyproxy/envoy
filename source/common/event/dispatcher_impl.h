@@ -86,6 +86,7 @@ public:
   }
 
 private:
+  TimerPtr createTimerInternal(TimerCb cb);
   void runPostCallbacks();
 
   // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the

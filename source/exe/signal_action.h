@@ -54,8 +54,7 @@ class SignalAction : NonCopyable {
 public:
   SignalAction()
       : guard_size_(sysconf(_SC_PAGE_SIZE)),
-        altstack_size_(std::max(guard_size_ * 4, static_cast<size_t>(MINSIGSTKSZ))),
-        altstack_(nullptr) {
+        altstack_size_(std::max(guard_size_ * 4, static_cast<size_t>(MINSIGSTKSZ))), altstack_() {
     mapAndProtectStackMemory();
     installSigHandlers();
   }
@@ -141,7 +140,7 @@ private:
    * Unmap alternative stack memory.
    */
   void unmapStackMemory();
-  char* altstack_;
+  char* altstack_{};
   std::array<struct sigaction, sizeof(FATAL_SIGS) / sizeof(int)> previous_handlers_;
   stack_t previous_altstack_;
   std::list<const CrashHandlerInterface*> crash_handlers_;

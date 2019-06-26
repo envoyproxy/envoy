@@ -527,12 +527,12 @@ public:
   virtual bool empty() const PURE;
 
   void logState(std::ostream& os, int indent_level = 0) const {
-    typedef std::pair<std::ostream*, const char*> IterateData;
+    using IterateData = std::pair<std::ostream*, const char*>;
     const char* spaces = spacesForLevel(indent_level);
     IterateData iterate_data = std::make_pair(&os, spaces);
     iterate(
         [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          IterateData* data = static_cast<IterateData*>(context);
+          auto* data = static_cast<IterateData*>(context);
           *data->first << data->second << "'" << header.key().getStringView() << "', '"
                        << header.value().getStringView() << "'\n";
           return HeaderMap::Iterate::Continue;
