@@ -31,8 +31,8 @@ envoy_cc_binary(
 )
 
 envoy_cc_library(
-    name = "crash_handler_lib",
-    hdrs = ["crash_handler.h"],
+    name = "fatal_error_handler_lib",
+    hdrs = ["fatal_error_handler.h"],
 )
 
 envoy_cc_library(
@@ -127,7 +127,7 @@ envoy_cc_library(
     hdrs = ["signal_action.h"],
     tags = ["backtrace"],
     deps = [
-        ":crash_handler_lib",
+        ":fatal_error_handler_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:non_copyable",
         "//source/common/singleton:threadsafe_singleton",

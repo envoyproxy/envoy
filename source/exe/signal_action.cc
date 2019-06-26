@@ -9,27 +9,27 @@
 namespace Envoy {
 
 ABSL_CONST_INIT static absl::Mutex failure_mutex(absl::kConstInit);
-using FailureFunctionList = std::list<const CrashHandlerInterface*>;
-ABSL_CONST_INIT std::atomic<FailureFunctionList*> crash_handlers{nullptr};
+using FailureFunctionList = std::list<const FatalErrorHandlerInterface*>;
+ABSL_CONST_INIT std::atomic<FailureFunctionList*> fatal_error_handlers{nullptr};
 
-void SignalAction::registerCrashHandler(const CrashHandlerInterface& handler) {
+void SignalAction::registerFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
   absl::MutexLock l(&failure_mutex);
-  FailureFunctionList* list = crash_handlers.exchange(nullptr, std::memory_order_relaxed);
+  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_relaxed);
   if (list == nullptr) {
     list = new FailureFunctionList;
   }
   list->push_back(&handler);
-  crash_handlers.store(list, std::memory_order_release);
+  fatal_error_handlers.store(list, std::memory_order_release);
 }
 
-void SignalAction::removeCrashHandler(const CrashHandlerInterface& handler) {
+void SignalAction::removeFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
   absl::MutexLock l(&failure_mutex);
-  FailureFunctionList* list = crash_handlers.exchange(nullptr, std::memory_order_relaxed);
+  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_relaxed);
   list->remove(&handler);
   if (list->empty()) {
     delete list;
   } else {
-    crash_handlers.store(list, std::memory_order_release);
+    fatal_error_handlers.store(list, std::memory_order_release);
   }
 }
 
@@ -46,11 +46,11 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
   }
   tracer.logTrace();
 
-  FailureFunctionList* list = crash_handlers.exchange(nullptr, std::memory_order_relaxed);
+  FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_relaxed);
   if (list) {
     // Finally after logging the stack trace, call any registered crash handlers.
     for (const auto* handler : *list) {
-      handler->crashHandler();
+      handler->onFatalError();
     }
   }
 

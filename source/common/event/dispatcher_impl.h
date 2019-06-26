@@ -19,7 +19,7 @@
 #include "common/event/libevent.h"
 #include "common/event/libevent_scheduler.h"
 
-#include "exe/crash_handler.h"
+#include "exe/fatal_error_handler.h"
 
 namespace Envoy {
 namespace Event {
@@ -29,7 +29,7 @@ namespace Event {
  */
 class DispatcherImpl : Logger::Loggable<Logger::Id::main>,
                        public Dispatcher,
-                       public CrashHandlerInterface {
+                       public FatalErrorHandlerInterface {
 public:
   DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system);
   DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
@@ -76,11 +76,11 @@ public:
     return return_object;
   }
 
-  // CrashHandlerInterface
-  void crashHandler() const override {
+  // FatalErrorInterface
+  void onFatalError() const override {
     if (isThreadSafe()) {
       if (current_object_) {
-        current_object_->logState(std::cerr);
+        current_object_->dumpState(std::cerr);
       }
     }
   }

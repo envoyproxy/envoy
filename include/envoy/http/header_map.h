@@ -13,7 +13,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
-#include "common/common/log_state_utils.h"
 #include "common/common/macros.h"
 
 #include "absl/strings/string_view.h"
@@ -526,19 +525,15 @@ public:
    */
   virtual bool empty() const PURE;
 
-  void logState(std::ostream& os, int indent_level = 0) const {
-    using IterateData = std::pair<std::ostream*, const char*>;
-    const char* spaces = spacesForLevel(indent_level);
-    IterateData iterate_data = std::make_pair(&os, spaces);
-    iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          auto* data = static_cast<IterateData*>(context);
-          *data->first << data->second << "'" << header.key().getStringView() << "', '"
-                       << header.value().getStringView() << "'\n";
-          return HeaderMap::Iterate::Continue;
-        },
-        &iterate_data);
-  }
+  /**
+   * Dump the header map to the ostream specified
+   *
+   * @param os the stream to dump state to
+   * @param indent_level the depth, for pretty-printing.
+   *
+   * This function is called on Envoy fatal errors so should avoid memory allocation where possible.
+   */
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
 
   /**
    * Allow easy pretty-printing of the key/value pairs in HeaderMap
@@ -546,7 +541,7 @@ public:
    * @param headers the headers to print.
    */
   friend std::ostream& operator<<(std::ostream& os, const HeaderMap& headers) {
-    headers.logState(os);
+    headers.dumpState(os);
     return os;
   }
 };

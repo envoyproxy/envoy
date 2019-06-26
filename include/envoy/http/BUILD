@@ -76,7 +76,6 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
-        "//source/common/common:log_state_utils",
     ],
 )
 

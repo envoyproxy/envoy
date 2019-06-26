@@ -9,10 +9,10 @@ namespace Envoy {
 //
 // This is split out of signal_action.h because it is exempted from various
 // builds.
-class CrashHandlerInterface {
+class FatalErrorHandlerInterface {
 public:
-  virtual ~CrashHandlerInterface() = default;
-  virtual void crashHandler() const PURE;
+  virtual ~FatalErrorHandlerInterface() = default;
+  virtual void onFatalError() const PURE;
 };
 
 } // namespace Envoy

@@ -204,7 +204,7 @@ public:
   /**
    * Sets a tracked object, which is currently operating in this Dispatcher.
    * This should be cleared with another call to setTrackedObject() when the object is done doing
-   * work.
+   * work. Calling setTrackedObject(nullptr) results in no object being tracked.
    *
    * @return The previously tracked object or nullptr if there was none.
    */

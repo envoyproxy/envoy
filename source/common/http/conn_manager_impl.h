@@ -28,8 +28,8 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/linked_object.h"
-#include "common/common/log_state_utils.h"
 #include "common/grpc/common.h"
 #include "common/http/conn_manager_config.h"
 #include "common/http/user_agent.h"
@@ -421,17 +421,17 @@ private:
     bool verbose() const override;
 
     // ScopeTrackedObject
-    void logState(std::ostream& os, int indent_level = 0) const override {
+    void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
-      os << spaces << "ActiveStream " << this << LOG_MEMBER(stream_id_)
-         << LOG_MEMBER(has_continue_headers_) << LOG_MEMBER(is_head_request_)
-         << LOG_MEMBER(decoding_headers_only_) << LOG_MEMBER(encoding_headers_only_) << "\n";
+      os << spaces << "ActiveStream " << this << DUMP_MEMBER(stream_id_)
+         << DUMP_MEMBER(has_continue_headers_) << DUMP_MEMBER(is_head_request_)
+         << DUMP_MEMBER(decoding_headers_only_) << DUMP_MEMBER(encoding_headers_only_) << "\n";
 
-      LOG_DETAILS(request_headers_);
-      LOG_DETAILS(request_trailers_);
-      LOG_DETAILS(response_headers_);
-      LOG_DETAILS(response_trailers_);
-      LOG_DETAILS(&stream_info_);
+      DUMP_DETAILS(request_headers_);
+      DUMP_DETAILS(request_trailers_);
+      DUMP_DETAILS(response_headers_);
+      DUMP_DETAILS(response_trailers_);
+      DUMP_DETAILS(&stream_info_);
     }
 
     void traceRequest();
@@ -512,7 +512,7 @@ private:
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
 
     friend std::ostream& operator<<(std::ostream& os, const ActiveStream& s) {
-      s.logState(os);
+      s.dumpState(os);
       return os;
     }
 

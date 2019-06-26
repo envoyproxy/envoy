@@ -43,13 +43,13 @@ DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& 
       post_timer_(createTimerInternal([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
 #ifdef ENVOY_HANDLE_SIGNALS
-  SignalAction::registerCrashHandler(*this);
+  SignalAction::registerFatalErrorHandler(*this);
 #endif
 }
 
 DispatcherImpl::~DispatcherImpl() {
 #ifdef ENVOY_HANDLE_SIGNALS
-  SignalAction::removeCrashHandler(*this);
+  SignalAction::removeFatalErrorHandler(*this);
 #endif
 }
 

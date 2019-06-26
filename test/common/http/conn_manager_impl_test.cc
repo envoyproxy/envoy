@@ -4320,7 +4320,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
         .WillOnce(Invoke([](const ScopeTrackedObject* object) -> const ScopeTrackedObject* {
           ASSERT(object != nullptr); // On the first call, this should be the active stream.
           std::stringstream out;
-          object->logState(out);
+          object->dumpState(out);
           std::string state = out.str();
           EXPECT_THAT(state, testing::HasSubstr("request_headers_: null"));
           EXPECT_THAT(state, testing::HasSubstr("protocol_: 1"));
@@ -4342,7 +4342,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
         .WillOnce(Invoke([](const ScopeTrackedObject* object) -> const ScopeTrackedObject* {
           ASSERT(object != nullptr); // On the first call, this should be the active stream.
           std::stringstream out;
-          object->logState(out);
+          object->dumpState(out);
           std::string state = out.str();
           EXPECT_THAT(state, testing::HasSubstr("request_headers_: \n"));
           EXPECT_THAT(state, testing::HasSubstr("':authority', 'host'\n"));

@@ -34,13 +34,13 @@ TEST(SignalsDeathTest, InvalidAddressDeathTest) {
       "backtrace.*Segmentation fault");
 }
 
-class TestCrashHandler : public CrashHandlerInterface {
-  virtual void crashHandler() const override { std::cerr << "HERE!"; }
+class TestFatalErrorHandler : public FatalErrorHandlerInterface {
+  virtual void onFatalError() const override { std::cerr << "HERE!"; }
 };
 
 TEST(SignalsDeathTest, RegisteredHandlerTest) {
-  TestCrashHandler handler;
-  SignalAction::registerCrashHandler(handler);
+  TestFatalErrorHandler handler;
+  SignalAction::registerFatalErrorHandler(handler);
   SignalAction actions;
   EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
@@ -49,7 +49,7 @@ TEST(SignalsDeathTest, RegisteredHandlerTest) {
         *(nasty_ptr) = 0;
       }(),
       "backtrace.*Segmentation fault");
-  SignalAction::removeCrashHandler(handler);
+  SignalAction::removeFatalErrorHandler(handler);
 
   /*  SignalAction actions;
     EXPECT_DEATH_LOG_TO_STDERR(

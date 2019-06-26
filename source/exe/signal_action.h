@@ -8,7 +8,7 @@
 
 #include "common/common/non_copyable.h"
 
-#include "exe/crash_handler.h"
+#include "exe/fatal_error_handler.h"
 
 #include "server/backtrace.h"
 
@@ -78,13 +78,13 @@ public:
    * Add this handler to the list of functions which will be called if Envoy
    * receives a fatal signal.
    */
-  static void registerCrashHandler(const CrashHandlerInterface& handler);
+  static void registerFatalErrorHandler(const FatalErrorHandlerInterface& handler);
 
   /**
    * Removes this handler from the list of functions which will be called if Envoy
    * receives a fatal signal.
    */
-  static void removeCrashHandler(const CrashHandlerInterface& handler);
+  static void removeFatalErrorHandler(const FatalErrorHandlerInterface& handler);
 
 private:
   /**
@@ -143,7 +143,7 @@ private:
   char* altstack_{};
   std::array<struct sigaction, sizeof(FATAL_SIGS) / sizeof(int)> previous_handlers_;
   stack_t previous_altstack_;
-  std::list<const CrashHandlerInterface*> crash_handlers_;
+  std::list<const FatalErrorHandlerInterface*> fatal_error_handlers_;
 };
 
 } // namespace Envoy

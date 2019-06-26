@@ -4,20 +4,22 @@
 
 namespace Envoy {
 
-#define LOG_MEMBER(member) ", " #member ": " << (member)
+// A collection of macros for pretty printing objects on fatal error.
 
-#define LOG_OPTIONAL_MEMBER(member)                                                                \
+#define DUMP_MEMBER(member) ", " #member ": " << (member)
+
+#define DUMP_OPTIONAL_MEMBER(member)                                                               \
   ", " #member ": " << ((member).has_value() ? absl::StrCat((member).value()) : "null")
 
 // Macro assumes local member variables
 // os (ostream)
 // indent_level (int)
-#define LOG_DETAILS(member)                                                                        \
+#define DUMP_DETAILS(member)                                                                       \
   do {                                                                                             \
     os << spaces << #member ": ";                                                                  \
     if ((member) != nullptr) {                                                                     \
       os << "\n";                                                                                  \
-      (member)->logState(os, indent_level + 1);                                                    \
+      (member)->dumpState(os, indent_level + 1);                                                   \
     } else {                                                                                       \
       os << spaces << "null\n";                                                                    \
     }                                                                                              \
