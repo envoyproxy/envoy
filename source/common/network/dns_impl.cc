@@ -223,6 +223,12 @@ void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
   struct ares_addrinfo_hints hints = {};
   hints.ai_family = family;
 
+  /**
+   * ARES_AI_NOSORT result addresses will not be sorted and no connections to resolved addresses
+   * will be attempted
+   */
+  hints.ai_flags = ARES_AI_NOSORT;
+
   ares_getaddrinfo(
       channel_, dns_name_.c_str(), /* service */ nullptr, &hints,
       [](void* arg, int status, int timeouts, ares_addrinfo* addrinfo) {
