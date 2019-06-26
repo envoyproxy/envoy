@@ -17,7 +17,7 @@ NOBORINGSSL_SKIP_TARGETS = {
     "lua": "envoy.filters.http.lua",
 
     # These two extensions are supposed to be replaced with alternative extensions.
-    "tls": "envoy.filters.http.tls",
+    "tls": "envoy.transport_sockets.tls",
     "tls_inspector": "envoy.filters.listener.tls_inspector",
 }
 
