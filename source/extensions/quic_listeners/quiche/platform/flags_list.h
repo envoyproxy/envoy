@@ -52,10 +52,6 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_bbr_one_mss_conservation, false,
             "When true, ensure BBR allows at least one MSS to be sent in "
             "response to an ACK in packet conservation.")
 
-QUICHE_FLAG(bool, quic_reloadable_flag_quic_bbr_slower_startup3, false,
-            "Add 3 connection options to decrease the pacing and CWND gain in "
-            "QUIC BBR STARTUP.")
-
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_bbr_slower_startup4, false,
             "Enables the BBQ5 connection option, which forces saved aggregation values "
             "to expire when the bandwidth increases more than 25% in QUIC BBR STARTUP.")
@@ -134,10 +130,6 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_fix_termination_packets, false,
             "If true, GFE time wait list will send termination packets based on "
             "current packet's encryption level.")
 
-QUICHE_FLAG(bool, quic_reloadable_flag_quic_fix_time_of_first_packet_sent_after_receiving, false,
-            "When true, fix initialization and updating of "
-            "|time_of_first_packet_sent_after_receiving_| in QuicConnection.")
-
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_limit_window_updates_in_traces, false,
             "Limits the number of window update events recorded in Tracegraf logs.")
 
@@ -183,9 +175,6 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_no_v2_scaling_factor, false,
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_optimize_inflight_check, false,
             "Stop checking QuicUnackedPacketMap::HasUnackedRetransmittableFrames "
             "and instead rely on the existing check that bytes_in_flight > 0")
-
-QUICHE_FLAG(bool, quic_reloadable_flag_quic_print_tag_hex, false,
-            "When true, non-ASCII QUIC tags are printed as hex instead of integers.")
 
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_proxy_check_toss_on_insertion_failure, false,
             "If true, enable the code that fixes a race condition for quic udp "
@@ -292,9 +281,6 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_validate_packet_number_post_decrypti
             "If true, a QUIC endpoint will valid a received packet number after "
             "successfully decrypting the packet.")
 
-QUICHE_FLAG(bool, quic_reloadable_flag_quic_send_version_negotiation_fixed_bit, false,
-            "When true, version negotiation packets sent by the server will set the fixed bit.")
-
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_eliminate_static_stream_map_3, false,
             "If true, static streams in a QuicSession will be stored inside dynamic stream map. "
             "static_stream_map will no longer be used.")
@@ -309,9 +295,6 @@ QUICHE_FLAG(bool, quic_reloadable_flag_send_quic_fallback_server_config_on_leto_
 
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_fix_bbr_cwnd_in_bandwidth_resumption, true,
             " If true, adjust congestion window when doing bandwidth resumption in BBR.")
-
-QUICHE_FLAG(bool, quic_reloadable_flag_quic_no_lumpy_pacing_at_low_bw, false,
-            "If true, disable lumpy pacing for low bandwidth flows.")
 
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_conservative_cwnd_and_pacing_gains, false,
             "If true, uses conservative cwnd gain and pacing gain.")
@@ -340,12 +323,24 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_ignore_tlpr_if_sending_ping, false,
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_terminate_gquic_connection_as_ietf, false,
             "If true, terminate Google QUIC connections similarly as IETF QUIC.")
 
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_disable_version_44, false,
+            "If true, disable QUIC version 44.")
+
+QUICHE_FLAG(
+    bool, quic_reloadable_flag_quic_fix_packets_acked, false,
+    "If true, when detecting losses, use packets_acked of corresponding packet number space.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_ignore_tlpr_if_no_pending_stream_data, false,
+            "If true, ignore TLPR if there is no pending stream data")
+
+QUICHE_FLAG(
+    bool, quic_reloadable_flag_quic_drop_invalid_small_initial_connection_id, false,
+    "When true, QuicDispatcher will drop packets that have an initial destination connection ID "
+    "that is too short, instead of responding with a Version Negotiation packet to reject it.")
+
 QUICHE_FLAG(bool, quic_restart_flag_quic_allow_loas_multipacket_chlo, false,
             "If true, inspects QUIC CHLOs for kLOAS and early creates sessions "
             "to allow multi-packet CHLOs")
-
-QUICHE_FLAG(bool, quic_restart_flag_quic_enable_accept_random_ipn, false,
-            "Allow QUIC to accept initial packet numbers that are random, not 1.")
 
 QUICHE_FLAG(bool, quic_restart_flag_quic_enable_gso_for_udp_egress, false,
             "If 1) flag is true, 2) UDP egress_method is used in GFE config, and "
@@ -393,14 +388,6 @@ QUICHE_FLAG(bool, quic_restart_flag_quic_use_pigeon_socket_to_backend, false,
 QUICHE_FLAG(bool, quic_restart_flag_quic_do_not_override_connection_id, false,
             " When true, QuicFramer will not override connection IDs in headers and will instead "
             "respect the source/destination direction as expected by IETF QUIC.")
-
-QUICHE_FLAG(bool, quic_restart_flag_quic_server_drop_version_negotiation, false,
-            "When true, QUIC server will drop IETF QUIC Version Negotiation packets.")
-
-QUICHE_FLAG(
-    bool, quic_restart_flag_quic_allow_variable_length_connection_id_for_negotiation, false,
-    "When true, allow variable length QUIC connection IDs for unsupported versions. This allows "
-    "performing version negotiation when the client-chosen server connection ID length is not 8")
 
 QUICHE_FLAG(bool, quic_restart_flag_quic_no_framer_object_in_dispatcher, false,
             "If true, make QuicDispatcher no longer have an instance of QuicFramer.")
@@ -469,6 +456,9 @@ QUICHE_FLAG(double, quic_pace_time_into_future_srtt_fraction,
 
 QUICHE_FLAG(bool, quic_export_server_num_packets_per_write_histogram, false,
             "If true, export number of packets written per write operation histogram.")
+
+QUICHE_FLAG(int64_t, quic_headers_stream_id_in_v99, 0,
+            "QUIC version 99 will use this stream ID for the headers stream.")
 
 QUICHE_FLAG(bool, http2_reloadable_flag_http2_testonly_default_false, false,
             "A testonly reloadable flag that will always default to false.")

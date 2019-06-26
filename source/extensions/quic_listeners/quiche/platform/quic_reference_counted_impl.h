@@ -33,8 +33,6 @@ protected:
 
 template <typename T> class QuicReferenceCountedPointerImpl {
 public:
-  static_assert(std::is_base_of<QuicReferenceCountedImpl, T>::value,
-                "T must derive from QuicReferenceCounted");
   QuicReferenceCountedPointerImpl() : refptr_(nullptr, T::destroy) {}
   QuicReferenceCountedPointerImpl(T* p) : refptr_(p, T::destroy) {}
   QuicReferenceCountedPointerImpl(std::nullptr_t) : refptr_(nullptr, T::destroy) {}

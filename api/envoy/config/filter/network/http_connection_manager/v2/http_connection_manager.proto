@@ -490,6 +490,10 @@ message ScopedRoutes {
         // Specifies a header field's key value pair to match on.
         message KvElement {
           // The separator between key and value (e.g., '=' separates 'k=v;...').
+          // If an element is an empty string, the element is ignored.
+          // If an element contains no separator, the whole element is parsed as key and the
+          // fragment value is an empty string.
+          // If there are multiple values for a matched key, the first value is returned.
           string separator = 1 [(validate.rules).string.min_bytes = 1];
 
           // The key to match on.
@@ -498,6 +502,8 @@ message ScopedRoutes {
 
         oneof extract_type {
           // Specifies the zero based index of the element to extract.
+          // Note Envoy concatenates multiple values of the same header key into a comma separated
+          // string, the splitting always happens after the concatenation.
           uint32 index = 3;
 
           // Specifies the key value pair to extract the value from.

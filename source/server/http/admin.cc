@@ -353,6 +353,7 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         envoy::admin::v2alpha::HostStatus& host_status = *cluster_status.add_host_statuses();
         Network::Utility::addressToProtobufAddress(*host->address(),
                                                    *host_status.mutable_address());
+        host_status.set_hostname(host->hostname());
         std::vector<Stats::CounterSharedPtr> sorted_counters;
         for (const Stats::CounterSharedPtr& counter : host->counters()) {
           sorted_counters.push_back(counter);
@@ -401,6 +402,8 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         }
 
         host_status.set_weight(host->weight());
+
+        host_status.set_priority(host->priority());
       }
     }
   }
@@ -433,11 +436,13 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
           all_stats[gauge->name()] = gauge->value();
         }
 
-        for (auto stat : all_stats) {
+        for (const auto& stat : all_stats) {
           response.add(fmt::format("{}::{}::{}::{}\n", cluster.second.get().info()->name(),
                                    host->address()->asString(), stat.first, stat.second));
         }
 
+        response.add(fmt::format("{}::{}::hostname::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->hostname()));
         response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second.get().info()->name(),
                                  host->address()->asString(),
                                  Upstream::HostUtility::healthFlagsToString(*host)));
@@ -454,6 +459,8 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
         response.add(fmt::format("{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),
                                  host->address()->asString(),
                                  host->outlierDetector().successRate()));
+        response.add(fmt::format("{}::{}::priority::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->priority()));
       }
     }
   }
@@ -672,31 +679,13 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-envoy::admin::v2alpha::ServerInfo::State AdminImpl::serverState() {
-  envoy::admin::v2alpha::ServerInfo::State state;
-
-  switch (server_.initManager().state()) {
-  case Init::Manager::State::Uninitialized:
-    state = envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;
-    break;
-  case Init::Manager::State::Initializing:
-    state = envoy::admin::v2alpha::ServerInfo::INITIALIZING;
-    break;
-  case Init::Manager::State::Initialized:
-    state = server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
-                                        : envoy::admin::v2alpha::ServerInfo::LIVE;
-    break;
-  }
-
-  return state;
-}
-
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
   time_t current_time = time(nullptr);
   envoy::admin::v2alpha::ServerInfo server_info;
   server_info.set_version(VersionInfo::version());
-  server_info.set_state(serverState());
+  server_info.set_state(
+      Utility::serverState(server_.initManager().state(), server_.healthCheckFailed()));
 
   server_info.mutable_uptime_current_epoch()->set_seconds(current_time -
                                                           server_.startTimeCurrentEpoch());
@@ -712,7 +701,8 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
 
 Http::Code AdminImpl::handlerReady(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
                                    AdminStream&) {
-  const envoy::admin::v2alpha::ServerInfo::State state = serverState();
+  const envoy::admin::v2alpha::ServerInfo::State state =
+      Utility::serverState(server_.initManager().state(), server_.healthCheckFailed());
 
   response.add(envoy::admin::v2alpha::ServerInfo_State_Name(state) + "\n");
   Http::Code code = state == envoy::admin::v2alpha::ServerInfo_State_LIVE
@@ -757,7 +747,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
       rc = Http::Code::NotFound;
     }
   } else { // Display plain stats if format query param is not there.
-    for (auto stat : all_stats) {
+    for (const auto& stat : all_stats) {
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
     }
     // TODO(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
@@ -769,7 +759,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
         all_histograms.emplace(histogram->name(), histogram->quantileSummary());
       }
     }
-    for (auto histogram : all_histograms) {
+    for (const auto& histogram : all_histograms) {
       response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
     }
   }
@@ -894,7 +884,7 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-  for (auto stat : all_stats) {
+  for (const auto& stat : all_stats) {
     Value stat_obj;
     stat_obj.SetObject();
     Value stat_name;
@@ -1437,6 +1427,20 @@ void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
     handler->addListener(*listener_);
   }
+}
+
+envoy::admin::v2alpha::ServerInfo::State Utility::serverState(Init::Manager::State state,
+                                                              bool health_check_failed) {
+  switch (state) {
+  case Init::Manager::State::Uninitialized:
+    return envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;
+  case Init::Manager::State::Initializing:
+    return envoy::admin::v2alpha::ServerInfo::INITIALIZING;
+  case Init::Manager::State::Initialized:
+    return health_check_failed ? envoy::admin::v2alpha::ServerInfo::DRAINING
+                               : envoy::admin::v2alpha::ServerInfo::LIVE;
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Server

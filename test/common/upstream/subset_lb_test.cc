@@ -38,7 +38,7 @@ public:
   using MetadataVector = std::vector<std::pair<std::string, ProtobufWkt::Value>>;
 
   void test(std::string expected, const MetadataVector& metadata) {
-    SubsetLoadBalancer::SubsetMetadata subset_metadata(metadata);
+    const SubsetLoadBalancer::SubsetMetadata& subset_metadata(metadata);
     EXPECT_EQ(expected, lb_.get()->describeMetadata(subset_metadata));
   }
 
@@ -114,6 +114,7 @@ public:
   }
 
   using HostMetadata = std::map<std::string, std::string>;
+  using HostListMetadata = std::map<std::string, std::vector<std::string>>;
   using HostURLMetadataMap = std::map<std::string, HostMetadata>;
 
   void init() {
@@ -233,6 +234,18 @@ public:
     for (const auto& m_it : metadata) {
       Config::Metadata::mutableMetadataValue(m, Config::MetadataFilters::get().ENVOY_LB, m_it.first)
           .set_string_value(m_it.second);
+    }
+
+    return makeTestHost(info_, url, m);
+  }
+  HostSharedPtr makeHost(const std::string& url, const HostListMetadata& metadata) {
+    envoy::api::v2::core::Metadata m;
+    for (const auto& m_it : metadata) {
+      auto& metadata = Config::Metadata::mutableMetadataValue(
+          m, Config::MetadataFilters::get().ENVOY_LB, m_it.first);
+      for (const auto& value : m_it.second) {
+        metadata.mutable_list_value()->add_values()->set_string_value(value);
+      }
     }
 
     return makeTestHost(info_, url, m);
@@ -632,6 +645,137 @@ TEST_P(SubsetLoadBalancerTest, BalancesSubsetAfterUpdate) {
   EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_12));
   EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+}
+
+TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabled) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  std::vector<SubsetSelectorPtr> subset_selectors = {
+      std::make_shared<SubsetSelector>(SubsetSelector{
+          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+  EXPECT_CALL(subset_info_, listAsAny()).WillRepeatedly(Return(true));
+
+  init({});
+  modifyHosts(
+      {makeHost("tcp://127.0.0.1:8000", {{"version", std::vector<std::string>{"1.2.1", "1.2"}}}),
+       makeHost("tcp://127.0.0.1:8001", {{"version", "1.0"}})},
+      {}, {}, 0);
+
+  {
+    TestLoadBalancerContext context({{"version", "1.0"}});
+    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
+  }
+  {
+    TestLoadBalancerContext context({{"version", "1.2"}});
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+  }
+  TestLoadBalancerContext context({{"version", "1.2.1"}});
+  EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+}
+
+TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabledMultipleLists) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  std::vector<SubsetSelectorPtr> subset_selectors = {
+      std::make_shared<SubsetSelector>(SubsetSelector{
+          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+  EXPECT_CALL(subset_info_, listAsAny()).WillRepeatedly(Return(true));
+
+  init({});
+  modifyHosts(
+      {makeHost("tcp://127.0.0.1:8000", {{"version", std::vector<std::string>{"1.2.1", "1.2"}}}),
+       makeHost("tcp://127.0.0.1:8000", {{"version", std::vector<std::string>{"1.2.2", "1.2"}}}),
+       makeHost("tcp://127.0.0.1:8001", {{"version", "1.0"}})},
+      {}, {}, 0);
+
+  {
+    TestLoadBalancerContext context({{"version", "1.0"}});
+    EXPECT_TRUE(host_set_.hosts()[2] == lb_->chooseHost(&context));
+    EXPECT_TRUE(host_set_.hosts()[2] == lb_->chooseHost(&context));
+  }
+  {
+    // This should LB between both hosts marked with version 1.2.
+    TestLoadBalancerContext context({{"version", "1.2"}});
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
+  }
+  {
+    // Choose a host multiple times to ensure that hosts()[0] is the *only*
+    // thing selected for this subset.
+    TestLoadBalancerContext context({{"version", "1.2.1"}});
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+  }
+
+  TestLoadBalancerContext context({{"version", "1.2.2"}});
+  EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
+}
+
+TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabledMultipleListsForSingleHost) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  std::vector<SubsetSelectorPtr> subset_selectors = {std::make_shared<SubsetSelector>(
+      SubsetSelector{{"version", "hardware"},
+                     envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+  EXPECT_CALL(subset_info_, listAsAny()).WillRepeatedly(Return(true));
+
+  init({});
+  modifyHosts(
+      {makeHost("tcp://127.0.0.1:8000", {{"version", std::vector<std::string>{"1.2.1", "1.2"}},
+                                         {"hardware", std::vector<std::string>{"a", "b"}}}),
+       makeHost("tcp://127.0.0.1:8000", {{"version", std::vector<std::string>{"1.1", "1.1.1"}},
+                                         {"hardware", std::vector<std::string>{"b", "c"}}})},
+      {}, {}, 0);
+
+  {
+    TestLoadBalancerContext context({{"version", "1.2"}, {"hardware", "a"}});
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+  }
+
+  {
+    TestLoadBalancerContext context({{"version", "1.1"}, {"hardware", "b"}});
+    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
+    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
+  }
+
+  {
+    TestLoadBalancerContext context({{"version", "1.1"}, {"hardware", "a"}});
+    EXPECT_TRUE(nullptr == lb_->chooseHost(&context));
+  }
+
+  TestLoadBalancerContext context({{"version", "1.2.1"}, {"hardware", "b"}});
+  EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+  EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+}
+
+TEST_P(SubsetLoadBalancerTest, ListAsAnyDisable) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  std::vector<SubsetSelectorPtr> subset_selectors = {
+      std::make_shared<SubsetSelector>(SubsetSelector{
+          {"version"}, envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED})};
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  init({});
+  modifyHosts(
+      {makeHost("tcp://127.0.0.1:8000", {{"version", std::vector<std::string>{"1.2.1", "1.2"}}}),
+       makeHost("tcp://127.0.0.1:8001", {{"version", "1.0"}})},
+      {}, {}, 0);
+
+  {
+    TestLoadBalancerContext context({{"version", "1.0"}});
+    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
+  }
+  TestLoadBalancerContext context({{"version", "1.2"}});
+  EXPECT_TRUE(nullptr == lb_->chooseHost(&context));
 }
 
 // Test that adding backends to a failover group causes no problems.

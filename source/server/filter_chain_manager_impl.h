@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/server/transport_socket_config.h"
 
 #include "common/common/logger.h"
 #include "common/network/cidr_range.h"
@@ -13,26 +14,29 @@
 namespace Envoy {
 namespace Server {
 
+class FilterChainFactoryBuilder {
+public:
+  virtual ~FilterChainFactoryBuilder() = default;
+  virtual std::unique_ptr<Network::FilterChain>
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const PURE;
+};
+
 /**
  * Implementation of FilterChainManager.
  */
 class FilterChainManagerImpl : public Network::FilterChainManager,
                                Logger::Loggable<Logger::Id::config> {
 public:
+  explicit FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address)
+      : address_(address) {}
+
   // Network::FilterChainManager
   const Network::FilterChain*
   findFilterChain(const Network::ConnectionSocket& socket) const override;
+
   void
-  addFilterChain(uint16_t destination_port, const std::vector<std::string>& destination_ips,
-                 const std::vector<std::string>& server_names,
-                 const std::string& transport_protocol,
-                 const std::vector<std::string>& application_protocols,
-                 const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
-                 const std::vector<std::string>& source_ips,
-                 const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
-                 Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                 std::vector<Network::FilterFactoryCb> filters_factory);
-  void finishFilterChain() { convertIPsToTries(); }
+  addFilterChain(absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
+                 FilterChainFactoryBuilder& b);
   static bool isWildcardServerName(const std::string& name);
 
 private:
@@ -122,12 +126,13 @@ private:
   // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
+  const Network::Address::InstanceConstSharedPtr address_;
 };
 
 class FilterChainImpl : public Network::FilterChain {
 public:
   FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                  std::vector<Network::FilterFactoryCb> filters_factory)
+                  std::vector<Network::FilterFactoryCb>&& filters_factory)
       : transport_socket_factory_(std::move(transport_socket_factory)),
         filters_factory_(std::move(filters_factory)) {}
 

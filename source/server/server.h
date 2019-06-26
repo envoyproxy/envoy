@@ -58,6 +58,7 @@ namespace Server {
   GAUGE(memory_allocated, Accumulate)                                                              \
   GAUGE(memory_heap_size, Accumulate)                                                              \
   GAUGE(parent_connections, Accumulate)                                                            \
+  GAUGE(state, NeverImport)                                                                        \
   GAUGE(total_connections, Accumulate)                                                             \
   GAUGE(uptime, Accumulate)                                                                        \
   GAUGE(version, NeverImport)
@@ -213,6 +214,7 @@ public:
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
+  void flushStatsInternal();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory, ListenerHooks& hooks);
   void loadServerFlags(const absl::optional<std::string>& flags_path);

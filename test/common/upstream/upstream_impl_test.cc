@@ -686,7 +686,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
             cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
   // Ensure that all host objects in the host list are unique.
-  for (const auto host : hosts) {
+  for (const auto& host : hosts) {
     EXPECT_EQ(1, std::count(hosts.begin(), hosts.end(), host));
   }
 
