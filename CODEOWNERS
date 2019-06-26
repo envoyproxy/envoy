@@ -34,3 +34,5 @@
 /*/extensions/filters/network/zookeeper_proxy @rgs1 @snowp
 # redis cluster extension
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
+# HTTP caching extension
+/*/extensions/filters/http/cache @toddmgreer @jmarantz
