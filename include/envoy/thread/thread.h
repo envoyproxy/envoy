@@ -18,7 +18,7 @@ namespace Thread {
 class ThreadId {
 public:
   ThreadId() : id_(std::numeric_limits<int64_t>::min()) {}
-  ThreadId(int64_t id) : id_(id) {}
+  explicit ThreadId(int64_t id) : id_(id) {}
   ~ThreadId() = default;
 
   std::string debugString() const { return std::to_string(id_); }

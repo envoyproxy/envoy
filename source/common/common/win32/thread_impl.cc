@@ -31,6 +31,7 @@ ThreadPtr ThreadFactoryImplWin32::createThread(std::function<void()> thread_rout
 }
 
 ThreadId ThreadFactoryImplWin32::currentThreadId() {
+  // TODO(mhoran,wrowe): test this in windows please.
   return ThreadId(static_cast<int64_t>(::GetCurrentThreadId()));
 }
 
