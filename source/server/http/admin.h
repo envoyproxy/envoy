@@ -224,10 +224,10 @@ private:
   void writeListenersAsText(Buffer::Instance& response);
 
   template <class StatType>
-  static bool shouldShowMetric(const Stats::RefcountPtr<StatType>& metric, const bool used_only,
+  static bool shouldShowMetric(const StatType& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric->used()) &&
-            (!regex.has_value() || std::regex_search(metric->name(), regex.value())));
+    return ((!used_only || metric.used()) &&
+            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
   }
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
@@ -451,10 +451,10 @@ private:
    * not show it if we only wanted used metrics.
    */
   template <class StatType>
-  static bool shouldShowMetric(const Stats::RefcountPtr<StatType>& metric, const bool used_only,
+  static bool shouldShowMetric(const StatType& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric->used()) &&
-            (!regex.has_value() || std::regex_search(metric->name(), regex.value())));
+    return ((!used_only || metric.used()) &&
+            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
   }
 };
 

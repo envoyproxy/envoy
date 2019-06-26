@@ -717,13 +717,13 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
 
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
-    if (shouldShowMetric(counter, used_only, regex)) {
+    if (shouldShowMetric(*counter, used_only, regex)) {
       all_stats.emplace(counter->name(), counter->value());
     }
   }
 
   for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
-    if (shouldShowMetric(gauge, used_only, regex)) {
+    if (shouldShowMetric(*gauge, used_only, regex)) {
       ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
       all_stats.emplace(gauge->name(), gauge->value());
     }
@@ -751,7 +751,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     // implemented this can be switched back to a normal map.
     std::multimap<std::string, std::string> all_histograms;
     for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
-      if (shouldShowMetric(histogram, used_only, regex)) {
+      if (shouldShowMetric(*histogram, used_only, regex)) {
         all_histograms.emplace(histogram->name(), histogram->quantileSummary());
       }
     }
@@ -806,7 +806,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const bool used_only, const absl::optional<std::regex>& regex) {
   std::unordered_set<std::string> metric_type_tracker;
   for (const auto& counter : counters) {
-    if (!shouldShowMetric(counter, used_only, regex)) {
+    if (!shouldShowMetric(*counter, used_only, regex)) {
       continue;
     }
 
@@ -820,7 +820,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   }
 
   for (const auto& gauge : gauges) {
-    if (!shouldShowMetric(gauge, used_only, regex)) {
+    if (!shouldShowMetric(*gauge, used_only, regex)) {
       continue;
     }
 
@@ -834,7 +834,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   }
 
   for (const auto& histogram : histograms) {
-    if (!shouldShowMetric(histogram, used_only, regex)) {
+    if (!shouldShowMetric(*histogram, used_only, regex)) {
       continue;
     }
 
@@ -902,7 +902,7 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   rapidjson::Value histogram_array(rapidjson::kArrayType);
 
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
-    if (shouldShowMetric(histogram, used_only, regex)) {
+    if (shouldShowMetric(*histogram, used_only, regex)) {
       if (!found_used_histogram) {
         // It is not possible for the supported quantiles to differ across histograms, so it is ok
         // to send them once.

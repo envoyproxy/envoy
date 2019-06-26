@@ -35,15 +35,14 @@ public:
     }
   }
 
-  RefcountPtr(const RefcountPtr& src) { set(src.get()); }
+  RefcountPtr(const RefcountPtr& src) : RefcountPtr(src.get()) {}
 
   // Constructor for up-casting reference-counted pointers. This doesn't change
   // the underlying object; it just upcasts the DerivedClass* in src.ptr_ to a
   // BaseClass* for assignment to this->ptr_. For usage of this to compile,
   // DerivedClass* must be assignable to BaseClass* without explicit casts.
-  template <class DerivedClass> RefcountPtr(const RefcountPtr<DerivedClass>& src) {
-    set(src.get());
-  }
+  template <class DerivedClass>
+  RefcountPtr(const RefcountPtr<DerivedClass>& src) : RefcountPtr(src.get()) {}
 
   // Move-construction is used by absl::flat_hash_map during resizes.
   RefcountPtr(RefcountPtr&& src) noexcept : ptr_(src.ptr_) { src.ptr_ = nullptr; }
@@ -51,7 +50,10 @@ public:
   RefcountPtr& operator=(const RefcountPtr& src) {
     if (&src != this && src.ptr_ != ptr_) {
       resetInternal();
-      set(src.get());
+      ptr_ = src.get();
+      if (ptr_ != nullptr) {
+        ptr_->incRefCount();
+      }
     }
     return *this;
   }
@@ -90,13 +92,6 @@ private:
   void resetInternal() {
     if (ptr_ != nullptr && ptr_->decRefCount()) {
       delete ptr_;
-    }
-  }
-
-  void set(T* ptr) {
-    ptr_ = ptr;
-    if (ptr_ != nullptr) {
-      ptr_->incRefCount();
     }
   }
 
