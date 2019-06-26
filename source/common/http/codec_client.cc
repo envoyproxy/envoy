@@ -136,11 +136,12 @@ void CodecClient::onData(Buffer::Instance& data) {
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
                                  Upstream::HostDescriptionConstSharedPtr host,
-                                 Event::Dispatcher& dispatcher)
+                                 Event::Dispatcher& dispatcher, bool validate_header_values)
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case Type::HTTP1: {
-    codec_ = std::make_unique<Http1::ClientConnectionImpl>(*connection_, *this);
+    codec_ =
+        std::make_unique<Http1::ClientConnectionImpl>(*connection_, *this, validate_header_values);
     break;
   }
   case Type::HTTP2: {

@@ -30,7 +30,6 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "//source/common/runtime:runtime_lib",
     ],
 )
 
@@ -57,6 +56,7 @@ envoy_cc_library(
         "//source/common/http:conn_pool_base_lib",
         "//source/common/http:headers_lib",
         "//source/common/network:utility_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/common/upstream:upstream_lib",
     ],
 )

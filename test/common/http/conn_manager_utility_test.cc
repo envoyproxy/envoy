@@ -43,13 +43,15 @@ public:
 
   // Http::ConnectionManagerConfig
   ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance& instance,
-                                  ServerConnectionCallbacks& callbacks) override {
-    return ServerConnectionPtr{createCodec_(connection, instance, callbacks)};
+                                  ServerConnectionCallbacks& callbacks,
+                                  const bool validate_header_values) override {
+    return ServerConnectionPtr{
+        createCodec_(connection, instance, callbacks, validate_header_values)};
   }
 
   MOCK_METHOD0(accessLogs, const std::list<AccessLog::InstanceSharedPtr>&());
-  MOCK_METHOD3(createCodec_, ServerConnection*(Network::Connection&, const Buffer::Instance&,
-                                               ServerConnectionCallbacks&));
+  MOCK_METHOD4(createCodec_, ServerConnection*(Network::Connection&, const Buffer::Instance&,
+                                               ServerConnectionCallbacks&, const bool));
   MOCK_METHOD0(dateProvider, DateProvider&());
   MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());

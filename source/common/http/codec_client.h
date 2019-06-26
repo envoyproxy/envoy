@@ -241,7 +241,8 @@ using CodecClientPtr = std::unique_ptr<CodecClient>;
 class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
+                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
+                  bool validate_header_values);
 };
 
 } // namespace Http
