@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/stats/utility.h"
 
 #include "extensions/filters/network/redis_proxy/config.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -24,9 +25,9 @@ InstanceImpl::InstanceImpl(
     const std::string& cluster_name, Upstream::ClusterManager& cm,
     Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
-    Api::Api& api, Stats::SymbolTable& symbol_table)
+    Api::Api& api, Stats::ScopePtr&& stats_scope)
     : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config),
-      api_(api), symbol_table_(symbol_table) {
+      api_(api), stats_scope_(std::move(stats_scope)) {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
@@ -49,8 +50,8 @@ InstanceImpl::makeRequestToHost(const std::string& host_address,
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
                                                std::string cluster_name)
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
-      drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })) {
-
+      drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
+      is_redis_cluster_(false) {
   cluster_update_handle_ = parent_.cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent_.cm_.get(cluster_name_);
   if (cluster != nullptr) {
@@ -101,6 +102,20 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
     for (auto& host : cluster_->prioritySet().hostSetsPerPriority()[i]->hosts()) {
       host_address_map_[host->address()->asString()] = host;
     }
+  }
+
+  // Figure out if the cluster associated with this ConnPool is a Redis cluster
+  // with its own hash slot sharding scheme and ability to dynamically discover
+  // its members. This is done once to minimize overhead in the data path, makeRequest() in
+  // particular.
+  Upstream::ClusterInfoConstSharedPtr info = cluster_->info();
+  const auto& cluster_type = info->clusterType();
+  is_redis_cluster_ = info->lbType() == Upstream::LoadBalancerType::ClusterProvided &&
+                      cluster_type.has_value() &&
+                      cluster_type->name() == Extensions::Clusters::ClusterTypes::get().Redis;
+  if (is_redis_cluster_) {
+    // "Register" a new statistic so it shows up in statistics with a zero value now.
+    parent_.stats_scope_->counter("upstream_cx_drained");
   }
 }
 
@@ -206,11 +221,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
     return nullptr;
   }
 
-  Upstream::ClusterInfoConstSharedPtr info = cluster_->info();
-  const auto& cluster_type = info->clusterType();
-  const bool use_crc16 = info->lbType() == Upstream::LoadBalancerType::ClusterProvided &&
-                         cluster_type.has_value() &&
-                         cluster_type->name() == Extensions::Clusters::ClusterTypes::get().Redis;
+  const bool use_crc16 = is_redis_cluster_;
   Clusters::Redis::RedisLoadBalancerContext lb_context(key, parent_.config_.enableHashtagging(),
                                                        use_crc16);
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
@@ -306,7 +317,7 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
            it++) {
         if ((*it).get() == this) {
           if (!redis_client_->active()) {
-            parent_.cluster_->info()->stats().upstream_cx_destroy_after_draining_rq_.inc();
+            parent_.parent_.stats_scope_->counter("upstream_cx_drained").inc();
           }
           parent_.dispatcher_.deferredDelete(std::move(redis_client_));
           parent_.clients_to_drain_.erase(it);

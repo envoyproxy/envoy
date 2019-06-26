@@ -81,6 +81,14 @@ following information:
 For topology configuration details, see the Redis Cluster
 :ref:`v2 API reference <envoy_api_msg_config.cluster.redis.RedisClusterConfig>`.
 
+Every Redis cluster has its own extra statistics tree rooted at *cluster.<name>.redis_cluster.* with the following statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  upstream_cx_drained, Counter, Total number of upstream connections drained of active requests before being closed
+
 Supported commands
 ------------------
 

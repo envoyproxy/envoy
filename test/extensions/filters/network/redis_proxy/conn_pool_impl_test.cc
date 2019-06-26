@@ -1,7 +1,6 @@
 #include <memory>
 
 #include "common/network/utility.h"
-#include "common/stats/fake_symbol_table_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/filters/network/common/redis/utility.h"
@@ -49,14 +48,26 @@ public:
       EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
     }
 
+    std::unique_ptr<NiceMock<Stats::MockStore>> store =
+        std::make_unique<NiceMock<Stats::MockStore>>();
     std::unique_ptr<InstanceImpl> conn_pool_impl = std::make_unique<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
         Common::Redis::Client::createConnPoolSettings(20, hashtagging, true, max_unknown_conns),
-        api_, *symbol_table_);
+        api_, std::move(store));
     // Set the authentication password for this connection pool.
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
     conn_pool_ = std::move(conn_pool_impl);
     test_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
+
+    upstream_cx_drained_.value_ = 0;
+    ON_CALL(*statsScope(), counter(Eq("upstream_cx_drained")))
+        .WillByDefault(ReturnRef(upstream_cx_drained_));
+    ON_CALL(upstream_cx_drained_, value()).WillByDefault(Invoke([&]() -> uint64_t {
+      return upstream_cx_drained_.value_;
+    }));
+    ON_CALL(upstream_cx_drained_, inc()).WillByDefault(Invoke([&]() {
+      upstream_cx_drained_.value_++;
+    }));
   }
 
   void makeSimpleRequest(bool create_client, const std::string& hash_key, uint64_t hash_value) {
@@ -124,6 +135,16 @@ public:
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().drainClients();
   }
 
+  Stats::Counter& upstreamCxDrained() {
+    InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
+    return conn_pool_impl->stats_scope_->counter("upstream_cx_drained");
+  }
+
+  NiceMock<Stats::MockStore>* statsScope() {
+    InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
+    return dynamic_cast<NiceMock<Stats::MockStore>*>(conn_pool_impl->stats_scope_.get());
+  }
+
   // Common::Redis::Client::ClientFactory
   Common::Redis::Client::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
                                           const Common::Redis::Client::Config&) override {
@@ -133,7 +154,6 @@ public:
   MOCK_METHOD1(create_, Common::Redis::Client::Client*(Upstream::HostConstSharedPtr host));
 
   const std::string cluster_name_{"fake_cluster"};
-  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   InstanceSharedPtr conn_pool_;
@@ -142,6 +162,7 @@ public:
   Network::Address::InstanceConstSharedPtr test_address_;
   std::string auth_password_;
   NiceMock<Api::MockApi> api_;
+  NiceMock<Stats::MockCounter> upstream_cx_drained_;
 };
 
 TEST_F(RedisConnPoolImplTest, Basic) {
@@ -660,8 +681,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
   EXPECT_EQ(clientsToDrain().size(), 0); // client1 has been drained and closed.
   EXPECT_EQ(drainTimer()->enabled(), false);
 
-  EXPECT_EQ(
-      cm_.thread_local_cluster_.info()->stats().upstream_cx_destroy_after_draining_rq_.value(), 1);
+  EXPECT_EQ(upstreamCxDrained().value(), 1);
 
   tls_.shutdownThread();
 }
@@ -741,8 +761,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
   EXPECT_CALL(*client1, active()).WillOnce(Return(true));
   EXPECT_CALL(*client2, active()).WillOnce(Return(true));
 
-  EXPECT_EQ(
-      cm_.thread_local_cluster_.info()->stats().upstream_cx_destroy_after_draining_rq_.value(), 0);
+  EXPECT_EQ(upstreamCxDrained().value(), 0);
 
   tls_.shutdownThread();
 }
@@ -827,8 +846,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
   EXPECT_EQ(clientMap().size(), 0);
   EXPECT_EQ(clientsToDrain().size(), 0);
 
-  EXPECT_EQ(
-      cm_.thread_local_cluster_.info()->stats().upstream_cx_destroy_after_draining_rq_.value(), 0);
+  EXPECT_EQ(upstreamCxDrained().value(), 0);
 
   tls_.shutdownThread();
 }
@@ -839,11 +857,9 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToRedisCluster) {
   cluster_type.emplace();
   cluster_type->set_name("envoy.clusters.redis");
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
-      .Times(2)
-      .WillRepeatedly(ReturnRef(cluster_type));
+      .WillOnce(ReturnRef(cluster_type));
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, lbType())
-      .Times(2)
-      .WillRepeatedly(Return(Upstream::LoadBalancerType::ClusterProvided));
+      .WillOnce(Return(Upstream::LoadBalancerType::ClusterProvided));
 
   setup();
 
@@ -861,11 +877,9 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToRedisClusterHashtag) {
   cluster_type.emplace();
   cluster_type->set_name("envoy.clusters.redis");
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
-      .Times(2)
-      .WillRepeatedly(ReturnRef(cluster_type));
+      .WillOnce(ReturnRef(cluster_type));
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, lbType())
-      .Times(2)
-      .WillRepeatedly(Return(Upstream::LoadBalancerType::ClusterProvided));
+      .WillOnce(Return(Upstream::LoadBalancerType::ClusterProvided));
 
   setup();
 
