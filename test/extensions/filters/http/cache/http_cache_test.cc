@@ -34,8 +34,7 @@ TEST_F(LookupRequestTest, makeLookupResultNoDate) {
       Http::makeHeaderMap({{"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response =
       lookup_request_.makeLookupResult(std::move(response_headers), 0);
-  EXPECT_EQ(CacheEntryStatus::RequiresValidation,
-            lookup_response.cache_entry_status)
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status)
       << formatter_.fromTime(current_time_);
 }
 

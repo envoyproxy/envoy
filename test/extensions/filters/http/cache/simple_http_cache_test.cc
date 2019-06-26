@@ -139,9 +139,8 @@ TEST_F(SimpleHttpCacheTest, Miss) {
 }
 
 TEST_F(SimpleHttpCacheTest, Fresh) {
-  const Http::TestHeaderMapImpl response_headers = {
-      {"date", formatter_.fromTime(current_time_)},
-      {"cache-control", "public, max-age=3600"}};
+  const Http::TestHeaderMapImpl response_headers = {{"date", formatter_.fromTime(current_time_)},
+                                                    {"cache-control", "public, max-age=3600"}};
   // TODO(toddmgreer) Test with various date headers.
   insert("/", response_headers, "");
   time_source_.sleep(std::chrono::seconds(3600));
@@ -150,9 +149,8 @@ TEST_F(SimpleHttpCacheTest, Fresh) {
 }
 
 TEST_F(SimpleHttpCacheTest, Stale) {
-  const Http::TestHeaderMapImpl response_headers = {
-      {"date", formatter_.fromTime(current_time_)},
-      {"cache-control", "public, max-age=3600"}};
+  const Http::TestHeaderMapImpl response_headers = {{"date", formatter_.fromTime(current_time_)},
+                                                    {"cache-control", "public, max-age=3600"}};
   // TODO(toddmgreer) Test with various date headers.
   insert("/", response_headers, "");
   time_source_.sleep(std::chrono::seconds(3601));
