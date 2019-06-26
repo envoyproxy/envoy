@@ -99,6 +99,9 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpPacketInfoOptions()
   options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
       envoy::api::v2::core::SocketOption::STATE_BOUND, ENVOY_RECV_IP_PKT_INFO,
       ENVOY_RECV_IPV6_PKT_INFO, 1));
+  options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
+      envoy::api::v2::core::SocketOption::STATE_BOUND, ENVOY_SEND_IP_PKT_INFO,
+      ENVOY_RECV_IPV6_PKT_INFO, 1));
   return options;
 }
 

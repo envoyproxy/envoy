@@ -92,6 +92,12 @@ namespace Network {
 #define ENVOY_RECV_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_PKTINFO))
 #endif
 
+#ifdef IP_SENDSRCADDR
+#define ENVOY_SEND_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_SENDSRCADDR))
+#elif IP_PKTINFO
+#define ENVOY_SEND_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_PKTINFO))
+#endif
+
 // Both Linux and FreeBSD use IPV6_RECVPKTINFO for both sending source address and
 // receiving destination address.
 #define ENVOY_RECV_IPV6_PKT_INFO                                                                   \
