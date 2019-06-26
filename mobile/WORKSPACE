@@ -112,7 +112,7 @@ git_repository(
     name = "io_bazel_rules_kotlin",
     commit = "af3dea0853f2821e7ece6e028fad57bcd6ce2831",  # from branch ks/bazel-fixups
     remote = "https://github.com/keith/rules_kotlin.git",
-    shallow_since = "1544305265 -0800",
+    shallow_since = "1556831609 -0700",
 )
 
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kotlin_repositories")
