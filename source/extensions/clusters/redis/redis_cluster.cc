@@ -141,6 +141,10 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolve() {
           parent_.onPreInitComplete();
           resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
         } else {
+          // Once the DNS resolve the initial set of addresses, call startResolve on the
+          // RedisDiscoverySession. The RedisDiscoverySession will using the "cluster slots" command
+          // for service discovery and slot allocation. All subsequent discoveries are handled by
+          // RedisDiscoverySession and will not use DNS resolution again.
           parent_.redis_discovery_session_.registerDiscoveryAddress(address_list, port_);
           parent_.redis_discovery_session_.startResolve();
         }
