@@ -98,8 +98,6 @@ public:
   virtual Ssl::ContextManager& sslContextManager() PURE;
 
   /**
-   * TODO(hyang): Remove this and only expose the scope, this would require refactoring
-   * TransportSocketFactoryContext
    * @return the server-wide stats store.
    */
   virtual Stats::Store& stats() PURE;

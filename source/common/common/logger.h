@@ -32,6 +32,7 @@ namespace Logger {
   FUNCTION(dubbo)                \
   FUNCTION(file)                 \
   FUNCTION(filter)               \
+  FUNCTION(forward_proxy)        \
   FUNCTION(grpc)                 \
   FUNCTION(hc)                   \
   FUNCTION(health_checker)       \
@@ -39,6 +40,7 @@ namespace Logger {
   FUNCTION(http2)                \
   FUNCTION(hystrix)              \
   FUNCTION(init)                 \
+  FUNCTION(io)                   \
   FUNCTION(kafka)                \
   FUNCTION(lua)                  \
   FUNCTION(main)                 \

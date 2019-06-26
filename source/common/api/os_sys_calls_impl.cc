@@ -45,6 +45,11 @@ SysCallSizeResult OsSysCallsImpl::recvfrom(int sockfd, void* buffer, size_t leng
   return {rc, errno};
 }
 
+SysCallSizeResult OsSysCallsImpl::recvmsg(int sockfd, struct msghdr* msg, int flags) {
+  const ssize_t rc = ::recvmsg(sockfd, msg, flags);
+  return {rc, errno};
+}
+
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
   const int rc = ::ftruncate(fd, length);
   return {rc, errno};

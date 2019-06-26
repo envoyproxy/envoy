@@ -191,7 +191,7 @@ def checkTools():
                             "users".format(CLANG_FORMAT_PATH))
   else:
     error_messages.append(
-        "Command {} not found. If you have clang-format in version 7.x.x "
+        "Command {} not found. If you have clang-format in version 8.x.x "
         "installed, but the binary name is different or it's not available in "
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"

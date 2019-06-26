@@ -1265,7 +1265,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 }
 
 Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Cluster& cluster) {
-  switch (cluster.dns_lookup_family()) {
+  return getDnsLookupFamilyFromEnum(cluster.dns_lookup_family());
+}
+
+Network::DnsLookupFamily
+getDnsLookupFamilyFromEnum(envoy::api::v2::Cluster::DnsLookupFamily family) {
+  switch (family) {
   case envoy::api::v2::Cluster::V6_ONLY:
     return Network::DnsLookupFamily::V6Only;
   case envoy::api::v2::Cluster::V4_ONLY:

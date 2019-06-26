@@ -257,27 +257,19 @@ public:
              absl::optional<std::reference_wrapper<ProcessObject>> process_object);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
-    while (counter(name) == nullptr || counter(name)->value() != value) {
-      time_system_.sleep(std::chrono::milliseconds(10));
-    }
+    TestUtility::waitForCounterEq(stat_store(), name, value, time_system_);
   }
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
-    while (counter(name) == nullptr || counter(name)->value() < value) {
-      time_system_.sleep(std::chrono::milliseconds(10));
-    }
+    TestUtility::waitForCounterGe(stat_store(), name, value, time_system_);
   }
 
   void waitForGaugeGe(const std::string& name, uint64_t value) override {
-    while (gauge(name) == nullptr || gauge(name)->value() < value) {
-      time_system_.sleep(std::chrono::milliseconds(10));
-    }
+    TestUtility::waitForGaugeGe(stat_store(), name, value, time_system_);
   }
 
   void waitForGaugeEq(const std::string& name, uint64_t value) override {
-    while (gauge(name) == nullptr || gauge(name)->value() != value) {
-      time_system_.sleep(std::chrono::milliseconds(10));
-    }
+    TestUtility::waitForGaugeEq(stat_store(), name, value, time_system_);
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {

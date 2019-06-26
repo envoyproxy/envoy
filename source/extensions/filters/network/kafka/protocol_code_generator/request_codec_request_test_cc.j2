@@ -12,6 +12,7 @@
 #include "extensions/filters/network/kafka/external/requests.h"
 #include "extensions/filters/network/kafka/request_codec.h"
 
+#include "test/extensions/filters/network/kafka/buffer_based_test.h"
 #include "test/extensions/filters/network/kafka/serialization_utilities.h"
 #include "test/mocks/server/mocks.h"
 
@@ -23,31 +24,29 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace RequestCodecRequestTest {
 
-class RequestCodecRequestTest : public testing::Test {
-protected:
-  template <typename T> void putInBuffer(T arg);
+class RequestCodecRequestTest : public testing::Test, public MessageBasedTest<RequestEncoder> {};
 
-  Buffer::OwnedImpl buffer_;
-};
+using RequestCapturingCallback = CapturingCallback<RequestCallback, AbstractRequestSharedPtr,
+  RequestParseFailureSharedPtr>;
 
-{% for request_type in request_types %}
+{% for message_type in message_types %}
 
-// Integration test for {{ request_type.name }} messages.
+// Integration test for {{ message_type.name }} messages.
 
-TEST_F(RequestCodecRequestTest, shouldHandle{{ request_type.name }}Messages) {
+TEST_F(RequestCodecRequestTest, shouldHandle{{ message_type.name }}Messages) {
   // given
-  using RequestUnderTest = Request<{{ request_type.name }}>;
+  using RequestUnderTest = Request<{{ message_type.name }}>;
 
   std::vector<RequestUnderTest> sent;
   int32_t correlation = 0;
 
-  {% for field_list in request_type.compute_field_lists() %}
+  {% for field_list in message_type.compute_field_lists() %}
   for (int i = 0; i < 100; ++i ) {
     const RequestHeader header =
-      { {{ request_type.get_extra('api_key') }}, {{ field_list.version }}, correlation++, "id" };
-    const {{ request_type.name }} data = { {{ field_list.example_value() }} };
+      { {{ message_type.get_extra('api_key') }}, {{ field_list.version }}, correlation++, "id" };
+    const {{ message_type.name }} data = { {{ field_list.example_value() }} };
     const RequestUnderTest request = {header, data};
-    putInBuffer(request);
+    putMessageIntoBuffer(request);
     sent.push_back(request);
   }
   {% endfor %}
@@ -55,16 +54,15 @@ TEST_F(RequestCodecRequestTest, shouldHandle{{ request_type.name }}Messages) {
   const InitialParserFactory& initial_parser_factory = InitialParserFactory::getDefaultInstance();
   const RequestParserResolver& request_parser_resolver =
     RequestParserResolver::getDefaultInstance();
-  const CapturingRequestCallbackSharedPtr request_callback =
-    std::make_shared<CapturingRequestCallback>();
+  const auto callback = std::make_shared<RequestCapturingCallback>();
 
-  RequestDecoder testee{initial_parser_factory, request_parser_resolver, {request_callback}};
+  RequestDecoder testee{initial_parser_factory, request_parser_resolver, {callback}};
 
   // when
   testee.onData(buffer_);
 
   // then
-  const std::vector<AbstractRequestSharedPtr>& received = request_callback->getCaptured();
+  const std::vector<AbstractRequestSharedPtr>& received = callback->getCapturedMessages();
   ASSERT_EQ(received.size(), sent.size());
 
   for (size_t i = 0; i < received.size(); ++i) {
@@ -75,12 +73,6 @@ TEST_F(RequestCodecRequestTest, shouldHandle{{ request_type.name }}Messages) {
   }
 }
 {% endfor %}
-
-template <typename T>
-void RequestCodecRequestTest::putInBuffer(const T arg) {
-  RequestEncoder encoder{buffer_};
-  encoder.encode(arg);
-}
 
 } // namespace RequestCodecRequestTest
 } // namespace Kafka

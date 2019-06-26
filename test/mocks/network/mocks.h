@@ -144,7 +144,7 @@ public:
 
   void onWriteReady(const Socket& socket) override { onWriteReady_(socket); }
 
-  void onReceiveError(const ErrorCode& err_code, int err) override {
+  void onReceiveError(const ErrorCode& err_code, Api::IoError::IoErrorCode err) override {
     onReceiveError_(err_code, err);
   }
 
@@ -152,7 +152,7 @@ public:
 
   MOCK_METHOD1(onWriteReady_, void(const Socket& socket));
 
-  MOCK_METHOD2(onReceiveError_, void(const ErrorCode& err_code, int err));
+  MOCK_METHOD2(onReceiveError_, void(const ErrorCode& err_code, Api::IoError::IoErrorCode err));
 };
 
 class MockDrainDecision : public DrainDecision {
