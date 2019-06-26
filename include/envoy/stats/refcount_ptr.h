@@ -17,6 +17,12 @@ namespace Stats {
 //    uint32_t use_count()
 // It may implement them by delegating to RefcountHelper (see below), or by
 // inheriting from RefcountInterface (see below).
+//
+// TODO(jmarantz): replace this with an absl or std implementation when
+// available. See https://github.com/abseil/abseil-cpp/issues/344, issued June
+// 26, 2019, and http://wg21.link/p0406, issued 2017. Note that the turnaround
+// time for getting an absl API added is measurable in months, and for a std
+// API in years.
 template <class T> class RefcountPtr {
 public:
   RefcountPtr() : ptr_(nullptr) {}
@@ -134,7 +140,16 @@ public:
 // explicit delegation will be needed for each of the three methods.
 struct RefcountHelper {
   // Implements the RefcountInterface API.
-  void incRefCount() { ++ref_count_; }
+  void incRefCount() {
+    // Note: The ++ref_count_ here and --ref_count_ below have implicit memory
+    // orderings of sequentially consistent. Relaxed on addition and
+    // acquire/release on subtraction is the typical use for reference
+    // counting. On x86, the difference in instruction count is minimal, but the
+    // savings are greater on other platforms.
+    //
+    // https://www.boost.org/doc/libs/1_69_0/doc/html/atomic/usage_examples.html#boost_atomic.usage_examples.example_reference_counters
+    ++ref_count_;
+  }
   bool decRefCount() {
     ASSERT(ref_count_ >= 1);
     return --ref_count_ == 0;
