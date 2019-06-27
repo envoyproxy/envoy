@@ -1218,9 +1218,9 @@ fake_cluster::1.2.3.4:80::region::test_region
 fake_cluster::1.2.3.4:80::zone::test_zone
 fake_cluster::1.2.3.4:80::sub_zone::test_sub_zone
 fake_cluster::1.2.3.4:80::canary::false
+fake_cluster::1.2.3.4:80::priority::6
 fake_cluster::1.2.3.4:80::success_rate::43.2
 fake_cluster::1.2.3.4:80::local_origin_success_rate::93.2
-fake_cluster::1.2.3.4:80::priority::6
 )EOF";
   EXPECT_EQ(expected_text, response2.toString());
 }

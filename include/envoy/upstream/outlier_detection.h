@@ -109,7 +109,7 @@ public:
    * and local origin errors, ExternalOrigin type returns success rate for external origin errors
    * and LocalOrigin type returns success rate for local origin errors.
    */
-  virtual double successRate(SuccessRateMonitorType type) PURE;
+  virtual double successRate(SuccessRateMonitorType type) const PURE;
 };
 
 using DetectorHostMonitorPtr = std::unique_ptr<DetectorHostMonitor>;

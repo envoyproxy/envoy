@@ -35,7 +35,7 @@ public:
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
   const absl::optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
-  double successRate(SuccessRateMonitorType) override { return -1; }
+  double successRate(SuccessRateMonitorType) const override { return -1; }
 
 private:
   const absl::optional<MonotonicTime> time_;
@@ -155,12 +155,18 @@ public:
     return last_unejection_time_;
   }
 
-  SuccessRateMonitor& getSRMonitor(SuccessRateMonitorType type) {
+  const SuccessRateMonitor& getSRMonitor(SuccessRateMonitorType type) const {
     return (SuccessRateMonitorType::ExternalOrigin == type) ? external_origin_SR_monitor_
                                                             : local_origin_SR_monitor_;
   }
 
-  double successRate(SuccessRateMonitorType type) override {
+  SuccessRateMonitor& getSRMonitor(SuccessRateMonitorType type) {
+    // Call const version of the same method
+    return const_cast<SuccessRateMonitor&>(
+        const_cast<const DetectorHostMonitorImpl*>(this)->getSRMonitor(type));
+  }
+
+  double successRate(SuccessRateMonitorType type) const override {
     return getSRMonitor(type).getSuccessRate();
   }
   void updateCurrentSuccessRateBucket();
