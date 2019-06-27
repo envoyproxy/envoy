@@ -1,8 +1,9 @@
 #include "common/common/thread.h"
+
 #include "test/test_common/thread_factory_for_test.h"
 
-#include "gmock/gmock.h"
 #include "absl/hash/hash_testing.h"
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace {
