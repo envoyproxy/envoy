@@ -338,6 +338,9 @@ QUICHE_FLAG(
     "When true, QuicDispatcher will drop packets that have an initial destination connection ID "
     "that is too short, instead of responding with a Version Negotiation packet to reject it.")
 
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_version_negotiation_grease, false,
+            "When true, QUIC Version Negotiation packets will randomly include fake versions.")
+
 QUICHE_FLAG(bool, quic_restart_flag_quic_allow_loas_multipacket_chlo, false,
             "If true, inspects QUIC CHLOs for kLOAS and early creates sessions "
             "to allow multi-packet CHLOs")
@@ -459,6 +462,9 @@ QUICHE_FLAG(bool, quic_export_server_num_packets_per_write_histogram, false,
 
 QUICHE_FLAG(int64_t, quic_headers_stream_id_in_v99, 0,
             "QUIC version 99 will use this stream ID for the headers stream.")
+
+QUICHE_FLAG(bool, quic_disable_version_negotiation_grease_randomness, false,
+            "If true, use predictable version negotiation versions.")
 
 QUICHE_FLAG(bool, http2_reloadable_flag_http2_testonly_default_false, false,
             "A testonly reloadable flag that will always default to false.")

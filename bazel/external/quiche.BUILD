@@ -55,7 +55,6 @@ genrule(
 quiche_copt = [
     # Remove these after upstream fix.
     "-Wno-unused-parameter",
-    "-Wno-type-limits",
     # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
     "-Wno-invalid-offsetof",
 ]
@@ -134,6 +133,13 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [":spdy_platform"],
+)
+
+envoy_cc_test_library(
+    name = "spdy_platform_test",
+    hdrs = ["quiche/spdy/platform/api/spdy_test.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:spdy_platform_test_impl_lib"],
 )
 
 envoy_cc_test_library(
@@ -233,6 +239,7 @@ envoy_cc_test_library(
         ":spdy_core_headers_handler_interface_lib",
         ":spdy_core_protocol_lib",
         ":spdy_platform",
+        ":spdy_platform_test",
     ],
 )
 
@@ -429,6 +436,13 @@ cc_proto_library(
     deps = [":quic_core_proto_cached_network_parameters_proto"],
 )
 
+envoy_cc_library(
+    name = "quic_core_proto_cached_network_parameters_proto_header",
+    hdrs = ["quiche/quic/core/proto/cached_network_parameters_proto.h"],
+    repository = "@envoy",
+    deps = [":quic_core_proto_cached_network_parameters_proto_cc"],
+)
+
 proto_library(
     name = "quic_core_proto_source_address_token_proto",
     srcs = ["quiche/quic/core/proto/source_address_token.proto"],
@@ -440,6 +454,13 @@ cc_proto_library(
     deps = [":quic_core_proto_source_address_token_proto"],
 )
 
+envoy_cc_library(
+    name = "quic_core_proto_source_address_token_proto_header",
+    hdrs = ["quiche/quic/core/proto/source_address_token_proto.h"],
+    repository = "@envoy",
+    deps = [":quic_core_proto_source_address_token_proto_cc"],
+)
+
 proto_library(
     name = "quic_core_proto_crypto_server_config_proto",
     srcs = ["quiche/quic/core/proto/crypto_server_config.proto"],
@@ -448,6 +469,13 @@ proto_library(
 cc_proto_library(
     name = "quic_core_proto_crypto_server_config_proto_cc",
     deps = [":quic_core_proto_crypto_server_config_proto"],
+)
+
+envoy_cc_library(
+    name = "quic_core_proto_crypto_server_config_proto_header",
+    hdrs = ["quiche/quic/core/proto/crypto_server_config_proto.h"],
+    repository = "@envoy",
+    deps = [":quic_core_proto_crypto_server_config_proto_cc"],
 )
 
 envoy_cc_library(
@@ -787,7 +815,7 @@ envoy_cc_library(
         ":quic_core_packet_writer_interface_lib",
         ":quic_core_packets_lib",
         ":quic_core_pending_retransmission_lib",
-        ":quic_core_proto_cached_network_parameters_proto_cc",
+        ":quic_core_proto_cached_network_parameters_proto_header",
         ":quic_core_sent_packet_manager_lib",
         ":quic_core_time_lib",
         ":quic_core_types_lib",
@@ -893,9 +921,9 @@ envoy_cc_library(
         ":quic_core_error_codes_lib",
         ":quic_core_lru_cache_lib",
         ":quic_core_packets_lib",
-        ":quic_core_proto_cached_network_parameters_proto_cc",
-        ":quic_core_proto_crypto_server_config_proto_cc",
-        ":quic_core_proto_source_address_token_proto_cc",
+        ":quic_core_proto_cached_network_parameters_proto_header",
+        ":quic_core_proto_crypto_server_config_proto_header",
+        ":quic_core_proto_source_address_token_proto_header",
         ":quic_core_server_id_lib",
         ":quic_core_socket_address_coder_lib",
         ":quic_core_time_lib",
@@ -1294,7 +1322,7 @@ envoy_cc_library(
         ":quic_core_types_lib",
         ":quic_core_utils_lib",
         ":quic_core_versions_lib",
-        ":quic_platform_base",
+        ":quic_platform",
         ":quic_platform_socket_address",
         ":spdy_core_priority_write_scheduler_lib",
     ],
@@ -1360,7 +1388,7 @@ envoy_cc_library(
         ":quic_core_crypto_encryption_lib",
         ":quic_core_packets_lib",
         ":quic_core_pending_retransmission_lib",
-        ":quic_core_proto_cached_network_parameters_proto_cc",
+        ":quic_core_proto_cached_network_parameters_proto_header",
         ":quic_core_sustained_bandwidth_recorder_lib",
         ":quic_core_transmission_info_lib",
         ":quic_core_types_lib",
@@ -1720,6 +1748,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
+        ":quic_core_crypto_random_lib",
         ":quic_core_tag_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
@@ -1830,7 +1859,10 @@ envoy_cc_test(
     name = "spdy_platform_api_test",
     srcs = ["quiche/spdy/platform/api/spdy_string_utils_test.cc"],
     repository = "@envoy",
-    deps = [":spdy_platform"],
+    deps = [
+        ":spdy_platform",
+        ":spdy_platform_test",
+    ],
 )
 
 envoy_cc_library(
