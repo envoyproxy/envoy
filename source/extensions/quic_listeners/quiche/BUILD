@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["envoy_quic_alarm.cc"],
     hdrs = ["envoy_quic_alarm.h"],
     external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
     deps = [
         "//include/envoy/event:timer_interface",
         "@com_googlesource_quiche//:quic_core_alarm_interface_lib",
@@ -24,6 +25,7 @@ envoy_cc_library(
     srcs = ["envoy_quic_alarm_factory.cc"],
     hdrs = ["envoy_quic_alarm_factory.h"],
     external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
     deps = [
         ":envoy_quic_alarm_lib",
         "@com_googlesource_quiche//:quic_core_alarm_factory_interface_lib",
@@ -36,6 +38,7 @@ envoy_cc_library(
     name = "envoy_quic_proof_source_lib",
     hdrs = ["envoy_quic_fake_proof_source.h"],
     external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
     deps = [
         "@com_googlesource_quiche//:quic_core_crypto_proof_source_interface_lib",
         "@com_googlesource_quiche//:quic_core_versions_lib",
