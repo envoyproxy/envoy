@@ -246,7 +246,7 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
 
   # gcovr is a pain to run with `bazel run`, so package it up into a
   # relocatable and hermetic-ish .par file.
-  bazel build @com_github_gcovr_gcovr//:gcovr.par
+  bazel build --python_version=PY2 @com_github_gcovr_gcovr//:gcovr.par
   export GCOVR="/tmp/gcovr.par"
   cp -f "${ENVOY_SRCDIR}/bazel-bin/external/com_github_gcovr_gcovr/gcovr.par" ${GCOVR}
 

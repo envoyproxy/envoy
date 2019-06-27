@@ -10,6 +10,7 @@ Version history
 * admin: the administration interface now includes a :ref:`/ready endpoint <operations_admin_interface>` for easier readiness checks.
 * admin: extend :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to support parameters within the request body.
 * admin: the :ref:`/listener endpoint <operations_admin_interface_listeners>` now returns :ref:`listeners.proto<envoy_api_msg_admin.v2alpha.Listeners>` which includes listener names and ports.
+* admin: added host priority to :http:get:`/clusters` and :http:get:`/clusters?format=json` end point response
 * admin: the :ref:`/clusters endpoint <operations_admin_interface_clusters>` now shows hostname
   for each host, useful for DNS based clusters.
 * api: track and report requests issued since last load report.
@@ -36,6 +37,7 @@ Version history
 * http: changed `sendLocalReply` to send percent-encoded `GrpcMessage`.
 * http: added :ref:`dynamic forward proxy <arch_overview_http_dynamic_forward_proxy>` support.
 * jwt_authn: make filter's parsing of JWT more flexible, allowing syntax like ``jwt=eyJhbGciOiJS...ZFnFIw,extra=7,realm=123``
+* outlier_detector: added configuration :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>` to distinguish locally and externally generated errors. See :ref:`arch_overview_outlier_detection` for full details.
 * listener: added :ref:`source IP <envoy_api_field_listener.FilterChainMatch.source_prefix_ranges>`
   and :ref:`source port <envoy_api_field_listener.FilterChainMatch.source_ports>` filter
   chain matching.
@@ -71,6 +73,9 @@ Version history
 * sandbox: added :ref:`CSRF sandbox <install_sandboxes_csrf>`.
 * server: ``--define manual_stamp=manual_stamp`` was added to allow server stamping outside of binary rules.
   more info in the `bazel docs <https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#enabling-optional-features>`_.
+* subset: added :ref:`list_as_any<envoy_api_field_Cluster.LbSubsetConfig.list_as_any>` option to
+  the subset lb which allows matching metadata against any of the values in a list value
+  on the endpoints.
 * server: added :ref:`Server State <statistics>` statistic.
 * tool: added :repo:`proto <test/tools/router_check/validation.proto>` support for :ref:`router check tool <install_tools_route_table_check_tool>` tests.
 * tracing: add trace sampling configuration to the route, to override the route level.
