@@ -30,7 +30,7 @@ touch $@
 
 alias(
     name = "android_aar",
-    actual = "//library:android_aar",
+    actual = "//library/kotlin/io/envoyproxy/envoymobile:android_aar",
 )
 
 genrule(
