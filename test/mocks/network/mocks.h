@@ -322,6 +322,7 @@ public:
   MockListener();
   ~MockListener();
 
+  MOCK_METHOD0(onDestroy, void());
   MOCK_METHOD0(enable, void());
   MOCK_METHOD0(disable, void());
 };
@@ -428,6 +429,7 @@ public:
   MockUdpListener();
   ~MockUdpListener();
 
+  MOCK_METHOD0(onDestroy, void());
   MOCK_METHOD0(enable, void());
   MOCK_METHOD0(disable, void());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());

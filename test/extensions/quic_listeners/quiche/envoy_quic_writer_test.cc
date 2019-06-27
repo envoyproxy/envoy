@@ -20,10 +20,11 @@ public:
     quic::QuicIpAddress peer_ip;
     peer_ip.FromString("127.0.0.1");
     peer_address_ = quic::QuicSocketAddress(peer_ip, /*port=*/123);
+    EXPECT_CALL(udp_listener_, onDestroy());
   }
 
 protected:
-  testing::NiceMock<Network::MockUdpListener> udp_listener_;
+  Network::MockUdpListener udp_listener_;
   quic::QuicIpAddress self_address_;
   quic::QuicSocketAddress peer_address_;
   EnvoyQuicPacketWriter envoy_quic_writer_;
