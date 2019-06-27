@@ -154,8 +154,7 @@ NSString *_ENDPOINT = @"http://localhost:9001/api.lyft.com/static/demo/hello_wor
 
   Result *result = self.results[indexPath.row];
   if (result.error == nil) {
-    cell.textLabel.text =
-        [NSString stringWithFormat:@"[%d] %@", result.identifier, result.body];
+    cell.textLabel.text = [NSString stringWithFormat:@"[%d] %@", result.identifier, result.body];
     cell.detailTextLabel.text =
         [NSString stringWithFormat:@"'Server' header: %@", result.serverHeader];
 
@@ -163,8 +162,7 @@ NSString *_ENDPOINT = @"http://localhost:9001/api.lyft.com/static/demo/hello_wor
     cell.detailTextLabel.textColor = [UIColor blackColor];
     cell.contentView.backgroundColor = [UIColor whiteColor];
   } else {
-    cell.textLabel.text =
-        [NSString stringWithFormat:@"[%d]", result.identifier];
+    cell.textLabel.text = [NSString stringWithFormat:@"[%d]", result.identifier];
     cell.detailTextLabel.text = result.error;
 
     cell.textLabel.textColor = [UIColor whiteColor];
