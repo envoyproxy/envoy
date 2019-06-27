@@ -367,7 +367,7 @@ TestPrivateKeyMethodProvider::TestPrivateKeyMethodProvider(
     method_->decrypt = ecdsaPrivateKeyDecrypt;
     method_->complete = ecdsaPrivateKeyComplete;
   } else {
-    throw EnvoyException("Unknown test provider mode.");
+    throw EnvoyException("Unknown test provider mode, supported modes are \"rsa\" and \"ecdsa\".");
   }
 
   pkey_ = std::move(pkey);
