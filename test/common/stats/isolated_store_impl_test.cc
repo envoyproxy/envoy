@@ -3,6 +3,8 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/stats/isolated_store_impl.h"
+#include "common/stats/null_counter.h"
+#include "common/stats/null_gauge.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"

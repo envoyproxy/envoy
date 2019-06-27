@@ -7,6 +7,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/matchers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -36,7 +37,11 @@ struct CsrfStats {
 class CsrfPolicy : public Router::RouteSpecificFilterConfig {
 public:
   CsrfPolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
-             Runtime::Loader& runtime) : policy_(policy), runtime_(runtime) {}
+             Runtime::Loader& runtime) : policy_(policy), runtime_(runtime) {
+    for (const auto& additional_origin : policy.additional_origins()) {
+      additional_origins_.emplace_back(Matchers::StringMatcher(additional_origin));
+    }
+  }
 
   bool enabled() const {
     const envoy::api::v2::core::RuntimeFractionalPercent& filter_enabled = policy_.filter_enabled();
@@ -53,9 +58,13 @@ public:
                                               shadow_enabled.default_value());
   }
 
+  const std::vector<Matchers::StringMatcher>& additional_origins() const { return additional_origins_; };
+
 private:
   const envoy::config::filter::http::csrf::v2::CsrfPolicy policy_;
+  std::vector<Matchers::StringMatcher> additional_origins_;
   Runtime::Loader& runtime_;
+
 };
 
 /**
@@ -97,6 +106,7 @@ public:
 
 private:
   void determinePolicy();
+  bool isValid(const absl::string_view source_origin, Http::HeaderMap& headers);
 
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   CsrfFilterConfigSharedPtr config_;

@@ -539,14 +539,16 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(500))).Times(AtLeast(1));
   onReceiveMessage(160);
   EXPECT_EQ(12, stats_.counter("control_plane.rate_limit_enforced").value());
-  EXPECT_EQ(12, stats_.counter("control_plane.pending_requests").value());
+  Stats::Gauge& pending_requests =
+      stats_.gauge("control_plane.pending_requests", Stats::Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(12, pending_requests.value());
 
   // Validate that drain requests call when there are multiple requests in queue.
   time_system_.setMonotonicTime(std::chrono::seconds(10));
   drain_timer_cb();
 
   // Check that the pending_requests stat is updated with the queue drain.
-  EXPECT_EQ(0, stats_.counter("control_plane.pending_requests").value());
+  EXPECT_EQ(0, pending_requests.value());
 }
 
 //  Verifies that a message with no resources is accepted.
