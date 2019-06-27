@@ -1047,7 +1047,14 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 
   NiceMock<Upstream::Outlier::MockDetector> outlier_detector;
   ON_CALL(Const(cluster), outlierDetector()).WillByDefault(Return(&outlier_detector));
-  ON_CALL(outlier_detector, successRateEjectionThreshold()).WillByDefault(Return(6.0));
+  ON_CALL(outlier_detector,
+          successRateEjectionThreshold(
+              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
+      .WillByDefault(Return(6.0));
+  ON_CALL(outlier_detector,
+          successRateEjectionThreshold(
+              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))
+      .WillByDefault(Return(9.0));
 
   ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(true));
 
@@ -1090,8 +1097,14 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL))
       .WillByDefault(Return(true));
 
-  ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
+  ON_CALL(
+      host->outlier_detector_,
+      successRate(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
+      .WillByDefault(Return(43.2));
   ON_CALL(*host, weight()).WillByDefault(Return(5));
+  ON_CALL(host->outlier_detector_,
+          successRate(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))
+      .WillByDefault(Return(93.2));
   ON_CALL(*host, priority()).WillByDefault(Return(6));
 
   Buffer::OwnedImpl response;
@@ -1107,6 +1120,9 @@ TEST_P(AdminInstanceTest, ClustersJson) {
    "name": "fake_cluster",
    "success_rate_ejection_threshold": {
     "value": 6
+   },
+   "local_origin_success_rate_ejection_threshold": {
+    "value": 9
    },
    "added_via_api": true,
    "host_statuses": [
@@ -1157,7 +1173,10 @@ TEST_P(AdminInstanceTest, ClustersJson) {
      },
      "weight": 5,
      "hostname": "foo.com",
-     "priority": 6
+     "priority": 6,
+     "local_origin_success_rate": {
+      "value": 93.2
+     }
     }
    ]
   }
@@ -1176,6 +1195,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters", header_map, response2));
   const std::string expected_text = R"EOF(fake_cluster::outlier::success_rate_average::0
 fake_cluster::outlier::success_rate_ejection_threshold::6
+fake_cluster::outlier::local_origin_success_rate_average::0
+fake_cluster::outlier::local_origin_success_rate_ejection_threshold::9
 fake_cluster::default_priority::max_connections::1
 fake_cluster::default_priority::max_pending_requests::1024
 fake_cluster::default_priority::max_requests::1024
@@ -1197,8 +1218,9 @@ fake_cluster::1.2.3.4:80::region::test_region
 fake_cluster::1.2.3.4:80::zone::test_zone
 fake_cluster::1.2.3.4:80::sub_zone::test_sub_zone
 fake_cluster::1.2.3.4:80::canary::false
-fake_cluster::1.2.3.4:80::success_rate::43.2
 fake_cluster::1.2.3.4:80::priority::6
+fake_cluster::1.2.3.4:80::success_rate::43.2
+fake_cluster::1.2.3.4:80::local_origin_success_rate::93.2
 )EOF";
   EXPECT_EQ(expected_text, response2.toString());
 }
