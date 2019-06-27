@@ -15,3 +15,4 @@ Envoy Mobile documentation
     about_docs
     intro/intro
     start/start
+    development/development
