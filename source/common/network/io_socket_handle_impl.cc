@@ -122,7 +122,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
 #else
     // Currently CMSG_SPACE is not constexpr in MAC OS. 48 bytes should be
     // enough for in_pktinfo or in6_pktinfo.
-    char cbuf[CMSG_SPACE(sizeof(struct in_addr))]{0};
+    char cbuf[48]{0};
 #endif
     message.msg_control = cbuf;
     cmsghdr* cmsg = CMSG_FIRSTHDR(&message);
