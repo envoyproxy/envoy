@@ -25,7 +25,7 @@ int64_t getCurrentThreadId() {
 } // namespace
 
 ThreadImplPosix::ThreadImplPosix(std::function<void()> thread_routine)
-    : thread_routine_(thread_routine) {
+    : thread_routine_(std::move(thread_routine)) {
   RELEASE_ASSERT(Logger::Registry::initialized(), "");
   const int rc = pthread_create(
       &thread_handle_, nullptr,

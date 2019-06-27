@@ -20,7 +20,7 @@ public:
    * @param interval WatchDog timer interval (used after startWatchdog())
    */
   WatchDogImpl(Thread::ThreadId thread_id, TimeSource& tsource, std::chrono::milliseconds interval)
-      : thread_id_(std::move(thread_id)), time_source_(tsource),
+      : thread_id_(thread_id), time_source_(tsource),
         latest_touch_time_since_epoch_(tsource.monotonicTime().time_since_epoch()),
         timer_interval_(interval) {}
 
