@@ -558,8 +558,14 @@ def fixBuildPath(file_path):
     sys.stdout.write(fixBuildLine(line, file_path))
 
   error_messages = []
+
+  run_build_fixer = True
+  for excluded_path in build_fixer_check_excluded_paths:
+    if file_path.startswith(excluded_path):
+      run_build_fixer = False
+
   # TODO(htuch): Add API specific BUILD fixer script.
-  if not isApiFile(file_path) and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
+  if run_build_fixer and not isApiFile(file_path) and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
 
@@ -570,7 +576,13 @@ def fixBuildPath(file_path):
 
 def checkBuildPath(file_path):
   error_messages = []
-  if not isApiFile(file_path) and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
+
+  run_build_fixer = True
+  for excluded_path in build_fixer_check_excluded_paths:
+    if file_path.startswith(excluded_path):
+      run_build_fixer = False
+
+  if run_build_fixer and not isApiFile(file_path) and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
 
@@ -796,6 +808,12 @@ if __name__ == "__main__":
       default=[],
       help="exclude paths from the namespace_check.")
   parser.add_argument(
+      "--build_fixer_check_excluded_paths",
+      type=str,
+      nargs="+",
+      default=[],
+      help="exclude paths from envoy_build_fixer check.")
+  parser.add_argument(
       "--include_dir_order",
       type=str,
       default=",".join(common.includeDirOrder()),
@@ -807,6 +825,7 @@ if __name__ == "__main__":
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
   namespace_check = args.namespace_check
   namespace_check_excluded_paths = args.namespace_check_excluded_paths
+  build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths
   include_dir_order = args.include_dir_order
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
