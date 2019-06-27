@@ -4,7 +4,8 @@
 namespace Envoy {
 namespace Server {
 
-Ssl::ContextManagerPtr createContextManager(TimeSource& time_source);
+Ssl::ContextManagerPtr createContextManager(const std::string& factory_name,
+                                            TimeSource& time_source);
 
 } // namespace Server
 } // namespace Envoy

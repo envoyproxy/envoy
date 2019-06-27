@@ -17,7 +17,7 @@ TEST(SslContextManager, createStub) {
   Ssl::MockServerContextConfig server_config;
   std::vector<std::string> server_names;
 
-  Ssl::ContextManagerPtr manager = createContextManager(time_system);
+  Ssl::ContextManagerPtr manager = createContextManager("fake_factory_name", time_system);
 
   // check we've created a stub
   EXPECT_EQ(manager->daysUntilFirstCertExpires(), std::numeric_limits<int>::max());
