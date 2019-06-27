@@ -130,7 +130,7 @@ static ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t
   }
 
   if (ops->test_options_.crypto_error_) {
-    // Flip the bits in the first byte of the digest the handshake to fail.
+    // Flip the bits in the first byte of the digest so that the handshake will fail.
     hash[0] ^= hash[0];
   }
 
