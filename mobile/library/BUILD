@@ -22,20 +22,11 @@ aar_with_jni(
 kt_android_library(
     name = "android_lib",
     srcs = [
-        "java/io/envoyproxy/envoymobile/engine/EnvoyEngine.java",
         "kotlin/io/envoyproxy/envoymobile/Envoy.kt",
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_srcs",
     ],
     custom_package = "io.envoyproxy.envoymobile",
     manifest = "kotlin/io/envoyproxy/envoymobile/EnvoyManifest.xml",
     visibility = ["//visibility:public"],
-    deps = ["envoy_engine_lib"],
-)
-
-android_library(
-    name = "envoy_engine_lib",
-    srcs = ["java/io/envoyproxy/envoymobile/engine/EnvoyEngine.java"],
-    custom_package = "io.envoyproxy.envoymobile.engine",
-    manifest = "java/io/envoyproxy/envoymobile/engine/EnvoyEngineManifest.xml",
-    visibility = ["//visibility:public"],
-    deps = ["//library/common:envoy_jni_interface_lib"],
+    deps = ["//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib"],
 )
