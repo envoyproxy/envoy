@@ -159,20 +159,20 @@ config_setting(
 )
 
 config_setting(
-    name = "enable_quiche",
-    values = {"define": "quiche=enabled"},
+    name = "boringssl_disabled",
+    values = {"define": "boringssl=disabled"},
 )
 
 config_setting(
-    name = "disable_boringssl",
-    define_values = {
-        "boringssl": "disable",
-    },
+    name = "enable_quiche",
+    values = {"define": "quiche=enabled"},
 )
 
 # Alias pointing to the selected version of BoringSSL:
 # - BoringSSL FIPS from @boringssl_fips//:ssl,
 # - non-FIPS BoringSSL from @boringssl//:ssl.
+# In case of disabled BoringSSL the @boringssl repository can be remapped to an
+# alternative one in WORKSPACE of the corresponding third party TLS extension.
 alias(
     name = "boringssl",
     actual = select({
