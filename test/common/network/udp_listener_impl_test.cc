@@ -40,12 +40,6 @@ public:
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());
     server_socket_->addOptions(SocketOptionFactory::buildRxQueueOverFlowOptions());
 
-    std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
-    options->push_back(std::make_shared<Network::SocketOptionImpl>(
-        envoy::api::v2::core::SocketOption::STATE_BOUND,
-        Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_FREEBIND)), 1));
-    server_socket_->addOptions(std::move(options));
-
     listener_ = std::make_unique<UdpListenerImpl>(
         dispatcherImpl(), *server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
   }
@@ -61,8 +55,12 @@ protected:
   }
 
   SocketPtr createServerSocket(bool bind) {
+    std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+    options->push_back(std::make_shared<Network::SocketOptionImpl>(
+        envoy::api::v2::core::SocketOption::STATE_PREBIND,
+        Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_FREEBIND)), 1));
     return std::make_unique<NetworkListenSocket<NetworkSocketTrait<Address::SocketType::Datagram>>>(
-        Network::Test::getAnyAddress(version_), nullptr, bind);
+        Network::Test::getAnyAddress(version_), std::move(options), bind);
   }
 
   SocketPtr createClientSocket(bool bind) {
@@ -375,7 +373,7 @@ TEST_P(UdpListenerImplTest, SendData) {
     // only checks if IoSocketHandle::sendmsg() sets up CMSG_DATA correctly,
     // i.e. cmsg_len is big enough when that code path is executed.
     send_from_addr.reset(
-        new Address::Ipv6Instance("::1", server_socket_->localAddress()->ip()->port()));
+        new Address::Ipv6Instance("::9", server_socket_->localAddress()->ip()->port()));
   }
 
   UdpSendData send_data{send_from_addr->ip(), client_socket_->localAddress(), *buffer};
