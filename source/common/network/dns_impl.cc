@@ -116,10 +116,6 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     ares_freeaddrinfo(addrinfo);
   }
 
-  if (addrinfo) {
-    ares_freeaddrinfo(addrinfo);
-  }
-
   if (timeouts > 0) {
     ENVOY_LOG(debug, "DNS request timed out {} times", timeouts);
   }

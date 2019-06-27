@@ -190,7 +190,7 @@ TestUtility::makeDnsResponse(const std::list<std::string>& addresses,
     ret.emplace_back(Network::DnsResponse(Network::Utility::parseInternetAddress(address), ttl));
   }
   return ret;
-} // namespace Envoy
+}
 
 std::vector<std::string> TestUtility::listFiles(const std::string& path, bool recursive) {
   std::vector<std::string> file_names;

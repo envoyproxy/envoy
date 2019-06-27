@@ -57,10 +57,6 @@ private:
      * @param addrinfo structure to store address info.
      */
     void onAresGetAddrInfoCallback(int status, int timeouts, ares_addrinfo* addrinfo);
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/master
     /**
      * wrapper function of call to ares_getaddrinfo.
      * @param family currently AF_INET and AF_INET6 are supported.
