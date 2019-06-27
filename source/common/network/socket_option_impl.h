@@ -85,18 +85,15 @@ namespace Network {
 // Linux uses IP_PKTINFO for both sending source address and receiving destination
 // address.
 // FreeBSD uses IP_RECVDSTADDR for receiving destination address and IP_SENDSRCADDR for sending
-// source address.
+// source address. And these two have same value for convenience purpose.
 #ifdef IP_RECVDSTADDR
-#define ENVOY_RECV_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_RECVDSTADDR))
+static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
+#define ENVOY_IP_PKTINFO IP_RECVDSTADDR
 #elif IP_PKTINFO
-#define ENVOY_RECV_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_PKTINFO))
+#define ENVOY_IP_PKTINFO IP_PKTINFO
 #endif
 
-#ifdef IP_SENDSRCADDR
-#define ENVOY_SEND_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_SENDSRCADDR))
-#elif IP_PKTINFO
-#define ENVOY_SEND_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_PKTINFO))
-#endif
+#define ENVOY_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, ENVOY_IP_PKTINFO))
 
 // Both Linux and FreeBSD use IPV6_RECVPKTINFO for both sending source address and
 // receiving destination address.

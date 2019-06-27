@@ -55,12 +55,10 @@ protected:
   }
 
   SocketPtr createServerSocket(bool bind) {
-    std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
-    options->push_back(std::make_shared<Network::SocketOptionImpl>(
-        envoy::api::v2::core::SocketOption::STATE_PREBIND,
-        Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_FREEBIND)), 1));
+    // Set IP_FREEBIND to allow sendmsg to send with nonlocal IPv6 source address.
     return std::make_unique<NetworkListenSocket<NetworkSocketTrait<Address::SocketType::Datagram>>>(
-        Network::Test::getAnyAddress(version_), std::move(options), bind);
+        Network::Test::getAnyAddress(version_), SocketOptionFactory::buildIpFreebindOptions(),
+        bind);
   }
 
   SocketPtr createClientSocket(bool bind) {
