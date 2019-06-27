@@ -601,7 +601,7 @@ optimizations
 ostream
 outlier
 outliers
-offsetoff
+offsetof
 overridable
 param
 parameterizable
