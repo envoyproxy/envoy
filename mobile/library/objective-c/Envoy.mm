@@ -6,14 +6,10 @@ static NSString *const kConfig = @"config";
 static NSString *const kLogLevel = @"logLevel";
 
 static NSString *const kLogLevelToString[] = {
-  [EnvoyLogLevelTrace] = @"trace",
-  [EnvoyLogLevelDebug] = @"debug",
-  [EnvoyLogLevelInfo] = @"info",
-  [EnvoyLogLevelWarn] = @"warn",
-  [EnvoyLogLevelError] = @"error",
-  [EnvoyLogLevelCritical] = @"critical",
-  [EnvoyLogLevelOff] = @"off"
-};
+    [EnvoyLogLevelTrace] = @"trace", [EnvoyLogLevelDebug] = @"debug",
+    [EnvoyLogLevelInfo] = @"info",   [EnvoyLogLevelWarn] = @"warn",
+    [EnvoyLogLevelError] = @"error", [EnvoyLogLevelCritical] = @"critical",
+    [EnvoyLogLevelOff] = @"off"};
 
 @interface Envoy ()
 @property (nonatomic, strong) NSThread *runner;
@@ -32,8 +28,8 @@ static NSString *const kLogLevelToString[] = {
   self = [super init];
   if (self) {
     NSDictionary *args = @{
-      kConfig: config,
-      kLogLevel: kLogLevelToString[logLevel],
+      kConfig : config,
+      kLogLevel : kLogLevelToString[logLevel],
     };
     self.runner = [[NSThread alloc] initWithTarget:self selector:@selector(run:) object:args];
     [self.runner start];
@@ -56,10 +52,10 @@ static NSString *const kLogLevelToString[] = {
     run_envoy([args[kConfig] UTF8String], [args[kLogLevel] UTF8String]);
   } catch (NSException *e) {
     NSLog(@"Envoy exception: %@", e);
-    NSDictionary *userInfo = @{ @"exception": e};
+    NSDictionary *userInfo = @{@"exception" : e};
     [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyException"
-                                        object:self
-                                        userInfo:userInfo];
+                                                      object:self
+                                                    userInfo:userInfo];
   }
 }
 
