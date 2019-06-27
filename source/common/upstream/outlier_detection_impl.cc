@@ -110,12 +110,11 @@ absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result resu
   case Result::EXT_ORIGIN_REQUEST_FAILED:
     http_code = Http::Code::InternalServerError;
     break;
-  /* LOCAL_ORIGIN_CONNECT_SUCCESS  is used is 2-layer protocols, like HTTP.
-     First connection is established and then higher level protocol runs.
-     If error happens in higher layer protocol, it will be mapped to
-     HTTP code indicating error. In order not to intervene with result of
-     higher layer protocol, this code is not mapped to HTTP code.
-  */
+    // LOCAL_ORIGIN_CONNECT_SUCCESS  is used is 2-layer protocols, like HTTP.
+    // First connection is established and then higher level protocol runs.
+    // If error happens in higher layer protocol, it will be mapped to
+    // HTTP code indicating error. In order not to intervene with result of
+    // higher layer protocol, this code is not mapped to HTTP code.
   case Result::LOCAL_ORIGIN_CONNECT_SUCCESS:
     return absl::nullopt;
   }
@@ -127,7 +126,7 @@ absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result resu
 // are not treated differently. All errors are mapped to HTTP codes.
 // Depending on the value of the parameter *code* the function behaves differently:
 // - if the *code* is not defined, mapping uses resultToHttpCode method to do mapping.
-// - if *code* is non-zero, it is taken as HTTP code and reported as such to outlier detector.
+// - if *code* is defined, it is taken as HTTP code and reported as such to outlier detector.
 void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
                                                             absl::optional<uint64_t> code) {
   if (code) {
@@ -160,7 +159,6 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
   case Result::EXT_ORIGIN_REQUEST_FAILED:
     // map it to http code and call http handler.
     return putHttpResponseCode(enumToInt(Http::Code::ServiceUnavailable));
-    break;
   // EXT_ORIGIN_REQUEST_SUCCESS is used to report that transaction with non-http server was
   // completed successfully. This means that connection and server level transactions were
   // successful. Map it to http code 200 OK and indicate that there was no errors on connection
