@@ -160,7 +160,7 @@ private:
 
     ~DnsDiscoveryResolveTarget();
 
-    void startResolve();
+    void startResolveDns();
 
     RedisCluster& parent_;
     Network::ActiveDnsQuery* active_query_{};
@@ -201,7 +201,7 @@ private:
         const uint32_t port);
 
     // Start discovery against a random host from existing hosts
-    void startResolve();
+    void startResolveRedis();
 
     // Extensions::NetworkFilters::Common::Redis::Client::Config
     bool disableOutlierEvents() const override { return true; }

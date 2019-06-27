@@ -420,7 +420,7 @@ protected:
           return &active_dns_query_;
         }));
     ;
-    resolver_target.startResolve();
+    resolver_target.startResolveDns();
 
     EXPECT_CALL(active_dns_query_, cancel());
   }
@@ -431,10 +431,10 @@ protected:
     discovery_session.registerDiscoveryAddress(
         TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"})), 22120);
     expectRedisResolve(true);
-    discovery_session.startResolve();
+    discovery_session.startResolveRedis();
 
-    // 2nd startResolve() call will be a no-opt until the first startResolve is done.
-    discovery_session.startResolve();
+    // 2nd startResolveRedis() call will be a no-opt until the first startResolve is done.
+    discovery_session.startResolveRedis();
 
     // Make sure cancel is called.
     EXPECT_CALL(pool_request_, cancel());
