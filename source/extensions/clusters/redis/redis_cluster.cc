@@ -134,7 +134,8 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
         if (address_list.empty()) {
           parent_.info_->stats().update_empty_.inc();
           if (!resolve_timer_) {
-            resolve_timer_ = parent_.dispatcher_.createTimer([this]() -> void { startResolveDns(); });
+            resolve_timer_ =
+                parent_.dispatcher_.createTimer([this]() -> void { startResolveDns(); });
           }
           // if the initial dns resolved to empty, we'll skip the redis discovery phase and treat it
           // as an empty cluster.
