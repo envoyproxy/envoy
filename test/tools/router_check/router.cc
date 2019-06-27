@@ -72,7 +72,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
 
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
-
+  
   return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
                          std::move(api));
 }
@@ -82,13 +82,19 @@ RouterCheckTool::RouterCheckTool(
     std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
     Api::ApiPtr api)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
-      stats_(std::move(stats)), api_(std::move(api)) {}
+      stats_(std::move(stats)), api_(std::move(api)) {
+        EXPECT_CALL(
+          factory_context_->runtime_loader_.snapshot_,
+          featureEnabled(_, testing::An<const envoy::type::FractionalPercent &>(), testing::An<uint64_t>()))
+        .WillRepeatedly(testing::Invoke(this, &RouterCheckTool::runtimeMock));
+      }
 
 // TODO(jyotima): Remove this code path once the json schema code path is deprecated.
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json, *api_);
+  
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
-
+  
   bool no_failures = true;
   for (const Json::ObjectSharedPtr& check_config : loader->asObjectArray()) {
     headers_finalized_ = false;
@@ -165,6 +171,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
   bool no_failures = true;
   for (const envoy::RouterCheckToolSchema::ValidationItem& check_config :
        validation_config.tests()) {
+    active_runtime = check_config.input().runtime();
     headers_finalized_ = false;
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
@@ -394,6 +401,17 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
               << "], test type: " << test_type << std::endl;
   }
   return false;
+}
+
+bool RouterCheckTool::runtimeMock(const std::string& key,
+                             testing::Unused,
+                             testing::Unused) {
+  if(active_runtime.empty()) {
+    return false;
+  }
+
+
+  return active_runtime.compare(key) == 0;
 }
 
 Options::Options(int argc, char** argv) {
