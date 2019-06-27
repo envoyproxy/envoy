@@ -72,7 +72,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
 
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
-  
+
   return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
                          std::move(api));
 }
@@ -94,7 +94,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
   Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json, *api_);
   
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
-  
+
   bool no_failures = true;
   for (const Json::ObjectSharedPtr& check_config : loader->asObjectArray()) {
     headers_finalized_ = false;
