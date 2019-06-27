@@ -353,11 +353,13 @@ def isSkylarkFile(file_path):
 def isWorkspaceFile(file_path):
   return os.path.basename(file_path) == "WORKSPACE"
 
+
 def isBuildFixerExcludedFile(file_path):
   for excluded_path in build_fixer_check_excluded_paths:
     if file_path.startswith(excluded_path):
       return True
   return False
+
 
 def hasInvalidAngleBracketDirectory(line):
   if not line.startswith(INCLUDE_ANGLE):
