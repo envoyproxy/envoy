@@ -56,7 +56,7 @@ void RdsJson::translateRateLimit(const Json::Object& json_rate_limit,
   JSON_UTIL_SET_INTEGER(json_rate_limit, rate_limit, stage);
   JSON_UTIL_SET_STRING(json_rate_limit, rate_limit, disable_key);
   const auto actions = json_rate_limit.getObjectArray("actions");
-  for (const auto json_action : actions) {
+  for (const auto& json_action : actions) {
     auto* action = rate_limit.mutable_actions()->Add();
     const std::string type = json_action->getString("type");
     if (type == "source_cluster") {
@@ -119,7 +119,7 @@ void RdsJson::translateRouteConfiguration(const Json::Object& json_route_config,
                                           envoy::api::v2::RouteConfiguration& route_config) {
   json_route_config.validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
 
-  for (const auto json_virtual_host : json_route_config.getObjectArray("virtual_hosts", true)) {
+  for (const auto& json_virtual_host : json_route_config.getObjectArray("virtual_hosts", true)) {
     auto* virtual_host = route_config.mutable_virtual_hosts()->Add();
     translateVirtualHost(*json_virtual_host, *virtual_host);
   }
@@ -129,7 +129,7 @@ void RdsJson::translateRouteConfiguration(const Json::Object& json_route_config,
     route_config.add_internal_only_headers(header);
   }
 
-  for (const auto header_value :
+  for (const auto& header_value :
        json_route_config.getObjectArray("response_headers_to_add", true)) {
     auto* header_value_option = route_config.mutable_response_headers_to_add()->Add();
     BaseJson::translateHeaderValueOption(*header_value, *header_value_option);
@@ -140,7 +140,8 @@ void RdsJson::translateRouteConfiguration(const Json::Object& json_route_config,
     route_config.add_response_headers_to_remove(header);
   }
 
-  for (const auto header_value : json_route_config.getObjectArray("request_headers_to_add", true)) {
+  for (const auto& header_value :
+       json_route_config.getObjectArray("request_headers_to_add", true)) {
     auto* header_value_option = route_config.mutable_request_headers_to_add()->Add();
     BaseJson::translateHeaderValueOption(*header_value, *header_value_option);
   }
@@ -159,7 +160,7 @@ void RdsJson::translateVirtualHost(const Json::Object& json_virtual_host,
     virtual_host.add_domains(domain);
   }
 
-  for (const auto json_route : json_virtual_host.getObjectArray("routes", true)) {
+  for (const auto& json_route : json_virtual_host.getObjectArray("routes", true)) {
     auto* route = virtual_host.mutable_routes()->Add();
     translateRoute(*json_route, *route);
   }
@@ -169,18 +170,19 @@ void RdsJson::translateVirtualHost(const Json::Object& json_virtual_host,
       StringUtil::toUpper(json_virtual_host.getString("require_ssl", "")), &tls_requirement);
   virtual_host.set_require_tls(tls_requirement);
 
-  for (const auto json_virtual_cluster :
+  for (const auto& json_virtual_cluster :
        json_virtual_host.getObjectArray("virtual_clusters", true)) {
     auto* virtual_cluster = virtual_host.mutable_virtual_clusters()->Add();
     translateVirtualCluster(*json_virtual_cluster, *virtual_cluster);
   }
 
-  for (const auto json_rate_limit : json_virtual_host.getObjectArray("rate_limits", true)) {
+  for (const auto& json_rate_limit : json_virtual_host.getObjectArray("rate_limits", true)) {
     auto* rate_limit = virtual_host.mutable_rate_limits()->Add();
     translateRateLimit(*json_rate_limit, *rate_limit);
   }
 
-  for (const auto header_value : json_virtual_host.getObjectArray("request_headers_to_add", true)) {
+  for (const auto& header_value :
+       json_virtual_host.getObjectArray("request_headers_to_add", true)) {
     auto* header_value_option = virtual_host.mutable_request_headers_to_add()->Add();
     BaseJson::translateHeaderValueOption(*header_value, *header_value_option);
   }
@@ -226,12 +228,12 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::rou
                                        *match->mutable_runtime_fraction());
   }
 
-  for (const auto json_header_matcher : json_route.getObjectArray("headers", true)) {
+  for (const auto& json_header_matcher : json_route.getObjectArray("headers", true)) {
     auto* header_matcher = match->mutable_headers()->Add();
     translateHeaderMatcher(*json_header_matcher, *header_matcher);
   }
 
-  for (const auto json_query_parameter_matcher :
+  for (const auto& json_query_parameter_matcher :
        json_route.getObjectArray("query_parameters", true)) {
     auto* query_parameter_matcher = match->mutable_query_parameters()->Add();
     translateQueryParameterMatcher(*json_query_parameter_matcher, *query_parameter_matcher);
@@ -308,12 +310,12 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::rou
                           &priority);
     action->set_priority(priority);
 
-    for (const auto header_value : json_route.getObjectArray("request_headers_to_add", true)) {
+    for (const auto& header_value : json_route.getObjectArray("request_headers_to_add", true)) {
       auto* header_value_option = route.mutable_request_headers_to_add()->Add();
       BaseJson::translateHeaderValueOption(*header_value, *header_value_option);
     }
 
-    for (const auto json_rate_limit : json_route.getObjectArray("rate_limits", true)) {
+    for (const auto& json_rate_limit : json_route.getObjectArray("rate_limits", true)) {
       auto* rate_limit = action->mutable_rate_limits()->Add();
       translateRateLimit(*json_rate_limit, *rate_limit);
     }

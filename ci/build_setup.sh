@@ -32,7 +32,7 @@ mkdir -p "${FAKE_HOME}"
 export HOME="${FAKE_HOME}"
 export PYTHONUSERBASE="${FAKE_HOME}"
 
-export BUILD_DIR=/build
+export BUILD_DIR=${BUILD_DIR:-/build}
 if [[ ! -d "${BUILD_DIR}" ]]
 then
   echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}? Creating."
@@ -57,7 +57,7 @@ rm -f "${SENTINEL}"
 
 # Environment setup.
 export USER=bazel
-export TEST_TMPDIR=/build/tmp
+export TEST_TMPDIR=${BUILD_DIR}/tmp
 export BAZEL="bazel"
 
 if [[ -f "/etc/redhat-release" ]]
@@ -71,9 +71,10 @@ fi
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
   --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
-  --jobs=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile ${BAZEL_BUILD_EXTRA_OPTIONS}"
-export BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HOME --test_env=PYTHONUSERBASE \
-  --cache_test_results=no --test_output=all ${BAZEL_EXTRA_TEST_OPTIONS}"
+  --jobs=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile \
+  --test_env=HOME --test_env=PYTHONUSERBASE --cache_test_results=no --test_output=all \
+  ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
+
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
 
 if [ "$1" != "-nofetch" ]; then

@@ -1,9 +1,10 @@
 #include "common/api/os_sys_calls_impl.h"
 
-#include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#include <cerrno>
 
 namespace Envoy {
 namespace Api {
@@ -41,6 +42,11 @@ SysCallSizeResult OsSysCallsImpl::recv(int socket, void* buffer, size_t length, 
 SysCallSizeResult OsSysCallsImpl::recvfrom(int sockfd, void* buffer, size_t length, int flags,
                                            struct sockaddr* addr, socklen_t* addrlen) {
   const ssize_t rc = ::recvfrom(sockfd, buffer, length, flags, addr, addrlen);
+  return {rc, errno};
+}
+
+SysCallSizeResult OsSysCallsImpl::recvmsg(int sockfd, struct msghdr* msg, int flags) {
+  const ssize_t rc = ::recvmsg(sockfd, msg, flags);
   return {rc, errno};
 }
 

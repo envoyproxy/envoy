@@ -28,10 +28,10 @@ MockEncoder::MockEncoder() {
           }));
 }
 
-MockEncoder::~MockEncoder() {}
+MockEncoder::~MockEncoder() = default;
 
-MockDecoder::MockDecoder() {}
-MockDecoder::~MockDecoder() {}
+MockDecoder::MockDecoder() = default;
+MockDecoder::~MockDecoder() = default;
 
 namespace Client {
 
@@ -45,13 +45,13 @@ MockClient::MockClient() {
   }));
 }
 
-MockClient::~MockClient() {}
+MockClient::~MockClient() = default;
 
-MockPoolRequest::MockPoolRequest() {}
-MockPoolRequest::~MockPoolRequest() {}
+MockPoolRequest::MockPoolRequest() = default;
+MockPoolRequest::~MockPoolRequest() = default;
 
-MockPoolCallbacks::MockPoolCallbacks() {}
-MockPoolCallbacks::~MockPoolCallbacks() {}
+MockPoolCallbacks::MockPoolCallbacks() = default;
+MockPoolCallbacks::~MockPoolCallbacks() = default;
 
 } // namespace Client
 

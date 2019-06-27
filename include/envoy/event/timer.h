@@ -58,7 +58,7 @@ using SchedulerPtr = std::unique_ptr<Scheduler>;
  */
 class TimeSystem : public TimeSource {
 public:
-  virtual ~TimeSystem() = default;
+  ~TimeSystem() override = default;
 
   using Duration = MonotonicTime::duration;
 

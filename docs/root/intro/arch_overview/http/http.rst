@@ -8,3 +8,4 @@ HTTP
   http_filters
   http_routing
   websocket
+  http_proxy

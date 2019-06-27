@@ -153,6 +153,34 @@ Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::str
   return findByName(store.gauges(), name);
 }
 
+void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
+                                   Event::TestTimeSystem& time_system) {
+  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+void TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
+                                   Event::TestTimeSystem& time_system) {
+  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+void TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
+                                 Event::TestTimeSystem& time_system) {
+  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+void TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
+                                 Event::TestTimeSystem& time_system) {
+  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
 std::list<Network::Address::InstanceConstSharedPtr>
 TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
   std::list<Network::Address::InstanceConstSharedPtr> ret;
@@ -287,7 +315,7 @@ std::string TestUtility::convertTime(const std::string& input, const std::string
 }
 
 // static
-bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr> gauges) {
+bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges) {
   // Returns true if all gauges are 0 except the circuit_breaker remaining resource
   // gauges which default to the resource max.
   std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
@@ -357,11 +385,10 @@ const uint32_t Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
 const uint32_t Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
 const uint32_t Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE;
 
-TestHeaderMapImpl::TestHeaderMapImpl() : HeaderMapImpl() {}
+TestHeaderMapImpl::TestHeaderMapImpl() = default;
 
 TestHeaderMapImpl::TestHeaderMapImpl(
-    const std::initializer_list<std::pair<std::string, std::string>>& values)
-    : HeaderMapImpl() {
+    const std::initializer_list<std::pair<std::string, std::string>>& values) {
   for (auto& value : values) {
     addCopy(value.first, value.second);
   }

@@ -7,6 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v2.listener";
 option go_package = "listener";
 option csharp_namespace = "Envoy.Api.V2.ListenerNS";
+option ruby_package = "Envoy::Api::V2::ListenerNS";
 
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/auth/cert.proto";

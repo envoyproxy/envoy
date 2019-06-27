@@ -160,7 +160,7 @@ ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value) {
   }
 
   std::string address = array[0].asString();
-  bool ipv6 = (address.find(":") != std::string::npos);
+  bool ipv6 = (address.find(':') != std::string::npos);
   if (ipv6) {
     return std::make_shared<Network::Address::Ipv6Instance>(address, array[1].asInteger());
   }

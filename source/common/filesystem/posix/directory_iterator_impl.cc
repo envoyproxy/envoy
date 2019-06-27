@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Filesystem {
 
 DirectoryIteratorImpl::DirectoryIteratorImpl(const std::string& directory_path)
-    : DirectoryIterator(), directory_path_(directory_path), dir_(nullptr),
+    : directory_path_(directory_path), dir_(nullptr),
       os_sys_calls_(Api::OsSysCallsSingleton::get()) {
   openDirectory();
   nextEntry();

@@ -107,7 +107,7 @@ class ListMatcher : public ValueMatcher {
 public:
   ListMatcher(const envoy::type::matcher::ListMatcher& matcher);
 
-  bool match(const ProtobufWkt::Value& value) const;
+  bool match(const ProtobufWkt::Value& value) const override;
 
 private:
   const envoy::type::matcher::ListMatcher matcher_;

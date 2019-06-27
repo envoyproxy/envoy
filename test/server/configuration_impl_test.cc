@@ -380,9 +380,9 @@ TEST(InitialImplTest, LayeredRuntime) {
         health_check:
           min_interval: 5
     - name: root
-      disk_layer: { symlink_root: /srv/runtime/current/envoy }
+      disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy }
     - name: override
-      disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
+      disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy_override, append_service_cluster: true }
     - name: admin
       admin_layer: {}
   )EOF";
@@ -448,9 +448,9 @@ TEST(InitialImplTest, DeprecatedRuntimeTranslation) {
       health_check:
         min_interval: 5
   - name: root
-    disk_layer: { symlink_root: /srv/runtime/current/envoy }
+    disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy }
   - name: override
-    disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
+    disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy_override, append_service_cluster: true }
   - name: admin
     admin_layer: {}
   )EOF";
