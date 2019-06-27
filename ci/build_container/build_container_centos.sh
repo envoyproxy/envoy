@@ -12,8 +12,8 @@ yum install -y devtoolset-7-gcc devtoolset-7-gcc-c++ devtoolset-7-binutils java-
 ln -s /usr/bin/cmake3 /usr/bin/cmake
 ln -s /usr/bin/ninja-build /usr/bin/ninja
 
-BAZEL_VERSION="$(curl -s https://api.github.com/repos/bazelbuild/bazel/releases/latest |
-    python -c "import json, sys; print json.load(sys.stdin)['tag_name']")"
+# Work-around for the bazel 0.27.0 issue: bazelbuild/bazel#8652
+BAZEL_VERSION=0.26.1
 BAZEL_INSTALLER="bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh"
 curl -OL "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/${BAZEL_INSTALLER}"
 chmod u+x "./${BAZEL_INSTALLER}"
