@@ -26,7 +26,6 @@ class SslContextManagerStub final : public Envoy::Ssl::ContextManager {
 };
 
 Ssl::ContextManagerPtr createContextManager(TimeSource& time_source) {
-
   Ssl::ContextManagerFactory* factory =
       Registry::FactoryRegistry<Ssl::ContextManagerFactory>::getFactory(
           Ssl::ContextManagerFactory::name());
