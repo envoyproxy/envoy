@@ -37,7 +37,6 @@ public:
 
 private:
   friend class DnsResolverImplPeer;
-
   struct PendingResolution : public ActiveDnsQuery {
     // Network::ActiveDnsQuery
     PendingResolution(ResolveCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
