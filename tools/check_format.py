@@ -353,6 +353,11 @@ def isSkylarkFile(file_path):
 def isWorkspaceFile(file_path):
   return os.path.basename(file_path) == "WORKSPACE"
 
+def isBuildFixerExcludedFile(file_path):
+  for excluded_path in build_fixer_check_excluded_paths:
+    if file_path.startswith(excluded_path):
+      return True
+  return False
 
 def hasInvalidAngleBracketDirectory(line):
   if not line.startswith(INCLUDE_ANGLE):
@@ -565,7 +570,7 @@ def fixBuildPath(file_path):
       run_build_fixer = False
 
   # TODO(htuch): Add API specific BUILD fixer script.
-  if run_build_fixer and not isApiFile(file_path) and not isSkylarkFile(
+  if not isBuildFixerExcludedFile(file_path) and not isApiFile(file_path) and not isSkylarkFile(
       file_path) and not isWorkspaceFile(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
@@ -578,12 +583,7 @@ def fixBuildPath(file_path):
 def checkBuildPath(file_path):
   error_messages = []
 
-  run_build_fixer = True
-  for excluded_path in build_fixer_check_excluded_paths:
-    if file_path.startswith(excluded_path):
-      run_build_fixer = False
-
-  if run_build_fixer and not isApiFile(file_path) and not isSkylarkFile(
+  if not isBuildFixerExcludedFile(file_path) and not isApiFile(file_path) and not isSkylarkFile(
       file_path) and not isWorkspaceFile(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
