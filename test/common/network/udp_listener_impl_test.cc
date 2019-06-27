@@ -365,11 +365,7 @@ TEST_P(UdpListenerImplTest, SendData) {
     send_from_addr.reset(
         new Address::Ipv4Instance("127.1.2.3", server_socket_->localAddress()->ip()->port()));
   } else {
-    // IPv6 doesn't allow any nonlocal source address for sendmsg. And the only
-    // local address guaranteed in tests in loopback. Unfortunately, even if it's not
-    // specified, kernel will pick this address as source address. So this test
-    // only checks if IoSocketHandle::sendmsg() sets up CMSG_DATA correctly,
-    // i.e. cmsg_len is big enough when that code path is executed.
+    // Witout IP_FREEBIND this is a EINVAL error.
     send_from_addr.reset(
         new Address::Ipv6Instance("::9", server_socket_->localAddress()->ip()->port()));
   }
