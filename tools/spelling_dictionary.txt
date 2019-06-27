@@ -164,6 +164,7 @@ NOAUTH
 NOLINT
 NOLINTNEXTLINE
 NONCES
+NOSORT
 NS
 NUL
 Nilsson
@@ -289,6 +290,7 @@ WS
 Welford's
 Werror
 XDS
+getaddrinfo
 sendto
 vip
 xDSes
