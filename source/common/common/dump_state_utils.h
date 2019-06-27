@@ -5,6 +5,9 @@
 namespace Envoy {
 
 // A collection of macros for pretty printing objects on fatal error.
+// These are fairly ugly in an attempt to maximize the conditions where fatal error logging occurs,
+// i.e. under the Envoy signal handler if encountering a SIGSEVG due to OOM, where allocating more
+// memory would likely lead to the crash handler itself causing a subeqeuent OOM.
 
 #define DUMP_MEMBER(member) ", " #member ": " << (member)
 
