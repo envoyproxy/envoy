@@ -87,7 +87,9 @@ namespace Network {
 // FreeBSD uses IP_RECVDSTADDR for receiving destination address and IP_SENDSRCADDR for sending
 // source address. And these two have same value for convenience purpose.
 #ifdef IP_RECVDSTADDR
+#ifdef IP_SENDSRCADDR
 static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
+#endif
 #define ENVOY_IP_PKTINFO IP_RECVDSTADDR
 #elif IP_PKTINFO
 #define ENVOY_IP_PKTINFO IP_PKTINFO

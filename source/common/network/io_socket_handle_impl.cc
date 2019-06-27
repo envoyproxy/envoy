@@ -122,17 +122,23 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
 #else
     // Currently CMSG_SPACE is not constexpr in MAC OS. 48 bytes should be
     // enough for in_pktinfo or in6_pktinfo.
-    char cbuf[48]{0};
+    char cbuf[CMSG_SPACE(sizeof(struct in_addr))]{0};
 #endif
     message.msg_control = cbuf;
     cmsghdr* cmsg = CMSG_FIRSTHDR(&message);
     if (self_ip->version() == Address::IpVersion::v4) {
-      cmsg->cmsg_len = CMSG_LEN(sizeof(in_pktinfo));
       cmsg->cmsg_level = IPPROTO_IP;
+#ifndef IP_SENDSRCADDR
+      cmsg->cmsg_len = CMSG_LEN(sizeof(in_pktinfo));
       cmsg->cmsg_type = IP_PKTINFO;
       in_pktinfo* pktinfo = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
       pktinfo->ipi_ifindex = 0;
       pktinfo->ipi_spec_dst.s_addr = self_ip->ipv4()->address();
+#else
+      cmsg->cmsg_type = IP_SENDSRCADDR;
+      cmsg->cmsg_len = CMSG_LEN(sizeof(in_addr));
+      *(reinterpret_cast<struct in_addr*>(CMSG_DATA(cmsg))).s_addr = self_ip->ipv4()->address();
+#endif
     } else if (self_ip->version() == Address::IpVersion::v6) {
       cmsg->cmsg_len = CMSG_LEN(sizeof(in6_pktinfo));
       cmsg->cmsg_level = IPPROTO_IPV6;
