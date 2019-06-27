@@ -1,3 +1,5 @@
+import ./envoy/.bazelrc
+
 build \
   --define=google_grpc=disabled \
   --define=hot_restart=disabled \
