@@ -76,7 +76,7 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
   }
 
   ENVOY_STREAM_LOG(debug, "dubbo router: decoding request", *callbacks_);
-  upstream_request_buffer_.move(ctx->message_origin_data(), ctx->header_size() + ctx->body_size());
+  upstream_request_buffer_.move(ctx->message_origin_data(), ctx->message_size());
 
   upstream_request_ = std::make_unique<UpstreamRequest>(
       *this, *conn_pool, metadata, callbacks_->serializationType(), callbacks_->protocolType());

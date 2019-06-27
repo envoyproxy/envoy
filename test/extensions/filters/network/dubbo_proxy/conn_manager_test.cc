@@ -342,10 +342,10 @@ TEST_F(ConnectionManagerTest, OnDataHandlesHeartbeatEvent) {
         auto result = protocol->decodeHeader(buffer, metadata);
         EXPECT_TRUE(result.second);
         const DubboProxy::ContextImpl& ctx = *static_cast<const ContextImpl*>(result.first.get());
-        EXPECT_TRUE(ctx.is_heartbeat_);
+        EXPECT_TRUE(ctx.is_heartbeat());
         EXPECT_EQ(metadata->response_status(), ResponseStatus::Ok);
         EXPECT_EQ(metadata->message_type(), MessageType::HeartbeatResponse);
-        buffer.drain(ctx.header_size_);
+        buffer.drain(ctx.header_size());
       }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);

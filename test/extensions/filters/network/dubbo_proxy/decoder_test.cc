@@ -41,8 +41,8 @@ public:
             Invoke([=](Buffer::Instance&,
                        MessageMetadataSharedPtr metadata) -> std::pair<ContextSharedPtr, bool> {
               auto context = std::make_shared<ContextImpl>();
-              context->header_size_ = 16;
-              context->body_size_ = body_size;
+              context->set_header_size(16);
+              context->set_body_size(body_size);
               metadata->setMessageType(type);
 
               return std::pair<ContextSharedPtr, bool>(context, true);
@@ -197,8 +197,8 @@ TEST_F(DubboDecoderTest, NeedMoreDataForProtocolBody) {
                           MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
         metadate->setMessageType(MessageType::Response);
         auto context = std::make_shared<ContextImpl>();
-        context->header_size_ = 16;
-        context->body_size_ = 10;
+        context->set_header_size(16);
+        context->set_body_size(10);
         return std::pair<ContextSharedPtr, bool>(context, true);
       }));
   EXPECT_CALL(protocol_, decodeData(_, _, _))
@@ -231,8 +231,8 @@ TEST_F(DubboDecoderTest, decodeResponseMessage) {
                           MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
         metadate->setMessageType(MessageType::Response);
         auto context = std::make_shared<ContextImpl>();
-        context->header_size_ = 16;
-        context->body_size_ = 10;
+        context->set_header_size(16);
+        context->set_body_size(10);
         return std::pair<ContextSharedPtr, bool>(context, true);
       }));
   EXPECT_CALL(protocol_, decodeData(_, _, _))

@@ -102,10 +102,8 @@ ConfigImpl::ConfigImpl(const DubboProxyConfig& config,
           SerializationTypeMapper::lookupSerializationType(config.serialization_type())),
       protocol_type_(ProtocolTypeMapper::lookupProtocolType(config.protocol_type())) {
   auto type = RouteMatcherTypeMapper::lookupRouteMatcherType(config.protocol_type());
-  Router::RouteMatcherPtr matcher =
-      Router::NamedRouteMatcherConfigFactory::getFactory(type).createRouteMatcher(
-          config.route_config(), context);
-  route_matcher_ = std::move(matcher);
+  route_matcher_ = Router::NamedRouteMatcherConfigFactory::getFactory(type).createRouteMatcher(
+      config.route_config(), context);
   if (config.dubbo_filters().empty()) {
     ENVOY_LOG(debug, "using default router filter");
 

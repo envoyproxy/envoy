@@ -30,11 +30,8 @@ public:
 
   const std::string& fromType(ProtocolType type) const {
     const auto& itor = protocolTypeNameMap.find(type);
-    if (itor != protocolTypeNameMap.end()) {
-      return itor->second;
-    }
-
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    ASSERT(itor != protocolTypeNameMap.end());
+    return itor->second;
   }
 };
 
@@ -58,11 +55,8 @@ public:
 
   const std::string& fromType(SerializationType type) const {
     const auto& itor = serializerTypeNameMap.find(type);
-    if (itor != serializerTypeNameMap.end()) {
-      return itor->second;
-    }
-
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    ASSERT(itor != serializerTypeNameMap.end());
+    return itor->second;
   }
 };
 
@@ -91,11 +85,8 @@ public:
 
   const std::string& fromType(ProtocolType protocol_type, SerializationType type) const {
     const auto& itor = protocolSerializerTypeNameMap.find(generateKey(protocol_type, type));
-    if (itor != protocolSerializerTypeNameMap.end()) {
-      return itor->second;
-    }
-
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    ASSERT(itor != protocolSerializerTypeNameMap.end());
+    return itor->second;
   }
 };
 

@@ -129,9 +129,9 @@ DubboProtocolImpl::decodeHeader(Buffer::Instance& buffer, MessageMetadataSharedP
   }
 
   auto context = std::make_shared<ContextImpl>();
-  context->header_size_ = DubboProtocolImpl::MessageSize;
-  context->body_size_ = body_size;
-  context->is_heartbeat_ = is_event;
+  context->set_header_size(DubboProtocolImpl::MessageSize);
+  context->set_body_size(body_size);
+  context->set_heartbeat(is_event);
 
   return std::pair<ContextSharedPtr, bool>(context, true);
 }

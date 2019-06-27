@@ -149,14 +149,14 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
     return nullptr;
   }
 
-  if (!invocation.method_name().has_value()) {
+  if (invocation.method_name().empty()) {
     ENVOY_LOG(error, "dubbo route matcher: there is no method name in the metadata");
     return nullptr;
   }
 
-  if (!method_name_.match(invocation.method_name().value())) {
+  if (!method_name_.match(invocation.method_name())) {
     ENVOY_LOG(debug, "dubbo route matcher: method matching failed, input method '{}'",
-              invocation.method_name().value());
+              invocation.method_name());
     return nullptr;
   }
 

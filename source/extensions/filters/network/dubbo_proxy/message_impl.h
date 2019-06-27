@@ -7,7 +7,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-struct ContextBase : public Context {
+class ContextBase : public Context {
+public:
   ContextBase() = default;
   ~ContextBase() override {}
 
@@ -15,14 +16,23 @@ struct ContextBase : public Context {
   size_t body_size() const override { return body_size_; }
   size_t header_size() const override { return header_size_; }
 
+  void set_body_size(size_t size) { body_size_ = size; }
+  void set_header_size(size_t size) { header_size_ = size; }
+
+protected:
   size_t body_size_{0};
   size_t header_size_{0};
 };
 
-struct ContextImpl : public ContextBase {
+class ContextImpl : public ContextBase {
+public:
   ContextImpl() = default;
   ~ContextImpl() override {}
 
+  bool is_heartbeat() const { return is_heartbeat_; }
+  void set_heartbeat(bool is_heartbeat) { is_heartbeat_ = is_heartbeat; }
+
+private:
   bool is_heartbeat_{false};
 };
 
@@ -34,7 +44,7 @@ public:
   const std::string& service_name() const override { return service_name_; }
 
   void setMethodName(const std::string& name) { method_name_ = name; }
-  const absl::optional<std::string>& method_name() const override { return method_name_; }
+  const std::string& method_name() const override { return method_name_; }
 
   void setServiceVersion(const std::string& version) { service_version_ = version; }
   const absl::optional<std::string>& service_version() const override { return service_version_; }
@@ -44,7 +54,7 @@ public:
 
 protected:
   std::string service_name_;
-  absl::optional<std::string> method_name_;
+  std::string method_name_;
   absl::optional<std::string> service_version_;
   absl::optional<std::string> group_;
 };

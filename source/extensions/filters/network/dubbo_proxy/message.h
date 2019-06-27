@@ -86,7 +86,7 @@ enum class RpcResponseType : uint8_t {
   ResponseNullValueWithAttachments = 5,
 };
 
-struct Context {
+class Context {
 public:
   using AttachmentMap = std::unordered_map<std::string, std::string>;
 
@@ -119,7 +119,7 @@ public:
   virtual ~RpcInvocation() = default;
 
   virtual const std::string& service_name() const PURE;
-  virtual const absl::optional<std::string>& method_name() const PURE;
+  virtual const std::string& method_name() const PURE;
   virtual const absl::optional<std::string>& service_version() const PURE;
   virtual const absl::optional<std::string>& service_group() const PURE;
 };

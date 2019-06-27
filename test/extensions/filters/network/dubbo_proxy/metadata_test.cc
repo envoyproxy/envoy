@@ -21,10 +21,7 @@ TEST(MessageMetadataTest, Fields) {
   metadata.setTimeout(3);
   EXPECT_TRUE(metadata.timeout().has_value());
 
-  EXPECT_FALSE(invo->method_name().has_value());
-  EXPECT_THROW(invo->method_name().value(), absl::bad_optional_access);
   invo->setMethodName("method");
-  EXPECT_TRUE(invo->method_name().has_value());
   EXPECT_EQ("method", invo->method_name());
 
   EXPECT_FALSE(invo->service_version().has_value());

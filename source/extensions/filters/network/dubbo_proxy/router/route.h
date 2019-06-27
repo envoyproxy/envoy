@@ -44,11 +44,8 @@ public:
 
   const std::string& fromType(RouteMatcherType type) const {
     const auto& itor = routeMatcherNameMap.find(type);
-    if (itor != routeMatcherNameMap.end()) {
-      return itor->second;
-    }
-
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    ASSERT(itor != routeMatcherNameMap.end());
+    return itor->second;
   }
 };
 
