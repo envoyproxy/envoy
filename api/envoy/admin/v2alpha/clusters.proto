@@ -99,6 +99,10 @@ message HostStatus {
 
   // The hostname of the host, if applicable.
   string hostname = 6;
+
+  // The host's priority. If not configured, the value defaults to 0 (highest priority).
+  uint32 priority = 7;
+
   // Request success rate for this host over the last calculated
   // interval when only locally originated errors are taken into account and externally originated
   // errors were treated as success.
@@ -111,7 +115,7 @@ message HostStatus {
   // Note: the message will not be present if host did not have enough request volume to calculate
   // success rate or the cluster did not have enough hosts to run through success rate outlier
   // ejection.
-  envoy.type.Percent local_origin_success_rate = 7;
+  envoy.type.Percent local_origin_success_rate = 8;
 }
 
 // Health status for a host.

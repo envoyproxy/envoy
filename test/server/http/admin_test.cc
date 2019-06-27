@@ -1105,6 +1105,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(host->outlier_detector_,
           successRate(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))
       .WillByDefault(Return(93.2));
+  ON_CALL(*host, priority()).WillByDefault(Return(6));
 
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
@@ -1172,6 +1173,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
      },
      "weight": 5,
      "hostname": "foo.com",
+     "priority": 6,
      "local_origin_success_rate": {
       "value": 93.2
      }
@@ -1218,6 +1220,7 @@ fake_cluster::1.2.3.4:80::sub_zone::test_sub_zone
 fake_cluster::1.2.3.4:80::canary::false
 fake_cluster::1.2.3.4:80::success_rate::43.2
 fake_cluster::1.2.3.4:80::local_origin_success_rate::93.2
+fake_cluster::1.2.3.4:80::priority::6
 )EOF";
   EXPECT_EQ(expected_text, response2.toString());
 }

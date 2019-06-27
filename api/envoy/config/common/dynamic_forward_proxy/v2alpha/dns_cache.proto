@@ -9,6 +9,7 @@ option java_package = "io.envoyproxy.envoy.config.common.dynamic_forward_proxy.v
 import "envoy/api/v2/cds.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
 
@@ -55,4 +56,13 @@ message DnsCacheConfig {
   //
   //   The TTL has no relation to DNS TTL and is only used to control Envoy's resource usage.
   google.protobuf.Duration host_ttl = 4 [(validate.rules).duration.gt = {}];
+
+  // The maximum number of hosts that the cache will hold. If not specified defaults to 1024.
+  //
+  // .. note:
+  //
+  //   The implementation is approximate and enforced independently on each worker thread, thus
+  //   it is possible for the maximum hosts in the cache to go slightly above the configured
+  //   value depending on timing. This is similar to how other circuit breakers work.
+  google.protobuf.UInt32Value max_hosts = 5 [(validate.rules).uint32.gt = 0];
 }
