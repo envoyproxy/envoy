@@ -92,7 +92,6 @@ RouterCheckTool::RouterCheckTool(
 // TODO(jyotima): Remove this code path once the json schema code path is deprecated.
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json, *api_);
-
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
 
   bool no_failures = true;
