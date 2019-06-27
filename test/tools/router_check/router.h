@@ -129,10 +129,8 @@ private:
    */
   bool compareResults(const std::string& actual, const std::string& expected,
                       const std::string& test_type);
-  
-  bool runtimeMock(const std::string& key,
-                   testing::Unused,
-                   testing::Unused);
+
+  bool runtimeMock(const std::string& key, testing::Unused, testing::Unused);
 
   bool headers_finalized_{false};
 

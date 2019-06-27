@@ -83,16 +83,16 @@ RouterCheckTool::RouterCheckTool(
     Api::ApiPtr api)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
       stats_(std::move(stats)), api_(std::move(api)) {
-        EXPECT_CALL(
-          factory_context_->runtime_loader_.snapshot_,
-          featureEnabled(_, testing::An<const envoy::type::FractionalPercent &>(), testing::An<uint64_t>()))
-        .WillRepeatedly(testing::Invoke(this, &RouterCheckTool::runtimeMock));
-      }
+  EXPECT_CALL(factory_context_->runtime_loader_.snapshot_,
+              featureEnabled(_, testing::An<const envoy::type::FractionalPercent&>(),
+                             testing::An<uint64_t>()))
+      .WillRepeatedly(testing::Invoke(this, &RouterCheckTool::runtimeMock));
+}
 
 // TODO(jyotima): Remove this code path once the json schema code path is deprecated.
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json, *api_);
-  
+
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
 
   bool no_failures = true;
@@ -403,13 +403,10 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
   return false;
 }
 
-bool RouterCheckTool::runtimeMock(const std::string& key,
-                             testing::Unused,
-                             testing::Unused) {
-  if(active_runtime.empty()) {
+bool RouterCheckTool::runtimeMock(const std::string& key, testing::Unused, testing::Unused) {
+  if (active_runtime.empty()) {
     return false;
   }
-
 
   return active_runtime.compare(key) == 0;
 }
