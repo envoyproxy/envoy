@@ -39,7 +39,6 @@ whitelist_rules:
   - force_unwrapping
   - generic_type_name
   - identical_operands
-  - identifier_name
   - implicit_getter
   - inert_defer
   - is_disjoint

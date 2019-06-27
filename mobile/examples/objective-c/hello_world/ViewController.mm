@@ -3,25 +3,29 @@
 
 #pragma mark - Constants
 
-NSString* _CELL_ID = @"cell-id";
-NSString* _ENDPOINT = @"http://localhost:9001/api.lyft.com/static/demo/hello_world.txt";
+NSString *_CELL_ID = @"cell-id";
+NSString *_ENDPOINT = @"http://localhost:9001/api.lyft.com/static/demo/hello_world.txt";
 
-#pragma mark - ResponseValue
+#pragma mark - Result
 
-/// Represents a response from the server.
-@interface ResponseValue : NSObject
-@property (nonatomic, strong) NSString* body;
-@property (nonatomic, strong) NSString* serverHeader;
+/// Represents a response from the server or an error.
+@interface Result : NSObject
+@property (nonatomic, assign) int identifier;
+@property (nonatomic, strong) NSString *body;
+@property (nonatomic, strong) NSString *serverHeader;
+@property (nonatomic, strong) NSString *error;
 @end
 
-@implementation ResponseValue
+@implementation Result
 @end
 
 #pragma mark - ViewController
 
 @interface ViewController ()
-@property (nonatomic, strong) NSMutableArray<ResponseValue*>* responses;
-@property (nonatomic, weak) NSTimer* requestTimer;
+@property (nonatomic, strong) NSURLSession *session;
+@property (nonatomic, assign) int requestCount;
+@property (nonatomic, strong) NSMutableArray<Result *> *results;
+@property (nonatomic, weak) NSTimer *requestTimer;
 @end
 
 @implementation ViewController
@@ -31,8 +35,14 @@ NSString* _ENDPOINT = @"http://localhost:9001/api.lyft.com/static/demo/hello_wor
 - (instancetype)init {
   self = [super init];
   if (self) {
-    self.responses = [NSMutableArray new];
-    self.tableView.allowsSelection = FALSE;
+    NSURLSessionConfiguration *configuration =
+        [NSURLSessionConfiguration defaultSessionConfiguration];
+    configuration.URLCache = nil;
+    configuration.timeoutIntervalForRequest = 10;
+    self.session = [NSURLSession sessionWithConfiguration:configuration];
+
+    self.results = [NSMutableArray new];
+    self.tableView.allowsSelection = NO;
   }
   return self;
 }
@@ -59,66 +69,109 @@ NSString* _ENDPOINT = @"http://localhost:9001/api.lyft.com/static/demo/hello_wor
 }
 
 - (void)performRequest {
-  NSURLSession* session = [NSURLSession sharedSession];
   // Note that the request is sent to the envoy thread listening locally on port 9001.
-  NSURL* url = [NSURL URLWithString:_ENDPOINT];
-  NSURLRequest* request = [NSURLRequest requestWithURL:url];
+  NSURL *url = [NSURL URLWithString:_ENDPOINT];
+  NSURLRequest *request = [NSURLRequest requestWithURL:url];
   NSLog(@"Starting request to '%@'", url.path);
 
-  __weak ViewController* weakSelf = self;
-  NSURLSessionDataTask* task =
-      [session dataTaskWithRequest:request
-                 completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
-                   if (error == nil && [(NSHTTPURLResponse*)response statusCode] == 200) {
-                     [weakSelf handleResponse:(NSHTTPURLResponse*)response data:data];
-                   } else {
-                     NSLog(@"Received error: %@", error);
-                   }
-                 }];
+  self.requestCount++;
+  int requestID = self.requestCount;
+
+  __weak ViewController *weakSelf = self;
+  NSURLSessionDataTask *task =
+      [self.session dataTaskWithRequest:request
+                      completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                          [weakSelf handleResponse:(NSHTTPURLResponse *)response
+                                              data:data
+                                        identifier:requestID
+                                             error:error];
+                        });
+                      }];
   [task resume];
 }
 
-- (void)handleResponse:(NSHTTPURLResponse*)response data:(NSData*)data {
-  NSString* body = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-  if (body == nil || response == nil) {
-    NSLog(@"Failed to deserialize response string");
+- (void)handleResponse:(NSHTTPURLResponse *)response
+                  data:(NSData *)data
+            identifier:(int)identifier
+                 error:(NSError *)error {
+  if (error != nil) {
+    NSLog(@"Received error: %@", error);
+    [self addResponseBody:nil serverHeader:nil identifier:identifier error:error.description];
+    return;
+  }
+
+  if (response.statusCode != 200) {
+    NSString *message = [NSString stringWithFormat:@"failed with status: %ld", response.statusCode];
+    [self addResponseBody:nil serverHeader:nil identifier:identifier error:message];
+    return;
+  }
+
+  NSString *body = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+  if (body == nil) {
+    NSString *message = @"failed to deserialize body";
+    [self addResponseBody:nil serverHeader:nil identifier:identifier error:message];
     return;
   }
 
   // Deserialize the response, which will include a `Server` header set by Envoy.
-  ResponseValue* value = [ResponseValue new];
-  value.body = body;
-  value.serverHeader = [[response allHeaderFields] valueForKey:@"Server"];
-
+  NSString *serverHeader = [[response allHeaderFields] valueForKey:@"Server"];
   NSLog(@"Response:\n%ld bytes\n%@\n%@", data.length, body, [response allHeaderFields]);
-  dispatch_async(dispatch_get_main_queue(), ^{
-    [self.responses addObject:value];
-    [self.tableView reloadData];
-  });
+  [self addResponseBody:body serverHeader:serverHeader identifier:identifier error:nil];
+}
+
+- (void)addResponseBody:(NSString *)body
+           serverHeader:(NSString *)serverHeader
+             identifier:(int)identifier
+                  error:(NSString *)error {
+  Result *result = [Result new];
+  result.identifier = identifier;
+  result.body = body;
+  result.serverHeader = serverHeader;
+  result.error = error;
+
+  [self.results insertObject:result atIndex:0];
+  [self.tableView reloadData];
 }
 
 #pragma mark - UITableView
 
-- (NSInteger)numberOfSectionsInTableView:(UITableView*)tableView {
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
   return 1;
 }
 
-- (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section {
-  return self.responses.count;
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+  return self.results.count;
 }
 
-- (UITableViewCell*)tableView:(UITableView*)tableView
-        cellForRowAtIndexPath:(NSIndexPath*)indexPath {
-  UITableViewCell* cell = [tableView dequeueReusableCellWithIdentifier:_CELL_ID];
+- (UITableViewCell *)tableView:(UITableView *)tableView
+         cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+  UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:_CELL_ID];
   if (cell == nil) {
     cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle
                                   reuseIdentifier:_CELL_ID];
   }
 
-  ResponseValue* response = self.responses[indexPath.row];
-  cell.textLabel.text = [NSString stringWithFormat:@"Response: %@", response.body];
-  cell.detailTextLabel.text =
-      [NSString stringWithFormat:@"'Server' header: %@", response.serverHeader];
+  Result *result = self.results[indexPath.row];
+  if (result.error == nil) {
+    cell.textLabel.text =
+        [NSString stringWithFormat:@"[%d] %@", result.identifier, result.body];
+    cell.detailTextLabel.text =
+        [NSString stringWithFormat:@"'Server' header: %@", result.serverHeader];
+
+    cell.textLabel.textColor = [UIColor blackColor];
+    cell.detailTextLabel.textColor = [UIColor blackColor];
+    cell.contentView.backgroundColor = [UIColor whiteColor];
+  } else {
+    cell.textLabel.text =
+        [NSString stringWithFormat:@"[%d]", result.identifier];
+    cell.detailTextLabel.text = result.error;
+
+    cell.textLabel.textColor = [UIColor whiteColor];
+    cell.detailTextLabel.textColor = [UIColor whiteColor];
+    cell.contentView.backgroundColor = [UIColor redColor];
+  }
+
   return cell;
 }
 
