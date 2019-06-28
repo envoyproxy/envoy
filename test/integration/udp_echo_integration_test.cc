@@ -82,6 +82,7 @@ public:
       retry++;
     } while (true);
 
+    recv_buf[bytes_to_read] = '\0';
     EXPECT_EQ(recv_buf, request);
   }
 };

@@ -21,10 +21,16 @@ public:
     peer_ip.FromString("127.0.0.1");
     peer_address_ = quic::QuicSocketAddress(peer_ip, /*port=*/123);
     EXPECT_CALL(udp_listener_, onDestroy());
+    ON_CALL(udp_listener_, send(_))
+        .WillByDefault(testing::Invoke([](const Network::UdpSendData& send_data) {
+          return Api::IoCallUint64Result(
+              send_data.buffer_.length(),
+              Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError));
+        }));
   }
 
 protected:
-  Network::MockUdpListener udp_listener_;
+  testing::NiceMock<Network::MockUdpListener> udp_listener_;
   quic::QuicIpAddress self_address_;
   quic::QuicSocketAddress peer_address_;
   EnvoyQuicPacketWriter envoy_quic_writer_;
@@ -72,6 +78,17 @@ TEST_F(EnvoyQuicWriterTest, SendBlocked) {
   EXPECT_EQ(static_cast<int>(Api::IoError::IoErrorCode::Again), result.error_code);
   EXPECT_TRUE(envoy_quic_writer_.IsWriteBlocked());
   // Writing while blocked is not allowed.
+#ifdef NDEBUG
+  EXPECT_CALL(udp_listener_, send(_))
+      .WillOnce(testing::Invoke([this, str](const Network::UdpSendData& send_data) {
+        EXPECT_EQ(peer_address_.ToString(), send_data.peer_address_->asString());
+        EXPECT_EQ(self_address_.ToString(), send_data.local_ip_->addressAsString());
+        EXPECT_EQ(str, send_data.buffer_.toString());
+        return Api::IoCallUint64Result(
+            0u, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                                Network::IoSocketError::deleteIoError));
+      }));
+#endif
   EXPECT_DEBUG_DEATH(envoy_quic_writer_.WritePacket(str.data(), str.length(), self_address_,
                                                     peer_address_, nullptr),
                      "Cannot write while IO handle is blocked.");
