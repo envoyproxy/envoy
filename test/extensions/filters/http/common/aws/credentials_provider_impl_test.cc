@@ -401,6 +401,55 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
   DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
 }
 
+TEST(CredentialsProviderChainTest, getCredentials_noCredentials) {
+  auto mock_provider1 = std::make_shared<MockCredentialsProvider>();
+  auto mock_provider2 = std::make_shared<MockCredentialsProvider>();
+
+  EXPECT_CALL(*mock_provider1, getCredentials()).Times(1);
+  EXPECT_CALL(*mock_provider2, getCredentials()).Times(1);
+
+  CredentialsProviderChain chain;
+  chain.add(mock_provider1);
+  chain.add(mock_provider2);
+
+  const Credentials creds = chain.getCredentials();
+  EXPECT_EQ(Credentials(), creds);
+}
+
+TEST(CredentialsProviderChainTest, getCredentials_firstProviderReturns) {
+  auto mock_provider1 = std::make_shared<MockCredentialsProvider>();
+  auto mock_provider2 = std::make_shared<MockCredentialsProvider>();
+
+  const Credentials creds("access_key", "secret_key");
+
+  EXPECT_CALL(*mock_provider1, getCredentials()).WillOnce(Return(creds));
+  EXPECT_CALL(*mock_provider2, getCredentials()).Times(0);
+
+  CredentialsProviderChain chain;
+  chain.add(mock_provider1);
+  chain.add(mock_provider2);
+
+  const Credentials ret_creds = chain.getCredentials();
+  EXPECT_EQ(creds, ret_creds);
+}
+
+TEST(CredentialsProviderChainTest, getCredentials_secondProviderReturns) {
+  auto mock_provider1 = std::make_shared<MockCredentialsProvider>();
+  auto mock_provider2 = std::make_shared<MockCredentialsProvider>();
+
+  const Credentials creds("access_key", "secret_key");
+
+  EXPECT_CALL(*mock_provider1, getCredentials()).Times(1);
+  EXPECT_CALL(*mock_provider2, getCredentials()).WillOnce(Return(creds));
+
+  CredentialsProviderChain chain;
+  chain.add(mock_provider1);
+  chain.add(mock_provider2);
+
+  const Credentials ret_creds = chain.getCredentials();
+  EXPECT_EQ(creds, ret_creds);
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace HttpFilters

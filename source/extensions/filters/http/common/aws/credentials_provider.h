@@ -41,6 +41,11 @@ public:
 
   const absl::optional<std::string>& sessionToken() const { return session_token_; }
 
+  bool operator==(const Credentials& other) const {
+    return access_key_id_ == other.access_key_id_ &&
+           secret_access_key_ == other.secret_access_key_ && session_token_ == other.session_token_;
+  }
+
 private:
   absl::optional<std::string> access_key_id_;
   absl::optional<std::string> secret_access_key_;
