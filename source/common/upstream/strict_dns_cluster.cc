@@ -136,7 +136,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         // complexity is needed so will start with this.
         parent_.onPreInitComplete();
 
-        auto final_refresh_rate = parent_.dns_refresh_rate_ms_;
+        std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
 
         if (parent_.respect_dns_ttl_ && ttl_refresh_rate != std::chrono::seconds(0)) {
           final_refresh_rate = ttl_refresh_rate;

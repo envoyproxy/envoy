@@ -76,7 +76,7 @@ void LogicalDnsCluster::startResolve() {
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address);
         info_->stats().update_success_.inc();
 
-        auto refresh_rate = dns_refresh_rate_ms_;
+        std::chrono::milliseconds refresh_rate = dns_refresh_rate_ms_;
         if (!response.empty()) {
           // TODO(mattklein123): Move port handling into the DNS interface.
           ASSERT(response.front().address_ != nullptr);
