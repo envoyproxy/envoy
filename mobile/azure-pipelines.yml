@@ -151,8 +151,11 @@ stages:
             inputs:
               artifactName: 'envoy-mac.aar'
               targetPath: dist
-          - script: bazel build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
-            displayName: 'Build java app'
+          - template: ci/templates/start_android_emulator.yaml
+          - script: bazel mobile-install --fat_apk_cpu=x86 --start_app //examples/java/hello_world:hello_envoy
+            displayName: 'Start java app'
+          - script: adb logcat -e "successful response!" -m 1
+            displayName: 'Check liveliness'
       - job: mac_kotlin_helloworld
         dependsOn: mac_dist
         timeoutInMinutes: 60
@@ -168,8 +171,11 @@ stages:
             inputs:
               artifactName: 'envoy-mac.aar'
               targetPath: dist
-          - script: bazel build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
-            displayName: 'Build kotlin app'
+          - template: ci/templates/start_android_emulator.yaml
+          - script: bazel mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+            displayName: 'Start kotlin app'
+          - script: adb logcat -e "successful response!" -m 1
+            displayName: 'Check liveliness'
   - stage: ios
     dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
     jobs:
