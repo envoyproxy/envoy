@@ -1,5 +1,6 @@
 #include <sys/socket.h>
 
+#include "common/common/assert.h"
 #include "common/network/address_impl.h"
 
 #include "quiche/quic/platform/api/quic_ip_address.h"

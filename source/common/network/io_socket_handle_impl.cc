@@ -109,9 +109,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   message.msg_iov = iov.begin();
   message.msg_iovlen = num_slices_to_write;
   message.msg_flags = 0;
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
   if (self_ip == nullptr) {
     message.msg_control = nullptr;
     message.msg_controllen = 0;
+    const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
+    return sysCallResultToIoCallResult(result);
   } else {
 #ifndef __APPLE__
     constexpr int kSpaceForIpv4 = CMSG_SPACE(sizeof(in_pktinfo));
@@ -125,7 +128,10 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     char cbuf[48]{0};
 #endif
     message.msg_control = cbuf;
-    cmsghdr* cmsg = CMSG_FIRSTHDR(&message);
+    message.msg_controllen = sizeof(cbuf);
+    cmsghdr* const cmsg = CMSG_FIRSTHDR(&message);
+    RELEASE_ASSERT(cmsg != nullptr, fmt::format("cbuf with size {} is not enough, cmsghdr size {}",
+                                                sizeof(cbuf), sizeof(cmsghdr)));
     if (self_ip->version() == Address::IpVersion::v4) {
       cmsg->cmsg_level = IPPROTO_IP;
 #ifndef IP_SENDSRCADDR
@@ -147,12 +153,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
       pktinfo->ipi6_ifindex = 0;
       *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) = self_ip->ipv6()->address();
     }
-    message.msg_controllen = cmsg->cmsg_len;
+    const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
+    return sysCallResultToIoCallResult(result);
   }
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
-
-  return sysCallResultToIoCallResult(result);
 }
 
 Api::IoCallUint64Result
@@ -175,13 +178,13 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const struct cmsghd
                                                              uint32_t self_port) {
   if (cmsg.cmsg_type == IPV6_PKTINFO) {
     const struct in6_pktinfo* info = reinterpret_cast<const in6_pktinfo*>(CMSG_DATA(&cmsg));
-    sockaddr_in6 ipv6_addr;
+    sockaddr_storage ss;
+    sockaddr_in6& ipv6_addr = reinterpret_cast<sockaddr_in6&>(ss);
     memset(&ipv6_addr, 0, sizeof(sockaddr_in6));
     ipv6_addr.sin6_family = AF_INET6;
     ipv6_addr.sin6_addr = info->ipi6_addr;
     ipv6_addr.sin6_port = htons(self_port);
-    return Address::addressFromSockAddr(reinterpret_cast<sockaddr_storage&>(ipv6_addr),
-                                        sizeof(sockaddr_in6), /*v6only=*/false);
+    return Address::addressFromSockAddr(ss, sizeof(sockaddr_in6), /*v6only=*/false);
   }
 #ifndef IP_RECVDSTADDR
   if (cmsg.cmsg_type == IP_PKTINFO) {
@@ -190,7 +193,8 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const struct cmsghd
   if (cmsg.cmsg_type == IP_RECVDSTADDR) {
     const struct in_addr* addr = reinterpret_cast<const in_addr*>(CMSG_DATA(&cmsg));
 #endif
-    sockaddr_in ipv4_addr;
+    sockaddr_storage ss;
+    sockaddr_in& ipv4_addr = reinterpret_cast<sockaddr_in&>(ss);
     memset(&ipv4_addr, 0, sizeof(sockaddr_in));
     ipv4_addr.sin_family = AF_INET;
     ipv4_addr.sin_addr =
@@ -200,8 +204,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const struct cmsghd
         *addr;
 #endif
     ipv4_addr.sin_port = htons(self_port);
-    return Address::addressFromSockAddr(reinterpret_cast<sockaddr_storage&>(ipv4_addr),
-                                        sizeof(sockaddr_in), /*v6only=*/false);
+    return Address::addressFromSockAddr(ss, sizeof(sockaddr_in), /*v6only=*/false);
   }
   return nullptr;
 }

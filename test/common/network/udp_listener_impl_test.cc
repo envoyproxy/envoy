@@ -57,7 +57,12 @@ protected:
   SocketPtr createServerSocket(bool bind) {
     // Set IP_FREEBIND to allow sendmsg to send with nonlocal IPv6 source address.
     return std::make_unique<NetworkListenSocket<NetworkSocketTrait<Address::SocketType::Datagram>>>(
-        Network::Test::getAnyAddress(version_), SocketOptionFactory::buildIpFreebindOptions(),
+        Network::Test::getAnyAddress(version_),
+#ifdef IP_FREEBIND
+        SocketOptionFactory::buildIpFreebindOptions(),
+#elif
+        nullptr,
+#endif
         bind);
   }
 
@@ -365,9 +370,17 @@ TEST_P(UdpListenerImplTest, SendData) {
     send_from_addr.reset(
         new Address::Ipv4Instance("127.1.2.3", server_socket_->localAddress()->ip()->port()));
   } else {
-    // Witout IP_FREEBIND this is a EINVAL error.
-    send_from_addr.reset(
-        new Address::Ipv6Instance("::9", server_socket_->localAddress()->ip()->port()));
+    // Only use non-local v6 address if IP_FREEBIND is supported. Otherwise use
+    // ::1 to avoid EINVAL error. Unfortunately this can't verify that sendmsg with
+    // customized source address is doing the work because kernel also picks ::1
+    // if it's not specified in cmsghdr.
+    send_from_addr.reset(new Address::Ipv6Instance(
+#ifdef IP_FREEBIND
+        "::9",
+#elif
+        "::1",
+#endif
+        server_socket_->localAddress()->ip()->port()));
   }
 
   UdpSendData send_data{send_from_addr->ip(), client_socket_->localAddress(), *buffer};
