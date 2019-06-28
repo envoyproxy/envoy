@@ -566,11 +566,6 @@ def fixBuildPath(file_path):
 
   error_messages = []
 
-  run_build_fixer = True
-  for excluded_path in build_fixer_check_excluded_paths:
-    if file_path.startswith(excluded_path):
-      run_build_fixer = False
-
   # TODO(htuch): Add API specific BUILD fixer script.
   if not isBuildFixerExcludedFile(file_path) and not isApiFile(file_path) and not isSkylarkFile(
       file_path) and not isWorkspaceFile(file_path):
