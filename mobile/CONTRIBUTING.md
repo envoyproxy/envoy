@@ -22,19 +22,7 @@ maximize the chances of your PR being merged.
 # Submitting a PR
 
 * Fork the repo.
-* In your local repo, install the git hooks that implement various important pre-commit and
-  pre-push checks:
-
-  ```bash
-  ./envoy/support/bootstrap
-  ```
-
-  Please see [envoy/support/README.md](https://github.com/envoyproxy/envoy/tree/master/support) for
-  more information on these hooks.
-
-  Note: the git hooks depend upon many of the dependencies used to build envoy via Bazel. Follow the
-  [Quick start Bazel build for developers](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers) guide to install these.
-
+* [[TODO: add bootstrap script for prepush hook](https://github.com/lyft/envoy-mobile/issues/185)]
 * Create your PR.
 * Tests will automatically run for you.
 * We will **not** merge any PR that is not passing tests.
