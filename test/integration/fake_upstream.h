@@ -126,7 +126,7 @@ public:
                << "Couldn't decode gRPC data frame: " << body().toString();
       }
     }
-    if (decoded_grpc_frames_.size() < 1) {
+    if (decoded_grpc_frames_.empty()) {
       timeout = std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
                                                                       timeSystem().monotonicTime());
       if (!waitForData(client_dispatcher, grpc_decoder_.length(), timeout)) {
