@@ -95,6 +95,7 @@ public class MainActivity extends Activity {
         InputStream inputStream = connection.getInputStream();
         String body = deserialize(inputStream);
         inputStream.close();
+        Log.d("Response", "successful response!");
         return new Success(body,
                            serverHeaderField != null ? String.join(", ", serverHeaderField) : "");
       } else {
