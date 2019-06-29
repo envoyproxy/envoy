@@ -93,7 +93,10 @@ public:
 
   // RefcountInterface
   void incRefCount() override { ++data_.ref_count_; }
-  bool decRefCount() override { return --data_.ref_count_ == 0; }
+  bool decRefCount() override {
+    ASSERT(data_.ref_count_ >= 1);
+    return --data_.ref_count_ == 0;
+  }
   uint32_t use_count() const override { return data_.ref_count_; }
 
 private:
@@ -192,7 +195,10 @@ public:
 
   // RefcountInterface
   void incRefCount() override { ++data_.ref_count_; }
-  bool decRefCount() override { return --data_.ref_count_ == 0; }
+  bool decRefCount() override {
+    ASSERT(data_.ref_count_ >= 1);
+    return --data_.ref_count_ == 0;
+  }
   uint32_t use_count() const override { return data_.ref_count_; }
 
 private:

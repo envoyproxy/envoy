@@ -311,10 +311,22 @@ void AdminImpl::addOutlierInfo(const std::string& cluster_name,
                                const Upstream::Outlier::Detector* outlier_detector,
                                Buffer::Instance& response) {
   if (outlier_detector) {
-    response.add(fmt::format("{}::outlier::success_rate_average::{}\n", cluster_name,
-                             outlier_detector->successRateAverage()));
-    response.add(fmt::format("{}::outlier::success_rate_ejection_threshold::{}\n", cluster_name,
-                             outlier_detector->successRateEjectionThreshold()));
+    response.add(fmt::format(
+        "{}::outlier::success_rate_average::{}\n", cluster_name,
+        outlier_detector->successRateAverage(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
+    response.add(fmt::format(
+        "{}::outlier::success_rate_ejection_threshold::{}\n", cluster_name,
+        outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
+    response.add(fmt::format(
+        "{}::outlier::local_origin_success_rate_average::{}\n", cluster_name,
+        outlier_detector->successRateAverage(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
+    response.add(fmt::format(
+        "{}::outlier::local_origin_success_rate_ejection_threshold::{}\n", cluster_name,
+        outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
   }
 }
 
@@ -341,9 +353,19 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
     cluster_status.set_name(cluster_info->name());
 
     const Upstream::Outlier::Detector* outlier_detector = cluster.outlierDetector();
-    if (outlier_detector != nullptr && outlier_detector->successRateEjectionThreshold() > 0.0) {
+    if (outlier_detector != nullptr &&
+        outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin) > 0.0) {
       cluster_status.mutable_success_rate_ejection_threshold()->set_value(
-          outlier_detector->successRateEjectionThreshold());
+          outlier_detector->successRateEjectionThreshold(
+              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
+    }
+    if (outlier_detector != nullptr &&
+        outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin) > 0.0) {
+      cluster_status.mutable_local_origin_success_rate_ejection_threshold()->set_value(
+          outlier_detector->successRateEjectionThreshold(
+              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
     }
 
     cluster_status.set_added_via_api(cluster_info->addedViaApi());
@@ -396,7 +418,8 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         HEALTH_FLAG_ENUM_VALUES(SET_HEALTH_FLAG)
 #undef SET_HEALTH_FLAG
 
-        double success_rate = host->outlierDetector().successRate();
+        double success_rate = host->outlierDetector().successRate(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
         if (success_rate >= 0.0) {
           host_status.mutable_success_rate()->set_value(success_rate);
         }
@@ -404,6 +427,11 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         host_status.set_weight(host->weight());
 
         host_status.set_priority(host->priority());
+        success_rate = host->outlierDetector().successRate(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
+        if (success_rate >= 0.0) {
+          host_status.mutable_local_origin_success_rate()->set_value(success_rate);
+        }
       }
     }
   }
@@ -456,11 +484,18 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
                                  host->address()->asString(), host->locality().sub_zone()));
         response.add(fmt::format("{}::{}::canary::{}\n", cluster.second.get().info()->name(),
                                  host->address()->asString(), host->canary()));
-        response.add(fmt::format("{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(),
-                                 host->outlierDetector().successRate()));
         response.add(fmt::format("{}::{}::priority::{}\n", cluster.second.get().info()->name(),
                                  host->address()->asString(), host->priority()));
+        response.add(fmt::format(
+            "{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),
+            host->address()->asString(),
+            host->outlierDetector().successRate(
+                Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
+        response.add(fmt::format(
+            "{}::{}::local_origin_success_rate::{}\n", cluster.second.get().info()->name(),
+            host->address()->asString(),
+            host->outlierDetector().successRate(
+                Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
       }
     }
   }

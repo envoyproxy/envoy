@@ -164,6 +164,7 @@ NOAUTH
 NOLINT
 NOLINTNEXTLINE
 NONCES
+NOSORT
 NS
 NUL
 Nilsson
@@ -290,6 +291,7 @@ Welford's
 Werror
 XDS
 decRefCount
+getaddrinfo
 sendto
 upcasts
 vip
