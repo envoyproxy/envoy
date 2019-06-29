@@ -483,7 +483,7 @@ resources, you can override Bazel's default job parallelism determination with
 `--jobs=N` to restrict the build to at most `N` simultaneous jobs, e.g.:
 
 ```
-bazel build --jobs=2 //source/...
+bazel build --jobs=2 //source/exe:envoy-static
 ```
 
 # Debugging the Bazel build
@@ -492,19 +492,19 @@ When trying to understand what Bazel is doing, the `-s` and `--explain` options
 are useful. To have Bazel provide verbose output on which commands it is executing:
 
 ```
-bazel build -s //source/...
+bazel build -s //source/exe:envoy-static
 ```
 
 To have Bazel emit to a text file the rationale for rebuilding a target:
 
 ```
-bazel build --explain=file.txt //source/...
+bazel build --explain=file.txt //source/exe:envoy-static
 ```
 
 To get more verbose explanations:
 
 ```
-bazel build --explain=file.txt --verbose_explanations //source/...
+bazel build --explain=file.txt --verbose_explanations //source/exe:envoy-static
 ```
 
 # Resolving paths in bazel build output
