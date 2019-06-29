@@ -169,11 +169,11 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
-    std::string test_name = check_config.test_name();
+    const std::string& test_name = check_config.test_name();
     if (details_) {
       std::cout << test_name << std::endl;
     }
-    envoy::RouterCheckToolSchema::ValidationAssert validate = check_config.validate();
+    const envoy::RouterCheckToolSchema::ValidationAssert& validate = check_config.validate();
 
     using checkerFunc =
         std::function<bool(ToolConfig&, const envoy::RouterCheckToolSchema::ValidationAssert&)>;

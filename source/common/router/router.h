@@ -467,7 +467,8 @@ private:
   void sendNoHealthyUpstreamResponse();
   bool setupRetry();
   bool setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upstream_request);
-  void updateOutlierDetection(Http::Code code, UpstreamRequest& upstream_request);
+  void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
+                              absl::optional<uint64_t> code);
   void doRetry();
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.

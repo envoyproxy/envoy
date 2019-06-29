@@ -311,10 +311,22 @@ void AdminImpl::addOutlierInfo(const std::string& cluster_name,
                                const Upstream::Outlier::Detector* outlier_detector,
                                Buffer::Instance& response) {
   if (outlier_detector) {
-    response.add(fmt::format("{}::outlier::success_rate_average::{}\n", cluster_name,
-                             outlier_detector->successRateAverage()));
-    response.add(fmt::format("{}::outlier::success_rate_ejection_threshold::{}\n", cluster_name,
-                             outlier_detector->successRateEjectionThreshold()));
+    response.add(fmt::format(
+        "{}::outlier::success_rate_average::{}\n", cluster_name,
+        outlier_detector->successRateAverage(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
+    response.add(fmt::format(
+        "{}::outlier::success_rate_ejection_threshold::{}\n", cluster_name,
+        outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
+    response.add(fmt::format(
+        "{}::outlier::local_origin_success_rate_average::{}\n", cluster_name,
+        outlier_detector->successRateAverage(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
+    response.add(fmt::format(
+        "{}::outlier::local_origin_success_rate_ejection_threshold::{}\n", cluster_name,
+        outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
   }
 }
 
@@ -341,9 +353,19 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
     cluster_status.set_name(cluster_info->name());
 
     const Upstream::Outlier::Detector* outlier_detector = cluster.outlierDetector();
-    if (outlier_detector != nullptr && outlier_detector->successRateEjectionThreshold() > 0.0) {
+    if (outlier_detector != nullptr &&
+        outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin) > 0.0) {
       cluster_status.mutable_success_rate_ejection_threshold()->set_value(
-          outlier_detector->successRateEjectionThreshold());
+          outlier_detector->successRateEjectionThreshold(
+              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
+    }
+    if (outlier_detector != nullptr &&
+        outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin) > 0.0) {
+      cluster_status.mutable_local_origin_success_rate_ejection_threshold()->set_value(
+          outlier_detector->successRateEjectionThreshold(
+              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
     }
 
     cluster_status.set_added_via_api(cluster_info->addedViaApi());
@@ -353,6 +375,7 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         envoy::admin::v2alpha::HostStatus& host_status = *cluster_status.add_host_statuses();
         Network::Utility::addressToProtobufAddress(*host->address(),
                                                    *host_status.mutable_address());
+        host_status.set_hostname(host->hostname());
         std::vector<Stats::CounterSharedPtr> sorted_counters;
         for (const Stats::CounterSharedPtr& counter : host->counters()) {
           sorted_counters.push_back(counter);
@@ -395,12 +418,20 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         HEALTH_FLAG_ENUM_VALUES(SET_HEALTH_FLAG)
 #undef SET_HEALTH_FLAG
 
-        double success_rate = host->outlierDetector().successRate();
+        double success_rate = host->outlierDetector().successRate(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
         if (success_rate >= 0.0) {
           host_status.mutable_success_rate()->set_value(success_rate);
         }
 
         host_status.set_weight(host->weight());
+
+        host_status.set_priority(host->priority());
+        success_rate = host->outlierDetector().successRate(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
+        if (success_rate >= 0.0) {
+          host_status.mutable_local_origin_success_rate()->set_value(success_rate);
+        }
       }
     }
   }
@@ -438,6 +469,8 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
                                    host->address()->asString(), stat.first, stat.second));
         }
 
+        response.add(fmt::format("{}::{}::hostname::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->hostname()));
         response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second.get().info()->name(),
                                  host->address()->asString(),
                                  Upstream::HostUtility::healthFlagsToString(*host)));
@@ -451,9 +484,18 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
                                  host->address()->asString(), host->locality().sub_zone()));
         response.add(fmt::format("{}::{}::canary::{}\n", cluster.second.get().info()->name(),
                                  host->address()->asString(), host->canary()));
-        response.add(fmt::format("{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(),
-                                 host->outlierDetector().successRate()));
+        response.add(fmt::format("{}::{}::priority::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->priority()));
+        response.add(fmt::format(
+            "{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),
+            host->address()->asString(),
+            host->outlierDetector().successRate(
+                Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
+        response.add(fmt::format(
+            "{}::{}::local_origin_success_rate::{}\n", cluster.second.get().info()->name(),
+            host->address()->asString(),
+            host->outlierDetector().successRate(
+                Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
       }
     }
   }
@@ -672,31 +714,13 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-envoy::admin::v2alpha::ServerInfo::State AdminImpl::serverState() {
-  envoy::admin::v2alpha::ServerInfo::State state;
-
-  switch (server_.initManager().state()) {
-  case Init::Manager::State::Uninitialized:
-    state = envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;
-    break;
-  case Init::Manager::State::Initializing:
-    state = envoy::admin::v2alpha::ServerInfo::INITIALIZING;
-    break;
-  case Init::Manager::State::Initialized:
-    state = server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
-                                        : envoy::admin::v2alpha::ServerInfo::LIVE;
-    break;
-  }
-
-  return state;
-}
-
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
   time_t current_time = time(nullptr);
   envoy::admin::v2alpha::ServerInfo server_info;
   server_info.set_version(VersionInfo::version());
-  server_info.set_state(serverState());
+  server_info.set_state(
+      Utility::serverState(server_.initManager().state(), server_.healthCheckFailed()));
 
   server_info.mutable_uptime_current_epoch()->set_seconds(current_time -
                                                           server_.startTimeCurrentEpoch());
@@ -712,7 +736,8 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
 
 Http::Code AdminImpl::handlerReady(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
                                    AdminStream&) {
-  const envoy::admin::v2alpha::ServerInfo::State state = serverState();
+  const envoy::admin::v2alpha::ServerInfo::State state =
+      Utility::serverState(server_.initManager().state(), server_.healthCheckFailed());
 
   response.add(envoy::admin::v2alpha::ServerInfo_State_Name(state) + "\n");
   Http::Code code = state == envoy::admin::v2alpha::ServerInfo_State_LIVE
@@ -1437,6 +1462,20 @@ void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
     handler->addListener(*listener_);
   }
+}
+
+envoy::admin::v2alpha::ServerInfo::State Utility::serverState(Init::Manager::State state,
+                                                              bool health_check_failed) {
+  switch (state) {
+  case Init::Manager::State::Uninitialized:
+    return envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;
+  case Init::Manager::State::Initializing:
+    return envoy::admin::v2alpha::ServerInfo::INITIALIZING;
+  case Init::Manager::State::Initialized:
+    return health_check_failed ? envoy::admin::v2alpha::ServerInfo::DRAINING
+                               : envoy::admin::v2alpha::ServerInfo::LIVE;
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Server

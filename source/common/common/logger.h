@@ -40,6 +40,7 @@ namespace Logger {
   FUNCTION(http2)                \
   FUNCTION(hystrix)              \
   FUNCTION(init)                 \
+  FUNCTION(io)                   \
   FUNCTION(kafka)                \
   FUNCTION(lua)                  \
   FUNCTION(main)                 \

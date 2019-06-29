@@ -14,30 +14,51 @@ namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 
+/**
+ * All DNS cache stats. @see stats_macros.h
+ */
+#define ALL_DNS_CACHE_STATS(COUNTER, GAUGE)                                                        \
+  COUNTER(dns_query_attempt)                                                                       \
+  COUNTER(dns_query_failure)                                                                       \
+  COUNTER(dns_query_success)                                                                       \
+  COUNTER(host_added)                                                                              \
+  COUNTER(host_address_changed)                                                                    \
+  COUNTER(host_overflow)                                                                           \
+  COUNTER(host_removed)                                                                            \
+  GAUGE(num_hosts, NeverImport)
+
+/**
+ * Struct definition for all DNS cache stats. @see stats_macros.h
+ */
+struct DnsCacheStats {
+  ALL_DNS_CACHE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
 class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   DnsCacheImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
+               Stats::Scope& root_scope,
                const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config);
   ~DnsCacheImpl();
 
   // DnsCache
-  LoadDnsCacheHandlePtr loadDnsCache(absl::string_view host, uint16_t default_port,
-                                     LoadDnsCacheCallbacks& callbacks) override;
+  LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
+                                            LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
 
 private:
   using TlsHostMap = absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>;
   using TlsHostMapSharedPtr = std::shared_ptr<TlsHostMap>;
 
-  struct LoadDnsCacheHandleImpl : public LoadDnsCacheHandle,
-                                  RaiiListElement<LoadDnsCacheHandleImpl*> {
-    LoadDnsCacheHandleImpl(std::list<LoadDnsCacheHandleImpl*>& parent, absl::string_view host,
-                           LoadDnsCacheCallbacks& callbacks)
-        : RaiiListElement<LoadDnsCacheHandleImpl*>(parent, this), host_(host),
+  struct LoadDnsCacheEntryHandleImpl : public LoadDnsCacheEntryHandle,
+                                       RaiiListElement<LoadDnsCacheEntryHandleImpl*> {
+    LoadDnsCacheEntryHandleImpl(std::list<LoadDnsCacheEntryHandleImpl*>& parent,
+                                absl::string_view host, LoadDnsCacheEntryCallbacks& callbacks)
+        : RaiiListElement<LoadDnsCacheEntryHandleImpl*>(parent, this), host_(host),
           callbacks_(callbacks) {}
 
     const std::string host_;
-    LoadDnsCacheCallbacks& callbacks_;
+    LoadDnsCacheEntryCallbacks& callbacks_;
   };
 
   // Per-thread DNS cache info including the currently known hosts as well as any pending callbacks.
@@ -46,7 +67,7 @@ private:
     void updateHostMap(const TlsHostMapSharedPtr& new_host_map);
 
     TlsHostMapSharedPtr host_map_;
-    std::list<LoadDnsCacheHandleImpl*> pending_resolutions_;
+    std::list<LoadDnsCacheEntryHandleImpl*> pending_resolutions_;
   };
 
   struct DnsHostInfoImpl : public DnsHostInfo {
@@ -68,10 +89,10 @@ private:
   // Primary host information that accounts for TTL, re-resolution, etc.
   struct PrimaryHostInfo {
     PrimaryHostInfo(DnsCacheImpl& parent, absl::string_view host_to_resolve, uint16_t port,
-                    const Event::TimerCb& timer_cb)
-        : host_to_resolve_(host_to_resolve), port_(port),
-          refresh_timer_(parent.main_thread_dispatcher_.createTimer(timer_cb)) {}
+                    const Event::TimerCb& timer_cb);
+    ~PrimaryHostInfo();
 
+    DnsCacheImpl& parent_;
     const std::string host_to_resolve_;
     const uint16_t port_;
     const Event::TimerPtr refresh_timer_;
@@ -103,10 +124,13 @@ private:
   const Network::DnsLookupFamily dns_lookup_family_;
   const Network::DnsResolverSharedPtr resolver_;
   const ThreadLocal::SlotPtr tls_slot_;
+  Stats::ScopePtr scope_;
+  DnsCacheStats stats_;
   std::list<AddUpdateCallbacksHandleImpl*> update_callbacks_;
   absl::flat_hash_map<std::string, PrimaryHostInfoPtr> primary_hosts_;
   const std::chrono::milliseconds refresh_interval_;
   const std::chrono::milliseconds host_ttl_;
+  const uint32_t max_hosts_;
 };
 
 } // namespace DynamicForwardProxy

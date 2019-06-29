@@ -54,7 +54,7 @@ HeaderString::HeaderString(const std::string& ref_value) : type_(Type::Reference
   ASSERT(valid());
 }
 
-HeaderString::HeaderString(HeaderString&& move_value) {
+HeaderString::HeaderString(HeaderString&& move_value) noexcept {
   type_ = move_value.type_;
   string_length_ = move_value.string_length_;
   switch (move_value.type_) {
