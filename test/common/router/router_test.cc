@@ -4170,6 +4170,49 @@ TEST_P(RouterTestStrictCheckSomeHeaders, IgnoreOmittedHeaders) {
   router_.onDestroy();
 }
 
+const std::vector<std::string> SUPPORTED_STRICT_CHECKED_HEADERS = {
+    "x-envoy-upstream-rq-timeout-ms", "x-envoy-upstream-rq-per-try-timeout-ms", "x-envoy-retry-on",
+    "x-envoy-retry-grpc-on", "x-envoy-max-retries"};
+
+class RouterTestStrictCheckAllHeaders
+    : public RouterTestBase,
+      public testing::WithParamInterface<std::tuple<std::string, std::string>> {
+public:
+  RouterTestStrictCheckAllHeaders()
+      : RouterTestBase(false, false, protobufStrList(SUPPORTED_STRICT_CHECKED_HEADERS)){};
+};
+
+INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckAllHeaders,
+                         testing::Combine(testing::ValuesIn(SUPPORTED_STRICT_CHECKED_HEADERS),
+                                          testing::ValuesIn(SUPPORTED_STRICT_CHECKED_HEADERS)));
+
+// Each instance of this test configures a router to strict-validate all
+// supported headers and asserts that a request with invalid values set for some
+// *pair* of headers is rejected.
+TEST_P(RouterTestStrictCheckAllHeaders, MultipleInvalidHeaders) {
+  const auto& header1 = std::get<0>(GetParam());
+  const auto& header2 = std::get<1>(GetParam());
+  Http::TestHeaderMapImpl headers{{header1, "invalid"}, {header2, "invalid"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders));
+
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](Http::HeaderMap& response_headers, bool end_stream) -> void {
+        EXPECT_EQ(enumToInt(Http::Code::BadRequest),
+                  Envoy::Http::Utility::getResponseStatus(response_headers));
+        EXPECT_FALSE(end_stream);
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, router_.decodeHeaders(headers, true));
+  EXPECT_THAT(callbacks_.details_,
+              StartsWith(fmt::format("request_headers_failed_strict_check{{")));
+  router_.onDestroy();
+}
+
+// Request has headers with invalid values, but headers are *excluded* from the
+// set to which strict-checks apply. Assert that these headers are not rejected.
 TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
   Http::TestHeaderMapImpl headers{
       {"X-envoy-Upstream-rq-timeout-ms", "100"},
@@ -4182,15 +4225,7 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
        "cancelled,internal,deadline-exceeded,resource-exhausted,unavailable"},
   };
 
-  std::array<std::string, 5> target_headers = {
-      "X-ENVOY-UPSTREAM-RQ-TIMEOUT-MS",
-      "x-envoy-upstream-rq-per-try-timeout-ms",
-      "x-envoy-max-retries",
-      "x-envoy-retry-on",
-      "x-envoy-retry-grpc-on",
-  };
-
-  for (const auto& target : target_headers) {
+  for (const auto& target : SUPPORTED_STRICT_CHECKED_HEADERS) {
     EXPECT_TRUE(
         FilterUtility::StrictHeaderChecker::checkHeader(headers, Http::LowerCaseString(target))
             .valid_)
@@ -4205,15 +4240,7 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
       {"x-envoy-retry-grpc-on", "cancelled, internal"}, // spaces are considered errors
   };
 
-  std::array<std::string, 5> fail_targets = {
-      "X-ENVOY-UPSTREAM-RQ-TIMEOUT-MS",
-      "x-envoy-upstream-rq-per-try-timeout-ms",
-      "x-envoy-max-retries",
-      "x-envoy-retry-on",
-      "x-envoy-retry-grpc-on",
-  };
-
-  for (const auto& target : fail_targets) {
+  for (const auto& target : SUPPORTED_STRICT_CHECKED_HEADERS) {
     EXPECT_FALSE(FilterUtility::StrictHeaderChecker::checkHeader(failing_headers,
                                                                  Http::LowerCaseString(target))
                      .valid_)
