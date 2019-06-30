@@ -729,7 +729,7 @@ public:
   ~QuicMemSliceTest() override {}
 };
 
-INSTANTIATE_TEST_CASE_P(QuicMemSliceTests, QuicMemSliceTest,
+INSTANTIATE_TEST_SUITE_P(QuicMemSliceTests, QuicMemSliceTest,
                         testing::ValuesIn({Envoy::Buffer::BufferImplementation::Old,
                                            Envoy::Buffer::BufferImplementation::New}));
 

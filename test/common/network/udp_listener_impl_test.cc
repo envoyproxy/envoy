@@ -88,7 +88,7 @@ protected:
   std::unique_ptr<UdpListenerImpl> listener_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, UdpListenerImplTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 

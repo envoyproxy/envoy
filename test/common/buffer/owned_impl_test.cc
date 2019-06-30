@@ -36,7 +36,7 @@ protected:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(OwnedImplTest, OwnedImplTest,
+INSTANTIATE_TEST_SUITE_P(OwnedImplTest, OwnedImplTest,
                         testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
 
 TEST_P(OwnedImplTest, AddBufferFragmentNoCleanup) {
