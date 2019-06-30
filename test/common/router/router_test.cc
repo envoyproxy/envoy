@@ -4192,7 +4192,8 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
 
   for (const auto& target : target_headers) {
     EXPECT_TRUE(
-        FilterUtility::StrictHeaderChecker::test(headers, Http::LowerCaseString(target)).valid_)
+        FilterUtility::StrictHeaderChecker::checkHeader(headers, Http::LowerCaseString(target))
+            .valid_)
         << fmt::format("'{}' should have passed strict validation", target);
   }
 
@@ -4213,9 +4214,9 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
   };
 
   for (const auto& target : fail_targets) {
-    EXPECT_FALSE(
-        FilterUtility::StrictHeaderChecker::test(failing_headers, Http::LowerCaseString(target))
-            .valid_)
+    EXPECT_FALSE(FilterUtility::StrictHeaderChecker::checkHeader(failing_headers,
+                                                                 Http::LowerCaseString(target))
+                     .valid_)
         << fmt::format("'{}' should have failed strict validation", target);
   }
 }

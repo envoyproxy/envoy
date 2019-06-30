@@ -74,8 +74,18 @@ public:
       const Http::HeaderEntry* entry_;
     };
 
-    static const HeaderCheckResult test(Http::HeaderMap& headers,
-                                        const Http::LowerCaseString& target_header);
+    /**
+     * Determine whether a given header's value passes the strict validation
+     * defined for that header.
+     * @param headers supplies the headers from which to get the target header.
+     * @param target_header is the header to be validated.
+     * @return HeaderCheckResult containing the entry for @param target_header
+     *         and valid_ set to FALSE if @param target_header is set to an
+     *         invalid value. If @param target_header doesn't appear in
+     *         @param headers, return a result with valid_ set to TRUE.
+     */
+    static const HeaderCheckResult checkHeader(Http::HeaderMap& headers,
+                                               const Http::LowerCaseString& target_header);
 
     using ParseRetryFlagsFunc = std::function<std::pair<uint32_t, bool>(absl::string_view)>;
 
@@ -182,7 +192,7 @@ public:
     }
   }
   using HeaderVector = std::vector<Http::LowerCaseString>;
-  using StrictCheckHeadersPtr = std::unique_ptr<HeaderVector>;
+  using HeaderVectorPtr = std::unique_ptr<HeaderVector>;
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
   TimeSource& timeSource() { return time_source_; }
@@ -196,8 +206,8 @@ public:
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
   const bool suppress_envoy_headers_;
-  // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down
-  StrictCheckHeadersPtr strict_check_headers_;
+  // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down.
+  HeaderVectorPtr strict_check_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
   Stats::StatNamePool stat_name_pool_;

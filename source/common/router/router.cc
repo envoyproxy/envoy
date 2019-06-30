@@ -223,9 +223,8 @@ Filter::~Filter() {
 }
 
 const FilterUtility::StrictHeaderChecker::HeaderCheckResult
-FilterUtility::StrictHeaderChecker::test(Http::HeaderMap& headers,
-                                         const Http::LowerCaseString& target_header) {
-  HeaderCheckResult r;
+FilterUtility::StrictHeaderChecker::checkHeader(Http::HeaderMap& headers,
+                                                const Http::LowerCaseString& target_header) {
   if (target_header == Http::Headers::get().EnvoyUpstreamRequestTimeoutMs) {
     return isInteger(headers.EnvoyUpstreamRequestTimeoutMs());
   } else if (target_header == Http::Headers::get().EnvoyUpstreamRequestPerTryTimeoutMs) {
@@ -237,12 +236,10 @@ FilterUtility::StrictHeaderChecker::test(Http::HeaderMap& headers,
   } else if (target_header == Http::Headers::get().EnvoyRetryGrpcOn) {
     return hasValidRetryFields(headers.EnvoyRetryGrpcOn(),
                                &Router::RetryStateImpl::parseRetryGrpcOn);
-  } else {
-    // Should only validate headers for which we have implemented a validator
-    ASSERT(false);
   }
-
-  return r;
+  NOT_REACHED_GCOVR_EXCL_LINE
+  // Should only validate headers for which we have implemented a validator.
+  ASSERT(false);
 }
 
 Stats::StatName Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
@@ -404,9 +401,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
                    route_entry_->clusterName(), headers.Path()->value().getStringView());
 
-  if (config_.strict_check_headers_ != nullptr && !config_.strict_check_headers_->empty()) {
+  if (config_.strict_check_headers_ != nullptr) {
     for (const auto& header : *config_.strict_check_headers_) {
-      const auto res = FilterUtility::StrictHeaderChecker::test(headers, header);
+      const auto res = FilterUtility::StrictHeaderChecker::checkHeader(headers, header);
       if (!res.valid_) {
         callbacks_->streamInfo().setResponseFlag(
             StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders);
