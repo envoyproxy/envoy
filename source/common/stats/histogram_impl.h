@@ -54,16 +54,9 @@ class HistogramImpl : public MetricImpl<Histogram> {
 public:
   HistogramImpl(StatName name, Store& parent, const std::string& tag_extracted_name,
                 const std::vector<Tag>& tags)
-      : MetricImpl<Histogram>(tag_extracted_name, tags, parent.symbolTable()),
-        name_(name, parent.symbolTable()), parent_(parent) {}
+      : MetricImpl<Histogram>(name, tag_extracted_name, tags, parent.symbolTable()),
+        parent_(parent) {}
   ~HistogramImpl() {
-    // We must explicitly free the StatName here using the SymbolTable reference
-    // we access via parent_. A pure RAII alternative would be to use
-    // StatNameManagedStorage rather than StatNameStorage, which will cost a total
-    // of 16 bytes per stat, counting the extra SymbolTable& reference here,
-    // plus the extra SymbolTable& reference in MetricImpl.
-    name_.free(symbolTable());
-
     // We must explicitly free the StatName here in order to supply the
     // SymbolTable reference. An RAII alternative would be to store a
     // reference to the SymbolTable in MetricImpl, which would cost 8 bytes
@@ -75,12 +68,9 @@ public:
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
   bool used() const override { return true; }
-  StatName statName() const override { return name_.statName(); }
   SymbolTable& symbolTable() override { return parent_.symbolTable(); }
 
 private:
-  StatNameStorage name_;
-
   // This is used for delivering the histogram data to sinks.
   Store& parent_;
 };
@@ -92,11 +82,9 @@ private:
 class NullHistogramImpl : public MetricImpl<Histogram> {
 public:
   explicit NullHistogramImpl(SymbolTable& symbol_table)
-      : MetricImpl<Histogram>(symbol_table), symbol_table_(symbol_table), name_("", symbol_table_) {
-  }
+      : MetricImpl<Histogram>(symbol_table), symbol_table_(symbol_table) {}
   ~NullHistogramImpl() { MetricImpl::clear(symbol_table_); }
 
-  StatName statName() const override { return name_.statName(); }
   bool used() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
@@ -104,7 +92,6 @@ public:
 
 private:
   SymbolTable& symbol_table_;
-  StatNameManagedStorage name_;
 };
 
 } // namespace Stats

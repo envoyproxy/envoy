@@ -14,16 +14,17 @@ MetricHelper::~MetricHelper() {
   ASSERT(!stat_names_.populated());
 }
 
-MetricHelper::MetricHelper(absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
-                           SymbolTable& symbol_table) {
+MetricHelper::MetricHelper(absl::string_view name, absl::string_view tag_extracted_name,
+                           const std::vector<Tag>& tags, SymbolTable& symbol_table) {
   // Encode all the names and tags into transient storage so we can count the
-  // required bytes. 1 is added to account for the tag_extracted_name, and we
-  // multiply the number of tags by 2 to account for the name and value of each
-  // tag.
-  const uint32_t num_names = 1 + 2 * tags.size();
+  // required bytes. 2 is added to account for the name and tag_extracted_name,
+  // and we multiply the number of tags by 2 to account for the name and value
+  // of each tag.
+  const uint32_t num_names = 2 + 2 * tags.size();
   STACK_ARRAY(names, absl::string_view, num_names);
-  names[0] = tag_extracted_name;
-  int index = 0;
+  names[0] = name;
+  names[1] = tag_extracted_name;
+  int index = 1;
   for (auto& tag : tags) {
     names[++index] = tag.name_;
     names[++index] = tag.value_;
@@ -31,11 +32,7 @@ MetricHelper::MetricHelper(absl::string_view tag_extracted_name, const std::vect
   symbol_table.populateList(names.begin(), num_names, stat_names_);
 }
 
-std::string MetricHelper::tagExtractedName(const SymbolTable& symbol_table) const {
-  return symbol_table.toString(tagExtractedStatName());
-}
-
-StatName MetricHelper::tagExtractedStatName() const {
+StatName MetricHelper::statName() const {
   StatName stat_name;
   stat_names_.iterate([&stat_name](StatName s) -> bool {
     stat_name = s;
@@ -44,8 +41,22 @@ StatName MetricHelper::tagExtractedStatName() const {
   return stat_name;
 }
 
+StatName MetricHelper::tagExtractedStatName() const {
+  StatName tag_extracted_stat_name;
+  bool skip = true;
+  stat_names_.iterate([&tag_extracted_stat_name, &skip](StatName s) -> bool {
+    if (skip) {
+      skip = false;
+      return true;
+    }
+    tag_extracted_stat_name = s;
+    return false; // Returning 'false' stops the iteration.
+  });
+  return tag_extracted_stat_name;
+}
+
 void MetricHelper::iterateTagStatNames(const Metric::TagStatNameIterFn& fn) const {
-  enum { TagExtractedName, TagName, TagValue } state = TagExtractedName;
+  enum { Name, TagExtractedName, TagName, TagValue } state = Name;
   StatName tag_name;
 
   // StatNameList maintains a linear ordered collection of StatNames, and we
@@ -54,6 +65,9 @@ void MetricHelper::iterateTagStatNames(const Metric::TagStatNameIterFn& fn) cons
   // as we iterate through the stat_names_.
   stat_names_.iterate([&state, &tag_name, &fn](StatName stat_name) -> bool {
     switch (state) {
+    case Name:
+      state = TagExtractedName;
+      break;
     case TagExtractedName:
       state = TagName;
       break;

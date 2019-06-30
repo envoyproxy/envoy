@@ -86,7 +86,7 @@ public:
   bool decRefCount() override { return refcount_helper_.decRefCount(); }
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
- private:
+private:
   RefcountHelper refcount_helper_;
 };
 

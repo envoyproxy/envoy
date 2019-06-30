@@ -32,6 +32,7 @@ protected:
   StatNamePool pool_;
 };
 
+/*
 // No truncation occurs in the implementation of HeapStatData.
 TEST_F(HeapStatDataTest, HeapNoTruncate) {
   const std::string long_string(128, 'A');
@@ -56,6 +57,7 @@ TEST_F(HeapStatDataTest, HeapAlloc) {
   stat_2->free(symbol_table_);
   stat_3->free(symbol_table_);
 }
+*/
 
 } // namespace
 } // namespace Stats
