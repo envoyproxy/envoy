@@ -1,67 +1,85 @@
 #!/usr/bin/python
 
+# Main library file containing all the protocol generation logic.
 
-def main():
+
+def generate_main_code(type, main_header_file, resolver_cc_file, input_files):
   """
-  Kafka header generator script
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  Generates C++ headers from Kafka protocol specification.
-  Can generate both main source code, as well as test code.
+  Main code generator.
 
-  Usage:
-    kafka_generator.py COMMAND MESSAGE_TYPE OUTPUT_FILES INPUT_FILES
-  where:
-  COMMAND : 'generate-source', to generate source files,
-            'generate-test', to generate test files.
-  MESSAGE_TYPE : 'request' or 'response'
-  OUTPUT_FILES : if generate-source: location of 'requests.h'/'responses.h' and
-                 'kafka_request_resolver.cc' / 'kafka_response_resolver.cc',
-                 if generate-test: location of 'requests_test.cc'/'responses_test.cc',
-                 'request_codec_request_test.cc' / 'response_codec_response_test.cc'.
-  INPUT_FILES: Kafka protocol json files to be processed.
+  Takes input files and processes them into structures representing a Kafka message (request or
+  response).
 
-  Kafka spec files are provided in Kafka clients jar file.
-  When generating source code, it creates:
-    - ${MESSAGE_TYPE}s.h - definition of all the structures/deserializers/parsers related to Kafka
-      requests/responses,
-    - kafka_${MESSAGE_TYPE}_resolver.cc - resolver that is responsible for creation of parsers
-      defined in ${MESSAGE_TYPE}s.h.
-  When generating test code, it creates:
-    - ${MESSAGE_TYPE}s_test.cc - serialization/deserialization tests for kafka structures,
-    - ${MESSAGE_TYPE}_codec_${MESSAGE_TYPE}_test.cc - test for all request/response operations
-      using the codec API.
-
-  Templates used are:
-  - to create '${MESSAGE_TYPE}.h': ${MESSAGE_TYPE}_h.j2, complex_type_template.j2,
-    request_parser.j2,
-  - to create 'kafka_${MESSAGE_TYPE}_resolver.cc': kafka_${MESSAGE_TYPE}_resolver_cc.j2,
-  - to create '${MESSAGE_TYPE}s_test.cc': ${MESSAGE_TYPE}s_test_cc.j2,
-  - to create '${MESSAGE_TYPE}_codec_${MESSAGE_TYPE}_test.cc' -
-      ${MESSAGE_TYPE}_codec_${MESSAGE_TYPE}_test_cc.j2.
+  These responses are then used to create:
+  - main_header_file - contains definitions of Kafka structures and their deserializers
+  - resolver_cc_file - contains request api key & version mapping to deserializer (from header file)
   """
+  # Parse provided input files.
+  messages = parse_messages(input_files)
 
-  import sys
-  import os
+  complex_type_template = RenderingHelper.get_template('complex_type_template.j2')
+  parsers_template = RenderingHelper.get_template("%s_parser.j2" % type)
 
-  command = sys.argv[1]
-  type = sys.argv[2]
+  main_header_contents = ''
 
-  if 'generate-source' == command:
-    main_header_file = os.path.abspath(sys.argv[3])
-    resolver_cc_file = os.path.abspath(sys.argv[4])
-    input_files = sys.argv[5:]
-  elif 'generate-test' == command:
-    header_test_cc_file = os.path.abspath(sys.argv[3])
-    codec_test_cc_file = os.path.abspath(sys.argv[4])
-    input_files = sys.argv[5:]
-  else:
-    raise ValueError('invalid command: ' + command)
+  for message in messages:
+    # For each child structure that is used by request/response, render its matching C++ code.
+    for dependency in message.declaration_chain:
+      main_header_contents += complex_type_template.render(complex_type=dependency)
+    # Each top-level structure (e.g. FetchRequest/FetchResponse) needs corresponding parsers.
+    main_header_contents += parsers_template.render(complex_type=message)
 
+  # Full file with headers, namespace declaration etc.
+  template = RenderingHelper.get_template("%ss_h.j2" % type)
+  contents = template.render(contents=main_header_contents)
+
+  # Generate main header file.
+  with open(main_header_file, 'w') as fd:
+    fd.write(contents)
+
+  template = RenderingHelper.get_template("kafka_%s_resolver_cc.j2" % type)
+  contents = template.render(message_types=messages)
+
+  # Generate ...resolver.cc file.
+  with open(resolver_cc_file, 'w') as fd:
+    fd.write(contents)
+
+
+def generate_test_code(type, header_test_cc_file, codec_test_cc_file, input_files):
+  """
+  Test code generator.
+
+  Takes input files and processes them into structures representing a Kafka message (request or
+  response).
+
+  These responses are then used to create:
+  - header_test_cc_file - tests for basic message serialization deserialization
+  - codec_test_cc_file - tests involving codec and Request/ResponseParserResolver
+  """
+  # Parse provided input files.
+  messages = parse_messages(input_files)
+
+  # Generate header-test file.
+  template = RenderingHelper.get_template("%ss_test_cc.j2" % type)
+  contents = template.render(message_types=messages)
+  with open(header_test_cc_file, 'w') as fd:
+    fd.write(contents)
+
+  # Generate codec-test file.
+  template = RenderingHelper.get_template("%s_codec_%s_test_cc.j2" % (type, type))
+  contents = template.render(message_types=messages)
+  with open(codec_test_cc_file, 'w') as fd:
+    fd.write(contents)
+
+
+def parse_messages(input_files):
+  """
+  Parse request/response structures from provided input files.
+  """
   import re
   import json
 
   messages = []
-
   # For each specification file, remove comments, and parse the remains.
   for input_file in input_files:
     with open(input_file, 'r') as fd:
@@ -73,51 +91,7 @@ def main():
 
   # Sort messages by api_key.
   messages.sort(key=lambda x: x.get_extra('api_key'))
-
-  # Generate main source code.
-  if 'generate-source' == command:
-    complex_type_template = RenderingHelper.get_template('complex_type_template.j2')
-    parsers_template = RenderingHelper.get_template("%s_parser.j2" % type)
-
-    main_header_contents = ''
-
-    for message in messages:
-      # For each child structure that is used by request/response, render its matching C++ code.
-      for dependency in message.declaration_chain:
-        main_header_contents += complex_type_template.render(complex_type=dependency)
-      # Each top-level structure (e.g. FetchRequest/FetchResponse) needs corresponding parsers.
-      main_header_contents += parsers_template.render(complex_type=message)
-
-    # Full file with headers, namespace declaration etc.
-    template = RenderingHelper.get_template("%ss_h.j2" % type)
-    contents = template.render(contents=main_header_contents)
-
-    # Generate main header file.
-    with open(main_header_file, 'w') as fd:
-      fd.write(contents)
-
-    template = RenderingHelper.get_template("kafka_%s_resolver_cc.j2" % type)
-    contents = template.render(message_types=messages)
-
-    # Generate ...resolver.cc file.
-    with open(resolver_cc_file, 'w') as fd:
-      fd.write(contents)
-
-  # Generate test code.
-  if 'generate-test' == command:
-    template = RenderingHelper.get_template("%ss_test_cc.j2" % type)
-    contents = template.render(message_types=messages)
-
-    # Generate header-test file.
-    with open(header_test_cc_file, 'w') as fd:
-      fd.write(contents)
-
-    template = RenderingHelper.get_template("%s_codec_%s_test_cc.j2" % (type, type))
-    contents = template.render(message_types=messages)
-
-    # Generate codec-test file.
-    with open(codec_test_cc_file, 'w') as fd:
-      fd.write(contents)
+  return messages
 
 
 def parse_top_level_element(spec):
@@ -535,10 +509,9 @@ class RenderingHelper:
   def get_template(template):
     import jinja2
     import os
+    import sys
+    # Templates are resolved relatively to main start script, due to main & test templates being
+    # stored in different directories.
     env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(searchpath=os.path.dirname(os.path.abspath(__file__))))
+        loader=jinja2.FileSystemLoader(searchpath=os.path.dirname(os.path.abspath(sys.argv[0]))))
     return env.get_template(template)
-
-
-if __name__ == "__main__":
-  main()
