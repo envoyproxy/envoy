@@ -21,7 +21,7 @@ struct Tag;
 /**
  * General interface for all stats objects.
  */
-class Metric {
+class Metric : public RefcountInterface {
 public:
   virtual ~Metric() = default;
   /**
@@ -110,7 +110,7 @@ public:
  * global counter as well as periodic counter. Calling latch() returns the periodic counter and
  * clears it.
  */
-class Counter : public Metric, public RefcountInterface {
+class Counter : public Metric {
 public:
   ~Counter() override = default;
 
@@ -126,7 +126,7 @@ using CounterSharedPtr = RefcountPtr<Counter>;
 /**
  * A gauge that can both increment and decrement.
  */
-class Gauge : public Metric, public RefcountInterface {
+class Gauge : public Metric {
 public:
   enum class ImportMode {
     Uninitialized, // Gauge was discovered during hot-restart transfer.
