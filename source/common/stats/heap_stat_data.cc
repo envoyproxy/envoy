@@ -60,21 +60,48 @@ void HeapStatDataAllocator::debugPrint() {
 }
 #endif
 
-class CounterImpl : public Counter, public MetricImpl {
+template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> {
 public:
-  CounterImpl(HeapStatData& data, HeapStatDataAllocator& alloc,
-              absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
-      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {}
+  explicit StatsSharedImpl(HeapStatData& data, HeapStatDataAllocator& alloc,
+                           absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
+      : MetricImpl<BaseClass>(tag_extracted_name, tags, alloc.symbolTable()), data_(data),
+        alloc_(alloc) {}
 
-  ~CounterImpl() override {
+  ~StatsSharedImpl() override {
     // MetricImpl must be explicitly cleared() before destruction, otherwise it
     // will not be able to access the SymbolTable& to free the symbols. An RAII
     // alternative would be to store the SymbolTable reference in the
     // MetricImpl, costing 8 bytes per stat.
-    MetricImpl::clear();
-    alloc_.removeCounterFromSet(this);
+    this->clear(symbolTable());
     data_.free(symbolTable());
   }
+
+  // Metric
+  SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
+  StatName statName() const override { return data_.statName(); }
+
+  // Counter/Gauge
+  bool used() const override { return data_.flags_ & Metric::Flags::Used; }
+
+  // RefcountInterface
+  void incRefCount() override { ++data_.ref_count_; }
+  bool decRefCount() override {
+    ASSERT(data_.ref_count_ >= 1);
+    return --data_.ref_count_ == 0;
+  }
+  uint32_t use_count() const override { return data_.ref_count_; }
+
+protected:
+  HeapStatData& data_;
+  HeapStatDataAllocator& alloc_;
+};
+
+class CounterImpl : public StatsSharedImpl<Counter> {
+public:
+  CounterImpl(HeapStatData& data, HeapStatDataAllocator& alloc,
+              absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
+      : StatsSharedImpl(data, alloc, tag_extracted_name, tags) {}
+  ~CounterImpl() override { alloc_.removeCounterFromSet(this); }
 
   // Stats::Counter
   void add(uint64_t amount) override {
@@ -87,28 +114,13 @@ public:
   void reset() override { data_.value_ = 0; }
   bool used() const override { return data_.flags_ & Flags::Used; }
   uint64_t value() const override { return data_.value_; }
-
-  SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
-  StatName statName() const override { return data_.statName(); }
-
-  // RefcountInterface
-  void incRefCount() override { ++data_.ref_count_; }
-  bool decRefCount() override {
-    ASSERT(data_.ref_count_ >= 1);
-    return --data_.ref_count_ == 0;
-  }
-  uint32_t use_count() const override { return data_.ref_count_; }
-
-private:
-  HeapStatData& data_;
-  HeapStatDataAllocator& alloc_;
 };
 
-class GaugeImpl : public Gauge, public MetricImpl {
+class GaugeImpl : public StatsSharedImpl<Gauge> {
 public:
   GaugeImpl(HeapStatData& data, HeapStatDataAllocator& alloc, absl::string_view tag_extracted_name,
             const std::vector<Tag>& tags, ImportMode import_mode)
-      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {
+      : StatsSharedImpl(data, alloc, tag_extracted_name, tags) {
     switch (import_mode) {
     case ImportMode::Accumulate:
       data_.flags_ |= Flags::LogicAccumulate;
@@ -124,16 +136,7 @@ public:
       break;
     }
   }
-
-  ~GaugeImpl() override {
-    // MetricImpl must be explicitly cleared() before destruction, otherwise it
-    // will not be able to access the SymbolTable& to free the symbols. An RAII
-    // alternative would be to store the SymbolTable reference in the
-    // MetricImpl, costing 8 bytes per stat.
-    MetricImpl::clear();
-    alloc_.removeGaugeFromSet(this);
-    data_.free(symbolTable());
-  }
+  ~GaugeImpl() override { alloc_.removeGaugeFromSet(this); }
 
   // Stats::Gauge
   void add(uint64_t amount) override {
@@ -152,7 +155,6 @@ public:
     data_.value_ -= amount;
   }
   uint64_t value() const override { return data_.value_; }
-  bool used() const override { return data_.flags_ & Flags::Used; }
 
   ImportMode importMode() const override {
     if (data_.flags_ & Flags::NeverImport) {
@@ -189,21 +191,6 @@ public:
       break;
     }
   }
-
-  SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
-  StatName statName() const override { return data_.statName(); }
-
-  // RefcountInterface
-  void incRefCount() override { ++data_.ref_count_; }
-  bool decRefCount() override {
-    ASSERT(data_.ref_count_ >= 1);
-    return --data_.ref_count_ == 0;
-  }
-  uint32_t use_count() const override { return data_.ref_count_; }
-
-private:
-  HeapStatData& data_;
-  HeapStatDataAllocator& alloc_;
 };
 
 CounterSharedPtr HeapStatDataAllocator::makeCounter(StatName name,

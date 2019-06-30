@@ -50,11 +50,11 @@ private:
 /**
  * Histogram implementation for the heap.
  */
-class HistogramImpl : public Histogram, public MetricImpl {
+class HistogramImpl : public MetricImpl<Histogram> {
 public:
   HistogramImpl(StatName name, Store& parent, const std::string& tag_extracted_name,
                 const std::vector<Tag>& tags)
-      : MetricImpl(tag_extracted_name, tags, parent.symbolTable()),
+      : MetricImpl<Histogram>(tag_extracted_name, tags, parent.symbolTable()),
         name_(name, parent.symbolTable()), parent_(parent) {}
   ~HistogramImpl() {
     // We must explicitly free the StatName here using the SymbolTable reference
@@ -68,7 +68,7 @@ public:
     // SymbolTable reference. An RAII alternative would be to store a
     // reference to the SymbolTable in MetricImpl, which would cost 8 bytes
     // per stat.
-    MetricImpl::clear();
+    MetricImpl::clear(symbolTable());
   }
 
   // Stats::Histogram
@@ -89,18 +89,22 @@ private:
  * Null histogram implementation.
  * No-ops on all calls and requires no underlying metric or data.
  */
-class NullHistogramImpl : public Histogram, NullMetricImpl {
+class NullHistogramImpl : public MetricImpl<Histogram> {
 public:
-  explicit NullHistogramImpl(SymbolTable& symbol_table) : NullMetricImpl(symbol_table) {}
-  ~NullHistogramImpl() override {
-    // MetricImpl must be explicitly cleared() before destruction, otherwise it
-    // will not be able to access the SymbolTable& to free the symbols. An RAII
-    // alternative would be to store the SymbolTable reference in the
-    // MetricImpl, costing 8 bytes per stat.
-    MetricImpl::clear();
+  explicit NullHistogramImpl(SymbolTable& symbol_table)
+      : MetricImpl<Histogram>(symbol_table), symbol_table_(symbol_table), name_("", symbol_table_) {
   }
+  ~NullHistogramImpl() { MetricImpl::clear(symbol_table_); }
+
+  StatName statName() const override { return name_.statName(); }
+  bool used() const override { return false; }
+  SymbolTable& symbolTable() override { return symbol_table_; }
 
   void recordValue(uint64_t) override {}
+
+private:
+  SymbolTable& symbol_table_;
+  StatNameManagedStorage name_;
 };
 
 } // namespace Stats

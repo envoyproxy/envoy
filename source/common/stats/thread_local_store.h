@@ -28,7 +28,7 @@ namespace Stats {
  * histograms, one to collect the values and other as backup that is used for merge process. The
  * swap happens during the merge process.
  */
-class ThreadLocalHistogramImpl : public Histogram, public MetricImpl {
+class ThreadLocalHistogramImpl : public MetricImpl<Histogram> {
 public:
   ThreadLocalHistogramImpl(StatName name, absl::string_view tag_extracted_name,
                            const std::vector<Tag>& tags, SymbolTable& symbol_table);
@@ -71,7 +71,7 @@ class TlsScope;
 /**
  * Log Linear Histogram implementation that is stored in the main thread.
  */
-class ParentHistogramImpl : public ParentHistogram, public MetricImpl {
+class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Store& parent, TlsScope& tlsScope,
                       absl::string_view tag_extracted_name, const std::vector<Tag>& tags);

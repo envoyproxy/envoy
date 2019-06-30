@@ -570,15 +570,15 @@ ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name,
                                                    absl::string_view tag_extracted_name,
                                                    const std::vector<Tag>& tags,
                                                    SymbolTable& symbol_table)
-    : MetricImpl(tag_extracted_name, tags, symbol_table), current_active_(0), used_(false),
-      created_thread_id_(std::this_thread::get_id()), name_(name, symbol_table),
+    : MetricImpl<Histogram>(tag_extracted_name, tags, symbol_table), current_active_(0),
+      used_(false), created_thread_id_(std::this_thread::get_id()), name_(name, symbol_table),
       symbol_table_(symbol_table) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();
 }
 
 ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
-  MetricImpl::clear();
+  MetricImpl::clear(symbolTable());
   name_.free(symbolTable());
   hist_free(histograms_[0]);
   hist_free(histograms_[1]);
@@ -605,7 +605,7 @@ ParentHistogramImpl::ParentHistogramImpl(StatName name, Store& parent, TlsScope&
       merged_(false), name_(name, parent.symbolTable()) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
-  MetricImpl::clear();
+  MetricImpl::clear(symbolTable());
   name_.free(symbolTable());
   hist_free(interval_histogram_);
   hist_free(cumulative_histogram_);

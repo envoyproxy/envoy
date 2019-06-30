@@ -7,15 +7,15 @@
 namespace Envoy {
 namespace Stats {
 
-MetricImpl::~MetricImpl() {
-  // The storage must be cleaned by a subclass of MetricImpl in its
+MetricHelper::~MetricHelper() {
+  // The storage must be cleaned by a subclass of MetricHelper in its
   // destructor, because the symbol-table is owned by the subclass.
-  // Simply call MetricImpl::clear() in the subclass dtor.
+  // Simply call MetricHelper::clear() in the subclass dtor.
   ASSERT(!stat_names_.populated());
 }
 
-MetricImpl::MetricImpl(absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
-                       SymbolTable& symbol_table) {
+MetricHelper::MetricHelper(absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
+                           SymbolTable& symbol_table) {
   // Encode all the names and tags into transient storage so we can count the
   // required bytes. 1 is added to account for the tag_extracted_name, and we
   // multiply the number of tags by 2 to account for the name and value of each
@@ -31,13 +31,11 @@ MetricImpl::MetricImpl(absl::string_view tag_extracted_name, const std::vector<T
   symbol_table.populateList(names.begin(), num_names, stat_names_);
 }
 
-void MetricImpl::clear() { stat_names_.clear(symbolTable()); }
-
-std::string MetricImpl::tagExtractedName() const {
-  return constSymbolTable().toString(tagExtractedStatName());
+std::string MetricHelper::tagExtractedName(const SymbolTable& symbol_table) const {
+  return symbol_table.toString(tagExtractedStatName());
 }
 
-StatName MetricImpl::tagExtractedStatName() const {
+StatName MetricHelper::tagExtractedStatName() const {
   StatName stat_name;
   stat_names_.iterate([&stat_name](StatName s) -> bool {
     stat_name = s;
@@ -46,7 +44,7 @@ StatName MetricImpl::tagExtractedStatName() const {
   return stat_name;
 }
 
-void MetricImpl::iterateTagStatNames(const TagStatNameIterFn& fn) const {
+void MetricHelper::iterateTagStatNames(const Metric::TagStatNameIterFn& fn) const {
   enum { TagExtractedName, TagName, TagValue } state = TagExtractedName;
   StatName tag_name;
 
@@ -75,16 +73,15 @@ void MetricImpl::iterateTagStatNames(const TagStatNameIterFn& fn) const {
   ASSERT(state != TagValue);
 }
 
-void MetricImpl::iterateTags(const TagIterFn& fn) const {
-  const SymbolTable& symbol_table = constSymbolTable();
+void MetricHelper::iterateTags(const SymbolTable& symbol_table, const Metric::TagIterFn& fn) const {
   iterateTagStatNames([&fn, &symbol_table](StatName name, StatName value) -> bool {
     return fn(Tag{symbol_table.toString(name), symbol_table.toString(value)});
   });
 }
 
-std::vector<Tag> MetricImpl::tags() const {
+std::vector<Tag> MetricHelper::tags(const SymbolTable& symbol_table) const {
   std::vector<Tag> tags;
-  iterateTags([&tags](const Tag& tag) -> bool {
+  iterateTags(symbol_table, [&tags](const Tag& tag) -> bool {
     tags.emplace_back(tag);
     return true;
   });

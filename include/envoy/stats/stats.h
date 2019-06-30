@@ -110,7 +110,7 @@ public:
  * global counter as well as periodic counter. Calling latch() returns the periodic counter and
  * clears it.
  */
-class Counter : public virtual Metric, public RefcountInterface {
+class Counter : public Metric, public RefcountInterface {
 public:
   ~Counter() override = default;
 
@@ -126,7 +126,7 @@ using CounterSharedPtr = RefcountPtr<Counter>;
 /**
  * A gauge that can both increment and decrement.
  */
-class Gauge : public virtual Metric, public RefcountInterface {
+class Gauge : public Metric, public RefcountInterface {
 public:
   enum class ImportMode {
     Uninitialized, // Gauge was discovered during hot-restart transfer.
