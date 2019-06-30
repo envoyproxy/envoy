@@ -244,7 +244,7 @@ protected:
   }
 
   Envoy::Http::AsyncClient::Callbacks* popPendingCallback() {
-    if (0 == callbacks_.size()) {
+    if (callbacks_.empty()) {
       // Can't use ASSERT_* as this is not a test function
       throw std::underflow_error("empty deque");
     }

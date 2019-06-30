@@ -17,7 +17,8 @@ import traceback
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
                      "./tools/testdata/check_format/", "./tools/pyformat/")
-SUFFIXES = (".cc", ".h", "BUILD", "WORKSPACE", ".bzl", ".java", ".md", ".rst", ".proto")
+SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto",
+            ".rst")
 DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
 
@@ -147,8 +148,8 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/ext_authz",
   "extensions/filters/network/redis_proxy",
   "extensions/filters/network/kafka",
-  "extensions/filters/network/kafka/protocol_code_generator",
-  "extensions/filters/network/kafka/serialization_code_generator",
+  "extensions/filters/network/kafka/protocol",
+  "extensions/filters/network/kafka/serialization",
   "extensions/filters/network/mongo_proxy",
   "extensions/filters/network/common",
   "extensions/filters/network/common/redis",

@@ -37,6 +37,7 @@ public:
   MOCK_CONST_METHOD0(localityWeightAware, bool());
   MOCK_CONST_METHOD0(scaleLocalityWeight, bool());
   MOCK_CONST_METHOD0(panicModeAny, bool());
+  MOCK_CONST_METHOD0(listAsAny, bool());
 
   std::vector<SubsetSelectorPtr> subset_selectors_;
 };

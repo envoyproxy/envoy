@@ -198,7 +198,7 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
   }
 
   BufferHelper::writeVarIntI32(header_buffer, 0); // num transforms
-  if (headers.size() > 0) {
+  if (!headers.empty()) {
     // Info ID 1
     header_buffer.writeByte(1);
 

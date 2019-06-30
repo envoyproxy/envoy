@@ -12,8 +12,8 @@ namespace DynamicForwardProxy {
 MockDnsCache::MockDnsCache() = default;
 MockDnsCache::~MockDnsCache() = default;
 
-MockLoadDnsCacheHandle::MockLoadDnsCacheHandle() = default;
-MockLoadDnsCacheHandle::~MockLoadDnsCacheHandle() { onDestroy(); }
+MockLoadDnsCacheEntryHandle::MockLoadDnsCacheEntryHandle() = default;
+MockLoadDnsCacheEntryHandle::~MockLoadDnsCacheEntryHandle() { onDestroy(); }
 
 MockDnsCacheManager::MockDnsCacheManager() {
   ON_CALL(*this, getCache(_)).WillByDefault(Return(dns_cache_));
@@ -28,8 +28,8 @@ MockDnsHostInfo::~MockDnsHostInfo() = default;
 MockUpdateCallbacks::MockUpdateCallbacks() = default;
 MockUpdateCallbacks::~MockUpdateCallbacks() = default;
 
-MockLoadDnsCacheCallbacks::MockLoadDnsCacheCallbacks() = default;
-MockLoadDnsCacheCallbacks::~MockLoadDnsCacheCallbacks() = default;
+MockLoadDnsCacheEntryCallbacks::MockLoadDnsCacheEntryCallbacks() = default;
+MockLoadDnsCacheEntryCallbacks::~MockLoadDnsCacheEntryCallbacks() = default;
 
 } // namespace DynamicForwardProxy
 } // namespace Common

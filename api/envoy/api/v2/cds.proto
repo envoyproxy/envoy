@@ -428,6 +428,11 @@ message Cluster {
     // subset might become empty. With this option enabled, if that happens the LB will attempt
     // to select a host from the entire cluster.
     bool panic_mode_any = 6;
+
+    // If true, metadata specified for a metadata key will be matched against the corresponding
+    // endpoint metadata if the endpoint metadata matches the value exactly OR it is a list value
+    // and any of the elements in the list matches the criteria.
+    bool list_as_any = 7;
   }
 
   // Configuration for load balancing subsetting.

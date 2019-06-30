@@ -133,10 +133,14 @@ statistics will be rooted at *cluster.<name>.outlier_detection.* and contain the
   ejections_overflow, Counter, Number of ejections aborted due to the max ejection %
   ejections_enforced_consecutive_5xx, Counter, Number of enforced consecutive 5xx ejections
   ejections_detected_consecutive_5xx, Counter, Number of detected consecutive 5xx ejections (even if unenforced)
-  ejections_enforced_success_rate, Counter, Number of enforced success rate outlier ejections
-  ejections_detected_success_rate, Counter, Number of detected success rate outlier ejections (even if unenforced)
+  ejections_enforced_success_rate, Counter, Number of enforced success rate outlier ejections. Exact meaning of this counter depends on :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>` config item. Refer to :ref:`Outlier Detection documentation<arch_overview_outlier_detection>` for details.
+  ejections_detected_success_rate, Counter, Number of detected success rate outlier ejections (even if unenforced). Exact meaning of this counter depends on :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>` config item. Refer to :ref:`Outlier Detection documentation<arch_overview_outlier_detection>` for details.
   ejections_enforced_consecutive_gateway_failure, Counter, Number of enforced consecutive gateway failure ejections
   ejections_detected_consecutive_gateway_failure, Counter, Number of detected consecutive gateway failure ejections (even if unenforced)
+  ejections_enforced_consecutive_local_origin_failure, Counter, Number of enforced consecutive local origin failure ejections
+  ejections_detected_consecutive_local_origin_failure, Counter, Number of detected consecutive local origin failure ejections (even if unenforced)
+  ejections_enforced_local_origin_success_rate, Counter, Number of enforced success rate outlier ejections for locally originated failures
+  ejections_detected_local_origin_success_rate, Counter, Number of detected success rate outlier ejections for locally originated failures (even if unenforced)
   ejections_total, Counter, Deprecated. Number of ejections due to any outlier type (even if unenforced)
   ejections_consecutive_5xx, Counter, Deprecated. Number of consecutive 5xx ejections (even if unenforced)
 

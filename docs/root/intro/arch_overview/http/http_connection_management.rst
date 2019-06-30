@@ -61,7 +61,7 @@ can be used to modify this behavior, and they fall into two categories:
     hosts that have already been attempted.
 
   * *envoy.retry_host_predicates.omit_canary_hosts*: This will reject any host that is a marked as canary host.
-    Hosts are marked by setting ``canary: true`` for the ```envoy.lb`` filter in the endpoint's filter metadata.
+    Hosts are marked by setting ``canary: true`` for the ``envoy.lb`` filter in the endpoint's filter metadata.
     See :ref:`LbEndpoint <envoy_api_msg_endpoint.LbEndpoint>` for more details.
 
 * :ref:`Priority Predicates<envoy_api_field_route.RetryPolicy.retry_priority>`: These predicates can
