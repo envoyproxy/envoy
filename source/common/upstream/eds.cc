@@ -252,7 +252,10 @@ bool EdsClusterImpl::updateHostsPerLocality(
 }
 
 void EdsClusterImpl::onConfigUpdateFailed(const EnvoyException* e) {
-  UNREFERENCED_PARAMETER(e);
+  //  We should not call onPreInitComplete if this method called because of stream disconnection.
+  if (e == nullptr) {
+    return;
+  }
   // We need to allow server startup to continue, even if we have a bad config.
   onPreInitComplete();
 }
