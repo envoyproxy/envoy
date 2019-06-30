@@ -764,7 +764,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(RememberStatsMatcherTest, RememberStatsMatcherTest,
-                        testing::ValuesIn({false, true}));
+                         testing::ValuesIn({false, true}));
 
 // Tests that the logic for remembering rejected stats works properly, both
 // with and without threading.

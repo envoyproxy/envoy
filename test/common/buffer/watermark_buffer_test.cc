@@ -28,7 +28,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(WatermarkBufferTest, WatermarkBufferTest,
-                        testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
+                         testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
 
 TEST_P(WatermarkBufferTest, TestWatermark) { ASSERT_EQ(10, buffer_.highWatermark()); }
 

@@ -75,7 +75,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(StatNameTest, StatNameTest,
-                        testing::ValuesIn({SymbolTableType::Real, SymbolTableType::Fake}));
+                         testing::ValuesIn({SymbolTableType::Real, SymbolTableType::Fake}));
 
 TEST_P(StatNameTest, AllocFree) { encodeDecode("hello.world"); }
 

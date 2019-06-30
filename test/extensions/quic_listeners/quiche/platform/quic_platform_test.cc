@@ -730,8 +730,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(QuicMemSliceTests, QuicMemSliceTest,
-                        testing::ValuesIn({Envoy::Buffer::BufferImplementation::Old,
-                                           Envoy::Buffer::BufferImplementation::New}));
+                         testing::ValuesIn({Envoy::Buffer::BufferImplementation::Old,
+                                            Envoy::Buffer::BufferImplementation::New}));
 
 TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');

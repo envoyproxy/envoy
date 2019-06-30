@@ -146,7 +146,7 @@ fragments:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ScopedRdsIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test that a SRDS DiscoveryResponse is successfully processed.
 TEST_P(ScopedRdsIntegrationTest, BasicSuccess) {
