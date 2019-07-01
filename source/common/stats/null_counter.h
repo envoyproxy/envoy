@@ -14,7 +14,7 @@ namespace Stats {
 class NullCounterImpl : public MetricImpl<Counter> {
 public:
   explicit NullCounterImpl(SymbolTable& symbol_table)
-      : MetricImpl<Counter>(symbol_table), symbol_table_(symbol_table)  {}
+      : MetricImpl<Counter>(symbol_table), symbol_table_(symbol_table) {}
   ~NullCounterImpl() override {
     // MetricImpl must be explicitly cleared() before destruction, otherwise it
     // will not be able to access the SymbolTable& to free the symbols. An RAII
