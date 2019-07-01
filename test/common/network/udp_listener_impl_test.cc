@@ -368,7 +368,7 @@ TEST_P(UdpListenerImplTest, SendData) {
   if (version_ == Address::IpVersion::v4) {
     // Kernel regards any 127.x.x.x as local address.
     send_from_addr.reset(
-        new Address::Ipv4Instance("127.1.2.3", server_socket_->localAddress()->ip()->port()));
+        new Address::Ipv4Instance("127.0.0.3", server_socket_->localAddress()->ip()->port()));
   } else {
     // Only use non-local v6 address if IP_FREEBIND is supported. Otherwise use
     // ::1 to avoid EINVAL error. Unfortunately this can't verify that sendmsg with

@@ -103,7 +103,7 @@ TEST_P(UdpEchoIntegrationTest, HelloWorldOnNonLocalAddress) {
   Network::Address::InstanceConstSharedPtr listener_address;
   if (version_ == Network::Address::IpVersion::v4) {
     // Kernel regards any 127.x.x.x as local address.
-    listener_address.reset(new Network::Address::Ipv4Instance("127.1.2.3", port));
+    listener_address.reset(new Network::Address::Ipv4Instance("127.0.0.3", port));
   } else {
     // IPv6 doesn't allow any nonlocal source address for sendmsg. And the only
     // local address guaranteed in tests in loopback. Unfortunately, even if it's not
