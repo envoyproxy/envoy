@@ -42,7 +42,7 @@ envoy_cc_library(
     deps = [
         ":envoy_quic_utils_lib",
         "@com_googlesource_quiche//:quic_core_packet_writer_interface_lib",
-            ],
+    ],
 )
 
 envoy_cc_library(

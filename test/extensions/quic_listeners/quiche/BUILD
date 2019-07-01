@@ -33,7 +33,7 @@ envoy_cc_test(
         "//source/common/network:io_socket_error_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_packet_writer_lib",
         "//test/mocks/network:network_mocks",
-            ],
+    ],
 )
 
 envoy_cc_test(
