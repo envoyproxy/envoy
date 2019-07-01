@@ -60,7 +60,7 @@ protected:
         Network::Test::getAnyAddress(version_),
 #ifdef IP_FREEBIND
         SocketOptionFactory::buildIpFreebindOptions(),
-#elif
+#else
         nullptr,
 #endif
         bind);
@@ -377,7 +377,7 @@ TEST_P(UdpListenerImplTest, SendData) {
     send_from_addr.reset(new Address::Ipv6Instance(
 #ifdef IP_FREEBIND
         "::9",
-#elif
+#else
         "::1",
 #endif
         server_socket_->localAddress()->ip()->port()));
