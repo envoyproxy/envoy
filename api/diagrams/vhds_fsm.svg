@@ -259,10 +259,14 @@
     <polyline style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" points="1150.93,545.844 1150.93,557.844 1162.93,557.844 "/>
     <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="867.034" y="570.744">
 <<<<<<< HEAD
+<<<<<<< HEAD
       <tspan x="867.034" y="570.744">VHDS Subscribed virtual hosts changed</tspan>
 =======
       <tspan x="867.034" y="570.744">VHDS Subscribed virutal hosts changed</tspan>
 >>>>>>> Moved over to RST/changed diagrams to SVG and other code review comments.
+=======
+      <tspan x="867.034" y="570.744">VHDS Subscribed virtual hosts changed</tspan>
+>>>>>>> Fix spelling error
     </text>
   </g>
   <g>
