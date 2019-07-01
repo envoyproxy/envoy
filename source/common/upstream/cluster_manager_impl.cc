@@ -344,7 +344,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     const auto merge_timeout =
         PROTOBUF_GET_MS_OR_DEFAULT(cluster.info()->lbConfig(), update_merge_window, 1000);
     // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
-    const bool is_mergeable = !hosts_added.size() && !hosts_removed.size();
+    const bool is_mergeable = hosts_added.empty() && hosts_removed.empty();
 
     if (merge_timeout > 0) {
       // If this is not mergeable, we should cancel any scheduled updates since

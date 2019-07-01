@@ -75,6 +75,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "refcount_ptr_test",
+    srcs = ["refcount_ptr_test.cc"],
+    deps = ["//include/envoy/stats:refcount_ptr_interface"],
+)
+
+envoy_cc_test(
     name = "symbol_table_impl_test",
     srcs = ["symbol_table_impl_test.cc"],
     deps = [
