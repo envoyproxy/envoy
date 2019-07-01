@@ -291,7 +291,6 @@ envoy_cc_library(
     }),
     copts = envoy_select_boringssl(
         ["-DENVOY_SSL_VERSION=\\\"BoringSSL-FIPS\\\""],
-        ["-DENVOY_SSL_VERSION=\\\"BoringSSL-DISABLED\\\""],
         ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
     ),
     linkstamp = "version_linkstamp.cc",
