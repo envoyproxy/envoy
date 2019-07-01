@@ -23,19 +23,22 @@ public:
   virtual void onData(Buffer::Instance& data) PURE;
 };
 
-/**
- * Kafka message encoder.
- * @param MessageType encoded message type (request or response).
- */
-template <typename MessageType> class MessageEncoder {
+template <typename MessageType, typename ParseFailureType>
+class MessageCallback {
 public:
-  virtual ~MessageEncoder() = default;
+  virtual ~MessageCallback() = default;
 
   /**
-   * Encodes given message.
-   * @param message message to be encoded.
+   * Callback method invoked when message is successfully decoded.
+   * @param message message that has been decoded.
    */
-  virtual void encode(const MessageType& message) PURE;
+  virtual void onMessage(MessageType response) PURE;
+
+  /**
+   * Callback method invoked when message could not be decoded.
+   * Invoked after all message's bytes have been consumed.
+   */
+  virtual void onFailedParse(ParseFailureType failure_data) PURE;
 };
 
 /**
@@ -137,7 +140,21 @@ private:
   const std::vector<CallbackType> callbacks_;
 
   ParserType current_parser_;
+};
 
+/**
+ * Kafka message encoder.
+ * @param MessageType encoded message type (request or response).
+ */
+template <typename MessageType> class MessageEncoder {
+public:
+  virtual ~MessageEncoder() = default;
+
+  /**
+   * Encodes given message.
+   * @param message message to be encoded.
+   */
+  virtual void encode(const MessageType& message) PURE;
 };
 
 } // namespace Kafka

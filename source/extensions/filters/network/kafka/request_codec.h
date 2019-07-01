@@ -13,25 +13,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-/**
- * Callback invoked when request is successfully decoded.
- */
-class RequestCallback {
-public:
-  virtual ~RequestCallback() = default;
-
-  /**
-   * Callback method invoked when request is successfully decoded.
-   * @param request request that has been decoded.
-   */
-  virtual void onMessage(AbstractRequestSharedPtr request) PURE;
-
-  /**
-   * Callback method invoked when request could not be decoded.
-   * Invoked after all request's bytes have been consumed.
-   */
-  virtual void onFailedParse(RequestParseFailureSharedPtr failure_data) PURE;
-};
+using RequestCallback = MessageCallback<AbstractRequestSharedPtr, RequestParseFailureSharedPtr>;
 
 using RequestCallbackSharedPtr = std::shared_ptr<RequestCallback>;
 
