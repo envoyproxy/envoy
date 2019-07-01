@@ -225,7 +225,7 @@ public:
    */
   static std::list<Network::DnsResponse>
   makeDnsResponse(const std::list<std::string>& addresses,
-                  const std::chrono::seconds = std::chrono::seconds(0));
+                  std::chrono::seconds = std::chrono::seconds(0));
 
   /**
    * List files in a given directory path

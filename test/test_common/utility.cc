@@ -182,8 +182,7 @@ void TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, u
 }
 
 std::list<Network::DnsResponse>
-TestUtility::makeDnsResponse(const std::list<std::string>& addresses,
-                             const std::chrono::seconds ttl) {
+TestUtility::makeDnsResponse(const std::list<std::string>& addresses, std::chrono::seconds ttl) {
   std::list<Network::DnsResponse> ret;
   for (const auto& address : addresses) {
 
