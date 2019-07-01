@@ -438,8 +438,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_hpack_decoder_hpack_block_decoder_lib",
-    srcs = ["http2/hpack/decoder/hpack_block_decoder.cc"],
-    hdrs = ["http2/hpack/decoder/hpack_block_decoder.h"],
+    srcs = ["quiche/http2/hpack/decoder/hpack_block_decoder.cc"],
+    hdrs = ["quiche/http2/hpack/decoder/hpack_block_decoder.h"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
@@ -453,8 +453,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_hpack_decoder_hpack_decoder_lib",
-    srcs = ["http2/hpack/decoder/hpack_decoder.cc"],
-    hdrs = ["http2/hpack/decoder/hpack_decoder.h"],
+    srcs = ["quiche/http2/hpack/decoder/hpack_decoder.cc"],
+    hdrs = ["quiche/http2/hpack/decoder/hpack_decoder.h"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
@@ -471,8 +471,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_hpack_decoder_hpack_decoder_listener_lib",
-    srcs = ["http2/hpack/decoder/hpack_decoder_listener.cc"],
-    hdrs = ["http2/hpack/decoder/hpack_decoder_listener.h"],
+    srcs = ["quiche/http2/hpack/decoder/hpack_decoder_listener.cc"],
+    hdrs = ["quiche/http2/hpack/decoder/hpack_decoder_listener.h"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
@@ -484,8 +484,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_hpack_decoder_hpack_decoder_state_lib",
-    srcs = ["http2/hpack/decoder/hpack_decoder_state.cc"],
-    hdrs = ["http2/hpack/decoder/hpack_decoder_state.h"],
+    srcs = ["quiche/http2/hpack/decoder/hpack_decoder_state.cc"],
+    hdrs = ["quiche/http2/hpack/decoder/hpack_decoder_state.h"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
@@ -502,8 +502,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_hpack_decoder_hpack_decoder_string_buffer_lib",
-    srcs = ["http2/hpack/decoder/hpack_decoder_string_buffer.cc"],
-    hdrs = ["http2/hpack/decoder/hpack_decoder_string_buffer.h"],
+    srcs = ["quiche/http2/hpack/decoder/hpack_decoder_string_buffer.cc"],
+    hdrs = ["quiche/http2/hpack/decoder/hpack_decoder_string_buffer.h"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
@@ -514,8 +514,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_hpack_decoder_hpack_decoder_tables_lib",
-    srcs = ["http2/hpack/decoder/hpack_decoder_tables.cc"],
-    hdrs = ["http2/hpack/decoder/hpack_decoder_tables.h"],
+    srcs = ["quiche/http2/hpack/decoder/hpack_decoder_tables.cc"],
+    hdrs = ["quiche/http2/hpack/decoder/hpack_decoder_tables.h"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
@@ -529,8 +529,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_hpack_decoder_hpack_entry_decoder_lib",
-    srcs = ["http2/hpack/decoder/hpack_entry_decoder.cc"],
-    hdrs = ["http2/hpack/decoder/hpack_entry_decoder.h"],
+    srcs = ["quiche/http2/hpack/decoder/hpack_entry_decoder.cc"],
+    hdrs = ["quiche/http2/hpack/decoder/hpack_entry_decoder.h"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
@@ -546,8 +546,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_hpack_decoder_hpack_entry_decoder_listener_lib",
-    srcs = ["http2/hpack/decoder/hpack_entry_decoder_listener.cc"],
-    hdrs = ["http2/hpack/decoder/hpack_entry_decoder_listener.h"],
+    srcs = ["quiche/http2/hpack/decoder/hpack_entry_decoder_listener.cc"],
+    hdrs = ["quiche/http2/hpack/decoder/hpack_entry_decoder_listener.h"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
@@ -558,8 +558,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_hpack_decoder_hpack_entry_type_decoder_lib",
-    srcs = ["http2/hpack/decoder/hpack_entry_type_decoder.cc"],
-    hdrs = ["http2/hpack/decoder/hpack_entry_type_decoder.h"],
+    srcs = ["quiche/http2/hpack/decoder/hpack_entry_type_decoder.cc"],
+    hdrs = ["quiche/http2/hpack/decoder/hpack_entry_type_decoder.h"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
@@ -573,8 +573,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_hpack_decoder_hpack_string_decoder_lib",
-    srcs = ["http2/hpack/decoder/hpack_string_decoder.cc"],
-    hdrs = ["http2/hpack/decoder/hpack_string_decoder.h"],
+    srcs = ["quiche/http2/hpack/decoder/hpack_string_decoder.cc"],
+    hdrs = ["quiche/http2/hpack/decoder/hpack_string_decoder.h"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
@@ -587,8 +587,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_hpack_decoder_hpack_string_decoder_listener_lib",
-    srcs = ["http2/hpack/decoder/hpack_string_decoder_listener.cc"],
-    hdrs = ["http2/hpack/decoder/hpack_string_decoder_listener.h"],
+    srcs = ["quiche/http2/hpack/decoder/hpack_string_decoder_listener.cc"],
+    hdrs = ["quiche/http2/hpack/decoder/hpack_string_decoder_listener.h"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [":http2_platform"],
@@ -596,8 +596,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_hpack_decoder_hpack_whole_entry_buffer_lib",
-    srcs = ["http2/hpack/decoder/hpack_whole_entry_buffer.cc"],
-    hdrs = ["http2/hpack/decoder/hpack_whole_entry_buffer.h"],
+    srcs = ["quiche/http2/hpack/decoder/hpack_whole_entry_buffer.cc"],
+    hdrs = ["quiche/http2/hpack/decoder/hpack_whole_entry_buffer.h"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
@@ -611,8 +611,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_hpack_decoder_hpack_whole_entry_listener_lib",
-    srcs = ["http2/hpack/decoder/hpack_whole_entry_listener.cc"],
-    hdrs = ["http2/hpack/decoder/hpack_whole_entry_listener.h"],
+    srcs = ["quiche/http2/hpack/decoder/hpack_whole_entry_listener.cc"],
+    hdrs = ["quiche/http2/hpack/decoder/hpack_whole_entry_listener.h"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
