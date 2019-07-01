@@ -12,7 +12,7 @@ namespace {
 
 // Must be a dedicated function so that TID is within the death test.
 static void deathTestWorker() {
-  ManagerImpl manager(Thread::threadFactoryForTest().currentThreadId());
+  ManagerImpl manager(Thread::threadFactoryForTest());
 
   manager.get("foo", [] { return nullptr; });
 }
@@ -35,7 +35,7 @@ public:
 };
 
 TEST(SingletonManagerImplTest, Basic) {
-  ManagerImpl manager(Thread::threadFactoryForTest().currentThreadId());
+  ManagerImpl manager(Thread::threadFactoryForTest());
 
   std::shared_ptr<TestSingleton> singleton = std::make_shared<TestSingleton>();
   EXPECT_EQ(singleton, manager.get("test_singleton", [singleton] { return singleton; }));
