@@ -15,9 +15,9 @@ Version history
   for each host, useful for DNS based clusters.
 * api: track and report requests issued since last load report.
 * build: releases are built with Clang and linked with LLD.
-* dns: added support for getting DNS record TTL which is used by STRICT_DNS/LOGICAL_DNS cluster as DNS refresh rate.
 * control-plane: management servers can respond with HTTP 304 to indicate that config is up to date for Envoy proxies polling a :ref:`REST API Config Type <envoy_api_field_core.ApiConfigSource.api_type>`
 * csrf: added support for whitelisting additional source origins.
+* dns: added support for getting DNS record TTL which is used by STRICT_DNS/LOGICAL_DNS cluster as DNS refresh rate.
 * dubbo_proxy: support the :ref:`Dubbo proxy filter <config_network_filters_dubbo_proxy>`.
 * eds: added support to specify max time for which endpoints can be used :ref:`gRPC filter <envoy_api_msg_ClusterLoadAssignment.Policy>`.
 * event: added :ref:`loop duration and poll delay statistics <operations_performance>`.

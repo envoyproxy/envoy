@@ -91,7 +91,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
           address.sin_addr = reinterpret_cast<sockaddr_in*>(ai->ai_addr)->sin_addr;
 
           address_list.emplace_back(
-              DnsResponse(Address::InstanceConstSharedPtr(new Address::Ipv4Instance(&address)),
+              DnsResponse(std::make_shared<const Address::Ipv4Instance>(&address),
                           std::chrono::seconds(ai->ai_ttl)));
         }
       } else if (addrinfo->nodes->ai_family == AF_INET6) {
@@ -102,7 +102,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
           address.sin6_port = 0;
           address.sin6_addr = reinterpret_cast<sockaddr_in6*>(ai->ai_addr)->sin6_addr;
           address_list.emplace_back(
-              DnsResponse(Address::InstanceConstSharedPtr(new Address::Ipv6Instance(address)),
+              DnsResponse(std::make_shared<const Address::Ipv6Instance>(address),
                           std::chrono::seconds(ai->ai_ttl)));
         }
       }
