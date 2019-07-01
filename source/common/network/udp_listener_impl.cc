@@ -88,8 +88,7 @@ void UdpListenerImpl::handleReadCallback() {
     if (!result.ok()) {
       // No more to read or encountered a system error.
       if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
-        ENVOY_UDP_LOG(error, "recvmsg result {}: {}",
-                      static_cast<int>(result.err_->getErrorCode()),
+        ENVOY_UDP_LOG(error, "recvmsg result {}: {}", static_cast<int>(result.err_->getErrorCode()),
                       result.err_->getErrorDetails());
         cb_.onReceiveError(UdpListenerCallbacks::ErrorCode::SyscallError,
                            result.err_->getErrorCode());
