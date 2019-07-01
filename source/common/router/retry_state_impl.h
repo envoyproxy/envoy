@@ -94,9 +94,6 @@ private:
   bool wouldRetryFromReset(const Http::StreamResetReason reset_reason);
   RetryStatus shouldRetry(bool would_retry, DoRetryCallback callback);
 
-  static uint32_t parseRetryOn_(absl::string_view config, bool flag_parse_failures);
-  static uint32_t parseRetryGrpcOn_(absl::string_view config, bool flag_parse_failures);
-
   const Upstream::ClusterInfo& cluster_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
