@@ -52,13 +52,12 @@ using CNameMap = std::unordered_map<std::string, std::string>;
 // just enough of RFC 1035 to handle queries we generate in the tests below.
 enum record_type { A, AAAA };
 
-class TestDnsServer;
-using TestDnsServerSharedPtr = std::shared_ptr<TestDnsServer>;
-
 class TestDnsServerQuery {
 public:
-  TestDnsServerQuery(ConnectionPtr connection, TestDnsServerSharedPtr dns_server)
-      : connection_(std::move(connection)), dns_server_(dns_server) {
+  TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_A, const HostMap& hosts_AAAA,
+                     const CNameMap& cnames, const std::chrono::seconds& record_ttl)
+      : connection_(std::move(connection)), hosts_A_(hosts_A), hosts_AAAA_(hosts_AAAA),
+        cnames_(cnames), record_ttl_(record_ttl) {
     connection_->addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
@@ -131,8 +130,8 @@ private:
         std::string cname;
         // check if we have a cname. If so, we will need to send a response element with the cname
         // and lookup the ips of the cname and send back those ips (if any) too
-        auto cit = parent_.dns_server_->cnames_.find(name);
-        if (cit != parent_.dns_server_->cnames_.end()) {
+        auto cit = parent_.cnames_.find(name);
+        if (cit != parent_.cnames_.end()) {
           cname = cit->second;
         }
         const char* hostLookup = name;
@@ -149,13 +148,13 @@ private:
         }
         ASSERT_TRUE(q_type == T_A || q_type == T_AAAA);
         if (q_type == T_A) {
-          auto it = parent_.dns_server_->hosts_A_.find(hostLookup);
-          if (it != parent_.dns_server_->hosts_A_.end()) {
+          auto it = parent_.hosts_A_.find(hostLookup);
+          if (it != parent_.hosts_A_.end()) {
             ips = &it->second;
           }
         } else {
-          auto it = parent_.dns_server_->hosts_AAAA_.find(hostLookup);
-          if (it != parent_.dns_server_->hosts_AAAA_.end()) {
+          auto it = parent_.hosts_AAAA_.find(hostLookup);
+          if (it != parent_.hosts_AAAA_.end()) {
             ips = &it->second;
           }
         }
@@ -251,10 +250,13 @@ private:
 
 private:
   ConnectionPtr connection_;
-  TestDnsServerSharedPtr dns_server_;
+  const HostMap& hosts_A_;
+  const HostMap& hosts_AAAA_;
+  const CNameMap& cnames_;
+  const std::chrono::seconds record_ttl_;
 };
 
-class TestDnsServer : public ListenerCallbacks, public std::enable_shared_from_this<TestDnsServer> {
+class TestDnsServer : public ListenerCallbacks {
 public:
   TestDnsServer(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher), record_ttl_(0) {}
 
@@ -265,8 +267,8 @@ public:
   }
 
   void onNewConnection(ConnectionPtr&& new_connection) override {
-    TestDnsServerQuery* query =
-        new TestDnsServerQuery(std::move(new_connection), shared_from_this());
+    TestDnsServerQuery* query = new TestDnsServerQuery(std::move(new_connection), hosts_A_,
+                                                       hosts_AAAA_, cnames_, record_ttl_);
     queries_.emplace_back(query);
   }
 
@@ -284,13 +286,13 @@ public:
 
   void setRecordTtl(const std::chrono::seconds& ttl) { record_ttl_ = ttl; }
 
+private:
+  Event::Dispatcher& dispatcher_;
+
   HostMap hosts_A_;
   HostMap hosts_AAAA_;
   CNameMap cnames_;
   std::chrono::seconds record_ttl_;
-
-private:
-  Event::Dispatcher& dispatcher_;
   // All queries are tracked so we can do resource reclamation when the test is
   // over.
   std::vector<std::unique_ptr<TestDnsServerQuery>> queries_;
