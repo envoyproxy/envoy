@@ -206,6 +206,8 @@ public:
    * This should be cleared with another call to setTrackedObject() when the object is done doing
    * work. Calling setTrackedObject(nullptr) results in no object being tracked.
    *
+   * This is optimized for performance, to avoid allocation where we do scoped object tracking.
+   *
    * @return The previously tracked object or nullptr if there was none.
    */
   virtual const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) PURE;

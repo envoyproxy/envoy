@@ -42,23 +42,15 @@ TEST(SignalsDeathTest, RegisteredHandlerTest) {
   TestFatalErrorHandler handler;
   SignalAction::registerFatalErrorHandler(handler);
   SignalAction actions;
+  // Make sure the cerr "HERE" registered above is logged on fatal error.
   EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
         // Oops!
         volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
         *(nasty_ptr) = 0;
       }(),
-      "backtrace.*Segmentation fault");
+      "HERE");
   SignalAction::removeFatalErrorHandler(handler);
-
-  /*  SignalAction actions;
-    EXPECT_DEATH_LOG_TO_STDERR(
-        []() -> void {
-          // Oops!
-          volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
-          *(nasty_ptr) = 0;
-        }(),
-        "HERE!");*/
 }
 
 TEST(SignalsDeathTest, BusDeathTest) {

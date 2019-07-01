@@ -8,7 +8,7 @@ namespace Envoy {
 
 /*
  * A class for tracking the scope of work.
- * Currently this is only used for best-effort tracking the any L7 stream doing
+ * Currently this is only used for best-effort tracking the L7 stream doing
  * work if a fatal error occurs.
  */
 class ScopeTrackedObject {

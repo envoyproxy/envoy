@@ -9,6 +9,13 @@
 namespace Envoy {
 
 ABSL_CONST_INIT static absl::Mutex failure_mutex(absl::kConstInit);
+// Since we can't grab the failure mutex on fatal error (snagging locks under
+// fatal crash causing potential deadlocks) access the handler list as an atomic
+// operation, to minimize the chance that one thread is operating on the list
+// while the crash handler is attempting to access it.
+// This basically makes edits to the list thread-safe - if one thread is
+// modifying the list rather than crashing in the crash handler due to accessing
+// the list in a non-thread-safe manner, it simply won't log crash traces.
 using FailureFunctionList = std::list<const FatalErrorHandlerInterface*>;
 ABSL_CONST_INIT std::atomic<FailureFunctionList*> fatal_error_handlers{nullptr};
 
