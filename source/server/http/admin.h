@@ -223,10 +223,11 @@ private:
   void writeListenersAsJson(Buffer::Instance& response);
   void writeListenersAsText(Buffer::Instance& response);
 
-  static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only,
+  template <class StatType>
+  static bool shouldShowMetric(const StatType& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric->used()) &&
-            (!regex.has_value() || std::regex_search(metric->name(), regex.value())));
+    return ((!used_only || metric.used()) &&
+            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
   }
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
@@ -449,10 +450,11 @@ private:
    * Determine whether a metric has never been emitted and choose to
    * not show it if we only wanted used metrics.
    */
-  static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only,
+  template <class StatType>
+  static bool shouldShowMetric(const StatType& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric->used()) &&
-            (!regex.has_value() || std::regex_search(metric->name(), regex.value())));
+    return ((!used_only || metric.used()) &&
+            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
   }
 };
 

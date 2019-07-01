@@ -107,7 +107,7 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   if [[ "$TEST_TARGETS" == "//test/..." ]]; then
     # We have various test binaries in the test directory such as tools, benchmarks, etc. We
     # run a build pass to make sure they compile.
-    bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
+    bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/exe:envoy-static //test/...
   fi
   # Now run all of the tests which should already be compiled.
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c opt ${TEST_TARGETS}
