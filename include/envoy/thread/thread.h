@@ -19,7 +19,6 @@ class ThreadId {
 public:
   ThreadId() : id_(std::numeric_limits<int64_t>::min()) {}
   explicit ThreadId(int64_t id) : id_(id) {}
-  ~ThreadId() = default;
 
   std::string debugString() const { return std::to_string(id_); }
   bool isEmpty() const { return *this == ThreadId(); }

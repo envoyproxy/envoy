@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 
+#include "common/common/non_copyable.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/thread/thread.h"
 
@@ -13,12 +14,10 @@ namespace Singleton {
  * assumed the singleton manager is only used on the main thread so it is not thread safe. Asserts
  * verify that.
  */
-class ManagerImpl : public Manager {
+class ManagerImpl : public Manager, NonCopyable {
 public:
   explicit ManagerImpl(Thread::ThreadFactory& thread_factory)
       : thread_factory_(thread_factory), run_tid_(thread_factory.currentThreadId()) {}
-  ManagerImpl(const ManagerImpl&) = delete;
-  ManagerImpl& operator=(const ManagerImpl&) = delete;
 
   // Singleton::Manager
   InstanceSharedPtr get(const std::string& name, SingletonFactoryCb cb) override;
@@ -26,7 +25,7 @@ public:
 private:
   std::unordered_map<std::string, std::weak_ptr<Instance>> singletons_;
   Thread::ThreadFactory& thread_factory_;
-  Thread::ThreadId run_tid_;
+  const Thread::ThreadId run_tid_;
 };
 
 } // namespace Singleton
