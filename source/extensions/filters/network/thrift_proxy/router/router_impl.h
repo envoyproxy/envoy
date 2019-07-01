@@ -142,7 +142,7 @@ class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
 public:
   Router(Upstream::ClusterManager& cluster_manager) : cluster_manager_(cluster_manager) {}
 
-  ~Router() {}
+  ~Router() override = default;
 
   // ThriftFilters::DecoderFilter
   void onDestroy() override;
@@ -174,7 +174,7 @@ private:
     UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
                     MessageMetadataSharedPtr& metadata, TransportType transport_type,
                     ProtocolType protocol_type);
-    ~UpstreamRequest();
+    ~UpstreamRequest() override;
 
     FilterStatus start();
     void resetStream();

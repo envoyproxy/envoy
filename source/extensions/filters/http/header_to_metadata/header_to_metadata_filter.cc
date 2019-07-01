@@ -54,7 +54,7 @@ bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
 
 HeaderToMetadataFilter::HeaderToMetadataFilter(const ConfigSharedPtr config) : config_(config) {}
 
-HeaderToMetadataFilter::~HeaderToMetadataFilter() {}
+HeaderToMetadataFilter::~HeaderToMetadataFilter() = default;
 
 Http::FilterHeadersStatus HeaderToMetadataFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   if (config_->doRequest()) {

@@ -11,6 +11,8 @@
 #include "common/common/hash.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/histogram_impl.h"
+#include "common/stats/null_counter.h"
+#include "common/stats/null_gauge.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
 
@@ -46,7 +48,7 @@ public:
 
   // Stats::Histogram
   void recordValue(uint64_t value) override;
-  bool used() const override { return flags_ & Flags::Used; }
+  bool used() const override { return used_; }
 
   // Stats::Metric
   StatName statName() const override { return name_.statName(); }
@@ -56,13 +58,13 @@ private:
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
   uint64_t current_active_;
   histogram_t* histograms_[2];
-  std::atomic<uint16_t> flags_;
+  std::atomic<bool> used_;
   std::thread::id created_thread_id_;
   StatNameStorage name_;
   SymbolTable& symbol_table_;
 };
 
-using TlsHistogramSharedPtr = std::shared_ptr<ThreadLocalHistogramImpl>;
+using TlsHistogramSharedPtr = RefcountPtr<ThreadLocalHistogramImpl>;
 
 class TlsScope;
 
@@ -113,7 +115,7 @@ private:
   StatNameStorage name_;
 };
 
-using ParentHistogramImplSharedPtr = std::shared_ptr<ParentHistogramImpl>;
+using ParentHistogramImplSharedPtr = RefcountPtr<ParentHistogramImpl>;
 
 /**
  * Class used to create ThreadLocalHistogram in the scope.
@@ -276,9 +278,9 @@ private:
     findHistogram(StatName name) const override;
 
     template <class StatType>
-    using MakeStatFn = std::function<std::shared_ptr<StatType>(StatDataAllocator&, StatName name,
-                                                               absl::string_view tag_extracted_name,
-                                                               const std::vector<Tag>& tags)>;
+    using MakeStatFn = std::function<RefcountPtr<StatType>(StatDataAllocator&, StatName name,
+                                                           absl::string_view tag_extracted_name,
+                                                           const std::vector<Tag>& tags)>;
 
     /**
      * Makes a stat either by looking it up in the central cache,
@@ -292,10 +294,10 @@ private:
      *     used if non-empty, or filled in if empty (and non-null).
      */
     template <class StatType>
-    StatType& safeMakeStat(StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
+    StatType& safeMakeStat(StatName name, StatMap<RefcountPtr<StatType>>& central_cache_map,
                            StatNameStorageSet& central_rejected_stats,
                            MakeStatFn<StatType> make_stat,
-                           StatMap<std::shared_ptr<StatType>>* tls_cache,
+                           StatMap<RefcountPtr<StatType>>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
     /**
@@ -309,7 +311,7 @@ private:
      */
     template <class StatType>
     absl::optional<std::reference_wrapper<const StatType>>
-    findStatLockHeld(StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map) const;
+    findStatLockHeld(StatName name, StatMap<RefcountPtr<StatType>>& central_cache_map) const;
 
     void extractTagsAndTruncate(StatName& name,
                                 std::unique_ptr<StatNameManagedStorage>& truncated_name_storage,

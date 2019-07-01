@@ -29,7 +29,7 @@ public:
       const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
       const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>& least_request_config,
       const envoy::api::v2::Cluster::CommonLbConfig& common_config);
-  ~SubsetLoadBalancer();
+  ~SubsetLoadBalancer() override;
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -135,7 +135,7 @@ private:
   // Entry in the subset hierarchy.
   class LbSubsetEntry {
   public:
-    LbSubsetEntry() {}
+    LbSubsetEntry() = default;
 
     bool initialized() const { return priority_subset_ != nullptr; }
     bool active() const { return initialized() && !priority_subset_->empty(); }
@@ -175,7 +175,8 @@ private:
                                       uint32_t idx);
   void forEachSubset(LbSubsetMap& subsets, std::function<void(LbSubsetEntryPtr)> cb);
 
-  SubsetMetadata extractSubsetMetadata(const std::set<std::string>& subset_keys, const Host& host);
+  std::vector<SubsetMetadata> extractSubsetMetadata(const std::set<std::string>& subset_keys,
+                                                    const Host& host);
   std::string describeMetadata(const SubsetMetadata& kvs);
 
   const LoadBalancerType lb_type_;
@@ -209,6 +210,7 @@ private:
 
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;
+  const bool list_as_any_;
 
   friend class SubsetLoadBalancerDescribeMetadataTester;
 };

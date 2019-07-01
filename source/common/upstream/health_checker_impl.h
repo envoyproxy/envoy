@@ -68,7 +68,7 @@ private:
                                         public Http::StreamDecoder,
                                         public Http::StreamCallbacks {
     HttpActiveHealthCheckSession(HttpHealthCheckerImpl& parent, const HostSharedPtr& host);
-    ~HttpActiveHealthCheckSession();
+    ~HttpActiveHealthCheckSession() override;
 
     void onResponseComplete();
     enum class HealthCheckResult { Succeeded, Degraded, Failed };
@@ -241,7 +241,7 @@ private:
   struct TcpActiveHealthCheckSession : public ActiveHealthCheckSession {
     TcpActiveHealthCheckSession(TcpHealthCheckerImpl& parent, const HostSharedPtr& host)
         : ActiveHealthCheckSession(parent, host), parent_(parent) {}
-    ~TcpActiveHealthCheckSession();
+    ~TcpActiveHealthCheckSession() override;
 
     void onData(Buffer::Instance& data);
     void onEvent(Network::ConnectionEvent event);
@@ -287,7 +287,7 @@ private:
                                         public Http::StreamDecoder,
                                         public Http::StreamCallbacks {
     GrpcActiveHealthCheckSession(GrpcHealthCheckerImpl& parent, const HostSharedPtr& host);
-    ~GrpcActiveHealthCheckSession();
+    ~GrpcActiveHealthCheckSession() override;
 
     void onRpcComplete(Grpc::Status::GrpcStatus grpc_status, const std::string& grpc_message,
                        bool end_stream);

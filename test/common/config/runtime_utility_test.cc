@@ -13,8 +13,16 @@ TEST(RuntimeUtility, TranslateEmpty) {
   envoy::config::bootstrap::v2::LayeredRuntime layered_runtime_config;
   translateRuntime({}, layered_runtime_config);
   envoy::config::bootstrap::v2::LayeredRuntime expected_runtime_config;
-  expected_runtime_config.add_layers()->mutable_static_layer();
-  expected_runtime_config.add_layers()->mutable_admin_layer();
+  {
+    auto* layer = expected_runtime_config.add_layers();
+    layer->set_name("base");
+    layer->mutable_static_layer();
+  }
+  {
+    auto* layer = expected_runtime_config.add_layers();
+    layer->set_name("admin");
+    layer->mutable_admin_layer();
+  }
   EXPECT_THAT(layered_runtime_config, ProtoEq(expected_runtime_config));
 }
 
@@ -25,11 +33,22 @@ TEST(RuntimeUtility, TranslateSubdirOnly) {
   envoy::config::bootstrap::v2::LayeredRuntime layered_runtime_config;
   translateRuntime(runtime_config, layered_runtime_config);
   envoy::config::bootstrap::v2::LayeredRuntime expected_runtime_config;
-  expected_runtime_config.add_layers()->mutable_static_layer();
-  auto* layer = expected_runtime_config.add_layers();
-  layer->set_name("root");
-  layer->mutable_disk_layer()->set_symlink_root("foo/bar");
-  expected_runtime_config.add_layers()->mutable_admin_layer();
+  {
+    auto* layer = expected_runtime_config.add_layers();
+    layer->set_name("base");
+    layer->mutable_static_layer();
+  }
+  {
+    auto* layer = expected_runtime_config.add_layers();
+    layer->set_name("root");
+    layer->mutable_disk_layer()->set_symlink_root("foo");
+    layer->mutable_disk_layer()->set_subdirectory("bar");
+  }
+  {
+    auto* layer = expected_runtime_config.add_layers();
+    layer->set_name("admin");
+    layer->mutable_admin_layer();
+  }
   EXPECT_THAT(layered_runtime_config, ProtoEq(expected_runtime_config));
 }
 
@@ -41,19 +60,29 @@ TEST(RuntimeUtility, TranslateSubdirOverride) {
   envoy::config::bootstrap::v2::LayeredRuntime layered_runtime_config;
   translateRuntime(runtime_config, layered_runtime_config);
   envoy::config::bootstrap::v2::LayeredRuntime expected_runtime_config;
-  expected_runtime_config.add_layers()->mutable_static_layer();
+  {
+    auto* layer = expected_runtime_config.add_layers();
+    layer->set_name("base");
+    layer->mutable_static_layer();
+  }
   {
     auto* layer = expected_runtime_config.add_layers();
     layer->set_name("root");
-    layer->mutable_disk_layer()->set_symlink_root("foo/bar");
+    layer->mutable_disk_layer()->set_symlink_root("foo");
+    layer->mutable_disk_layer()->set_subdirectory("bar");
   }
   {
     auto* layer = expected_runtime_config.add_layers();
     layer->set_name("override");
-    layer->mutable_disk_layer()->set_symlink_root("foo/baz");
+    layer->mutable_disk_layer()->set_symlink_root("foo");
+    layer->mutable_disk_layer()->set_subdirectory("baz");
     layer->mutable_disk_layer()->set_append_service_cluster(true);
   }
-  expected_runtime_config.add_layers()->mutable_admin_layer();
+  {
+    auto* layer = expected_runtime_config.add_layers();
+    layer->set_name("admin");
+    layer->mutable_admin_layer();
+  }
   EXPECT_THAT(layered_runtime_config, ProtoEq(expected_runtime_config));
 }
 

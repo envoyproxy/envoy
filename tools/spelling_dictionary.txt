@@ -18,6 +18,7 @@ CB
 CBs
 CDS
 CHACHA
+CHLO
 CIDR
 CLA
 CLI
@@ -165,6 +166,7 @@ NOAUTH
 NOLINT
 NOLINTNEXTLINE
 NONCES
+NOSORT
 NS
 NUL
 Nilsson
@@ -180,6 +182,7 @@ OSS
 OSX
 OT
 OU
+OVFL
 PB
 PC
 PCC
@@ -199,6 +202,8 @@ QUIC
 RAII
 RANLUX
 RBAC
+RECVDSTADDR
+RECVPKTINFO
 RCU
 RDN
 RDS
@@ -214,15 +219,19 @@ RNG
 RPC
 RSA
 RST
+RTDS
 RTTI
 RW
 RX
+RXQ
 Runn
 SA
 SAN
 SANs
+SCT
 SDK
 SDS
+SENDSRCADDR
 SHA
 SHM
 SIBABRT
@@ -249,7 +258,6 @@ TBD
 TCLAP
 TCMalloc
 TCP
-TDS
 TE
 TFO
 TID
@@ -285,7 +293,10 @@ WS
 Welford's
 Werror
 XDS
+decRefCount
+getaddrinfo
 sendto
+upcasts
 vip
 xDSes
 XFCC
@@ -356,6 +367,7 @@ casted
 chrono
 chroot
 chunked
+ci
 circllhist
 cmd
 codec
@@ -386,6 +398,7 @@ cstring
 ctor
 ctrl
 customizations
+darwin
 dbg
 de
 dechunking
@@ -535,6 +548,7 @@ keepalives
 ketama
 kqueue
 kubernetes
+kv
 kvs
 lala
 latencies

@@ -269,7 +269,6 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/listener:well_known_names",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
@@ -284,9 +283,12 @@ envoy_cc_library(
     hdrs = ["filter_chain_manager_impl.h"],
     deps = [
         "//include/envoy/server:listener_manager_interface",
+        "//include/envoy/server:transport_socket_config_interface",
         "//source/common/common:empty_string",
+        "//source/common/config:utility_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:lc_trie_lib",
+        "//source/server:configuration_lib",
     ],
 )
 
@@ -311,7 +313,7 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2:srds_cc",
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
         "@envoy_api//envoy/service/discovery/v2:hds_cc",
-        "@envoy_api//envoy/service/discovery/v2:tds_cc",
+        "@envoy_api//envoy/service/discovery/v2:rtds_cc",
         "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )

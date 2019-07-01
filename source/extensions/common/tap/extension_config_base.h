@@ -27,7 +27,7 @@ protected:
                       TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
                       Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
                       Event::Dispatcher& main_thread_dispatcher);
-  ~ExtensionConfigBase();
+  ~ExtensionConfigBase() override;
 
   // All tap configurations derive from TapConfig for type safety. In order to use a common
   // extension base class (with TLS logic, etc.) we must dynamic cast to the actual tap

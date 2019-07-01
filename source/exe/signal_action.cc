@@ -1,7 +1,8 @@
 #include "exe/signal_action.h"
 
-#include <signal.h>
 #include <sys/mman.h>
+
+#include <csignal>
 
 #include "common/common/assert.h"
 
