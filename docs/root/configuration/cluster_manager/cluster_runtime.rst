@@ -42,6 +42,11 @@ outlier_detection.consecutive_gateway_failure
   <envoy_api_field_cluster.OutlierDetection.consecutive_gateway_failure>`
   setting in outlier detection
 
+outlier_detection.consecutive_local_origin_failure
+  :ref:`consecutive_local_origin_failure
+  <envoy_api_field_cluster.OutlierDetection.consecutive_local_origin_failure>`
+  setting in outlier detection
+
 outlier_detection.interval_ms
   :ref:`interval_ms
   <envoy_api_field_cluster.OutlierDetection.interval>`
@@ -67,9 +72,19 @@ outlier_detection.enforcing_consecutive_gateway_failure
   <envoy_api_field_cluster.OutlierDetection.enforcing_consecutive_gateway_failure>`
   setting in outlier detection
 
+outlier_detection.enforcing_consecutive_local_origin_failure
+  :ref:`enforcing_consecutive_local_origin_failure
+  <envoy_api_field_cluster.OutlierDetection.enforcing_consecutive_local_origin_failure>`
+  setting in outlier detection
+
 outlier_detection.enforcing_success_rate
   :ref:`enforcing_success_rate
   <envoy_api_field_cluster.OutlierDetection.enforcing_success_rate>`
+  setting in outlier detection
+
+outlier_detection.enforcing_local_origin_success_rate
+  :ref:`enforcing_local_origin_success_rate
+  <envoy_api_field_cluster.OutlierDetection.enforcing_local_origin_success_rate>`
   setting in outlier detection
 
 outlier_detection.success_rate_minimum_hosts

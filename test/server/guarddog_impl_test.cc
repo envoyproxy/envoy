@@ -316,7 +316,7 @@ TEST_P(GuardDogTestBase, WatchDogThreadIdTest) {
   initGuardDog(stats, config);
   auto watched_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   EXPECT_EQ(watched_dog->threadId().debugString(),
-            api_->threadFactory().currentThreadId()->debugString());
+            api_->threadFactory().currentThreadId().debugString());
   guard_dog_->stopWatching(watched_dog);
 }
 

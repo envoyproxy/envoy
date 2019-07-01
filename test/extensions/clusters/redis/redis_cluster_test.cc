@@ -428,8 +428,9 @@ protected:
   void testRedisResolve() {
     EXPECT_CALL(dispatcher_, createTimer_(_));
     RedisCluster::RedisDiscoverySession discovery_session(*cluster_, *this);
-    discovery_session.registerDiscoveryAddress(
-        TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"})), 22120);
+    auto dns_response =
+        TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"}));
+    discovery_session.registerDiscoveryAddress(std::move(dns_response), 22120);
     expectRedisResolve(true);
     discovery_session.startResolveRedis();
 
@@ -453,7 +454,7 @@ protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   std::shared_ptr<Upstream::MockClusterMockPrioritySet> hosts_;

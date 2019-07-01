@@ -17,6 +17,14 @@ try:
 except NameError:
   pass
 
+try:
+  cmp
+except NameError:
+
+  def cmp(x, y):
+    return (x > y) - (x < y)
+
+
 TOOLS_DIR = os.path.dirname(os.path.realpath(__file__))
 
 # Single line comments: // comment OR /* comment */

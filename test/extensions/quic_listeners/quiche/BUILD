@@ -16,10 +16,23 @@ envoy_cc_test(
     name = "envoy_quic_alarm_test",
     srcs = ["envoy_quic_alarm_test.cc"],
     external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
     deps = [
         "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_factory_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_lib",
         "//source/extensions/quic_listeners/quiche/platform:envoy_quic_clock_lib",
         "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "envoy_quic_proof_source_test",
+    srcs = ["envoy_quic_proof_source_test.cc"],
+    external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
+    deps = [
+        "//source/extensions/quic_listeners/quiche:envoy_quic_proof_source_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_proof_verifier_lib",
+        "@com_googlesource_quiche//:quic_core_versions_lib",
     ],
 )

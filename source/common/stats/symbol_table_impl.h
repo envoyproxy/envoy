@@ -261,7 +261,7 @@ public:
 
   // Move constructor; needed for using StatNameStorage as an
   // absl::flat_hash_map value.
-  StatNameStorage(StatNameStorage&& src) : bytes_(std::move(src.bytes_)) {}
+  StatNameStorage(StatNameStorage&& src) noexcept : bytes_(std::move(src.bytes_)) {}
 
   // Obtains new backing storage for an already existing StatName. Used to
   // record a computed StatName held in a temp into a more persistent data

@@ -74,7 +74,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& p
 }
 
 const Matcher& TapConfigBaseImpl::rootMatcher() const {
-  ASSERT(matchers_.size() >= 1);
+  ASSERT(!matchers_.empty());
   return *matchers_[0];
 }
 

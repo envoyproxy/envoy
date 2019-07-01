@@ -72,12 +72,14 @@ private:
   // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
   // dispatcher run loop is executing on. We allow run_tid_ == nullptr for tests where we don't
   // invoke run().
-  bool isThreadSafe() const { return run_tid_ == nullptr || run_tid_->isCurrentThreadId(); }
+  bool isThreadSafe() const {
+    return run_tid_.isEmpty() || run_tid_ == api_.threadFactory().currentThreadId();
+  }
 
   Api::Api& api_;
   std::string stats_prefix_;
   std::unique_ptr<DispatcherStats> stats_;
-  Thread::ThreadIdPtr run_tid_;
+  Thread::ThreadId run_tid_;
   Buffer::WatermarkFactoryPtr buffer_factory_;
   LibeventScheduler base_scheduler_;
   SchedulerPtr scheduler_;

@@ -209,6 +209,11 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "spdy_platform_test_impl_lib",
+    hdrs = ["spdy_test_impl.h"],
+)
+
 envoy_cc_test(
     name = "envoy_quic_clock_test",
     srcs = ["envoy_quic_clock_test.cc"],

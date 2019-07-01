@@ -29,5 +29,5 @@ else
   TEST_TARGETS=//test/...
 fi
 
-bazel build ${BAZEL_BUILD_OPTIONS} //source/... ${TEST_TARGETS}
+bazel build ${BAZEL_BUILD_OPTIONS} //source/exe:envoy-static ${TEST_TARGETS}
 bazel test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}

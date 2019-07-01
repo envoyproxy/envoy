@@ -420,6 +420,10 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/hash:hash",
     )
     native.bind(
+        name = "abseil_hash_testing",
+        actual = "@com_google_absl//absl/hash:hash_testing",
+    )
+    native.bind(
         name = "abseil_inlined_vector",
         actual = "@com_google_absl//absl/container:inlined_vector",
     )
