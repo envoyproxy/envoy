@@ -3,11 +3,13 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/config/filter_json.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 
@@ -658,6 +660,53 @@ filter:
   header_filter:
     header:
       name: test-header
+config:
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+
+  request_headers_.addCopy("test-header", "present");
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+}
+
+class MockFilterFactory : public FilterFactory {
+public:
+  virtual ~MockFilterFactory() = default;
+
+  FilterPtr createFilter(const envoy::config::filter::accesslog::v2::AccessLogFilter& config,
+                         Runtime::Loader& /* runtime */,
+                         Runtime::RandomGenerator& /* random */) override {
+    auto factory_config = Config::Utility::translateToFactoryConfig(
+        config.extension_filter(), Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
+    const auto& header_config =
+        MessageUtil::downcastAndValidate<const envoy::config::filter::accesslog::v2::HeaderFilter&>(
+            *factory_config);
+    return FilterPtr{new HeaderFilter(header_config)};
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::filter::accesslog::v2::HeaderFilter>();
+  }
+
+  std::string name() const override { return "mock_filter"; }
+};
+
+TEST_F(AccessLogImplTest, MockFilterHeaderPresence) {
+  Registry::RegisterFactory<MockFilterFactory, FilterFactory> registered;
+
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  extension_filter:
+    name: mock_filter
+    config:
+      header:
+        name: test-header
 config:
   path: /dev/null
   )EOF";
