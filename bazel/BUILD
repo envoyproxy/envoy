@@ -170,17 +170,13 @@ config_setting(
 
 # Alias pointing to the selected version of BoringSSL:
 # - BoringSSL FIPS from @boringssl_fips//:ssl,
-# - alternative SSL implementation (not BoringSSL) from @boringssl//:ssl,
 # - non-FIPS BoringSSL from @boringssl//:ssl.
-# Note that if BoringSSL is disabled //bazel:boringssl alias still points
-# to @boringssl//:ssl, but in this case @boringssl is supposed to be remapped
-# to an alternative SSL implementation in WORKSPACE of the corresponding third
-# party TLS extension.
+# In case of disabled BoringSSL the @boringssl repository can be remapped to an
+# alternative one in WORKSPACE of the corresponding third party TLS extension.
 alias(
     name = "boringssl",
     actual = select({
         "//bazel:boringssl_fips": "@boringssl_fips//:ssl",
-        "//bazel:boringssl_disabled": "@boringssl//:ssl",
         "//conditions:default": "@boringssl//:ssl",
     }),
 )
