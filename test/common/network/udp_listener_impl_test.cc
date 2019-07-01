@@ -387,7 +387,7 @@ TEST_P(UdpListenerImplTest, SendData) {
 
   auto send_result = listener_->send(send_data);
 
-  ASSERT(send_result.ok());
+  EXPECT_TRUE(send_result.ok()) << "send() failed : " << send_result.err_.getErrorDetails();
 
   // This is trigerred on opening the listener on registering the event
   EXPECT_CALL(listener_callbacks_, onWriteReady_(_)).WillOnce(Invoke([&](const Socket& socket) {
