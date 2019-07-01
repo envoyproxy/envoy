@@ -57,7 +57,7 @@ replaceInvalidStringValues(const envoy::api::v2::core::Metadata& upstream_metada
   envoy::api::v2::core::Metadata processed = upstream_metadata;
   for (auto& metadata_struct : *processed.mutable_filter_metadata()) {
     for (auto& field : *metadata_struct.second.mutable_fields()) {
-      if (field.second.kind_case() == Protobuf::Value::kStringValue) {
+      if (field.second.kind_case() == ProtobufWkt::Value::kStringValue) {
         field.second.set_string_value(replaceInvalidCharacters(field.second.string_value()));
       }
     }
