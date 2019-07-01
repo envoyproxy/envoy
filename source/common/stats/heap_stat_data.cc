@@ -64,8 +64,8 @@ void HeapStatDataAllocator::debugPrint() {
 
 template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> {
 public:
-  explicit StatsSharedImpl(StatName name, HeapStatDataAllocator& alloc,
-                           absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
+  StatsSharedImpl(StatName name, HeapStatDataAllocator& alloc, absl::string_view tag_extracted_name,
+                  const std::vector<Tag>& tags)
       : MetricImpl<BaseClass>(name, tag_extracted_name, tags, alloc.symbolTable()), alloc_(alloc) {}
 
   ~StatsSharedImpl() override {

@@ -21,7 +21,7 @@ namespace Stats {
  * of indirection needed to enable stats created with the same name from
  * different scopes to share the same value.
  */
-struct HeapStatData : public InlineStorage {
+struct HeapStatData {
   std::atomic<uint64_t> value_{0};
   std::atomic<uint64_t> pending_increment_{0};
   std::atomic<uint16_t> flags_{0};
