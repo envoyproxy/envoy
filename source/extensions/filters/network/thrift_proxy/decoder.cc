@@ -116,8 +116,11 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::listValue(Buffer::Instan
     return DecoderStatus(popReturnState(), FilterStatus::Continue);
   }
   frame.remaining_--;
+  DecoderStatus s = handleValue(buffer, frame.value_type_, ProtocolState::MapKey);
+  if(s.next_state_ == ProtocolState::WaitForData)
+	  frame.remaining_++;
 
-  return handleValue(buffer, frame.elem_type_, ProtocolState::ListValue);
+  return s;
 }
 
 // ListEnd -> stack's return state
@@ -162,8 +165,11 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::mapValue(Buffer::Instanc
   Frame& frame = stack_.back();
   ASSERT(frame.remaining_ != 0);
   frame.remaining_--;
+  DecoderStatus s = handleValue(buffer, frame.elem_type_, ProtocolState::SetValue);
+  if(s.next_state_ == ProtocolState::WaitForData)
+	  frame.remaining_++;
 
-  return handleValue(buffer, frame.value_type_, ProtocolState::MapKey);
+  return s;
 }
 
 // MapEnd -> stack's return state
@@ -198,8 +204,11 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::setValue(Buffer::Instanc
     return DecoderStatus(popReturnState(), FilterStatus::Continue);
   }
   frame.remaining_--;
+  DecoderStatus s = handleValue(buffer, frame.elem_type_, ProtocolState::ListValue);
+  if(s.next_state_ == ProtocolState::WaitForData)
+	  frame.remaining_++;
 
-  return handleValue(buffer, frame.elem_type_, ProtocolState::SetValue);
+  return s;
 }
 
 // SetEnd -> stack's return state
