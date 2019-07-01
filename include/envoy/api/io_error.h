@@ -26,11 +26,11 @@ public:
     // Permission denied.
     Permission,
     // Message too big to send.
-    MessageSize,
+    MessageTooBig,
     // Kernel interrupt.
     Interrupt,
     // Given argument is not valid.
-    InvalidValue,
+    InvalidArgument,
     // Requested a nonexistent interface or a non-local source address.
     AddressNotAvailable,
     // Other error codes cannot be mapped to any one above in getErrorCode().

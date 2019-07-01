@@ -95,11 +95,11 @@ static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
 #define ENVOY_IP_PKTINFO IP_PKTINFO
 #endif
 
-#define ENVOY_IP_PKT_INFO Network::SocketOptionName(std::make_pair(IPPROTO_IP, ENVOY_IP_PKTINFO))
+#define ENVOY_SELF_IP_ADDR Network::SocketOptionName(std::make_pair(IPPROTO_IP, ENVOY_IP_PKTINFO))
 
 // Both Linux and FreeBSD use IPV6_RECVPKTINFO for both sending source address and
 // receiving destination address.
-#define ENVOY_RECV_IPV6_PKT_INFO                                                                   \
+#define ENVOY_SELF_IPV6_ADDR                                                                       \
   Network::SocketOptionName(std::make_pair(IPPROTO_IPV6, IPV6_RECVPKTINFO))
 
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {

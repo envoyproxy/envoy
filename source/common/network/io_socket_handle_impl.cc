@@ -116,19 +116,16 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
     return sysCallResultToIoCallResult(result);
   } else {
-#ifndef __APPLE__
-    constexpr int kSpaceForIpv4 = CMSG_SPACE(sizeof(in_pktinfo));
     constexpr int kSpaceForIpv6 = CMSG_SPACE(sizeof(in6_pktinfo));
+    // FreeBSD only needs in_addr size, but allocates more to unitify two platforms.
+    const int kSpaceForIpv4 = CMSG_SPACE(sizeof(in_pktinfo));
+    const int kSpaceForIp = (kSpaceForIpv4 < kSpaceForIpv6) ? kSpaceForIpv6 : kSpaceForIpv4;
     // kSpaceForIp should be big enough to hold both IPv4 and IPv6 packet info.
-    constexpr int kSpaceForIp = (kSpaceForIpv4 < kSpaceForIpv6) ? kSpaceForIpv6 : kSpaceForIpv4;
-    char cbuf[kSpaceForIp]{0};
-#else
-    // Currently CMSG_SPACE is not constexpr in MAC OS. 48 bytes should be
-    // enough for in_pktinfo or in6_pktinfo.
-    char cbuf[48]{0};
-#endif
-    message.msg_control = cbuf;
-    message.msg_controllen = sizeof(cbuf);
+    STACK_ARRAY(cbuf, char, kSpaceForIp);
+    memset(cbuf.begin(), 0, kSpaceForIp);
+
+    message.msg_control = cbuf.begin();
+    message.msg_controllen = kSpaceForIp * sizeof(char);
     cmsghdr* const cmsg = CMSG_FIRSTHDR(&message);
     RELEASE_ASSERT(cmsg != nullptr, fmt::format("cbuf with size {} is not enough, cmsghdr size {}",
                                                 sizeof(cbuf), sizeof(cmsghdr)));

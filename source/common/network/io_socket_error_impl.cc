@@ -20,11 +20,11 @@ Api::IoError::IoErrorCode IoSocketError::getErrorCode() const {
   case EPERM:
     return IoErrorCode::Permission;
   case EMSGSIZE:
-    return IoErrorCode::MessageSize;
+    return IoErrorCode::MessageTooBig;
   case EINTR:
     return IoErrorCode::Interrupt;
   case EINVAL:
-    return IoErrorCode::InvalidValue;
+    return IoErrorCode::InvalidArgument;
   case EADDRNOTAVAIL:
     return IoErrorCode::AddressNotAvailable;
   default:

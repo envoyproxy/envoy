@@ -115,7 +115,7 @@ TEST_F(EnvoyQuicWriterTest, SendFailure) {
   EXPECT_FALSE(envoy_quic_writer_.IsWriteBlocked());
 }
 
-TEST_F(EnvoyQuicWriterTest, SendFailureMessageSize) {
+TEST_F(EnvoyQuicWriterTest, SendFailureMessageTooBig) {
   std::string str("Hello World!");
   EXPECT_CALL(udp_listener_, send(_))
       .WillOnce(testing::Invoke([this, str](const Network::UdpSendData& send_data) {
@@ -130,7 +130,7 @@ TEST_F(EnvoyQuicWriterTest, SendFailureMessageSize) {
   // Currently MessageSize should be propagated through error_code. This test
   // would fail if QUICHE changes to propagate through status in the future.
   EXPECT_EQ(quic::WRITE_STATUS_ERROR, result.status);
-  EXPECT_EQ(static_cast<int>(Api::IoError::IoErrorCode::MessageSize), result.error_code);
+  EXPECT_EQ(static_cast<int>(Api::IoError::IoErrorCode::MessageTooBig), result.error_code);
   EXPECT_FALSE(envoy_quic_writer_.IsWriteBlocked());
 }
 
