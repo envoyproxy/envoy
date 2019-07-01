@@ -165,12 +165,6 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
             ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders)) {
-    common_access_log.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
-        envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
-            ResponseFlags_Unauthorized_Reason_STRICT_HEADER_CHECK_FAILED);
-  }
-
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError)) {
     common_access_log.mutable_response_flags()->set_rate_limit_service_error(true);
   }
@@ -185,6 +179,10 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout)) {
     common_access_log.mutable_response_flags()->set_stream_idle_timeout(true);
+  }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders)) {
+    common_access_log.mutable_response_flags()->set_invalid_envoy_request_headers(true);
   }
 }
 
