@@ -387,7 +387,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
 
   ScopePtr scope2 = scope1->createScope("foo.");
   Counter& c2 = scope2->counter("bar");
-  EXPECT_NE(&c1, &c2);
+  EXPECT_EQ(&c1, &c2);
   EXPECT_EQ("scope1.foo.bar", c2.name());
   StatNameManagedStorage c2_name("scope1.foo.bar", symbol_table_);
   auto found_counter2 = store_->findCounter(c2_name.statName());
@@ -417,7 +417,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   // We will call alloc twice, but they should point to the same backing storage.
   Counter& c1 = scope1->counter("c");
   Counter& c2 = scope2->counter("c");
-  EXPECT_NE(&c1, &c2);
+  EXPECT_EQ(&c1, &c2);
   c1.inc();
   EXPECT_EQ(1UL, c1.value());
   EXPECT_EQ(1UL, c2.value());
@@ -431,7 +431,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   // Gauges should work the same way.
   Gauge& g1 = scope1->gauge("g", Gauge::ImportMode::Accumulate);
   Gauge& g2 = scope2->gauge("g", Gauge::ImportMode::Accumulate);
-  EXPECT_NE(&g1, &g2);
+  EXPECT_EQ(&g1, &g2);
   g1.set(5);
   EXPECT_EQ(5UL, g1.value());
   EXPECT_EQ(5UL, g2.value());
@@ -861,8 +861,8 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   TestUtil::forEachSampleStat(
       1000, [&store](absl::string_view name) { store.counter(std::string(name)); });
   const size_t million = 1000 * 1000;
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 12430144); // June 18, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 13 * million);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 10260352); // July 1, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 11 * million);
 }
 
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
@@ -881,8 +881,8 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
   TestUtil::forEachSampleStat(
       1000, [&store](absl::string_view name) { store.counter(std::string(name)); });
   const size_t million = 1000 * 1000;
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 15707232); // June 18, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 16 * million);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 12488864); // July 1, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 13 * million);
   store.shutdownThreading();
   tls.shutdownThread();
 }

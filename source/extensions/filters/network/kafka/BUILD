@@ -74,12 +74,12 @@ genrule(
         "external/kafka_request_resolver.cc",
     ],
     cmd = """
-      ./$(location :kafka_code_generator) generate-source request \
+      ./$(location :kafka_protocol_code_generator_bin) request \
         $(location external/requests.h) $(location external/kafka_request_resolver.cc) \
         $(SRCS)
     """,
     tools = [
-        ":kafka_code_generator",
+        ":kafka_protocol_code_generator_bin",
     ],
 )
 
@@ -135,21 +135,29 @@ genrule(
         "external/kafka_response_resolver.cc",
     ],
     cmd = """
-      ./$(location :kafka_code_generator) generate-source response \
+      ./$(location :kafka_protocol_code_generator_bin) response \
         $(location external/responses.h) $(location external/kafka_response_resolver.cc) \
         $(SRCS)
     """,
     tools = [
-        ":kafka_code_generator",
+        ":kafka_protocol_code_generator_bin",
     ],
 )
 
 py_binary(
-    name = "kafka_code_generator",
-    srcs = ["protocol_code_generator/kafka_generator.py"],
-    data = glob(["protocol_code_generator/*.j2"]),
-    main = "protocol_code_generator/kafka_generator.py",
-    deps = ["@com_github_pallets_jinja//:jinja2"],
+    name = "kafka_protocol_code_generator_bin",
+    srcs = ["protocol/launcher.py"],
+    data = glob(["protocol/*.j2"]),
+    main = "protocol/launcher.py",
+    deps = [
+        ":kafka_protocol_generator_lib",
+        "@com_github_pallets_jinja//:jinja2",
+    ],
+)
+
+py_library(
+    name = "kafka_protocol_generator_lib",
+    srcs = ["protocol/generator.py"],
 )
 
 envoy_cc_library(
@@ -183,20 +191,28 @@ genrule(
         "external/serialization_composite.h",
     ],
     cmd = """
-      ./$(location :serialization_composite_generator) generate-source \
+      ./$(location :serialization_composite_code_generator_bin) \
       $(location external/serialization_composite.h)
     """,
     tools = [
-        ":serialization_composite_generator",
+        ":serialization_composite_code_generator_bin",
     ],
 )
 
 py_binary(
-    name = "serialization_composite_generator",
-    srcs = ["serialization_code_generator/serialization_composite_generator.py"],
-    data = glob(["serialization_code_generator/*.j2"]),
-    main = "serialization_code_generator/serialization_composite_generator.py",
-    deps = ["@com_github_pallets_jinja//:jinja2"],
+    name = "serialization_composite_code_generator_bin",
+    srcs = ["serialization/launcher.py"],
+    data = glob(["serialization/*.j2"]),
+    main = "serialization/launcher.py",
+    deps = [
+        ":serialization_composite_generator_lib",
+        "@com_github_pallets_jinja//:jinja2",
+    ],
+)
+
+py_library(
+    name = "serialization_composite_generator_lib",
+    srcs = ["serialization/generator.py"],
 )
 
 envoy_cc_library(

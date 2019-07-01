@@ -1448,7 +1448,7 @@ virtual_hosts:
                              ->mutable_routes(0)
                              ->mutable_route()
                              ->mutable_hash_policy();
-    if (hash_policies->size() > 0) {
+    if (!hash_policies->empty()) {
       return hash_policies->Mutable(0);
     } else {
       return hash_policies->Add();
