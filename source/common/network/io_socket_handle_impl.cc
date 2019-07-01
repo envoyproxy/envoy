@@ -117,7 +117,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     return sysCallResultToIoCallResult(result);
   } else {
     constexpr int kSpaceForIpv6 = CMSG_SPACE(sizeof(in6_pktinfo));
-    // FreeBSD only needs in_addr size, but allocates more to unitify two platforms.
+    // FreeBSD only needs in_addr size, but allocates more to unify code in two platforms.
     const int kSpaceForIpv4 = CMSG_SPACE(sizeof(in_pktinfo));
     const int kSpaceForIp = (kSpaceForIpv4 < kSpaceForIpv6) ? kSpaceForIpv6 : kSpaceForIpv4;
     // kSpaceForIp should be big enough to hold both IPv4 and IPv6 packet info.
