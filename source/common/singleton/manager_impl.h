@@ -2,9 +2,10 @@
 
 #include <unordered_map>
 
-#include "common/common/non_copyable.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/thread/thread.h"
+
+#include "common/common/non_copyable.h"
 
 namespace Envoy {
 namespace Singleton {
