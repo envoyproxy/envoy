@@ -253,7 +253,7 @@ private:
   const HostMap& hosts_A_;
   const HostMap& hosts_AAAA_;
   const CNameMap& cnames_;
-  const std::chrono::seconds record_ttl_;
+  const std::chrono::seconds& record_ttl_;
 };
 
 class TestDnsServer : public ListenerCallbacks {
