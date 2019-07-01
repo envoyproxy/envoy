@@ -14,7 +14,7 @@ namespace Stats {
 class NullCounterImpl : public MetricImpl<Counter> {
 public:
   explicit NullCounterImpl(SymbolTable& symbol_table)
-      : MetricImpl<Counter>(symbol_table), symbol_table_(symbol_table), name_("", symbol_table_) {}
+      : MetricImpl<Counter>(symbol_table), symbol_table_(symbol_table)  {}
   ~NullCounterImpl() override {
     // MetricImpl must be explicitly cleared() before destruction, otherwise it
     // will not be able to access the SymbolTable& to free the symbols. An RAII
@@ -30,7 +30,6 @@ public:
   uint64_t value() const override { return 0; }
 
   // Metric
-  StatName statName() const override { return name_.statName(); }
   bool used() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
@@ -42,7 +41,6 @@ public:
 private:
   RefcountHelper refcount_helper_;
   SymbolTable& symbol_table_;
-  StatNameManagedStorage name_;
 };
 
 } // namespace Stats

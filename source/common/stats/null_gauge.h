@@ -14,7 +14,7 @@ namespace Stats {
 class NullGaugeImpl : public MetricImpl<Gauge> {
 public:
   explicit NullGaugeImpl(SymbolTable& symbol_table)
-      : MetricImpl<Gauge>(symbol_table), symbol_table_(symbol_table), name_("", symbol_table_) {}
+      : MetricImpl<Gauge>(symbol_table), symbol_table_(symbol_table) {}
   ~NullGaugeImpl() override {
     // MetricImpl must be explicitly cleared() before destruction, otherwise it
     // will not be able to access the SymbolTable& to free the symbols. An RAII
@@ -33,7 +33,6 @@ public:
   void mergeImportMode(ImportMode /* import_mode */) override {}
 
   // Metric
-  StatName statName() const override { return name_.statName(); }
   bool used() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
@@ -45,7 +44,6 @@ public:
 private:
   RefcountHelper refcount_helper_;
   SymbolTable& symbol_table_;
-  StatNameManagedStorage name_;
 };
 
 } // namespace Stats
