@@ -27,6 +27,22 @@ public:
   MOCK_METHOD2(sign, void(Http::Message&, bool));
 };
 
+class MockMetadataFetcher {
+public:
+  virtual ~MockMetadataFetcher(){};
+
+  MOCK_CONST_METHOD3(fetch, absl::optional<std::string>(const std::string&, const std::string&,
+                                                        const absl::optional<std::string>&));
+};
+
+class DummyMetadataFetcher {
+public:
+  absl::optional<std::string> operator()(const std::string&, const std::string&,
+                                         const absl::optional<std::string>&) {
+    return absl::nullopt;
+  }
+};
+
 } // namespace Aws
 } // namespace Common
 } // namespace HttpFilters
