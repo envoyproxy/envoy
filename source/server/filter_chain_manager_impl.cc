@@ -3,7 +3,6 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
-#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "server/configuration_impl.h"
@@ -15,9 +14,6 @@ namespace Envoy {
 namespace Server {
 
 namespace {
-
-using FcProto = const ::envoy::api::v2::listener::FilterChain;
-using FcImplSptr = std::shared_ptr<Network::FilterChain>;
 
 // Return a fake address for use when either the source or destination is UDS.
 Network::Address::InstanceConstSharedPtr fakeAddress() {
@@ -42,39 +38,25 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
 void FilterChainManagerImpl::addFilterChain(
     absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
     FilterChainFactoryBuilder& filter_chain_factory_builder) {
-
   addFilterChainInternalForFcds(filter_chain_span, filter_chain_factory_builder);
-  // TODO: smarter at seeing if we do need a drain
-  // TODO(silentdai): to drain the old lookup
-  // auto old_warming_lookup = std::move(warming_lookup_);
-
-  // warming_lookup = std::make_shared<FilterChainLookup>();
-  // // addFilterchainInternal(warming_lookup_, filter_chain_span, b);
-  // auto version_info = "LATERST_FROM_LDS";
-  // Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources_from_lds;
-  // for (const auto& filter_chain : filter_chain_span) {
-  //   *resources_from_lds.Add() = *filter_chain;
-  // }
-  // onConfigUpdate(reources_from_lds, version_info);
 }
 
 void FilterChainManagerImpl::addFilterChainInternalForFcds(
     absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
     FilterChainFactoryBuilder& filter_chain_factory_builder) {
 
+  // TODO(silentdai): replacing the old warming one is safe.
   warming_lookup_ = createFilterChainLookup();
   filter_chain_factory_builder.setInitManager(warming_lookup_->getInitManager());
   using FilterChainMap = decltype(warming_lookup_->existing_active_filter_chains_);
   FilterChainMap* existing_active_filter_chains = nullptr;
   existing_active_filter_chains =
       active_lookup_ == nullptr ? nullptr : &active_lookup_->existing_active_filter_chains_;
-  // TODO(silentdai):
-  // 1. provides new FC internal init manager (need to be warmed up)
-  // 2. override the one in builder if needed
+
   std::unordered_set<envoy::api::v2::listener::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
   for (const auto& filter_chain : filter_chain_span) {
-    FcImplSptr existing_chain_impl;
+    std::shared_ptr<Network::FilterChain> existing_chain_impl;
     if (existing_active_filter_chains == nullptr) {
       existing_chain_impl = std::shared_ptr<Network::FilterChain>(
           filter_chain_factory_builder.buildFilterChain(*filter_chain));
@@ -88,8 +70,6 @@ void FilterChainManagerImpl::addFilterChainInternalForFcds(
       }
     }
     warming_lookup_->existing_active_filter_chains_.emplace(*filter_chain, existing_chain_impl);
-
-    // Below is copy from the current except the bottom addFilterChainForDesitionPorts
 
     const auto& filter_chain_match = filter_chain->filter_chain_match();
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
@@ -136,13 +116,11 @@ void FilterChainManagerImpl::addFilterChainInternalForFcds(
         server_names, filter_chain_match.transport_protocol(), application_protocols,
         filter_chain_match.source_type(), source_ips, filter_chain_match.source_ports(),
         existing_chain_impl);
-    ENVOY_LOG(warn, "Added a filter chain");
+    ENVOY_LOG(trace, "Added a filter chain");
   }
   convertIPsToTries(warming_lookup_->destination_ports_map_);
-  // delay determine the to_drain : it's possible that the new one is replaced by a even newer.
   // TODO(silentdai) : trigger fcds api
-  ENVOY_LOG(warn, "initializing lookup");
-  // IMPORTANT: initialize either call by FCM or subscription
+  ENVOY_LOG(debug, "initializing filter chain lookup of listener {}", address_->asString());
   warming_lookup_->initialize();
 }
 
@@ -605,46 +583,31 @@ std::unique_ptr<FilterChainManagerImpl::FilterChainLookup>
 FilterChainManagerImpl::createFilterChainLookup() {
   auto res = std::make_unique<FilterChainManagerImpl::FilterChainLookup>();
   res->has_active_lookup_ = active_lookup_.get() != nullptr;
-  ENVOY_LOG(info, "new filter chain lookup has_active_lookup = {}", res->has_active_lookup_);
-  res->init_watcher_ = std::make_unique<Init::WatcherImpl>("lookup warmed cb", [lookup = res.get(),
-                                                                                this]() {
-    warmed(lookup);
-    // TODO verify if lookup->has_active_lookup_ works as there might be multiple warming lookup
-    // TODO: here or in warmed()?
-    if (!lookup->has_active_lookup_) {
-      ENVOY_LOG(
-          info,
-          "FOO: this warmed up lookup was created with no active lookup, call parent target ready");
-      init_target_.ready();
-      target_ready_ = true;
-    } else {
-      ENVOY_LOG(info, "FOO: this warmed up lookup was created with active lookup, wont notify "
-                      "filte chain manager");
-    }
-  });
+  ENVOY_LOG(trace, "{} filter chain lookup {} has_active_lookup = {}", address_->asString(),
+            static_cast<void*>(res.get()), res->has_active_lookup_);
+  res->init_watcher_ =
+      std::make_unique<Init::WatcherImpl>("lookup warmed cb", [lookup = res.get(), this]() {
+        warmed(lookup);
+        if (!lookup->has_active_lookup_) {
+          ENVOY_LOG(
+              debug,
+              "lookup {} was created with no active lookup, mark filter chain manager {} as ready",
+              static_cast<void*>(lookup), address_->asString());
+          init_target_.ready();
+          target_ready_ = true;
+        } else {
+          ENVOY_LOG(debug,
+                    "lookup {} was created with active lookup, wont notify "
+                    "filter chain manager {}",
+                    static_cast<void*>(lookup), address_->asString());
+        }
+      });
   return res;
 }
 
 void FilterChainManagerImpl::FilterChainLookup::initialize() {
-  ENVOY_LOG(info, "initialize lookup with its local init manager. has_active_lookup_ = {}",
-            has_active_lookup_);
   dynamic_init_manager_.initialize(*init_watcher_);
 }
 
-std::string FilterChainManagerImpl::resourceName(const ProtobufWkt::Any& resource) {
-  return MessageUtil::anyConvert<envoy::api::v2::listener::FilterChain>(
-             resource, ProtobufMessage::getNullValidationVisitor())
-      .name();
-}
-
-// void FilterChainManagerImpl::onConfigUpdate(
-//     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-//     const std::string& version_info) {
-//   //Protobuf::RepeatedPtrField<envoy::api::v2::Resource> ;
-//   for (const auto& filter_chain_resource : resources) {
-//     MessageUtil::anyConvert<envoy::api::v2::listener::FilterChain>(
-//         filter_chain_resource, validation_visitor_);
-//   }
-// }
 } // namespace Server
 } // namespace Envoy

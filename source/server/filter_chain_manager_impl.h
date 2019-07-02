@@ -10,7 +10,6 @@
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
 
-#include "server/fcds_api.h"
 #include "server/lds_api.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -33,11 +32,7 @@ public:
  * Encapulating the subscription from FCDS Api.
  */
 class FilterChainManagerImpl : public Network::FilterChainManager,
-                               public Config::SubscriptionCallbacks,
                                Logger::Loggable<Logger::Id::config> {
-
-  using FcProto = ::envoy::api::v2::listener::FilterChain;
-
 public:
   FilterChainManagerImpl(Init::Manager& init_manager,
                          Network::Address::InstanceConstSharedPtr address);
@@ -58,21 +53,6 @@ public:
       FilterChainFactoryBuilder& b);
 
   static bool isWildcardServerName(const std::string& name);
-
-  // TODO(silentdai): implement Config::SubscriptionCallbacks
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                      const std::string& version_info) override {
-    ENVOY_LOG(info, "{}{}", resources.size(), version_info);
-  }
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string& system_version_info) override {
-    ENVOY_LOG(info, "{}{}{}", added_resources.size(), removed_resources.size(),
-              system_version_info);
-  }
-  void onConfigUpdateFailed(const EnvoyException* e) override { throw *e; }
-
-  std::string resourceName(const ProtobufWkt::Any& resource) override;
 
   // In order to share between internal class
   using SourcePortsMap = absl::flat_hash_map<uint16_t, Network::FilterChainSharedPtr>;
@@ -169,7 +149,8 @@ private:
     // and application protocols, using structures defined above.
     DestinationPortsMap destination_ports_map_;
 
-    std::unordered_map<FcProto, std::shared_ptr<Network::FilterChain>, MessageUtil, MessageUtil>
+    std::unordered_map<::envoy::api::v2::listener::FilterChain,
+                       std::shared_ptr<Network::FilterChain>, MessageUtil, MessageUtil>
         existing_active_filter_chains_;
 
     // Used during warm up, notified by dependencies, and notify parent that the index is ready.
@@ -216,7 +197,7 @@ private:
                                 }};
 
   // The address should never change during the lifetime of the filter chain manager.
-  Network::Address::InstanceConstSharedPtr address_;
+  const Network::Address::InstanceConstSharedPtr address_;
 };
 
 class FilterChainImpl : public Network::FilterChain {
