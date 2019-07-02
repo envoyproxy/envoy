@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Server {
 
-class SslContextManagerStub final : public Envoy::Ssl::ContextManager {
+class SslContextManagerNoTlsStub final : public Envoy::Ssl::ContextManager {
   Ssl::ClientContextSharedPtr
   createSslClientContext(Stats::Scope& /* scope */,
                          const Envoy::Ssl::ClientContextConfig& /* config */) override {
@@ -33,7 +33,7 @@ Ssl::ContextManagerPtr createContextManager(const std::string& factory_name,
     return factory->createContextManager(time_source);
   }
 
-  return std::make_unique<SslContextManagerStub>();
+  return std::make_unique<SslContextManagerNoTlsStub>();
 }
 
 } // namespace Server
