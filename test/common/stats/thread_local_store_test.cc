@@ -763,8 +763,8 @@ public:
   ScopePtr scope_;
 };
 
-INSTANTIATE_TEST_CASE_P(RememberStatsMatcherTest, RememberStatsMatcherTest,
-                        testing::ValuesIn({false, true}));
+INSTANTIATE_TEST_SUITE_P(RememberStatsMatcherTest, RememberStatsMatcherTest,
+                         testing::ValuesIn({false, true}));
 
 // Tests that the logic for remembering rejected stats works properly, both
 // with and without threading.

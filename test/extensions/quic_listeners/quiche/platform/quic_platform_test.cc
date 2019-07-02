@@ -729,9 +729,9 @@ public:
   ~QuicMemSliceTest() override {}
 };
 
-INSTANTIATE_TEST_CASE_P(QuicMemSliceTests, QuicMemSliceTest,
-                        testing::ValuesIn({Envoy::Buffer::BufferImplementation::Old,
-                                           Envoy::Buffer::BufferImplementation::New}));
+INSTANTIATE_TEST_SUITE_P(QuicMemSliceTests, QuicMemSliceTest,
+                         testing::ValuesIn({Envoy::Buffer::BufferImplementation::Old,
+                                            Envoy::Buffer::BufferImplementation::New}));
 
 TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');
