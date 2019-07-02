@@ -25,7 +25,7 @@ UdpListenerEchoFilter::UdpListenerEchoFilter(Network::UdpReadFilterCallbacks& ca
     : Network::UdpListenerReadFilter(callbacks) {}
 
 void UdpListenerEchoFilter::onData(Network::UdpRecvData& data) {
-  ENVOY_LOG(trace, "UdpEchoFilter: Got {} bytes from {} on interface {}", data.buffer_->length(),
+  ENVOY_LOG(trace, "UdpEchoFilter: Got {} bytes from {} on {}", data.buffer_->length(),
             data.peer_address_->asString(), data.local_address_->asString());
 
   // send back the received data

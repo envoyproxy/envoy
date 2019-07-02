@@ -32,7 +32,7 @@ public:
   GetMaxPacketSize(const quic::QuicSocketAddress& /*peer_address*/) const override {
     return quic::kMaxOutgoingPacketSize;
   }
-  // Currently this writer doesn't support batch writing mode.
+  // Currently this writer doesn't support pacing offload or batch writing.
   bool SupportsReleaseTime() const override { return false; }
   bool IsBatchMode() const override { return false; }
   char* GetNextWriteLocation(const quic::QuicIpAddress& /*self_address*/,

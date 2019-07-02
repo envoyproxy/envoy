@@ -16,6 +16,7 @@
 #include "common/common/stack_array.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/io_socket_error_impl.h"
 
 #include "event2/listener.h"
 
@@ -158,14 +159,14 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
   buffer.getRawSlices(slices.begin(), num_slices);
-  Api::IoCallUint64Result send_result = socket_.ioHandle().sendmsg(
-      slices.begin(), num_slices, 0, send_data.local_ip_, *send_data.peer_address_);
-  while (!send_result.ok() &&
-         send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt) {
-    // Send again if interrupted.
+  Api::IoCallUint64Result send_result(
+      /*rc=*/0, /*err=*/Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+  do {
     send_result = socket_.ioHandle().sendmsg(slices.begin(), num_slices, 0, send_data.local_ip_,
                                              *send_data.peer_address_);
-  }
+  } while (!send_result.ok() &&
+           // Send again if interrupted.
+           send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);
 
   if (send_result.ok()) {
     ASSERT(send_result.rc_ == buffer.length());

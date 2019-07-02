@@ -116,16 +116,16 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
     return sysCallResultToIoCallResult(result);
   } else {
-    const int kSpaceForIpv6 = CMSG_SPACE(sizeof(in6_pktinfo));
+    const int space_v6 = CMSG_SPACE(sizeof(in6_pktinfo));
     // FreeBSD only needs in_addr size, but allocates more to unify code in two platforms.
-    const int kSpaceForIpv4 = CMSG_SPACE(sizeof(in_pktinfo));
-    const int kSpaceForIp = (kSpaceForIpv4 < kSpaceForIpv6) ? kSpaceForIpv6 : kSpaceForIpv4;
+    const int space_v4 = CMSG_SPACE(sizeof(in_pktinfo));
+    const int cmsg_space = (space_v4 < space_v6) ? space_v6 : space_v4;
     // kSpaceForIp should be big enough to hold both IPv4 and IPv6 packet info.
-    STACK_ARRAY(cbuf, char, kSpaceForIp);
-    memset(cbuf.begin(), 0, kSpaceForIp);
+    STACK_ARRAY(cbuf, char, cmsg_space);
+    memset(cbuf.begin(), 0, cmsg_space);
 
     message.msg_control = cbuf.begin();
-    message.msg_controllen = kSpaceForIp * sizeof(char);
+    message.msg_controllen = cmsg_space * sizeof(char);
     cmsghdr* const cmsg = CMSG_FIRSTHDR(&message);
     RELEASE_ASSERT(cmsg != nullptr, fmt::format("cbuf with size {} is not enough, cmsghdr size {}",
                                                 sizeof(cbuf), sizeof(cmsghdr)));
@@ -222,45 +222,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
                                                     RecvMsgOutput& output) {
 
-#ifndef __APPLE__
   // The minimum cmsg buffer size to filled in destination address and packets dropped when
   // receiving a packet. It is possible for a received packet to contain both IPv4 and IPv6
   // addresses.
-  constexpr int cmsg_space = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
-                             CMSG_SPACE(sizeof(struct in6_pktinfo));
-  char cbuf[cmsg_space];
-#else
-  // CMSG_SPACE() is supposed to be a constant expression, and most
-  // BSD-ish code uses it to determine the size of buffers used to
-  // send/receive descriptors in the control message for
-  // sendmsg/recvmsg. Such buffers are often automatic variables.
-
-  // In Darwin, CMSG_SPACE uses __DARWIN_ALIGN. And __DARWIN_ALIGN(p)
-  // expands to
-
-  // ((__darwin_size_t)((char *)(__darwin_size_t)(p) + __DARNWIN_ALIGNBYTES)
-  //  &~ __DARWIN_ALIGNBYTES)
-
-  // which Clang (to which many Apple employees contribute!) complains
-  // about when invoked with -pedantic -- and with our -Werror, causes
-  // Clang-based builds to fail. Clang says this is not a constant
-  // expression:
-
-  // error: variable length array folded to constant array as an
-  // extension [-Werror,-pedantic]
-
-  // Possibly true per standard definition, since that cast to (char *)
-  // is ugly, but actually Clang was able to convert to a compile-time
-  // constant... it just had to work harder.
-
-  // As a ugly workaround, we define the following constant for use in
-  // automatic array declarations, and in all cases have an assert to
-  // verify that the value is of sufficient size. (The assert should
-  // constantly propagate and be dead-code eliminated in normal compiles
-  // and should cause a quick death if ever violated.)
-  constexpr int cmsg_space = 128;
-  char cbuf[cmsg_space];
-#endif
+  const int cmsg_space = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
+                         CMSG_SPACE(sizeof(struct in6_pktinfo));
+  STACK_ARRAY(cbuf, char, cmsg_space);
+  memset(cbuf.begin(), 0, cmsg_space);
 
   STACK_ARRAY(iov, iovec, num_slice);
   uint64_t num_slices_for_read = 0;
@@ -280,7 +248,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   hdr.msg_iovlen = num_slices_for_read;
   hdr.msg_flags = 0;
 
-  struct cmsghdr* cmsg = reinterpret_cast<struct cmsghdr*>(cbuf);
+  struct cmsghdr* cmsg = reinterpret_cast<struct cmsghdr*>(cbuf.begin());
   cmsg->cmsg_len = cmsg_space;
   hdr.msg_control = cmsg;
   hdr.msg_controllen = cmsg_space;

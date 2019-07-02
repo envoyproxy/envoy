@@ -366,9 +366,14 @@ TEST_P(UdpListenerImplTest, SendData) {
   // consideration.
   Address::InstanceConstSharedPtr send_from_addr;
   if (version_ == Address::IpVersion::v4) {
-    // Kernel regards any 127.x.x.x as local address.
-    send_from_addr.reset(
-        new Address::Ipv4Instance("127.0.0.3", server_socket_->localAddress()->ip()->port()));
+    // Linux kernel regards any 127.x.x.x as local address. But Mac OS doesn't.
+    send_from_addr.reset(new Address::Ipv4Instance(
+#ifndef __APPLE__
+        "127.1.2.3",
+#else
+        "127.0.0.1",
+#endif
+        server_socket_->localAddress()->ip()->port()));
   } else {
     // Only use non-local v6 address if IP_FREEBIND is supported. Otherwise use
     // ::1 to avoid EINVAL error. Unfortunately this can't verify that sendmsg with
@@ -396,8 +401,9 @@ TEST_P(UdpListenerImplTest, SendData) {
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  constexpr uint64_t bytes_to_read = 11;
-  char recv_buf[bytes_to_read + 1];
+  const uint64_t bytes_to_read = payload.length();
+  // Make receive buffer 1 byte larger for trailling '\0'.
+  auto recv_buf = std::make_unique<char[]>(bytes_to_read + 1);
   uint64_t bytes_read = 0;
   int retry = 0;
 
@@ -406,7 +412,7 @@ TEST_P(UdpListenerImplTest, SendData) {
   socklen_t addr_len = sizeof(sockaddr_storage);
   do {
     Api::SysCallSizeResult result = os_sys_calls.recvfrom(
-        client_socket_->ioHandle().fd(), recv_buf + bytes_read, bytes_to_read - bytes_read, 0,
+        client_socket_->ioHandle().fd(), recv_buf.get() + bytes_read, bytes_to_read - bytes_read, 0,
         reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
     if (result.rc_ >= 0) {
       bytes_read += result.rc_;
@@ -426,7 +432,7 @@ TEST_P(UdpListenerImplTest, SendData) {
   } while (true);
   EXPECT_EQ(bytes_to_read, bytes_read);
   recv_buf[bytes_to_read] = '\0';
-  EXPECT_EQ(std::string(recv_buf), payload);
+  EXPECT_EQ(recv_buf.get(), payload);
 }
 
 /**

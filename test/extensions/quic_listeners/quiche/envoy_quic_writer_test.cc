@@ -29,6 +29,12 @@ public:
         }));
   }
 
+  void verifySendData(const std::string& content, const Network::UdpSendData send_data) {
+    EXPECT_EQ(peer_address_.ToString(), send_data.peer_address_->asString());
+    EXPECT_EQ(self_address_.ToString(), send_data.local_ip_->addressAsString());
+    EXPECT_EQ(content, send_data.buffer_.toString());
+  }
+
 protected:
   testing::NiceMock<Network::MockUdpListener> udp_listener_;
   quic::QuicIpAddress self_address_;
@@ -48,9 +54,7 @@ TEST_F(EnvoyQuicWriterTest, SendSuccessfully) {
   std::string str("Hello World!");
   EXPECT_CALL(udp_listener_, send(_))
       .WillOnce(testing::Invoke([this, str](const Network::UdpSendData& send_data) {
-        EXPECT_EQ(peer_address_.ToString(), send_data.peer_address_->asString());
-        EXPECT_EQ(self_address_.ToString(), send_data.local_ip_->addressAsString());
-        EXPECT_EQ(str, send_data.buffer_.toString());
+        verifySendData(str, send_data);
         return Api::IoCallUint64Result(
             str.length(), Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError));
       }));
@@ -65,9 +69,7 @@ TEST_F(EnvoyQuicWriterTest, SendBlocked) {
   std::string str("Hello World!");
   EXPECT_CALL(udp_listener_, send(_))
       .WillOnce(testing::Invoke([this, str](const Network::UdpSendData& send_data) {
-        EXPECT_EQ(peer_address_.ToString(), send_data.peer_address_->asString());
-        EXPECT_EQ(self_address_.ToString(), send_data.local_ip_->addressAsString());
-        EXPECT_EQ(str, send_data.buffer_.toString());
+        verifySendData(str, send_data);
         return Api::IoCallUint64Result(
             0u, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                 Network::IoSocketError::deleteIoError));
@@ -81,9 +83,7 @@ TEST_F(EnvoyQuicWriterTest, SendBlocked) {
 #ifdef NDEBUG
   EXPECT_CALL(udp_listener_, send(_))
       .WillOnce(testing::Invoke([this, str](const Network::UdpSendData& send_data) {
-        EXPECT_EQ(peer_address_.ToString(), send_data.peer_address_->asString());
-        EXPECT_EQ(self_address_.ToString(), send_data.local_ip_->addressAsString());
-        EXPECT_EQ(str, send_data.buffer_.toString());
+        verifySendData(str, send_data);
         return Api::IoCallUint64Result(
             0u, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                 Network::IoSocketError::deleteIoError));
@@ -101,9 +101,7 @@ TEST_F(EnvoyQuicWriterTest, SendFailure) {
   EXPECT_CALL(udp_listener_, send(_))
       .WillOnce(testing::Invoke(
           [this, str](const Network::UdpSendData& send_data) -> Api::IoCallUint64Result {
-            EXPECT_EQ(peer_address_.ToString(), send_data.peer_address_->asString());
-            EXPECT_EQ(self_address_.ToString(), send_data.local_ip_->addressAsString());
-            EXPECT_EQ(str, send_data.buffer_.toString());
+            verifySendData(str, send_data);
             return Api::IoCallUint64Result(0u,
                                            Api::IoErrorPtr(new Network::IoSocketError(ENOTSUP),
                                                            Network::IoSocketError::deleteIoError));
@@ -119,9 +117,7 @@ TEST_F(EnvoyQuicWriterTest, SendFailureMessageTooBig) {
   std::string str("Hello World!");
   EXPECT_CALL(udp_listener_, send(_))
       .WillOnce(testing::Invoke([this, str](const Network::UdpSendData& send_data) {
-        EXPECT_EQ(peer_address_.ToString(), send_data.peer_address_->asString());
-        EXPECT_EQ(self_address_.ToString(), send_data.local_ip_->addressAsString());
-        EXPECT_EQ(str, send_data.buffer_.toString());
+        verifySendData(str, send_data);
         return Api::IoCallUint64Result(0u, Api::IoErrorPtr(new Network::IoSocketError(EMSGSIZE),
                                                            Network::IoSocketError::deleteIoError));
       }));

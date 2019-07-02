@@ -55,15 +55,15 @@ public:
     sockaddr_storage peer_addr;
     socklen_t addr_len = sizeof(sockaddr_storage);
 
-    constexpr uint64_t bytes_to_read = 11;
-    char recv_buf[bytes_to_read + 1];
+    const uint64_t bytes_to_read = request.length();
+    auto recv_buf = std::make_unique<char[]>(bytes_to_read + 1);
     uint64_t bytes_read = 0;
 
     int retry = 0;
     do {
       Api::SysCallSizeResult result = os_sys_calls.recvfrom(
-          client_socket->ioHandle().fd(), recv_buf + bytes_read, bytes_to_read - bytes_read, 0,
-          reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
+          client_socket->ioHandle().fd(), recv_buf.get() + bytes_read, bytes_to_read - bytes_read,
+          0, reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
       if (result.rc_ >= 0) {
         bytes_read += result.rc_;
         Network::Address::InstanceConstSharedPtr peer_address =
@@ -83,7 +83,7 @@ public:
     } while (true);
 
     recv_buf[bytes_to_read] = '\0';
-    EXPECT_EQ(recv_buf, request);
+    EXPECT_EQ(recv_buf.get(), request);
   }
 };
 
