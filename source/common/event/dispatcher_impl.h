@@ -77,7 +77,7 @@ public:
 
   // FatalErrorInterface
   void onFatalError() const override {
-    // Dump the stae of the tracked object if it is in the current thread. This generally results
+    // Dump the state of the tracked object if it is in the current thread. This generally results
     // in dumping the active state only for the thread which caused the fatal error.
     if (isThreadSafe()) {
       if (current_object_) {

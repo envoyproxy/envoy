@@ -42,7 +42,7 @@ TEST(SignalsDeathTest, RegisteredHandlerTest) {
   TestFatalErrorHandler handler;
   SignalAction::registerFatalErrorHandler(handler);
   SignalAction actions;
-  // Make sure the cerr "HERE" registered above is logged on fatal error.
+  // Make sure the fatal error log "HERE" registered above is logged on fatal error.
   EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
         // Oops!
