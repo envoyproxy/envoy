@@ -11,6 +11,8 @@ import "envoy/config/filter/accesslog/v2/accesslog.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "validate/validate.proto";
+
 // [#protodoc-title: Router]
 // Router :ref:`configuration overview <config_http_filters_router>`.
 
@@ -36,4 +38,30 @@ message Router {
   // <config_http_filters_router_headers_set>`, other Envoy filters and the HTTP
   // connection manager may continue to set *x-envoy-* headers.
   bool suppress_envoy_headers = 4;
+
+  // Specifies a list of HTTP headers to strictly validate. Envoy will reject a
+  // request and respond with HTTP status 400 if the request contains an invalid
+  // value for any of the headers listed in this field. Strict header checking
+  // is only supported for the following headers:
+  //
+  // Value must be a ','-delimited list (i.e. no spaces) of supported retry
+  // policy values:
+  //
+  // * :ref:`config_http_filters_router_x-envoy-retry-grpc-on`
+  // * :ref:`config_http_filters_router_x-envoy-retry-on`
+  //
+  // Value must be an integer:
+  //
+  // * :ref:`config_http_filters_router_x-envoy-max-retries`
+  // * :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`
+  // * :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`
+  repeated string strict_check_headers = 5 [(validate.rules).repeated .items.string = {
+    in: [
+      "x-envoy-upstream-rq-timeout-ms",
+      "x-envoy-upstream-rq-per-try-timeout-ms",
+      "x-envoy-max-retries",
+      "x-envoy-retry-grpc-on",
+      "x-envoy-retry-on"
+    ]
+  }];
 }

@@ -54,7 +54,7 @@ class MockOptions : public Options {
 public:
   MockOptions() : MockOptions(std::string()) {}
   MockOptions(const std::string& config_path);
-  ~MockOptions();
+  ~MockOptions() override;
 
   MOCK_CONST_METHOD0(baseId, uint64_t());
   MOCK_CONST_METHOD0(concurrency, uint32_t());
@@ -102,7 +102,7 @@ public:
 class MockConfigTracker : public ConfigTracker {
 public:
   MockConfigTracker();
-  ~MockConfigTracker();
+  ~MockConfigTracker() override;
 
   struct MockEntryOwner : public EntryOwner {};
 
@@ -120,7 +120,7 @@ public:
 class MockAdmin : public Admin {
 public:
   MockAdmin();
-  ~MockAdmin();
+  ~MockAdmin() override;
 
   // Server::Admin
   MOCK_METHOD5(addHandler, bool(const std::string& prefix, const std::string& help_text,
@@ -142,7 +142,7 @@ public:
 class MockAdminStream : public AdminStream {
 public:
   MockAdminStream();
-  ~MockAdminStream();
+  ~MockAdminStream() override;
 
   MOCK_METHOD1(setEndStreamOnComplete, void(bool));
   MOCK_METHOD1(addOnDestroyCallback, void(std::function<void()>));
@@ -155,7 +155,7 @@ public:
 class MockDrainManager : public DrainManager {
 public:
   MockDrainManager();
-  ~MockDrainManager();
+  ~MockDrainManager() override;
 
   // Server::DrainManager
   MOCK_CONST_METHOD0(drainClose, bool());
@@ -168,22 +168,22 @@ public:
 class MockWatchDog : public WatchDog {
 public:
   MockWatchDog();
-  ~MockWatchDog();
+  ~MockWatchDog() override;
 
   // Server::WatchDog
   MOCK_METHOD1(startWatchdog, void(Event::Dispatcher& dispatcher));
   MOCK_METHOD0(touch, void());
-  MOCK_CONST_METHOD0(threadId, const Thread::ThreadId&());
+  MOCK_CONST_METHOD0(threadId, Thread::ThreadId());
   MOCK_CONST_METHOD0(lastTouchTime, MonotonicTime());
 };
 
 class MockGuardDog : public GuardDog {
 public:
   MockGuardDog();
-  ~MockGuardDog();
+  ~MockGuardDog() override;
 
   // Server::GuardDog
-  MOCK_METHOD1(createWatchDog, WatchDogSharedPtr(Thread::ThreadIdPtr&&));
+  MOCK_METHOD1(createWatchDog, WatchDogSharedPtr(Thread::ThreadId));
   MOCK_METHOD1(stopWatching, void(WatchDogSharedPtr wd));
 
   std::shared_ptr<MockWatchDog> watch_dog_;
@@ -192,7 +192,7 @@ public:
 class MockHotRestart : public HotRestart {
 public:
   MockHotRestart();
-  ~MockHotRestart();
+  ~MockHotRestart() override;
 
   // Server::HotRestart
   MOCK_METHOD0(drainParentListeners, void());
@@ -218,7 +218,7 @@ private:
 class MockListenerComponentFactory : public ListenerComponentFactory {
 public:
   MockListenerComponentFactory();
-  ~MockListenerComponentFactory();
+  ~MockListenerComponentFactory() override;
 
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override {
     return DrainManagerPtr{createDrainManager_(drain_type)};
@@ -254,7 +254,7 @@ public:
 class MockListenerManager : public ListenerManager {
 public:
   MockListenerManager();
-  ~MockListenerManager();
+  ~MockListenerManager() override;
 
   MOCK_METHOD3(addOrUpdateListener, bool(const envoy::api::v2::Listener& config,
                                          const std::string& version_info, bool modifiable));
@@ -270,7 +270,7 @@ public:
 class MockServerLifecycleNotifier : public ServerLifecycleNotifier {
 public:
   MockServerLifecycleNotifier();
-  ~MockServerLifecycleNotifier();
+  ~MockServerLifecycleNotifier() override;
 
   MOCK_METHOD2(registerCallback, ServerLifecycleNotifier::HandlePtr(Stage, StageCallback));
   MOCK_METHOD2(registerCallback,
@@ -280,7 +280,7 @@ public:
 class MockWorkerFactory : public WorkerFactory {
 public:
   MockWorkerFactory();
-  ~MockWorkerFactory();
+  ~MockWorkerFactory() override;
 
   // Server::WorkerFactory
   WorkerPtr createWorker(OverloadManager&) override { return WorkerPtr{createWorker_()}; }
@@ -291,7 +291,7 @@ public:
 class MockWorker : public Worker {
 public:
   MockWorker();
-  ~MockWorker();
+  ~MockWorker() override;
 
   void callAddCompletion(bool success) {
     EXPECT_NE(nullptr, add_listener_completion_);
@@ -324,7 +324,7 @@ public:
 class MockOverloadManager : public OverloadManager {
 public:
   MockOverloadManager();
-  ~MockOverloadManager();
+  ~MockOverloadManager() override;
 
   // OverloadManager
   MOCK_METHOD0(start, void());
@@ -338,7 +338,7 @@ public:
 class MockInstance : public Instance {
 public:
   MockInstance();
-  ~MockInstance();
+  ~MockInstance() override;
 
   Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
 
@@ -414,7 +414,7 @@ class MockMain : public Main {
 public:
   MockMain() : MockMain(0, 0, 0, 0) {}
   MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill);
-  ~MockMain();
+  ~MockMain() override;
 
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager*());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
@@ -434,7 +434,7 @@ public:
 class MockFactoryContext : public virtual FactoryContext {
 public:
   MockFactoryContext();
-  ~MockFactoryContext();
+  ~MockFactoryContext() override;
 
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
@@ -487,7 +487,7 @@ public:
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {
 public:
   MockTransportSocketFactoryContext();
-  ~MockTransportSocketFactoryContext();
+  ~MockTransportSocketFactoryContext() override;
 
   Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
 
@@ -514,7 +514,7 @@ public:
 class MockListenerFactoryContext : public MockFactoryContext, public ListenerFactoryContext {
 public:
   MockListenerFactoryContext();
-  ~MockListenerFactoryContext();
+  ~MockListenerFactoryContext() override;
 
   void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) override {
     addListenSocketOption_(option);
@@ -533,7 +533,7 @@ public:
 class MockHealthCheckerFactoryContext : public virtual HealthCheckerFactoryContext {
 public:
   MockHealthCheckerFactoryContext();
-  ~MockHealthCheckerFactoryContext();
+  ~MockHealthCheckerFactoryContext() override;
 
   MOCK_METHOD0(cluster, Upstream::Cluster&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
