@@ -1658,7 +1658,7 @@ TEST_F(EdsTest, MalformedIP) {
 
 class EdsAssignmentTimeoutTest : public EdsTest {
 public:
-  EdsAssignmentTimeoutTest() : EdsTest(), interval_timer_(nullptr) {
+  EdsAssignmentTimeoutTest() : interval_timer_(nullptr) {
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .WillOnce(Invoke([this](Event::TimerCb cb) {
           timer_cb_ = cb;

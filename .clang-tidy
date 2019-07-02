@@ -28,6 +28,7 @@ WarningsAsErrors: 'abseil-duration-*,
                    performance-unnecessary-copy-initialization,
                    readability-braces-around-statements,
                    readability-container-size-empty,
+                   readability-redundant-member-init,
                    readability-redundant-smartptr-get,
                    readability-redundant-string-cstr'
 

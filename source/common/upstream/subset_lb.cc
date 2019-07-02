@@ -615,9 +615,8 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
                                                            HostPredicate predicate,
                                                            bool locality_weight_aware,
                                                            bool scale_locality_weight)
-    : PrioritySetImpl(), original_priority_set_(subset_lb.original_priority_set_),
-      predicate_(predicate), locality_weight_aware_(locality_weight_aware),
-      scale_locality_weight_(scale_locality_weight) {
+    : original_priority_set_(subset_lb.original_priority_set_), predicate_(predicate),
+      locality_weight_aware_(locality_weight_aware), scale_locality_weight_(scale_locality_weight) {
 
   for (size_t i = 0; i < original_priority_set_.hostSetsPerPriority().size(); ++i) {
     empty_ &= getOrCreateHostSet(i).hosts().empty();
