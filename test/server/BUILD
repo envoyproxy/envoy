@@ -188,6 +188,37 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "filter_chain_manager_impl_test",
+    srcs = ["filter_chain_manager_impl_test.cc"],
+    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
+    deps = [
+        ":utility_lib",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/network:addr_family_aware_socket_option_lib",
+        "//source/common/network:listen_socket_lib",
+        "//source/common/network:socket_option_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/protobuf",
+        "//source/extensions/filters/listener/original_dst:config",
+        "//source/extensions/filters/listener/tls_inspector:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/server:filter_chain_manager_lib",
+        "//source/server:listener_manager_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_time_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
 envoy_cc_fuzz_test(
     name = "server_fuzz_test",
     srcs = ["server_fuzz_test.cc"],

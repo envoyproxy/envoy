@@ -10,6 +10,7 @@
 
 #include "common/common/utility.h"
 #include "common/stats/heap_stat_data.h"
+#include "common/stats/null_counter.h"
 #include "common/stats/null_gauge.h"
 #include "common/stats/store_impl.h"
 #include "common/stats/symbol_table_impl.h"
@@ -25,8 +26,8 @@ namespace Stats {
  */
 template <class Base> class IsolatedStatsCache {
 public:
-  using Allocator = std::function<std::shared_ptr<Base>(StatName name)>;
-  using AllocatorImportMode = std::function<std::shared_ptr<Base>(StatName, Gauge::ImportMode)>;
+  using Allocator = std::function<RefcountPtr<Base>(StatName name)>;
+  using AllocatorImportMode = std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode)>;
 
   IsolatedStatsCache(Allocator alloc) : alloc_(alloc) {}
   IsolatedStatsCache(AllocatorImportMode alloc) : alloc_import_(alloc) {}
@@ -37,7 +38,7 @@ public:
       return *stat->second;
     }
 
-    std::shared_ptr<Base> new_stat = alloc_(name);
+    RefcountPtr<Base> new_stat = alloc_(name);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
@@ -48,13 +49,13 @@ public:
       return *stat->second;
     }
 
-    std::shared_ptr<Base> new_stat = alloc_import_(name, import_mode);
+    RefcountPtr<Base> new_stat = alloc_import_(name, import_mode);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
 
-  std::vector<std::shared_ptr<Base>> toVector() const {
-    std::vector<std::shared_ptr<Base>> vec;
+  std::vector<RefcountPtr<Base>> toVector() const {
+    std::vector<RefcountPtr<Base>> vec;
     vec.reserve(stats_.size());
     for (auto& stat : stats_) {
       vec.push_back(stat.second);
@@ -71,10 +72,10 @@ private:
     if (stat == stats_.end()) {
       return absl::nullopt;
     }
-    return std::cref(*stat->second.get());
+    return std::cref(*stat->second);
   }
 
-  StatNameHashMap<std::shared_ptr<Base>> stats_;
+  StatNameHashMap<RefcountPtr<Base>> stats_;
   Allocator alloc_;
   AllocatorImportMode alloc_import_;
 };
@@ -93,7 +94,8 @@ public:
     gauge.mergeImportMode(import_mode);
     return gauge;
   }
-  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
+  NullCounterImpl& nullCounter() { return *null_counter_; }
+  NullGaugeImpl& nullGauge(const std::string&) override { return *null_gauge_; }
   Histogram& histogramFromStatName(StatName name) override {
     Histogram& histogram = histograms_.get(name);
     return histogram;
@@ -144,7 +146,8 @@ private:
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
-  NullGaugeImpl null_gauge_;
+  RefcountPtr<NullCounterImpl> null_counter_;
+  RefcountPtr<NullGaugeImpl> null_gauge_;
 };
 
 } // namespace Stats

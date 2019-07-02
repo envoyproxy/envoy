@@ -128,10 +128,10 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolve() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+      [this](std::list<Network::DnsResponse>&& response) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
-        parent_.redis_discovery_session_.registerDiscoveryAddress(address_list, port_);
+        parent_.redis_discovery_session_.registerDiscoveryAddress(std::move(response), port_);
         parent_.redis_discovery_session_.startResolve();
       });
 }
@@ -190,13 +190,12 @@ void RedisCluster::RedisDiscoveryClient::onEvent(Network::ConnectionEvent event)
 }
 
 void RedisCluster::RedisDiscoverySession::registerDiscoveryAddress(
-    const std::list<Envoy::Network::Address::InstanceConstSharedPtr>& address_list,
-    const uint32_t port) {
+    std::list<Envoy::Network::DnsResponse>&& response, const uint32_t port) {
   // Since the address from DNS does not have port, we need to make a new address that has port in
   // it.
-  for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
-    ASSERT(address != nullptr);
-    discovery_address_list_.push_back(Network::Utility::getAddressWithPort(*address, port));
+  for (const Network::DnsResponse& res : response) {
+    ASSERT(res.address_ != nullptr);
+    discovery_address_list_.push_back(Network::Utility::getAddressWithPort(*(res.address_), port));
   }
 }
 
