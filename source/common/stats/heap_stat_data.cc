@@ -55,8 +55,8 @@ void HeapStatDataAllocator::debugPrint() {
 // which we need in order to clean up the counter and gauge maps in that class
 // when they are destroyed.
 //
-// We implement the RefcountInterface API, using 16 bits hidden in the alignment
-// padding along with the flags in HeapStatData.
+// We implement the RefcountInterface API, using 16 bits that would otherwise be
+// wasted in the alignment padding next to flags_.
 template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> {
 public:
   StatsSharedImpl(StatName name, HeapStatDataAllocator& alloc, absl::string_view tag_extracted_name,

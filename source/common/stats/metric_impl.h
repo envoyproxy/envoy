@@ -38,21 +38,21 @@ private:
 };
 
 /**
- * Implementation of the Metric interface. This class implements most of the
- * Metric API for Counters, Gauges, and Histograms. It leaves symbolTable()
- * unimplemented so that implementations can keep a reference to the allocator
- * instead, and derive the symbolTable() from that.
+ * Partial implementation of the Metric interface on behalf of Counters, Gauges,
+ * and Histograms. It leaves symbolTable() unimplemented so that implementations
+ * of stats managed by an allocator, specifically Counters and Gauges, can keep
+ * a reference to the allocator instead, and derive the symbolTable() from that.
  *
  * We templatize on the base class (Counter, Gauge, or Histogram), rather than
  * using multiple virtual inheritance, as this avoids the overhead of an extra
- * vptr per instance. This is important for stats because there can be a huge
- * number of stats in systems with large numbers of clusters and hosts, and a
- * few 8-byte pointers per-stat here and there can add up to significant amounts
- * of memory.
+ * vptr per instance. This is important for stats because there can be many
+ * stats in systems with large numbers of clusters and hosts, and a few 8-byte
+ * pointers per-stat here and there can add up to significant amounts of memory.
  *
  * Note the delegation of the implementation to a helper class, which is neither
- * templatized nor virtual. This avoids having separate copies of the
- * implementation for each base class.
+ * templatized nor virtual. This avoids having the compiler elaborate complete
+ * copies of the underlying implementation for each base class during template
+ * expansion.
  */
 template <class BaseClass> class MetricImpl : public BaseClass {
 public:

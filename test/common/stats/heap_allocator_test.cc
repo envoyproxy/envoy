@@ -11,10 +11,10 @@ namespace Envoy {
 namespace Stats {
 namespace {
 
-class HeapStatDataTest : public testing::Test {
+class HeapAllocatorTest : public testing::Test {
 protected:
-  HeapStatDataTest() : alloc_(symbol_table_), pool_(symbol_table_) {}
-  ~HeapStatDataTest() { clearStorage(); }
+  HeapAllocatorTest() : alloc_(symbol_table_), pool_(symbol_table_) {}
+  ~HeapAllocatorTest() { clearStorage(); }
 
   StatNameStorage makeStatStorage(absl::string_view name) {
     return StatNameStorage(name, symbol_table_);
@@ -32,8 +32,8 @@ protected:
   StatNamePool pool_;
 };
 
-// Allocate 2 counters or gauges of the same name, and you'll get the same object.
-TEST_F(HeapStatDataTest, StatsWithSameName) {
+// Allocate 2 counters of the same name, and you'll get the same object.
+TEST_F(HeapAllocatorTest, CountersWithSameName) {
   StatName counter_name = makeStat("counter.name");
   CounterSharedPtr c1 = alloc_.makeCounter(counter_name, "", std::vector<Tag>());
   EXPECT_EQ(1, c1->use_count());
@@ -49,6 +49,9 @@ TEST_F(HeapStatDataTest, StatsWithSameName) {
   c2->inc();
   EXPECT_EQ(2, c1->value());
   EXPECT_EQ(2, c2->value());
+}
+
+TEST_F(HeapAllocatorTest, GaugesWithSameName) {
   StatName gauge_name = makeStat("gauges.name");
   GaugeSharedPtr g1 =
       alloc_.makeGauge(gauge_name, "", std::vector<Tag>(), Gauge::ImportMode::Accumulate);
@@ -68,7 +71,7 @@ TEST_F(HeapStatDataTest, StatsWithSameName) {
   g2->dec();
   EXPECT_EQ(0, g1->value());
   EXPECT_EQ(0, g2->value());
-};
+}
 
 } // namespace
 } // namespace Stats

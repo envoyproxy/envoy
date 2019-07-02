@@ -42,6 +42,11 @@ StatName MetricHelper::statName() const {
 }
 
 StatName MetricHelper::tagExtractedStatName() const {
+  // The name is the first element in stat_names_. The second is the
+  // tag-extracted-name. We don't have random access in that format,
+  // so we iterate through them, skipping the first element (name),
+  // and terminating the iteration after capturing the tag-extracted
+  // name by returning false from the lambda.
   StatName tag_extracted_stat_name;
   bool skip = true;
   stat_names_.iterate([&tag_extracted_stat_name, &skip](StatName s) -> bool {
