@@ -51,7 +51,7 @@ public:
   }
 };
 
-typedef ConstSingleton<TransportNameValues> TransportNames;
+using TransportNames = ConstSingleton<TransportNameValues>;
 
 enum class ProtocolType {
   Binary,
@@ -102,7 +102,7 @@ public:
   }
 };
 
-typedef ConstSingleton<ProtocolNameValues> ProtocolNames;
+using ProtocolNames = ConstSingleton<ProtocolNameValues>;
 
 /**
  * Thrift protocol message types.

@@ -602,6 +602,10 @@ Supported variable names are:
     namespace and key(s) are specified as a JSON array of strings. Finally, percent symbols in the
     parameters **do not** need to be escaped by doubling them.
 
+%UPSTREAM_REMOTE_ADDRESS%
+    Remote address of the upstream host. If the address is an IP address it includes both address
+    and port.
+
 %PER_REQUEST_STATE(reverse.dns.data.name)%
     Populates the header with values set on the stream info filterState() object. To be
     usable in custom request/response headers, these values must be of type

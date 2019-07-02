@@ -111,7 +111,7 @@ protected:
     const LowerCaseString* key_;
   };
 
-  typedef StaticLookupResponse (*EntryCb)(HeaderMapImpl&);
+  using EntryCb = StaticLookupResponse (*)(HeaderMapImpl&);
 
   /**
    * This is the static lookup table that is used to determine whether a header is one of the O(1)
@@ -201,7 +201,7 @@ protected:
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
 };
 
-typedef std::unique_ptr<HeaderMapImpl> HeaderMapImplPtr;
+using HeaderMapImplPtr = std::unique_ptr<HeaderMapImpl>;
 
 } // namespace Http
 } // namespace Envoy

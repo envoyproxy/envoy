@@ -70,18 +70,18 @@ struct EntryHash {
   }
 };
 
-typedef std::unordered_set<DirectoryEntry, EntryHash> EntrySet;
+using EntrySet = std::unordered_set<DirectoryEntry, EntryHash>;
 
 EntrySet getDirectoryContents(const std::string& dir_path, bool recursive) {
   Directory directory(dir_path);
   EntrySet ret;
-  for (const DirectoryEntry entry : directory) {
+  for (const DirectoryEntry& entry : directory) {
     ret.insert(entry);
     if (entry.type_ == FileType::Directory && entry.name_ != "." && entry.name_ != ".." &&
         recursive) {
       std::string subdir_name = entry.name_;
       EntrySet subdir = getDirectoryContents(dir_path + "/" + subdir_name, recursive);
-      for (const DirectoryEntry entry : subdir) {
+      for (const DirectoryEntry& entry : subdir) {
         ret.insert({subdir_name + "/" + entry.name_, entry.type_});
       }
     }

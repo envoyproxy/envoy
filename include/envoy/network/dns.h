@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 #include <list>
 #include <memory>
@@ -16,12 +17,23 @@ namespace Network {
  */
 class ActiveDnsQuery {
 public:
-  virtual ~ActiveDnsQuery() {}
+  virtual ~ActiveDnsQuery() = default;
 
   /**
    * Cancel an outstanding DNS request.
    */
   virtual void cancel() PURE;
+};
+
+/**
+ * DNS response.
+ */
+struct DnsResponse {
+  DnsResponse(const Address::InstanceConstSharedPtr& address, const std::chrono::seconds ttl)
+      : address_(address), ttl_(ttl) {}
+
+  const Address::InstanceConstSharedPtr address_;
+  const std::chrono::seconds ttl_;
 };
 
 enum class DnsLookupFamily { V4Only, V6Only, Auto };
@@ -31,14 +43,14 @@ enum class DnsLookupFamily { V4Only, V6Only, Auto };
  */
 class DnsResolver {
 public:
-  virtual ~DnsResolver() {}
+  virtual ~DnsResolver() = default;
 
   /**
    * Called when a resolution attempt is complete.
-   * @param address_list supplies the list of resolved IP addresses. The list will be empty if
+   * @param response supplies the list of resolved IP addresses and TTLs. The list will be empty if
    *                     the resolution failed.
    */
-  typedef std::function<void(std::list<Address::InstanceConstSharedPtr>&& address_list)> ResolveCb;
+  using ResolveCb = std::function<void(std::list<DnsResponse>&& response)>;
 
   /**
    * Initiate an async DNS resolution.
@@ -52,7 +64,7 @@ public:
                                   ResolveCb callback) PURE;
 };
 
-typedef std::shared_ptr<DnsResolver> DnsResolverSharedPtr;
+using DnsResolverSharedPtr = std::shared_ptr<DnsResolver>;
 
 } // namespace Network
 } // namespace Envoy

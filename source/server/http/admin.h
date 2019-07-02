@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/admin/v2alpha/clusters.pb.h"
+#include "envoy/admin/v2alpha/listeners.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -36,6 +37,11 @@
 
 namespace Envoy {
 namespace Server {
+
+namespace Utility {
+envoy::admin::v2alpha::ServerInfo::State serverState(Init::Manager::State state,
+                                                     bool health_check_failed);
+} // namespace Utility
 
 class AdminInternalAddressConfig : public Http::InternalAddressConfig {
   bool isInternalAddress(const Network::Address::Instance&) const override { return false; }
@@ -103,6 +109,7 @@ public:
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return false; }
+  bool preserveExternalRequestId() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
@@ -210,10 +217,17 @@ private:
   void writeClustersAsJson(Buffer::Instance& response);
   void writeClustersAsText(Buffer::Instance& response);
 
-  static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only,
+  /**
+   * Helper methods for the /listeners url handler.
+   */
+  void writeListenersAsJson(Buffer::Instance& response);
+  void writeListenersAsText(Buffer::Instance& response);
+
+  template <class StatType>
+  static bool shouldShowMetric(const StatType& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric->used()) &&
-            (!regex.has_value() || std::regex_search(metric->name(), regex.value())));
+    return ((!used_only || metric.used()) &&
+            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
   }
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
@@ -436,10 +450,11 @@ private:
    * Determine whether a metric has never been emitted and choose to
    * not show it if we only wanted used metrics.
    */
-  static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only,
+  template <class StatType>
+  static bool shouldShowMetric(const StatType& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric->used()) &&
-            (!regex.has_value() || std::regex_search(metric->name(), regex.value())));
+    return ((!used_only || metric.used()) &&
+            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
   }
 };
 

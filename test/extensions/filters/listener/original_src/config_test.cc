@@ -19,7 +19,7 @@ class OriginalSrcConfigTest : public testing::Test {
 public:
   Config makeConfigFromProto(
       const envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc& proto_config) {
-    return Config(proto_config);
+    return {proto_config};
   }
 };
 

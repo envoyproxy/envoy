@@ -134,12 +134,42 @@ TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
   target.ready();
 }
 
+class InitializingInitManager : public Init::ManagerImpl {
+public:
+  InitializingInitManager(absl::string_view name) : Init::ManagerImpl(name) {}
+
+  State state() const override { return State::Initializing; }
+};
+
+class InitializingInstanceImpl : public InstanceImpl {
+private:
+  InitializingInitManager init_manager_{"Server"};
+
+public:
+  InitializingInstanceImpl(const Options& options, Event::TimeSystem& time_system,
+                           Network::Address::InstanceConstSharedPtr local_address,
+                           ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
+                           Thread::BasicLockable& access_log_lock,
+                           ComponentFactory& component_factory,
+                           Runtime::RandomGeneratorPtr&& random_generator,
+                           ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
+                           Filesystem::Instance& file_system,
+                           std::unique_ptr<ProcessContext> process_context)
+      : InstanceImpl(options, time_system, local_address, hooks, restarter, store, access_log_lock,
+                     component_factory, std::move(random_generator), tls, thread_factory,
+                     file_system, std::move(process_context)) {}
+
+  Init::Manager& initManager() override { return init_manager_; }
+};
+
 // Class creates minimally viable server instance for testing.
 class ServerInstanceImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   ServerInstanceImplTest() : version_(GetParam()) {}
 
-  void initialize(const std::string& bootstrap_path) {
+  void initialize(const std::string& bootstrap_path) { initialize(bootstrap_path, false); }
+
+  void initialize(const std::string& bootstrap_path, const bool use_intializing_instance) {
     if (bootstrap_path.empty()) {
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           "test/config/integration/server.json", {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
@@ -151,13 +181,24 @@ protected:
     if (process_object_ != nullptr) {
       process_context_ = std::make_unique<ProcessContextImpl>(*process_object_);
     }
-    server_ = std::make_unique<InstanceImpl>(
-        options_, test_time_.timeSystem(),
-        Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-        hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
-        std::move(process_context_));
+    if (use_intializing_instance) {
+      server_ = std::make_unique<InitializingInstanceImpl>(
+          options_, test_time_.timeSystem(),
+          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+          hooks_, restart_, stats_store_, fakelock_, component_factory_,
+          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
+          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+          std::move(process_context_));
+
+    } else {
+      server_ = std::make_unique<InstanceImpl>(
+          options_, test_time_.timeSystem(),
+          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+          hooks_, restart_, stats_store_, fakelock_, component_factory_,
+          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
+          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+          std::move(process_context_));
+    }
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
@@ -180,6 +221,27 @@ protected:
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
 
+  Thread::ThreadPtr startTestServer(const std::string& bootstrap_path,
+                                    const bool use_intializing_instance) {
+    absl::Notification started;
+
+    auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+      initialize(bootstrap_path, use_intializing_instance);
+      auto startup_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
+                                                      [&] { started.Notify(); });
+      auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                                                       [&](Event::PostCb) { FAIL(); });
+      shutdown_handle = nullptr; // unregister callback
+      server_->run();
+      startup_handle = nullptr;
+      server_ = nullptr;
+      thread_local_ = nullptr;
+    });
+
+    started.WaitForNotification();
+    return server_thread;
+  }
+
   // Returns the server's tracer as a pointer, for use in dynamic_cast tests.
   Tracing::HttpTracer* tracer() { return &server_->httpContext().tracer(); };
 
@@ -197,27 +259,59 @@ protected:
   std::unique_ptr<InstanceImpl> server_;
 };
 
+// Custom StatsSink that just increments a counter when flush is called.
+class CustomStatsSink : public Stats::Sink {
+public:
+  CustomStatsSink(Stats::Scope& scope) : stats_flushed_(scope.counter("stats.flushed")) {}
+
+  // Stats::Sink
+  void flush(Stats::MetricSnapshot&) override { stats_flushed_.inc(); }
+
+  void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
+
+private:
+  Stats::Counter& stats_flushed_;
+};
+
+// Custom StatsSinFactory that creates CustomStatsSink.
+class CustomStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
+public:
+  // StatsSinkFactory
+  Stats::SinkPtr createStatsSink(const Protobuf::Message&, Server::Instance& server) override {
+    return std::make_unique<CustomStatsSink>(server.stats());
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  }
+
+  std::string name() override { return "envoy.custom_stats_sink"; }
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+/**
+ * Static registration for the custom sink factory. @see RegisterFactory.
+ */
+REGISTER_FACTORY(CustomStatsSinkFactory, Server::Configuration::StatsSinkFactory);
+
+// Validates that server stats are flushed even when server is stuck with initialization.
+TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
+  auto server_thread = startTestServer("test/server/stats_sink_bootstrap.yaml", true);
+
+  // Wait till stats are flushed to custom sink and validate that the actual flush happens.
+  TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, test_time_.timeSystem());
+  EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.state")->value());
+  EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
-  absl::Notification started;
-
-  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
-    initialize("test/server/node_bootstrap.yaml");
-    auto startup_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
-                                                    [&] { started.Notify(); });
-    auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
-                                                     [&](Event::PostCb) { FAIL(); });
-    shutdown_handle = nullptr; // unregister callback
-    server_->run();
-    startup_handle = nullptr;
-    server_ = nullptr;
-    thread_local_ = nullptr;
-  });
-
-  started.WaitForNotification();
+  auto server_thread = startTestServer("test/server/node_bootstrap.yaml", false);
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
 }
@@ -360,6 +454,19 @@ TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
 TEST_P(ServerInstanceImplTest, InvalidBootstrapRuntime) {
   EXPECT_THROW_WITH_MESSAGE(initialize("test/server/invalid_runtime_bootstrap.yaml"),
                             EnvoyException, "Invalid runtime entry value for foo");
+}
+
+// Validate invalid layered runtime missing a name is rejected.
+TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapMissingName) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/invalid_layered_runtime_missing_name.yaml"),
+                          EnvoyException,
+                          "RuntimeLayerValidationError.Name: \\[\"value length must be at least");
+}
+
+// Validate invalid layered runtime with duplicate names is rejected.
+TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapDuplicateName) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/invalid_layered_runtime_duplicate_name.yaml"),
+                          EnvoyException, "Duplicate layer name: some_static_laye");
 }
 
 // Regression test for segfault when server initialization fails prior to

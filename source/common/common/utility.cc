@@ -32,7 +32,7 @@ public:
   const std::regex PATTERN{"(%([1-9])?f)|(%s)", std::regex::optimize};
 };
 
-typedef ConstSingleton<SpecifierConstantValues> SpecifierConstants;
+using SpecifierConstants = ConstSingleton<SpecifierConstantValues>;
 
 } // namespace
 

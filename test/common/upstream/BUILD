@@ -401,6 +401,7 @@ envoy_cc_test_library(
         "//source/common/stats:stats_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

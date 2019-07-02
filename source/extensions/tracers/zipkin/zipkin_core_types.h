@@ -28,7 +28,7 @@ public:
   /**
    * Destructor.
    */
-  virtual ~ZipkinBase() {}
+  virtual ~ZipkinBase() = default;
 
   /**
    * All classes defining Zipkin abstractions need to implement this method to convert
@@ -56,7 +56,7 @@ public:
   /**
    * Default constructor. Creates an empty Endpoint.
    */
-  Endpoint() : service_name_(), address_(nullptr) {}
+  Endpoint() : address_(nullptr) {}
 
   /**
    * Constructor that initializes an endpoint with the given attributes.
@@ -118,7 +118,7 @@ public:
   /**
    * Default constructor. Creates an empty annotation.
    */
-  Annotation() : timestamp_(0), value_() {}
+  Annotation() : timestamp_(0) {}
 
   /**
    * Constructor that creates an annotation based on the given parameters.
@@ -217,7 +217,7 @@ public:
   /**
    * Default constructor. Creates an empty binary annotation.
    */
-  BinaryAnnotation() : key_(), value_(), annotation_type_(STRING) {}
+  BinaryAnnotation() : annotation_type_(STRING) {}
 
   /**
    * Constructor that creates a binary annotation based on the given parameters.
@@ -288,10 +288,10 @@ private:
   std::string key_;
   std::string value_;
   absl::optional<Endpoint> endpoint_;
-  AnnotationType annotation_type_;
+  AnnotationType annotation_type_{};
 };
 
-typedef std::unique_ptr<Span> SpanPtr;
+using SpanPtr = std::unique_ptr<Span>;
 
 /**
  * Represents a Zipkin span. This class is based on Zipkin's Thrift definition of a span.
@@ -307,7 +307,7 @@ public:
    * Default constructor. Creates an empty span.
    */
   explicit Span(TimeSource& time_source)
-      : trace_id_(0), name_(), id_(0), debug_(false), sampled_(false), monotonic_start_time_(0),
+      : trace_id_(0), id_(0), debug_(false), sampled_(false), monotonic_start_time_(0),
         tracer_(nullptr), time_source_(time_source) {}
 
   /**

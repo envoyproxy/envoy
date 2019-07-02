@@ -299,9 +299,8 @@ public:
   ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
 
   // Upstream::ClusterManager
-  MOCK_METHOD3(addOrUpdateCluster,
-               bool(const envoy::api::v2::Cluster& cluster, const std::string& version_info,
-                    ClusterWarmingCallback cluster_warming_cb));
+  MOCK_METHOD2(addOrUpdateCluster,
+               bool(const envoy::api::v2::Cluster& cluster, const std::string& version_info));
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_METHOD0(clusters, ClusterInfoMap());
   MOCK_METHOD1(get, ThreadLocalCluster*(absl::string_view cluster));

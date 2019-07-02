@@ -77,7 +77,7 @@ public:
 private:
   struct DecoderStatus {
     DecoderStatus() = default;
-    DecoderStatus(ProtocolState next_state) : next_state_(next_state), filter_status_{} {};
+    DecoderStatus(ProtocolState next_state) : next_state_(next_state){};
     DecoderStatus(ProtocolState next_state, Network::FilterStatus filter_status)
         : next_state_(next_state), filter_status_(filter_status){};
 
@@ -108,7 +108,7 @@ private:
   DecoderEventHandler* handler_;
 };
 
-typedef std::unique_ptr<DecoderStateMachine> DecoderStateMachinePtr;
+using DecoderStateMachinePtr = std::unique_ptr<DecoderStateMachine>;
 
 /**
  * Decoder encapsulates a configured and ProtocolPtr and SerializationPtr.
@@ -140,7 +140,7 @@ private:
   DecoderCallbacks& decoder_callbacks_;
 };
 
-typedef std::unique_ptr<Decoder> DecoderPtr;
+using DecoderPtr = std::unique_ptr<Decoder>;
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

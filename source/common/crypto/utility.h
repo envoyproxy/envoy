@@ -25,7 +25,7 @@ struct VerificationOutput {
   std::string error_message_;
 };
 
-typedef bssl::UniquePtr<EVP_PKEY> PublicKeyPtr;
+using PublicKeyPtr = bssl::UniquePtr<EVP_PKEY>;
 
 class Utility {
 public:

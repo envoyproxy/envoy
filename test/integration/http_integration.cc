@@ -328,7 +328,7 @@ void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
 }
 
 void HttpIntegrationTest::addFilters(std::vector<std::string> filters) {
-  for (const auto filter : filters) {
+  for (const auto& filter : filters) {
     config_helper_.addFilter(filter);
   }
 }

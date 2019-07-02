@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/symbol_table.h"
 
 #include "absl/strings/string_view.h"
@@ -22,7 +23,7 @@ struct Tag;
  */
 class Metric {
 public:
-  virtual ~Metric() {}
+  virtual ~Metric() = default;
   /**
    * Returns the full name of the Metric. This is intended for most uses, such
    * as streaming out the name to a stats sink or admin request, or comparing
@@ -97,11 +98,8 @@ public:
    */
   struct Flags {
     static const uint8_t Used = 0x01;
-    // TODO(fredlas) these logic flags should be removed if we move to indicating combine logic in
-    // the stat declaration macros themselves. (Now that stats no longer use shared memory, it's
-    // safe to mess with what these flag bits mean whenever we want).
     static const uint8_t LogicAccumulate = 0x02;
-    static const uint8_t ImportModeUninitialized = 0x04; // Stat was discovered during import.
+    static const uint8_t NeverImport = 0x04;
   };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;
@@ -112,9 +110,10 @@ public:
  * global counter as well as periodic counter. Calling latch() returns the periodic counter and
  * clears it.
  */
-class Counter : public virtual Metric {
+class Counter : public virtual Metric, public RefcountInterface {
 public:
-  virtual ~Counter() {}
+  ~Counter() override = default;
+
   virtual void add(uint64_t amount) PURE;
   virtual void inc() PURE;
   virtual uint64_t latch() PURE;
@@ -122,12 +121,12 @@ public:
   virtual uint64_t value() const PURE;
 };
 
-typedef std::shared_ptr<Counter> CounterSharedPtr;
+using CounterSharedPtr = RefcountPtr<Counter>;
 
 /**
  * A gauge that can both increment and decrement.
  */
-class Gauge : public virtual Metric {
+class Gauge : public virtual Metric, public RefcountInterface {
 public:
   enum class ImportMode {
     Uninitialized, // Gauge was discovered during hot-restart transfer.
@@ -135,7 +134,7 @@ public:
     Accumulate,    // Transfers gauge state on hot-restart.
   };
 
-  virtual ~Gauge() {}
+  ~Gauge() override = default;
 
   virtual void add(uint64_t amount) PURE;
   virtual void dec() PURE;
@@ -161,7 +160,7 @@ public:
   virtual void mergeImportMode(ImportMode import_mode) PURE;
 };
 
-typedef std::shared_ptr<Gauge> GaugeSharedPtr;
+using GaugeSharedPtr = RefcountPtr<Gauge>;
 
 } // namespace Stats
 } // namespace Envoy

@@ -48,7 +48,7 @@ void DispatcherImpl::initializeStats(Stats::Scope& scope, const std::string& pre
     stats_ = std::make_unique<DispatcherStats>(
         DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
     base_scheduler_.initializeStats(stats_.get());
-    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, run_tid_->debugString());
+    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, run_tid_.debugString());
   });
 }
 
@@ -130,7 +130,7 @@ DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbac
 Network::ListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
                                                        Network::UdpListenerCallbacks& cb) {
   ASSERT(isThreadSafe());
-  return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb)};
+  return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb, timeSource())};
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {

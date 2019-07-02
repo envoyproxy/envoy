@@ -42,12 +42,14 @@
 #include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
+#include "quiche/quic/platform/api/quic_macros.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mem_slice.h"
 #include "quiche/quic/platform/api/quic_mem_slice_span.h"
 #include "quiche/quic/platform/api/quic_mem_slice_storage.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
+#include "quiche/quic/platform/api/quic_optional.h"
 #include "quiche/quic/platform/api/quic_pcc_sender.h"
 #include "quiche/quic/platform/api/quic_port_utils.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
@@ -120,6 +122,9 @@ TEST_F(QuicPlatformTest, QuicClientStats) {
                               100, "doc");
   QUIC_CLIENT_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
   QuicClientSparseHistogram("my.sparse.histogram", 345);
+  // Make sure compiler doesn't report unused-parameter error.
+  bool should_be_used;
+  QUIC_CLIENT_HISTOGRAM_BOOL("my.bool.histogram", should_be_used, "doc");
 }
 
 TEST_F(QuicPlatformTest, QuicExpectBug) {
@@ -684,19 +689,17 @@ TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
 }
 
 TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
-  bool deterministic_stats = Envoy::Stats::TestUtil::hasDeterministicMallocStats();
-  const size_t start_mem = Envoy::Memory::Stats::totalCurrentlyAllocated();
   QuicStreamBufferAllocator allocator;
-  char* p = allocator.New(1024);
-  if (deterministic_stats) {
-    EXPECT_LT(start_mem, Envoy::Memory::Stats::totalCurrentlyAllocated());
+  Envoy::Stats::TestUtil::MemoryTest memory_test;
+  if (memory_test.mode() == Envoy::Stats::TestUtil::MemoryTest::Mode::Disabled) {
+    return;
   }
+  char* p = allocator.New(1024);
   EXPECT_NE(nullptr, p);
+  EXPECT_GT(memory_test.consumedBytes(), 0);
   memset(p, 'a', 1024);
   allocator.Delete(p);
-  if (deterministic_stats) {
-    EXPECT_EQ(start_mem, Envoy::Memory::Stats::totalCurrentlyAllocated());
-  }
+  EXPECT_EQ(memory_test.consumedBytes(), 0);
 }
 
 TEST_F(QuicPlatformTest, TestSystemEventLoop) {
@@ -706,14 +709,29 @@ TEST_F(QuicPlatformTest, TestSystemEventLoop) {
   QuicSystemEventLoop("dummy");
 }
 
+QUIC_MUST_USE_RESULT bool dummyTestFunction() { return false; }
+
+TEST_F(QuicPlatformTest, TestQuicMacros) {
+  // Just make sure it compiles.
+  EXPECT_FALSE(dummyTestFunction());
+  int a QUIC_UNUSED;
+}
+
+TEST_F(QuicPlatformTest, TestQuicOptional) {
+  QuicOptional<int32_t> maybe_a;
+  EXPECT_FALSE(maybe_a.has_value());
+  maybe_a = 1;
+  EXPECT_EQ(1, *maybe_a);
+}
+
 class QuicMemSliceTest : public Envoy::Buffer::BufferImplementationParamTest {
 public:
   ~QuicMemSliceTest() override {}
 };
 
-INSTANTIATE_TEST_CASE_P(QuicMemSliceTests, QuicMemSliceTest,
-                        testing::ValuesIn({Envoy::Buffer::BufferImplementation::Old,
-                                           Envoy::Buffer::BufferImplementation::New}));
+INSTANTIATE_TEST_SUITE_P(QuicMemSliceTests, QuicMemSliceTest,
+                         testing::ValuesIn({Envoy::Buffer::BufferImplementation::Old,
+                                            Envoy::Buffer::BufferImplementation::New}));
 
 TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');
@@ -752,6 +770,18 @@ TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
   EXPECT_TRUE(slice2.empty());
   EXPECT_EQ(nullptr, slice2.data());
   EXPECT_TRUE(fragment_releaser_called);
+}
+
+TEST_P(QuicMemSliceTest, ConstructQuicMemSliceSpan) {
+  Envoy::Buffer::OwnedImpl buffer;
+  Envoy::Buffer::BufferImplementationParamTest::verifyImplementation(buffer);
+  std::string str(1024, 'a');
+  buffer.add(str);
+  quic::QuicMemSlice slice{quic::QuicMemSliceImpl(buffer, str.length())};
+
+  QuicMemSliceSpan span(&slice);
+  EXPECT_EQ(1024u, span.total_length());
+  EXPECT_EQ(str, span.GetData(0));
 }
 
 TEST_P(QuicMemSliceTest, QuicMemSliceStorage) {

@@ -17,7 +17,7 @@ struct RcDetailsValues {
   // The rbac filter rejected the request
   const std::string RbacAccessDenied = "rbac_access_denied";
 };
-typedef ConstSingleton<RcDetailsValues> RcDetails;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::config::filter::http::rbac::v2::RBAC& proto_config,

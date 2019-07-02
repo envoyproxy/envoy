@@ -24,7 +24,7 @@ public:
   const std::string Hystrix = "envoy.stat_sinks.hystrix";
 };
 
-typedef ConstSingleton<StatsSinkNameValues> StatsSinkNames;
+using StatsSinkNames = ConstSingleton<StatsSinkNameValues>;
 
 } // namespace StatSinks
 } // namespace Extensions

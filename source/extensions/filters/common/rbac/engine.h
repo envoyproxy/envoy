@@ -16,7 +16,7 @@ namespace RBAC {
  */
 class RoleBasedAccessControlEngine {
 public:
-  virtual ~RoleBasedAccessControlEngine() {}
+  virtual ~RoleBasedAccessControlEngine() = default;
 
   /**
    * Returns whether or not the current action is permitted.

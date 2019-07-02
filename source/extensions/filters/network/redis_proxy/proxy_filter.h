@@ -63,7 +63,7 @@ private:
   static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
 };
 
-typedef std::shared_ptr<ProxyFilterConfig> ProxyFilterConfigSharedPtr;
+using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
 
 /**
  * A redis multiplexing proxy filter. This filter will take incoming redis pipelined commands, and

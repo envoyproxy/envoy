@@ -341,9 +341,9 @@ public:
     size_t index_;
   };
 
-  ConstIterator begin() const noexcept { return ConstIterator(*this, 0); }
+  ConstIterator begin() const noexcept { return {*this, 0}; }
 
-  ConstIterator end() const noexcept { return ConstIterator(*this, size_); }
+  ConstIterator end() const noexcept { return {*this, size_}; }
 
 private:
   constexpr static size_t InlineRingCapacity = 8;
@@ -507,7 +507,7 @@ public:
 
   // LibEventInstance
   Event::Libevent::BufferPtr& buffer() override { return buffer_; }
-  virtual void postProcess() override;
+  void postProcess() override;
 
   /**
    * Create a new slice at the end of the buffer, and copy the supplied content into it.

@@ -59,8 +59,8 @@ private:
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
 };
 
-typedef std::shared_ptr<RoleBasedAccessControlFilterConfig>
-    RoleBasedAccessControlFilterConfigSharedPtr;
+using RoleBasedAccessControlFilterConfigSharedPtr =
+    std::shared_ptr<RoleBasedAccessControlFilterConfig>;
 
 /**
  * A filter that provides role-based access control authorization for HTTP requests.

@@ -1,8 +1,10 @@
 # A simple script to snag deprecated proto fields and add them to runtime_features.h
 
+from __future__ import print_function
 import re
 import subprocess
 import fileinput
+from six.moves import input
 
 
 # Sorts out the list of deprecated proto fields which should be disallowed and returns a tuple of
@@ -19,7 +21,7 @@ def deprecate_proto():
     if match:
       filenames_and_fields.add(tuple([match.group(1), match.group(2)]))
     else:
-      print 'no match in ' + line + ' please address manually!'
+      print('no match in ' + line + ' please address manually!')
 
   # Now discard any deprecated features already listed in runtime_features
   exiting_deprecated_regex = re.compile(r'.*"envoy.deprecated_features.(.*):(.*)",.*')
@@ -59,7 +61,7 @@ def flip_runtime_features():
     if match:
       features_to_flip.add(match.group(1))
     else:
-      print 'no match in ' + line + ' please address manually!'
+      print('no match in ' + line + ' please address manually!')
 
   # Exempt the two test flags.
   features_to_flip.remove('envoy.reloadable_features.my_feature_name')
@@ -85,10 +87,10 @@ deprecate_email, deprecate_code = deprecate_proto()
 email = ('The Envoy maintainer team is cutting the next Envoy release.  In the new release ' +
          runtime_email + deprecate_email)
 
-print '\n\nSuggested envoy-announce email: \n'
-print email
+print('\n\nSuggested envoy-announce email: \n')
+print(email)
 
-if not raw_input('Apply relevant runtime changes? [yN] ').strip().lower() in ('y', 'yes'):
+if not input('Apply relevant runtime changes? [yN] ').strip().lower() in ('y', 'yes'):
   exit(1)
 
 for line in fileinput.FileInput('source/common/runtime/runtime_features.cc', inplace=1):
@@ -96,6 +98,6 @@ for line in fileinput.FileInput('source/common/runtime/runtime_features.cc', inp
     line = line.replace(line, line + runtime_features_code)
   if 'envoy.deprecated_features.deprecated.proto:is_deprecated_fatal' in line:
     line = line.replace(line, line + deprecate_code)
-  print line,
+  print(line, end='')
 
-print '\nChanges applied.  Please send the email above to envoy-announce.\n'
+print('\nChanges applied.  Please send the email above to envoy-announce.\n')

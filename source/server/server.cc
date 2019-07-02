@@ -22,6 +22,7 @@
 #include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
 #include "common/buffer/buffer_impl.h"
+#include "common/common/enum_to_int.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
@@ -60,7 +61,7 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
       thread_local_(tls), api_(new Api::Impl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),
-      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
+      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
@@ -166,27 +167,40 @@ void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
 
 void InstanceImpl::flushStats() {
   ENVOY_LOG(debug, "flushing stats");
-  // A shutdown initiated before this callback may prevent this from being called as per
-  // the semantics documented in ThreadLocal's runOnAllThreads method.
-  stats_store_.mergeHistograms([this]() -> void {
-    // mergeParentStatsIfAny() does nothing and returns a struct of 0s if there is no parent.
-    HotRestart::ServerStatsFromParent parent_stats = restarter_.mergeParentStatsIfAny(stats_store_);
+  // If Envoy is not fully initialized, workers will not be started and mergeHistograms
+  // completion callback is not called immediately. As a result of this server stats will
+  // not be updated and flushed to stat sinks. So skip mergeHistograms call if workers are
+  // not started yet.
+  if (initManager().state() == Init::Manager::State::Initialized) {
+    // A shutdown initiated before this callback may prevent this from being called as per
+    // the semantics documented in ThreadLocal's runOnAllThreads method.
+    stats_store_.mergeHistograms([this]() -> void { flushStatsInternal(); });
+  } else {
+    ENVOY_LOG(debug, "Envoy is not fully initialized, skipping histogram merge and flushing stats");
+    flushStatsInternal();
+  }
+}
 
-    server_stats_->uptime_.set(time(nullptr) - original_start_time_);
-    server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
-                                         parent_stats.parent_memory_allocated_);
-    server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
-    server_stats_->parent_connections_.set(parent_stats.parent_connections_);
-    server_stats_->total_connections_.set(listener_manager_->numConnections() +
-                                          parent_stats.parent_connections_);
-    server_stats_->days_until_first_cert_expiring_.set(
-        sslContextManager().daysUntilFirstCertExpires());
-    InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
-    // TODO(ramaraochavali): consider adding different flush interval for histograms.
-    if (stat_flush_timer_ != nullptr) {
-      stat_flush_timer_->enableTimer(config_.statsFlushInterval());
-    }
-  });
+void InstanceImpl::flushStatsInternal() {
+  // mergeParentStatsIfAny() does nothing and returns a struct of 0s if there is no parent.
+  HotRestart::ServerStatsFromParent parent_stats = restarter_.mergeParentStatsIfAny(stats_store_);
+
+  server_stats_->uptime_.set(time(nullptr) - original_start_time_);
+  server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
+                                       parent_stats.parent_memory_allocated_);
+  server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
+  server_stats_->parent_connections_.set(parent_stats.parent_connections_);
+  server_stats_->total_connections_.set(listener_manager_->numConnections() +
+                                        parent_stats.parent_connections_);
+  server_stats_->days_until_first_cert_expiring_.set(
+      sslContextManager().daysUntilFirstCertExpires());
+  server_stats_->state_.set(
+      enumToInt(Utility::serverState(initManager().state(), !healthCheckFailed())));
+  InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
+  // TODO(ramaraochavali): consider adding different flush interval for histograms.
+  if (stat_flush_timer_ != nullptr) {
+    stat_flush_timer_->enableTimer(config_.statsFlushInterval());
+  }
 }
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
@@ -361,6 +375,10 @@ void InstanceImpl::initialize(const Options& options,
     listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config());
   }
 
+  // We have to defer RTDS initialization until after the cluster manager is
+  // instantiated (which in turn relies on runtime...).
+  Runtime::LoaderSingleton::get().initialize(clusterManager());
+
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
@@ -402,9 +420,10 @@ void InstanceImpl::startWorkers() {
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
-  return std::make_unique<Runtime::LoaderImpl>(server.dispatcher(), server.threadLocal(),
-                                               config.runtime(), server.localInfo().clusterName(),
-                                               server.stats(), server.random(), server.api());
+  return std::make_unique<Runtime::LoaderImpl>(
+      server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
+      server.initManager(), server.stats(), server.random(), server.messageValidationVisitor(),
+      server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {

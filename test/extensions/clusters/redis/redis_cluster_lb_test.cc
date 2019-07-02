@@ -14,6 +14,8 @@ class TestLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
   TestLoadBalancerContext(uint64_t hash_key) : hash_key_(hash_key) {}
 
+  TestLoadBalancerContext(absl::optional<uint64_t> hash) : hash_key_(hash) {}
+
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
 
@@ -51,6 +53,28 @@ public:
 TEST_F(RedisClusterLoadBalancerTest, NoHost) {
   init();
   EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
+};
+
+// Works correctly with empty context
+TEST_F(RedisClusterLoadBalancerTest, NoHash) {
+  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:92")};
+
+  const std::vector<ClusterSlot> slots{
+      ClusterSlot(0, 1000, hosts[0]->address()),
+      ClusterSlot(1001, 2000, hosts[1]->address()),
+      ClusterSlot(2001, 16383, hosts[2]->address()),
+  };
+  Upstream::HostMap all_hosts{
+      {hosts[0]->address()->asString(), hosts[0]},
+      {hosts[1]->address()->asString(), hosts[1]},
+      {hosts[2]->address()->asString(), hosts[2]},
+  };
+  init();
+  factory_->onClusterSlotUpdate(slots, all_hosts);
+  TestLoadBalancerContext context(absl::nullopt);
+  EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(&context));
 };
 
 TEST_F(RedisClusterLoadBalancerTest, Basic) {
