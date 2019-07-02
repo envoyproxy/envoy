@@ -8,6 +8,7 @@ Performance Analysis
 
   binary_size
   cpu_battery_impact
+  device_conditions
 
 Performance analysis can take several shapes in mobile applications. These docs
 describe the process (tools, analysis, measurements) that the Envoy Mobile team
