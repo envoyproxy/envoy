@@ -43,7 +43,6 @@ using ParserSharedPtr = std::shared_ptr<Parser<MessageType, FailureDataType>>;
  */
 template <typename MessageType, typename FailureDataType> class ParseResponse {
 public:
-
   using failure_type = FailureDataType;
 
   /**
@@ -91,11 +90,9 @@ public:
   FailureDataType failure_data_;
 };
 
-template <typename ContextType, typename ResponseType>
-class AbstractSentinelParser {
+template <typename ContextType, typename ResponseType> class AbstractSentinelParser {
 public:
-
-  AbstractSentinelParser(ContextType context): context_{context} {};
+  AbstractSentinelParser(ContextType context) : context_{context} {};
 
   ResponseType parse(absl::string_view& data) {
     const uint32_t min = std::min<uint32_t>(context_->remaining(), data.size());
@@ -111,6 +108,7 @@ public:
   }
 
   const ContextType contextForTest() const { return context_; }
+
 private:
   ContextType context_;
 };

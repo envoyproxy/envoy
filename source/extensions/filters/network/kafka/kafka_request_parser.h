@@ -28,16 +28,12 @@ struct RequestContext {
   /**
    * Bytes left to consume.
    */
-  int32_t& remaining() {
-    return remaining_request_size_;
-  }
+  int32_t& remaining() { return remaining_request_size_; }
 
   /**
    * Returns data needed for construction of parse failure message.
    */
-  const RequestHeader asFailureData() const {
-    return request_header_;
-  }
+  const RequestHeader asFailureData() const { return request_header_; }
 };
 
 using RequestContextSharedPtr = std::shared_ptr<RequestContext>;
@@ -140,7 +136,8 @@ private:
  * api_key & api_version. It does not attempt to capture any data, just throws it away until end of
  * message.
  */
-class SentinelParser : public AbstractSentinelParser<RequestContextSharedPtr, RequestParseResponse>, public RequestParser {
+class SentinelParser : public AbstractSentinelParser<RequestContextSharedPtr, RequestParseResponse>,
+                       public RequestParser {
 public:
   SentinelParser(RequestContextSharedPtr context) : AbstractSentinelParser{context} {};
 

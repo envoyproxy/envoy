@@ -57,7 +57,9 @@ using ResponseInitialParserFactorySharedPtr = std::shared_ptr<ResponseInitialPar
  * As Kafka protocol does not carry response type data, it is necessary to register expected message
  * type beforehand with `expectResponse`.
  */
-class ResponseDecoder : public AbstractMessageDecoder<ResponseParserSharedPtr, ResponseCallbackSharedPtr>, public Logger::Loggable<Logger::Id::kafka> {
+class ResponseDecoder
+    : public AbstractMessageDecoder<ResponseParserSharedPtr, ResponseCallbackSharedPtr>,
+      public Logger::Loggable<Logger::Id::kafka> {
 public:
   /**
    * Creates a decoder that will notify provided callbacks when a message is successfully parsed.
@@ -77,7 +79,8 @@ public:
   ResponseDecoder(const ResponseInitialParserFactorySharedPtr factory,
                   const ResponseParserResolver& response_parser_resolver,
                   const std::vector<ResponseCallbackSharedPtr> callbacks)
-      : AbstractMessageDecoder{callbacks}, factory_{factory}, response_parser_resolver_{response_parser_resolver} {};
+      : AbstractMessageDecoder{callbacks}, factory_{factory}, response_parser_resolver_{
+                                                                  response_parser_resolver} {};
 
   /**
    * Registers an expected message.

@@ -43,7 +43,8 @@ public:
  * Each parser along the line returns the fully parsed message or the next parser.
  * Stores parse state (as large message's payload can be provided through multiple `onData` calls).
  */
-class RequestDecoder : public AbstractMessageDecoder<RequestParserSharedPtr, RequestCallbackSharedPtr> {
+class RequestDecoder
+    : public AbstractMessageDecoder<RequestParserSharedPtr, RequestCallbackSharedPtr> {
 public:
   /**
    * Creates a decoder that will notify provided callbacks when a message is successfully parsed.

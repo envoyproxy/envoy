@@ -1,7 +1,7 @@
 #include "extensions/filters/network/kafka/response_codec.h"
 
-#include "common/common/stack_array.h"
 #include "common/buffer/buffer_impl.h"
+#include "common/common/stack_array.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -2,6 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+
 #include "common/common/stack_array.h"
 
 namespace Envoy {
@@ -23,8 +24,7 @@ public:
   virtual void onData(Buffer::Instance& data) PURE;
 };
 
-template <typename MessageType, typename ParseFailureType>
-class MessageCallback {
+template <typename MessageType, typename ParseFailureType> class MessageCallback {
 public:
   virtual ~MessageCallback() = default;
 
@@ -48,14 +48,13 @@ public:
 template <typename ParserType, typename CallbackType>
 class AbstractMessageDecoder : public MessageDecoder {
 public:
-
   virtual ~AbstractMessageDecoder() = default;
 
   /**
    * Creates a decoder that will invoke given callbacks when a message has been parsed.
    * @param callbacks callbacks to be invoked (in order).
    */
-  AbstractMessageDecoder(const std::vector<CallbackType> callbacks): callbacks_{callbacks} {};
+  AbstractMessageDecoder(const std::vector<CallbackType> callbacks) : callbacks_{callbacks} {};
 
   /**
    * Consumes all data present in a buffer.
@@ -77,14 +76,12 @@ public:
   ParserType getCurrentParserForTest() const { return current_parser_; }
 
 protected:
-
   /**
    * Create a start parser for a new message.
    */
   virtual ParserType createStartParser() PURE;
 
 private:
-
   /**
    * Main parse loop.
    *
