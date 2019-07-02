@@ -74,6 +74,8 @@ public:
     }
   }
 
+  ParserType getCurrentParserForTest() const { return current_parser_; }
+
 protected:
 
   /**
