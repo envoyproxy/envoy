@@ -222,6 +222,25 @@ Filter::~Filter() {
   ASSERT(!retry_state_);
 }
 
+const FilterUtility::StrictHeaderChecker::HeaderCheckResult
+FilterUtility::StrictHeaderChecker::checkHeader(Http::HeaderMap& headers,
+                                                const Http::LowerCaseString& target_header) {
+  if (target_header == Http::Headers::get().EnvoyUpstreamRequestTimeoutMs) {
+    return isInteger(headers.EnvoyUpstreamRequestTimeoutMs());
+  } else if (target_header == Http::Headers::get().EnvoyUpstreamRequestPerTryTimeoutMs) {
+    return isInteger(headers.EnvoyUpstreamRequestPerTryTimeoutMs());
+  } else if (target_header == Http::Headers::get().EnvoyMaxRetries) {
+    return isInteger(headers.EnvoyMaxRetries());
+  } else if (target_header == Http::Headers::get().EnvoyRetryOn) {
+    return hasValidRetryFields(headers.EnvoyRetryOn(), &Router::RetryStateImpl::parseRetryOn);
+  } else if (target_header == Http::Headers::get().EnvoyRetryGrpcOn) {
+    return hasValidRetryFields(headers.EnvoyRetryGrpcOn(),
+                               &Router::RetryStateImpl::parseRetryGrpcOn);
+  }
+  // Should only validate headers for which we have implemented a validator.
+  NOT_REACHED_GCOVR_EXCL_LINE
+}
+
 Stats::StatName Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
   return upstream_host ? upstream_host->localityZoneStatName() : config_.empty_stat_name_;
 }
@@ -380,6 +399,24 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   request_vcluster_ = route_entry_->virtualCluster(headers);
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
                    route_entry_->clusterName(), headers.Path()->value().getStringView());
+
+  if (config_.strict_check_headers_ != nullptr) {
+    for (const auto& header : *config_.strict_check_headers_) {
+      const auto res = FilterUtility::StrictHeaderChecker::checkHeader(headers, header);
+      if (!res.valid_) {
+        callbacks_->streamInfo().setResponseFlag(
+            StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders);
+        const std::string body = fmt::format("invalid header '{}' with value '{}'",
+                                             std::string(res.entry_->key().getStringView()),
+                                             std::string(res.entry_->value().getStringView()));
+        const std::string details =
+            absl::StrCat(StreamInfo::ResponseCodeDetails::get().InvalidEnvoyRequestHeaders, "{",
+                         res.entry_->key().getStringView(), "}");
+        callbacks_->sendLocalReply(Http::Code::BadRequest, body, nullptr, absl::nullopt, details);
+        return Http::FilterHeadersStatus::StopIteration;
+      }
+    }
+  }
 
   const Http::HeaderEntry* request_alt_name = headers.EnvoyUpstreamAltStatName();
   if (request_alt_name) {
@@ -665,7 +702,8 @@ void Filter::onResponseTimeout() {
       // If this upstream request already hit a "soft" timeout, then it
       // already recorded a timeout into outlier detection. Don't do it again.
       if (!upstream_request->outlier_detection_timeout_recorded_) {
-        updateOutlierDetection(timeout_response_code_, *upstream_request);
+        updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, *upstream_request,
+                               absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
       }
 
       chargeUpstreamAbort(timeout_response_code_, false, *upstream_request);
@@ -682,7 +720,8 @@ void Filter::onResponseTimeout() {
 void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
   // Track this as a timeout for outlier detection purposes even though we didn't
   // cancel the request yet and might get a 2xx later.
-  updateOutlierDetection(timeout_response_code_, upstream_request);
+  updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, upstream_request,
+                         absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
   upstream_request.outlier_detection_timeout_recorded_ = true;
 
   if (!downstream_response_started_ && retry_state_) {
@@ -719,7 +758,8 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
 
   upstream_request.resetStream();
 
-  updateOutlierDetection(timeout_response_code_, upstream_request);
+  updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, upstream_request,
+                         absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
 
   if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request)) {
     return;
@@ -733,9 +773,11 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
                          StreamInfo::ResponseCodeDetails::get().UpstreamPerTryTimeout);
 }
 
-void Filter::updateOutlierDetection(Http::Code code, UpstreamRequest& upstream_request) {
+void Filter::updateOutlierDetection(Upstream::Outlier::Result result,
+                                    UpstreamRequest& upstream_request,
+                                    absl::optional<uint64_t> code) {
   if (upstream_request.upstream_host_) {
-    upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(enumToInt(code));
+    upstream_request.upstream_host_->outlierDetector().putResult(result, code);
   }
 }
 
@@ -825,7 +867,12 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
                    Http::Utility::resetReasonToString(reset_reason));
 
-  updateOutlierDetection(Http::Code::ServiceUnavailable, upstream_request);
+  // TODO: The reset may also come from upstream over the wire. In this case it should be
+  // treated as external origin error and distinguished from local origin error.
+  // This matters only when running OutlierDetection with split_external_local_origin_errors config
+  // param set to true.
+  updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, upstream_request,
+                         absl::nullopt);
 
   if (maybeRetryReset(reset_reason, upstream_request)) {
     return;
@@ -1454,6 +1501,8 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
 void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host) {
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
+
+  host->outlierDetector().putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS);
 
   // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);
