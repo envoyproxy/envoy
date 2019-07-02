@@ -489,7 +489,7 @@ TEST_F(ThreadLocalScopedConfigImplTest, Update) {
   // Found scope_info_a_.
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), scope_info_a_->routeConfig());
 
-  // Remvoe scope "foo_scope".
+  // Remove scope "foo_scope".
   scoped_config_impl_->removeRoutingScope("foo_scope");
   // scope_info_a_ is gone.
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
