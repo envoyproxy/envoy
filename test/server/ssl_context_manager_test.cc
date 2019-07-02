@@ -19,11 +19,11 @@ TEST(SslContextManager, createStub) {
 
   Ssl::ContextManagerPtr manager = createContextManager("fake_factory_name", time_system);
 
-  // check we've created a stub
+  // Check we've created a stub, not real manager.
   EXPECT_EQ(manager->daysUntilFirstCertExpires(), std::numeric_limits<int>::max());
-  ASSERT_THROW(manager->createSslClientContext(scope, client_config), EnvoyException);
-  ASSERT_THROW(manager->createSslServerContext(scope, server_config, server_names), EnvoyException);
-  ASSERT_NO_THROW(manager->iterateContexts([](const Envoy::Ssl::Context&) -> void {}));
+  EXPECT_THROW(manager->createSslClientContext(scope, client_config), EnvoyException);
+  EXPECT_THROW(manager->createSslServerContext(scope, server_config, server_names), EnvoyException);
+  EXPECT_NO_THROW(manager->iterateContexts([](const Envoy::Ssl::Context&) -> void {}));
 }
 
 } // namespace
