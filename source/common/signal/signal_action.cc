@@ -28,6 +28,8 @@ void SignalAction::registerFatalErrorHandler(const FatalErrorHandlerInterface& h
   }
   list->push_back(&handler);
   fatal_error_handlers.store(list, std::memory_order_release);
+#else
+  UNREFERENCED_PARAMETER(handler);
 #endif
 }
 
@@ -41,6 +43,8 @@ void SignalAction::removeFatalErrorHandler(const FatalErrorHandlerInterface& han
   } else {
     fatal_error_handlers.store(list, std::memory_order_release);
   }
+#else
+  UNREFERENCED_PARAMETER(handler);
 #endif
 }
 
