@@ -84,7 +84,6 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/http/ratelimit",
   "extensions/filters/http/buffer",
   "extensions/filters/http/grpc_http1_bridge",
-  "extensions/filters/http/grpc_http1_reverse_bridge",
   "extensions/filters/http/rbac",
   "extensions/filters/http/gzip",
   "extensions/filters/http/ip_tagging",
