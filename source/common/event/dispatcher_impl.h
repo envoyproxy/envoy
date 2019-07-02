@@ -18,8 +18,7 @@
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
 #include "common/event/libevent_scheduler.h"
-
-#include "exe/fatal_error_handler.h"
+#include "common/signal/fatal_error_handler.h"
 
 namespace Envoy {
 namespace Event {

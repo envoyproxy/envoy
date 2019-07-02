@@ -417,7 +417,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
       stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()),
       upstream_options_(std::make_shared<Network::Socket::Options>()) {
-  ScopeTrackerImpl scope(this, connection_manager_.read_callbacks_->connection().dispatcher());
+  ScopeTrackerScopeState scope(this,
+                               connection_manager_.read_callbacks_->connection().dispatcher());
 
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
@@ -588,7 +589,8 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 // TODO(alyssawilk) all the calls here should be audited for order priority,
 // e.g. many early returns do not currently handle connection: close properly.
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
-  ScopeTrackerImpl scope(this, connection_manager_.read_callbacks_->connection().dispatcher());
+  ScopeTrackerScopeState scope(this,
+                               connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
   if (Http::Headers::get().MethodValues.Head ==
       request_headers_->Method()->value().getStringView()) {
@@ -885,7 +887,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
-  ScopeTrackerImpl scope(this, connection_manager_.read_callbacks_->connection().dispatcher());
+  ScopeTrackerScopeState scope(this,
+                               connection_manager_.read_callbacks_->connection().dispatcher());
   maybeEndDecode(end_stream);
   stream_info_.addBytesReceived(data.length());
 
@@ -895,7 +898,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
 void ConnectionManagerImpl::ActiveStream::decodeData(
     ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream,
     FilterIterationStartState filter_iteration_start_state) {
-  ScopeTrackerImpl scope(this, connection_manager_.read_callbacks_->connection().dispatcher());
+  ScopeTrackerScopeState scope(this,
+                               connection_manager_.read_callbacks_->connection().dispatcher());
   resetIdleTimer();
 
   // If we previously decided to decode only the headers, do nothing here.
@@ -1035,7 +1039,8 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(HeaderMapPtr&& trailers) {
-  ScopeTrackerImpl scope(this, connection_manager_.read_callbacks_->connection().dispatcher());
+  ScopeTrackerScopeState scope(this,
+                               connection_manager_.read_callbacks_->connection().dispatcher());
   resetIdleTimer();
   maybeEndDecode(true);
   request_trailers_ = std::move(trailers);

@@ -5,14 +5,19 @@
 
 namespace Envoy {
 
-class ScopeTrackerImpl {
+// A small class for tracking the scope of the object which is currently having
+// work done in this thread.
+//
+// When created, it sets the tracked object in the dispatcher, and when destroyed it points the
+// dispatcher at the previously tracked object.
+class ScopeTrackerScopeState {
 public:
-  ScopeTrackerImpl(const ScopeTrackedObject* object, Event::Dispatcher& dispatcher)
+  ScopeTrackerScopeState(const ScopeTrackedObject* object, Event::Dispatcher& dispatcher)
       : dispatcher_(dispatcher) {
     latched_object_ = dispatcher_.setTrackedObject(object);
   }
 
-  ~ScopeTrackerImpl() { dispatcher_.setTrackedObject(latched_object_); }
+  ~ScopeTrackerScopeState() { dispatcher_.setTrackedObject(latched_object_); }
 
 private:
   const ScopeTrackedObject* latched_object_;

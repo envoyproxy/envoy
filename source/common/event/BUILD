@@ -75,11 +75,11 @@ envoy_cc_library(
         "//include/envoy/network:connection_handler_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
-        "//source/exe:fatal_error_handler_lib",
+        "//source/common/signal:fatal_error_handler_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],
         "//conditions:default": [
-            "//source/exe:sigaction_lib",
+            "//source/common/signal:sigaction_lib",
         ],
     }),
 )

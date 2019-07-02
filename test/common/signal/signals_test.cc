@@ -1,7 +1,7 @@
 #include <signal.h>
 #include <sys/mman.h>
 
-#include "exe/signal_action.h"
+#include "common/signal/signal_action.h"
 
 #include "test/test_common/utility.h"
 

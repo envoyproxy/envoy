@@ -1,4 +1,4 @@
-#include "exe/signal_action.h"
+#include "common/signal/signal_action.h"
 
 #include <sys/mman.h>
 
@@ -20,6 +20,7 @@ using FailureFunctionList = std::list<const FatalErrorHandlerInterface*>;
 ABSL_CONST_INIT std::atomic<FailureFunctionList*> fatal_error_handlers{nullptr};
 
 void SignalAction::registerFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
+#ifndef ENVOY_SKIP_OBJECT_TRACE_ON_DUMP
   absl::MutexLock l(&failure_mutex);
   FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_relaxed);
   if (list == nullptr) {
@@ -27,9 +28,11 @@ void SignalAction::registerFatalErrorHandler(const FatalErrorHandlerInterface& h
   }
   list->push_back(&handler);
   fatal_error_handlers.store(list, std::memory_order_release);
+#endif
 }
 
 void SignalAction::removeFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
+#ifndef ENVOY_SKIP_OBJECT_TRACE_ON_DUMP
   absl::MutexLock l(&failure_mutex);
   FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_relaxed);
   list->remove(&handler);
@@ -38,6 +41,7 @@ void SignalAction::removeFatalErrorHandler(const FatalErrorHandlerInterface& han
   } else {
     fatal_error_handlers.store(list, std::memory_order_release);
   }
+#endif
 }
 
 constexpr int SignalAction::FATAL_SIGS[];
