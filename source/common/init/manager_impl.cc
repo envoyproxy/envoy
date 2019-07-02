@@ -17,7 +17,7 @@ void ManagerImpl::add(const Target& target) {
   switch (state_) {
   case State::Uninitialized:
     // If the manager isn't initialized yet, save the target handle to be initialized later.
-    ENVOY_LOG(debug, "added {} to {}", target.name(), name_);
+    ENVOY_LOG(debug, "added target {} to manager {}", target.name(), name_);
     target_handles_.push_back(std::move(target_handle));
     return;
   case State::Initializing:
@@ -25,7 +25,7 @@ void ManagerImpl::add(const Target& target) {
     // it's important in this case that count_ was incremented above before calling the target,
     // because if the target calls the init manager back immediately, count_ will be decremented
     // here (see the definition of watcher_ above).
-    ENVOY_LOG(debug, "initializing {} on {}", target.name(), name_);
+    ENVOY_LOG(debug, "initializing target {} on manager {}", target.name(), name_);
     target_handle->initialize(watcher_);
     return;
   case State::Initialized:
@@ -63,10 +63,10 @@ void ManagerImpl::initialize(const Watcher& watcher) {
 void ManagerImpl::onTargetReady() {
   // If there are no remaining targets and one mysteriously calls us back, this manager is haunted.
   ASSERT(count_ != 0, fmt::format("{} called back by target after initialization complete"));
+  ENVOY_LOG(trace, "manager {} has {} uninitialized targets ", name_, count_ - 1);
 
   // If there are no uninitialized targets remaining when called back by a target, that means it was
   // the last. Signal `ready` to the handle we saved in `initialize`.
-  ENVOY_LOG(debug, "FOO: init manager {} has count {} and desc counter ", name_, count_);
   if (--count_ == 0) {
     ready();
   }

@@ -118,7 +118,7 @@ protected:
   ListenerHandle* expectListenerCreateWithSocket(
       bool need_init, bool create_socket,
       envoy::api::v2::Listener::DrainType drain_type = envoy::api::v2::Listener_DrainType_DEFAULT) {
-    ListenerHandle* raw_listener = new ListenerHandle();
+    auto* raw_listener = new ListenerHandle();
     EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
     EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, create_socket));
@@ -591,7 +591,6 @@ TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
 
   ListenerHandle* listener_foo =
       expectListenerCreateWithSocket(false, true, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
-  // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   CHECK_STATS(1, 0, 0, 0, 1, 0);
 
@@ -615,7 +614,6 @@ drain_type: default
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreateWithSocket(false, true);
-  // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
 
   CHECK_STATS(1, 0, 0, 0, 1, 0);
@@ -632,9 +630,6 @@ filter_chains:
 drain_type: modify_only
   )EOF";
   {
-    // ListenerHandle* listener_foo_different_address =
-    //     expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
-
     auto listener_foo_different_address = std::make_unique<ListenerHandle>();
     EXPECT_CALL(listener_factory_,
                 createDrainManager_(envoy::api::v2::Listener_DrainType_MODIFY_ONLY))
@@ -675,8 +670,6 @@ drain_type: default
   ON_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillByDefault(Return(Api::SysCallIntResult{5, 0}));
   ON_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillByDefault(Return(Api::SysCallIntResult{-1, 0}));
 
-  // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   CHECK_STATS(1, 0, 0, 0, 1, 0);
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -707,8 +700,6 @@ drain_type: default
   ON_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillByDefault(Return(Api::SysCallIntResult{-1, 0}));
   ON_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillByDefault(Return(Api::SysCallIntResult{5, 0}));
 
-  // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   CHECK_STATS(1, 0, 0, 0, 1, 0);
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -732,7 +723,6 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreateWithSocket(false, true);
-  // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", false));
   CHECK_STATS(1, 0, 0, 0, 1, 0);
   checkConfigDump(R"EOF(
@@ -804,31 +794,7 @@ address:
 filter_chains: {}
   )EOF";
 
-  ListenerHandle* listener_foo = nullptr;
-  {
-    bool need_init = false;
-    ListenerHandle* raw_listener = new ListenerHandle();
-    EXPECT_CALL(listener_factory_, createDrainManager_(envoy::api::v2::Listener_DrainType_DEFAULT))
-        .WillOnce(Return(raw_listener->drain_manager_));
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
-        .WillOnce(Invoke(
-            [raw_listener, need_init](
-                const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
-                Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
-              ENVOY_LOG_MISC(info, "in mock createNetworkFilterFactoryList on handle {}",
-                             static_cast<void*>(raw_listener));
-              std::shared_ptr<ListenerHandle> notifier(raw_listener);
-              raw_listener->context_ = &context;
-              if (need_init) {
-                context.initManager().add(notifier->target_);
-              }
-              return {[notifier](Network::FilterManager&) -> void {}};
-            }));
-    listener_foo = raw_listener;
-  }
-  // ListenerHandle* listener_foo = expectListenerCreateWithSocket(false, /*createListenSocket*/
-  // true); EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  ListenerHandle* listener_foo = expectListenerCreateWithSocket(false, true);
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "version1", true));
   CHECK_STATS(1, 0, 0, 0, 1, 0);
@@ -869,30 +835,8 @@ per_connection_buffer_limit_bytes: 10
 
   time_system_.setSystemTime(std::chrono::milliseconds(2002002002002));
 
-  ListenerHandle* listener_foo_update1;
-  {
-    bool need_init = false;
-    ListenerHandle* raw_listener = new ListenerHandle();
-    EXPECT_CALL(listener_factory_, createDrainManager_(envoy::api::v2::Listener_DrainType_DEFAULT))
-        .WillOnce(Return(raw_listener->drain_manager_));
-    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
-        .WillOnce(Invoke(
-            [raw_listener, need_init](
-                const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
-                Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
-              ENVOY_LOG_MISC(info, "in mock createNetworkFilterFactoryList on handle {}",
-                             static_cast<void*>(raw_listener));
-              std::shared_ptr<ListenerHandle> notifier(raw_listener);
-              raw_listener->context_ = &context;
-              if (need_init) {
-                context.initManager().add(notifier->target_);
-              }
-              return {[notifier](Network::FilterManager&) -> void {}};
-            }));
-    listener_foo_update1 = raw_listener;
-  }
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(false);
 
-  // listener_foo_update1 = expectListenerCreate(false);
   EXPECT_CALL(*listener_foo, onDestroy());
   ENVOY_LOG_MISC(info, "before update listener v2");
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml),
@@ -982,11 +926,10 @@ dynamic_draining_listeners:
   worker_->callRemovalCompletion();
   CHECK_STATS(1, 2, 0, 0, 1, 0);
 
-  /*
-    time_system_.setSystemTime(std::chrono::milliseconds(4004004004004));
+  time_system_.setSystemTime(std::chrono::milliseconds(4004004004004));
 
-    // Add bar listener.
-    const std::string listener_bar_yaml = R"EOF(
+  // Add bar listener.
+  const std::string listener_bar_yaml = R"EOF(
   name: "bar"
   address:
     socket_address:
@@ -995,18 +938,18 @@ dynamic_draining_listeners:
   filter_chains: {}
     )EOF";
 
-    ListenerHandle* listener_bar = expectListenerCreate(false);
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-    EXPECT_CALL(*worker_, addListener(_, _));
-    EXPECT_TRUE(
-        manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_bar_yaml), "version4",
-  true)); EXPECT_EQ(2UL, manager_->listeners().size()); worker_->callAddCompletion(true);
-    CHECK_STATS(2, 2, 0, 0, 2, 0);
+  ListenerHandle* listener_bar = expectListenerCreateWithSocket(false, true);
+  EXPECT_CALL(*worker_, addListener(_, _));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_bar_yaml), "version4", true));
+  EXPECT_EQ(2UL, manager_->listeners().size());
+  worker_->callAddCompletion(true);
+  CHECK_STATS(2, 2, 0, 0, 2, 0);
 
-    time_system_.setSystemTime(std::chrono::milliseconds(5005005005005));
+  time_system_.setSystemTime(std::chrono::milliseconds(5005005005005));
 
-    // Add baz listener, this time requiring initializing.
-    const std::string listener_baz_yaml = R"EOF(
+  // Add baz listener, this time requiring initializing.
+  const std::string listener_baz_yaml = R"EOF(
   name: "baz"
   address:
     socket_address:
@@ -1015,14 +958,14 @@ dynamic_draining_listeners:
   filter_chains: {}
     )EOF";
 
-    ListenerHandle* listener_baz = expectListenerCreate(true);
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-    EXPECT_CALL(listener_baz->target_, initialize());
-    EXPECT_TRUE(
-        manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_baz_yaml), "version5",
-  true)); EXPECT_EQ(2UL, manager_->listeners().size()); CHECK_STATS(3, 2, 0, 1, 2, 0);
-    EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version5"));
-    checkConfigDump(R"EOF(
+  ListenerHandle* listener_baz = expectListenerCreateWithSocket(true, true);
+  EXPECT_CALL(listener_baz->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_baz_yaml), "version5", true));
+  EXPECT_EQ(2UL, manager_->listeners().size());
+  CHECK_STATS(3, 2, 0, 1, 2, 0);
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version5"));
+  checkConfigDump(R"EOF(
   version_info: version5
   static_listeners:
   dynamic_active_listeners:
@@ -1063,12 +1006,12 @@ dynamic_draining_listeners:
   dynamic_draining_listeners:
   )EOF");
 
-    // Update a duplicate baz that is currently warming.
-    EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_baz_yaml), "",
-  true)); CHECK_STATS(3, 2, 0, 1, 2, 0);
+  // Update a duplicate baz that is currently warming.
+  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_baz_yaml), "", true));
+  CHECK_STATS(3, 2, 0, 1, 2, 0);
 
-    // Update baz while it is warming.
-    const std::string listener_baz_update1_yaml = R"EOF(
+  // Update baz while it is warming.
+  const std::string listener_baz_update1_yaml = R"EOF(
   name: baz
   address:
     socket_address:
@@ -1080,26 +1023,26 @@ dynamic_draining_listeners:
       config: {}
     )EOF";
 
-    ListenerHandle* listener_baz_update1 = expectListenerCreate(true);
-    EXPECT_CALL(*listener_baz, onDestroy()).WillOnce(Invoke([listener_baz]() -> void {
-      // Call the initialize callback during destruction like RDS will.
-      listener_baz->target_.ready();
-    }));
-    EXPECT_CALL(listener_baz_update1->target_, initialize());
-    EXPECT_TRUE(
-        manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_baz_update1_yaml), "",
-  true)); EXPECT_EQ(2UL, manager_->listeners().size()); CHECK_STATS(3, 3, 0, 1, 2, 0);
+  ListenerHandle* listener_baz_update1 = expectListenerCreate(true);
+  EXPECT_CALL(listener_baz_update1->target_, initialize());
+  EXPECT_CALL(*listener_baz, onDestroy()).WillOnce(Invoke([listener_baz]() -> void {
+    // Call the initialize callback during destruction like RDS will.
+    listener_baz->target_.ready();
+  }));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_baz_update1_yaml), "", true));
+  EXPECT_EQ(2UL, manager_->listeners().size());
+  CHECK_STATS(3, 3, 0, 1, 2, 0);
 
-    // Finish initialization for baz which should make it active.
-    EXPECT_CALL(*worker_, addListener(_, _));
-    listener_baz_update1->target_.ready();
-    EXPECT_EQ(3UL, manager_->listeners().size());
-    worker_->callAddCompletion(true);
-    CHECK_STATS(3, 3, 0, 0, 3, 0);
-    EXPECT_CALL(*listener_bar, onDestroy());
-    EXPECT_CALL(*listener_baz_update1, onDestroy());
-    */
+  // Finish initialization for baz which should make it active.
+  EXPECT_CALL(*worker_, addListener(_, _));
+  listener_baz_update1->target_.ready();
+  EXPECT_EQ(3UL, manager_->listeners().size());
+  worker_->callAddCompletion(true);
+  CHECK_STATS(3, 3, 0, 0, 3, 0);
   EXPECT_CALL(*listener_foo_update2, onDestroy());
+  EXPECT_CALL(*listener_bar, onDestroy());
+  EXPECT_CALL(*listener_baz_update1, onDestroy());
 }
 
 TEST_F(ListenerManagerImplTest, AddDrainingListener) {
@@ -1124,7 +1067,6 @@ filter_chains:
   ON_CALL(*listener_factory_.socket_, localAddress()).WillByDefault(ReturnRef(local_address));
 
   ListenerHandle* listener_foo = expectListenerCreateWithSocket(false, true);
-  // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   worker_->callAddCompletion(true);
@@ -1196,7 +1138,6 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreateWithSocket(false, true);
-  // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   worker_->callAddCompletion(true);
@@ -1250,7 +1191,6 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreateWithSocket(true, true);
-  // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   EXPECT_EQ(0UL, manager_->listeners().size());
@@ -1264,7 +1204,6 @@ filter_chains:
 
   // Add foo again and initialize it.
   listener_foo = expectListenerCreateWithSocket(true, true);
-  // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   CHECK_STATS(2, 0, 1, 1, 0, 0);
@@ -1327,7 +1266,6 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreateWithSocket(false, true);
-  // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
 
@@ -1380,7 +1318,6 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreateWithSocket(true, false);
-  // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, false));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
 
@@ -1399,8 +1336,6 @@ filter_chains:
 
   {
     auto listener_bar = std::make_unique<ListenerHandle>();
-
-    UNREFERENCED_PARAMETER(listener_bar);
     EXPECT_CALL(listener_factory_, createDrainManager_(envoy::api::v2::Listener_DrainType_DEFAULT))
         .WillOnce(Return(listener_bar->drain_manager_));
     EXPECT_CALL(*listener_bar, onDestroy());
@@ -1417,7 +1352,6 @@ filter_chains:
 
   {
     auto listener_bar = std::make_unique<ListenerHandle>();
-    UNREFERENCED_PARAMETER(listener_bar);
     EXPECT_CALL(listener_factory_, createDrainManager_(envoy::api::v2::Listener_DrainType_DEFAULT))
         .WillOnce(Return(listener_bar->drain_manager_));
     EXPECT_CALL(*listener_bar, onDestroy());

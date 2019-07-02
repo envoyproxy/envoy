@@ -582,7 +582,7 @@ void FilterChainManagerImpl::warmed(FilterChainLookup* warming_lookup) {
 std::unique_ptr<FilterChainManagerImpl::FilterChainLookup>
 FilterChainManagerImpl::createFilterChainLookup() {
   auto res = std::make_unique<FilterChainManagerImpl::FilterChainLookup>();
-  res->has_active_lookup_ = active_lookup_.get() != nullptr;
+  res->has_active_lookup_ = active_lookup_ != nullptr;
   ENVOY_LOG(trace, "{} filter chain lookup {} has_active_lookup = {}", address_->asString(),
             static_cast<void*>(res.get()), res->has_active_lookup_);
   res->init_watcher_ =

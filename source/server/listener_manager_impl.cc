@@ -383,8 +383,7 @@ void ListenerImpl::initialize() {
       parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
       parent_.server_.threadLocal(), parent_.server_.messageValidationVisitor(),
       parent_.server_.api());
-  // moved to filter_chain_manager_
-  // factory_context.setInitManager(initManager());
+
   ListenerFilterChainFactoryBuilder filter_chain_factory_builder(*this, factory_context);
   filter_chain_manager_.addFilterChain(config_.filter_chains(), filter_chain_factory_builder);
 }
@@ -529,7 +528,15 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
     new_listener->setSocket((*existing_warming_listener)->getSocket());
+
+    updateWarmingActiveGauges();
+    stats_.listener_modified_.inc();
+    // Initialize before free the existing listener. Otherwise the existing listener might be the
+    // last one in warming state and notify the global init manager that all targets are done.
+    new_listener_ref.initialize();
+
     *existing_warming_listener = std::move(new_listener);
+    return true;
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not. Either way we get the socket from the existing listener.
