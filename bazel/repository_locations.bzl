@@ -127,7 +127,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/benchmark/archive/v1.5.0.tar.gz"],
     ),
     com_github_libevent_libevent = dict(
-        sha256 = "6f799dd920aab9487cb04cd40627a5d4104fbbd246ebb5c8fd5e520055af2ef5",
+        sha256 = "549d34065eb2485dfad6c8de638caaa6616ed130eec36dd978f73b6bdd5af113",
         # This SHA includes the new "prepare" and "check" watchers, used for event loop performance
         # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
         # in the watchers (see https://github.com/libevent/libevent/pull/802).
