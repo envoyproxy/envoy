@@ -5,7 +5,7 @@
 # api
 /api/ @envoyproxy/api-shepherds
 # access loggers
-/*/extensions/access_loggers/common @auni53
+/*/extensions/access_loggers/common @auni53 @zuercher
 # csrf extension
 /*/extensions/filters/http/csrf @dschaller @mattklein123
 # original_src http filter extension
