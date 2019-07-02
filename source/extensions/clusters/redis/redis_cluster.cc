@@ -131,7 +131,7 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
       [this](std::list<Network::DnsResponse>&& response) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
-        if (address_list.empty()) {
+        if (response.empty()) {
           parent_.info_->stats().update_empty_.inc();
           if (!resolve_timer_) {
             resolve_timer_ =
