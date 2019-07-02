@@ -6,6 +6,11 @@
 namespace Envoy {
 namespace Server {
 
+/**
+ * A stub that provides a SSL context manager capable of reporting on
+ * certificates' data in case there's no TLS implementation built
+ * into Envoy.
+ */
 class SslContextManagerNoTlsStub final : public Envoy::Ssl::ContextManager {
   Ssl::ClientContextSharedPtr
   createSslClientContext(Stats::Scope& /* scope */,
