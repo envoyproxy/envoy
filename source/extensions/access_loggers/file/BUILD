@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/access_log:access_log_interface",
         "//source/common/access_log:access_log_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/access_loggers/common:access_log_base",
     ],
 )
 

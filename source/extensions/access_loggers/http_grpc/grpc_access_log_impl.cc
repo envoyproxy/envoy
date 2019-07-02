@@ -89,7 +89,7 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
     AccessLog::FilterPtr&& filter,
     const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
     GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer)
-    : AccessLog::InstanceImpl(std::move(filter)), config_(config),
+    : Common::Base(std::move(filter)), config_(config),
       grpc_access_log_streamer_(grpc_access_log_streamer) {
   for (const auto& header : config_.additional_request_headers_to_log()) {
     request_headers_to_log_.emplace_back(header);
@@ -182,10 +182,10 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
   }
 }
 
-void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
-                            const Http::HeaderMap* response_headers,
-                            const Http::HeaderMap* response_trailers,
-                            const StreamInfo::StreamInfo& stream_info) {
+void HttpGrpcAccessLog::emitLog(const Http::HeaderMap* request_headers,
+                                const Http::HeaderMap* response_headers,
+                                const Http::HeaderMap* response_trailers,
+                                const StreamInfo::StreamInfo& stream_info) {
   static Http::HeaderMapImpl empty_headers;
   if (!request_headers) {
     request_headers = &empty_headers;

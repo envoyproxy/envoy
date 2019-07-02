@@ -51,7 +51,7 @@ public:
   ~MockInstance();
 
   // AccessLog::Instance
-  MOCK_METHOD4(maybeLog,
+  MOCK_METHOD4(log,
                void(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
                     const Http::HeaderMap* response_trailers,
                     const StreamInfo::StreamInfo& stream_info));

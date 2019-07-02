@@ -180,7 +180,7 @@ Filter::~Filter() {
   getStreamInfo().onRequestComplete();
 
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->maybeLog(nullptr, nullptr, nullptr, getStreamInfo());
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
   }
 
   ASSERT(upstream_handle_ == nullptr);

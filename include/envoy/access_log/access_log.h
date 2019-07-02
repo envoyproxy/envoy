@@ -79,10 +79,9 @@ public:
   /**
    * Log a request depending on the AccessLog::Filter configuration.
    */
-  virtual void maybeLog(const Http::HeaderMap* request_headers,
-                        const Http::HeaderMap* response_headers,
-                        const Http::HeaderMap* response_trailers,
-                        const StreamInfo::StreamInfo& stream_info) PURE;
+  virtual void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
+                   const Http::HeaderMap* response_trailers,
+                   const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 using InstanceSharedPtr = std::shared_ptr<Instance>;

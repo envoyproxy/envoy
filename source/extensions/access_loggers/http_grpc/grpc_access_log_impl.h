@@ -16,6 +16,8 @@
 #include "common/access_log/access_log_impl.h"
 #include "common/grpc/typed_async_client.h"
 
+#include "extensions/access_loggers/common/access_log_base.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
@@ -116,7 +118,7 @@ private:
 /**
  * Access log Instance that streams HTTP logs over gRPC.
  */
-class HttpGrpcAccessLog : public AccessLog::InstanceImpl {
+class HttpGrpcAccessLog : public Common::Base {
 public:
   HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
                     const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
@@ -127,10 +129,10 @@ public:
       const StreamInfo::StreamInfo& stream_info);
 
 private:
-  // AccessLog::InstanceImpl
-  void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-           const Http::HeaderMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info) override;
+  // Common::Base
+  void emitLog(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
+               const Http::HeaderMap* response_trailers,
+               const StreamInfo::StreamInfo& stream_info) override;
 
   AccessLog::FilterPtr filter_; // AccessLog::InstanceImpl
   const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
