@@ -159,6 +159,11 @@ config_setting(
 )
 
 config_setting(
+    name = "boringssl_disabled",
+    values = {"define": "boringssl=disabled"},
+)
+
+config_setting(
     name = "enable_quiche",
     values = {"define": "quiche=enabled"},
 )
