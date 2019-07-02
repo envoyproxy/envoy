@@ -4,13 +4,17 @@
 
 #include "envoy/api/v2/srds.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/router/rds.h"
 #include "envoy/router/router.h"
 #include "envoy/router/scopes.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "common/common/hash.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
-#include "common/router/scoped_config_manager.h"
+
+#include "absl/numeric/int128.h"
+#include "absl/strings/str_format.h"
 
 namespace Envoy {
 namespace Router {
@@ -26,15 +30,14 @@ public:
 
   bool operator==(const ScopeKeyFragmentBase& other) const {
     if (typeid(*this) == typeid(other)) {
-      return equals(other);
+      return hash() == other.hash();
     }
     return false;
   }
   virtual ~ScopeKeyFragmentBase() = default;
 
-private:
-  // Returns true if the two fragments equal else false.
-  virtual bool equals(const ScopeKeyFragmentBase&) const PURE;
+  // Hash of the fragment.
+  virtual uint64_t hash() const PURE;
 };
 
 /**
@@ -52,14 +55,22 @@ public:
   // Caller should guarantee the fragment is not nullptr.
   void addFragment(std::unique_ptr<ScopeKeyFragmentBase>&& fragment) {
     ASSERT(fragment != nullptr, "null fragment not allowed in ScopeKey.");
+    updateHash(*fragment);
     fragments_.emplace_back(std::move(fragment));
   }
 
+  uint64_t hash() const { return hash_; }
   bool operator!=(const ScopeKey& other) const;
-
   bool operator==(const ScopeKey& other) const;
 
 private:
+  // Update the key's hash with the new fragment hash.
+  void updateHash(const ScopeKeyFragmentBase& fragment) {
+    absl::uint128 buffer = absl::MakeUint128(hash_, fragment.hash());
+    hash_ = HashUtil::xxHash64(absl::string_view(reinterpret_cast<char*>(&buffer), 16));
+  }
+
+  uint64_t hash_{0};
   std::vector<std::unique_ptr<ScopeKeyFragmentBase>> fragments_;
 };
 
@@ -68,11 +79,9 @@ class StringKeyFragment : public ScopeKeyFragmentBase {
 public:
   explicit StringKeyFragment(absl::string_view value) : value_(value) {}
 
-private:
-  bool equals(const ScopeKeyFragmentBase& other) const override {
-    return value_ == static_cast<const StringKeyFragment&>(other).value_;
-  }
+  uint64_t hash() const override { return HashUtil::xxHash64(value_); }
 
+private:
   const std::string value_;
 };
 
@@ -132,9 +141,44 @@ private:
   std::vector<std::unique_ptr<FragmentBuilderBase>> fragment_builders_;
 };
 
+// ScopedRouteConfiguration and corresponding RouteConfigProvider.
+class ScopedRouteInfo {
+public:
+  ScopedRouteInfo(envoy::api::v2::ScopedRouteConfiguration&& config_proto,
+                  std::shared_ptr<RouteConfigProvider>&& route_provider)
+      : config_proto_(std::move(config_proto)), route_provider_(std::move(route_provider)) {
+    ASSERT(route_provider_ != nullptr, "ScopedRouteInfo expects a valid RouteConfigProvider.");
+    ASSERT(route_provider_->config()->name() == config_proto_.route_configuration_name(),
+           absl::StrFormat(
+               "RouteConfigProvider's name '%s' doesn't match route_configuration_name '%s'.",
+               route_provider_->config()->name(), config_proto_.route_configuration_name()));
+    // TODO(stevenzzzz): Maybe worth a KeyBuilder abstraction when there are more than one type of
+    // Fragment.
+    for (const auto& fragment : config_proto_.key().fragments()) {
+      switch (fragment.type_case()) {
+      case envoy::api::v2::ScopedRouteConfiguration::Key::Fragment::kStringKey:
+        scope_key_.addFragment(std::make_unique<StringKeyFragment>(fragment.string_key()));
+        break;
+      default:
+        NOT_REACHED_GCOVR_EXCL_LINE;
+      }
+    }
+  }
+  Router::ConfigConstSharedPtr routeConfig() const { return route_provider_->config(); }
+  const ScopeKey& scopeKey() const { return scope_key_; }
+  const envoy::api::v2::ScopedRouteConfiguration& configProto() const { return config_proto_; }
+  const std::string& scopeName() const { return config_proto_.name(); }
+
+private:
+  const envoy::api::v2::ScopedRouteConfiguration config_proto_;
+  ScopeKey scope_key_;
+  std::shared_ptr<RouteConfigProvider> route_provider_;
+};
+using ScopedRouteInfoConstSharedPtr = std::shared_ptr<const ScopedRouteInfo>;
+// Ordered map for consistent config dumping.
+using ScopedRouteMap = std::map<std::string, ScopedRouteInfoConstSharedPtr>;
+
 /**
- * TODO(AndresGuedez): implement scoped routing logic.
- *
  * Each Envoy worker is assigned an instance of this type. When config updates are received,
  * addOrUpdateRoutingScope() and removeRoutingScope() are called to update the set of scoped routes.
  *
@@ -153,8 +197,11 @@ public:
   Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const override;
 
 private:
-  const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
-      scope_key_builder_;
+  ScopeKeyBuilderImpl scope_key_builder_;
+  // From scope name to cached ScopedRouteInfo.
+  absl::flat_hash_map<std::string, const ScopedRouteInfoConstSharedPtr> scoped_route_info_by_name_;
+  // Hash by ScopeKey hash to lookup in constant time.
+  absl::flat_hash_map<uint64_t, const ScopedRouteInfoConstSharedPtr> scoped_route_info_by_key_;
 };
 
 /**

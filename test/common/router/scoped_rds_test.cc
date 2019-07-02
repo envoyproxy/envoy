@@ -6,16 +6,22 @@
 
 #include "common/router/scoped_rds.h"
 
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::ByMove;
+using testing::DoAll;
 using testing::InSequence;
+using testing::Invoke;
 using testing::Return;
+using testing::ReturnRefOfCopy;
 
 namespace Envoy {
 namespace Router {
@@ -45,11 +51,45 @@ class ScopedRoutesTestBase : public testing::Test {
 protected:
   ScopedRoutesTestBase() {
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("route_scopes", _));
-    config_provider_manager_ =
-        std::make_unique<ScopedRoutesConfigProviderManager>(factory_context_.admin_);
+    config_provider_manager_ = std::make_unique<ScopedRoutesConfigProviderManager>(
+        factory_context_.admin_, route_config_provider_manager_);
+    EXPECT_CALL(route_config_provider_manager_, createRdsRouteConfigProvider(_, _, _))
+        .WillRepeatedly(Invoke(
+            [this](const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+                   Server::Configuration::FactoryContext&,
+                   const std::string&) -> RouteConfigProviderPtr {
+              auto iter = cached_route_configs_.find(rds.route_config_name());
+              if (iter == cached_route_configs_.end()) {
+                cached_route_configs_[rds.route_config_name()] = std::make_shared<MockConfig>();
+                EXPECT_CALL(*cached_route_configs_[rds.route_config_name()], name())
+                    .WillRepeatedly(ReturnRefOfCopy(rds.route_config_name()));
+              }
+              auto provider = std::make_unique<NiceMock<MockRouteConfigProvider>>();
+              EXPECT_CALL(*provider, config())
+                  .WillRepeatedly(Invoke([this, rds]() -> ConfigConstSharedPtr {
+                    std::cerr << "DDD returns config() for :" << rds.route_config_name()
+                              << std::endl;
+                    return cached_route_configs_[rds.route_config_name()];
+                  }));
+              return provider;
+            }));
   }
 
   ~ScopedRoutesTestBase() override { factory_context_.thread_local_.shutdownThread(); }
+
+  // The delta style API helper.
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource>
+  anyToResource(Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources, std::string version) {
+    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> added_resources;
+    for (const auto& resource_any : resources) {
+      auto config = TestUtility::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource_any);
+      auto* to_add = added_resources.Add();
+      to_add->set_name(config.name());
+      to_add->set_version(version);
+      to_add->mutable_resource()->PackFrom(config);
+    }
+    return added_resources;
+  }
 
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
@@ -57,6 +97,8 @@ protected:
   Upstream::ClusterManager::ClusterInfoMap cluster_map_;
   Upstream::MockClusterMockPrioritySet cluster_;
   std::unique_ptr<ScopedRoutesConfigProviderManager> config_provider_manager_;
+  MockRouteConfigProviderManager route_config_provider_manager_;
+  absl::flat_hash_map<std::string, std::shared_ptr<MockConfig>> cached_route_configs_;
   Event::SimulatedTimeSystem time_system_;
   envoy::api::v2::core::ConfigSource rds_config_source_;
 };
@@ -70,7 +112,11 @@ protected:
 name: foo_scoped_routes
 scope_key_builder:
   fragments:
-    - header_value_extractor: { name: X-Google-VIP }
+    - header_value_extractor:
+        name: X-Google-VIP
+        element:
+          key: x-foo-key
+          separator: ;
 )EOF";
     envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes scoped_routes_config;
     TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
@@ -101,6 +147,9 @@ key:
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
   EXPECT_THROW(subscription_callbacks_->onConfigUpdate(resources, "1"), ProtoValidationException);
 
+  EXPECT_THROW(subscription_callbacks_->onConfigUpdate(anyToResource(resources, "1"), {}, "1"),
+               ProtoValidationException);
+
   // 'route_configuration_name' validation: value must be > 1 byte.
   const std::string config_yaml2 = R"EOF(
 name: foo_scope
@@ -112,6 +161,8 @@ key:
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources2;
   parseScopedRouteConfigurationFromYaml(*resources2.Add(), config_yaml2);
   EXPECT_THROW(subscription_callbacks_->onConfigUpdate(resources2, "1"), ProtoValidationException);
+  EXPECT_THROW(subscription_callbacks_->onConfigUpdate(anyToResource(resources2, "1"), {}, "1"),
+               ProtoValidationException);
 
   // 'key' validation: must define at least 1 fragment.
   const std::string config_yaml3 = R"EOF(
@@ -122,6 +173,8 @@ key:
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources3;
   parseScopedRouteConfigurationFromYaml(*resources3.Add(), config_yaml3);
   EXPECT_THROW(subscription_callbacks_->onConfigUpdate(resources3, "1"), ProtoValidationException);
+  EXPECT_THROW(subscription_callbacks_->onConfigUpdate(anyToResource(resources3, "1"), {}, "1"),
+               ProtoValidationException);
 }
 
 // Tests that multiple uniquely named resources are allowed in config updates.
@@ -149,6 +202,12 @@ key:
   EXPECT_EQ(
       1UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
+
+  // Delta API.
+  EXPECT_NO_THROW(subscription_callbacks_->onConfigUpdate(anyToResource(resources, "2"), {}, "2"));
+  EXPECT_EQ(
+      2UL,
+      factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
 }
 
 // Tests that only one resource is provided during a config update.
@@ -167,6 +226,10 @@ key:
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
   EXPECT_THROW_WITH_MESSAGE(subscription_callbacks_->onConfigUpdate(resources, "1"), EnvoyException,
                             "duplicate scoped route configuration foo_scope found");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      subscription_callbacks_->onConfigUpdate(anyToResource(resources, "1"), {}, "1"),
+      EnvoyException, "duplicate scoped route configuration foo_scope found");
 }
 
 // Tests a config update failure.
@@ -185,7 +248,8 @@ TEST_F(ScopedRdsTest, ConfigUpdateFailure) {
 
 using ScopedRoutesConfigProviderManagerTest = ScopedRoutesTestBase;
 
-// Tests that the /config_dump handler returns the corresponding scoped routing config.
+// Tests that the /config_dump handler returns the corresponding scoped routing
+// config.
 TEST_F(ScopedRoutesConfigProviderManagerTest, ConfigDump) {
   auto message_ptr =
       factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
@@ -200,7 +264,7 @@ inline_scoped_route_configs:
 dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
-  EXPECT_EQ(expected_config_dump.DebugString(), scoped_routes_config_dump.DebugString());
+  EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump));
 
   timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
 
@@ -214,7 +278,9 @@ scoped_routes:
   name: $0
   scope_key_builder:
     fragments:
-      - header_value_extractor: { name: X-Google-VIP }
+      - header_value_extractor:
+          name: X-Google-VIP
+          index: 0
 $1
 )EOF";
   const std::string inline_scoped_route_configs_yaml = R"EOF(
@@ -256,7 +322,7 @@ inline_scoped_route_configs:
 dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
-  EXPECT_EQ(expected_config_dump.DebugString(), scoped_routes_config_dump2.DebugString());
+  EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump2));
 
   const std::string scoped_rds_config_yaml = R"EOF(
   scoped_rds:
@@ -311,7 +377,7 @@ dynamic_scoped_route_configs:
   const auto& scoped_routes_config_dump3 =
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
-  EXPECT_EQ(expected_config_dump.DebugString(), scoped_routes_config_dump3.DebugString());
+  EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump3));
 
   resources.Clear();
   factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(resources,
@@ -343,14 +409,15 @@ dynamic_scoped_route_configs:
   const auto& scoped_routes_config_dump4 =
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
-  EXPECT_EQ(expected_config_dump.DebugString(), scoped_routes_config_dump4.DebugString());
+  EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump4));
 }
 
 using ScopedRoutesConfigProviderManagerDeathTest = ScopedRoutesConfigProviderManagerTest;
 
 // Tests that SRDS only allows creation of delta static config providers.
 TEST_F(ScopedRoutesConfigProviderManagerDeathTest, DeltaStaticConfigProviderOnly) {
-  // Use match all regex due to lack of distinctive matchable output for coverage test.
+  // Use match all regex due to lack of distinctive matchable output for
+  // coverage test.
   EXPECT_DEATH(config_provider_manager_->createStaticConfigProvider(
                    parseScopedRouteConfigurationFromYaml(R"EOF(
 name: dynamic-foo
