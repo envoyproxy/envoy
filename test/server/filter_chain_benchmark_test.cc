@@ -222,7 +222,6 @@ FilterChainBenchmarkFixture/FilterChainFindTest/8                  1848 ns      
 FilterChainBenchmarkFixture/FilterChainFindTest/64                16612 ns        16609 ns 41876
 FilterChainBenchmarkFixture/FilterChainFindTest/512              164513 ns       164316 ns 4125
 FilterChainBenchmarkFixture/FilterChainFindTest/4096            4066173 ns      4061772 ns 226
-
 */
 } // namespace Server
 } // namespace Envoy
