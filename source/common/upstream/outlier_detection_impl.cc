@@ -119,7 +119,7 @@ absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result resu
     return absl::nullopt;
   }
 
-  return absl::optional<Http::Code>(http_code);
+  return {http_code};
 }
 
 // Method is called by putResult when external and local origin errors
@@ -713,8 +713,8 @@ SuccessRateAccumulator::getSuccessRate(uint64_t success_rate_request_volume) {
     return absl::optional<double>();
   }
 
-  return absl::optional<double>(backup_success_rate_bucket_->success_request_counter_ * 100.0 /
-                                backup_success_rate_bucket_->total_request_counter_);
+  return {backup_success_rate_bucket_->success_request_counter_ * 100.0 /
+          backup_success_rate_bucket_->total_request_counter_};
 }
 
 } // namespace Outlier
