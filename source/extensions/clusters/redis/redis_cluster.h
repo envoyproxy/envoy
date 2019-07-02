@@ -195,9 +195,7 @@ private:
 
     ~RedisDiscoverySession() override;
 
-    void registerDiscoveryAddress(
-        const std::list<Network::Address::InstanceConstSharedPtr>& address_list,
-        const uint32_t port);
+    void registerDiscoveryAddress(std::list<Network::DnsResponse>&& response, const uint32_t port);
 
     // Start discovery against a random host from existing hosts
     void startResolve();

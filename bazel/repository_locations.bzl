@@ -156,10 +156,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/msgpack/msgpack-c/archive/cpp-3.1.1.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "700be26170c1917e83d1319b88a2112dccd1179cd78c5672940483e7c45ca6ae",
-        strip_prefix = "jwt_verify_lib-85cf0edf1f1bc507ff7d96a8d6a9bc20307b0fcf",
-        # 2018-12-01
-        urls = ["https://github.com/google/jwt_verify_lib/archive/85cf0edf1f1bc507ff7d96a8d6a9bc20307b0fcf.tar.gz"],
+        sha256 = "8ab9a0b3f8b7eab5f1cd059920e81fdc138cd4ee657c1412af891652929885c5",
+        strip_prefix = "jwt_verify_lib-6356535ae83a3f1820b6b06dae80cd6a0a03e7f2",
+        # 2019-07-01
+        urls = ["https://github.com/google/jwt_verify_lib/archive/6356535ae83a3f1820b6b06dae80cd6a0a03e7f2.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
         sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
@@ -246,8 +246,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/curl/curl/releases/download/curl-7_65_1/curl-7.65.1.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/77ae31cbfb5bf41299c8c10a06a205a8a0d37cae.tar.gz
-        sha256 = "20542b8f3df505e4850c8538d747ce21275b1fde64106ccae49a19a3fd7a1ac5",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/77ae31cbfb5bf41299c8c10a06a205a8a0d37cae.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/8f3a576515ada564d3e2b560220649f49a21dec1.tar.gz
+        sha256 = "ae2f3ecd7a87154ae4668f7b1876846c1cf4efa8abc987511809433f73914a68",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/8f3a576515ada564d3e2b560220649f49a21dec1.tar.gz"],
     ),
 )
