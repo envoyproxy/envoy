@@ -23,6 +23,7 @@ static_resources:
     - name: hello_world_api
       connect_timeout: 30s
       dns_lookup_family: V4_ONLY
+      dns_refresh_rate: 60s
       lb_policy: ROUND_ROBIN
       load_assignment:
         cluster_name: hello_world_api
@@ -34,3 +35,7 @@ static_resources:
       tls_context:
         sni: s3.amazonaws.com
       type: LOGICAL_DNS
+stats_flush_interval: 60s
+watchdog:
+  megamiss_timeout: 60s
+  miss_timeout: 60s
