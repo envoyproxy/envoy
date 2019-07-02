@@ -381,18 +381,18 @@ void ListenerImpl::initialize() {
   // If workers have already started, we shift from using the global init manager to using a local
   // per listener init manager. See ~ListenerImpl() for why we gate the onListenerWarmed() call
   // by resetting the watcher.
-  if (workers_started_) {
-    dynamic_init_manager_.initialize(*init_watcher_);
-  }
+  // if (workers_started_) {
+  dynamic_init_manager_.initialize(*init_watcher_);
+  //}
 }
 
 Init::Manager& ListenerImpl::initManager() {
   // See initialize() for why we choose different init managers to return.
-  if (workers_started_) {
-    return dynamic_init_manager_;
-  } else {
-    return parent_.server_.initManager();
-  }
+  // if (workers_started_) {
+  return dynamic_init_manager_;
+  //} else {
+  return parent_.server_.initManager();
+  //}
 }
 
 void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
@@ -571,13 +571,14 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
                                                               new_listener->socketType(),
                                                               new_listener->listenSocketOptions(),
                                                               new_listener->bindToPort()));
-    if (workers_started_) {
-      new_listener->debugLog("add warming listener");
-      warming_listeners_.emplace_back(std::move(new_listener));
-    } else {
-      new_listener->debugLog("add active listener");
-      active_listeners_.emplace_back(std::move(new_listener));
-    }
+    // if (workers_started_) {
+    ENVOY_LOG(info, "jianfeih debug changing to warming listener.");
+    new_listener->debugLog("add warming listener");
+    warming_listeners_.emplace_back(std::move(new_listener));
+    //} else {
+    // new_listener->debugLog("add active listener");
+    // active_listeners_.emplace_back(std::move(new_listener));
+    //}
 
     added = true;
   }
@@ -758,7 +759,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   workers_started_ = true;
   uint32_t i = 0;
   for (const auto& worker : workers_) {
-    ASSERT(warming_listeners_.empty());
+    // ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
       addListenerToWorker(*worker, *listener);
     }
