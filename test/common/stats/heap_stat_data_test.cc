@@ -32,32 +32,43 @@ protected:
   StatNamePool pool_;
 };
 
-/*
-// No truncation occurs in the implementation of HeapStatData.
-TEST_F(HeapStatDataTest, HeapNoTruncate) {
-  const std::string long_string(128, 'A');
-  StatName stat_name = makeStat(long_string);
-  HeapStatData* stat{};
-  EXPECT_NO_LOGS(stat = HeapStatData::alloc(stat_name, symbol_table_));
-  EXPECT_EQ(stat->statName(), stat_name);
-  stat->free(symbol_table_);
+// Allocate 2 counters or gauges of the same name, and you'll get the same object.
+TEST_F(HeapStatDataTest, StatsWithSameName) {
+  StatName counter_name = makeStat("counter.name");
+  CounterSharedPtr c1 = alloc_.makeCounter(counter_name, "", std::vector<Tag>());
+  EXPECT_EQ(1, c1->use_count());
+  CounterSharedPtr c2 = alloc_.makeCounter(counter_name, "", std::vector<Tag>());
+  EXPECT_EQ(2, c1->use_count());
+  EXPECT_EQ(2, c2->use_count());
+  EXPECT_EQ(c1.get(), c2.get());
+  EXPECT_FALSE(c1->used());
+  EXPECT_FALSE(c2->used());
+  c1->inc();
+  EXPECT_TRUE(c1->used());
+  EXPECT_TRUE(c2->used());
+  c2->inc();
+  EXPECT_EQ(2, c1->value());
+  EXPECT_EQ(2, c2->value());
+  StatName gauge_name = makeStat("gauges.name");
+  GaugeSharedPtr g1 =
+      alloc_.makeGauge(gauge_name, "", std::vector<Tag>(), Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(1, g1->use_count());
+  GaugeSharedPtr g2 =
+      alloc_.makeGauge(gauge_name, "", std::vector<Tag>(), Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(2, g1->use_count());
+  EXPECT_EQ(2, g2->use_count());
+  EXPECT_EQ(g1.get(), g2.get());
+  EXPECT_FALSE(g1->used());
+  EXPECT_FALSE(g2->used());
+  g1->inc();
+  EXPECT_TRUE(g1->used());
+  EXPECT_TRUE(g2->used());
+  EXPECT_EQ(1, g1->value());
+  EXPECT_EQ(1, g2->value());
+  g2->dec();
+  EXPECT_EQ(0, g1->value());
+  EXPECT_EQ(0, g2->value());
 };
-
-TEST_F(HeapStatDataTest, HeapAlloc) {
-  HeapStatData* stat_1 = HeapStatData::alloc(makeStat("ref_name"), symbol_table_);
-  ASSERT_NE(stat_1, nullptr);
-  HeapStatData* stat_2 = HeapStatData::alloc(makeStat("ref_name"), symbol_table_);
-  ASSERT_NE(stat_2, nullptr);
-  HeapStatData* stat_3 = HeapStatData::alloc(makeStat("not_ref_name"), symbol_table_);
-  ASSERT_NE(stat_3, nullptr);
-  EXPECT_NE(stat_1, stat_2);
-  EXPECT_NE(stat_1, stat_3);
-  EXPECT_NE(stat_2, stat_3);
-  stat_1->free(symbol_table_);
-  stat_2->free(symbol_table_);
-  stat_3->free(symbol_table_);
-}
-*/
 
 } // namespace
 } // namespace Stats

@@ -15,7 +15,9 @@ namespace Stats {
 
 /**
  * Helper class for implementing Metrics. This does not participate in any,
- * inheritance chains, but can be instantiated by classes that do.
+ * inheritance chains, but can be instantiated by classes that do. It just
+ * implements the mechanics of representing the name, tag-extracted-name,
+ * and all tags as a StatNameList.
  */
 class MetricHelper {
 public:
@@ -36,11 +38,21 @@ private:
 };
 
 /**
- * Implementation of the Metric interface. Virtual inheritance is used because the interfaces that
- * will inherit from Metric will have other base classes that will also inherit from Metric.
+ * Implementation of the Metric interface. This class implements most of the
+ * Metric API for Counters, Gauges, and Histograms. It leaves symbolTable()
+ * unimplemented so that implementations can keep a reference to the allocator
+ * instead, and derive the symbolTable() from that.
  *
- * MetricImpl is not meant to be instantiated as-is. For performance reasons we keep name() virtual
- * and expect child classes to implement it.
+ * We templatize on the base class (Counter, Gauge, or Histogram), rather than
+ * using multiple virtual inheritance, as this avoids the overhead of an extra
+ * vptr per instance. This is important for stats because there can be a huge
+ * number of stats in systems with large numbers of clusters and hosts, and a
+ * few 8-byte pointers per-stat here and there can add up to significant amounts
+ * of memory.
+ *
+ * Note the delegation of the implementation to a helper class, which is neither
+ * templatized nor virtual. This avoids having separate copies of the
+ * implementation for each base class.
  */
 template <class BaseClass> class MetricImpl : public BaseClass {
 public:

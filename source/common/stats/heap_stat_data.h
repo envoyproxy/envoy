@@ -16,24 +16,11 @@
 namespace Envoy {
 namespace Stats {
 
-/**
- * Holds backing store for both CounterImpl and GaugeImpl. This provides a level
- * of indirection needed to enable stats created with the same name from
- * different scopes to share the same value.
- */
-struct HeapStatData {
-  std::atomic<uint64_t> value_{0};
-  std::atomic<uint64_t> pending_increment_{0};
-  std::atomic<uint16_t> flags_{0};
-  std::atomic<uint16_t> ref_count_{0};
-};
-
 class HeapStatDataAllocator : public StatDataAllocator {
 public:
   HeapStatDataAllocator(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   ~HeapStatDataAllocator() override;
 
-  HeapStatData& alloc(StatName name);
   void removeCounterFromSet(Counter* counter);
   void removeGaugeFromSet(Gauge* gauge);
 
