@@ -207,9 +207,18 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/06/03  7199     49393               absl update
   // 2019/06/06  7208     49650               make memory targets approximate
   // 2019/06/17  7243     49412       49700   macros for exact/upper-bound memory checks
+  // 2019/06/29  7364     45685       46000   combine 2 levels of stat ref-counting into 1
 
-  EXPECT_MEMORY_EQ(m_per_cluster, 49412);
-  EXPECT_MEMORY_LE(m_per_cluster, 49700);
+  // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
+  // 'release' builds, where we control the platform and tool-chain. So you
+  // will need to find the correct value only after failing CI and looking
+  // at the logs.
+  //
+  // On a local clang8/libstdc++/linux flow, the memory usage was observed in
+  // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
+  // vary.
+  EXPECT_MEMORY_EQ(m_per_cluster, 45685);
+  EXPECT_MEMORY_LE(m_per_cluster, 46000);
 }
 
 } // namespace

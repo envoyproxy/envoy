@@ -132,7 +132,7 @@ public:
   NiceMock<Server::MockAdmin> admin_;
   NiceMock<Secret::MockSecretManager> secret_manager_;
   NiceMock<AccessLog::MockAccessLogManager> log_manager_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
 };
@@ -290,7 +290,7 @@ public:
   envoy::api::v2::core::Metadata buildMetadata(const std::string& version) const {
     envoy::api::v2::core::Metadata metadata;
 
-    if (version != "") {
+    if (!version.empty()) {
       Envoy::Config::Metadata::mutableMetadataValue(
           metadata, Config::MetadataFilters::get().ENVOY_LB, "version")
           .set_string_value(version);

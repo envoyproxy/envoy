@@ -1047,7 +1047,14 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 
   NiceMock<Upstream::Outlier::MockDetector> outlier_detector;
   ON_CALL(Const(cluster), outlierDetector()).WillByDefault(Return(&outlier_detector));
-  ON_CALL(outlier_detector, successRateEjectionThreshold()).WillByDefault(Return(6.0));
+  ON_CALL(outlier_detector,
+          successRateEjectionThreshold(
+              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
+      .WillByDefault(Return(6.0));
+  ON_CALL(outlier_detector,
+          successRateEjectionThreshold(
+              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))
+      .WillByDefault(Return(9.0));
 
   ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(true));
 
@@ -1090,8 +1097,14 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL))
       .WillByDefault(Return(true));
 
-  ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
+  ON_CALL(
+      host->outlier_detector_,
+      successRate(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
+      .WillByDefault(Return(43.2));
   ON_CALL(*host, weight()).WillByDefault(Return(5));
+  ON_CALL(host->outlier_detector_,
+          successRate(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))
+      .WillByDefault(Return(93.2));
   ON_CALL(*host, priority()).WillByDefault(Return(6));
 
   Buffer::OwnedImpl response;
@@ -1107,6 +1120,9 @@ TEST_P(AdminInstanceTest, ClustersJson) {
    "name": "fake_cluster",
    "success_rate_ejection_threshold": {
     "value": 6
+   },
+   "local_origin_success_rate_ejection_threshold": {
+    "value": 9
    },
    "added_via_api": true,
    "host_statuses": [
@@ -1157,7 +1173,10 @@ TEST_P(AdminInstanceTest, ClustersJson) {
      },
      "weight": 5,
      "hostname": "foo.com",
-     "priority": 6
+     "priority": 6,
+     "local_origin_success_rate": {
+      "value": 93.2
+     }
     }
    ]
   }
@@ -1176,6 +1195,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters", header_map, response2));
   const std::string expected_text = R"EOF(fake_cluster::outlier::success_rate_average::0
 fake_cluster::outlier::success_rate_ejection_threshold::6
+fake_cluster::outlier::local_origin_success_rate_average::0
+fake_cluster::outlier::local_origin_success_rate_ejection_threshold::9
 fake_cluster::default_priority::max_connections::1
 fake_cluster::default_priority::max_pending_requests::1024
 fake_cluster::default_priority::max_requests::1024
@@ -1197,8 +1218,9 @@ fake_cluster::1.2.3.4:80::region::test_region
 fake_cluster::1.2.3.4:80::zone::test_zone
 fake_cluster::1.2.3.4:80::sub_zone::test_sub_zone
 fake_cluster::1.2.3.4:80::canary::false
-fake_cluster::1.2.3.4:80::success_rate::43.2
 fake_cluster::1.2.3.4:80::priority::6
+fake_cluster::1.2.3.4:80::success_rate::43.2
+fake_cluster::1.2.3.4:80::local_origin_success_rate::93.2
 )EOF";
   EXPECT_EQ(expected_text, response2.toString());
 }
@@ -1367,6 +1389,11 @@ protected:
     histograms_.push_back(histogram);
   }
 
+  using MockHistogramSharedPtr = Stats::RefcountPtr<NiceMock<Stats::MockParentHistogram>>;
+  MockHistogramSharedPtr makeHistogram() {
+    return MockHistogramSharedPtr(new NiceMock<Stats::MockParentHistogram>());
+  }
+
   Stats::FakeSymbolTableImpl symbol_table_;
   Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
@@ -1451,7 +1478,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
   h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  auto histogram = makeHistogram();
   histogram->name_ = "histogram1";
   histogram->used_ = true;
   ON_CALL(*histogram, cumulativeStatistics())
@@ -1504,7 +1531,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
 
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  auto histogram = makeHistogram();
   histogram->name_ = "histogram1";
   histogram->used_ = true;
   ON_CALL(*histogram, cumulativeStatistics())
@@ -1556,7 +1583,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
   histogram1->used_ = true;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
@@ -1616,7 +1643,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
   histogram1->used_ = true;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
@@ -1663,7 +1690,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
   histogram1->used_ = false;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
@@ -1702,7 +1729,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);

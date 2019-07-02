@@ -27,6 +27,14 @@ public:
   uint64_t latch() override { return 0; }
   void reset() override {}
   uint64_t value() const override { return 0; }
+
+  // RefcountInterface
+  void incRefCount() override { refcount_helper_.incRefCount(); }
+  bool decRefCount() override { return refcount_helper_.decRefCount(); }
+  uint32_t use_count() const override { return refcount_helper_.use_count(); }
+
+private:
+  RefcountHelper refcount_helper_;
 };
 
 } // namespace Stats
