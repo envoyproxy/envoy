@@ -104,7 +104,7 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
     std::vector<Json::ObjectSharedPtr> transact_items =
         json_data.getObjectArray("TransactItems", true);
     for (const Json::ObjectSharedPtr& transact_item : transact_items) {
-      auto next_table_name = getTableNameFromTransactItem(*transact_item);
+      const auto next_table_name = getTableNameFromTransactItem(*transact_item);
       if (!next_table_name.has_value()) {
         // if an operation is missing a table name, we want to throw the normal set of errors
         table.table_name = "";
