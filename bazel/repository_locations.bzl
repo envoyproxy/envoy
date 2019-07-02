@@ -135,7 +135,7 @@ REPOSITORY_LOCATIONS = dict(
         # and https://github.com/lyft/envoy-mobile/issues/215.
         # TODO(mergeconflict): Update to v2.2 when it is released.
         strip_prefix = "libevent-0d7d85c2083f7a4c9efe01c061486f332b576d28",
-        # 2019-05-16
+        # 2019-07-02
         urls = ["https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"],
     ),
     net_zlib = dict(
