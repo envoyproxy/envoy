@@ -47,15 +47,31 @@ private:
   double sample_sum_;
 };
 
+class HistogramImplHelper : public MetricImpl<Histogram> {
+public:
+  HistogramImplHelper(StatName name, const std::string& tag_extracted_name,
+                      const std::vector<Tag>& tags, SymbolTable& symbol_table)
+      : MetricImpl<Histogram>(name, tag_extracted_name, tags, symbol_table) {}
+  HistogramImplHelper(SymbolTable& symbol_table) : MetricImpl<Histogram>(symbol_table) {}
+
+  // RefcountInterface
+  void incRefCount() override { refcount_helper_.incRefCount(); }
+  bool decRefCount() override { return refcount_helper_.decRefCount(); }
+  uint32_t use_count() const override { return refcount_helper_.use_count(); }
+
+private:
+  RefcountHelper refcount_helper_;
+};
+
 /**
  * Histogram implementation for the heap.
  */
-class HistogramImpl : public MetricImpl<Histogram> {
+class HistogramImpl : public HistogramImplHelper {
 public:
   HistogramImpl(StatName name, Store& parent, const std::string& tag_extracted_name,
                 const std::vector<Tag>& tags)
-      : MetricImpl<Histogram>(name, tag_extracted_name, tags, parent.symbolTable()),
-        parent_(parent) {}
+      : HistogramImplHelper(name, tag_extracted_name, tags, parent.symbolTable()), parent_(parent) {
+  }
   ~HistogramImpl() {
     // We must explicitly free the StatName here in order to supply the
     // SymbolTable reference. An RAII alternative would be to store a
@@ -79,10 +95,10 @@ private:
  * Null histogram implementation.
  * No-ops on all calls and requires no underlying metric or data.
  */
-class NullHistogramImpl : public MetricImpl<Histogram> {
+class NullHistogramImpl : public HistogramImplHelper {
 public:
   explicit NullHistogramImpl(SymbolTable& symbol_table)
-      : MetricImpl<Histogram>(symbol_table), symbol_table_(symbol_table) {}
+      : HistogramImplHelper(symbol_table), symbol_table_(symbol_table) {}
   ~NullHistogramImpl() { MetricImpl::clear(symbol_table_); }
 
   bool used() const override { return false; }

@@ -80,14 +80,6 @@ public:
    * Records an unsigned value. If a timer, values are in units of milliseconds.
    */
   virtual void recordValue(uint64_t value) PURE;
-
-  // RefcountInterface
-  void incRefCount() override { refcount_helper_.incRefCount(); }
-  bool decRefCount() override { return refcount_helper_.decRefCount(); }
-  uint32_t use_count() const override { return refcount_helper_.use_count(); }
-
-private:
-  RefcountHelper refcount_helper_;
 };
 
 using HistogramSharedPtr = RefcountPtr<Histogram>;

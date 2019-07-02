@@ -187,7 +187,15 @@ public:
   MOCK_METHOD1(recordValue, void(uint64_t value));
   MOCK_CONST_METHOD0(used, bool());
 
+  // RefcountInterface
+  void incRefCount() override { refcount_helper_.incRefCount(); }
+  bool decRefCount() override { return refcount_helper_.decRefCount(); }
+  uint32_t use_count() const override { return refcount_helper_.use_count(); }
+
   Store* store_;
+
+private:
+  RefcountHelper refcount_helper_;
 };
 
 class MockParentHistogram : public MockMetric<ParentHistogram> {

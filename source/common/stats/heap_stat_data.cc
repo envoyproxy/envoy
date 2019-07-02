@@ -73,8 +73,6 @@ public:
 
   // Metric
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
-
-  // Counter/Gauge
   bool used() const override { return flags_ & Metric::Flags::Used; }
 
   // RefcountInterface
@@ -106,6 +104,8 @@ public:
 
   // Stats::Counter
   void add(uint64_t amount) override {
+    // Note that a reader may see a new value but an old pending_increment_ or
+    // used(). From a system perspective this should be eventually consistent.
     value_ += amount;
     pending_increment_ += amount;
     flags_ |= Flags::Used;

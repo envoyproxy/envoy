@@ -567,10 +567,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
 }
 
 ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name,
-                                                   absl::string_view tag_extracted_name,
+                                                   const std::string& tag_extracted_name,
                                                    const std::vector<Tag>& tags,
                                                    SymbolTable& symbol_table)
-    : MetricImpl<Histogram>(name, tag_extracted_name, tags, symbol_table), current_active_(0),
+    : HistogramImplHelper(name, tag_extracted_name, tags, symbol_table), current_active_(0),
       used_(false), created_thread_id_(std::this_thread::get_id()), symbol_table_(symbol_table) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();

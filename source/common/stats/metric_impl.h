@@ -14,7 +14,7 @@ namespace Envoy {
 namespace Stats {
 
 /**
- * Helper class for implementing Metrics. This does not participate in any,
+ * Helper class for implementing Metrics. This does not participate in any
  * inheritance chains, but can be instantiated by classes that do. It just
  * implements the mechanics of representing the name, tag-extracted-name,
  * and all tags as a StatNameList.
