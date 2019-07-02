@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/common/time.h"
 #include "envoy/ssl/context_manager.h"
 
