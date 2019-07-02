@@ -15,19 +15,24 @@ class SslContextManagerNoTlsStub final : public Envoy::Ssl::ContextManager {
   Ssl::ClientContextSharedPtr
   createSslClientContext(Stats::Scope& /* scope */,
                          const Envoy::Ssl::ClientContextConfig& /* config */) override {
-    throw EnvoyException("SSL is not supported in this configuration");
+    throwException();
+    return nullptr;
   }
 
   Ssl::ServerContextSharedPtr
   createSslServerContext(Stats::Scope& /* scope */,
                          const Envoy::Ssl::ServerContextConfig& /* config */,
                          const std::vector<std::string>& /* server_names */) override {
-    throw EnvoyException("SSL is not supported in this configuration");
+    throwException();
+    return nullptr;
   }
 
   size_t daysUntilFirstCertExpires() const override { return std::numeric_limits<int>::max(); }
 
   void iterateContexts(std::function<void(const Envoy::Ssl::Context&)> /* callback */) override{};
+
+private:
+  void throwException() { throw EnvoyException("SSL is not supported in this configuration"); }
 };
 
 Ssl::ContextManagerPtr createContextManager(const std::string& factory_name,
