@@ -411,11 +411,11 @@ TEST_P(UdpListenerImplTest, SendData) {
   sockaddr_storage peer_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
   do {
-    Api::SysCallSizeResult result = os_sys_calls.recvfrom(
-        client_socket_->ioHandle().fd(), recv_buf.get() + bytes_read, bytes_to_read - bytes_read, 0,
-        reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
+    Api::SysCallSizeResult result =
+        os_sys_calls.recvfrom(client_socket_->ioHandle().fd(), recv_buf.get(), bytes_to_read, 0,
+                              reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
     if (result.rc_ >= 0) {
-      bytes_read += result.rc_;
+      bytes_read = result.rc_;
       Address::InstanceConstSharedPtr peer_address =
           Address::addressFromSockAddr(peer_addr, addr_len, false);
       EXPECT_EQ(send_from_addr->asString(), peer_address->asString());
@@ -429,6 +429,7 @@ TEST_P(UdpListenerImplTest, SendData) {
 
     retry++;
     ::usleep(10000);
+    ASSERT(bytes_read == 0);
   } while (true);
   EXPECT_EQ(bytes_to_read, bytes_read);
   recv_buf[bytes_to_read] = '\0';

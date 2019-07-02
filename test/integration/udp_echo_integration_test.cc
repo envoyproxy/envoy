@@ -61,11 +61,11 @@ public:
 
     int retry = 0;
     do {
-      Api::SysCallSizeResult result = os_sys_calls.recvfrom(
-          client_socket->ioHandle().fd(), recv_buf.get() + bytes_read, bytes_to_read - bytes_read,
-          0, reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
+      Api::SysCallSizeResult result =
+          os_sys_calls.recvfrom(client_socket->ioHandle().fd(), recv_buf.get(), bytes_to_read, 0,
+                                reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
       if (result.rc_ >= 0) {
-        bytes_read += result.rc_;
+        bytes_read = result.rc_;
         Network::Address::InstanceConstSharedPtr peer_address =
             Network::Address::addressFromSockAddr(peer_addr, addr_len, false);
         // Expect to receive from the same peer address as it sent to.
@@ -77,6 +77,7 @@ public:
       if (bytes_read >= bytes_to_read) {
         break;
       }
+      ASSERT(bytes_read == 0);
       // Retry after 10ms
       timeSystem().sleep(std::chrono::milliseconds(10));
       retry++;
