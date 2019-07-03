@@ -197,11 +197,11 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/f9/e7/4f80d582578f8489226370762d2cf6bc9381175d1929eba1754e03f70708/twitter.common.finagle-thrift-0.3.9.tar.gz"],
     ),
     com_google_googletest = dict(
-        sha256 = "a4cb4b0c3ebb191b798594aca674ad47eee255dcb4c26885cf7f49777703484f",
-        strip_prefix = "googletest-eb9225ce361affe561592e0912320b9db84985d0",
+        sha256 = "cbd251a40485fddd44cdf641af6df2953d45695853af6d68aeb11c7efcde6771",
+        strip_prefix = "googletest-d7003576dd133856432e2e07340f45926242cc3a",
         # TODO(akonradi): Switch this back to a released version later than 1.8.1 once there is
         # one available.
-        urls = ["https://github.com/google/googletest/archive/eb9225ce361affe561592e0912320b9db84985d0.tar.gz"],
+        urls = ["https://github.com/google/googletest/archive/d7003576dd133856432e2e07340f45926242cc3a.tar.gz"],
     ),
     com_google_protobuf = dict(
         sha256 = "c10ef8d8ad5a9e5f850483051b7f9ee2c8bb3ca2e0e16a4cf105bd1321afb2d6",
