@@ -274,7 +274,7 @@ max_concurrent_streams: 2
 initial_stream_window_size: 65535
 initial_connection_window_size: 65535
     )EOF";
-      auto http2_settings = parseHttp2SettingsFromV2Yaml(yaml);
+    auto http2_settings = parseHttp2SettingsFromV2Yaml(yaml);
     EXPECT_EQ(1U, http2_settings.hpack_table_size_);
     EXPECT_EQ(2U, http2_settings.max_concurrent_streams_);
     EXPECT_EQ(65535U, http2_settings.initial_stream_window_size_);
