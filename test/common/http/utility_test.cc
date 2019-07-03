@@ -1,6 +1,9 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/v2/core/protocol.pb.h"
+#include "envoy/api/v2/core/protocol.pb.validate.h"
+
 #include "common/common/fmt.h"
 #include "common/config/protocol_json.h"
 #include "common/http/exception.h"
@@ -244,11 +247,9 @@ TEST(HttpUtility, createSslRedirectPath) {
 
 namespace {
 
-Http2Settings parseHttp2SettingsFromJson(const std::string& json_string) {
+Http2Settings parseHttp2SettingsFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::core::Http2ProtocolOptions http2_protocol_options;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::ProtocolJson::translateHttp2ProtocolOptions(
-      *json_object_ptr->getObject("http2_settings", true), http2_protocol_options);
+  TestUtility::loadFromYamlAndValidate(yaml, http2_protocol_options);
   return Utility::parseHttp2Settings(http2_protocol_options);
 }
 
@@ -256,7 +257,7 @@ Http2Settings parseHttp2SettingsFromJson(const std::string& json_string) {
 
 TEST(HttpUtility, parseHttp2Settings) {
   {
-    auto http2_settings = parseHttp2SettingsFromJson("{}");
+    auto http2_settings = parseHttp2SettingsFromV2Yaml("{}");
     EXPECT_EQ(Http2Settings::DEFAULT_HPACK_TABLE_SIZE, http2_settings.hpack_table_size_);
     EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
               http2_settings.max_concurrent_streams_);
@@ -267,18 +268,17 @@ TEST(HttpUtility, parseHttp2Settings) {
   }
 
   {
-    auto http2_settings = parseHttp2SettingsFromJson(R"raw({
-                                          "http2_settings" : {
-                                            "hpack_table_size": 1,
-                                            "max_concurrent_streams": 2,
-                                            "initial_stream_window_size": 3,
-                                            "initial_connection_window_size": 4
-                                          }
-                                        })raw");
+    const std::string yaml = R"EOF(
+hpack_table_size: 1
+max_concurrent_streams: 2
+initial_stream_window_size: 65535
+initial_connection_window_size: 65535
+    )EOF";
+    auto http2_settings = parseHttp2SettingsFromV2Yaml(yaml);
     EXPECT_EQ(1U, http2_settings.hpack_table_size_);
     EXPECT_EQ(2U, http2_settings.max_concurrent_streams_);
-    EXPECT_EQ(3U, http2_settings.initial_stream_window_size_);
-    EXPECT_EQ(4U, http2_settings.initial_connection_window_size_);
+    EXPECT_EQ(65535U, http2_settings.initial_stream_window_size_);
+    EXPECT_EQ(65535U, http2_settings.initial_connection_window_size_);
   }
 }
 
