@@ -120,7 +120,7 @@ public:
   void addSingleFilterChainHelper(const envoy::api::v2::listener::FilterChain& filter_chain) {
     filter_chain_manager_->addFilterChain(
         std::vector<const envoy::api::v2::listener::FilterChain*>{&filter_chain},
-        filter_chain_factory_builder_);
+        std::make_unique<MockFilterChainFactoryBuilder>());
   }
 
   // Intermedia states.
@@ -155,7 +155,6 @@ public:
   )EOF";
   envoy::api::v2::listener::FilterChain filter_chain_template_;
   envoy::api::v2::listener::FilterChain filter_chain_template_peer_;
-  MockFilterChainFactoryBuilder filter_chain_factory_builder_;
   std::unique_ptr<Init::Manager> init_manager_;
   std::unique_ptr<Init::Watcher> init_watcher_;
   // Test target

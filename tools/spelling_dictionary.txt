@@ -697,6 +697,8 @@ rpcs
 rq
 rtrim
 rtt
+rval
+rvalue
 sanitization
 sanitizer
 scala

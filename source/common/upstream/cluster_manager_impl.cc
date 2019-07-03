@@ -283,6 +283,11 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   ads_mux_->start();
 
+  // Pause RDS to ensure that we don't send any requests until we've
+  // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
+  // so we pause RDS until we've completed all the callbacks.
+  ads_mux_->pause(Config::TypeUrl::get().RouteConfiguration);
+
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
     load_stats_reporter_ =

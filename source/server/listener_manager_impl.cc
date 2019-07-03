@@ -197,7 +197,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), modifiable_(modifiable),
       workers_started_(workers_started), hash_(hash),
-      dynamic_init_manager_(fmt::format("Listener {}", name)),
+      dynamic_init_manager_(fmt::format("Listener {}_{}", name, listener_tag_)),
       filter_chain_manager_(getInitManager(), address_),
       init_watcher_(std::make_unique<Init::WatcherImpl>(
           "ListenerImpl", [this] { parent_.onListenerWarmed(*this); })),
@@ -364,7 +364,8 @@ bool ListenerImpl::drainClose() const {
 
 void ListenerImpl::debugLog(const std::string& message) {
   UNREFERENCED_PARAMETER(message);
-  ENVOY_LOG(debug, "{}: name={}, hash={}, address={}", message, name_, hash_, address_->asString());
+  ENVOY_LOG(debug, "{}: name={}_{}, hash={}, address={}", message, name_, listener_tag_, hash_,
+            address_->asString());
 }
 
 void ListenerImpl::initialize() {
@@ -384,8 +385,9 @@ void ListenerImpl::initialize() {
       parent_.server_.threadLocal(), parent_.server_.messageValidationVisitor(),
       parent_.server_.api());
 
-  ListenerFilterChainFactoryBuilder filter_chain_factory_builder(*this, factory_context);
-  filter_chain_manager_.addFilterChain(config_.filter_chains(), filter_chain_factory_builder);
+  filter_chain_manager_.addFilterChain(
+      config_.filter_chains(),
+      std::make_unique<ListenerFilterChainFactoryBuilder>(*this, std::move(factory_context)));
 }
 
 Init::Manager& ListenerImpl::initManager() {
@@ -531,11 +533,15 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
 
     updateWarmingActiveGauges();
     stats_.listener_modified_.inc();
+
+    // TODO(silentdai): use swap. both lhs and rhs should not expire
+    // RAII
+    auto owned_existing_warming = std::move(*existing_warming_listener);
+    (*existing_warming_listener) = std::move(new_listener);
+
     // Initialize before free the existing listener. Otherwise the existing listener might be the
     // last one in warming state and notify the global init manager that all targets are done.
     new_listener_ref.initialize();
-
-    *existing_warming_listener = std::move(new_listener);
     return true;
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
@@ -548,10 +554,14 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
       new_listener->debugLog("update active listener");
       updateWarmingActiveGauges();
       stats_.listener_modified_.inc();
+
+      // RAII
+      auto owned_existing_active = std::move(*existing_active_listener);
+      (*existing_active_listener) = std::move(new_listener);
       // Initialize before free the existing listener. Otherwise the existing listener might be the
       // last one in warming state and notify the global init manager that all targets are done.
       new_listener_ref.initialize();
-      *existing_active_listener = std::move(new_listener);
+      //*existing_active_listener = std::move(new_listener);
       return true;
     }
   } else {
@@ -811,10 +821,11 @@ void ListenerManagerImpl::stopWorkers() {
 
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ListenerImpl& listener,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
-    : parent_(listener), factory_context_(factory_context) {}
+    Server::Configuration::TransportSocketFactoryContextImpl&& factory_context)
+    : listener_factory_context_(listener), factory_context_(std::move(factory_context)) {}
 
 void ListenerFilterChainFactoryBuilder::setInitManager(Init::Manager& init_manager) {
+  listener_factory_context_.setInitManager(init_manager);
   factory_context_.setInitManager(init_manager);
 }
 
@@ -837,7 +848,7 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      transport_socket, parent_.messageValidationVisitor(), config_factory);
+      transport_socket, listener_factory_context_.messageValidationVisitor(), config_factory);
 
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
@@ -845,7 +856,8 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
   return std::make_unique<FilterChainImpl>(
       config_factory.createTransportSocketFactory(*message, factory_context_,
                                                   std::move(server_names)),
-      parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
+      listener_factory_context_.listener_.parent_.factory_.createNetworkFilterFactoryList(
+          filter_chain.filters(), listener_factory_context_));
 }
 
 } // namespace Server

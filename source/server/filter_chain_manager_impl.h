@@ -43,14 +43,14 @@ public:
 
   void
   addFilterChain(absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
-                 FilterChainFactoryBuilder& b);
+                 std::unique_ptr<FilterChainFactoryBuilder> filter_chain_factory_builder);
 
   void addFilterChainInternalForFcds(
       absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
-      FilterChainFactoryBuilder& b);
+      std::unique_ptr<FilterChainFactoryBuilder> filter_chain_factory_builder);
   void addFilterChainInternal(
       absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
-      FilterChainFactoryBuilder& b);
+      std::unique_ptr<FilterChainFactoryBuilder> filter_chain_factory_builder);
 
   static bool isWildcardServerName(const std::string& name);
 
@@ -145,9 +145,15 @@ private:
                                     const Network::ConnectionSocket& socket) const;
 
   struct FilterChainLookup {
+    ~FilterChainLookup() {
+      // to abandon all the pending registered targets
+      init_watcher_.reset();
+    }
     // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
     // and application protocols, using structures defined above.
     DestinationPortsMap destination_ports_map_;
+
+    std::unique_ptr<FilterChainFactoryBuilder> filter_chain_builder_;
 
     std::unordered_map<::envoy::api::v2::listener::FilterChain,
                        std::shared_ptr<Network::FilterChain>, MessageUtil, MessageUtil>

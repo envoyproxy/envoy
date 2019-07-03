@@ -389,13 +389,64 @@ class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
   ListenerFilterChainFactoryBuilder(
       // TODO(silentdai): move construct factory_context
-      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
+      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl&& factory_context);
   void setInitManager(Init::Manager& init_manager) override;
   std::unique_ptr<Network::FilterChain>
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) override;
 
 private:
-  ListenerImpl& parent_;
+  class ListenerFactoryContextImpl : public Configuration::ListenerFactoryContext {
+  public:
+    ListenerFactoryContextImpl(ListenerImpl& listener) : listener_(listener) {}
+
+    // This is the only exception
+    Init::Manager& initManager() override { return *init_manager_; }
+    void setInitManager(Init::Manager& init_manager) { init_manager_ = &init_manager; }
+
+    // FactoryContext
+    AccessLog::AccessLogManager& accessLogManager() override {
+      return listener_.accessLogManager();
+    }
+    Upstream::ClusterManager& clusterManager() override { return listener_.clusterManager(); }
+    Event::Dispatcher& dispatcher() override { return listener_.dispatcher(); }
+    const Network::DrainDecision& drainDecision() override { return listener_.drainDecision(); }
+    bool healthCheckFailed() override { return listener_.healthCheckFailed(); }
+    Tracing::HttpTracer& httpTracer() override { return listener_.httpTracer(); }
+    ServerLifecycleNotifier& lifecycleNotifier() override { return listener_.lifecycleNotifier(); }
+    const LocalInfo::LocalInfo& localInfo() const override { return listener_.localInfo(); }
+    Envoy::Runtime::RandomGenerator& random() override { return listener_.random(); }
+    Envoy::Runtime::Loader& runtime() override { return listener_.runtime(); }
+    Stats::Scope& scope() override { return listener_.scope(); }
+    Singleton::Manager& singletonManager() override { return listener_.singletonManager(); }
+    ThreadLocal::SlotAllocator& threadLocal() override { return listener_.threadLocal(); }
+    Server::Admin& admin() override { return listener_.admin(); }
+    Stats::Scope& listenerScope() override { return listener_.listenerScope(); }
+    const envoy::api::v2::core::Metadata& listenerMetadata() const override {
+      return listener_.listenerMetadata();
+    }
+    TimeSource& timeSource() override { return listener_.timeSource(); }
+    OverloadManager& overloadManager() override { return listener_.overloadManager(); }
+    Http::Context& httpContext() override { return listener_.httpContext(); }
+    Grpc::Context& grpcContext() override { return listener_.grpcContext(); }
+    ProcessContext& processContext() override { return listener_.processContext(); }
+    ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+      return listener_.messageValidationVisitor();
+    }
+    Api::Api& api() override { return listener_.api(); }
+    // ListenerFactoryContext
+    void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) override {
+      return listener_.addListenSocketOption(option);
+    }
+    void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
+      return listener_.addListenSocketOptions(options);
+    }
+    const Network::ListenerConfig& listenerConfig() const override {
+      return listener_.listenerConfig();
+    }
+    ListenerImpl& listener_;
+    Init::Manager* init_manager_{};
+  };
+  ListenerFactoryContextImpl listener_factory_context_;
   Configuration::TransportSocketFactoryContextImpl factory_context_;
 };
 

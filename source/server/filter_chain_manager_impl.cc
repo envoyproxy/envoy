@@ -37,17 +37,19 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
 
 void FilterChainManagerImpl::addFilterChain(
     absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
-    FilterChainFactoryBuilder& filter_chain_factory_builder) {
-  addFilterChainInternalForFcds(filter_chain_span, filter_chain_factory_builder);
+    std::unique_ptr<FilterChainFactoryBuilder> filter_chain_factory_builder) {
+  addFilterChainInternalForFcds(filter_chain_span, std::move(filter_chain_factory_builder));
 }
 
 void FilterChainManagerImpl::addFilterChainInternalForFcds(
     absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
-    FilterChainFactoryBuilder& filter_chain_factory_builder) {
+    std::unique_ptr<FilterChainFactoryBuilder> filter_chain_factory_builder) {
 
   // TODO(silentdai): replacing the old warming one is safe.
   warming_lookup_ = createFilterChainLookup();
-  filter_chain_factory_builder.setInitManager(warming_lookup_->getInitManager());
+  filter_chain_factory_builder->setInitManager(warming_lookup_->getInitManager());
+  // mark builder as rvalue ref in func declaration
+  warming_lookup_->filter_chain_builder_ = std::move(filter_chain_factory_builder);
   using FilterChainMap = decltype(warming_lookup_->existing_active_filter_chains_);
   FilterChainMap* existing_active_filter_chains = nullptr;
   existing_active_filter_chains =
@@ -59,14 +61,14 @@ void FilterChainManagerImpl::addFilterChainInternalForFcds(
     std::shared_ptr<Network::FilterChain> existing_chain_impl;
     if (existing_active_filter_chains == nullptr) {
       existing_chain_impl = std::shared_ptr<Network::FilterChain>(
-          filter_chain_factory_builder.buildFilterChain(*filter_chain));
+          warming_lookup_->filter_chain_builder_->buildFilterChain(*filter_chain));
     } else {
       auto it = existing_active_filter_chains->find(*filter_chain);
       if (it != existing_active_filter_chains->end()) {
         existing_chain_impl = it->second;
       } else {
         existing_chain_impl = std::shared_ptr<Network::FilterChain>(
-            filter_chain_factory_builder.buildFilterChain(*filter_chain));
+            warming_lookup_->filter_chain_builder_->buildFilterChain(*filter_chain));
       }
     }
     warming_lookup_->existing_active_filter_chains_.emplace(*filter_chain, existing_chain_impl);
@@ -126,7 +128,7 @@ void FilterChainManagerImpl::addFilterChainInternalForFcds(
 
 void FilterChainManagerImpl::addFilterChainInternal(
     absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
-    FilterChainFactoryBuilder& filter_chain_factory_builder) {
+    std::unique_ptr<FilterChainFactoryBuilder> filter_chain_factory_builder) {
   active_lookup_ = std::make_unique<FilterChainLookup>();
 
   std::unordered_set<envoy::api::v2::listener::FilterChainMatch, MessageUtil, MessageUtil>
@@ -173,7 +175,7 @@ void FilterChainManagerImpl::addFilterChainInternal(
         filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
         filter_chain_match.source_ports(),
         std::shared_ptr<Network::FilterChain>(
-            filter_chain_factory_builder.buildFilterChain(*filter_chain)));
+            filter_chain_factory_builder->buildFilterChain(*filter_chain)));
   }
   convertIPsToTries(active_lookup_->destination_ports_map_);
 }
