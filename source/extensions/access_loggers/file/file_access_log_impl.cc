@@ -18,16 +18,6 @@ void FileAccessLog::emitLog(const Http::HeaderMap* request_headers,
                             const Http::HeaderMap* response_headers,
                             const Http::HeaderMap* response_trailers,
                             const StreamInfo::StreamInfo& stream_info) {
-  static Http::HeaderMapImpl empty_headers;
-  if (!request_headers) {
-    request_headers = &empty_headers;
-  }
-  if (!response_headers) {
-    response_headers = &empty_headers;
-  }
-  if (!response_trailers) {
-    response_trailers = &empty_headers;
-  }
   log_file_->write(
       formatter_->format(*request_headers, *response_headers, *response_trailers, stream_info));
 }

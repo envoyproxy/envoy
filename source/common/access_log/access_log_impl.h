@@ -20,38 +20,6 @@ namespace Envoy {
 namespace AccessLog {
 
 /**
- * Implemention of access logger handles common filter logic.
- */
-class InstanceImpl : public Instance {
-public:
-  InstanceImpl(FilterPtr filter) : filter_(std::move(filter)) {}
-
-  /**
-   * Log a completed request if the underlying AccessLog `filter_` allows it.
-   */
-  virtual void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers, const Http::HeaderMap* response_trailers, const StreamInfo::StreamInfo& stream_info) {
-    if (filter_ &&
-        !filter_->evaluate(stream_info, request_headers, response_headers, response_trailers)) {
-      return;
-    }
-    return emitLog(request_headers, response_headers, response_trailers, stream_info);
-  }
-
-private:
-  /**
-   * Log a completed request.
-   * @param request_headers supplies the incoming request headers after filtering.
-   * @param response_headers supplies response headers.
-   * @param response_trailers supplies response trailers.
-   * @param stream_info supplies additional information about the request not
-   * contained in the request headers.
-   */
-  virtual void emitLog(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers, const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info) PURE;
-
-  FilterPtr filter_;
-};
-
-/**
  * Access log filter factory that reads from proto.
  */
 class FilterFactory {
