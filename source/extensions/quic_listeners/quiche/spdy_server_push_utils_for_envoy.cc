@@ -1,0 +1,35 @@
+#include "quiche/quic/core/http/spdy_server_push_utils.h"
+
+// NOLINT(namespace-envoy)
+
+// This file has a substitude definition for
+// quiche/quic/core/http/spdy_server_push_utils.cc which depends on GURL.
+// Since Envoy doesn't support server push, these functions shouldn't be
+// executed at all.
+
+using spdy::SpdyHeaderBlock;
+
+namespace quic {
+
+// static
+std::string SpdyServerPushUtils::GetPromisedUrlFromHeaders(const SpdyHeaderBlock& /*headers*/){
+    NOT_REACHED_GCOVR_EXCL_LINE}
+
+// static
+std::string
+    SpdyServerPushUtils::GetPromisedHostNameFromHeaders(const SpdyHeaderBlock& /*headers*/) {
+  NOT_REACHED_GCOVR_EXCL_LINE
+}
+
+// static
+bool SpdyServerPushUtils::PromisedUrlIsValid(const SpdyHeaderBlock& /*headers*/){
+    NOT_REACHED_GCOVR_EXCL_LINE}
+
+// static
+std::string SpdyServerPushUtils::GetPushPromiseUrl(QuicStringPiece /*scheme*/,
+                                                   QuicStringPiece /*authority*/,
+                                                   QuicStringPiece /*path*/) {
+  NOT_REACHED_GCOVR_EXCL_LINE
+}
+
+} // namespace quic
