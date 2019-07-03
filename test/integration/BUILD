@@ -566,6 +566,7 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
     ],
+    coverage = False,
 )
 
 envoy_cc_test(
