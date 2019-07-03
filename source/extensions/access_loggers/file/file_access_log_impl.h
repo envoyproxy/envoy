@@ -1,9 +1,5 @@
 #pragma once
 
-#include "envoy/access_log/access_log.h"
-
-#include "common/access_log/access_log_impl.h"
-
 #include "extensions/access_loggers/common/access_log_base.h"
 
 namespace Envoy {

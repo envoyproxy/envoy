@@ -16,9 +16,9 @@ using AccessLog::MockFilter;
 using testing::_;
 using testing::Return;
 
-class TestImpl : public Base {
+class TestImpl : public ImplBase {
 public:
-  TestImpl(FilterPtr filter) : Base(std::move(filter)) {}
+  TestImpl(FilterPtr filter) : ImplBase(std::move(filter)) {}
 
   int n() { return n_; };
 
