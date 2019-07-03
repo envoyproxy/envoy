@@ -7,6 +7,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
+#include "common/common/dump_state_utils.h"
 #include "common/stream_info/filter_state_impl.h"
 
 namespace Envoy {
@@ -206,6 +207,13 @@ struct StreamInfoImpl : public StreamInfo {
 
   const std::string& upstreamTransportFailureReason() const override {
     return upstream_transport_failure_reason_;
+  }
+
+  void dumpState(std::ostream& os, int indent_level = 0) const {
+    const char* spaces = spacesForLevel(indent_level);
+    os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
+       << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
+       << DUMP_MEMBER(health_check_request_) << DUMP_MEMBER(route_name_) << "\n";
   }
 
   TimeSource& time_source_;

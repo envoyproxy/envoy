@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/scope_tracker.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -27,6 +28,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/linked_object.h"
 #include "common/grpc/common.h"
 #include "common/http/conn_manager_config.h"
@@ -334,9 +336,10 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
-                        public Tracing::Config {
+                        public Tracing::Config,
+                        public ScopeTrackedObject {
     ActiveStream(ConnectionManagerImpl& connection_manager);
-    ~ActiveStream();
+    ~ActiveStream() override;
 
     // Indicates which filter to start the iteration with.
     enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
@@ -417,6 +420,20 @@ private:
     const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
     bool verbose() const override;
 
+    // ScopeTrackedObject
+    void dumpState(std::ostream& os, int indent_level = 0) const override {
+      const char* spaces = spacesForLevel(indent_level);
+      os << spaces << "ActiveStream " << this << DUMP_MEMBER(stream_id_)
+         << DUMP_MEMBER(has_continue_headers_) << DUMP_MEMBER(is_head_request_)
+         << DUMP_MEMBER(decoding_headers_only_) << DUMP_MEMBER(encoding_headers_only_) << "\n";
+
+      DUMP_DETAILS(request_headers_);
+      DUMP_DETAILS(request_trailers_);
+      DUMP_DETAILS(response_headers_);
+      DUMP_DETAILS(response_trailers_);
+      DUMP_DETAILS(&stream_info_);
+    }
+
     void traceRequest();
 
     void refreshCachedRoute();
@@ -493,6 +510,11 @@ private:
     void onRequestTimeout();
 
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
+
+    friend std::ostream& operator<<(std::ostream& os, const ActiveStream& s) {
+      s.dumpState(os);
+      return os;
+    }
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;

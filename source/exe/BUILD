@@ -77,7 +77,7 @@ envoy_cc_library(
     ] + select({
         "//bazel:disable_signal_trace": [],
         "//conditions:default": [
-            ":sigaction_lib",
+            "//source/common/signal:sigaction_lib",
             ":terminate_handler_lib",
         ],
     }) + envoy_cc_platform_dep("platform_impl_lib"),
@@ -114,18 +114,6 @@ envoy_cc_win32_library(
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
         "//source/common/filesystem:filesystem_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "sigaction_lib",
-    srcs = ["signal_action.cc"],
-    hdrs = ["signal_action.h"],
-    tags = ["backtrace"],
-    deps = [
-        "//source/common/common:assert_lib",
-        "//source/common/common:non_copyable",
-        "//source/server:backtrace_lib",
     ],
 )
 

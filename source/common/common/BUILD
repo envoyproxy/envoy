@@ -109,6 +109,12 @@ envoy_cc_library(
     deps = [":assert_lib"],
 )
 
+# Contains macros and helpers for dumpState utilities
+envoy_cc_library(
+    name = "dump_state_utils",
+    hdrs = ["dump_state_utils.h"],
+)
+
 # Contains minimal code for logging to stderr.
 envoy_cc_library(
     name = "minimal_logger_lib",
@@ -140,6 +146,7 @@ envoy_cc_library(
     srcs = ["logger_delegates.cc"],
     hdrs = ["logger_delegates.h"],
     deps = [
+        ":dump_state_utils",
         ":macros",
         ":minimal_logger_lib",
         "//include/envoy/access_log:access_log_interface",
@@ -175,6 +182,15 @@ envoy_cc_library(
 envoy_cc_library(
     name = "phantom",
     hdrs = ["phantom.h"],
+)
+
+envoy_cc_library(
+    name = "scope_tracker",
+    hdrs = ["scope_tracker.h"],
+    deps = [
+        "//include/envoy/common:scope_tracker_interface",
+        "//include/envoy/event:dispatcher_interface",
+    ],
 )
 
 envoy_cc_library(
