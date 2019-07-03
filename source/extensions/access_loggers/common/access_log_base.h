@@ -22,9 +22,9 @@ namespace Common {
 /**
  * Base of access logger handles common filter logic.
  */
-class Base : public AccessLog::Instance {
+class ImplBase : public AccessLog::Instance {
 public:
-  Base(AccessLog::FilterPtr filter) : filter_(std::move(filter)) {}
+  ImplBase(AccessLog::FilterPtr filter) : filter_(std::move(filter)) {}
 
   /**
    * Log a completed request if the underlying AccessLog `filter_` allows it.

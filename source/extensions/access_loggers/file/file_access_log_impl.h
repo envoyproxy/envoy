@@ -14,13 +14,13 @@ namespace File {
 /**
  * Access log Instance that writes logs to a file.
  */
-class FileAccessLog : public Common::Base {
+class FileAccessLog : public Common::ImplBase {
 public:
   FileAccessLog(const std::string& access_log_path, AccessLog::FilterPtr&& filter,
                 AccessLog::FormatterPtr&& formatter, AccessLog::AccessLogManager& log_manager);
 
 private:
-  // Common::Base
+  // Common::ImplBase
   void emitLog(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
                const Http::HeaderMap* response_trailers,
                const StreamInfo::StreamInfo& stream_info) override;

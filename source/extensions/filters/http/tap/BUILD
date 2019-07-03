@@ -40,7 +40,7 @@ envoy_cc_library(
     deps = [
         ":tap_config_interface",
         "//include/envoy/http:filter_interface",
-        "//source/common/access_log:access_log_lib",
+        "//source/extensions/access_loggers/common:access_log_base",
         "//source/extensions/common/tap:extension_config_base",
         "@envoy_api//envoy/config/filter/http/tap/v2alpha:tap_cc",
     ],

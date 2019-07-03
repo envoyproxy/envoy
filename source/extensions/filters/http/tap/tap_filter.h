@@ -5,8 +5,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/access_log/access_log_impl.h"
-
+#include "extensions/access_loggers/common/access_log_base.h"
 #include "extensions/common/tap/extension_config_base.h"
 #include "extensions/filters/http/tap/tap_config.h"
 
@@ -74,10 +73,9 @@ private:
 /**
  * HTTP tap filter.
  */
-class Filter : public Http::StreamFilter, public AccessLog::InstanceImpl {
+class Filter : public Http::StreamFilter, public AccessLog::Instance {
 public:
-  Filter(FilterConfigSharedPtr config)
-      : AccessLog::InstanceImpl(nullptr), config_(std::move(config)) {}
+  Filter(FilterConfigSharedPtr config) : config_(std::move(config)) {}
 
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
@@ -105,12 +103,12 @@ public:
   }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
 
-private:
   // AccessLog::Instance
   void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
            const Http::HeaderMap* response_trailers,
            const StreamInfo::StreamInfo& stream_info) override;
 
+private:
   FilterConfigSharedPtr config_;
   HttpPerRequestTapperPtr tapper_;
 };

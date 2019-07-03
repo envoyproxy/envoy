@@ -118,7 +118,7 @@ private:
 /**
  * Access log Instance that streams HTTP logs over gRPC.
  */
-class HttpGrpcAccessLog : public Common::Base {
+class HttpGrpcAccessLog : public Common::ImplBase {
 public:
   HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
                     const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
@@ -129,12 +129,11 @@ public:
       const StreamInfo::StreamInfo& stream_info);
 
 private:
-  // Common::Base
+  // Common::ImplBase
   void emitLog(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
                const Http::HeaderMap* response_trailers,
                const StreamInfo::StreamInfo& stream_info) override;
 
-  AccessLog::FilterPtr filter_; // AccessLog::InstanceImpl
   const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
   GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer_;
   std::vector<Http::LowerCaseString> request_headers_to_log_;
