@@ -22,13 +22,13 @@ using RequestParserSharedPtr = std::shared_ptr<RequestParser>;
  * Context that is shared between parsers that are handling the same single message.
  */
 struct RequestContext {
-  int32_t remaining_request_size_{0};
+  uint32_t remaining_request_size_{0};
   RequestHeader request_header_{};
 
   /**
    * Bytes left to consume.
    */
-  int32_t& remaining() { return remaining_request_size_; }
+  uint32_t& remaining() { return remaining_request_size_; }
 
   /**
    * Returns data needed for construction of parse failure message.

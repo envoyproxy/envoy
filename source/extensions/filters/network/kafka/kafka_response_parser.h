@@ -39,7 +39,7 @@ struct ResponseContext {
   /**
    * Bytes left to process.
    */
-  int32_t remaining_response_size_;
+  uint32_t remaining_response_size_;
 
   /**
    * Response's correlation id.
@@ -49,7 +49,7 @@ struct ResponseContext {
   /**
    * Bytes left to consume.
    */
-  int32_t& remaining() { return remaining_response_size_; }
+  uint32_t& remaining() { return remaining_response_size_; }
 
   /**
    * Returns data needed for construction of parse failure message.
