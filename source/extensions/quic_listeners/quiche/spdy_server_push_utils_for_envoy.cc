@@ -2,7 +2,7 @@
 
 // NOLINT(namespace-envoy)
 
-// This file has a substitude definition for
+// This file has a substitute definition for
 // quiche/quic/core/http/spdy_server_push_utils.cc which depends on GURL.
 // Since Envoy doesn't support server push, these functions shouldn't be
 // executed at all.
