@@ -2,6 +2,8 @@
 
 #include "source/extensions/clusters/redis/redis_cluster_lb.h"
 
+#include "extensions/filters/network/common/redis/client.h"
+
 #include "test/common/upstream/utility.h"
 #include "test/mocks/upstream/mocks.h"
 
@@ -10,16 +12,26 @@ namespace Extensions {
 namespace Clusters {
 namespace Redis {
 
-class TestLoadBalancerContext : public Upstream::LoadBalancerContextBase {
+class TestLoadBalancerContext : public RedisLoadBalancerContext,
+                                public Upstream::LoadBalancerContextBase {
 public:
-  TestLoadBalancerContext(uint64_t hash_key) : hash_key_(hash_key) {}
+  TestLoadBalancerContext(uint64_t hash_key, bool is_read,
+                          NetworkFilters::Common::Redis::Client::ReadPolicy read_policy)
+      : hash_key_(hash_key), is_read_(is_read), read_policy_(read_policy) {}
 
   TestLoadBalancerContext(absl::optional<uint64_t> hash) : hash_key_(hash) {}
 
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
 
+  bool isReadCommand() const override { return is_read_; };
+  NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
+    return read_policy_;
+  };
+
   absl::optional<uint64_t> hash_key_;
+  bool is_read_;
+  NetworkFilters::Common::Redis::Client::ReadPolicy read_policy_;
 };
 
 class RedisClusterLoadBalancerTest : public testing::Test {
@@ -27,26 +39,41 @@ public:
   RedisClusterLoadBalancerTest() = default;
 
   void init() {
-    factory_ = std::make_shared<RedisClusterLoadBalancerFactory>();
+    factory_ = std::make_shared<RedisClusterLoadBalancerFactory>(random_);
     lb_ = std::make_unique<RedisClusterThreadAwareLoadBalancer>(factory_);
     lb_->initialize();
   }
 
   void validateAssignment(Upstream::HostVector& hosts,
-                          const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments) {
+                          const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments,
+                          bool read_command = false,
+                          NetworkFilters::Common::Redis::Client::ReadPolicy read_policy =
+                              NetworkFilters::Common::Redis::Client::ReadPolicy::Master) {
 
     Upstream::LoadBalancerPtr lb = lb_->factory()->create();
     for (auto& assignment : expected_assignments) {
-      TestLoadBalancerContext context(assignment.first);
-      EXPECT_EQ(hosts[assignment.second]->address()->asString(),
-                lb->chooseHost(&context)->address()->asString());
+      TestLoadBalancerContext context(assignment.first, read_command, read_policy);
+      auto host = lb->chooseHost(&context);
+      EXPECT_FALSE(host == nullptr);
+      EXPECT_EQ(hosts[assignment.second]->address()->asString(), host->address()->asString());
     }
+  }
+
+  static std::pair<std::string, Upstream::HostSharedPtr> makePair(Upstream::HostSharedPtr host) {
+    return std::make_pair(host->address()->asString(), std::move(host));
+  }
+
+  Upstream::HostMap generateHostMap(Upstream::HostVector& hosts) {
+    Upstream::HostMap map;
+    std::transform(hosts.begin(), hosts.end(), std::inserter(map, map.end()), makePair);
+    return map;
   }
 
   std::shared_ptr<RedisClusterLoadBalancerFactory> factory_;
   SlotArraySharedPtr slot_array_;
   std::unique_ptr<RedisClusterThreadAwareLoadBalancer> lb_;
   std::shared_ptr<Upstream::MockClusterInfo> info_{new NiceMock<Upstream::MockClusterInfo>()};
+  NiceMock<Runtime::MockRandomGenerator> random_;
 };
 
 // Works correctly without any hosts.
@@ -61,18 +88,18 @@ TEST_F(RedisClusterLoadBalancerTest, NoHash) {
                              Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
                              Upstream::makeTestHost(info_, "tcp://127.0.0.1:92")};
 
-  const std::vector<ClusterSlot> slots{
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
       ClusterSlot(0, 1000, hosts[0]->address()),
       ClusterSlot(1001, 2000, hosts[1]->address()),
       ClusterSlot(2001, 16383, hosts[2]->address()),
-  };
+  });
   Upstream::HostMap all_hosts{
       {hosts[0]->address()->asString(), hosts[0]},
       {hosts[1]->address()->asString(), hosts[1]},
       {hosts[2]->address()->asString(), hosts[2]},
   };
   init();
-  factory_->onClusterSlotUpdate(slots, all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
   TestLoadBalancerContext context(absl::nullopt);
   EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(&context));
 };
@@ -82,18 +109,18 @@ TEST_F(RedisClusterLoadBalancerTest, Basic) {
                              Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
                              Upstream::makeTestHost(info_, "tcp://127.0.0.1:92")};
 
-  const std::vector<ClusterSlot> slots{
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
       ClusterSlot(0, 1000, hosts[0]->address()),
       ClusterSlot(1001, 2000, hosts[1]->address()),
       ClusterSlot(2001, 16383, hosts[2]->address()),
-  };
+  });
   Upstream::HostMap all_hosts{
       {hosts[0]->address()->asString(), hosts[0]},
       {hosts[1]->address()->asString(), hosts[1]},
       {hosts[2]->address()->asString(), hosts[2]},
   };
   init();
-  factory_->onClusterSlotUpdate(slots, all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
 
   // A list of (hash: host_index) pair
   const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments = {
@@ -102,15 +129,50 @@ TEST_F(RedisClusterLoadBalancerTest, Basic) {
   validateAssignment(hosts, expected_assignments);
 }
 
+TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesHealthy) {
+  Upstream::HostVector hosts{
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:90"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:91"),
+  };
+
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
+      ClusterSlot(0, 2000, hosts[0]->address()),
+      ClusterSlot(2001, 16383, hosts[1]->address()),
+  });
+  slots->at(0).addSlave(hosts[2]->address());
+  slots->at(1).addSlave(hosts[3]->address());
+  Upstream::HostMap all_hosts;
+  std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
+  init();
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+
+  // A list of (hash: host_index) pair
+  const std::vector<std::pair<uint32_t, uint32_t>> replica_assignments = {
+      {0, 2}, {1100, 2}, {2000, 2}, {18382, 2}, {2001, 3}, {2100, 3}, {16383, 3}, {19382, 3}};
+  validateAssignment(hosts, replica_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
+  validateAssignment(hosts, replica_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
+
+  const std::vector<std::pair<uint32_t, uint32_t>> master_assignments = {
+      {0, 0}, {1100, 0}, {2000, 0}, {18382, 0}, {2001, 1}, {2100, 1}, {16383, 1}, {19382, 1}};
+  validateAssignment(hosts, master_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+  validateAssignment(hosts, master_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
+}
+
 TEST_F(RedisClusterLoadBalancerTest, ClusterSlotUpdate) {
   Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
                              Upstream::makeTestHost(info_, "tcp://127.0.0.1:91")};
-  const std::vector<ClusterSlot> slots{ClusterSlot(0, 1000, hosts[0]->address()),
-                                       ClusterSlot(1001, 16383, hosts[1]->address())};
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
+      ClusterSlot(0, 1000, hosts[0]->address()), ClusterSlot(1001, 16383, hosts[1]->address())});
   Upstream::HostMap all_hosts{{hosts[0]->address()->asString(), hosts[0]},
                               {hosts[1]->address()->asString(), hosts[1]}};
   init();
-  EXPECT_EQ(true, factory_->onClusterSlotUpdate(slots, all_hosts));
+  EXPECT_EQ(true, factory_->onClusterSlotUpdate(std::move(slots), all_hosts));
 
   // A list of initial (hash: host_index) pair
   const std::vector<std::pair<uint32_t, uint32_t>> original_assignments = {
@@ -124,7 +186,8 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotUpdate) {
       ClusterSlot(1001, 2000, hosts[1]->address()),
       ClusterSlot(2001, 16383, hosts[0]->address()),
   };
-  EXPECT_EQ(true, factory_->onClusterSlotUpdate(updated_slot, all_hosts));
+  EXPECT_EQ(true, factory_->onClusterSlotUpdate(
+                      std::make_unique<std::vector<ClusterSlot>>(updated_slot), all_hosts));
 
   // A list of updated (hash: host_index) pair.
   const std::vector<std::pair<uint32_t, uint32_t>> updated_assignments = {
@@ -137,11 +200,11 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotNoUpdate) {
                              Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
                              Upstream::makeTestHost(info_, "tcp://127.0.0.1:92")};
 
-  const std::vector<ClusterSlot> slots{
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
       ClusterSlot(0, 1000, hosts[0]->address()),
       ClusterSlot(1001, 2000, hosts[1]->address()),
       ClusterSlot(2001, 16383, hosts[2]->address()),
-  };
+  });
   Upstream::HostMap all_hosts{
       {hosts[0]->address()->asString(), hosts[0]},
       {hosts[1]->address()->asString(), hosts[1]},
@@ -153,7 +216,7 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotNoUpdate) {
       {100, 0}, {1100, 1}, {2100, 2}};
 
   init();
-  EXPECT_EQ(true, factory_->onClusterSlotUpdate(slots, all_hosts));
+  EXPECT_EQ(true, factory_->onClusterSlotUpdate(std::move(slots), all_hosts));
   validateAssignment(hosts, expected_assignments);
 
   // Calling cluster slot update without change should not change assignment.
@@ -162,7 +225,8 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotNoUpdate) {
       ClusterSlot(1001, 2000, hosts[1]->address()),
       ClusterSlot(2001, 16383, hosts[2]->address()),
   };
-  EXPECT_EQ(false, factory_->onClusterSlotUpdate(updated_slot, all_hosts));
+  EXPECT_EQ(false, factory_->onClusterSlotUpdate(
+                       std::make_unique<std::vector<ClusterSlot>>(updated_slot), all_hosts));
   validateAssignment(hosts, expected_assignments);
 }
 

@@ -13,6 +13,8 @@
 #include "common/singleton/const_singleton.h"
 #include "common/upstream/load_balancer_impl.h"
 
+#include "source/extensions/filters/network/common/redis/_virtual_includes/codec_interface/extensions/filters/network/common/redis/codec.h"
+
 #include "extensions/filters/network/common/redis/client.h"
 
 namespace Envoy {
@@ -45,6 +47,7 @@ public:
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return buffer_flush_timeout_;
   }
+  ReadPolicy readPolicy() const override { return read_policy_; }
 
 private:
   const std::chrono::milliseconds op_timeout_;
@@ -52,6 +55,7 @@ private:
   const bool enable_redirection_;
   const uint32_t max_buffer_size_before_flush_;
   const std::chrono::milliseconds buffer_flush_timeout_;
+  ReadPolicy read_policy_;
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {

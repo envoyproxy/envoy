@@ -122,7 +122,7 @@ private:
   void updateAllHosts(const Upstream::HostVector& hosts_added,
                       const Upstream::HostVector& hosts_removed, uint32_t priority);
 
-  void onClusterSlotUpdate(const std::vector<ClusterSlot>&);
+  void onClusterSlotUpdate(ClusterSlotsPtr&&);
 
   const envoy::api::v2::endpoint::LocalityLbEndpoints& localityLbEndpoint() const {
     // Always use the first endpoint.
@@ -212,6 +212,9 @@ private:
     bool enableRedirection() const override { return false; }
     uint32_t maxBufferSizeBeforeFlush() const override { return 0; }
     std::chrono::milliseconds bufferFlushTimeoutInMs() const override { return buffer_timeout_; }
+    Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
+      return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Any;
+    }
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;

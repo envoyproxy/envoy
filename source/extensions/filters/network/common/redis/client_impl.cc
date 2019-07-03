@@ -18,7 +18,32 @@ ConfigImpl::ConfigImpl(
           config, buffer_flush_timeout,
           3)) // Default timeout is 3ms. If max_buffer_size_before_flush is zero, this is not used
               // as the buffer is flushed on each request immediately.
-{}
+{
+  switch (config.read_policy()) {
+  case envoy::config::filter::network::redis_proxy::v2::
+      RedisProxy_ConnPoolSettings_ReadPolicy_MASTER:
+    read_policy_ = ReadPolicy::Master;
+    break;
+  case envoy::config::filter::network::redis_proxy::v2::
+      RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_MASTER:
+    read_policy_ = ReadPolicy::PreferMaster;
+    break;
+  case envoy::config::filter::network::redis_proxy::v2::
+      RedisProxy_ConnPoolSettings_ReadPolicy_REPLICA:
+    read_policy_ = ReadPolicy::PreferMaster;
+    break;
+  case envoy::config::filter::network::redis_proxy::v2::
+      RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_REPLICA:
+    read_policy_ = ReadPolicy::PreferMaster;
+    break;
+  case envoy::config::filter::network::redis_proxy::v2::RedisProxy_ConnPoolSettings_ReadPolicy_ANY:
+    read_policy_ = ReadPolicy::PreferMaster;
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+    break;
+  }
+}
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,

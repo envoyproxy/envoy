@@ -10,13 +10,8 @@
 #include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
-#include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/network/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/mocks/upstream/mocks.h"
-#include "test/test_common/global.h"
-#include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -50,7 +45,8 @@ public:
 
     std::unique_ptr<InstanceImpl> conn_pool_impl = std::make_unique<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
-        Common::Redis::Client::createConnPoolSettings(20, hashtagging, true), api_, *symbol_table_);
+        Common::Redis::Client::createConnPoolSettings(20, hashtagging, true, read_policy_), api_,
+        *symbol_table_);
     // Set the authentication password for this connection pool.
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
     conn_pool_ = std::move(conn_pool_impl);
@@ -92,6 +88,43 @@ public:
     return Common::Redis::Client::ClientPtr{create_(host)};
   }
 
+  void testReadPolicy(
+      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ReadPolicy
+          read_policy) {
+    InSequence s;
+
+    read_policy_ = read_policy;
+    setup();
+
+    Common::Redis::RespValue value;
+    Common::Redis::Client::MockPoolRequest auth_request, active_request, readonly_request;
+    Common::Redis::Client::MockPoolCallbacks callbacks;
+    Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
+
+    EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+        .WillOnce(
+            Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+              EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+              EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+              EXPECT_EQ(context->downstreamConnection(), nullptr);
+              return cm_.thread_local_cluster_.lb_.host_;
+            }));
+    EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+    EXPECT_CALL(
+        *client,
+        makeRequest(Eq(NetworkFilters::Common::Redis::Utility::ReadOnlyRequest::instance_), _))
+        .WillOnce(Return(&readonly_request));
+    EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+        .WillRepeatedly(Return(test_address_));
+    EXPECT_CALL(*client, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));
+    Common::Redis::Client::PoolRequest* request =
+        conn_pool_->makeRequest("hash_key", value, callbacks);
+    EXPECT_EQ(&active_request, request);
+
+    EXPECT_CALL(*client, close());
+    tls_.shutdownThread();
+  }
+
   MOCK_METHOD1(create_, Common::Redis::Client::Client*(Upstream::HostConstSharedPtr host));
 
   const std::string cluster_name_{"fake_cluster"};
@@ -104,6 +137,9 @@ public:
   Network::Address::InstanceConstSharedPtr test_address_;
   std::string auth_password_;
   NiceMock<Api::MockApi> api_;
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ReadPolicy
+      read_policy_ = envoy::config::filter::network::redis_proxy::v2::
+          RedisProxy_ConnPoolSettings_ReadPolicy_MASTER;
 };
 
 TEST_F(RedisConnPoolImplTest, Basic) {
@@ -167,6 +203,17 @@ TEST_F(RedisConnPoolImplTest, BasicWithAuthPassword) {
 
   EXPECT_CALL(*client, close());
   tls_.shutdownThread();
+};
+
+TEST_F(RedisConnPoolImplTest, BasicWithReadPolicy) {
+  testReadPolicy(envoy::config::filter::network::redis_proxy::v2::
+                     RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_MASTER);
+  testReadPolicy(envoy::config::filter::network::redis_proxy::v2::
+                     RedisProxy_ConnPoolSettings_ReadPolicy_REPLICA);
+  testReadPolicy(envoy::config::filter::network::redis_proxy::v2::
+                     RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_REPLICA);
+  testReadPolicy(
+      envoy::config::filter::network::redis_proxy::v2::RedisProxy_ConnPoolSettings_ReadPolicy_ANY);
 };
 
 TEST_F(RedisConnPoolImplTest, Hashtagging) {

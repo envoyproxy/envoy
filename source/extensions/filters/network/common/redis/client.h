@@ -94,6 +94,11 @@ public:
 using ClientPtr = std::unique_ptr<Client>;
 
 /**
+ * Read policy to use for Redis cluster.
+ */
+enum class ReadPolicy { Master, PreferMaster, Replica, PreferReplica, Any };
+
+/**
  * Configuration for a redis connection pool.
  */
 class Config {
@@ -134,6 +139,11 @@ public:
    * @return timeout for batching commands for a single upstream host.
    */
   virtual std::chrono::milliseconds bufferFlushTimeoutInMs() const PURE;
+
+  /**
+   * @return the read policy the proxy should use.
+   */
+  virtual ReadPolicy readPolicy() const PURE;
 };
 
 /**

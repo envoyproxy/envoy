@@ -82,6 +82,25 @@ message RedisProxy {
     // If `max_buffer_size_before_flush` is set, but `buffer_flush_timeout` is not, the latter
     // defaults to 3ms.
     google.protobuf.Duration buffer_flush_timeout = 5 [(gogoproto.stdduration) = true];
+
+    // All ReadPolicy settings except MASTER may return stale data because replicas replication is
+    // asynchronous and requires some delay. You need to ensure that your application can tolerate
+    // stale data.
+    enum ReadPolicy {
+      // Default mode. Read from the current master node.
+      MASTER = 0;
+      // Read from the master, but if it is unavailable, read from replica nodes.
+      PREFER_MASTER = 1;
+      // Read from replica nodes.
+      REPLICA = 2;
+      // Read from the replica nodes, but if none is unavailable, read from the master.
+      PREFER_REPLICA = 3;
+      // Read from any node of the cluster.
+      ANY = 4;
+    }
+
+    // Read policy, by default it is read from master.
+    ReadPolicy read_policy = 6;
   }
 
   // Network settings for the connection pool to the upstream clusters.
