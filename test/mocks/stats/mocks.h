@@ -212,10 +212,18 @@ public:
   MOCK_CONST_METHOD0(cumulativeStatistics, const HistogramStatistics&());
   MOCK_CONST_METHOD0(intervalStatistics, const HistogramStatistics&());
 
+  // RefcountInterface
+  void incRefCount() override { refcount_helper_.incRefCount(); }
+  bool decRefCount() override { return refcount_helper_.decRefCount(); }
+  uint32_t use_count() const override { return refcount_helper_.use_count(); }
+
   bool used_;
   Store* store_;
   std::shared_ptr<HistogramStatistics> histogram_stats_ =
       std::make_shared<HistogramStatisticsImpl>();
+
+private:
+  RefcountHelper refcount_helper_;
 };
 
 class MockMetricSnapshot : public MetricSnapshot {
