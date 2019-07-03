@@ -88,9 +88,9 @@ protected:
   std::unique_ptr<UdpListenerImpl> listener_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, UdpListenerImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Test that socket options are set after the listener is setup.
 TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {

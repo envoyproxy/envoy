@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 # This tool is a helper script that queries the admin address for all listener
 # addresses after envoy startup. (The admin address is written out to a file by
@@ -10,7 +10,7 @@
 from collections import OrderedDict
 
 import argparse
-import httplib
+import http.client
 import json
 import os.path
 import re
@@ -29,12 +29,12 @@ def GenerateNewConfig(original_yaml, admin_address, updated_json):
   with open(original_yaml, 'r') as original_file:
     sys.stdout.write('Admin address is ' + admin_address + '\n')
     try:
-      admin_conn = httplib.HTTPConnection(admin_address)
+      admin_conn = http.client.HTTPConnection(admin_address)
       admin_conn.request('GET', '/listeners?format=json')
       admin_response = admin_conn.getresponse()
       if not admin_response.status == 200:
         return False
-      discovered_listeners = json.loads(admin_response.read())
+      discovered_listeners = json.loads(admin_response.read().decode('utf-8'))
     except Exception as e:
       sys.stderr.write('Cannot connect to admin: %s\n' % e)
       return False

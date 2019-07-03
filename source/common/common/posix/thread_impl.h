@@ -9,18 +9,6 @@
 namespace Envoy {
 namespace Thread {
 
-class ThreadIdImplPosix : public ThreadId {
-public:
-  ThreadIdImplPosix(int64_t id);
-
-  // Thread::ThreadId
-  std::string debugString() const override;
-  bool isCurrentThreadId() const override;
-
-private:
-  int64_t id_;
-};
-
 /**
  * Wrapper for a pthread thread. We don't use std::thread because it eats exceptions and leads to
  * unusable stack traces.
@@ -44,7 +32,7 @@ class ThreadFactoryImplPosix : public ThreadFactory {
 public:
   // Thread::ThreadFactory
   ThreadPtr createThread(std::function<void()> thread_routine) override;
-  ThreadIdPtr currentThreadId() override;
+  ThreadId currentThreadId() override;
 };
 
 } // namespace Thread
