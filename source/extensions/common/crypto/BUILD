@@ -9,7 +9,7 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "utility_lib_impl",
+    name = "utility_lib",
     srcs = ["utility.cc"],
     external_deps = [
         "ssl",

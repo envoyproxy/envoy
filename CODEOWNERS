@@ -58,4 +58,4 @@ extensions/filters/common/original_src @snowp @klarose
 # webassembly common extension
 /*/extensions/common/wasm @jplevyak @PiotrSikora
 # common crypto extension
-/*/extensions/common/crypto @bdecoste @lizan @PiotrSikora
+/*/extensions/common/crypto @lizan @PiotrSikora @bdecoste

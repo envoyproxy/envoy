@@ -7,10 +7,14 @@
 
 #include "extensions/filters/common/lua/lua.h"
 
+#include "openssl/evp.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
+
+using PublicKeyPtr = bssl::UniquePtr<EVP_PKEY>;
 
 class HeaderMapWrapper;
 
@@ -208,7 +212,7 @@ private:
  */
 class PublicKeyWrapper : public Filters::Common::Lua::BaseLuaObject<PublicKeyWrapper> {
 public:
-  PublicKeyWrapper(Envoy::Common::Crypto::PublicKeyPtr key) : public_key_(std::move(key)) {}
+  PublicKeyWrapper(EVP_PKEY* key) : public_key_(std::move(key)) {}
   static ExportedFunctions exportedFunctions() { return {{"get", static_luaGet}}; }
 
 private:
@@ -218,7 +222,7 @@ private:
    */
   DECLARE_LUA_FUNCTION(PublicKeyWrapper, luaGet);
 
-  Envoy::Common::Crypto::PublicKeyPtr public_key_;
+  PublicKeyPtr public_key_;
 };
 
 } // namespace Lua

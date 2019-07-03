@@ -479,7 +479,9 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
     public_key_wrapper_.pushStack();
   } else {
     public_key_wrapper_.reset(
-        PublicKeyWrapper::create(state, Common::Crypto::Utility::importPublicKey(key)), true);
+        PublicKeyWrapper::create(
+            state, reinterpret_cast<EVP_PKEY*>(Common::Crypto::Utility::importPublicKey(key))),
+        true);
   }
 
   return 1;
