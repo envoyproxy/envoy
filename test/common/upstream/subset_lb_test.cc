@@ -381,7 +381,7 @@ public:
                                                bool is_default = false) const {
     envoy::api::v2::core::Metadata metadata;
 
-    if (version != "") {
+    if (!version.empty()) {
       Envoy::Config::Metadata::mutableMetadataValue(
           metadata, Config::MetadataFilters::get().ENVOY_LB, "version")
           .set_string_value(version);

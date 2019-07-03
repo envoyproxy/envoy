@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/symbol_table.h"
 
 #include "absl/strings/string_view.h"
@@ -20,7 +21,7 @@ struct Tag;
 /**
  * General interface for all stats objects.
  */
-class Metric {
+class Metric : public RefcountInterface {
 public:
   virtual ~Metric() = default;
   /**
@@ -45,19 +46,23 @@ public:
   virtual std::vector<Tag> tags() const PURE;
 
   /**
+   * See a more detailed description in tagExtractedStatName(), which is the
+   * preferred API to use when feasible. This API needs to compose the
+   * std::string on the fly, and return it by value.
+   *
+   * @return The stat name with all tag values extracted, as a std::string.
+   */
+  virtual std::string tagExtractedName() const PURE;
+
+  /**
    * Returns the name of the Metric with the portions designated as tags removed
    * as a string. For example, The stat name "vhost.foo.vcluster.bar.c1" would
    * have "foo" extracted as the value of tag "vhost" and "bar" extracted as the
    * value of tag "vcluster". Thus the tagExtractedName is simply
    * "vhost.vcluster.c1".
    *
-   * @return The stat name with all tag values extracted.
-   */
-  virtual std::string tagExtractedName() const PURE;
-
-  /**
-   * Returns the name of the Metric with the portions designated as tags
-   * removed as a StatName
+   * @return the name of the Metric with the portions designated as tags
+   *     removed.
    */
   virtual StatName tagExtractedStatName() const PURE;
 
@@ -109,9 +114,10 @@ public:
  * global counter as well as periodic counter. Calling latch() returns the periodic counter and
  * clears it.
  */
-class Counter : public virtual Metric {
+class Counter : public Metric {
 public:
   ~Counter() override = default;
+
   virtual void add(uint64_t amount) PURE;
   virtual void inc() PURE;
   virtual uint64_t latch() PURE;
@@ -119,12 +125,12 @@ public:
   virtual uint64_t value() const PURE;
 };
 
-using CounterSharedPtr = std::shared_ptr<Counter>;
+using CounterSharedPtr = RefcountPtr<Counter>;
 
 /**
  * A gauge that can both increment and decrement.
  */
-class Gauge : public virtual Metric {
+class Gauge : public Metric {
 public:
   enum class ImportMode {
     Uninitialized, // Gauge was discovered during hot-restart transfer.
@@ -158,7 +164,7 @@ public:
   virtual void mergeImportMode(ImportMode import_mode) PURE;
 };
 
-using GaugeSharedPtr = std::shared_ptr<Gauge>;
+using GaugeSharedPtr = RefcountPtr<Gauge>;
 
 } // namespace Stats
 } // namespace Envoy

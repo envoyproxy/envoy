@@ -6,6 +6,7 @@
 #include "extensions/filters/network/kafka/external/requests.h"
 #include "extensions/filters/network/kafka/request_codec.h"
 
+#include "test/extensions/filters/network/kafka/buffer_based_test.h"
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
@@ -17,11 +18,9 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace RequestTest {
 
-class RequestTest : public testing::Test {
-public:
-  Buffer::OwnedImpl buffer_;
-
-  template <typename T> std::shared_ptr<T> serializeAndDeserialize(T request);
+class RequestTest : public testing::Test, public MessageBasedTest<RequestEncoder> {
+protected:
+  template <typename T> std::shared_ptr<T> serializeAndDeserialize(T message);
 };
 
 class MockMessageListener : public RequestCallback {
@@ -35,40 +34,39 @@ public:
  * Takes an instance of a request, serializes it, then deserializes it.
  * This method gets executed for every request * version pair.
  */
-template <typename T> std::shared_ptr<T> RequestTest::serializeAndDeserialize(T request) {
-  RequestEncoder encoder{buffer_};
-  encoder.encode(request);
+template <typename T> std::shared_ptr<T> RequestTest::serializeAndDeserialize(T message) {
+  putMessageIntoBuffer(message);
 
   std::shared_ptr<MockMessageListener> mock_listener = std::make_shared<MockMessageListener>();
   RequestDecoder testee{RequestParserResolver::getDefaultInstance(), {mock_listener}};
 
-  AbstractRequestSharedPtr receivedMessage;
+  AbstractRequestSharedPtr received_message;
   EXPECT_CALL(*mock_listener, onMessage(testing::_))
-    .WillOnce(testing::SaveArg<0>(&receivedMessage));
+    .WillOnce(testing::SaveArg<0>(&received_message));
 
   testee.onData(buffer_);
 
-  return std::dynamic_pointer_cast<T>(receivedMessage);
+  return std::dynamic_pointer_cast<T>(received_message);
 };
 
 {#
-  Concrete tests for each request_type and version (field_list).
+  Concrete tests for each message_type and version (field_list).
   Each request is naively constructed using some default values
   (put "string" as std::string, 32 as uint32_t, etc.).
 #}
-{% for request_type in request_types %}{% for field_list in request_type.compute_field_lists() %}
-TEST_F(RequestTest, shouldParse{{ request_type.name }}V{{ field_list.version }}) {
+{% for message_type in message_types %}{% for field_list in message_type.compute_field_lists() %}
+TEST_F(RequestTest, shouldParse{{ message_type.name }}V{{ field_list.version }}) {
   // given
-  {{ request_type.name }} data = { {{ field_list.example_value() }} };
-  Request<{{ request_type.name }}> request = { {
-    {{ request_type.get_extra('api_key') }}, {{ field_list.version }}, 0, absl::nullopt }, data };
+  {{ message_type.name }} data = { {{ field_list.example_value() }} };
+  Request<{{ message_type.name }}> message = { {
+    {{ message_type.get_extra('api_key') }}, {{ field_list.version }}, 0, absl::nullopt }, data };
 
   // when
-  auto received = serializeAndDeserialize(request);
+  auto received = serializeAndDeserialize(message);
 
   // then
   ASSERT_NE(received, nullptr);
-  ASSERT_EQ(*received, request);
+  ASSERT_EQ(*received, message);
 }
 {% endfor %}{% endfor %}
 

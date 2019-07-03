@@ -152,22 +152,11 @@ public:
   MOCK_CONST_METHOD0(getUpstreamSocketOptions, Network::Socket::OptionsSharedPtr());
 
   // Http::StreamDecoderFilterCallbacks
-  void sendLocalReply(Code code, absl::string_view body,
-                      std::function<void(HeaderMap& headers)> modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                      absl::string_view details) override {
-    details_ = std::string(details);
-    Utility::sendLocalReply(
-        is_grpc_request_,
-        [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
-          if (modify_headers != nullptr) {
-            modify_headers(*headers);
-          }
-          encodeHeaders(std::move(headers), end_stream);
-        },
-        [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
-        stream_destroyed_, code, body, grpc_status, is_head_request_);
-  }
+  void sendLocalReply_(Code code, absl::string_view body,
+                       std::function<void(HeaderMap& headers)> modify_headers,
+                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                       absl::string_view details);
+
   void encode100ContinueHeaders(HeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);
   }
@@ -190,6 +179,10 @@ public:
   MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers_, void(HeaderMap& trailers));
   MOCK_METHOD1(encodeMetadata_, void(MetadataMapPtr metadata_map));
+  MOCK_METHOD5(sendLocalReply, void(Code code, absl::string_view body,
+                                    std::function<void(HeaderMap& headers)> modify_headers,
+                                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                    absl::string_view details));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
@@ -489,7 +482,7 @@ public:
   explicit IsSubsetOfHeadersMatcherImpl(const HeaderMap& expected_headers)
       : expected_headers_(expected_headers) {}
 
-  IsSubsetOfHeadersMatcherImpl(IsSubsetOfHeadersMatcherImpl&& other)
+  IsSubsetOfHeadersMatcherImpl(IsSubsetOfHeadersMatcherImpl&& other) noexcept
       : expected_headers_(other.expected_headers_) {}
 
   IsSubsetOfHeadersMatcherImpl(const IsSubsetOfHeadersMatcherImpl& other)
@@ -522,7 +515,7 @@ public:
   IsSubsetOfHeadersMatcher(const HeaderMap& expected_headers)
       : expected_headers_(expected_headers) {}
 
-  IsSubsetOfHeadersMatcher(IsSubsetOfHeadersMatcher&& other)
+  IsSubsetOfHeadersMatcher(IsSubsetOfHeadersMatcher&& other) noexcept
       : expected_headers_(static_cast<const HeaderMap&>(other.expected_headers_)) {}
 
   IsSubsetOfHeadersMatcher(const IsSubsetOfHeadersMatcher& other)
@@ -544,7 +537,7 @@ public:
   explicit IsSupersetOfHeadersMatcherImpl(const HeaderMap& expected_headers)
       : expected_headers_(expected_headers) {}
 
-  IsSupersetOfHeadersMatcherImpl(IsSupersetOfHeadersMatcherImpl&& other)
+  IsSupersetOfHeadersMatcherImpl(IsSupersetOfHeadersMatcherImpl&& other) noexcept
       : expected_headers_(other.expected_headers_) {}
 
   IsSupersetOfHeadersMatcherImpl(const IsSupersetOfHeadersMatcherImpl& other)
@@ -578,7 +571,7 @@ public:
   IsSupersetOfHeadersMatcher(const HeaderMap& expected_headers)
       : expected_headers_(expected_headers) {}
 
-  IsSupersetOfHeadersMatcher(IsSupersetOfHeadersMatcher&& other)
+  IsSupersetOfHeadersMatcher(IsSupersetOfHeadersMatcher&& other) noexcept
       : expected_headers_(static_cast<const HeaderMap&>(other.expected_headers_)) {}
 
   IsSupersetOfHeadersMatcher(const IsSupersetOfHeadersMatcher& other)

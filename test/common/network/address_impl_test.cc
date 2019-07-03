@@ -431,7 +431,7 @@ public:
 protected:
   InstanceConstSharedPtr testCaseToInstance(const struct TestCase& test_case) {
     // Catch default construction.
-    if (test_case.address_ == "") {
+    if (test_case.address_.empty()) {
       return nullptr;
     }
     switch (test_case.type_) {
