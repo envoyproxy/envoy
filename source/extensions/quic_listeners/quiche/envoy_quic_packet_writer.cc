@@ -32,7 +32,7 @@ quic::WriteResult EnvoyQuicPacketWriter::WritePacket(const char* buffer, size_t 
       quicAddressToEnvoyAddressInstance(self_address);
   Network::Address::InstanceConstSharedPtr remote_addr =
       quicAddressToEnvoyAddressInstance(peer_address);
-  Network::UdpSendData send_data{local_addr == nullptr ? nullptr : local_addr->ip(), remote_addr,
+  Network::UdpSendData send_data{local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr,
                                  buffer_wrapper};
   Api::IoCallUint64Result result = listener_.send(send_data);
   if (result.ok()) {

@@ -9,6 +9,8 @@
 namespace Envoy {
 namespace Quic {
 
+// TODO(danzh): this is called on each write. Consider to return an address instance on the stack if
+// the heap allocation is too expensive.
 inline Network::Address::InstanceConstSharedPtr
 quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address) {
   ASSERT(quic_address.host().address_family() != quic::IpAddressFamily::IP_UNSPEC);

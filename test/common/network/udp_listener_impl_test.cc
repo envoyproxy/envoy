@@ -388,7 +388,7 @@ TEST_P(UdpListenerImplTest, SendData) {
         server_socket_->localAddress()->ip()->port()));
   }
 
-  UdpSendData send_data{send_from_addr->ip(), client_socket_->localAddress(), *buffer};
+  UdpSendData send_data{send_from_addr->ip(), *client_socket_->localAddress(), *buffer};
 
   auto send_result = listener_->send(send_data);
 
@@ -444,7 +444,7 @@ TEST_P(UdpListenerImplTest, SendDataError) {
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
   // send data to itself
-  UdpSendData send_data{send_to_addr_->ip(), server_socket_->localAddress(), *buffer};
+  UdpSendData send_data{send_to_addr_->ip(), *server_socket_->localAddress(), *buffer};
 
   // This is trigerred on opening the listener on registering the event
   EXPECT_CALL(listener_callbacks_, onWriteReady_(_)).WillOnce(Invoke([&](const Socket& socket) {

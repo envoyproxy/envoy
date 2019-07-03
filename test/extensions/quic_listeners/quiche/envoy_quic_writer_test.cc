@@ -30,7 +30,7 @@ public:
   }
 
   void verifySendData(const std::string& content, const Network::UdpSendData send_data) {
-    EXPECT_EQ(peer_address_.ToString(), send_data.peer_address_->asString());
+    EXPECT_EQ(peer_address_.ToString(), send_data.peer_address_.asString());
     EXPECT_EQ(self_address_.ToString(), send_data.local_ip_->addressAsString());
     EXPECT_EQ(content, send_data.buffer_.toString());
   }

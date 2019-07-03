@@ -116,10 +116,10 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
     return sysCallResultToIoCallResult(result);
   } else {
-    const int space_v6 = CMSG_SPACE(sizeof(in6_pktinfo));
+    const size_t space_v6 = CMSG_SPACE(sizeof(in6_pktinfo));
     // FreeBSD only needs in_addr size, but allocates more to unify code in two platforms.
-    const int space_v4 = CMSG_SPACE(sizeof(in_pktinfo));
-    const int cmsg_space = (space_v4 < space_v6) ? space_v6 : space_v4;
+    const size_t space_v4 = CMSG_SPACE(sizeof(in_pktinfo));
+    const size_t cmsg_space = (space_v4 < space_v6) ? space_v6 : space_v4;
     // kSpaceForIp should be big enough to hold both IPv4 and IPv6 packet info.
     STACK_ARRAY(cbuf, char, cmsg_space);
     memset(cbuf.begin(), 0, cmsg_space);
@@ -225,8 +225,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   // The minimum cmsg buffer size to filled in destination address and packets dropped when
   // receiving a packet. It is possible for a received packet to contain both IPv4 and IPv6
   // addresses.
-  const int cmsg_space = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
-                         CMSG_SPACE(sizeof(struct in6_pktinfo));
+  const size_t cmsg_space = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
+                            CMSG_SPACE(sizeof(struct in6_pktinfo));
   STACK_ARRAY(cbuf, char, cmsg_space);
   memset(cbuf.begin(), 0, cmsg_space);
 

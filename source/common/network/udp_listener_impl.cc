@@ -163,7 +163,7 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
       /*rc=*/0, /*err=*/Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
   do {
     send_result = socket_.ioHandle().sendmsg(slices.begin(), num_slices, 0, send_data.local_ip_,
-                                             *send_data.peer_address_);
+                                             send_data.peer_address_);
   } while (!send_result.ok() &&
            // Send again if interrupted.
            send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);

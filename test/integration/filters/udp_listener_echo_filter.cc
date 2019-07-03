@@ -29,7 +29,7 @@ void UdpListenerEchoFilter::onData(Network::UdpRecvData& data) {
             data.peer_address_->asString(), data.local_address_->asString());
 
   // send back the received data
-  Network::UdpSendData send_data{data.local_address_->ip(), data.peer_address_, *data.buffer_};
+  Network::UdpSendData send_data{data.local_address_->ip(), *data.peer_address_, *data.buffer_};
   auto send_result = read_callbacks_->udpListener().send(send_data);
 
   ASSERT(send_result.ok());

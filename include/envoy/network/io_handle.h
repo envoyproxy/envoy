@@ -72,7 +72,8 @@ public:
    * Send a message to the address.
    * @param slices points to the location of data to be sent.
    * @param num_slice indicates number of slices |slices| contains.
-   * @param self_ip is the source address whose port should be ignored.
+   * @param self_ip is the source address whose port should be ignored. Nullptr
+   * if caller wants kernel to select source address.
    * @param peer_address is the destination address.
    * @return a Api::IoCallUint64Result with err_ = an Api::IoError instance or
    * err_ = nullptr and rc_ = the bytes written for success.
