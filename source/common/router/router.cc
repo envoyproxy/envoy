@@ -1502,7 +1502,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
 
   upstream_timing_.onFirstUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
 
-  bool end_stream = !buffered_request_body_ && encode_complete_ && !encode_trailers_;
+  const bool end_stream = !buffered_request_body_ && encode_complete_ && !encode_trailers_;
   // If end_stream is set in headers, and there are metadata to send, delays end_stream. The case
   // only happens when decoding headers filters return ContinueAndEndStream.
   const bool delay_headers_end_stream = end_stream && !downstream_metadata_map_vector_.empty();

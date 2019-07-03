@@ -1113,7 +1113,8 @@ void ConnectionManagerImpl::ActiveStream::decodeMetadata(ActiveStreamDecoderFilt
   for (; entry != decoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame type, stores metadata and return.
     // If the filter pointed by entry hasn't returned from decodeHeaders, stores newly added
-    // metadata in case decodeHeaders returns StopAllIteration.
+    // metadata in case decodeHeaders returns StopAllIteration. The latter can happen when headers
+    // callbacks generate new metadata.
     if (!(*entry)->decode_headers_called_ || (*entry)->stoppedAll()) {
       Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
       (*entry)->getSavedRequestMetadata()->emplace_back(std::move(metadata_map_ptr));
@@ -1599,7 +1600,7 @@ void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
 }
 
 bool ConnectionManagerImpl::ActiveStream::processNewlyAddedMetadata() {
-  if (getRequestMetadataMapVector()->empty()) {
+  if (request_metadata_map_vector_ == nullptr) {
     return false;
   }
   for (const auto& metadata_map : *getRequestMetadataMapVector()) {
@@ -1752,9 +1753,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
     doHeaders(complete() && !bufferedData() && !trailers());
   }
 
-  if (!saved_metadata().empty()) {
-    doMetadata();
-  }
+  doMetadata();
 
   // Make sure we handle filters returning StopIterationNoBuffer and then commonContinue by flushing
   // the terminal fin.
@@ -1938,7 +1937,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::handleMetadataAfterHeader
   iterate_from_current_filter_ = true;
   // If decodeHeaders() returns StopAllIteration, we should skip draining metadata, and wait
   // for doMetadata() to drain the metadata after iteration continues.
-  if (!stoppedAll() && !getSavedRequestMetadata()->empty()) {
+  if (!stoppedAll() && saved_request_metadata_ != nullptr && !getSavedRequestMetadata()->empty()) {
     drainSavedRequestMetadata();
   }
   // Restores the original value of iterate_from_current_filter_.
