@@ -143,7 +143,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
   }
   if (ip_address[0] == '[') {
     // Appears to be an IPv6 address. Find the "]:" that separates the address from the port.
-    auto pos = ip_address.rfind("]:");
+    const auto pos = ip_address.rfind("]:");
     if (pos == std::string::npos) {
       throwWithMalformedIp(ip_address);
     }
@@ -163,7 +163,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
     return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
   }
   // Treat it as an IPv4 address followed by a port.
-  auto pos = ip_address.rfind(':');
+  const auto pos = ip_address.rfind(':');
   if (pos == std::string::npos) {
     throwWithMalformedIp(ip_address);
   }
@@ -259,7 +259,7 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
   });
   RELEASE_ASSERT(rc == 0, "");
 
-  auto af_look_up =
+  const auto af_look_up =
       (remote_address->ip()->version() == Address::IpVersion::v4) ? AF_INET : AF_INET6;
 
   for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
@@ -269,7 +269,7 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
 
     if (ifa->ifa_addr->sa_family == af_look_up) {
       const auto* addr = reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      auto local_address = Address::addressFromSockAddr(
+      const auto local_address = Address::addressFromSockAddr(
           *addr, (af_look_up == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
 
       if (remote_address == local_address) {
@@ -416,7 +416,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
 
 void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>& list) {
   const auto ranges = StringUtil::splitToken(string, ",");
-  for (auto s : ranges) {
+  for (const auto& s : ranges) {
     const std::string s_string{s};
     std::stringstream ss(s_string);
     uint32_t min = 0;
@@ -508,7 +508,7 @@ Address::SocketType
 Utility::protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address) {
   switch (proto_address.address_case()) {
   case envoy::api::v2::core::Address::kSocketAddress: {
-    auto protocol = proto_address.socket_address().protocol();
+    const auto protocol = proto_address.socket_address().protocol();
     switch (protocol) {
     case envoy::api::v2::core::SocketAddress::TCP:
       return Address::SocketType::Stream;

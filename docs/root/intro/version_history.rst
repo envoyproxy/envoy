@@ -21,6 +21,7 @@ Version history
 * dns: added support for getting DNS record TTL which is used by STRICT_DNS/LOGICAL_DNS cluster as DNS refresh rate.
 * dubbo_proxy: support the :ref:`Dubbo proxy filter <config_network_filters_dubbo_proxy>`.
 * eds: added support to specify max time for which endpoints can be used :ref:`gRPC filter <envoy_api_msg_ClusterLoadAssignment.Policy>`.
+* eds: removed max limit for `load_balancing_weight`.
 * event: added :ref:`loop duration and poll delay statistics <operations_performance>`.
 * ext_authz: added a `x-envoy-auth-partial-body` metadata header set to `false|true` indicating if there is a partial body sent in the authorization request message.
 * ext_authz: added configurable status code that allows customizing HTTP responses on filter check status errors.

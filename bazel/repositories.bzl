@@ -12,6 +12,14 @@ load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
+NOBORINGSSL_SKIP_TARGETS = {
+    # The lua filter depends on BoringSSL
+    "lua": "envoy.filters.http.lua",
+
+    # These two extensions are supposed to be replaced with alternative extensions.
+    "tls": "envoy.transport_sockets.tls",
+    "tls_inspector": "envoy.filters.listener.tls_inspector",
+}
 
 # go version for rules_go
 GO_VERSION = "1.12.5"
