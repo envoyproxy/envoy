@@ -20,7 +20,7 @@ using FailureFunctionList = std::list<const FatalErrorHandlerInterface*>;
 ABSL_CONST_INIT std::atomic<FailureFunctionList*> fatal_error_handlers{nullptr};
 
 void SignalAction::registerFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
-#ifndef ENVOY_SKIP_OBJECT_TRACE_ON_DUMP
+#ifdef ENVOY_OBJECT_TRACE_ON_DUMP
   absl::MutexLock l(&failure_mutex);
   FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_relaxed);
   if (list == nullptr) {
@@ -34,7 +34,7 @@ void SignalAction::registerFatalErrorHandler(const FatalErrorHandlerInterface& h
 }
 
 void SignalAction::removeFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
-#ifndef ENVOY_SKIP_OBJECT_TRACE_ON_DUMP
+#ifdef ENVOY_OBJECT_TRACE_ON_DUMP
   absl::MutexLock l(&failure_mutex);
   FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_relaxed);
   list->remove(&handler);
