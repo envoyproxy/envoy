@@ -10,8 +10,10 @@ Modified versions of the "hello world" example apps were used to run these exper
 - :tree:`iOS control app <f05d43f/examples/objective-c/control/control>`
 - :tree:`iOS Envoy app <f05d43f/examples/objective-c/xcode_variant/EnvoyObjc/EnvoyObjc>`
 
-- **Control** - Made a request every ``200ms`` to an endpoint without Envoy compiled in the app.
-- **Envoy** - Made the same request at the same interval, but routed through an instance of Envoy.
+The 2 apps on each platform:
+
+- **Control:** Made a request every ``200ms`` to an endpoint without Envoy compiled in the app.
+- **Envoy:** Made the same request at the same interval, but routed through an instance of Envoy.
 
 All request/response caching was disabled.
 
@@ -78,7 +80,7 @@ Both apps were run (one at a time) on a physical device (iPhone 6s iOS 12.2.x) w
 Reproducing the Envoy example app:
 
 1. Build the library using ``bazel build ios_dist --config=ios --config=fat``
-2. Copy ``./dist/Envoy.framework`` to the example's `source directory <ios_envoy_example_app>`__
+2. Copy ``./dist/Envoy.framework`` to the example's :tree:`source directory <f05d43f/examples/objective-c/xcode_variant/EnvoyObjc/EnvoyObjc>`
 3. Build/run the example app
 
 Android
