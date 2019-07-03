@@ -477,6 +477,7 @@ void ConnectionImpl::onMessageCompleteBase() {
 
 void ConnectionImpl::onMessageBeginBase() {
   ENVOY_CONN_LOG(trace, "message begin", connection_);
+  protocol_ = Protocol::Http11;
   ASSERT(!current_header_map_);
   current_header_map_ = std::make_unique<HeaderMapImpl>();
   header_parsing_state_ = HeaderParsingState::Field;
