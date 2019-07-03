@@ -954,7 +954,8 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
   initialize();
 }
 
-TEST_P(AdsIntegrationTest, ListenerDrainBeforeClusterInit) {
+// Validates that listeners can be removed before server start.
+TEST_P(AdsIntegrationTest, ListenerDrainBeforeServerStart) {
   initialize();
 
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
@@ -964,14 +965,11 @@ TEST_P(AdsIntegrationTest, ListenerDrainBeforeClusterInit) {
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "1");
 
-  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
-      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
   sendDiscoveryResponse<envoy::api::v2::Listener>(
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {}, "1");
 
-  // Remove listener, causing drain before all owned clusters have been initialized.
+  // Remove listener.
   sendDiscoveryResponse<envoy::api::v2::Listener>(Config::TypeUrl::get().Listener, {}, {}, {}, "1");
 }
 
