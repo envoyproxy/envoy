@@ -83,8 +83,8 @@ FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFi
 }
 
 bool TraceableRequestFilter::evaluate(const StreamInfo::StreamInfo& info,
-                                      const Http::HeaderMap* request_headers,
-                                      const Http::HeaderMap*, const Http::HeaderMap*) {
+                                      const Http::HeaderMap& request_headers,
+                                      const Http::HeaderMap&, const Http::HeaderMap*) {
   static Http::HeaderMapImpl empty_headers;
   if (!request_headers) {
     request_headers = &empty_headers;
@@ -94,8 +94,8 @@ bool TraceableRequestFilter::evaluate(const StreamInfo::StreamInfo& info,
   return decision.traced && decision.reason == Tracing::Reason::ServiceForced;
 }
 
-bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap*,
-                                const Http::HeaderMap*, const Http::HeaderMap*) {
+bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
+                                const Http::HeaderMap&, const Http::HeaderMap*) {
   if (!info.responseCode()) {
     return compareAgainstValue(0ULL);
   }
@@ -103,8 +103,8 @@ bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
   return compareAgainstValue(info.responseCode().value());
 }
 
-bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap*,
-                              const Http::HeaderMap*, const Http::HeaderMap*) {
+bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
+                              const Http::HeaderMap&, const Http::HeaderMap*) {
   absl::optional<std::chrono::nanoseconds> final = info.requestComplete();
   ASSERT(final);
 
@@ -118,8 +118,8 @@ RuntimeFilter::RuntimeFilter(const envoy::config::filter::accesslog::v2::Runtime
       percent_(config.percent_sampled()),
       use_independent_randomness_(config.use_independent_randomness()) {}
 
-bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap* request_headers,
-                             const Http::HeaderMap*, const Http::HeaderMap*) {
+bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_headers,
+                             const Http::HeaderMap&, const Http::HeaderMap*) {
   static Http::HeaderMapImpl empty_headers;
   if (!request_headers) {
     request_headers = &empty_headers;
@@ -155,9 +155,9 @@ AndFilter::AndFilter(const envoy::config::filter::accesslog::v2::AndFilter& conf
                      Runtime::Loader& runtime, Runtime::RandomGenerator& random)
     : OperatorFilter(config.filters(), runtime, random) {}
 
-bool OrFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap* request_headers,
-                        const Http::HeaderMap* response_headers,
-                        const Http::HeaderMap* response_trailers) {
+bool OrFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                        const Http::HeaderMap& response_headers,
+                        const Http::HeaderMap& response_trailers) {
   bool result = false;
   for (auto& filter : filters_) {
     result |= filter->evaluate(info, request_headers, response_headers, response_trailers);
@@ -170,9 +170,9 @@ bool OrFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMa
   return result;
 }
 
-bool AndFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap* request_headers,
-                         const Http::HeaderMap* response_headers,
-                         const Http::HeaderMap* response_trailers) {
+bool AndFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                         const Http::HeaderMap& response_headers,
+                         const Http::HeaderMap& response_trailers) {
   bool result = true;
   for (auto& filter : filters_) {
     result &= filter->evaluate(info, request_headers, response_headers, response_trailers);
@@ -185,8 +185,8 @@ bool AndFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderM
   return result;
 }
 
-bool NotHealthCheckFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap*,
-                                    const Http::HeaderMap*, const Http::HeaderMap*) {
+bool NotHealthCheckFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
+                                    const Http::HeaderMap&, const Http::HeaderMap*) {
   return !info.healthCheck();
 }
 
@@ -194,8 +194,8 @@ HeaderFilter::HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFil
   header_data_.push_back(Http::HeaderUtility::HeaderData(config.header()));
 }
 
-bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap* request_headers,
-                            const Http::HeaderMap*, const Http::HeaderMap*) {
+bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_headers,
+                            const Http::HeaderMap&, const Http::HeaderMap*) {
   if (!request_headers) {
     return false;
   }
@@ -213,8 +213,8 @@ ResponseFlagFilter::ResponseFlagFilter(
   }
 }
 
-bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap*,
-                                  const Http::HeaderMap*, const Http::HeaderMap*) {
+bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
+                                  const Http::HeaderMap&, const Http::HeaderMap*) {
   if (configured_flags_ != 0) {
     return info.intersectResponseFlags(configured_flags_);
   }
@@ -230,9 +230,9 @@ GrpcStatusFilter::GrpcStatusFilter(
   exclude_ = config.exclude();
 }
 
-bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap*,
-                                const Http::HeaderMap* response_headers,
-                                const Http::HeaderMap* response_trailers) {
+bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
+                                const Http::HeaderMap& response_headers,
+                                const Http::HeaderMap& response_trailers) {
   static Http::HeaderMapImpl empty_headers;
   if (!response_headers) {
     response_headers = &empty_headers;
