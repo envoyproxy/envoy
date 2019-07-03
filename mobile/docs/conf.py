@@ -69,7 +69,9 @@ blob_sha = os.environ['ENVOY_BLOB_SHA']
 # ones.
 extensions = ['sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig']
 extlinks = {
+    'issue': ('https://github.com/lyft/envoy-mobile/issues/%s', ''),
     'repo': ('https://github.com/lyft/envoy-mobile/blob/{}/%s'.format(blob_sha), ''),
+    'tree': ('https://github.com/lyft/envoy-mobile/tree/%s', ''),
 }
 
 # Set up global substitutions
