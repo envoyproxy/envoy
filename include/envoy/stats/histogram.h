@@ -72,7 +72,7 @@ public:
  * class (Sinks, in particular) will need to explicitly differentiate between histograms
  * representing durations and histograms representing other types of data.
  */
-class Histogram : public virtual Metric, public RefcountHelper {
+class Histogram : public Metric {
 public:
   ~Histogram() override = default;
 
@@ -87,7 +87,7 @@ using HistogramSharedPtr = RefcountPtr<Histogram>;
 /**
  * A histogram that is stored in main thread and provides summary view of the histogram.
  */
-class ParentHistogram : public virtual Histogram {
+class ParentHistogram : public Histogram {
 public:
   ~ParentHistogram() override = default;
 
