@@ -29,7 +29,7 @@ public:
 
 /**
  * Implementation of FilterChainManager.
- * Encapulating the subscription from FCDS Api.
+ * Encapsulating the subscription from FCDS Api.
  */
 class FilterChainManagerImpl : public Network::FilterChainManager,
                                Logger::Loggable<Logger::Id::config> {
@@ -181,7 +181,7 @@ private:
   // overriding a new warming one by elder one. The warming lookup may replace the active_lookup
   // atomically, or replaced by another warming up. If warming one is replaced by another warming
   // one, the former one should have no side effect. If the warming eventually replaces the active
-  // one, the warming one could assume the active one never changed durign the warm up.
+  // one, the warming one could assume the active one never changed during the warm up.
   std::shared_ptr<FilterChainLookup> active_lookup_;
   std::shared_ptr<FilterChainLookup> warming_lookup_;
 

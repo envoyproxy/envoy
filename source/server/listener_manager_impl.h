@@ -337,7 +337,7 @@ public:
   SystemTime last_updated_;
 
 private:
-  // A non-virtual implementation that could be used in constuctor.
+  // A non-virtual implementation that could be used in constructor.
   Init::Manager& getInitManager() {
     // See initialize() for why we choose different init managers to return.
     if (workers_started_) {
