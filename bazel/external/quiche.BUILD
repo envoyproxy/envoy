@@ -2094,6 +2094,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_interval.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
 )
 
@@ -2102,6 +2103,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_interval_set.h"],
     copts = quiche_copt,
     repository = "@envoy",
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_core_interval_lib",
@@ -2113,6 +2115,7 @@ envoy_cc_library(
     name = "quic_core_lru_cache_lib",
     hdrs = ["quiche/quic/core/quic_lru_cache.h"],
     repository = "@envoy",
+    tags = ["nofips"],
     deps = [":quic_platform_base"],
 )
 
@@ -2120,6 +2123,7 @@ envoy_cc_library(
     name = "quic_core_one_block_arena_lib",
     srcs = ["quiche/quic/core/quic_one_block_arena.h"],
     repository = "@envoy",
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_core_arena_scoped_ptr_lib",

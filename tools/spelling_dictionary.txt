@@ -165,6 +165,7 @@ NOAUTH
 NOLINT
 NOLINTNEXTLINE
 NONCES
+NOSORT
 NS
 NUL
 Nilsson
@@ -180,6 +181,7 @@ OSS
 OSX
 OT
 OU
+OVFL
 PB
 PC
 PCC
@@ -199,6 +201,8 @@ QUIC
 RAII
 RANLUX
 RBAC
+RECVDSTADDR
+RECVPKTINFO
 RCU
 RDN
 RDS
@@ -218,6 +222,7 @@ RTDS
 RTTI
 RW
 RX
+RXQ
 Runn
 SA
 SAN
@@ -225,6 +230,7 @@ SANs
 SCT
 SDK
 SDS
+SENDSRCADDR
 SHA
 SHM
 SIBABRT
@@ -286,7 +292,10 @@ WS
 Welford's
 Werror
 XDS
+decRefCount
+getaddrinfo
 sendto
+upcasts
 vip
 xDSes
 XFCC
@@ -388,6 +397,7 @@ cstring
 ctor
 ctrl
 customizations
+darwin
 dbg
 de
 dechunking
@@ -536,6 +546,7 @@ keepalives
 ketama
 kqueue
 kubernetes
+kv
 kvs
 lala
 latencies

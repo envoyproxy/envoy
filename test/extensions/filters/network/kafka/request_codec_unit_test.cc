@@ -1,5 +1,6 @@
 #include "extensions/filters/network/kafka/request_codec.h"
 
+#include "test/extensions/filters/network/kafka/buffer_based_test.h"
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
@@ -45,12 +46,8 @@ public:
 
 using MockRequestCallbackSharedPtr = std::shared_ptr<MockRequestCallback>;
 
-class RequestCodecUnitTest : public testing::Test {
+class RequestCodecUnitTest : public testing::Test, public BufferBasedTest {
 protected:
-  template <typename T> void putInBuffer(T arg);
-
-  Buffer::OwnedImpl buffer_;
-
   MockParserFactory initial_parser_factory_{};
   MockRequestParserResolver parser_resolver_{};
   MockRequestCallbackSharedPtr request_callback_{std::make_shared<MockRequestCallback>()};
@@ -61,14 +58,17 @@ RequestParseResponse consumeOneByte(absl::string_view& data) {
   return RequestParseResponse::stillWaiting();
 }
 
-TEST_F(RequestCodecUnitTest, shouldDoNothingIfParserNeverReturnsMessage) {
+TEST_F(RequestCodecUnitTest, shouldDoNothingIfParserReturnsWaiting) {
   // given
-  putInBuffer(Request<int32_t>{{}, 0});
+  putGarbageIntoBuffer();
 
   MockParserSharedPtr parser = std::make_shared<MockParser>();
   EXPECT_CALL(*parser, parse(_)).Times(AnyNumber()).WillRepeatedly(Invoke(consumeOneByte));
 
   EXPECT_CALL(initial_parser_factory_, create(_)).WillOnce(Return(parser));
+
+  EXPECT_CALL(*request_callback_, onMessage(_)).Times(0);
+  EXPECT_CALL(*request_callback_, onFailedParse(_)).Times(0);
 
   RequestDecoder testee{initial_parser_factory_, parser_resolver_, {request_callback_}};
 
@@ -76,12 +76,12 @@ TEST_F(RequestCodecUnitTest, shouldDoNothingIfParserNeverReturnsMessage) {
   testee.onData(buffer_);
 
   // then
-  // There were no interactions with `request_callback`.
+  // There were no interactions with `request_callback_`.
 }
 
 TEST_F(RequestCodecUnitTest, shouldUseNewParserAsResponse) {
   // given
-  putInBuffer(Request<int32_t>{{}, 0});
+  putGarbageIntoBuffer();
 
   MockParserSharedPtr parser1 = std::make_shared<MockParser>();
   MockParserSharedPtr parser2 = std::make_shared<MockParser>();
@@ -92,24 +92,26 @@ TEST_F(RequestCodecUnitTest, shouldUseNewParserAsResponse) {
 
   EXPECT_CALL(initial_parser_factory_, create(_)).WillOnce(Return(parser1));
 
+  EXPECT_CALL(*request_callback_, onMessage(_)).Times(0);
+  EXPECT_CALL(*request_callback_, onFailedParse(_)).Times(0);
+
   RequestDecoder testee{initial_parser_factory_, parser_resolver_, {request_callback_}};
 
   // when
   testee.onData(buffer_);
 
   // then
-  // There were no interactions with `request_callback`.
+  // There were no interactions with `request_callback_`.
 }
 
 TEST_F(RequestCodecUnitTest, shouldPassParsedMessageToCallbackAndReinitialize) {
   // given
-  putInBuffer(Request<int32_t>{{}, 0});
+  putGarbageIntoBuffer();
+
+  AbstractRequestSharedPtr message = std::make_shared<Request<int32_t>>(RequestHeader(), 0);
 
   MockParserSharedPtr parser1 = std::make_shared<MockParser>();
-  RequestParseFailureSharedPtr failure_data =
-      std::make_shared<RequestParseFailure>(RequestHeader());
-  EXPECT_CALL(*parser1, parse(_))
-      .WillOnce(Return(RequestParseResponse::parseFailure(failure_data)));
+  EXPECT_CALL(*parser1, parse(_)).WillOnce(Return(RequestParseResponse::parsedMessage(message)));
 
   MockParserSharedPtr parser2 = std::make_shared<MockParser>();
   EXPECT_CALL(*parser2, parse(_)).Times(AnyNumber()).WillRepeatedly(Invoke(consumeOneByte));
@@ -118,7 +120,8 @@ TEST_F(RequestCodecUnitTest, shouldPassParsedMessageToCallbackAndReinitialize) {
       .WillOnce(Return(parser1))
       .WillOnce(Return(parser2));
 
-  EXPECT_CALL(*request_callback_, onFailedParse(failure_data));
+  EXPECT_CALL(*request_callback_, onMessage(message));
+  EXPECT_CALL(*request_callback_, onFailedParse(_)).Times(0);
 
   RequestDecoder testee{initial_parser_factory_, parser_resolver_, {request_callback_}};
 
@@ -126,16 +129,17 @@ TEST_F(RequestCodecUnitTest, shouldPassParsedMessageToCallbackAndReinitialize) {
   testee.onData(buffer_);
 
   // then
-  // There was only one message sent to `request_callback`.
+  // `request_callback_` had `onFailedParse` invoked once with matching argument.
 }
 
 TEST_F(RequestCodecUnitTest, shouldPassParseFailureDataToCallbackAndReinitialize) {
   // given
-  putInBuffer(Request<int32_t>{{}, 0});
+  putGarbageIntoBuffer();
 
-  MockParserSharedPtr parser1 = std::make_shared<MockParser>();
   RequestParseFailureSharedPtr failure_data =
       std::make_shared<RequestParseFailure>(RequestHeader());
+
+  MockParserSharedPtr parser1 = std::make_shared<MockParser>();
   EXPECT_CALL(*parser1, parse(_))
       .WillOnce(Return(RequestParseResponse::parseFailure(failure_data)));
 
@@ -146,6 +150,7 @@ TEST_F(RequestCodecUnitTest, shouldPassParseFailureDataToCallbackAndReinitialize
       .WillOnce(Return(parser1))
       .WillOnce(Return(parser2));
 
+  EXPECT_CALL(*request_callback_, onMessage(_)).Times(0);
   EXPECT_CALL(*request_callback_, onFailedParse(failure_data));
 
   RequestDecoder testee{initial_parser_factory_, parser_resolver_, {request_callback_}};
@@ -154,12 +159,12 @@ TEST_F(RequestCodecUnitTest, shouldPassParseFailureDataToCallbackAndReinitialize
   testee.onData(buffer_);
 
   // then
-  // `request_callback` had `onFailedParse` invoked once with matching argument.
+  // `request_callback_` had `onFailedParse` invoked once with matching argument.
 }
 
 TEST_F(RequestCodecUnitTest, shouldInvokeParsersEvenIfTheyDoNotConsumeZeroBytes) {
   // given
-  putInBuffer(Request<int32_t>{{}, 0});
+  putGarbageIntoBuffer();
 
   MockParserSharedPtr parser1 = std::make_shared<MockParser>();
   MockParserSharedPtr parser2 = std::make_shared<MockParser>();
@@ -194,14 +199,8 @@ TEST_F(RequestCodecUnitTest, shouldInvokeParsersEvenIfTheyDoNotConsumeZeroBytes)
   testee.onData(buffer_);
 
   // then
-  // `request_callback` was invoked only once.
+  // `request_callback_` had `onFailedParse` invoked once with matching argument.
   // After that, `parser3` was created and passed remaining data (that should have been empty).
-}
-
-// Helper function.
-template <typename T> void RequestCodecUnitTest::putInBuffer(T arg) {
-  RequestEncoder encoder{buffer_};
-  encoder.encode(arg);
 }
 
 } // namespace RequestCodecUnitTest

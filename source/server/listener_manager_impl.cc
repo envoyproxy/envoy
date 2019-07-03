@@ -1,5 +1,7 @@
 #include "server/listener_manager_impl.h"
 
+#include <algorithm>
+
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
@@ -23,7 +25,6 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/filters/listener/well_known_names.h"
-#include "extensions/filters/network/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/strings/match.h"
@@ -185,6 +186,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
                            ListenerManagerImpl& parent, const std::string& name, bool modifiable,
                            bool workers_started, uint64_t hash)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
+      filter_chain_manager_(address_),
       socket_type_(Network::Utility::protobufAddressSocketType(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
@@ -212,6 +214,12 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   if (!config.socket_options().empty()) {
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
+  }
+  if (socket_type_ == Network::Address::SocketType::Datagram) {
+    // Needed for recvmsg to return destination address in IP header.
+    addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
+    // Needed to return receive buffer overflown indicator.
+    addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
   }
 
   if (!config.listener_filters().empty()) {
@@ -267,120 +275,43 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
   }
 
-  bool need_tls_inspector = false;
-  std::unordered_set<envoy::api::v2::listener::FilterChainMatch, MessageUtil, MessageUtil>
-      filter_chains;
-
-  // TODO(lambdai): move the trie construction to FilterChainManagerImpl
-  for (const auto& filter_chain : config.filter_chains()) {
-    const auto& filter_chain_match = filter_chain.filter_chain_match();
-    if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
-      throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
-                                       "unimplemented fields",
-                                       address_->asString()));
-    }
-    if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
-      throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
-                                       "the same matching rules are defined",
-                                       address_->asString()));
-    }
-    filter_chains.insert(filter_chain_match);
-
-    // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
-    // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
-    // We copy by value first then override if necessary.
-    auto transport_socket = filter_chain.transport_socket();
-    if (!filter_chain.has_transport_socket()) {
-      if (filter_chain.has_tls_context()) {
-        transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-        MessageUtil::jsonConvert(filter_chain.tls_context(), *transport_socket.mutable_config());
-      } else {
-        transport_socket.set_name(
-            Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
-      }
-    }
-
-    auto& config_factory = Config::Utility::getAndCheckFactory<
-        Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        transport_socket, parent_.server_.messageValidationVisitor(), config_factory);
-
-    // Validate IP addresses.
-    std::vector<std::string> destination_ips;
-    destination_ips.reserve(filter_chain_match.prefix_ranges().size());
-    for (const auto& destination_ip : filter_chain_match.prefix_ranges()) {
-      const auto& cidr_range = Network::Address::CidrRange::create(destination_ip);
-      destination_ips.push_back(cidr_range.asString());
-    }
-
-    std::vector<std::string> server_names(filter_chain_match.server_names().begin(),
-                                          filter_chain_match.server_names().end());
-
-    // Reject partial wildcards, we don't match on them.
-    for (const auto& server_name : server_names) {
-      if (server_name.find('*') != std::string::npos &&
-          !FilterChainManagerImpl::isWildcardServerName(server_name)) {
-        throw EnvoyException(
-            fmt::format("error adding listener '{}': partial wildcards are not supported in "
-                        "\"server_names\"",
-                        address_->asString()));
-      }
-    }
-
-    std::vector<std::string> source_ips;
-    source_ips.reserve(filter_chain_match.source_prefix_ranges().size());
-    for (const auto& source_ip : filter_chain_match.source_prefix_ranges()) {
-      const auto& cidr_range = Network::Address::CidrRange::create(source_ip);
-      source_ips.push_back(cidr_range.asString());
-    }
-
-    std::vector<std::string> application_protocols(
-        filter_chain_match.application_protocols().begin(),
-        filter_chain_match.application_protocols().end());
-    Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
-        parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
-        parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
-        parent_.server_.threadLocal(), parent_.server_.messageValidationVisitor(),
-        parent_.server_.api());
-    factory_context.setInitManager(initManager());
-    filter_chain_manager_.addFilterChain(
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
-        server_names, filter_chain_match.transport_protocol(), application_protocols,
-        filter_chain_match.source_type(), source_ips, filter_chain_match.source_ports(),
-        config_factory.createTransportSocketFactory(*message, factory_context, server_names),
-        parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), *this));
-
-    need_tls_inspector |= filter_chain_match.transport_protocol() == "tls" ||
-                          (filter_chain_match.transport_protocol().empty() &&
-                           (!server_names.empty() || !application_protocols.empty()));
-  }
-
-  // Convert both destination and source IP CIDRs to tries for faster lookups.
-  filter_chain_manager_.finishFilterChain();
-
+  Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
+      parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
+      parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
+      parent_.server_.threadLocal(), parent_.server_.messageValidationVisitor(),
+      parent_.server_.api());
+  factory_context.setInitManager(initManager());
+  ListenerFilterChainFactoryBuilder builder(*this, factory_context);
+  filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
+  const bool need_tls_inspector =
+      std::any_of(
+          config.filter_chains().begin(), config.filter_chains().end(),
+          [](const auto& filter_chain) {
+            const auto& matcher = filter_chain.filter_chain_match();
+            return matcher.transport_protocol() == "tls" ||
+                   (matcher.transport_protocol().empty() &&
+                    (!matcher.server_names().empty() || !matcher.application_protocols().empty()));
+          }) &&
+      not std::any_of(config.listener_filters().begin(), config.listener_filters().end(),
+                      [](const auto& filter) {
+                        return filter.name() ==
+                               Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector;
+                      });
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
   if (need_tls_inspector) {
-    for (const auto& filter : config.listener_filters()) {
-      if (filter.name() == Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector) {
-        need_tls_inspector = false;
-        break;
-      }
-    }
-    if (need_tls_inspector) {
-      const std::string message =
-          fmt::format("adding listener '{}': filter chain match rules require TLS Inspector "
-                      "listener filter, but it isn't configured, trying to inject it "
-                      "(this might fail if Envoy is compiled without it)",
-                      address_->asString());
-      ENVOY_LOG(warn, "{}", message);
+    const std::string message =
+        fmt::format("adding listener '{}': filter chain match rules require TLS Inspector "
+                    "listener filter, but it isn't configured, trying to inject it "
+                    "(this might fail if Envoy is compiled without it)",
+                    address_->asString());
+    ENVOY_LOG(warn, "{}", message);
 
-      auto& factory =
-          Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
-              Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector);
-      listener_filter_factories_.push_back(
-          factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
-    }
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+            Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector);
+    listener_filter_factories_.push_back(
+        factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
   }
 }
 
@@ -851,6 +782,41 @@ void ListenerManagerImpl::stopWorkers() {
   for (const auto& worker : workers_) {
     worker->stop();
   }
+}
+
+ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
+    ListenerImpl& listener,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
+    : parent_(listener), factory_context_(factory_context) {}
+
+std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
+    const ::envoy::api::v2::listener::FilterChain& filter_chain) const {
+  // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
+  // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
+  // We copy by value first then override if necessary.
+  auto transport_socket = filter_chain.transport_socket();
+  if (!filter_chain.has_transport_socket()) {
+    if (filter_chain.has_tls_context()) {
+      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
+      MessageUtil::jsonConvert(filter_chain.tls_context(), *transport_socket.mutable_config());
+    } else {
+      transport_socket.set_name(
+          Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
+    }
+  }
+
+  auto& config_factory = Config::Utility::getAndCheckFactory<
+      Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      transport_socket, parent_.messageValidationVisitor(), config_factory);
+
+  std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
+                                        filter_chain.filter_chain_match().server_names().end());
+
+  return std::make_unique<FilterChainImpl>(
+      config_factory.createTransportSocketFactory(*message, factory_context_,
+                                                  std::move(server_names)),
+      parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
 }
 
 } // namespace Server

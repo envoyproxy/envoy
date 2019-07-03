@@ -10,6 +10,7 @@ par_binary(
     name = "gcovr",
     srcs = [":renamed_gcovr.py"],
     main = ":renamed_gcovr.py",
+    python_version = "PY2",
     visibility = ["//visibility:public"],
 )
 
