@@ -74,6 +74,72 @@ TEST(DynamoRequestParser, parseTableNameSingleOperation) {
   }
 }
 
+TEST(DynamoRequestParser, parseTableNameTransactOperation) {
+  std::vector<std::string> supported_transact_operations{"TransactGetItems", "TransactWriteItems"};
+  // testing single table operation
+  {
+    std::string json_string = R"EOF(
+    {
+      "TransactItems": [
+        { "Update": { "TableName": "Pets", "Key": { "Name": {"S": "Maxine"} }, "AnimalType": {"S": "Dog"} } },
+        { "Put": { "TableName": "Pets", "Key": { "Name": {"S": "Max"} }, "AnimalType": {"S": "Puppy"} } },
+        { "Put": { "TableName": "Pets", "Key": { "Name": {"S": "Oscar"} }, "AnimalType": {"S": "Puppy"} } },
+        { "Put": { "TableName": "Pets", "Key": { "Name": {"S": "Chloe"} }, "AnimalType": {"S": "Puppy"} } }
+      ]
+    }
+    )EOF";
+    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(json_string);
+
+    for (const std::string& operation : supported_transact_operations) {
+      RequestParser::TableDescriptor table = RequestParser::parseTable(operation, *json_data);
+      EXPECT_EQ("Pets", table.table_name);
+      EXPECT_TRUE(table.is_single_table);
+    }
+  }
+
+  // testing multi-table operation
+  {
+    std::string json_string = R"EOF(
+    {
+      "TransactItems": [
+        { "Put": { "TableName": "Pets", "Key": { "AnimalType": {"S": "Dog"}, "Name": {"S": "Fido"} } } },
+        { "Delete": { "TableName": "Strays", "Key": { "AnimalType": {"S": "Dog"}, "Name": {"S": "Fido"} } } },
+        { "Put": { "TableName": "Pets", "Key": { "AnimalType": {"S": "Cat"}, "Name": {"S": "Max"} } } },
+        { "Delete": { "TableName": "Strays", "Key": { "AnimalType": {"S": "Cat"}, "Name": {"S": "Max"} } } }
+      ]
+    }
+    )EOF";
+    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(json_string);
+
+    for (const std::string& operation : supported_transact_operations) {
+      RequestParser::TableDescriptor table = RequestParser::parseTable(operation, *json_data);
+      EXPECT_EQ("", table.table_name);
+      EXPECT_FALSE(table.is_single_table);
+    }
+  }
+
+  // testing missing table
+  {
+    std::string json_string = R"EOF(
+    {
+      "TransactItems": [
+        { "Put": { "TableName": "" } },
+        { "Delete": { "TableName": "Strays", "Key": { "AnimalType": {"S": "Dog"}, "Name": {"S": "Fido"} } } },
+        { "Put": { "TableName": "Pets", "Key": { "AnimalType": {"S": "Cat"}, "Name": {"S": "Max"} } } },
+        { "Delete": { "TableName": "Strays", "Key": { "AnimalType": {"S": "Cat"}, "Name": {"S": "Max"} } } }
+      ]
+    }
+    )EOF";
+    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(json_string);
+
+    for (const std::string& operation : supported_transact_operations) {
+      RequestParser::TableDescriptor table = RequestParser::parseTable(operation, *json_data);
+      EXPECT_EQ("", table.table_name);
+      EXPECT_TRUE(table.is_single_table);
+    }
+  }
+}
+
 TEST(DynamoRequestParser, parseErrorType) {
   {
     EXPECT_EQ("ResourceNotFoundException",

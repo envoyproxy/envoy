@@ -14,9 +14,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
-#include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -422,7 +420,7 @@ protected:
           return &active_dns_query_;
         }));
     ;
-    resolver_target.startResolve();
+    resolver_target.startResolveDns();
 
     EXPECT_CALL(active_dns_query_, cancel());
   }
@@ -434,10 +432,10 @@ protected:
         TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"}));
     discovery_session.registerDiscoveryAddress(std::move(dns_response), 22120);
     expectRedisResolve(true);
-    discovery_session.startResolve();
+    discovery_session.startResolveRedis();
 
-    // 2nd startResolve() call will be a no-opt until the first startResolve is done.
-    discovery_session.startResolve();
+    // 2nd startResolveRedis() call will be a no-opt until the first startResolve is done.
+    discovery_session.startResolveRedis();
 
     // Make sure cancel is called.
     EXPECT_CALL(pool_request_, cancel());
@@ -551,6 +549,30 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
   cluster_->initialize([&]() -> void { initialized_.ready(); });
 
   expectHealthyHosts(std::get<3>(GetParam()));
+}
+
+TEST_F(RedisClusterTest, EmptyDnsResponse) {
+  Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  setupFromV2Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{};
+  EXPECT_CALL(*dns_timer, enableTimer(_));
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1U, cluster_->info()->stats().update_empty_.value());
+
+  // Does not recreate the timer on subsequent DNS resolve calls.
+  EXPECT_CALL(*dns_timer, enableTimer(_));
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  dns_timer->invokeCallback();
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(2U, cluster_->info()->stats().update_empty_.value());
 }
 
 TEST_F(RedisClusterTest, Basic) {

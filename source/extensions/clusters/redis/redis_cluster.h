@@ -160,12 +160,13 @@ private:
 
     ~DnsDiscoveryResolveTarget();
 
-    void startResolve();
+    void startResolveDns();
 
     RedisCluster& parent_;
     Network::ActiveDnsQuery* active_query_{};
     const std::string dns_address_;
     const uint32_t port_;
+    Event::TimerPtr resolve_timer_;
   };
 
   using DnsDiscoveryResolveTargetPtr = std::unique_ptr<DnsDiscoveryResolveTarget>;
@@ -198,7 +199,7 @@ private:
     void registerDiscoveryAddress(std::list<Network::DnsResponse>&& response, const uint32_t port);
 
     // Start discovery against a random host from existing hosts
-    void startResolve();
+    void startResolveRedis();
 
     // Extensions::NetworkFilters::Common::Redis::Client::Config
     bool disableOutlierEvents() const override { return true; }

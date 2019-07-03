@@ -127,15 +127,16 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/benchmark/archive/v1.5.0.tar.gz"],
     ),
     com_github_libevent_libevent = dict(
-        sha256 = "6f799dd920aab9487cb04cd40627a5d4104fbbd246ebb5c8fd5e520055af2ef5",
+        sha256 = "549d34065eb2485dfad6c8de638caaa6616ed130eec36dd978f73b6bdd5af113",
         # This SHA includes the new "prepare" and "check" watchers, used for event loop performance
         # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
         # in the watchers (see https://github.com/libevent/libevent/pull/802).
-        # This also includes the fix for https://github.com/libevent/libevent/issues/806
+        # This also includes the fixes for https://github.com/libevent/libevent/issues/806
+        # and https://github.com/lyft/envoy-mobile/issues/215.
         # TODO(mergeconflict): Update to v2.2 when it is released.
-        strip_prefix = "libevent-3b1864b625ec37c3051512845982f347f4cc5621",
-        # 2019-05-16
-        urls = ["https://github.com/libevent/libevent/archive/3b1864b625ec37c3051512845982f347f4cc5621.tar.gz"],
+        strip_prefix = "libevent-0d7d85c2083f7a4c9efe01c061486f332b576d28",
+        # 2019-07-02
+        urls = ["https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"],
     ),
     net_zlib = dict(
         # TODO(moderation): revert to com_github_madler_zlib name pending resolution of workaround
@@ -197,11 +198,11 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/f9/e7/4f80d582578f8489226370762d2cf6bc9381175d1929eba1754e03f70708/twitter.common.finagle-thrift-0.3.9.tar.gz"],
     ),
     com_google_googletest = dict(
-        sha256 = "a4cb4b0c3ebb191b798594aca674ad47eee255dcb4c26885cf7f49777703484f",
-        strip_prefix = "googletest-eb9225ce361affe561592e0912320b9db84985d0",
+        sha256 = "cbd251a40485fddd44cdf641af6df2953d45695853af6d68aeb11c7efcde6771",
+        strip_prefix = "googletest-d7003576dd133856432e2e07340f45926242cc3a",
         # TODO(akonradi): Switch this back to a released version later than 1.8.1 once there is
         # one available.
-        urls = ["https://github.com/google/googletest/archive/eb9225ce361affe561592e0912320b9db84985d0.tar.gz"],
+        urls = ["https://github.com/google/googletest/archive/d7003576dd133856432e2e07340f45926242cc3a.tar.gz"],
     ),
     com_google_protobuf = dict(
         sha256 = "c10ef8d8ad5a9e5f850483051b7f9ee2c8bb3ca2e0e16a4cf105bd1321afb2d6",
