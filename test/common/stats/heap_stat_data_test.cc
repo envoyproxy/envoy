@@ -37,24 +37,24 @@ TEST_F(HeapStatDataTest, HeapNoTruncate) {
   const std::string long_string(128, 'A');
   StatName stat_name = makeStat(long_string);
   HeapStatData* stat{};
-  EXPECT_NO_LOGS(stat = &alloc_.alloc(stat_name));
+  EXPECT_NO_LOGS(stat = HeapStatData::alloc(stat_name, symbol_table_));
   EXPECT_EQ(stat->statName(), stat_name);
-  alloc_.free(*stat);
+  stat->free(symbol_table_);
 };
 
 TEST_F(HeapStatDataTest, HeapAlloc) {
-  HeapStatData* stat_1 = &alloc_.alloc(makeStat("ref_name"));
+  HeapStatData* stat_1 = HeapStatData::alloc(makeStat("ref_name"), symbol_table_);
   ASSERT_NE(stat_1, nullptr);
-  HeapStatData* stat_2 = &alloc_.alloc(makeStat("ref_name"));
+  HeapStatData* stat_2 = HeapStatData::alloc(makeStat("ref_name"), symbol_table_);
   ASSERT_NE(stat_2, nullptr);
-  HeapStatData* stat_3 = &alloc_.alloc(makeStat("not_ref_name"));
+  HeapStatData* stat_3 = HeapStatData::alloc(makeStat("not_ref_name"), symbol_table_);
   ASSERT_NE(stat_3, nullptr);
-  EXPECT_EQ(stat_1, stat_2);
+  EXPECT_NE(stat_1, stat_2);
   EXPECT_NE(stat_1, stat_3);
   EXPECT_NE(stat_2, stat_3);
-  alloc_.free(*stat_1);
-  alloc_.free(*stat_2);
-  alloc_.free(*stat_3);
+  stat_1->free(symbol_table_);
+  stat_2->free(symbol_table_);
+  stat_3->free(symbol_table_);
 }
 
 } // namespace

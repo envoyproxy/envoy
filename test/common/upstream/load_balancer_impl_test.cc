@@ -1175,7 +1175,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
   HostsPerLocalitySharedPtr upstream_hosts_per_locality = makeHostsPerLocality(
       {{makeTestHost(info_, "tcp://127.0.0.1:80")}, {makeTestHost(info_, "tcp://127.0.0.1:81")}},
       true);
-  HostsPerLocalitySharedPtr local_hosts_per_locality = upstream_hosts_per_locality;
+  const HostsPerLocalitySharedPtr& local_hosts_per_locality = upstream_hosts_per_locality;
 
   hostSet().healthy_hosts_ = *upstream_hosts;
   hostSet().hosts_ = *upstream_hosts;

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 
 #include "envoy/common/pure.h"
 
@@ -47,6 +48,20 @@ public:
    */
   virtual uint64_t max() PURE;
 };
+
+/**
+ * RAII wrapper that increments a resource on construction and decrements it on destruction.
+ */
+class ResourceAutoIncDec {
+public:
+  ResourceAutoIncDec(Resource& resource) : resource_(resource) { resource_.inc(); }
+  ~ResourceAutoIncDec() { resource_.dec(); }
+
+private:
+  Resource& resource_;
+};
+
+using ResourceAutoIncDecPtr = std::unique_ptr<ResourceAutoIncDec>;
 
 /**
  * Global resource manager that loosely synchronizes maximum connections, pending requests, etc.

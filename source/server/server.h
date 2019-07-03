@@ -38,8 +38,6 @@
 #include "server/overload_manager_impl.h"
 #include "server/worker_impl.h"
 
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
@@ -58,6 +56,7 @@ namespace Server {
   GAUGE(memory_allocated, Accumulate)                                                              \
   GAUGE(memory_heap_size, Accumulate)                                                              \
   GAUGE(parent_connections, Accumulate)                                                            \
+  GAUGE(state, NeverImport)                                                                        \
   GAUGE(total_connections, Accumulate)                                                             \
   GAUGE(uptime, Accumulate)                                                                        \
   GAUGE(version, NeverImport)
@@ -213,6 +212,7 @@ public:
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
+  void flushStatsInternal();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory, ListenerHooks& hooks);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
@@ -248,7 +248,7 @@ private:
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorPtr random_generator_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
-  std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> ssl_context_manager_;
+  std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;

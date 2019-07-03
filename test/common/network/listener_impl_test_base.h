@@ -5,6 +5,7 @@
 #include "common/network/utility.h"
 
 #include "test/test_common/network_utility.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -34,8 +35,8 @@ protected:
 
   const Address::IpVersion version_;
   const Address::InstanceConstSharedPtr alt_address_;
+  Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
 };
 

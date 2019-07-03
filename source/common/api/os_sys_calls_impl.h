@@ -17,6 +17,7 @@ public:
   SysCallSizeResult recv(int socket, void* buffer, size_t length, int flags) override;
   SysCallSizeResult recvfrom(int sockfd, void* buffer, size_t length, int flags,
                              struct sockaddr* addr, socklen_t* addrlen) override;
+  SysCallSizeResult recvmsg(int sockfd, struct msghdr* msg, int flags) override;
   SysCallIntResult close(int fd) override;
   SysCallIntResult ftruncate(int fd, off_t length) override;
   SysCallPtrResult mmap(void* addr, size_t length, int prot, int flags, int fd,

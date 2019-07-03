@@ -191,7 +191,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   if (config.certificateValidationContext() != nullptr &&
       !config.certificateValidationContext()->verifyCertificateSpkiList().empty()) {
-    for (auto hash : config.certificateValidationContext()->verifyCertificateSpkiList()) {
+    for (const auto& hash : config.certificateValidationContext()->verifyCertificateSpkiList()) {
       const auto decoded = Base64::decode(hash);
       if (decoded.size() != SHA256_DIGEST_LENGTH) {
         throw EnvoyException(fmt::format("Invalid base64-encoded SHA-256 {}", hash));
@@ -895,7 +895,7 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 
   if (encrypt == 1) {
     // Encrypt
-    RELEASE_ASSERT(session_ticket_keys_.size() >= 1, "");
+    RELEASE_ASSERT(!session_ticket_keys_.empty(), "");
     // TODO(ggreenway): validate in SDS that session_ticket_keys_ cannot be empty,
     // or if we allow it to be emptied, reconfigure the context so this callback
     // isn't set.

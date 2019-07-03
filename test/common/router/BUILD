@@ -78,6 +78,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "scoped_config_impl_test",
+    srcs = ["scoped_config_impl_test.cc"],
+    external_deps = [
+        "abseil_strings",
+    ],
+    deps = [
+        "//source/common/router:scoped_config_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "scoped_rds_test",
     srcs = ["scoped_rds_test.cc"],
     external_deps = [

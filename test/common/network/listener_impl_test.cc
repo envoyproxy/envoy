@@ -252,7 +252,7 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
   timer->enableTimer(std::chrono::milliseconds(2000));
 
   EXPECT_CALL(listener_callbacks, onAccept_(_, _)).Times(0);
-
+  time_system_.sleep(std::chrono::milliseconds(2000));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // When the listener is re-enabled, the pending connection should be accepted.
