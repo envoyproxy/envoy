@@ -269,8 +269,8 @@ TEST(SliceDequeTest, CreateDelete) {
 
 class BufferHelperTest : public BufferImplementationParamTest {};
 
-INSTANTIATE_TEST_CASE_P(BufferHelperTest, BufferHelperTest,
-                        testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
+INSTANTIATE_TEST_SUITE_P(BufferHelperTest, BufferHelperTest,
+                         testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
 
 TEST_P(BufferHelperTest, PeekI8) {
   {

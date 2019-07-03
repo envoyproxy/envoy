@@ -79,10 +79,11 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
 
   // Merge in the headers.
   if (request_headers.EnvoyRetryOn()) {
-    retry_on_ |= parseRetryOn(request_headers.EnvoyRetryOn()->value().getStringView());
+    retry_on_ |= parseRetryOn(request_headers.EnvoyRetryOn()->value().getStringView()).first;
   }
   if (request_headers.EnvoyRetryGrpcOn()) {
-    retry_on_ |= parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView());
+    retry_on_ |=
+        parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView()).first;
   }
   if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
     uint64_t temp;
@@ -113,8 +114,9 @@ void RetryStateImpl::enableBackoffTimer() {
   retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
 }
 
-uint32_t RetryStateImpl::parseRetryOn(absl::string_view config) {
+std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config) {
   uint32_t ret = 0;
+  bool all_fields_valid = true;
   for (const auto retry_on : StringUtil::splitToken(config, ",")) {
     if (retry_on == Http::Headers::get().EnvoyRetryOnValues._5xx) {
       ret |= RetryPolicy::RETRY_ON_5XX;
@@ -128,14 +130,17 @@ uint32_t RetryStateImpl::parseRetryOn(absl::string_view config) {
       ret |= RetryPolicy::RETRY_ON_REFUSED_STREAM;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RetriableStatusCodes) {
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
+    } else {
+      all_fields_valid = false;
     }
   }
 
-  return ret;
+  return {ret, all_fields_valid};
 }
 
-uint32_t RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header) {
+std::pair<uint32_t, bool> RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header) {
   uint32_t ret = 0;
+  bool all_fields_valid = true;
   for (const auto retry_on : StringUtil::splitToken(retry_grpc_on_header, ",")) {
     if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Cancelled) {
       ret |= RetryPolicy::RETRY_ON_GRPC_CANCELLED;
@@ -147,10 +152,12 @@ uint32_t RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header
       ret |= RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Internal) {
       ret |= RetryPolicy::RETRY_ON_GRPC_INTERNAL;
+    } else {
+      all_fields_valid = false;
     }
   }
 
-  return ret;
+  return {ret, all_fields_valid};
 }
 
 void RetryStateImpl::resetRetry() {

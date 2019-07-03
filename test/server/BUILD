@@ -283,6 +283,18 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "ssl_context_manager_test",
+    srcs = ["ssl_context_manager_test.cc"],
+    deps = [
+        "//source/server:ssl_context_manager_lib",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "utility_lib",
     hdrs = ["utility.h"],
