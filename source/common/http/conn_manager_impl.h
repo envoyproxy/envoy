@@ -337,6 +337,7 @@ private:
                          ActiveStream::FilterIterationStartState::CanStartFromCurrent);
     }
     void drainSavedResponseMetadata() {
+      ASSERT(saved_response_metadata_ != nullptr);
       for (auto& metadata_map : *getSavedResponseMetadata()) {
         parent_.encodeMetadata(this, std::move(metadata_map));
       }
