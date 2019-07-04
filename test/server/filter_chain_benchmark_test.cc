@@ -104,7 +104,7 @@ private:
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
 };
-const std::string yaml_header = R"EOF(
+const char YamlHeader[] = R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
@@ -121,7 +121,7 @@ const std::string yaml_header = R"EOF(
         session_ticket_keys:
           keys:
           - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
-const std::string yaml_single_server = R"EOF(
+const char YamlSingleServer[] = R"EOF(
     - filter_chain_match:
         server_names: "server1.example.com"
         transport_protocol: "tls"
@@ -133,10 +133,10 @@ const std::string yaml_single_server = R"EOF(
         session_ticket_keys:
           keys:
           - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
-const std::string yaml_single_dst_port_top = R"EOF(
+const char YamlSingleDstPortTop[] = R"EOF(
     - filter_chain_match:
         destination_port: )EOF";
-const std::string yaml_single_dst_port_bottom = R"EOF(
+const char YamlSingleDstPortBottom[] = R"EOF(
       tls_context:
         common_tls_context:
           tls_certificates:
@@ -153,11 +153,10 @@ public:
     int64_t input_size = state.range(0);
     std::vector<std::string> port_chains;
     for (int i = 0; i < input_size; i++) {
-      port_chains.push_back(
-          absl::StrCat(yaml_single_dst_port_top, 10000 + i, yaml_single_dst_port_bottom));
+      port_chains.push_back(absl::StrCat(YamlSingleDstPortTop, 10000 + i, YamlSingleDstPortBottom));
     }
     listener_yaml_config_ = TestEnvironment::substitute(
-        absl::StrCat(yaml_header, yaml_single_server, absl::StrJoin(port_chains, "")),
+        absl::StrCat(YamlHeader, YamlSingleServer, absl::StrJoin(port_chains, "")),
         Network::Address::IpVersion::v4);
     TestUtility::loadFromYaml(listener_yaml_config_, listener_config_);
     filter_chains_ = listener_config_.filter_chains();
@@ -208,20 +207,30 @@ BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainFindTest)
     });
 
 /*
+clang-format off
+
+Run on (32 X 2200 MHz CPU s)
+CPU Caches:
+  L1 Data 32K (x16)
+  L1 Instruction 32K (x16)
+  L2 Unified 256K (x16)
+  L3 Unified 56320K (x1)
+Load Average: 19.05, 9.89, 3.92
 -------------------------------------------------------------------------------------------------------
-Benchmark                                                             Time             CPU
-Iterations
+Benchmark                                                             Time             CPU   Iterations
 -------------------------------------------------------------------------------------------------------
-FilterChainBenchmarkFixture/FilterChainManagerBuildTest/1         60839 ns        60833 ns 11700
-FilterChainBenchmarkFixture/FilterChainManagerBuildTest/8        233775 ns       233759 ns 3137
-FilterChainBenchmarkFixture/FilterChainManagerBuildTest/64      2045695 ns      1950081 ns 349
-FilterChainBenchmarkFixture/FilterChainManagerBuildTest/512    13860128 ns     13582855 ns 49
-FilterChainBenchmarkFixture/FilterChainManagerBuildTest/4096  128333290 ns    127249140 ns 6
-FilterChainBenchmarkFixture/FilterChainFindTest/1                   214 ns          214 ns 3230736
-FilterChainBenchmarkFixture/FilterChainFindTest/8                  1848 ns         1848 ns 397754
-FilterChainBenchmarkFixture/FilterChainFindTest/64                16612 ns        16609 ns 41876
-FilterChainBenchmarkFixture/FilterChainFindTest/512              164513 ns       164316 ns 4125
-FilterChainBenchmarkFixture/FilterChainFindTest/4096            4066173 ns      4061772 ns 226
+FilterChainBenchmarkFixture/FilterChainManagerBuildTest/1         51002 ns        50998 ns        12033
+FilterChainBenchmarkFixture/FilterChainManagerBuildTest/8        205175 ns       205161 ns         3782
+FilterChainBenchmarkFixture/FilterChainManagerBuildTest/64      1400449 ns      1400328 ns          485
+FilterChainBenchmarkFixture/FilterChainManagerBuildTest/512    10488106 ns     10485949 ns           62
+FilterChainBenchmarkFixture/FilterChainManagerBuildTest/4096  118373326 ns    117786871 ns            7
+FilterChainBenchmarkFixture/FilterChainFindTest/1                   209 ns          209 ns      3257004
+FilterChainBenchmarkFixture/FilterChainFindTest/8                  1780 ns         1780 ns       391501
+FilterChainBenchmarkFixture/FilterChainFindTest/64                16707 ns        16705 ns        42110
+FilterChainBenchmarkFixture/FilterChainFindTest/512              150220 ns       150072 ns         4675
+FilterChainBenchmarkFixture/FilterChainFindTest/4096            2227852 ns      2227703 ns          320
+
+clang-format on
 */
 } // namespace Server
 } // namespace Envoy
