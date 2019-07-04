@@ -408,11 +408,7 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
 bool RouterCheckTool::runtimeMock(const std::string& key,
                                   const envoy::type::FractionalPercent& default_value,
                                   uint64_t random_value) {
-  if (active_runtime.empty()) {
-    return false;
-  }
-
-  return active_runtime.compare(key) == 0 &&
+  return !active_runtime.empty() && active_runtime.compare(key) == 0 &&
          ProtobufPercentHelper::evaluateFractionalPercent(default_value, random_value);
 }
 
