@@ -935,7 +935,9 @@ TEST(HostImplTest, Weight) {
 
   EXPECT_EQ(1U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 0)->weight());
   EXPECT_EQ(128U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 128)->weight());
-  EXPECT_EQ(128U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 129)->weight());
+  EXPECT_EQ(std::numeric_limits<uint32_t>::max(),
+            makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", std::numeric_limits<uint32_t>::max())
+                ->weight());
 
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 50);
   EXPECT_EQ(50U, host->weight());
@@ -943,8 +945,8 @@ TEST(HostImplTest, Weight) {
   EXPECT_EQ(51U, host->weight());
   host->weight(0);
   EXPECT_EQ(1U, host->weight());
-  host->weight(129);
-  EXPECT_EQ(128U, host->weight());
+  host->weight(std::numeric_limits<uint32_t>::max());
+  EXPECT_EQ(std::numeric_limits<uint32_t>::max(), host->weight());
 }
 
 TEST(HostImplTest, HostnameCanaryAndLocality) {
