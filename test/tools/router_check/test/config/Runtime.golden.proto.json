@@ -10,7 +10,6 @@
           "internal": true
         },
         "validate": {
-          "path_redirect": "",
           "cluster_name": "www3"
         }
       },
@@ -22,10 +21,25 @@
           "method": "GET",
           "ssl": true,
           "internal": true,
-          "runtime": "runtime.key"
+          "runtime": "runtime.key",
+          "random_value": 70
         },
         "validate": {
-          "path_redirect": "",
+          "cluster_name": "www3"
+        }
+      },
+      {
+        "test_name": "Test_3",
+        "input": {
+          "authority": "www.lyft.com",
+          "path": "/",
+          "method": "GET",
+          "ssl": true,
+          "internal": true,
+          "runtime": "runtime.key",
+          "random_value": 20
+        },
+        "validate": {
           "cluster_name": "www2"
         }
       }

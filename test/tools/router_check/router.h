@@ -130,7 +130,8 @@ private:
   bool compareResults(const std::string& actual, const std::string& expected,
                       const std::string& test_type);
 
-  bool runtimeMock(const std::string& key, testing::Unused, testing::Unused);
+  bool runtimeMock(const std::string& key, const envoy::type::FractionalPercent& default_value,
+                   uint64_t random_value);
 
   bool headers_finalized_{false};
 

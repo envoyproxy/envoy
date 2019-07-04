@@ -8,7 +8,7 @@ virtual_hosts:
         runtime_fraction:
           runtime_key: runtime.key
           default_value:
-            numerator: 100
+            numerator: 30
             denominator: HUNDRED
       route:
         cluster: www2

@@ -83,10 +83,10 @@ RouterCheckTool::RouterCheckTool(
     Api::ApiPtr api)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
       stats_(std::move(stats)), api_(std::move(api)) {
-  EXPECT_CALL(factory_context_->runtime_loader_.snapshot_,
-              featureEnabled(_, testing::An<const envoy::type::FractionalPercent&>(),
-                             testing::An<uint64_t>()))
-      .WillRepeatedly(testing::Invoke(this, &RouterCheckTool::runtimeMock));
+  ON_CALL(factory_context_->runtime_loader_.snapshot_,
+          featureEnabled(_, testing::An<const envoy::type::FractionalPercent&>(),
+                         testing::An<uint64_t>()))
+      .WillByDefault(testing::Invoke(this, &RouterCheckTool::runtimeMock));
 }
 
 // TODO(jyotima): Remove this code path once the json schema code path is deprecated.
@@ -402,12 +402,18 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
   return false;
 }
 
-bool RouterCheckTool::runtimeMock(const std::string& key, testing::Unused, testing::Unused) {
+// The Mock for runtime value checks.
+// This is a simple implementation to mimic the actual runtime checks at
+// https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_impl.cc#L250
+bool RouterCheckTool::runtimeMock(const std::string& key,
+                                  const envoy::type::FractionalPercent& default_value,
+                                  uint64_t random_value) {
   if (active_runtime.empty()) {
     return false;
   }
 
-  return active_runtime.compare(key) == 0;
+  return active_runtime.compare(key) == 0 &&
+         ProtobufPercentHelper::evaluateFractionalPercent(default_value, random_value);
 }
 
 Options::Options(int argc, char** argv) {
