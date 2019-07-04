@@ -7,8 +7,8 @@ Modified versions of the "hello world" example apps were used to run these exper
 
 - :tree:`Android control app <8636711/examples/kotlin/control>`
 - :tree:`Android Envoy app <8636711/examples/kotlin/hello_world>`
-- :tree:`iOS control app <f05d43f/examples/objective-c/control/control>`
-- :tree:`iOS Envoy app <f05d43f/examples/objective-c/xcode_variant/EnvoyObjc/EnvoyObjc>`
+- :tree:`iOS control app <2f27581/examples/objective-c/control/control>`
+- :tree:`iOS Envoy app <2f27581/examples/objective-c/xcode_variant/EnvoyObjc/EnvoyObjc>`
 
 The 2 apps on each platform:
 
@@ -23,22 +23,21 @@ Results
 iOS
 ---
 
-Valid through SHA :tree:`f05d43f <f05d43f>`.
+Valid through SHA :tree:`2f27581 <2f27581>`.
 
 Envoy:
 
-- Avg CPU: >= 100%
+- Avg CPU: ~4%
 - Avg memory: 12MB
-- Battery: 12/20 Xcode Instruments score
+- Battery: 1/20 Xcode Instruments score
 
 Control:
 
-- Avg CPU: 12%
+- Avg CPU: ~2%
 - Avg memory: 6MB
 - Battery: 1/20 Xcode Instruments score
 
-**Based on these results, memory usage is similar. However, CPU (and consequently battery) usage is very high.**
-The root cause has been identified and is being tracked in :issue:`issue 215 <215>`.
+**Based on these results, control and Envoy are relatively similar with a slight increase using Envoy.**
 
 Android
 -------
@@ -67,7 +66,8 @@ Experimentation method
 iOS
 ---
 
-The original investigation was completed as part of :issue:`this issue <113>`.
+The original investigation was completed as part of :issue:`#113 <113>`,
+and a critical performance issue was fixed in :issue:`#215 <215>`.
 
 For analysis, the `Energy Diagnostics tool from Xcode Instruments <https://developer.apple.com/library/archive/documentation/Performance/Conceptual/EnergyGuide-iOS/MonitorEnergyWithInstruments.html>`_
 was used.
@@ -80,7 +80,7 @@ Both apps were run (one at a time) on a physical device (iPhone 6s iOS 12.2.x) w
 Reproducing the Envoy example app:
 
 1. Build the library using ``bazel build ios_dist --config=ios --config=fat``
-2. Copy ``./dist/Envoy.framework`` to the example's :tree:`source directory <f05d43f/examples/objective-c/xcode_variant/EnvoyObjc/EnvoyObjc>`
+2. Copy ``./dist/Envoy.framework`` to the example's :tree:`source directory <2f27581/examples/objective-c/xcode_variant/EnvoyObjc/EnvoyObjc>`
 3. Build/run the example app
 
 Android
@@ -123,15 +123,10 @@ Analysis
 iOS
 ---
 
-Envoy had a reasonable increase in memory usage of a few megabytes compared to control.
+Envoy had a small increase in memory and CPU usage compared to control.
 
-CPU/battery usage, however, was much higher. After some digging, the largest contributor to this usage
-was :issue:`identified as a poller <113#issuecomment-505676324>`.
-
-Upon further investigation, the :issue:`root cause was determined <113#issuecomment-507425528>`
-to be that ``poll_dispatch`` was being used by ``libevent`` instead of the much more performant ``kqueue``.
-Forcing ``libevent`` to use ``kqueue`` reduced the CPU usage **from >= 100% down to ~3%**.
-This issue and the subsequent fix are being tracked :issue:`here <215>`.
+During the :issue:`initial investigation <113#issuecomment-505676324>`, we identified and fixed
+:issue:`issue <215>` with ``libevent`` that was severely degrading CPU (and subsequently battery) performance.
 
 :issue:`We used Wireshark <113#issuecomment-505673869>` to validate that
 network traffic was flowing through Envoy on the phone every ``200ms``, giving us confidence that there was
