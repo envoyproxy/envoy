@@ -43,7 +43,7 @@ expects a cluster name match of "instant-server".::
 .. code-block:: yaml
 
   tests
-  - test_name: "...",
+  - test_name: ...,
     input:
       authority: ...,
       path": ...,
@@ -87,8 +87,8 @@ input
     If not specified, or if internal is equal to false, x-envoy-internal is not set.
 
   random_value
-    *(optional, integer)* An integer used to identify the target for weighted cluster selection and
-    as a factor for the routing engine to decide whether a runtime based route takes effect.
+    *(optional, integer)* An integer used to identify the target for weighted cluster selection
+    and as a factor for the routing engine to decide whether a runtime based route takes effect.
     The default value of random_value is 0.
 
   ssl
