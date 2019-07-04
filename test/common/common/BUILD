@@ -205,6 +205,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "thread_id_test",
+    srcs = ["thread_id_test.cc"],
+    external_deps = ["abseil_hash_testing"],
+    deps = [
+        "//source/common/common:thread_lib",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "stl_helpers_test",
     srcs = ["stl_helpers_test.cc"],
     deps = [

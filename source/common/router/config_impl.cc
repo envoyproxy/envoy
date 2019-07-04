@@ -70,8 +70,8 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
-  retry_on_ = RetryStateImpl::parseRetryOn(retry_policy.retry_on());
-  retry_on_ |= RetryStateImpl::parseRetryGrpcOn(retry_policy.retry_on());
+  retry_on_ = RetryStateImpl::parseRetryOn(retry_policy.retry_on()).first;
+  retry_on_ |= RetryStateImpl::parseRetryGrpcOn(retry_policy.retry_on()).first;
 
   for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(

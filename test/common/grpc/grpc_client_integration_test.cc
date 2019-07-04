@@ -396,8 +396,8 @@ public:
     AssertionResult result = fake_stream.waitForHeadersComplete();
     RELEASE_ASSERT(result, result.message());
     Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
-    if (access_token_value_ != "") {
-      if (access_token_value_2_ == "") {
+    if (!access_token_value_.empty()) {
+      if (access_token_value_2_.empty()) {
         EXPECT_EQ("Bearer " + access_token_value_, stream_headers.get_("authorization"));
       } else {
         EXPECT_EQ("Bearer " + access_token_value_ + ",Bearer " + access_token_value_2_,
@@ -414,10 +414,10 @@ public:
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     google_grpc->add_call_credentials()->set_access_token(access_token_value_);
-    if (access_token_value_2_ != "") {
+    if (!access_token_value_2_.empty()) {
       google_grpc->add_call_credentials()->set_access_token(access_token_value_2_);
     }
-    if (refresh_token_value_ != "") {
+    if (!refresh_token_value_.empty()) {
       google_grpc->add_call_credentials()->set_google_refresh_token(refresh_token_value_);
     }
     return config;

@@ -210,6 +210,10 @@ message ResponseFlags {
 
   // Indicates that the stream idle timeout was hit, resulting in a downstream 408.
   bool stream_idle_timeout = 17;
+
+  // Indicates that the request was rejected because an envoy request header failed strict
+  // validation.
+  bool invalid_envoy_request_headers = 18;
 }
 
 // Properties of a negotiated TLS connection.

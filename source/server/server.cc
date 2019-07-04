@@ -43,6 +43,7 @@
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
 #include "server/listener_hooks.h"
+#include "server/ssl_context_manager.h"
 
 namespace Envoy {
 namespace Server {
@@ -61,7 +62,7 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
       thread_local_(tls), api_(new Api::Impl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),
-      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
+      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
@@ -354,8 +355,7 @@ void InstanceImpl::initialize(const Options& options,
   hooks.onRuntimeCreated();
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_source_);
+  ssl_context_manager_ = createContextManager(Ssl::ContextManagerFactory::name(), time_source_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,

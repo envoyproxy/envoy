@@ -5,8 +5,7 @@ Dynamic forward proxy
 
 .. attention::
 
-  HTTP dynamic forward proxy support should be considered alpha and not production ready. Circuit
-  breakers are missing and will be added soon.
+  HTTP dynamic forward proxy support should be considered alpha and not production ready.
 
 * HTTP dynamic forward proxy :ref:`architecture overview <arch_overview_http_dynamic_forward_proxy>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig>`

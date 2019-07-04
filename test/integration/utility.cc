@@ -24,6 +24,8 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 void BufferingStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!complete_);
@@ -140,7 +142,7 @@ Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data, bool 
   data_.append(data.toString());
   data.drain(data.length());
   read_end_stream_ = end_stream;
-  if ((!data_to_wait_for_.empty() && data_.find(data_to_wait_for_) == 0) ||
+  if ((!data_to_wait_for_.empty() && absl::StartsWith(data_, data_to_wait_for_)) ||
       (exact_match_ == false && data_.find(data_to_wait_for_) != std::string::npos) || end_stream) {
     data_to_wait_for_.clear();
     dispatcher_.exit();

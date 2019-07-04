@@ -64,10 +64,10 @@ struct CompositeResultWith{{ field_count }}Fields {
   }
 };
 
-typedef CompositeDeserializerWith{{ field_count }}Delegates<
+using TestCompositeDeserializer{{ field_count }} =
+  CompositeDeserializerWith{{ field_count }}Delegates<
   CompositeResultWith{{ field_count }}Fields
-  {% for field in range(1, field_count + 1) %}, StringDeserializer{% endfor %}
-> TestCompositeDeserializer{{ field_count }};
+  {% for field in range(1, field_count + 1) %}, StringDeserializer{% endfor %}>;
 
 TEST(CompositeDeserializerWith{{ field_count }}Delegates, EmptyBufferShouldNotBeReady) {
   // given

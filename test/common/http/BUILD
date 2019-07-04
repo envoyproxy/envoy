@@ -333,6 +333,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/core:protocol_cc",
     ],
 )
 
