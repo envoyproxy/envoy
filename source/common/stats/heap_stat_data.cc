@@ -143,30 +143,30 @@ public:
 
   // Stats::Gauge
   void add(uint64_t amount) override {
-    Thread::LockGuard lock(mutex_);
+    absl::MutexLock lock(&mutex_);
     value_ += amount;
     flags_ |= Flags::Used;
   }
   void dec() override { sub(1); }
   void inc() override { add(1); }
   void set(uint64_t value) override {
-    Thread::LockGuard lock(mutex_);
+    absl::MutexLock lock(&mutex_);
     value_ = value;
     flags_ |= Flags::Used;
   }
   void sub(uint64_t amount) override {
-    Thread::LockGuard lock(mutex_);
+    absl::MutexLock lock(&mutex_);
     ASSERT(value_ >= amount);
     ASSERT(usedLockHeld() || amount == 0);
     value_ -= amount;
   }
   uint64_t value() const override {
-    Thread::LockGuard lock(mutex_);
+    absl::MutexLock lock(&mutex_);
     return value_;
   }
 
   ImportMode importMode() const override {
-    Thread::LockGuard lock(mutex_);
+    absl::MutexLock lock(&mutex_);
     return importModeLockHeld();
   }
 
@@ -180,7 +180,7 @@ public:
   }
 
   void mergeImportMode(ImportMode import_mode) override {
-    Thread::LockGuard lock(mutex_);
+    absl::MutexLock lock(&mutex_);
     ImportMode current = importModeLockHeld();
     if (current == import_mode) {
       return;
@@ -209,7 +209,7 @@ public:
 
   // Metric
   bool used() const override {
-    Thread::LockGuard lock(mutex_);
+    absl::MutexLock lock(&mutex_);
     return usedLockHeld();
   }
 
@@ -229,7 +229,7 @@ private:
   // Holds backing store for both CounterImpl and GaugeImpl. This provides a level
   // of indirection needed to enable stats created with the same name from
   // different scopes to share the same value.
-  mutable Thread::MutexBasicLockable mutex_;
+  mutable absl::Mutex mutex_; // 8 bytes smaller than Thread::MutexBasicLockable.
   uint64_t value_ GUARDED_BY(mutex_);
   uint16_t flags_ GUARDED_BY(mutex_);
   std::atomic<uint16_t> ref_count_{0};
