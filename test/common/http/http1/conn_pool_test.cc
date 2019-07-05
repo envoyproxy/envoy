@@ -272,6 +272,45 @@ TEST_F(Http1ConnPoolImplTest, VerifyBufferLimits) {
 }
 
 /**
+ * Verify that canceling pending connections within the callback works.
+ */
+TEST_F(Http1ConnPoolImplTest, VerifyCancelInCallback) {
+  Http::ConnectionPool::Cancellable* handle1{};
+  Http::ConnectionPool::Cancellable* handle2{};
+  // In this scenario, all connections must succeed, so when
+  // one fails, the others are canceled.
+  ConnPoolCallbacks callbacks1;
+  EXPECT_CALL(callbacks1.pool_failure_, ready()).Times(1).WillRepeatedly(Invoke([&]() -> void {
+    if (handle2 != nullptr) {
+      handle2->cancel();
+      handle2 = nullptr;
+    }
+  }));
+  ConnPoolCallbacks callbacks2;
+  EXPECT_CALL(callbacks2.pool_failure_, ready()).Times(1).WillRepeatedly(Invoke([&]() -> void {
+    if (handle1 != nullptr) {
+      handle1->cancel();
+      handle1 = nullptr;
+    }
+  }));
+
+  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  // Create the first client.
+  conn_pool_.expectClientCreate();
+  handle1 = conn_pool_.newStream(outer_decoder, callbacks1);
+  ASSERT_NE(nullptr, handle1);
+
+  // Create the second client.
+  handle2 = conn_pool_.newStream(outer_decoder, callbacks2);
+  ASSERT_NE(nullptr, handle2);
+
+  // Simulate connection failure.
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
  * Tests a request that generates a new connection, completes, and then a second request that uses
  * the same connection.
  */
