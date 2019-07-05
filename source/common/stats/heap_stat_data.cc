@@ -110,9 +110,7 @@ public:
   uint32_t use_count() const override { return ref_count_; }
 
 private:
-  // Holds backing store for both CounterImpl and GaugeImpl. This provides a level
-  // of indirection needed to enable stats created with the same name from
-  // different scopes to share the same value.
+  // All counter state is held in individual atomics.
   std::atomic<uint64_t> value_{0};
   std::atomic<uint64_t> pending_increment_{0};
   std::atomic<uint16_t> flags_{0};
