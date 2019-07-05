@@ -43,6 +43,8 @@ using ParserSharedPtr = std::shared_ptr<Parser<MessageType, FailureDataType>>;
  */
 template <typename MessageType, typename FailureDataType> class ParseResponse {
 public:
+  using failure_type = FailureDataType;
+
   /**
    * Constructs a response that states that parser still needs data and should not be replaced.
    */
@@ -86,6 +88,29 @@ public:
   ParserSharedPtr<MessageType, FailureDataType> next_parser_;
   MessageType message_;
   FailureDataType failure_data_;
+};
+
+template <typename ContextType, typename ResponseType> class AbstractSentinelParser {
+public:
+  AbstractSentinelParser(ContextType context) : context_{context} {};
+
+  ResponseType parse(absl::string_view& data) {
+    const uint32_t min = std::min<uint32_t>(context_->remaining(), data.size());
+    data = {data.data() + min, data.size() - min};
+    context_->remaining() -= min;
+    if (0 == context_->remaining()) {
+      using failure_type = typename ResponseType::failure_type::element_type;
+      auto failure_data = std::make_shared<failure_type>(context_->asFailureData());
+      return ResponseType::parseFailure(failure_data);
+    } else {
+      return ResponseType::stillWaiting();
+    }
+  }
+
+  const ContextType contextForTest() const { return context_; }
+
+private:
+  ContextType context_;
 };
 
 } // namespace Kafka

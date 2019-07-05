@@ -51,6 +51,7 @@ using testing::AnyNumber;
 using testing::AtLeast;
 using testing::DoAll;
 using testing::Eq;
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -4294,5 +4295,67 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
   Buffer::OwnedImpl fake_input;
   conn_manager_->onData(fake_input, false);
 }
+
+TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
+  setup(false, "");
+
+  // Set up the codec.
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+    data.drain(4);
+  }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  setupFilterChain(1, 1);
+
+  // Create a new stream
+  StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+
+  // Send headers to that stream, and verify we both set and clear the tracked object.
+  {
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_))
+        .Times(2)
+        .WillOnce(Invoke([](const ScopeTrackedObject* object) -> const ScopeTrackedObject* {
+          ASSERT(object != nullptr); // On the first call, this should be the active stream.
+          std::stringstream out;
+          object->dumpState(out);
+          std::string state = out.str();
+          EXPECT_THAT(state, testing::HasSubstr("request_headers_: null"));
+          EXPECT_THAT(state, testing::HasSubstr("protocol_: 1"));
+          return nullptr;
+        }))
+        .WillRepeatedly(Return(nullptr));
+    EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+        .WillOnce(Invoke([](HeaderMap&, bool) -> FilterHeadersStatus {
+          return FilterHeadersStatus::StopIteration;
+        }));
+    decoder->decodeHeaders(std::move(headers), false);
+  }
+
+  // Send trailers to that stream, and verify by this point headers are in logged state.
+  {
+    HeaderMapPtr trailers{new TestHeaderMapImpl{{"foo", "bar"}}};
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_))
+        .Times(2)
+        .WillOnce(Invoke([](const ScopeTrackedObject* object) -> const ScopeTrackedObject* {
+          ASSERT(object != nullptr); // On the first call, this should be the active stream.
+          std::stringstream out;
+          object->dumpState(out);
+          std::string state = out.str();
+          EXPECT_THAT(state, testing::HasSubstr("request_headers_: \n"));
+          EXPECT_THAT(state, testing::HasSubstr("':authority', 'host'\n"));
+          EXPECT_THAT(state, testing::HasSubstr("protocol_: 1"));
+          return nullptr;
+        }))
+        .WillRepeatedly(Return(nullptr));
+    EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+    EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
+        .WillOnce(Return(FilterTrailersStatus::StopIteration));
+    decoder->decodeTrailers(std::move(trailers));
+  }
+}
+
 } // namespace Http
 } // namespace Envoy

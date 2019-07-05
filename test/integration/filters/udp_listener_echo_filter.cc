@@ -33,8 +33,6 @@ void UdpListenerEchoFilter::onData(Network::UdpRecvData& data) {
   auto send_result = read_callbacks_->udpListener().send(send_data);
 
   ASSERT(send_result.ok());
-
-  return;
 }
 
 /**

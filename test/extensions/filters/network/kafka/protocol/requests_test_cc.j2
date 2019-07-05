@@ -38,7 +38,7 @@ template <typename T> std::shared_ptr<T> RequestTest::serializeAndDeserialize(T 
   putMessageIntoBuffer(message);
 
   std::shared_ptr<MockMessageListener> mock_listener = std::make_shared<MockMessageListener>();
-  RequestDecoder testee{RequestParserResolver::getDefaultInstance(), {mock_listener}};
+  RequestDecoder testee{ {mock_listener} };
 
   AbstractRequestSharedPtr received_message;
   EXPECT_CALL(*mock_listener, onMessage(testing::_))
