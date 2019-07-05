@@ -237,7 +237,6 @@ private:
         buffer_.drain(size_);
         size_ = 0;
       }
-      return;
     }
 
     TestDnsServerQuery& parent_;
