@@ -41,7 +41,6 @@ void ConnPoolImplBase::purgePendingRequests(
 void ConnPoolImplBase::onPendingRequestCancel(PendingRequest& request) {
   ENVOY_LOG(debug, "cancelling pending request");
   request.removeFromList(pending_requests_);
-
   host_->cluster().stats().upstream_rq_cancelled_.inc();
   checkForDrained();
 }
