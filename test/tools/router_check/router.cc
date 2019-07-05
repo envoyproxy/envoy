@@ -403,8 +403,7 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
 }
 
 // The Mock for runtime value checks.
-// This is a simple implementation to mimic the actual runtime checks at
-// https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_impl.cc#L250
+// This is a simple implementation to mimic the actual runtime checks in Snapshot.featureEnabled
 bool RouterCheckTool::runtimeMock(const std::string& key,
                                   const envoy::type::FractionalPercent& default_value,
                                   uint64_t random_value) {
