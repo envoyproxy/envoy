@@ -209,7 +209,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/06/17  7243     49412       49700   macros for exact/upper-bound memory checks
   // 2019/06/29  7364     45685       46000   combine 2 levels of stat ref-counting into 1
   // 2019/06/30  7428     42742       43000   remove stats multiple inheritance, inline HeapStatData
-  // 2019/07/03  4980     35224       35500   use real symbol tables
+  // 2019/07/03  4980     35393       35800   use real symbol tables
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
