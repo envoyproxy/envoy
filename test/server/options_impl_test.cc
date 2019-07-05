@@ -37,6 +37,7 @@ public:
   std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
     std::vector<std::string> words = TestUtility::split(args, ' ');
     std::vector<const char*> argv;
+    argv.reserve(words.size());
     for (const std::string& s : words) {
       argv.push_back(s.c_str());
     }
