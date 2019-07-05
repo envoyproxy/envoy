@@ -219,7 +219,11 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
   const uint32_t normalized_total_availability =
       calculateNormalizedTotalAvailability(per_priority_health_, per_priority_degraded_);
 
-  if (normalized_total_availability == 0) {
+  uint64_t global_panic_threshold = std::min<uint64_t>(
+      100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
+
+  // Panic mode is disabled only when global_panic_threshold is 0%.
+  if (global_panic_threshold > 0 && normalized_total_availability == 0) {
     // Everything is terrible. All load should be to P=0. Turn on panic mode.
     ASSERT(per_priority_load_.healthy_priority_load_.get()[0] == 100);
     per_priority_panic_[0] = true;
