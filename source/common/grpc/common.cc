@@ -54,7 +54,7 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
 
   uint64_t grpc_status_code;
   if (!grpc_status_header || grpc_status_header->value().empty()) {
-    return absl::optional<Status::GrpcStatus>();
+    return {};
   }
   if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
       grpc_status_code > Status::GrpcStatus::MaximumValid) {
