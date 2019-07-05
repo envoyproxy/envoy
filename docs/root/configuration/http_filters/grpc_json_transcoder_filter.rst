@@ -116,7 +116,9 @@ gRPC or RESTful JSON requests to localhost:51051.
               - name: local_service
                 domains: ["*"]
                 routes:
-                - match: { prefix: "/" }
+                # NOTE: by default, matching happens based on the gRPC route, and not on the incoming request path.
+                # Reference: https://www.envoyproxy.io/docs/envoy/latest/configuration/http_filters/grpc_json_transcoder_filter#route-configs-for-transcoded-requests
+                - match: { prefix: "/helloworld.Greeter" }
                   route: { cluster: grpc, timeout: { seconds: 60 } }
             http_filters:
             - name: envoy.grpc_json_transcoder
