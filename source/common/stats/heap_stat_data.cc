@@ -73,26 +73,9 @@ public:
 
   // Metric
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
-  bool used() const override { return flags_ & Metric::Flags::Used; }
-
-  // RefcountInterface
-  void incRefCount() override { ++ref_count_; }
-  bool decRefCount() override {
-    ASSERT(ref_count_ >= 1);
-    return --ref_count_ == 0;
-  }
-  uint32_t use_count() const override { return ref_count_; }
 
 protected:
   HeapStatDataAllocator& alloc_;
-
-  // Holds backing store for both CounterImpl and GaugeImpl. This provides a level
-  // of indirection needed to enable stats created with the same name from
-  // different scopes to share the same value.
-  std::atomic<uint64_t> value_{0};
-  std::atomic<uint64_t> pending_increment_{0};
-  std::atomic<uint16_t> flags_{0};
-  std::atomic<uint16_t> ref_count_{0};
 };
 
 class CounterImpl : public StatsSharedImpl<Counter> {
@@ -113,15 +96,34 @@ public:
   void inc() override { add(1); }
   uint64_t latch() override { return pending_increment_.exchange(0); }
   void reset() override { value_ = 0; }
-  bool used() const override { return flags_ & Flags::Used; }
   uint64_t value() const override { return value_; }
+
+  // Metric
+  bool used() const override { return flags_ & Metric::Flags::Used; }
+
+  // RefcountInterface
+  void incRefCount() override { ++ref_count_; }
+  bool decRefCount() override {
+    ASSERT(ref_count_ >= 1);
+    return --ref_count_ == 0;
+  }
+  uint32_t use_count() const override { return ref_count_; }
+
+private:
+  // Holds backing store for both CounterImpl and GaugeImpl. This provides a level
+  // of indirection needed to enable stats created with the same name from
+  // different scopes to share the same value.
+  std::atomic<uint64_t> value_{0};
+  std::atomic<uint64_t> pending_increment_{0};
+  std::atomic<uint16_t> flags_{0};
+  std::atomic<uint16_t> ref_count_{0};
 };
 
 class GaugeImpl : public StatsSharedImpl<Gauge> {
 public:
   GaugeImpl(StatName name, HeapStatDataAllocator& alloc, absl::string_view tag_extracted_name,
             const std::vector<Tag>& tags, ImportMode import_mode)
-      : StatsSharedImpl(name, alloc, tag_extracted_name, tags) {
+      : StatsSharedImpl(name, alloc, tag_extracted_name, tags), value_(0), flags_(0) {
     switch (import_mode) {
     case ImportMode::Accumulate:
       flags_ |= Flags::LogicAccumulate;
@@ -141,23 +143,34 @@ public:
 
   // Stats::Gauge
   void add(uint64_t amount) override {
+    Thread::LockGuard lock(mutex_);
     value_ += amount;
     flags_ |= Flags::Used;
   }
   void dec() override { sub(1); }
   void inc() override { add(1); }
   void set(uint64_t value) override {
+    Thread::LockGuard lock(mutex_);
     value_ = value;
     flags_ |= Flags::Used;
   }
   void sub(uint64_t amount) override {
+    Thread::LockGuard lock(mutex_);
     ASSERT(value_ >= amount);
-    ASSERT(used() || amount == 0);
+    ASSERT(usedLockHeld() || amount == 0);
     value_ -= amount;
   }
-  uint64_t value() const override { return value_; }
+  uint64_t value() const override {
+    Thread::LockGuard lock(mutex_);
+    return value_;
+  }
 
   ImportMode importMode() const override {
+    Thread::LockGuard lock(mutex_);
+    return importModeLockHeld();
+  }
+
+  ImportMode importModeLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     if (flags_ & Flags::NeverImport) {
       return ImportMode::NeverImport;
     } else if (flags_ & Flags::LogicAccumulate) {
@@ -167,7 +180,8 @@ public:
   }
 
   void mergeImportMode(ImportMode import_mode) override {
-    ImportMode current = importMode();
+    Thread::LockGuard lock(mutex_);
+    ImportMode current = importModeLockHeld();
     if (current == import_mode) {
       return;
     }
@@ -192,6 +206,33 @@ public:
       break;
     }
   }
+
+  // Metric
+  bool used() const override {
+    Thread::LockGuard lock(mutex_);
+    return usedLockHeld();
+  }
+
+  // RefcountInterface
+  void incRefCount() override { ++ref_count_; }
+  bool decRefCount() override {
+    ASSERT(ref_count_ >= 1);
+    return --ref_count_ == 0;
+  }
+  uint32_t use_count() const override { return ref_count_; }
+
+  bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+    return flags_ & Metric::Flags::Used;
+  }
+
+private:
+  // Holds backing store for both CounterImpl and GaugeImpl. This provides a level
+  // of indirection needed to enable stats created with the same name from
+  // different scopes to share the same value.
+  mutable Thread::MutexBasicLockable mutex_;
+  uint64_t value_ GUARDED_BY(mutex_);
+  uint16_t flags_ GUARDED_BY(mutex_);
+  std::atomic<uint16_t> ref_count_{0};
 };
 
 CounterSharedPtr HeapStatDataAllocator::makeCounter(StatName name,
