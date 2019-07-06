@@ -16,7 +16,7 @@
 #include "gtest/gtest.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "exe/signal_action.h"
+#include "common/signal/signal_action.h"
 #endif
 
 #include "absl/synchronization/notification.h"

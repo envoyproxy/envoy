@@ -26,10 +26,10 @@
 namespace Envoy {
 namespace Stats {
 
-class MockMetric : public virtual Metric {
+template <class BaseClass> class MockMetric : public BaseClass {
 public:
-  MockMetric();
-  ~MockMetric() override;
+  MockMetric() : name_(*this), tag_pool_(*symbol_table_) {}
+  ~MockMetric() override = default;
 
   // This bit of C++ subterfuge allows us to support the wealth of tests that
   // do metric->name_ = "foo" even though names are more complex now. Note
@@ -37,9 +37,16 @@ public:
   class MetricName {
   public:
     explicit MetricName(MockMetric& mock_metric) : mock_metric_(mock_metric) {}
-    ~MetricName();
+    ~MetricName() {
+      if (stat_name_storage_ != nullptr) {
+        stat_name_storage_->free(*mock_metric_.symbol_table_);
+      }
+    }
 
-    void operator=(absl::string_view str);
+    void operator=(absl::string_view str) {
+      name_ = std::string(str);
+      stat_name_storage_ = std::make_unique<StatNameStorage>(str, mock_metric_.symbolTable());
+    }
 
     std::string name() const { return name_; }
     StatName statName() const { return stat_name_storage_->statName(); }
@@ -58,19 +65,47 @@ public:
   std::string name() const override { return name_.name(); }
   StatName statName() const override { return name_.statName(); }
   std::vector<Tag> tags() const override { return tags_; }
-  void setTagExtractedName(absl::string_view name);
+  void setTagExtractedName(absl::string_view name) {
+    tag_extracted_name_ = std::string(name);
+    tag_extracted_stat_name_ =
+        std::make_unique<StatNameManagedStorage>(tagExtractedName(), *symbol_table_);
+  }
   std::string tagExtractedName() const override {
     return tag_extracted_name_.empty() ? name() : tag_extracted_name_;
   }
   StatName tagExtractedStatName() const override { return tag_extracted_stat_name_->statName(); }
-  void iterateTagStatNames(const TagStatNameIterFn& fn) const override;
-  void iterateTags(const TagIterFn& fn) const override;
+  void iterateTagStatNames(const Metric::TagStatNameIterFn& fn) const override {
+    ASSERT((tag_names_and_values_.size() % 2) == 0);
+    for (size_t i = 0; i < tag_names_and_values_.size(); i += 2) {
+      if (!fn(tag_names_and_values_[i], tag_names_and_values_[i + 1])) {
+        return;
+      }
+    }
+  }
+  void iterateTags(const Metric::TagIterFn& fn) const override {
+    for (const Tag& tag : tags_) {
+      if (!fn(tag)) {
+        return;
+      }
+    }
+  }
 
   Test::Global<FakeSymbolTableImpl> symbol_table_; // Must outlive name_.
   MetricName name_;
 
-  void setTags(const std::vector<Tag>& tags);
-  void addTag(const Tag& tag);
+  void setTags(const std::vector<Tag>& tags) {
+    tag_pool_.clear();
+    tags_ = tags;
+    for (const Tag& tag : tags) {
+      tag_names_and_values_.push_back(tag_pool_.add(tag.name_));
+      tag_names_and_values_.push_back(tag_pool_.add(tag.value_));
+    }
+  }
+  void addTag(const Tag& tag) {
+    tags_.emplace_back(tag);
+    tag_names_and_values_.push_back(tag_pool_.add(tag.name_));
+    tag_names_and_values_.push_back(tag_pool_.add(tag.value_));
+  }
 
 private:
   std::vector<Tag> tags_;
@@ -80,7 +115,17 @@ private:
   std::unique_ptr<StatNameManagedStorage> tag_extracted_stat_name_;
 };
 
-class MockCounter : public Counter, public MockMetric {
+template <class BaseClass> class MockStatWithRefcount : public MockMetric<BaseClass> {
+public:
+  // RefcountInterface
+  void incRefCount() override { refcount_helper_.incRefCount(); }
+  bool decRefCount() override { return refcount_helper_.decRefCount(); }
+  uint32_t use_count() const override { return refcount_helper_.use_count(); }
+
+  RefcountHelper refcount_helper_;
+};
+
+class MockCounter : public MockStatWithRefcount<Counter> {
 public:
   MockCounter();
   ~MockCounter() override;
@@ -105,7 +150,7 @@ private:
   RefcountHelper refcount_helper_;
 };
 
-class MockGauge : public Gauge, public MockMetric, public RefcountHelper {
+class MockGauge : public MockStatWithRefcount<Gauge> {
 public:
   MockGauge();
   ~MockGauge() override;
@@ -134,7 +179,7 @@ private:
   RefcountHelper refcount_helper_;
 };
 
-class MockHistogram : public Histogram, public MockMetric {
+class MockHistogram : public MockMetric<Histogram> {
 public:
   MockHistogram();
   ~MockHistogram() override;
@@ -142,10 +187,18 @@ public:
   MOCK_METHOD1(recordValue, void(uint64_t value));
   MOCK_CONST_METHOD0(used, bool());
 
+  // RefcountInterface
+  void incRefCount() override { refcount_helper_.incRefCount(); }
+  bool decRefCount() override { return refcount_helper_.decRefCount(); }
+  uint32_t use_count() const override { return refcount_helper_.use_count(); }
+
   Store* store_;
+
+private:
+  RefcountHelper refcount_helper_;
 };
 
-class MockParentHistogram : public ParentHistogram, public MockMetric {
+class MockParentHistogram : public MockMetric<ParentHistogram> {
 public:
   MockParentHistogram();
   ~MockParentHistogram() override;
@@ -159,10 +212,18 @@ public:
   MOCK_CONST_METHOD0(cumulativeStatistics, const HistogramStatistics&());
   MOCK_CONST_METHOD0(intervalStatistics, const HistogramStatistics&());
 
+  // RefcountInterface
+  void incRefCount() override { refcount_helper_.incRefCount(); }
+  bool decRefCount() override { return refcount_helper_.decRefCount(); }
+  uint32_t use_count() const override { return refcount_helper_.use_count(); }
+
   bool used_;
   Store* store_;
   std::shared_ptr<HistogramStatistics> histogram_stats_ =
       std::make_shared<HistogramStatisticsImpl>();
+
+private:
+  RefcountHelper refcount_helper_;
 };
 
 class MockMetricSnapshot : public MetricSnapshot {

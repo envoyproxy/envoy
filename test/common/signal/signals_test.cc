@@ -1,7 +1,7 @@
 #include <signal.h>
 #include <sys/mman.h>
 
-#include "exe/signal_action.h"
+#include "common/signal/signal_action.h"
 
 #include "test/test_common/utility.h"
 
@@ -32,6 +32,25 @@ TEST(SignalsDeathTest, InvalidAddressDeathTest) {
         *(nasty_ptr) = 0;
       }(),
       "backtrace.*Segmentation fault");
+}
+
+class TestFatalErrorHandler : public FatalErrorHandlerInterface {
+  virtual void onFatalError() const override { std::cerr << "HERE!"; }
+};
+
+TEST(SignalsDeathTest, RegisteredHandlerTest) {
+  TestFatalErrorHandler handler;
+  SignalAction::registerFatalErrorHandler(handler);
+  SignalAction actions;
+  // Make sure the fatal error log "HERE" registered above is logged on fatal error.
+  EXPECT_DEATH_LOG_TO_STDERR(
+      []() -> void {
+        // Oops!
+        volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
+        *(nasty_ptr) = 0;
+      }(),
+      "HERE");
+  SignalAction::removeFatalErrorHandler(handler);
 }
 
 TEST(SignalsDeathTest, BusDeathTest) {
@@ -90,6 +109,7 @@ TEST(SignalsDeathTest, RestoredPreviousHandlerDeathTest) {
   // Outer SignalAction should be active again:
   EXPECT_DEATH_LOG_TO_STDERR([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
 }
+
 #endif
 
 TEST(SignalsDeathTest, IllegalStackAccessDeathTest) {
