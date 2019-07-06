@@ -341,6 +341,7 @@ void BaseIntegrationTest::createEnvoy() {
 
   std::vector<std::string> named_ports;
   const auto& static_resources = config_helper_.bootstrap().static_resources();
+  named_ports.reserve(static_resources.listeners_size());
   for (int i = 0; i < static_resources.listeners_size(); ++i) {
     named_ports.push_back(static_resources.listeners(i).name());
   }

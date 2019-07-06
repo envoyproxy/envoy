@@ -243,7 +243,7 @@ private:
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
-  const Ssl::ConnectionInfo* downstream_ssl_info_;
+  const Ssl::ConnectionInfo* downstream_ssl_info_{};
   std::string requested_server_name_;
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
