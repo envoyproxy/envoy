@@ -131,9 +131,7 @@ public:
     last_cluster_names_ = cluster_names;
   }
 
-  void expectConfigUpdateFailed() override {
-    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
-  }
+  void expectConfigUpdateFailed() override { EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)); }
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
     init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
