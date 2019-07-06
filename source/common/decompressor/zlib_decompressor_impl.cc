@@ -50,6 +50,8 @@ void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
     }
   }
 
+  // Flush z_stream and reset its buffer. Otherwise the stale content of the buffer
+  // will polute output upon the next call to decompress().
   updateOutput(output_buffer);
 }
 
