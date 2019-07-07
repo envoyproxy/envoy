@@ -72,6 +72,10 @@ following statistics:
   checkwatches_rq, Counter, Number of checkwatches requests
   removewatches_rq, Counter, Number of removewatches requests
   check_rq, Counter, Number of check requests
+  connect_resp, Counter, Number of connect responses
+  ping_resp, Counter, Number of ping responses
+  auth_resp, Counter, Number of auth responses
+  watch_event, Counter, Number of watch events fired by the server
 
 .. _config_network_filters_zookeeper_proxy_dynamic_metadata:
 
@@ -90,3 +94,10 @@ The ZooKeeper filter emits the following dynamic metadata for each message parse
   <bytes>, string, "The size of the request message in bytes"
   <watch>, string, "True if a watch is being set, false otherwise"
   <version>, string, "The version parameter, if any, given with the request"
+  <timeout>, string, "The timeout parameter in a connect response"
+  <protocol_version>, string, "The protocol version in a connect response"
+  <readonly>, string, "The readonly flag in a connect response"
+  <zxid>, string, "The zxid field in a response header"
+  <error>, string, "The error field in a response header"
+  <client_state>, string, "The state field in a watch event"
+  <event_type>, string, "The event type in a a watch event"

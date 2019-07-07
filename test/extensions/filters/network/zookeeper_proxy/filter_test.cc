@@ -57,6 +57,55 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl encodeConnectResponse(const bool readonly = false,
+                                          const uint32_t session_timeout = 10,
+                                          const uint32_t session_id = 200,
+                                          const std::string& passwd = "") const {
+    Buffer::OwnedImpl buffer;
+    const uint32_t message_size = readonly ? 20 + passwd.length() + 1 : 20 + passwd.length();
+
+    buffer.writeBEInt<uint32_t>(message_size);
+    buffer.writeBEInt<uint32_t>(0); // Protocol version.
+    buffer.writeBEInt<uint32_t>(session_timeout);
+    buffer.writeBEInt<uint64_t>(session_id);
+    addString(buffer, passwd);
+
+    if (readonly) {
+      const char readonly_flag = 0b1;
+      buffer.add(std::string(1, readonly_flag));
+    }
+
+    return buffer;
+  }
+
+  Buffer::OwnedImpl encodeResponseHeader(const int32_t xid, const int64_t zxid,
+                                         const int32_t error) const {
+    Buffer::OwnedImpl buffer;
+    const uint32_t message_size = 16;
+
+    buffer.writeBEInt<uint32_t>(message_size);
+    buffer.writeBEInt<uint32_t>(xid);
+    buffer.writeBEInt<uint64_t>(zxid);
+    buffer.writeBEInt<uint32_t>(error);
+
+    return buffer;
+  }
+
+  Buffer::OwnedImpl encodeWatchEvent(const std::string& path, const int32_t event_type,
+                                     const int32_t client_state) const {
+    Buffer::OwnedImpl buffer;
+
+    buffer.writeBEInt<uint32_t>(28 + path.size());
+    buffer.writeBEInt<uint32_t>(enumToSignedInt(XidCodes::WATCH_XID));
+    buffer.writeBEInt<uint64_t>(1000);
+    buffer.writeBEInt<uint32_t>(0);
+    buffer.writeBEInt<uint32_t>(event_type);
+    buffer.writeBEInt<uint32_t>(client_state);
+    addString(buffer, path);
+
+    return buffer;
+  }
+
   Buffer::OwnedImpl encodeBadMessage() const {
     Buffer::OwnedImpl buffer;
 
@@ -442,10 +491,20 @@ TEST_F(ZooKeeperFilterTest, Connect) {
   Buffer::OwnedImpl data = encodeConnect();
 
   expectSetDynamicMetadata({{"opname", "connect"}}, {{"bytes", "32"}});
-
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().connect_rq_.value());
   EXPECT_EQ(32UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  data = encodeConnectResponse();
+  expectSetDynamicMetadata({{"opname", "connect_response"},
+                            {"protocol_version", "0"},
+                            {"timeout", "10"},
+                            {"readonly", "0"}},
+                           {{"bytes", "24"}});
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
+  EXPECT_EQ(1UL, config_->stats().connect_resp_.value());
+  EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
@@ -460,6 +519,17 @@ TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
   EXPECT_EQ(0UL, config_->stats().connect_rq_.value());
   EXPECT_EQ(1UL, config_->stats().connect_readonly_rq_.value());
   EXPECT_EQ(33UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  data = encodeConnectResponse(true);
+  expectSetDynamicMetadata({{"opname", "connect_response"},
+                            {"protocol_version", "0"},
+                            {"timeout", "10"},
+                            {"readonly", "1"}},
+                           {{"bytes", "25"}});
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
+  EXPECT_EQ(1UL, config_->stats().connect_resp_.value());
+  EXPECT_EQ(25UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
@@ -521,6 +591,14 @@ TEST_F(ZooKeeperFilterTest, PingRequest) {
   EXPECT_EQ(1UL, config_->stats().ping_rq_.value());
   EXPECT_EQ(12UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  data = encodeResponseHeader(enumToSignedInt(XidCodes::PING_XID), 1000, 0);
+  expectSetDynamicMetadata({{"opname", "ping_response"}, {"zxid", "1000"}, {"error", "0"}},
+                           {{"bytes", "20"}});
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
+  EXPECT_EQ(1UL, config_->stats().ping_resp_.value());
+  EXPECT_EQ(20UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
 TEST_F(ZooKeeperFilterTest, AuthRequest) {
@@ -529,10 +607,17 @@ TEST_F(ZooKeeperFilterTest, AuthRequest) {
   Buffer::OwnedImpl data = encodeAuth("digest");
 
   expectSetDynamicMetadata({{"opname", "auth"}}, {{"bytes", "36"}});
-
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(scope_.counter("test.zookeeper.auth.digest_rq").value(), 1);
   EXPECT_EQ(36UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  data = encodeResponseHeader(enumToSignedInt(XidCodes::AUTH_XID), 1000, 0);
+  expectSetDynamicMetadata({{"opname", "auth_response"}, {"zxid", "1000"}, {"error", "0"}},
+                           {{"bytes", "20"}});
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
+  EXPECT_EQ(1UL, config_->stats().auth_resp_.value());
+  EXPECT_EQ(20UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
@@ -803,10 +888,17 @@ TEST_F(ZooKeeperFilterTest, SetWatchesRequestControlXid) {
       encodeSetWatchesRequest(dataw, existw, childw, enumToSignedInt(XidCodes::SET_WATCHES_XID));
 
   expectSetDynamicMetadata({{"opname", "setwatches"}}, {{"bytes", "76"}});
-
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().setwatches_rq_.value());
   EXPECT_EQ(76UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  data = encodeResponseHeader(enumToSignedInt(XidCodes::SET_WATCHES_XID), 1000, 0);
+  expectSetDynamicMetadata({{"opname", "setwatches_resp"}, {"zxid", "1000"}, {"error", "0"}},
+                           {{"bytes", "20"}});
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
+  EXPECT_EQ(1UL, config_->stats().setwatches_resp_.value());
+  EXPECT_EQ(20UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
@@ -865,6 +957,22 @@ TEST_F(ZooKeeperFilterTest, CloseRequest) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().close_rq_.value());
   EXPECT_EQ(12UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, WatchEvent) {
+  initialize();
+
+  Buffer::OwnedImpl data = encodeWatchEvent("/foo", 1, 0);
+  expectSetDynamicMetadata({{"opname", "watch_event"},
+                            {"event_type", "1"},
+                            {"client_state", "0"},
+                            {"zxid", "1000"},
+                            {"error", "0"}},
+                           {{"bytes", "36"}});
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
+  EXPECT_EQ(1UL, config_->stats().watch_event_.value());
+  EXPECT_EQ(36UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
