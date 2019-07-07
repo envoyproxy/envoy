@@ -48,7 +48,6 @@ namespace Server {
 /**
  * All server wide stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_SERVER_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
   COUNTER(debug_assertion_failures)                                                                \
   GAUGE(concurrency, NeverImport)                                                                  \
@@ -63,7 +62,6 @@ namespace Server {
   GAUGE(uptime, Accumulate)                                                                        \
   GAUGE(version, NeverImport)                                                                      \
   HISTOGRAM(initialization_time_ms)
-// clang-format on
 
 struct ServerStats {
   ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
