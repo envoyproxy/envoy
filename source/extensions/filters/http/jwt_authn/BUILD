@@ -100,6 +100,7 @@ envoy_cc_library(
     deps = [
         ":jwks_cache_lib",
         ":matchers_lib",
+        "//include/envoy/router:string_accessor_interface",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/thread_local:thread_local_interface",

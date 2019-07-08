@@ -64,7 +64,7 @@ public:
   ~MockStreamCallbacks();
 
   // Http::StreamCallbacks
-  MOCK_METHOD1(onResetStream, void(StreamResetReason reason));
+  MOCK_METHOD2(onResetStream, void(StreamResetReason reason, absl::string_view));
   MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
 };
@@ -148,22 +148,15 @@ public:
   MOCK_METHOD1(setDecoderBufferLimit, void(uint32_t));
   MOCK_METHOD0(decoderBufferLimit, uint32_t());
   MOCK_METHOD0(recreateStream, bool());
+  MOCK_METHOD1(addUpstreamSocketOptions, void(const Network::Socket::OptionsSharedPtr& options));
+  MOCK_CONST_METHOD0(getUpstreamSocketOptions, Network::Socket::OptionsSharedPtr());
 
   // Http::StreamDecoderFilterCallbacks
-  void sendLocalReply(Code code, absl::string_view body,
-                      std::function<void(HeaderMap& headers)> modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
-    Utility::sendLocalReply(
-        is_grpc_request_,
-        [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
-          if (modify_headers != nullptr) {
-            modify_headers(*headers);
-          }
-          encodeHeaders(std::move(headers), end_stream);
-        },
-        [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
-        stream_destroyed_, code, body, grpc_status, is_head_request_);
-  }
+  void sendLocalReply_(Code code, absl::string_view body,
+                       std::function<void(HeaderMap& headers)> modify_headers,
+                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                       absl::string_view details);
+
   void encode100ContinueHeaders(HeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);
   }
@@ -177,6 +170,7 @@ public:
 
   MOCK_METHOD0(continueDecoding, void());
   MOCK_METHOD2(addDecodedData, void(Buffer::Instance& data, bool streaming));
+  MOCK_METHOD2(injectDecodedDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD0(addDecodedTrailers, HeaderMap&());
   MOCK_METHOD0(decodingBuffer, const Buffer::Instance*());
   MOCK_METHOD1(modifyDecodingBuffer, void(std::function<void(Buffer::Instance&)>));
@@ -185,11 +179,16 @@ public:
   MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers_, void(HeaderMap& trailers));
   MOCK_METHOD1(encodeMetadata_, void(MetadataMapPtr metadata_map));
+  MOCK_METHOD5(sendLocalReply, void(Code code, absl::string_view body,
+                                    std::function<void(HeaderMap& headers)> modify_headers,
+                                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                    absl::string_view details));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
+  std::string details_;
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool stream_destroyed_{};
@@ -219,6 +218,7 @@ public:
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD2(addEncodedData, void(Buffer::Instance& data, bool streaming));
+  MOCK_METHOD2(injectEncodedDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD0(addEncodedTrailers, HeaderMap&());
   MOCK_METHOD0(continueEncoding, void());
   MOCK_METHOD0(encodingBuffer, const Buffer::Instance*());
@@ -482,7 +482,7 @@ public:
   explicit IsSubsetOfHeadersMatcherImpl(const HeaderMap& expected_headers)
       : expected_headers_(expected_headers) {}
 
-  IsSubsetOfHeadersMatcherImpl(IsSubsetOfHeadersMatcherImpl&& other)
+  IsSubsetOfHeadersMatcherImpl(IsSubsetOfHeadersMatcherImpl&& other) noexcept
       : expected_headers_(other.expected_headers_) {}
 
   IsSubsetOfHeadersMatcherImpl(const IsSubsetOfHeadersMatcherImpl& other)
@@ -515,7 +515,7 @@ public:
   IsSubsetOfHeadersMatcher(const HeaderMap& expected_headers)
       : expected_headers_(expected_headers) {}
 
-  IsSubsetOfHeadersMatcher(IsSubsetOfHeadersMatcher&& other)
+  IsSubsetOfHeadersMatcher(IsSubsetOfHeadersMatcher&& other) noexcept
       : expected_headers_(static_cast<const HeaderMap&>(other.expected_headers_)) {}
 
   IsSubsetOfHeadersMatcher(const IsSubsetOfHeadersMatcher& other)
@@ -537,7 +537,7 @@ public:
   explicit IsSupersetOfHeadersMatcherImpl(const HeaderMap& expected_headers)
       : expected_headers_(expected_headers) {}
 
-  IsSupersetOfHeadersMatcherImpl(IsSupersetOfHeadersMatcherImpl&& other)
+  IsSupersetOfHeadersMatcherImpl(IsSupersetOfHeadersMatcherImpl&& other) noexcept
       : expected_headers_(other.expected_headers_) {}
 
   IsSupersetOfHeadersMatcherImpl(const IsSupersetOfHeadersMatcherImpl& other)
@@ -571,7 +571,7 @@ public:
   IsSupersetOfHeadersMatcher(const HeaderMap& expected_headers)
       : expected_headers_(expected_headers) {}
 
-  IsSupersetOfHeadersMatcher(IsSupersetOfHeadersMatcher&& other)
+  IsSupersetOfHeadersMatcher(IsSupersetOfHeadersMatcher&& other) noexcept
       : expected_headers_(static_cast<const HeaderMap&>(other.expected_headers_)) {}
 
   IsSupersetOfHeadersMatcher(const IsSupersetOfHeadersMatcher& other)

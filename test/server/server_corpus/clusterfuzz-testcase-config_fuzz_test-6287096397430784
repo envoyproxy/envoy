@@ -94,11 +94,6 @@ static_resources {
       locality_weight_aware: true
     }
     ring_hash_lb_config {
-      deprecated_v1 {
-        use_std_hash {
-          value: true
-        }
-      }
     }
   }
   clusters {

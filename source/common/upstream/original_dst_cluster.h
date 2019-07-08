@@ -12,7 +12,10 @@
 
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
+#include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "extensions/clusters/well_known_names.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -114,6 +117,18 @@ private:
   Event::Dispatcher& dispatcher_;
   const std::chrono::milliseconds cleanup_interval_ms_;
   Event::TimerPtr cleanup_timer_;
+};
+
+class OriginalDstClusterFactory : public ClusterFactoryImplBase {
+public:
+  OriginalDstClusterFactory()
+      : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().OriginalDst) {}
+
+private:
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                    Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream

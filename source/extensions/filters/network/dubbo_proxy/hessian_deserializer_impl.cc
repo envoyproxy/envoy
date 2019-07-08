@@ -14,18 +14,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-enum class RpcResponseType : uint8_t {
-  ResponseWithException = 0,
-  ResponseWithValue = 1,
-  ResponseWithNullValue = 2,
-  ResponseWithExceptionWithAttachments = 3,
-  ResponseValueWithAttachments = 4,
-  ResponseNullValueWithAttachments = 5,
-};
-
-RpcInvocationPtr HessianDeserializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
-                                                                   size_t body_size) {
-  ASSERT(buffer.length() >= body_size);
+void HessianDeserializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer, size_t body_size,
+                                                       MessageMetadataSharedPtr metadata) {
+  ASSERT(buffer.length() >= static_cast<uint64_t>(body_size));
   size_t total_size = 0, size;
   // TODO(zyfjeff): Add format checker
   std::string dubbo_version = HessianUtils::peekString(buffer, &size);
@@ -37,12 +28,14 @@ RpcInvocationPtr HessianDeserializerImpl::deserializeRpcInvocation(Buffer::Insta
   std::string method_name = HessianUtils::peekString(buffer, &size, total_size);
   total_size = total_size + size;
 
-  if (body_size < total_size) {
+  if (static_cast<uint64_t>(body_size) < total_size) {
     throw EnvoyException(
         fmt::format("RpcInvocation size({}) large than body size({})", total_size, body_size));
   }
-  buffer.drain(body_size);
-  return std::make_unique<RpcInvocationImpl>(method_name, service_name, service_version);
+
+  metadata->setServiceName(service_name);
+  metadata->setServiceVersion(service_version);
+  metadata->setMethodName(method_name);
 }
 
 RpcResultPtr HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buffer,
@@ -57,9 +50,9 @@ RpcResultPtr HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buf
   switch (type) {
   case RpcResponseType::ResponseWithException:
   case RpcResponseType::ResponseWithExceptionWithAttachments:
+  case RpcResponseType::ResponseWithValue:
     result = std::make_unique<RpcResultImpl>(true);
     break;
-  case RpcResponseType::ResponseWithValue:
   case RpcResponseType::ResponseWithNullValue:
     has_value = false;
     FALLTHRU;
@@ -81,8 +74,25 @@ RpcResultPtr HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buf
         fmt::format("RpcResult is no value, but the rest of the body size({}) not equal 0",
                     (body_size - total_size)));
   }
-  buffer.drain(body_size);
+
   return result;
+}
+
+size_t HessianDeserializerImpl::serializeRpcResult(Buffer::Instance& output_buffer,
+                                                   const std::string& content,
+                                                   RpcResponseType type) {
+  size_t origin_length = output_buffer.length();
+
+  // The serialized response type is compact int.
+  size_t serialized_size = HessianUtils::writeInt(
+      output_buffer, static_cast<std::underlying_type<RpcResponseType>::type>(type));
+
+  // Serialized response content.
+  serialized_size += HessianUtils::writeString(output_buffer, content);
+
+  ASSERT((output_buffer.length() - origin_length) == serialized_size);
+
+  return serialized_size;
 }
 
 class HessianDeserializerConfigFactory : public DeserializerFactoryBase<HessianDeserializerImpl> {

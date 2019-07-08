@@ -24,6 +24,7 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:codes_lib",
+        "//source/common/http:utility_lib",
         "//source/common/router:config_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",

@@ -69,11 +69,6 @@ public:
 };
 
 /**
- * Setup nghttp2 trace-level logging for when debugging.
- */
-void initializeNghttp2Logging();
-
-/**
  * Base class for HTTP/2 client and server codecs.
  */
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
@@ -173,8 +168,8 @@ protected:
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
     void resetStream(StreamResetReason reason) override;
-    virtual void readDisable(bool disable) override;
-    virtual uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
+    void readDisable(bool disable) override;
+    uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
 
     void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
       pending_recv_data_.setWatermarks(low_watermark, high_watermark);
@@ -232,7 +227,7 @@ protected:
     bool reset_due_to_messaging_error_ : 1;
   };
 
-  typedef std::unique_ptr<StreamImpl> StreamImplPtr;
+  using StreamImplPtr = std::unique_ptr<StreamImpl>;
 
   /**
    * Client side stream (request).
@@ -244,7 +239,7 @@ protected:
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
     void transformUpgradeFromH1toH2(HeaderMap& headers) override {
-      upgrade_type_ = headers.Upgrade()->value().c_str();
+      upgrade_type_ = std::string(headers.Upgrade()->value().getStringView());
       Http::Utility::transformUpgradeRequestFromH1toH2(headers);
     }
     void maybeTransformUpgradeFromH2ToH1() override {

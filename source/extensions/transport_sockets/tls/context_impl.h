@@ -161,7 +161,7 @@ protected:
   const unsigned tls_max_version_;
 };
 
-typedef std::shared_ptr<ContextImpl> ContextImplSharedPtr;
+using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;
 
 class ClientContextImpl : public ContextImpl, public Envoy::Ssl::ClientContext {
 public:

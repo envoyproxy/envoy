@@ -16,7 +16,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
-#include "test/mocks/init/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -240,8 +239,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
 
 class SdsDynamicDownstreamCertValidationContextTest : public SdsDynamicDownstreamIntegrationTest {
 public:
-  SdsDynamicDownstreamCertValidationContextTest()
-      : SdsDynamicDownstreamIntegrationTest(), use_combined_validation_context_(false) {}
+  SdsDynamicDownstreamCertValidationContextTest() : use_combined_validation_context_(false) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -411,7 +409,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/test/long/url", "", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 
   // To flush out the reset connection from the first request in upstream.
   FakeRawConnectionPtr fake_upstream_connection;

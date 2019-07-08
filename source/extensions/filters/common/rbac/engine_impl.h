@@ -13,7 +13,7 @@ namespace RBAC {
 
 class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine {
 public:
-  RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v2alpha::RBAC& rules);
+  RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v2::RBAC& rules);
 
   bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const envoy::api::v2::core::Metadata& metadata,

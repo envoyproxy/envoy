@@ -9,6 +9,7 @@ static_resources:
       - name: envoy.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          generate_request_id: true
           tracing:
             operation_name: egress
           codec_type: auto
@@ -29,6 +30,7 @@ static_resources:
           http_filters:
           - name: envoy.router
             typed_config: {}
+          use_remote_address: true
   clusters:
   - name: service1
     connect_timeout: 0.250s
@@ -56,7 +58,7 @@ static_resources:
             address:
               socket_address:
                 address: jaeger
-                port_value: 80
+                port_value: 9411
 tracing:
   http:
     name: envoy.zipkin

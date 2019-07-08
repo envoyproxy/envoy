@@ -27,6 +27,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -56,14 +57,14 @@ public:
   }
 
   void setupValidDriver() {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
 
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     collector_endpoint: /api/v1/spans
     )EOF";
     envoy::config::trace::v2::ZipkinConfig zipkin_config;
-    MessageUtil::loadFromYaml(yaml_string, zipkin_config);
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     setup(zipkin_config, true);
   }
@@ -104,20 +105,20 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
 
   {
     // Valid config but not valid cluster.
-    EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     collector_endpoint: /api/v1/spans
     )EOF";
     envoy::config::trace::v2::ZipkinConfig zipkin_config;
-    MessageUtil::loadFromYaml(yaml_string, zipkin_config);
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     EXPECT_THROW(setup(zipkin_config, false), EnvoyException);
   }
 
   {
     // valid config
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
 
     const std::string yaml_string = R"EOF(
@@ -125,7 +126,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     collector_endpoint: /api/v1/spans
     )EOF";
     envoy::config::trace::v2::ZipkinConfig zipkin_config;
-    MessageUtil::loadFromYaml(yaml_string, zipkin_config);
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     setup(zipkin_config, true);
   }
@@ -145,9 +146,10 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
-            EXPECT_STREQ("/api/v1/spans", message->headers().Path()->value().c_str());
-            EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
-            EXPECT_STREQ("application/json", message->headers().ContentType()->value().c_str());
+            EXPECT_EQ("/api/v1/spans", message->headers().Path()->value().getStringView());
+            EXPECT_EQ("fake_cluster", message->headers().Host()->value().getStringView());
+            EXPECT_EQ("application/json",
+                      message->headers().ContentType()->value().getStringView());
 
             return &request;
           }));
@@ -195,9 +197,10 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
-            EXPECT_STREQ("/api/v1/spans", message->headers().Path()->value().c_str());
-            EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
-            EXPECT_STREQ("application/json", message->headers().ContentType()->value().c_str());
+            EXPECT_EQ("/api/v1/spans", message->headers().Path()->value().getStringView());
+            EXPECT_EQ("fake_cluster", message->headers().Host()->value().getStringView());
+            EXPECT_EQ("application/json",
+                      message->headers().ContentType()->value().getStringView());
 
             return &request;
           }));
@@ -496,6 +499,27 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
   EXPECT_TRUE(zipkin_span->span().sampled());
 }
 
+TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
+  setupValidDriver();
+
+  // Root span so have same trace and span id
+  const std::string id = Hex::uint64ToHex(generateRandom64());
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID, id);
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, id);
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
+                                   ZipkinCoreConstants::get().SAMPLED);
+
+  // Set parent span id to empty string, to ensure it is ignored
+  const std::string parent_span_id = "";
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID, parent_span_id);
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+
+  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
+  EXPECT_TRUE(zipkin_span->span().sampled());
+}
+
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
   setupValidDriver();
 
@@ -612,9 +636,9 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, false});
 
-  typedef std::function<bool(const std::string& key)> DupCallback;
-  DupCallback dup_callback = [](const std::string& key) -> bool {
-    static std::unordered_map<std::string, bool> dup;
+  using DupCallback = std::function<bool(absl::string_view key)>;
+  DupCallback dup_callback = [](absl::string_view key) -> bool {
+    static absl::flat_hash_map<std::string, bool> dup;
     if (dup.find(key) == dup.end()) {
       dup[key] = true;
       return false;
@@ -626,7 +650,7 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   span->injectContext(request_headers_);
   request_headers_.iterate(
       [](const Http::HeaderEntry& header, void* cb) -> Http::HeaderMap::Iterate {
-        EXPECT_FALSE(static_cast<DupCallback*>(cb)->operator()(header.key().c_str()));
+        EXPECT_FALSE(static_cast<DupCallback*>(cb)->operator()(header.key().getStringView()));
         return Http::HeaderMap::Iterate::Continue;
       },
       &dup_callback);

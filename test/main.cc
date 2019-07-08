@@ -8,7 +8,7 @@
 #include "absl/debugging/symbolize.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "exe/signal_action.h"
+#include "common/signal/signal_action.h"
 #endif
 
 // The main entry point (and the rest of this file) should have no logic in it,
@@ -21,7 +21,6 @@ int main(int argc, char** argv) {
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
   Envoy::SignalAction handle_sigs;
 #endif
-  Envoy::Thread::ThreadFactorySingleton::set(&Envoy::Thread::threadFactoryForTest());
 
   Envoy::TestEnvironment::setEnvVar("TEST_RUNDIR",
                                     (Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +

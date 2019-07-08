@@ -8,9 +8,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-Command::Cmd Command::parseCmd(Buffer::Instance& data, uint64_t& offset) {
+Command::Cmd Command::parseCmd(Buffer::Instance& data) {
   uint8_t cmd;
-  if (BufferHelper::peekUint8(data, offset, cmd) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint8(data, cmd) != MYSQL_SUCCESS) {
     return Command::Cmd::COM_NULL;
   }
   return static_cast<Command::Cmd>(cmd);
@@ -20,8 +20,8 @@ void Command::setCmd(Command::Cmd cmd) { cmd_ = cmd; }
 
 void Command::setDb(std::string db) { db_ = db; }
 
-int Command::parseMessage(Buffer::Instance& buffer, uint64_t& offset, int len) {
-  Command::Cmd cmd = parseCmd(buffer, offset);
+int Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
+  Command::Cmd cmd = parseCmd(buffer);
   setCmd(cmd);
   if (cmd == Command::Cmd::COM_NULL) {
     return MYSQL_FAILURE;
@@ -32,7 +32,7 @@ int Command::parseMessage(Buffer::Instance& buffer, uint64_t& offset, int len) {
   case Command::Cmd::COM_CREATE_DB:
   case Command::Cmd::COM_DROP_DB: {
     std::string db = "";
-    BufferHelper::peekStringBySize(buffer, offset, len - 1, db);
+    BufferHelper::readStringBySize(buffer, len - 1, db);
     setDb(db);
     break;
   }
@@ -40,7 +40,7 @@ int Command::parseMessage(Buffer::Instance& buffer, uint64_t& offset, int len) {
   case Command::Cmd::COM_QUERY:
     is_query_ = true;
     // query string starts after one byte for comm type
-    BufferHelper::peekStringBySize(buffer, offset, len - 1, data_);
+    BufferHelper::readStringBySize(buffer, len - 1, data_);
     setDb("");
     break;
 

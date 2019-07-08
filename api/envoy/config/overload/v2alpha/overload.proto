@@ -32,7 +32,7 @@ message ResourceMonitor {
 
   // Configuration for the resource monitor being instantiated.
   oneof config_type {
-    google.protobuf.Struct config = 2 [deprecated = true];
+    google.protobuf.Struct config = 2;
 
     google.protobuf.Any typed_config = 3;
   }

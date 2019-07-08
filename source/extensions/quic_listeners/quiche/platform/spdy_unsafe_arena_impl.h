@@ -6,9 +6,10 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include "quiche/spdy/core/spdy_simple_arena.h"
+
 namespace spdy {
 
-// TODO: implement
-class SpdyUnsafeArenaImpl {};
+using SpdyUnsafeArenaImpl = SpdySimpleArena;
 
 } // namespace spdy

@@ -21,7 +21,7 @@ bool UuidUtils::uuidModBy(const std::string& uuid, uint64_t& out, uint64_t mod) 
   return true;
 }
 
-UuidTraceStatus UuidUtils::isTraceableUuid(const std::string& uuid) {
+UuidTraceStatus UuidUtils::isTraceableUuid(absl::string_view uuid) {
   if (uuid.length() != Runtime::RandomGeneratorImpl::UUID_LENGTH) {
     return UuidTraceStatus::NoTrace;
   }

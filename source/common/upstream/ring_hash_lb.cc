@@ -26,9 +26,6 @@ RingHashLoadBalancer::RingHashLoadBalancer(
       max_ring_size_(config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), maximum_ring_size,
                                                               DefaultMaxRingSize)
                             : DefaultMaxRingSize),
-      use_std_hash_(config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(),
-                                                             use_std_hash, false)
-                           : false),
       hash_function_(config ? config.value().hash_function()
                             : HashFunction::Cluster_RingHashLbConfig_HashFunction_XX_HASH) {
   // It's important to do any config validation here, rather than deferring to Ring's ctor, because
@@ -83,8 +80,8 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
 using HashFunction = envoy::api::v2::Cluster_RingHashLbConfig_HashFunction;
 RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_host_weights,
                                  double min_normalized_weight, uint64_t min_ring_size,
-                                 uint64_t max_ring_size, bool use_std_hash,
-                                 HashFunction hash_function, RingHashLoadBalancerStats& stats)
+                                 uint64_t max_ring_size, HashFunction hash_function,
+                                 RingHashLoadBalancerStats& stats)
     : stats_(stats) {
   ENVOY_LOG(trace, "ring hash: building ring");
 
@@ -155,14 +152,10 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
           StringUtil::itoa(hash_key_buffer + offset_start, StringUtil::MIN_ITOA_OUT_LEN, i);
       absl::string_view hash_key(hash_key_buffer, total_hash_key_len);
 
-      // Sadly std::hash provides no mechanism for hashing arbitrary bytes so we must copy here.
-      // xxHash is done without copies.
       const uint64_t hash =
-          use_std_hash
-              ? std::hash<std::string>()(std::string(hash_key))
-              : (hash_function == HashFunction::Cluster_RingHashLbConfig_HashFunction_MURMUR_HASH_2)
-                    ? MurmurHash::murmurHash2_64(hash_key, MurmurHash::STD_HASH_SEED)
-                    : HashUtil::xxHash64(hash_key);
+          (hash_function == HashFunction::Cluster_RingHashLbConfig_HashFunction_MURMUR_HASH_2)
+              ? MurmurHash::murmurHash2_64(hash_key, MurmurHash::STD_HASH_SEED)
+              : HashUtil::xxHash64(hash_key);
 
       ENVOY_LOG(trace, "ring hash: hash_key={} hash={}", hash_key.data(), hash);
       ring_.push_back({hash, host});

@@ -6,7 +6,7 @@
 
 namespace Envoy {
 
-DangerousDeprecatedTestTime::DangerousDeprecatedTestTime() {}
+DangerousDeprecatedTestTime::DangerousDeprecatedTestTime() = default;
 
 namespace Event {
 
@@ -18,11 +18,15 @@ TestTimeSystem& GlobalTimeSystem::timeSystem() {
   return singleton_->timeSystem(make_real_time_system);
 }
 
-void TestRealTimeSystem::sleep(const Duration& duration) { std::this_thread::sleep_for(duration); }
+void TestRealTimeSystem::sleep(const Duration& duration) {
+  only_one_thread_.checkOneThread();
+  std::this_thread::sleep_for(duration);
+}
 
 Thread::CondVar::WaitStatus TestRealTimeSystem::waitFor(Thread::MutexBasicLockable& lock,
                                                         Thread::CondVar& condvar,
                                                         const Duration& duration) noexcept {
+  only_one_thread_.checkOneThread();
   return condvar.waitFor(lock, duration);
 }
 

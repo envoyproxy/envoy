@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_select_google_grpc",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -70,9 +71,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "alts_integration_test",
-    srcs = [
-        "alts_integration_test.cc",
-    ],
+    srcs = envoy_select_google_grpc(["alts_integration_test.cc"]),
     extension_name = "envoy.transport_sockets.alts",
     external_deps = [
         "grpc_alts_fake_handshaker_server",

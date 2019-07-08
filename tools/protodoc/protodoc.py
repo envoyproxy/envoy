@@ -68,9 +68,8 @@ INHERITED_ANNOTATIONS = set([
 ])
 
 # Template for data plane API URLs.
-# TODO(htuch): Add the ability to build a permalink by feeding a hash
-# to the tool or inferring from local tree (only really make sense in CI).
-DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/master/api/%s#L%d'
+DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d'.format(
+    os.environ['ENVOY_BLOB_SHA'])
 
 
 class ProtodocError(Exception):

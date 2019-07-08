@@ -1,6 +1,7 @@
 #include "envoy/config/transport_socket/alts/v2alpha/alts.pb.validate.h"
 
 #include "common/protobuf/protobuf.h"
+#include "common/singleton/manager_impl.h"
 
 #include "extensions/transport_sockets/alts/config.h"
 
@@ -12,6 +13,7 @@
 using Envoy::Server::Configuration::MockTransportSocketFactoryContext;
 using testing::_;
 using testing::Invoke;
+using testing::ReturnRef;
 using testing::StrictMock;
 
 namespace Envoy {
@@ -22,6 +24,8 @@ namespace {
 
 TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
   MockTransportSocketFactoryContext factory_context;
+  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
+  EXPECT_CALL(factory_context, singletonManager()).WillRepeatedly(ReturnRef(singleton_manager));
   UpstreamAltsTransportSocketConfigFactory factory;
 
   ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
@@ -30,7 +34,7 @@ TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
   handshaker_service: 169.254.169.254:8080
   peer_service_accounts: ["server-sa"]
   )EOF";
-  MessageUtil::loadFromYaml(yaml, *config);
+  TestUtility::loadFromYaml(yaml, *config);
 
   auto socket_factory = factory.createTransportSocketFactory(*config, factory_context);
 
@@ -40,6 +44,8 @@ TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
 
 TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
   MockTransportSocketFactoryContext factory_context;
+  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
+  EXPECT_CALL(factory_context, singletonManager()).WillRepeatedly(ReturnRef(singleton_manager));
   DownstreamAltsTransportSocketConfigFactory factory;
 
   ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
@@ -48,7 +54,7 @@ TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
   handshaker_service: 169.254.169.254:8080
   peer_service_accounts: ["server-sa"]
   )EOF";
-  MessageUtil::loadFromYaml(yaml, *config);
+  TestUtility::loadFromYaml(yaml, *config);
 
   auto socket_factory = factory.createTransportSocketFactory(*config, factory_context, {});
 

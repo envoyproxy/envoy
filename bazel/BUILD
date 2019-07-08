@@ -37,16 +37,6 @@ genrule(
 )
 
 config_setting(
-    name = "windows_x86_64",
-    values = {"cpu": "x64_windows"},
-)
-
-config_setting(
-    name = "linux_ppc",
-    values = {"cpu": "ppc"},
-)
-
-config_setting(
     name = "windows_opt_build",
     values = {
         "cpu": "x64_windows",
@@ -86,6 +76,11 @@ config_setting(
 )
 
 config_setting(
+    name = "asan_build",
+    values = {"define": "ENVOY_CONFIG_ASAN=1"},
+)
+
+config_setting(
     name = "coverage_build",
     values = {"define": "ENVOY_CONFIG_COVERAGE=1"},
 )
@@ -106,13 +101,32 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_object_dump_on_signal_trace",
+    values = {"define": "object_dump_on_signal_trace=disabled"},
+)
+
+config_setting(
     name = "disable_hot_restart",
     values = {"define": "hot_restart=disabled"},
+)
+
+# Used to avoid conflicting selects https://github.com/bazelbuild/bazel/issues/8323
+alias(
+    name = "disable_hot_restart_or_apple",
+    actual = select({
+        ":apple": ":apple",
+        "//conditions:default": ":disable_hot_restart",
+    }),
 )
 
 config_setting(
     name = "disable_google_grpc",
     values = {"define": "google_grpc=disabled"},
+)
+
+config_setting(
+    name = "enable_path_normalization_by_default",
+    values = {"define": "path_normalization_by_default=true"},
 )
 
 cc_proto_library(
@@ -150,6 +164,11 @@ config_setting(
 )
 
 config_setting(
+    name = "boringssl_disabled",
+    values = {"define": "boringssl=disabled"},
+)
+
+config_setting(
     name = "enable_quiche",
     values = {"define": "quiche=enabled"},
 )
@@ -163,4 +182,118 @@ alias(
         "//bazel:boringssl_fips": "@boringssl_fips//:ssl",
         "//conditions:default": "@boringssl//:ssl",
     }),
+)
+
+config_setting(
+    name = "linux_x86_64",
+    values = {"cpu": "k8"},
+)
+
+config_setting(
+    name = "linux_aarch64",
+    values = {"cpu": "aarch64"},
+)
+
+config_setting(
+    name = "linux_ppc",
+    values = {"cpu": "ppc"},
+)
+
+config_setting(
+    name = "windows_x86_64",
+    values = {"cpu": "x64_windows"},
+)
+
+# Configuration settings to make doing selects for Apple vs non-Apple platforms
+# easier. More details: https://docs.bazel.build/versions/master/configurable-attributes.html#config_settingaliasing
+config_setting(
+    name = "darwin",
+    values = {"cpu": "darwin"},
+)
+
+config_setting(
+    name = "darwin_x86_64",
+    values = {"cpu": "darwin_x86_64"},
+)
+
+config_setting(
+    name = "ios_i386",
+    values = {"cpu": "ios_i386"},
+)
+
+config_setting(
+    name = "ios_x86_64",
+    values = {"cpu": "ios_x86_64"},
+)
+
+config_setting(
+    name = "ios_armv7",
+    values = {"cpu": "ios_armv7"},
+)
+
+config_setting(
+    name = "ios_armv7s",
+    values = {"cpu": "ios_armv7s"},
+)
+
+config_setting(
+    name = "ios_arm64",
+    values = {"cpu": "ios_arm64"},
+)
+
+config_setting(
+    name = "ios_arm64e",
+    values = {"cpu": "ios_arm64e"},
+)
+
+config_setting(
+    name = "manual_stamp",
+    values = {"define": "manual_stamp=manual_stamp"},
+)
+
+alias(
+    name = "apple",
+    actual = select(
+        {
+            ":darwin": ":darwin",
+            ":darwin_x86_64": ":darwin_x86_64",
+            ":ios_arm64": ":ios_arm64",
+            ":ios_arm64e": ":ios_arm64e",
+            ":ios_armv7": ":ios_armv7",
+            ":ios_armv7s": ":ios_armv7s",
+            ":ios_i386": ":ios_i386",
+            ":ios_x86_64": ":ios_x86_64",
+            # If we're not on an apple platform return a value that will never match in the select() statement calling this
+            # since it would have already been matched above.
+            "//conditions:default": ":darwin",
+        },
+    ),
+)
+
+alias(
+    name = "linux",
+    actual = select(
+        {
+            ":linux_x86_64": ":linux_x86_64",
+            ":linux_aarch64": ":linux_aarch64",
+            ":linux_ppc": ":linux_ppc",
+            # If we're not on an linux platform return a value that will never match in the select() statement calling this
+            # since it would have already been matched above.
+            "//conditions:default": ":linux_x86_64",
+        },
+    ),
+)
+
+alias(
+    name = "x86",
+    actual = select(
+        {
+            ":darwin_x86_64": ":darwin_x86_64",
+            ":ios_x86_64": "ios_x86_64",
+            "linux_x86_64": "linux_x86_64",
+            "windows_x86_64": "windows_x86_64",
+            # If we're not on an x86 platform return a value that will never match in the select() statement calling this since it would have already been matched above.
+            "//conditions:default": ":darwin_x86_64",
+        },
+    ),
 )

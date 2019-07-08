@@ -13,26 +13,27 @@ namespace DubboProxy {
 /**
  * All dubbo filter stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_DUBBO_FILTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                          \
-  COUNTER(request)                                                                                 \
-  COUNTER(request_twoway)                                                                          \
-  COUNTER(request_oneway)                                                                          \
-  COUNTER(request_event)                                                                           \
-  COUNTER(request_invalid_type)                                                                    \
-  COUNTER(request_decoding_error)                                                                  \
-  GAUGE(request_active)                                                                            \
-  HISTOGRAM(request_time_ms)                                                                       \
-  COUNTER(response)                                                                                \
-  COUNTER(response_success)                                                                        \
-  COUNTER(response_error)                                                                          \
-  COUNTER(response_exception)                                                                      \
-  COUNTER(response_decoding_error)                                                                 \
   COUNTER(cx_destroy_local_with_active_rq)                                                         \
   COUNTER(cx_destroy_remote_with_active_rq)                                                        \
-  COUNTER(downstream_flow_control_paused_reading_total)                                            \
-  COUNTER(downstream_flow_control_resumed_reading_total)                                           \
-// clang-format on
+  COUNTER(local_response_business_exception)                                                       \
+  COUNTER(local_response_error)                                                                    \
+  COUNTER(local_response_success)                                                                  \
+  COUNTER(request)                                                                                 \
+  COUNTER(request_decoding_error)                                                                  \
+  COUNTER(request_decoding_success)                                                                \
+  COUNTER(request_event)                                                                           \
+  COUNTER(request_oneway)                                                                          \
+  COUNTER(request_twoway)                                                                          \
+  COUNTER(response)                                                                                \
+  COUNTER(response_business_exception)                                                             \
+  COUNTER(response_decoding_error)                                                                 \
+  COUNTER(response_decoding_success)                                                               \
+  COUNTER(response_error)                                                                          \
+  COUNTER(response_error_caused_connection_close)                                                  \
+  COUNTER(response_success)                                                                        \
+  GAUGE(request_active, Accumulate)                                                                \
+  HISTOGRAM(request_time_ms)
 
 /**
  * Struct definition for all dubbo proxy stats. @see stats_macros.h

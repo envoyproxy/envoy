@@ -3,6 +3,7 @@
 #include <chrono>
 
 #include "envoy/stats/scope.h"
+#include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Http {
@@ -86,36 +87,13 @@ class CodeStats {
 public:
   virtual ~CodeStats() = default;
 
-  struct ResponseStatInfo {
-    Stats::Scope& global_scope_;
-    Stats::Scope& cluster_scope_;
-    const std::string& prefix_;
-    uint64_t response_status_code_;
-    bool internal_request_;
-    const std::string& request_vhost_name_;
-    const std::string& request_vcluster_name_;
-    const std::string& from_zone_;
-    const std::string& to_zone_;
-    bool upstream_canary_;
-  };
-
-  struct ResponseTimingInfo {
-    Stats::Scope& global_scope_;
-    Stats::Scope& cluster_scope_;
-    const std::string& prefix_;
-    std::chrono::milliseconds response_time_;
-    bool upstream_canary_;
-    bool internal_request_;
-    const std::string& request_vhost_name_;
-    const std::string& request_vcluster_name_;
-    const std::string& from_zone_;
-    const std::string& to_zone_;
-  };
+  struct ResponseStatInfo;
+  struct ResponseTimingInfo;
 
   /**
    * Charge a simple response stat to an upstream.
    */
-  virtual void chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
+  virtual void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
                                        Code response_code) const PURE;
 
   /**

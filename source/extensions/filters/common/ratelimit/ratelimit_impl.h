@@ -9,12 +9,14 @@
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/ratelimit/ratelimit.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/service/ratelimit/v2/rls.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
+#include "common/grpc/typed_async_client.h"
 #include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit.h"
@@ -25,8 +27,8 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::ratelimit::v2::RateLimitResponse>
-    RateLimitAsyncCallbacks;
+using RateLimitAsyncCallbacks =
+    Grpc::AsyncRequestCallbacks<envoy::service::ratelimit::v2::RateLimitResponse>;
 
 struct ConstantValues {
   const std::string TraceStatus = "ratelimit_status";
@@ -34,7 +36,7 @@ struct ConstantValues {
   const std::string TraceOk = "ok";
 };
 
-typedef ConstSingleton<ConstantValues> Constants;
+using Constants = ConstSingleton<ConstantValues>;
 
 // TODO(htuch): We should have only one client per thread, but today we create one per filter stack.
 // This will require support for more than one outstanding request per client (limit() assumes only
@@ -43,7 +45,7 @@ class GrpcClientImpl : public Client,
                        public RateLimitAsyncCallbacks,
                        public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
+  GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl();
 
@@ -66,57 +68,20 @@ public:
 
 private:
   const Protobuf::MethodDescriptor& service_method_;
-  Grpc::AsyncClientPtr async_client_;
+  Grpc::AsyncClient<envoy::service::ratelimit::v2::RateLimitRequest,
+                    envoy::service::ratelimit::v2::RateLimitResponse>
+      async_client_;
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
 };
 
-class GrpcFactoryImpl : public ClientFactory {
-public:
-  GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitServiceConfig& config,
-                  Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope);
-
-  // Filters::Common::RateLimit::ClientFactory
-  ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout) override;
-
-  const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig>&
-  rateLimitConfig() const override {
-    return config_;
-  }
-
-private:
-  Grpc::AsyncClientFactoryPtr async_client_factory_;
-  const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig> config_;
-};
-
-// TODO(ramaraochavali): NullClientImpl and NullFactoryImpl should be removed when we remove rate
-// limit config from bootstrap.
-class NullClientImpl : public Client {
-public:
-  // Filters::Common::RateLimit::Client
-  void cancel() override {}
-  void limit(RequestCallbacks& callbacks, const std::string&,
-             const std::vector<Envoy::RateLimit::Descriptor>&, Tracing::Span&) override {
-    callbacks.complete(LimitStatus::OK, nullptr);
-  }
-};
-
-class NullFactoryImpl : public ClientFactory {
-public:
-  // Filters::Common::RateLimit::ClientFactory
-  ClientPtr create(const absl::optional<std::chrono::milliseconds>&) override {
-    return ClientPtr{new NullClientImpl()};
-  }
-
-  const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig>&
-  rateLimitConfig() const override {
-    return config_;
-  }
-
-private:
-  const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig> config_;
-};
+/**
+ * Builds the rate limit client.
+ */
+ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
+                          const envoy::api::v2::core::GrpcService& grpc_service,
+                          const std::chrono::milliseconds timeout);
 
 } // namespace RateLimit
 } // namespace Common

@@ -26,12 +26,25 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "metrics_proto_descriptors_lib",
+    srcs = ["grpc_metrics_proto_descriptors.cc"],
+    hdrs = ["grpc_metrics_proto_descriptors.h"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
         "//include/envoy/registry",
+        "//source/common/common:assert_lib",
         "//source/extensions/stat_sinks:well_known_names",
+        "//source/extensions/stat_sinks/metrics_service:metrics_proto_descriptors_lib",
         "//source/extensions/stat_sinks/metrics_service:metrics_service_grpc_lib",
         "//source/server:configuration_lib",
         "@envoy_api//envoy/config/metrics/v2:stats_cc",

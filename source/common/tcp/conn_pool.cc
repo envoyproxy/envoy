@@ -6,6 +6,8 @@
 #include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/upstream/upstream_impl.h"
+
 namespace Envoy {
 namespace Tcp {
 
@@ -120,25 +122,13 @@ void ConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent 
       event == Network::ConnectionEvent::LocalClose) {
     ENVOY_CONN_LOG(debug, "client disconnected", *conn.conn_);
 
-    if (event == Network::ConnectionEvent::LocalClose) {
-      host_->cluster().stats().upstream_cx_destroy_local_.inc();
-    }
-    if (event == Network::ConnectionEvent::RemoteClose) {
-      host_->cluster().stats().upstream_cx_destroy_remote_.inc();
-    }
-    host_->cluster().stats().upstream_cx_destroy_.inc();
+    Envoy::Upstream::reportUpstreamCxDestroy(host_, event);
 
     ActiveConnPtr removed;
     bool check_for_drained = true;
     if (conn.wrapper_ != nullptr) {
       if (!conn.wrapper_->released_) {
-        if (event == Network::ConnectionEvent::LocalClose) {
-          host_->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
-        }
-        if (event == Network::ConnectionEvent::RemoteClose) {
-          host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
-        }
-        host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
+        Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
 
         conn.wrapper_->release(true);
       }
@@ -161,6 +151,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent 
       // do with the request.
       // NOTE: We move the existing pending requests to a temporary list. This is done so that
       //       if retry logic submits a new request to the pool, we don't fail it inline.
+      // TODO(lizan): If pool failure due to transport socket, propagate the reason to access log.
       ConnectionPool::PoolFailureReason reason;
       if (conn.timed_out_) {
         reason = ConnectionPool::PoolFailureReason::Timeout;

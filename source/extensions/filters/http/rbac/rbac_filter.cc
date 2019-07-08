@@ -6,10 +6,18 @@
 
 #include "extensions/filters/http/well_known_names.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
+
+struct RcDetailsValues {
+  // The rbac filter rejected the request
+  const std::string RbacAccessDenied = "rbac_access_denied";
+};
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
@@ -48,18 +56,18 @@ RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpec
 
 Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::HeaderMap& headers,
                                                                       bool) {
-  ENVOY_LOG(
-      debug,
-      "checking request: remoteAddress: {}, localAddress: {}, ssl: {}, headers: {}, "
-      "dynamicMetadata: {}",
-      callbacks_->connection()->remoteAddress()->asString(),
-      callbacks_->connection()->localAddress()->asString(),
-      callbacks_->connection()->ssl()
-          ? "uriSanPeerCertificate: " + callbacks_->connection()->ssl()->uriSanPeerCertificate() +
-                ", subjectPeerCertificate: " +
-                callbacks_->connection()->ssl()->subjectPeerCertificate()
-          : "none",
-      headers, callbacks_->streamInfo().dynamicMetadata().DebugString());
+  ENVOY_LOG(debug,
+            "checking request: remoteAddress: {}, localAddress: {}, ssl: {}, headers: {}, "
+            "dynamicMetadata: {}",
+            callbacks_->connection()->remoteAddress()->asString(),
+            callbacks_->connection()->localAddress()->asString(),
+            callbacks_->connection()->ssl()
+                ? "uriSanPeerCertificate: " +
+                      absl::StrJoin(callbacks_->connection()->ssl()->uriSanPeerCertificate(), ",") +
+                      ", subjectPeerCertificate: " +
+                      callbacks_->connection()->ssl()->subjectPeerCertificate()
+                : "none",
+            headers, callbacks_->streamInfo().dynamicMetadata().DebugString());
 
   std::string effective_policy_id;
   const auto& shadow_engine =
@@ -105,7 +113,7 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
     } else {
       ENVOY_LOG(debug, "enforced denied");
       callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
-                                 absl::nullopt);
+                                 absl::nullopt, RcDetails::get().RbacAccessDenied);
       config_->stats().denied_.inc();
       return Http::FilterHeadersStatus::StopIteration;
     }

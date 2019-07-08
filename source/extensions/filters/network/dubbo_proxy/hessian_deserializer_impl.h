@@ -14,9 +14,11 @@ public:
     return DeserializerNames::get().fromType(type());
   }
   virtual SerializationType type() const override { return SerializationType::Hessian; }
-  virtual RpcInvocationPtr deserializeRpcInvocation(Buffer::Instance& buffer,
-                                                    size_t body_size) override;
+  virtual void deserializeRpcInvocation(Buffer::Instance& buffer, size_t body_size,
+                                        MessageMetadataSharedPtr metadata) override;
   virtual RpcResultPtr deserializeRpcResult(Buffer::Instance& buffer, size_t body_size) override;
+  virtual size_t serializeRpcResult(Buffer::Instance& output_buffer, const std::string& content,
+                                    RpcResponseType type) override;
 };
 
 } // namespace DubboProxy

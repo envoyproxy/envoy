@@ -7,25 +7,27 @@
 
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
 #include "common/event/real_time_system.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/manager_impl.h"
 
+#include "server/ssl_context_manager.h"
+
 namespace Envoy {
 namespace Server {
 
 bool validateConfig(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory) {
+                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
+                    Filesystem::Instance& file_system) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
 
   try {
     Event::RealTimeSystem time_system;
     ValidationInstance server(options, time_system, local_address, stats_store, access_log_lock,
-                              component_factory, thread_factory);
+                              component_factory, thread_factory, file_system);
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
     server.shutdown();
     return true;
@@ -39,14 +41,16 @@ ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem
                                        Stats::IsolatedStoreImpl& store,
                                        Thread::BasicLockable& access_log_lock,
                                        ComponentFactory& component_factory,
-                                       Thread::ThreadFactory& thread_factory)
+                                       Thread::ThreadFactory& thread_factory,
+                                       Filesystem::Instance& file_system)
     : options_(options), stats_store_(store),
-      api_(new Api::ValidationImpl(thread_factory, store, time_system)),
+      api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),
-      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
+      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
-      mutex_tracer_(nullptr), time_system_(time_system) {
+      mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
+      http_context_(stats_store_.symbolTable()), time_system_(time_system) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
@@ -71,7 +75,7 @@ void ValidationInstance::initialize(const Options& options,
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  InstanceUtil::loadBootstrapConfig(bootstrap, options, *api_);
+  InstanceUtil::loadBootstrapConfig(bootstrap, options, messageValidationVisitor(), *api_);
 
   Config::Utility::createTagProducer(bootstrap);
 
@@ -83,21 +87,21 @@ void ValidationInstance::initialize(const Options& options,
 
   Configuration::InitialImpl initial_config(bootstrap);
   overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
-                                                            bootstrap.overload_manager(), *api_);
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this);
+                                                            bootstrap.overload_manager(),
+                                                            messageValidationVisitor(), *api_);
+  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>();
   ssl_context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(api_->timeSource());
+      createContextManager(Ssl::ContextManagerFactory::name(), api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
-      dispatcher(), localInfo(), *secret_manager_, *api_, http_context_, accessLogManager(),
-      singletonManager(), time_system_);
+      dispatcher(), localInfo(), *secret_manager_, messageValidationVisitor(), *api_, http_context_,
+      accessLogManager(), singletonManager(), time_system_);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   http_context_.setTracer(config_.httpTracer());
-  clusterManager().setInitializedCb(
-      [this]() -> void { init_manager_.initialize([]() -> void {}); });
+  clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }
 
 void ValidationInstance::shutdown() {

@@ -9,7 +9,7 @@ namespace Http {
 class MockStreamDecoder : public StreamDecoder {
 public:
   MockStreamDecoder();
-  ~MockStreamDecoder();
+  ~MockStreamDecoder() override;
 
   void decode100ContinueHeaders(HeaderMapPtr&& headers) override {
     decode100ContinueHeaders_(headers);

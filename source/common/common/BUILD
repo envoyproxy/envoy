@@ -62,6 +62,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "cleanup_lib",
     hdrs = ["cleanup.h"],
+    deps = [
+        ":assert_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -106,6 +109,12 @@ envoy_cc_library(
     deps = [":assert_lib"],
 )
 
+# Contains macros and helpers for dumpState utilities
+envoy_cc_library(
+    name = "dump_state_utils",
+    hdrs = ["dump_state_utils.h"],
+)
+
 # Contains minimal code for logging to stderr.
 envoy_cc_library(
     name = "minimal_logger_lib",
@@ -137,6 +146,7 @@ envoy_cc_library(
     srcs = ["logger_delegates.cc"],
     hdrs = ["logger_delegates.h"],
     deps = [
+        ":dump_state_utils",
         ":macros",
         ":minimal_logger_lib",
         "//include/envoy/access_log:access_log_interface",
@@ -172,6 +182,15 @@ envoy_cc_library(
 envoy_cc_library(
     name = "phantom",
     hdrs = ["phantom.h"],
+)
+
+envoy_cc_library(
+    name = "scope_tracker",
+    hdrs = ["scope_tracker.h"],
+    deps = [
+        "//include/envoy/common:scope_tracker_interface",
+        "//include/envoy/event:dispatcher_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -238,6 +257,7 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         ":hash_lib",
+        ":non_copyable",
         "//include/envoy/common:interval_set_interface",
         "//include/envoy/common:time_interface",
         "//source/common/singleton:const_singleton",
@@ -251,6 +271,23 @@ genrule(
     cmd = """echo "#define BUILD_VERSION_NUMBER \\"$$(cat $<)\\"" >$@""",
 )
 
+genrule(
+    name = "generate_version_linkstamp",
+    outs = ["lib/version_linkstamp.h"],
+    cmd = "$(location :generate_version_linkstamp.sh) >> $@",
+    # Undocumented attr to depend on workspace status files.
+    # https://github.com/bazelbuild/bazel/issues/4942
+    # Used here because generate_version_linkstamp.sh depends on the workspace status files.
+    stamp = 1,
+    tools = [":generate_version_linkstamp.sh"],
+)
+
+genrule(
+    name = "generate_version_linkstamp_empty",
+    outs = ["empty/version_linkstamp.h"],
+    cmd = """>$@""",
+)
+
 envoy_cc_library(
     name = "version_includes",
     hdrs = [
@@ -262,11 +299,21 @@ envoy_cc_library(
 envoy_cc_library(
     name = "version_lib",
     srcs = ["version.cc"],
+    hdrs = select({
+        "//bazel:manual_stamp": [":generate_version_linkstamp"],
+        # By default the header file is empty.
+        # This is done so that the definitions linked via the linkstamp rule don't cause collisions.
+        "//conditions:default": [":generate_version_linkstamp_empty"],
+    }),
     copts = envoy_select_boringssl(
         ["-DENVOY_SSL_VERSION=\\\"BoringSSL-FIPS\\\""],
         ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
     ),
     linkstamp = "version_linkstamp.cc",
+    strip_include_prefix = select({
+        "//bazel:manual_stamp": "lib",
+        "//conditions:default": "empty",
+    }),
     deps = [
         ":version_includes",
         "//source/common/common:macros",
@@ -285,16 +332,6 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         "//include/envoy/common:callback",
-    ],
-)
-
-envoy_cc_library(
-    name = "block_memory_hash_set_lib",
-    hdrs = ["block_memory_hash_set.h"],
-    deps = [
-        ":assert_lib",
-        ":logger_lib",
-        "//source/common/stats:stats_options_lib",
     ],
 )
 

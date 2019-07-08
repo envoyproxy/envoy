@@ -4,9 +4,11 @@
 #include <list>
 #include <string>
 
-#include "extensions/filters/network/redis_proxy/codec_impl.h"
+#include "extensions/filters/network/common/redis/client.h"
+#include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
+#include "extensions/filters/network/redis_proxy/router.h"
 
 #include "test/test_common/printers.h"
 
@@ -17,91 +19,42 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-/**
- * Pretty print const RespValue& value
- */
-
-void PrintTo(const RespValue& value, std::ostream* os);
-void PrintTo(const RespValuePtr& value, std::ostream* os);
-bool operator==(const RespValue& lhs, const RespValue& rhs);
-
-class MockEncoder : public Encoder {
+class MockRouter : public Router {
 public:
-  MockEncoder();
-  ~MockEncoder();
+  MockRouter();
+  ~MockRouter();
 
-  MOCK_METHOD2(encode, void(const RespValue& value, Buffer::Instance& out));
-
-private:
-  EncoderImpl real_encoder_;
+  MOCK_METHOD1(upstreamPool, RouteSharedPtr(std::string& key));
 };
 
-class MockDecoder : public Decoder {
+class MockRoute : public Route {
 public:
-  MockDecoder();
-  ~MockDecoder();
+  MockRoute(ConnPool::InstanceSharedPtr);
+  ~MockRoute();
 
-  MOCK_METHOD1(decode, void(Buffer::Instance& data));
+  MOCK_CONST_METHOD0(upstream, ConnPool::InstanceSharedPtr());
+  MOCK_CONST_METHOD0(mirrorPolicies, const MirrorPolicies&());
+
+private:
+  ConnPool::InstanceSharedPtr conn_pool_;
+  const MirrorPolicies policies_;
 };
 
 namespace ConnPool {
-
-class MockClient : public Client {
-public:
-  MockClient();
-  ~MockClient();
-
-  void raiseEvent(Network::ConnectionEvent event) {
-    for (Network::ConnectionCallbacks* callbacks : callbacks_) {
-      callbacks->onEvent(event);
-    }
-  }
-
-  void runHighWatermarkCallbacks() {
-    for (auto* callback : callbacks_) {
-      callback->onAboveWriteBufferHighWatermark();
-    }
-  }
-
-  void runLowWatermarkCallbacks() {
-    for (auto* callback : callbacks_) {
-      callback->onBelowWriteBufferLowWatermark();
-    }
-  }
-
-  MOCK_METHOD1(addConnectionCallbacks, void(Network::ConnectionCallbacks& callbacks));
-  MOCK_METHOD0(close, void());
-  MOCK_METHOD2(makeRequest, PoolRequest*(const RespValue& request, PoolCallbacks& callbacks));
-
-  std::list<Network::ConnectionCallbacks*> callbacks_;
-};
-
-class MockPoolRequest : public PoolRequest {
-public:
-  MockPoolRequest();
-  ~MockPoolRequest();
-
-  MOCK_METHOD0(cancel, void());
-};
-
-class MockPoolCallbacks : public PoolCallbacks {
-public:
-  MockPoolCallbacks();
-  ~MockPoolCallbacks();
-
-  void onResponse(RespValuePtr&& value) override { onResponse_(value); }
-
-  MOCK_METHOD1(onResponse_, void(RespValuePtr& value));
-  MOCK_METHOD0(onFailure, void());
-};
 
 class MockInstance : public Instance {
 public:
   MockInstance();
   ~MockInstance();
 
-  MOCK_METHOD3(makeRequest, PoolRequest*(const std::string& hash_key, const RespValue& request,
-                                         PoolCallbacks& callbacks));
+  MOCK_METHOD3(makeRequest,
+               Common::Redis::Client::PoolRequest*(
+                   const std::string& hash_key, const Common::Redis::RespValue& request,
+                   Common::Redis::Client::PoolCallbacks& callbacks));
+  MOCK_METHOD3(makeRequestToHost,
+               Common::Redis::Client::PoolRequest*(
+                   const std::string& host_address, const Common::Redis::RespValue& request,
+                   Common::Redis::Client::PoolCallbacks& callbacks));
 };
 
 } // namespace ConnPool
@@ -121,9 +74,12 @@ public:
   MockSplitCallbacks();
   ~MockSplitCallbacks();
 
-  void onResponse(RespValuePtr&& value) override { onResponse_(value); }
+  MOCK_METHOD0(connectionAllowed, bool());
+  MOCK_METHOD1(onAuth, void(const std::string& password));
 
-  MOCK_METHOD1(onResponse_, void(RespValuePtr& value));
+  void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
+
+  MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));
 };
 
 class MockInstance : public Instance {
@@ -131,11 +87,13 @@ public:
   MockInstance();
   ~MockInstance();
 
-  SplitRequestPtr makeRequest(const RespValue& request, SplitCallbacks& callbacks) override {
-    return SplitRequestPtr{makeRequest_(request, callbacks)};
+  SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
+                              SplitCallbacks& callbacks) override {
+    return SplitRequestPtr{makeRequest_(*request, callbacks)};
   }
 
-  MOCK_METHOD2(makeRequest_, SplitRequest*(const RespValue& request, SplitCallbacks& callbacks));
+  MOCK_METHOD2(makeRequest_,
+               SplitRequest*(const Common::Redis::RespValue& request, SplitCallbacks& callbacks));
 };
 
 } // namespace CommandSplitter

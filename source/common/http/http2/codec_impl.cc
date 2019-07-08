@@ -33,21 +33,9 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
     cookies.append("; ", 2);
   }
 
-  cookies.append(value.c_str(), value.size());
+  const absl::string_view value_view = value.getStringView();
+  cookies.append(value_view.data(), value_view.size());
   return true;
-}
-
-void initializeNghttp2Logging() {
-  nghttp2_set_debug_vprintf_callback([](const char* format, va_list args) {
-    char buf[2048];
-    const int n = ::vsnprintf(buf, sizeof(buf), format, args);
-    // nghttp2 inserts new lines, but we also insert a new line in the ENVOY_LOG
-    // below, so avoid double \n.
-    if (n >= 1 && static_cast<size_t>(n) < sizeof(buf) && buf[n - 1] == '\n') {
-      buf[n - 1] = '\0';
-    }
-    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::http2), trace, "nghttp2: {}", buf);
-  });
 }
 
 ConnectionImpl::Http2Callbacks ConnectionImpl::http2_callbacks_;
@@ -79,9 +67,11 @@ static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& he
   if (header.value().type() == HeaderString::Type::Reference) {
     flags |= NGHTTP2_NV_FLAG_NO_COPY_VALUE;
   }
-  headers.push_back({remove_const<uint8_t>(header.key().c_str()),
-                     remove_const<uint8_t>(header.value().c_str()), header.key().size(),
-                     header.value().size(), flags});
+  const absl::string_view header_key = header.key().getStringView();
+  const absl::string_view header_value = header.value().getStringView();
+  headers.push_back({remove_const<uint8_t>(header_key.data()),
+                     remove_const<uint8_t>(header_value.data()), header_key.size(),
+                     header_value.size(), flags});
 }
 
 void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_headers,
@@ -521,6 +511,7 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "sent frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
   switch (frame->hd.type) {
   case NGHTTP2_GOAWAY: {
+    ENVOY_CONN_LOG(debug, "sent goaway code={}", connection_, frame->goaway.error_code);
     if (frame->goaway.error_code != NGHTTP2_NO_ERROR) {
       return NGHTTP2_ERR_CALLBACK_FAILURE;
     }
@@ -747,7 +738,7 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings, bool disa
     ASSERT(rc == 0);
   } else {
     // nghttp2_submit_settings need to be called at least once
-    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, 0, 0);
+    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, nullptr, 0);
     ASSERT(rc == 0);
   }
 
@@ -867,6 +858,10 @@ ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) 
   // of kept alive HTTP/2 connections.
   nghttp2_option_set_no_closed_streams(options_, 1);
   nghttp2_option_set_no_auto_window_update(options_, 1);
+
+  // The max send header block length is configured to an arbitrarily high number so as to never
+  // trigger the check within nghttp2, as we check request headers length in codec_impl::saveHeader.
+  nghttp2_option_set_max_send_header_block_length(options_, 0x2000000);
 
   if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
     nghttp2_option_set_max_deflate_dynamic_table_size(options_, http2_settings.hpack_table_size_);

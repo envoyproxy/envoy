@@ -14,9 +14,9 @@ namespace Extensions {
 namespace Common {
 namespace Tap {
 
-using TraceWrapperSharedPtr = std::shared_ptr<envoy::data::tap::v2alpha::TraceWrapper>;
-inline TraceWrapperSharedPtr makeTraceWrapper() {
-  return std::make_shared<envoy::data::tap::v2alpha::TraceWrapper>();
+using TraceWrapperPtr = std::unique_ptr<envoy::data::tap::v2alpha::TraceWrapper>;
+inline TraceWrapperPtr makeTraceWrapper() {
+  return std::make_unique<envoy::data::tap::v2alpha::TraceWrapper>();
 }
 
 /**
@@ -33,7 +33,7 @@ public:
    * @param trace supplies the trace to send.
    * @param format supplies the output format to use.
    */
-  virtual void submitTrace(const TraceWrapperSharedPtr& trace,
+  virtual void submitTrace(TraceWrapperPtr&& trace,
                            envoy::service::tap::v2alpha::OutputSink::Format format) PURE;
 };
 
@@ -51,7 +51,7 @@ public:
   /**
    * Submit a buffered or streamed trace segment to all managed per-tap sink handles.
    */
-  virtual void submitTrace(const TraceWrapperSharedPtr& trace) PURE;
+  virtual void submitTrace(TraceWrapperPtr&& trace) PURE;
 };
 
 using PerTapSinkHandleManagerPtr = std::unique_ptr<PerTapSinkHandleManager>;

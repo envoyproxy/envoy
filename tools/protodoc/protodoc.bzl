@@ -31,9 +31,7 @@ def _proto_path(proto):
 # get docs created.
 def _proto_doc_aspect_impl(target, ctx):
     # Compute RST files from the current proto_library node's dependencies.
-    transitive_outputs = depset()
-    for dep in ctx.rule.attr.deps:
-        transitive_outputs = transitive_outputs | dep.output_groups["rst"]
+    transitive_outputs = depset(transitive = [dep.output_groups["rst"] for dep in ctx.rule.attr.deps])
     proto_sources = target[ProtoInfo].direct_sources
 
     # If this proto_library doesn't actually name any sources, e.g. //api:api,
@@ -46,7 +44,7 @@ def _proto_doc_aspect_impl(target, ctx):
     # these don't include source_code_info, which we need for comment
     # extractions. See https://github.com/bazelbuild/bazel/issues/3971.
     import_paths = []
-    for f in target[ProtoInfo].transitive_sources:
+    for f in target[ProtoInfo].transitive_sources.to_list():
         if f.root.path:
             import_path = f.root.path + "/" + f.owner.workspace_root
         else:
@@ -66,15 +64,16 @@ def _proto_doc_aspect_impl(target, ctx):
     args += ["-I" + import_path for import_path in import_paths]
     args += ["--plugin=protoc-gen-protodoc=" + ctx.executable._protodoc.path, "--protodoc_out=" + output_path]
     args += [_proto_path(src) for src in target[ProtoInfo].direct_sources]
-    ctx.action(
+    ctx.actions.run(
         executable = ctx.executable._protoc,
         arguments = args,
-        inputs = [ctx.executable._protodoc] + target[ProtoInfo].transitive_sources.to_list(),
+        inputs = target[ProtoInfo].transitive_sources,
+        tools = [ctx.executable._protodoc],
         outputs = outputs,
         mnemonic = "ProtoDoc",
         use_default_shell_env = True,
     )
-    transitive_outputs = depset(outputs) | transitive_outputs
+    transitive_outputs = depset(outputs, transitive = [transitive_outputs])
     return [OutputGroupInfo(rst = transitive_outputs)]
 
 proto_doc_aspect = aspect(

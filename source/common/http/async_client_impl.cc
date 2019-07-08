@@ -12,9 +12,6 @@
 namespace Envoy {
 namespace Http {
 
-const std::list<std::string> AsyncStreamImpl::NullCorsPolicy::allow_origin_;
-const std::list<std::regex> AsyncStreamImpl::NullCorsPolicy::allow_origin_regex_;
-const absl::optional<bool> AsyncStreamImpl::NullCorsPolicy::allow_credentials_;
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
     AsyncStreamImpl::NullRateLimitPolicy::rate_limit_policy_entry_;
 const AsyncStreamImpl::NullHedgePolicy AsyncStreamImpl::RouteEntryImpl::hedge_policy_;
@@ -39,9 +36,9 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Runtime::RandomGenerator& random,
                                  Router::ShadowWriterPtr&& shadow_writer,
                                  Http::Context& http_context)
-    : cluster_(cluster),
-      config_("http.async-client.", local_info, stats_store, cm, runtime, random,
-              std::move(shadow_writer), true, false, false, dispatcher.timeSource(), http_context),
+    : cluster_(cluster), config_("http.async-client.", local_info, stats_store, cm, runtime, random,
+                                 std::move(shadow_writer), true, false, false, {},
+                                 dispatcher.timeSource(), http_context),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -113,7 +110,7 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
-  if (Http::Headers::get().MethodValues.Head == headers.Method()->value().c_str()) {
+  if (Http::Headers::get().MethodValues.Head == headers.Method()->value().getStringView()) {
     is_head_request_ = true;
   }
 

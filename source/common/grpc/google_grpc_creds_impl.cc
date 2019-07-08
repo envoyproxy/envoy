@@ -25,6 +25,9 @@ std::shared_ptr<grpc::ChannelCredentials> CredsUtility::getChannelCredentials(
     case envoy::api::v2::core::GrpcService::GoogleGrpc::ChannelCredentials::kLocalCredentials: {
       return grpc::experimental::LocalCredentials(UDS);
     }
+    case envoy::api::v2::core::GrpcService::GoogleGrpc::ChannelCredentials::kGoogleDefault: {
+      return grpc::GoogleDefaultCredentials();
+    }
     default:
       return nullptr;
     }

@@ -34,6 +34,7 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_name = "envoy.filters.network.client_ssl_auth",
     deps = [
+        "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/client_ssl_auth:config",
         "//test/mocks/server:server_mocks",
     ],

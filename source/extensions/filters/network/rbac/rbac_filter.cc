@@ -5,6 +5,8 @@
 
 #include "extensions/filters/network/well_known_names.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -26,7 +28,8 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
       callbacks_->connection().remoteAddress()->asString(),
       callbacks_->connection().localAddress()->asString(),
       callbacks_->connection().ssl()
-          ? "uriSanPeerCertificate: " + callbacks_->connection().ssl()->uriSanPeerCertificate() +
+          ? "uriSanPeerCertificate: " +
+                absl::StrJoin(callbacks_->connection().ssl()->uriSanPeerCertificate(), ",") +
                 ", subjectPeerCertificate: " +
                 callbacks_->connection().ssl()->subjectPeerCertificate()
           : "none",

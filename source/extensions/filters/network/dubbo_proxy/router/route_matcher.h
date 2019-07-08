@@ -34,7 +34,7 @@ public:
   // Router::RouteEntry
   const std::string& clusterName() const override;
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return metadata_match_criteria_.get();
   }
 
   // Router::Route
@@ -72,7 +72,7 @@ private:
     Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   };
 
-  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
+  using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
   uint64_t total_cluster_weight_;
   const std::string cluster_name_;
@@ -83,7 +83,7 @@ private:
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
 };
 
-typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
+using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBase>;
 
 class ParameterRouteEntryImpl : public RouteEntryImplBase {
 public:
@@ -107,7 +107,7 @@ public:
                               uint64_t random_value) const override;
 
 private:
-  bool matchParameter(const std::string& request_data, const ParameterData& config_data) const;
+  bool matchParameter(absl::string_view request_data, const ParameterData& config_data) const;
 
   std::vector<ParameterData> parameter_data_list_;
 };
@@ -140,8 +140,8 @@ private:
   const absl::optional<std::string> version_;
 };
 
-typedef std::shared_ptr<const RouteMatcher> RouteMatcherConstSharedPtr;
-typedef std::unique_ptr<RouteMatcher> RouteMatcherPtr;
+using RouteMatcherConstSharedPtr = std::shared_ptr<const RouteMatcher>;
+using RouteMatcherPtr = std::unique_ptr<RouteMatcher>;
 
 class MultiRouteMatcher : public Logger::Loggable<Logger::Id::dubbo> {
 public:

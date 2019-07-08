@@ -16,7 +16,7 @@ namespace Http {
 
 envoy::api::v2::route::HeaderMatcher parseHeaderMatcherFromYaml(const std::string& yaml) {
   envoy::api::v2::route::HeaderMatcher header_matcher;
-  MessageUtil::loadFromYaml(yaml, header_matcher);
+  TestUtility::loadFromYaml(yaml, header_matcher);
   return header_matcher;
 }
 
@@ -412,8 +412,8 @@ TEST(HeaderAddTest, HeaderAdd) {
   headers_to_add.iterate(
       [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
         TestHeaderMapImpl* headers = static_cast<TestHeaderMapImpl*>(context);
-        Http::LowerCaseString lower_key{entry.key().c_str()};
-        EXPECT_STREQ(entry.value().c_str(), headers->get(lower_key)->value().c_str());
+        Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
+        EXPECT_EQ(entry.value().getStringView(), headers->get(lower_key)->value().getStringView());
         return Http::HeaderMap::Iterate::Continue;
       },
       &headers);

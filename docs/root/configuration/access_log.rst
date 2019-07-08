@@ -28,7 +28,7 @@ Format Strings
 --------------
 
 Format strings are plain strings, specified using the ``format`` key. They may contain
-either command operators or other characters interpreted as a plain string. 
+either command operators or other characters interpreted as a plain string.
 The access log formatter does not make any assumptions about a new line separator, so one
 has to specified as part of the format string.
 See the :ref:`default format <config_access_log_default_format>` for an example.
@@ -78,7 +78,7 @@ For example, with the following format provided in the configuration:
       }
     }
   }
-  
+
 The following JSON object would be written to the log file:
 
 .. code-block:: json
@@ -162,6 +162,16 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+.. _config_access_log_format_response_code_details:
+
+%RESPONSE_CODE_DETAILS%
+  HTTP
+    HTTP response code details provides additional information about the response code, such as
+    who set it (the upstream or envoy) and why.
+
+  TCP
+    Not implemented ("-")
+
 %BYTES_SENT%
   HTTP
     Body bytes sent. For WebSocket connection it will also include response header bytes.
@@ -208,6 +218,8 @@ The following command operators are supported:
     * **RL**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
     * **UAEX**: The request was denied by the external authorization service.
     * **RLSE**: The request was rejected because there was an error in rate limit service.
+    * **IH**: The request was rejected because it set an invalid value for a
+      :ref:`strictly-checked header <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>` in addition to 400 response code.
     * **SI**: Stream idle timeout in addition to 408 response code.
 
 %RESPONSE_TX_DURATION%
@@ -218,6 +230,9 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+%ROUTE_NAME%
+  Name of the route.
+
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
 
@@ -227,6 +242,17 @@ The following command operators are supported:
 %UPSTREAM_LOCAL_ADDRESS%
   Local address of the upstream connection. If the address is an IP address it includes both
   address and port.
+
+.. _config_access_log_format_upstream_transport_failure_reason:
+
+%UPSTREAM_TRANSPORT_FAILURE_REASON%
+  HTTP
+    If upstream connection failed due to transport socket (e.g. TLS handshake), provides the failure
+    reason from the transport socket. The format of this field depends on the configured upstream
+    transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+
+  TCP
+    Not implemented ("-")
 
 %DOWNSTREAM_REMOTE_ADDRESS%
   Remote address of the downstream connection. If the address is an IP address it includes both
@@ -311,4 +337,82 @@ The following command operators are supported:
     String value set on ssl connection socket for Server Name Indication (SNI)
   TCP
     String value set on ssl connection socket for Server Name Indication (SNI)
+
+%DOWNSTREAM_LOCAL_URI_SAN%
+  HTTP
+    The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
+  TCP
+    The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_URI_SAN%
+  HTTP
+    The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
+  TCP
+    The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_LOCAL_SUBJECT%
+  HTTP
+    The subject present in the local certificate used to establish the downstream TLS connection.
+  TCP
+    The subject present in the local certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_SUBJECT%
+  HTTP
+    The subject present in the peer certificate used to establish the downstream TLS connection.
+  TCP
+    The subject present in the peer certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_ISSUER%
+  HTTP
+    The issuer present in the peer certificate used to establish the downstream TLS connection.
+  TCP
+    The issuer present in the peer certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_TLS_SESSION_ID%
+  HTTP
+    The session ID for the established downstream TLS connection.
+  TCP
+    The session ID for the established downstream TLS connection.
+
+%DOWNSTREAM_TLS_CIPHER%
+  HTTP
+    The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.
+  TCP
+    The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.
+
+%DOWNSTREAM_TLS_VERSION%
+  HTTP
+    The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
+  TCP
+    The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_FINGERPRINT_256%
+  HTTP
+    The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_SERIAL%
+  HTTP
+    The serial number of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The serial number of the client certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_CERT%
+  HTTP
+    The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
+  TCP
+    The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_CERT_V_START%
+  HTTP
+    The validity start date of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The validity start date of the client certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_CERT_V_END%
+  HTTP
+    The validity end date of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The validity end date of the client certificate used to establish the downstream TLS connection.
 

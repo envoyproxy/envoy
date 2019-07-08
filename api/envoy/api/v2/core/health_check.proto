@@ -44,6 +44,11 @@ message HealthCheck {
     (gogoproto.stdduration) = true
   ];
 
+  // An optional jitter amount in milliseconds. If specified, Envoy will start health
+  // checking after for a random time in ms between 0 and initial_jitter. This only
+  // applies to the first health check.
+  google.protobuf.Duration initial_jitter = 20;
+
   // An optional jitter amount in milliseconds. If specified, during every
   // interval Envoy will add interval_jitter to the wait time.
   google.protobuf.Duration interval_jitter = 3;
@@ -171,7 +176,7 @@ message HealthCheck {
     // A custom health checker specific configuration which depends on the custom health checker
     // being instantiated. See :api:`envoy/config/health_checker` for reference.
     oneof config_type {
-      google.protobuf.Struct config = 2 [deprecated = true];
+      google.protobuf.Struct config = 2;
 
       google.protobuf.Any typed_config = 3;
     }

@@ -116,7 +116,9 @@ gRPC or RESTful JSON requests to localhost:51051.
               - name: local_service
                 domains: ["*"]
                 routes:
-                - match: { prefix: "/" }
+                # NOTE: by default, matching happens based on the gRPC route, and not on the incoming request path.
+                # Reference: https://www.envoyproxy.io/docs/envoy/latest/configuration/http_filters/grpc_json_transcoder_filter#route-configs-for-transcoded-requests
+                - match: { prefix: "/helloworld.Greeter" }
                   route: { cluster: grpc, timeout: { seconds: 60 } }
             http_filters:
             - name: envoy.grpc_json_transcoder
@@ -144,6 +146,9 @@ gRPC or RESTful JSON requests to localhost:51051.
           - endpoint:
               address:
                 socket_address:
-                  address: docker.for.mac.localhost
+                  # WARNING: "docker.for.mac.localhost" has been deprecated from Docker v18.03.0.
+                  # If you're running an older version of Docker, please use "docker.for.mac.localhost" instead.
+                  # Reference: https://docs.docker.com/docker-for-mac/release-notes/#docker-community-edition-18030-ce-mac59-2018-03-26
+                  address: host.docker.internal
                   port_value: 50051
 

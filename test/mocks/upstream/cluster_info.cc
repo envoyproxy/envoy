@@ -1,5 +1,10 @@
 #include "test/mocks/upstream/cluster_info.h"
 
+#include <limits>
+
+#include "envoy/upstream/upstream.h"
+
+#include "common/config/metadata.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -17,7 +22,7 @@ MockLoadBalancerSubsetInfo::MockLoadBalancerSubsetInfo() {
   ON_CALL(*this, fallbackPolicy())
       .WillByDefault(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
   ON_CALL(*this, defaultSubset()).WillByDefault(ReturnRef(ProtobufWkt::Struct::default_instance()));
-  ON_CALL(*this, subsetKeys()).WillByDefault(ReturnRef(subset_keys_));
+  ON_CALL(*this, subsetSelectors()).WillByDefault(ReturnRef(subset_selectors_));
 }
 
 MockLoadBalancerSubsetInfo::~MockLoadBalancerSubsetInfo() {}
@@ -33,8 +38,9 @@ MockClusterInfo::MockClusterInfo()
       transport_socket_factory_(new Network::RawBufferSocketFactory),
       load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
       circuit_breakers_stats_(
-          ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default")),
+          ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default", true)),
       resource_manager_(new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1024, 1024, 1,
+                                                          std::numeric_limits<uint64_t>::max(),
                                                           circuit_breakers_stats_)) {
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
@@ -46,7 +52,11 @@ MockClusterInfo::MockClusterInfo()
       .WillByDefault(ReturnPointee(&max_requests_per_connection_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(stats_store_));
-  ON_CALL(*this, transportSocketFactory()).WillByDefault(ReturnRef(*transport_socket_factory_));
+  // TODO(mattklein123): The following is a hack because it's not possible to directly embed
+  // a mock transport socket factory due to circular dependencies. Fix this up in a follow up.
+  ON_CALL(*this, transportSocketFactory())
+      .WillByDefault(Invoke(
+          [this]() -> Network::TransportSocketFactory& { return *transport_socket_factory_; }));
   ON_CALL(*this, loadReportStats()).WillByDefault(ReturnRef(load_report_stats_));
   ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
   ON_CALL(*this, resourceManager(_))
@@ -59,6 +69,17 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, lbOriginalDstConfig()).WillByDefault(ReturnRef(lb_original_dst_config_));
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
   ON_CALL(*this, clusterSocketOptions()).WillByDefault(ReturnRef(cluster_socket_options_));
+  ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
+  // Delayed construction of typed_metadata_, to allow for injection of metadata
+  ON_CALL(*this, typedMetadata())
+      .WillByDefault(Invoke([this]() -> const Envoy::Config::TypedMetadata& {
+        if (typed_metadata_ == nullptr) {
+          typed_metadata_ =
+              std::make_unique<Config::TypedMetadataImpl<ClusterTypedMetadataFactory>>(metadata_);
+        }
+        return *typed_metadata_;
+      }));
+  ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
 }
 
 MockClusterInfo::~MockClusterInfo() {}

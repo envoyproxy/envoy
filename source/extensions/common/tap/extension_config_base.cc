@@ -29,7 +29,9 @@ ExtensionConfigBase::ExtensionConfigBase(
     ENVOY_LOG(debug, "initializing tap extension with static config");
     break;
   }
-  default: { NOT_REACHED_GCOVR_EXCL_LINE; }
+  default: {
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
   }
 }
 

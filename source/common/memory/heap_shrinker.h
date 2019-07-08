@@ -2,6 +2,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/overload_manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
 namespace Envoy {
@@ -14,14 +15,14 @@ namespace Memory {
 class HeapShrinker {
 public:
   HeapShrinker(Event::Dispatcher& dispatcher, Server::OverloadManager& overload_manager,
-               Stats::Scope& stats);
+               Envoy::Stats::Scope& stats);
 
 private:
   void shrinkHeap();
 
   bool active_;
-  Stats::Counter* shrink_counter_;
-  Event::TimerPtr timer_;
+  Envoy::Stats::Counter* shrink_counter_;
+  Envoy::Event::TimerPtr timer_;
 };
 
 } // namespace Memory

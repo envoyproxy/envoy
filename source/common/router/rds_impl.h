@@ -12,10 +12,10 @@
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
-#include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
+#include "envoy/router/route_config_update_receiver.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/singleton/instance.h"
@@ -23,7 +23,10 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
+#include "common/init/target_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/router/route_config_update_receiver_impl.h"
+#include "common/router/vhds.h"
 
 namespace Envoy {
 namespace Router {
@@ -62,6 +65,7 @@ public:
     return ConfigInfo{route_config_proto_, ""};
   }
   SystemTime lastUpdated() const override { return last_updated_; }
+  void onConfigUpdate() override {}
 
 private:
   ConfigConstSharedPtr config_;
@@ -93,31 +97,29 @@ class RdsRouteConfigProviderImpl;
  * A class that fetches the route configuration dynamically using the RDS API and updates them to
  * RDS config providers.
  */
-class RdsRouteConfigSubscription
-    : public Init::Target,
-      Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
-      Logger::Loggable<Logger::Id::router> {
+class RdsRouteConfigSubscription : Envoy::Config::SubscriptionCallbacks,
+                                   Logger::Loggable<Logger::Id::router> {
 public:
-  ~RdsRouteConfigSubscription();
+  ~RdsRouteConfigSubscription() override;
 
-  // Init::Target
-  void initialize(std::function<void()> callback) override {
-    initialize_callback_ = callback;
-    subscription_->start({route_config_name_}, *this);
+  std::unordered_set<RouteConfigProvider*>& routeConfigProviders() {
+    return route_config_providers_;
   }
-
-  // Config::SubscriptionCallbacks
-  void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
-  void onConfigUpdateFailed(const EnvoyException* e) override;
-  std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
-  }
+  RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
 
 private:
-  struct LastConfigInfo {
-    uint64_t last_config_hash_;
-    std::string last_config_version_;
-  };
+  // Config::SubscriptionCallbacks
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string&) override;
+  void onConfigUpdateFailed(const EnvoyException* e) override;
+  std::string resourceName(const ProtobufWkt::Any& resource) override {
+    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource,
+                                                                       validation_visitor_)
+        .name();
+  }
 
   RdsRouteConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
@@ -125,27 +127,26 @@ private:
       const std::string& stat_prefix,
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
-  void registerInitTarget(Init::Manager& init_manager);
-  void runInitializeCallbackIfAny();
+  bool validateUpdateSize(int num_resources);
 
-  std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
-  std::function<void()> initialize_callback_;
+  std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const std::string route_config_name_;
+  Server::Configuration::FactoryContext& factory_context_;
+  Init::TargetImpl init_target_;
   Stats::ScopePtr scope_;
+  std::string stat_prefix_;
   RdsStats stats_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
   const uint64_t manager_identifier_;
-  TimeSource& time_source_;
-  SystemTime last_updated_;
-  absl::optional<LastConfigInfo> config_info_;
-  envoy::api::v2::RouteConfiguration route_config_proto_;
-  std::unordered_set<RdsRouteConfigProviderImpl*> route_config_providers_;
+  std::unordered_set<RouteConfigProvider*> route_config_providers_;
+  VhdsSubscriptionPtr vhds_subscription_;
+  RouteConfigUpdatePtr config_update_info_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 
   friend class RouteConfigProviderManagerImpl;
-  friend class RdsRouteConfigProviderImpl;
 };
 
-typedef std::shared_ptr<RdsRouteConfigSubscription> RdsRouteConfigSubscriptionSharedPtr;
+using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;
 
 /**
  * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
@@ -154,20 +155,21 @@ typedef std::shared_ptr<RdsRouteConfigSubscription> RdsRouteConfigSubscriptionSh
 class RdsRouteConfigProviderImpl : public RouteConfigProvider,
                                    Logger::Loggable<Logger::Id::router> {
 public:
-  ~RdsRouteConfigProviderImpl();
+  ~RdsRouteConfigProviderImpl() override;
 
   RdsRouteConfigSubscription& subscription() { return *subscription_; }
-  void onConfigUpdate();
+  void onConfigUpdate() override;
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;
-  absl::optional<ConfigInfo> configInfo() const override;
-  SystemTime lastUpdated() const override { return subscription_->last_updated_; }
+  absl::optional<ConfigInfo> configInfo() const override {
+    return config_update_info_->configInfo();
+  }
+  SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalConfig(ConfigConstSharedPtr initial_config) : config_(initial_config) {}
-
+    ThreadLocalConfig(ConfigConstSharedPtr initial_config) : config_(std::move(initial_config)) {}
     ConfigConstSharedPtr config_;
   };
 
@@ -175,6 +177,7 @@ private:
                              Server::Configuration::FactoryContext& factory_context);
 
   RdsRouteConfigSubscriptionSharedPtr subscription_;
+  RouteConfigUpdatePtr& config_update_info_;
   Server::Configuration::FactoryContext& factory_context_;
   ThreadLocal::SlotPtr tls_;
 

@@ -18,14 +18,43 @@ src_base_dir=$$(dirname $$(dirname $$(dirname $(rootpath quic/core/quic_constant
 
 # sed commands to apply to each source file.
 cat <<EOF >sed_commands
+# Rewrite include directives for testonly platform impl files.
+/^#include/ s!net/http2/platform/impl/http2_reconstruct_object_impl.h!test/extensions/quic_listeners/quiche/platform/http2_reconstruct_object_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_expect_bug_impl.h!test/extensions/quic_listeners/quiche/platform/quic_expect_bug_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_mock_log_impl.h!test/extensions/quic_listeners/quiche/platform/quic_mock_log_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_port_utils_impl.h!test/extensions/quic_listeners/quiche/platform/quic_port_utils_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_sleep_impl.h!test/extensions/quic_listeners/quiche/platform/quic_sleep_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_system_event_loop_impl.h!test/extensions/quic_listeners/quiche/platform/quic_system_event_loop_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_test_impl.h!test/extensions/quic_listeners/quiche/platform/quic_test_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_test_mem_slice_vector_impl.h!test/extensions/quic_listeners/quiche/platform/quic_test_mem_slice_vector_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_test_output_impl.h!test/extensions/quic_listeners/quiche/platform/quic_test_output_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_thread_impl.h!test/extensions/quic_listeners/quiche/platform/quic_thread_impl.h!
+/^#include/ s!net/quiche/common/platform/impl/quiche_test_impl.h!test/extensions/quic_listeners/quiche/platform/quiche_test_impl.h!
+/^#include/ s!net/spdy/platform/impl/spdy_test_helpers_impl.h!test/extensions/quic_listeners/quiche/platform/spdy_test_helpers_impl.h!
+/^#include/ s!net/spdy/platform/impl/spdy_test_impl.h!test/extensions/quic_listeners/quiche/platform/spdy_test_impl.h!
+
 # Rewrite include directives for platform impl files.
-/^#include/ s!net/(http2|spdy|quic)/platform/impl/!extensions/quic_listeners/quiche/platform/!
+/^#include/ s!net/(http2|spdy|quic|quiche/common)/platform/impl/!extensions/quic_listeners/quiche/platform/!
+
+# Rewrite include directives for epoll_server platform impl files.
+/^#include/ s!net/tools/epoll_server/platform/impl!test/extensions/quic_listeners/quiche/platform/!
 
 # Strip "net/third_party" from include directives to other QUICHE files.
 /^#include/ s!net/third_party/quiche/src/!quiche/!
 
-# Rewrite gtest includes.
+# Rewrite gmock & gtest includes.
+/^#include/ s!testing/gmock/include/gmock/!gmock/!
 /^#include/ s!testing/gtest/include/gtest/!gtest/!
+
+# Rewrite third_party includes.
+/^#include/ s!third_party/boringssl/src/include/!!
+/^#include/ s!third_party/zlib/zlib!zlib!
+
+/^import/ s!cached_network_parameters!quiche/quic/core/proto/cached_network_parameters!
+
+# Rewrite #pragma clang
+/^#pragma/ s!clang!GCC!
+/^#pragma/ s!-Weverything!-Wall!
 EOF
 
 for src_file in $(SRCS); do

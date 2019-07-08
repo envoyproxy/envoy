@@ -30,13 +30,14 @@ envoy_cc_test_library(
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/thread:thread_factory_singleton_lib",
+        "//source/exe:process_wide_lib",
+        "//test/common/runtime:utility_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:global_lib",
         "//test/test_common:printers_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],
-        "//conditions:default": ["//source/exe:sigaction_lib"],
+        "//conditions:default": ["//source/common/signal:sigaction_lib"],
     }),
 )

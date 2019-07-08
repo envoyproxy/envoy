@@ -19,7 +19,9 @@ namespace Common {
 namespace Lua {
 namespace {
 
-class TestObject : public BaseLuaObject<TestObject> {
+// Setting large alignment requirement here so it fails the UBSAN tests if Lua allocated memory is
+// not aligned by Envoy. See https://github.com/envoyproxy/envoy/issues/5551 for details.
+class alignas(32) TestObject : public BaseLuaObject<TestObject> {
 public:
   ~TestObject() { onDestroy(); }
 

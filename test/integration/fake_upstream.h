@@ -90,7 +90,7 @@ public:
   void startGrpcStream();
   void finishGrpcStream(Grpc::Status::GrpcStatus status);
   template <class T> void sendGrpcMessage(const T& message) {
-    auto serialized_response = Grpc::Common::serializeBody(message);
+    auto serialized_response = Grpc::Common::serializeToGrpcFrame(message);
     encodeData(*serialized_response, false);
     ENVOY_LOG(debug, "Sent gRPC message: {}", message.DebugString());
   }
@@ -126,7 +126,7 @@ public:
                << "Couldn't decode gRPC data frame: " << body().toString();
       }
     }
-    if (decoded_grpc_frames_.size() < 1) {
+    if (decoded_grpc_frames_.empty()) {
       timeout = std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
                                                                       timeSystem().monotonicTime());
       if (!waitForData(client_dispatcher, grpc_decoder_.length(), timeout)) {
@@ -153,7 +153,8 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
   // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason) override;
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
@@ -179,7 +180,7 @@ private:
   Event::TestTimeSystem& time_system_;
 };
 
-typedef std::unique_ptr<FakeStream> FakeStreamPtr;
+using FakeStreamPtr = std::unique_ptr<FakeStream>;
 
 // Encapsulates various state and functionality related to sharing a Connection object across
 // threads. With FakeUpstream fabricated objects, we have a Connection that is associated with a
@@ -288,10 +289,10 @@ private:
   const bool allow_unexpected_disconnects_;
 };
 
-typedef std::unique_ptr<SharedConnectionWrapper> SharedConnectionWrapperPtr;
+using SharedConnectionWrapperPtr = std::unique_ptr<SharedConnectionWrapper>;
 
 class QueuedConnectionWrapper;
-typedef std::unique_ptr<QueuedConnectionWrapper> QueuedConnectionWrapperPtr;
+using QueuedConnectionWrapperPtr = std::unique_ptr<QueuedConnectionWrapper>;
 
 /**
  * Wraps a raw Network::Connection in a safe way, such that the connection can
@@ -401,7 +402,7 @@ public:
   enum class Type { HTTP1, HTTP2 };
 
   FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
-                     Event::TestTimeSystem& time_system);
+                     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb);
 
   // By default waitForNewStream assumes the next event is a new stream and
   // returns AssertionFailure if an unexpected event occurs. If a caller truly
@@ -434,7 +435,7 @@ private:
   std::list<FakeStreamPtr> new_streams_;
 };
 
-typedef std::unique_ptr<FakeHttpConnection> FakeHttpConnectionPtr;
+using FakeHttpConnectionPtr = std::unique_ptr<FakeHttpConnection>;
 
 /**
  * Fake raw connection for integration testing.
@@ -443,7 +444,7 @@ class FakeRawConnection : public FakeConnectionBase {
 public:
   FakeRawConnection(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
       : FakeConnectionBase(shared_connection, time_system) {}
-  typedef const std::function<bool(const std::string&)> ValidatorFunction;
+  using ValidatorFunction = const std::function<bool(const std::string&)>;
 
   // Writes to data. If data is nullptr, discards the received data.
   ABSL_MUST_USE_RESULT
@@ -499,7 +500,7 @@ private:
   std::string data_;
 };
 
-typedef std::unique_ptr<FakeRawConnection> FakeRawConnectionPtr;
+using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;
 
 /**
  * Provides a fake upstream server for integration testing.
@@ -529,7 +530,8 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForHttpConnection(Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
-                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
+                        uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -555,6 +557,8 @@ public:
   createNetworkFilterChain(Network::Connection& connection,
                            const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
+  bool createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
+                                    Network::UdpReadFilterCallbacks& callbacks) override;
   void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
@@ -620,6 +624,6 @@ private:
   const Network::FilterChainSharedPtr filter_chain_;
 };
 
-typedef std::unique_ptr<FakeUpstream> FakeUpstreamPtr;
+using FakeUpstreamPtr = std::unique_ptr<FakeUpstream>;
 
 } // namespace Envoy

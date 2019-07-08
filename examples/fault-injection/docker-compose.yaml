@@ -1,0 +1,23 @@
+version: "3.7"
+services:
+  envoy:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+    command: /usr/local/bin/envoy -c /etc/envoy.yaml
+    volumes:
+      - ./envoy.yaml:/etc/envoy.yaml
+      - ./runtime:/srv/runtime
+    networks:
+      - envoymesh
+    ports:
+      - 9211:9211
+      - 9901:9901
+  backend:
+    image: kennethreitz/httpbin@sha256:2c7abc4803080c22928265744410173b6fea3b898872c01c5fd0f0f9df4a59fb
+    networks:
+      - envoymesh
+    ports:
+      - 8080:80
+networks:
+  envoymesh: {}

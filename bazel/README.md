@@ -8,12 +8,7 @@ independently sourced, the following steps should be followed:
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
 2. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements).
-3. Configure a Bazel [WORKSPACE](https://bazel.build/versions/master/docs/be/workspace.html)
-   to point Bazel at the Envoy dependencies. An example is provided in the CI Docker image
-   [WORKSPACE](https://github.com/envoyproxy/envoy/blob/master/ci/WORKSPACE) and corresponding
-   [BUILD](https://github.com/envoyproxy/envoy/blob/master/ci/prebuilt/BUILD) files.
-4. `bazel build --package_path %workspace%:<path to Envoy source tree> //source/exe:envoy-static`
-   from the directory containing your WORKSPACE.
+3. `bazel build //source/exe:envoy-static` from the repository root.
 
 ## Quick start Bazel build for developers
 
@@ -33,7 +28,7 @@ for how to update or override dependencies.
     sudo apt-get install \
        libtool \
        cmake \
-       clang-format-7 \
+       clang-format-8 \
        automake \
        autoconf \
        make \
@@ -45,14 +40,14 @@ for how to update or override dependencies.
 
     On Fedora (maybe also other red hat distros), run the following:
     ```
-    dnf install cmake libtool libstdc++ ninja-build lld patch
+    dnf install cmake libtool libstdc++ ninja-build lld patch aspell-en
     ```
 
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```
-    brew install coreutils wget cmake libtool go bazel automake ninja llvm@7 autoconf
+    brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell
     ```
-    _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`; `llvm@7` is used for `clang-format`
+    _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
 
     Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
     Apple LLVM version 9.1.0 (clang-902.0.30).
@@ -268,7 +263,7 @@ Use `RUN_REMOTE=yes` when you don't want to run against your local docker instan
 will need to override a few environment variables to set up the remote docker. The list of variables
 can be found in the [Documentation](https://docs.docker.com/engine/reference/commandline/cli/).
 
-Use `LOCAL_MOUNT=yes` when you are not building with the envoy build container. This will ensure
+Use `LOCAL_MOUNT=yes` when you are not building with the Envoy build container. This will ensure
 that the libraries against which the tests dynamically link will be available and of the correct
 version.
 
@@ -302,6 +297,13 @@ You can use the `-c <compilation_mode>` flag to control this, e.g.
 
 ```
 bazel build -c opt //source/exe:envoy-static
+```
+
+To override the compilation mode and optimize the build for binary size, you can
+use the `sizeopt` configuration:
+
+```
+bazel build //source/exe:envoy-static --config=sizeopt
 ```
 
 ## Sanitizers
@@ -348,6 +350,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * Hot restart with `--define hot_restart=disabled`
 * Google C++ gRPC client with `--define google_grpc=disabled`
 * Backtracing on signals with `--define signal_trace=disabled`
+* Active stream state dump on signals with `--define signal_trace=disabled` or `--define disable_object_dump_on_signal_trace=disabled`
 * tcmalloc with `--define tcmalloc=disabled`
 
 ## Enabling optional features
@@ -366,6 +369,12 @@ The following optional features can be enabled on the Bazel build command-line:
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
 * memory-debugging (scribbling over memory after allocation and before freeing) with
   `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL.
+* Default [path normalization](https://github.com/envoyproxy/envoy/issues/6435) with
+  `--define path_normalization_by_default=true`. Note this still could be disable by explicit xDS config.
+* Manual stamping via VersionInfo with `--define manual_stamp=manual_stamp`.
+  This is needed if the `version_info_lib` is compiled via a non-binary bazel rules, e.g `envoy_cc_library`.
+  Otherwise, the linker will fail to resolve symbols that are included via the `linktamp` rule, which is only available to binary targets.
+  This is being tracked as a feature in: https://github.com/envoyproxy/envoy/issues/6859.
 
 ## Disabling extensions
 
@@ -409,18 +418,6 @@ local_repository(
 ...
 ```
 
-## Stats Tunables
-
-The default maximum number of stats in shared memory, and the default
-maximum length of a cluster/route config/listener name, can be
-overridden at compile-time by defining `ENVOY_DEFAULT_MAX_STATS` and
-`ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH`, respectively, to the desired
-value. For example:
-
-```
-bazel build --copt=-DENVOY_DEFAULT_MAX_STATS=32768 --copt=-DENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH=150 //source/exe:envoy-static
-```
-
 # Release builds
 
 Release builds should be built in `opt` mode, processed with `strip` and have a
@@ -458,12 +455,13 @@ then log back in and it should start working.
 The latest coverage report for master is available
 [here](https://s3.amazonaws.com/lyft-envoy/coverage/report-master/coverage.html).
 
-It's also possible to specialize the coverage build to a single test target. This is useful
-when doing things like exploring the coverage of a fuzzer over its corpus. This can be done with
-the `COVERAGE_TARGET` and `VALIDATE_COVERAGE` environment variables, e.g.:
+It's also possible to specialize the coverage build to a specified test or test dir. This is useful
+when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by
+passing coverage targets as the command-line arguments and using the `VALIDATE_COVERAGE` environment
+variable, e.g.:
 
 ```
-COVERAGE_TARGET=//test/common/common:base64_fuzz_test VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh
+VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh //test/common/common:base64_fuzz_test
 ```
 
 # Cleaning the build and test artifacts
@@ -486,7 +484,7 @@ resources, you can override Bazel's default job parallelism determination with
 `--jobs=N` to restrict the build to at most `N` simultaneous jobs, e.g.:
 
 ```
-bazel build --jobs=2 //source/...
+bazel build --jobs=2 //source/exe:envoy-static
 ```
 
 # Debugging the Bazel build
@@ -495,19 +493,19 @@ When trying to understand what Bazel is doing, the `-s` and `--explain` options
 are useful. To have Bazel provide verbose output on which commands it is executing:
 
 ```
-bazel build -s //source/...
+bazel build -s //source/exe:envoy-static
 ```
 
 To have Bazel emit to a text file the rationale for rebuilding a target:
 
 ```
-bazel build --explain=file.txt //source/...
+bazel build --explain=file.txt //source/exe:envoy-static
 ```
 
 To get more verbose explanations:
 
 ```
-bazel build --explain=file.txt --verbose_explanations //source/...
+bazel build --explain=file.txt --verbose_explanations //source/exe:envoy-static
 ```
 
 # Resolving paths in bazel build output
@@ -533,19 +531,20 @@ to run clang-format scripts on your workstation directly:
  * It's possible there is a speed advantage
  * Docker itself can sometimes go awry and you then have to deal with that
  * Type-ahead doesn't always work when waiting running a command through docker
+
 To run the tools directly, you must install the correct version of clang. This
-may change over time but as of January 2019,
-[clang+llvm-7.0.0](https://releases.llvm.org/download.html) works well. You must
+may change over time but as of June 2019,
+[clang+llvm-8.0.0](https://releases.llvm.org/download.html) works well. You must
 also have 'buildifier' installed from the bazel distribution.
 
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-8.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
 
-Once this is set up, you can run clang-tidy without docker:
+Once this is set up, you can run clang-format without docker:
 
 ```shell
 ./tools/check_format.py check
@@ -558,28 +557,6 @@ Once this is set up, you can run clang-tidy without docker:
 
 Setting up an HTTP cache for Bazel output helps optimize Bazel performance and resource usage when
 using multiple compilation modes or multiple trees.
-
-## Setup common `envoy_deps`
-
-This step sets up the common `envoy_deps` allowing HTTP or disk cache (described below) to work
-across working trees in different paths. Also it allows new working trees to skip dependency
-compilation. The drawback is that the cached dependencies won't be updated automatically, so make
-sure all your working trees have same (or compatible) dependencies, and run this step periodically
-to update them.
-
-Make sure you don't have `--override_repository` in your `.bazelrc` when you run this step.
-
-```
-bazel fetch //test/...
-cp -LR $(bazel info output_base)/external/envoy_deps ${HOME}/envoy_deps_cache
-```
-
-Adding the following parameter to Bazel everytime or persist them in `.bazelrc`, note you will need to expand
-the environment variables for `.bazelrc`.
-
-```
---override_repository=envoy_deps=${HOME}/envoy_deps_cache
-```
 
 ## Setup local cache
 

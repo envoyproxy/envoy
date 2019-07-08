@@ -23,7 +23,7 @@ class Stream;
  */
 class StreamEncoder {
 public:
-  virtual ~StreamEncoder() {}
+  virtual ~StreamEncoder() = default;
 
   /**
    * Encode 100-Continue headers.
@@ -69,7 +69,7 @@ public:
  */
 class StreamDecoder {
 public:
-  virtual ~StreamDecoder() {}
+  virtual ~StreamDecoder() = default;
 
   /**
    * Called with decoded 100-Continue headers.
@@ -129,13 +129,15 @@ enum class StreamResetReason {
  */
 class StreamCallbacks {
 public:
-  virtual ~StreamCallbacks() {}
+  virtual ~StreamCallbacks() = default;
 
   /**
    * Fires when a stream has been remote reset.
    * @param reason supplies the reset reason.
+   * @param transport_failure_reason supplies underlying transport failure reason.
    */
-  virtual void onResetStream(StreamResetReason reason) PURE;
+  virtual void onResetStream(StreamResetReason reason,
+                             absl::string_view transport_failure_reason) PURE;
 
   /**
    * Fires when a stream, or the connection the stream is sending to, goes over its high watermark.
@@ -154,7 +156,7 @@ public:
  */
 class Stream {
 public:
-  virtual ~Stream() {}
+  virtual ~Stream() = default;
 
   /**
    * Add stream callbacks.
@@ -179,6 +181,12 @@ public:
    * Cessation of data may not be immediate. For example, for HTTP/2 this may stop further flow
    * control window updates which will result in the peer eventually stopping sending data.
    * @param disable informs if reads should be disabled (true) or re-enabled (false).
+   *
+   * Note that this function reference counts calls. For example
+   * readDisable(true);  // Disables data
+   * readDisable(true);  // Notes the stream is blocked by two sources
+   * readDisable(false);  // Notes the stream is blocked by one source
+   * readDisable(false);  // Marks the stream as unblocked, so resumes reading.
    */
   virtual void readDisable(bool disable) PURE;
 
@@ -195,7 +203,7 @@ public:
  */
 class ConnectionCallbacks {
 public:
-  virtual ~ConnectionCallbacks() {}
+  virtual ~ConnectionCallbacks() = default;
 
   /**
    * Fires when the remote indicates "go away." No new streams should be created.
@@ -271,7 +279,7 @@ struct Http2Settings {
  */
 class Connection {
 public:
-  virtual ~Connection() {}
+  virtual ~Connection() = default;
 
   /**
    * Dispatch incoming connection data.
@@ -319,16 +327,22 @@ public:
  */
 class DownstreamWatermarkCallbacks {
 public:
-  virtual ~DownstreamWatermarkCallbacks() {}
+  virtual ~DownstreamWatermarkCallbacks() = default;
 
   /**
-   * Called when the downstream connection or stream goes over its high watermark.
+   * Called when the downstream connection or stream goes over its high watermark. Note that this
+   * may be called separately for both the stream going over and the connection going over. It
+   * is the responsibility of the DownstreamWatermarkCallbacks implementation to handle unwinding
+   * multiple high and low watermark calls.
    */
   virtual void onAboveWriteBufferHighWatermark() PURE;
 
   /**
    * Called when the downstream connection or stream goes from over its high watermark to under its
-   * low watermark.
+   * low watermark. As with onAboveWriteBufferHighWatermark above, this may be called independently
+   * when both the stream and the connection go under the low watermark limit, and the callee must
+   * ensure that the flow of data does not resume until all callers which were above their high
+   * watermarks have gone below.
    */
   virtual void onBelowWriteBufferLowWatermark() PURE;
 };
@@ -355,7 +369,7 @@ public:
  */
 class ServerConnection : public virtual Connection {};
 
-typedef std::unique_ptr<ServerConnection> ServerConnectionPtr;
+using ServerConnectionPtr = std::unique_ptr<ServerConnection>;
 
 /**
  * A client side HTTP connection.
@@ -370,7 +384,7 @@ public:
   virtual StreamEncoder& newStream(StreamDecoder& response_decoder) PURE;
 };
 
-typedef std::unique_ptr<ClientConnection> ClientConnectionPtr;
+using ClientConnectionPtr = std::unique_ptr<ClientConnection>;
 
 } // namespace Http
 } // namespace Envoy

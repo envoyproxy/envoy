@@ -10,17 +10,21 @@
 
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
+#include "envoy/router/scopes.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
+
+#include "common/stats/fake_symbol_table_impl.h"
+
+#include "test/test_common/global.h"
 
 #include "gmock/gmock.h"
 
@@ -40,6 +44,7 @@ public:
                      void(Http::HeaderMap& headers, bool insert_envoy_original_path));
   MOCK_CONST_METHOD0(responseCode, Http::Code());
   MOCK_CONST_METHOD0(responseBody, const std::string&());
+  MOCK_CONST_METHOD0(routeName, const std::string&());
 };
 
 class TestCorsPolicy : public CorsPolicy {
@@ -73,11 +78,11 @@ public:
   const envoy::type::FractionalPercent& additionalRequestChance() const override {
     return additional_request_chance_;
   }
-  bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout; }
+  bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout_; }
 
   uint32_t initial_requests_{};
   envoy::type::FractionalPercent additional_request_chance_{};
-  bool hedge_on_per_try_timeout{};
+  bool hedge_on_per_try_timeout_{};
 };
 
 class TestRetryPolicy : public RetryPolicy {
@@ -92,12 +97,16 @@ public:
   const std::vector<uint32_t>& retriableStatusCodes() const override {
     return retriable_status_codes_;
   }
+  absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
+  absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
 
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
   uint32_t host_selection_max_attempts_;
   std::vector<uint32_t> retriable_status_codes_;
+  absl::optional<std::chrono::milliseconds> base_interval_{};
+  absl::optional<std::chrono::milliseconds> max_interval_{};
 };
 
 class MockRetryState : public RetryState {
@@ -106,13 +115,16 @@ public:
   ~MockRetryState();
 
   void expectHeadersRetry();
+  void expectHedgedPerTryTimeoutRetry();
   void expectResetRetry();
 
   MOCK_METHOD0(enabled, bool());
   MOCK_METHOD2(shouldRetryHeaders,
                RetryStatus(const Http::HeaderMap& response_headers, DoRetryCallback callback));
+  MOCK_METHOD1(wouldRetryFromHeaders, bool(const Http::HeaderMap& response_headers));
   MOCK_METHOD2(shouldRetryReset,
                RetryStatus(const Http::StreamResetReason reset_reason, DoRetryCallback callback));
+  MOCK_METHOD1(shouldHedgeRetryPerTryTimeout, RetryStatus(DoRetryCallback callback));
   MOCK_METHOD1(onHostAttempted, void(Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Upstream::Host& host));
   MOCK_METHOD2(priorityLoadForRetry,
@@ -185,9 +197,10 @@ public:
 class TestVirtualCluster : public VirtualCluster {
 public:
   // Router::VirtualCluster
-  const std::string& name() const override { return name_; }
+  Stats::StatName statName() const override { return stat_name_.statName(); }
 
-  std::string name_{"fake_virtual_cluster"};
+  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::StatNameManagedStorage stat_name_{"fake_virtual_cluster", *symbol_table_};
 };
 
 class MockVirtualHost : public VirtualHost {
@@ -205,7 +218,14 @@ public:
   MOCK_METHOD0(retryPriority, Upstream::RetryPrioritySharedPtr());
   MOCK_METHOD0(retryHostPredicate, Upstream::RetryHostPredicateSharedPtr());
 
+  Stats::StatName statName() const override {
+    stat_name_ = std::make_unique<Stats::StatNameManagedStorage>(name(), *symbol_table_);
+    return stat_name_->statName();
+  }
+
+  mutable Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   std::string name_{"fake_vhost"};
+  mutable std::unique_ptr<Stats::StatNameManagedStorage> stat_name_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestCorsPolicy cors_policy_;
 };
@@ -269,6 +289,7 @@ public:
   MOCK_CONST_METHOD0(timeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(maxGrpcTimeout, absl::optional<std::chrono::milliseconds>());
+  MOCK_CONST_METHOD0(grpcTimeoutOffset, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD1(virtualCluster, const VirtualCluster*(const Http::HeaderMap& headers));
   MOCK_CONST_METHOD0(virtualHostName, const std::string&());
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
@@ -283,8 +304,10 @@ public:
   MOCK_CONST_METHOD0(includeAttemptCount, bool());
   MOCK_CONST_METHOD0(upgradeMap, const UpgradeMap&());
   MOCK_CONST_METHOD0(internalRedirectAction, InternalRedirectAction());
+  MOCK_CONST_METHOD0(routeName, const std::string&());
 
   std::string cluster_name_{"fake_cluster"};
+  std::string route_name_{"fake_route_name"};
   std::multimap<std::string, std::string> opaque_config_;
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
@@ -312,6 +335,17 @@ public:
   std::string operation_{"fake_operation"};
 };
 
+class MockRouteTracing : public RouteTracing {
+public:
+  MockRouteTracing();
+  ~MockRouteTracing();
+
+  // Router::RouteTracing
+  MOCK_CONST_METHOD0(getClientSampling, const envoy::type::FractionalPercent&());
+  MOCK_CONST_METHOD0(getRandomSampling, const envoy::type::FractionalPercent&());
+  MOCK_CONST_METHOD0(getOverallSampling, const envoy::type::FractionalPercent&());
+};
+
 class MockRoute : public Route {
 public:
   MockRoute();
@@ -321,10 +355,12 @@ public:
   MOCK_CONST_METHOD0(directResponseEntry, const DirectResponseEntry*());
   MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());
   MOCK_CONST_METHOD0(decorator, const Decorator*());
+  MOCK_CONST_METHOD0(tracingConfig, const RouteTracing*());
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
 
   testing::NiceMock<MockRouteEntry> route_entry_;
   testing::NiceMock<MockDecorator> decorator_;
+  testing::NiceMock<MockRouteTracing> route_tracing_;
 };
 
 class MockConfig : public Config {
@@ -336,6 +372,7 @@ public:
   MOCK_CONST_METHOD2(route, RouteConstSharedPtr(const Http::HeaderMap&, uint64_t random_value));
   MOCK_CONST_METHOD0(internalOnlyHeaders, const std::list<Http::LowerCaseString>&());
   MOCK_CONST_METHOD0(name, const std::string&());
+  MOCK_CONST_METHOD0(usesVhds, bool());
 
   std::shared_ptr<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;
@@ -355,6 +392,14 @@ public:
   MOCK_METHOD2(createStaticRouteConfigProvider,
                RouteConfigProviderPtr(const envoy::api::v2::RouteConfiguration& route_config,
                                       Server::Configuration::FactoryContext& factory_context));
+};
+
+class MockScopedConfig : public ScopedConfig {
+public:
+  MockScopedConfig();
+  ~MockScopedConfig();
+
+  MOCK_CONST_METHOD1(getRouteConfig, ConfigConstSharedPtr(const Http::HeaderMap& headers));
 };
 
 } // namespace Router

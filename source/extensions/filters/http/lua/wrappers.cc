@@ -25,8 +25,10 @@ int HeaderMapIterator::luaPairsIterator(lua_State* state) {
     parent_.iterator_.reset();
     return 0;
   } else {
-    lua_pushstring(state, entries_[current_]->key().c_str());
-    lua_pushstring(state, entries_[current_]->value().c_str());
+    const absl::string_view key_view(entries_[current_]->key().getStringView());
+    lua_pushlstring(state, key_view.data(), key_view.length());
+    const absl::string_view value_view(entries_[current_]->value().getStringView());
+    lua_pushlstring(state, value_view.data(), value_view.length());
     current_++;
     return 2;
   }
@@ -45,7 +47,8 @@ int HeaderMapWrapper::luaGet(lua_State* state) {
   const char* key = luaL_checkstring(state, 2);
   const Http::HeaderEntry* entry = headers_.get(Http::LowerCaseString(key));
   if (entry != nullptr) {
-    lua_pushstring(state, entry->value().c_str());
+    lua_pushlstring(state, entry->value().getStringView().data(),
+                    entry->value().getStringView().length());
     return 1;
   } else {
     return 0;
@@ -168,6 +171,15 @@ int DynamicMetadataMapWrapper::luaPairs(lua_State* state) {
 
   iterator_.reset(DynamicMetadataMapIterator::create(state, *this), true);
   lua_pushcclosure(state, DynamicMetadataMapIterator::static_luaPairsIterator, 1);
+  return 1;
+}
+
+int PublicKeyWrapper::luaGet(lua_State* state) {
+  if (public_key_ == nullptr || public_key_.get() == nullptr) {
+    lua_pushnil(state);
+  } else {
+    lua_pushlightuserdata(state, public_key_.get());
+  }
   return 1;
 }
 

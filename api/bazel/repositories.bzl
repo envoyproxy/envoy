@@ -8,7 +8,7 @@ def api_dependencies():
         locations = REPOSITORY_LOCATIONS,
     )
     envoy_http_archive(
-        "com_lyft_protoc_gen_validate",
+        "com_envoyproxy_protoc_gen_validate",
         locations = REPOSITORY_LOCATIONS,
     )
     envoy_http_archive(
@@ -27,14 +27,19 @@ def api_dependencies():
         build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
     )
     envoy_http_archive(
-        name = "io_opencensus_trace",
+        name = "opencensus_proto",
         locations = REPOSITORY_LOCATIONS,
-        build_file_content = OPENCENSUSTRACE_BUILD_CONTENT,
+    )
+    envoy_http_archive(
+        name = "kafka_source",
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = KAFKASOURCE_BUILD_CONTENT,
     )
 
 GOOGLEAPIS_BUILD_CONTENT = """
-load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
+load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 
 filegroup(
     name = "api_httpbody_protos_src",
@@ -53,12 +58,7 @@ proto_library(
 
 cc_proto_library(
     name = "api_httpbody_protos",
-    srcs = [
-        "google/api/httpbody.proto",
-    ],
-    default_runtime = "@com_google_protobuf//:protobuf",
-    protoc = "@com_google_protobuf//:protoc",
-    deps = ["@com_google_protobuf//:cc_wkt_protos"],
+    deps = [":api_httpbody_protos_proto"],
     visibility = ["//visibility:public"],
 )
 
@@ -109,13 +109,7 @@ proto_library(
 
 cc_proto_library(
     name = "http_api_protos",
-    srcs = [
-        "google/api/annotations.proto",
-        "google/api/http.proto",
-    ],
-    default_runtime = "@com_google_protobuf//:protobuf",
-    protoc = "@com_google_protobuf//:protoc",
-    deps = ["@com_google_protobuf//:cc_wkt_protos"],
+    deps = [":http_api_protos_proto"],
     visibility = ["//visibility:public"],
 )
 
@@ -158,14 +152,9 @@ proto_library(
 )
 
 cc_proto_library(
-     name = "rpc_status_protos",
-     srcs = ["google/rpc/status.proto"],
-     default_runtime = "@com_google_protobuf//:protobuf",
-     protoc = "@com_google_protobuf//:protoc",
-     deps = [
-         "@com_google_protobuf//:cc_wkt_protos"
-     ],
-     visibility = ["//visibility:public"],
+    name = "rpc_status_protos",
+    deps = [":rpc_status_protos_lib"],
+    visibility = ["//visibility:public"],
 )
 
 go_proto_library(
@@ -174,7 +163,7 @@ go_proto_library(
     proto = ":rpc_status_protos_lib",
     visibility = ["//visibility:public"],
     deps = [
-      "@com_github_golang_protobuf//ptypes/any:go_default_library",
+      "@io_bazel_rules_go//proto/wkt:any_go_proto",
     ],
 )
 
@@ -189,6 +178,35 @@ py_proto_library(
      visibility = ["//visibility:public"],
      deps = ["@com_google_protobuf//:protobuf_python"],
 )
+
+proto_library(
+    name = "tracing_proto_proto",
+    srcs = [
+        "google/devtools/cloudtrace/v2/trace.proto",
+        "google/devtools/cloudtrace/v2/tracing.proto",
+    ],
+    deps = [
+        ":http_api_protos_proto",
+        ":rpc_status_protos_lib",
+        "@com_google_protobuf//:timestamp_proto",
+        "@com_google_protobuf//:wrappers_proto",
+        "@com_google_protobuf//:empty_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "tracing_proto_cc",
+    deps = [":tracing_proto_proto"],
+)
+
+cc_grpc_library(
+    name = "tracing_proto",
+    srcs = [":tracing_proto_proto"],
+    deps = [":tracing_proto_cc"],
+    grpc_only = True,
+    visibility = ["@io_opencensus_cpp//opencensus:__subpackages__"],
+)
+
 """
 
 GOGOPROTO_BUILD_CONTENT = """
@@ -284,4 +302,24 @@ go_proto_library(
     proto = ":trace_model",
     visibility = ["//visibility:public"],
 )
+"""
+
+KAFKASOURCE_BUILD_CONTENT = """
+
+filegroup(
+    name = "request_protocol_files",
+    srcs = glob([
+        "*Request.json",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "response_protocol_files",
+    srcs = glob([
+        "*Response.json",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
 """

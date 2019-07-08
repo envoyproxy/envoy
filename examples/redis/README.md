@@ -3,8 +3,8 @@ In this example, we show how a [Redis filter](https://www.envoyproxy.io/docs/env
 
 
 # Usage
-1. `docker-compose build`
-2. `docker-compose up`
+1. `docker-compose pull`
+2. `docker-compose up --build`
 3. Issue redis commands using your favourite redis client such as `redis-cli`
 
 ## Sample Output:

@@ -89,5 +89,16 @@ MockClientConnection::MockClientConnection() {
 
 MockClientConnection::~MockClientConnection() {}
 
+MockFilterManagerConnection::MockFilterManagerConnection() {
+  remote_address_ = Utility::resolveUrl("tcp://10.0.0.3:50000");
+  initializeMockConnection(*this);
+
+  // The real implementation will move the buffer data into the socket.
+  ON_CALL(*this, rawWrite(_, _)).WillByDefault(Invoke([](Buffer::Instance& buffer, bool) -> void {
+    buffer.drain(buffer.length());
+  }));
+}
+MockFilterManagerConnection::~MockFilterManagerConnection() {}
+
 } // namespace Network
 } // namespace Envoy

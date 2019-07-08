@@ -121,10 +121,10 @@ route_config:
         - match: { prefix: "/test" }
           route:
             cluster: cluster_0
-            request_headers_to_add:
-              - header:
-                  key: "x-real-ip"
-                  value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+          request_headers_to_add:
+            - header:
+                key: "x-real-ip"
+                value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
     - name: append-same-headers
       domains: ["append-same-headers.com"]
       request_headers_to_add:
@@ -138,13 +138,30 @@ route_config:
         - match: { prefix: "/test" }
           route:
             cluster: cluster_0
-            request_headers_to_add:
-              - header:
-                  key: "x-foo"
-                  value: "value2"
-              - header:
-                  key: "authorization"
-                  value: "token2"
+          request_headers_to_add:
+            - header:
+                key: "x-foo"
+                value: "value2"
+            - header:
+                key: "authorization"
+                value: "token2"
+    - name: path-sanitization
+      domains: ["path-sanitization.com"]
+      routes:
+        - match: { prefix: "/private" }
+          route:
+            cluster: cluster_0
+          request_headers_to_add:
+            - header:
+                key: "x-site"
+                value: "private"
+        - match: { prefix: "/public" }
+          route:
+            cluster: cluster_0
+          request_headers_to_add:
+            - header:
+                key: "x-site"
+                value: "public"
 )EOF";
 
 } // namespace
@@ -248,10 +265,10 @@ public:
         [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
                 hcm) {
           // Overwrite default config with our own.
-          MessageUtil::loadFromYaml(http_connection_mgr_config, hcm);
+          TestUtility::loadFromYaml(http_connection_mgr_config, hcm);
           envoy::config::filter::http::router::v2::Router router_config;
           router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
-          MessageUtil::jsonConvert(router_config, *hcm.mutable_http_filters(0)->mutable_config());
+          TestUtility::jsonConvert(router_config, *hcm.mutable_http_filters(0)->mutable_config());
 
           const bool append = mode == HeaderMode::Append;
 
@@ -268,24 +285,24 @@ public:
 
           if (use_eds_) {
             addHeader(route_config->mutable_response_headers_to_add(), "x-routeconfig-dynamic",
-                      "%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
+                      R"(%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
 
             // Iterate over VirtualHosts, nested Routes and WeightedClusters, adding a dynamic
             // response header.
             for (auto& vhost : *route_config->mutable_virtual_hosts()) {
               addHeader(vhost.mutable_response_headers_to_add(), "x-vhost-dynamic",
-                        "vhost:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
+                        R"(vhost:%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
 
               for (auto& route : *vhost.mutable_routes()) {
                 addHeader(route.mutable_response_headers_to_add(), "x-route-dynamic",
-                          "route:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
+                          R"(route:%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
 
                 if (route.has_route()) {
                   auto* route_action = route.mutable_route();
                   if (route_action->has_weighted_clusters()) {
                     for (auto& c : *route_action->mutable_weighted_clusters()->mutable_clusters()) {
                       addHeader(c.mutable_response_headers_to_add(), "x-weighted-cluster-dynamic",
-                                "weighted:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%",
+                                R"(weighted:%UPSTREAM_METADATA(["test.namespace", "key"])%)",
                                 append);
                     }
                   }
@@ -293,6 +310,8 @@ public:
               }
             }
           }
+
+          hcm.mutable_normalize_path()->set_value(normalize_path_);
 
           if (append) {
             // The config specifies append by default: no modifications needed.
@@ -310,9 +329,6 @@ public:
 
               if (route.has_route()) {
                 auto* route_action = route.mutable_route();
-
-                disableHeaderValueOptionAppend(*route_action->mutable_request_headers_to_add());
-                disableHeaderValueOptionAppend(*route_action->mutable_response_headers_to_add());
 
                 if (route_action->has_weighted_clusters()) {
                   for (auto& c : *route_action->mutable_weighted_clusters()->mutable_clusters()) {
@@ -415,6 +431,7 @@ protected:
   }
 
   bool use_eds_{false};
+  bool normalize_path_{false};
   FakeHttpConnectionPtr eds_connection_;
   FakeStreamPtr eds_stream_;
 };
@@ -991,4 +1008,63 @@ TEST_P(HeaderIntegrationTest, TestAppendSameHeaders) {
       });
 }
 
+// Validates behavior when normalize path is off.
+// Route selection and path to upstream are the exact string literal
+// from downstream.
+TEST_P(HeaderIntegrationTest, TestPathAndRouteWhenNormalizePathOff) {
+  normalize_path_ = false;
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/private/../public"},
+          {":scheme", "http"},
+          {":authority", "path-sanitization.com"},
+      },
+      Http::TestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                              {":path", "/private/../public"},
+                              {":method", "GET"},
+                              {"x-site", "private"}},
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-unmodified", "response"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-unmodified", "response"},
+          {":status", "200"},
+      });
+}
+
+// Validates behavior when normalize path is on.
+// Path to decide route and path to upstream are both
+// the normalized.
+TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
+  normalize_path_ = true;
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/private/../public"},
+          {":scheme", "http"},
+          {":authority", "path-sanitization.com"},
+      },
+      Http::TestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                              {":path", "/public"},
+                              {":method", "GET"},
+                              {"x-site", "public"}},
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-unmodified", "response"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-unmodified", "response"},
+          {":status", "200"},
+      });
+}
 } // namespace Envoy

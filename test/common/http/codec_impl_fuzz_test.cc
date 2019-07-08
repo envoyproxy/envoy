@@ -37,23 +37,7 @@ namespace Http {
 constexpr bool DebugMode = false;
 
 Http::TestHeaderMapImpl fromSanitizedHeaders(const test::fuzz::Headers& headers) {
-  // When we are injecting headers, we don't allow the key to ever be empty,
-  // since calling code is not supposed to do this. Also disallowed
-  // transfer-encoding.
-  test::fuzz::Headers sanitized_headers;
-  for (const auto& header : headers.headers()) {
-    const std::string key = StringUtil::toLower(header.key());
-
-    if (key == "transfer-encoding") {
-      continue;
-    }
-
-    auto* sane_header = sanitized_headers.add_headers();
-    sane_header->set_key(key.empty() ? "non-empty" : key);
-    sane_header->set_value(header.value());
-  }
-
-  return Fuzz::fromHeaders(sanitized_headers);
+  return Fuzz::fromHeaders(headers, {"transfer-encoding"});
 }
 
 // Convert from test proto Http1ServerSettings to Http1Settings.
@@ -132,14 +116,16 @@ public:
 
   HttpStream(ClientConnection& client, const TestHeaderMapImpl& request_headers, bool end_stream) {
     request_.encoder_ = &client.newStream(response_.decoder_);
-    ON_CALL(request_.stream_callbacks_, onResetStream(_)).WillByDefault(InvokeWithoutArgs([this] {
-      ENVOY_LOG_MISC(trace, "reset request for stream index {}", stream_index_);
-      resetStream();
-    }));
-    ON_CALL(response_.stream_callbacks_, onResetStream(_)).WillByDefault(InvokeWithoutArgs([this] {
-      ENVOY_LOG_MISC(trace, "reset response for stream index {}", stream_index_);
-      resetStream();
-    }));
+    ON_CALL(request_.stream_callbacks_, onResetStream(_, _))
+        .WillByDefault(InvokeWithoutArgs([this] {
+          ENVOY_LOG_MISC(trace, "reset request for stream index {}", stream_index_);
+          resetStream();
+        }));
+    ON_CALL(response_.stream_callbacks_, onResetStream(_, _))
+        .WillByDefault(InvokeWithoutArgs([this] {
+          ENVOY_LOG_MISC(trace, "reset response for stream index {}", stream_index_);
+          resetStream();
+        }));
     ON_CALL(request_.decoder_, decodeHeaders_(_, true)).WillByDefault(InvokeWithoutArgs([this] {
       // The HTTP/1 codec needs this to cleanup any latent stream resources.
       response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
@@ -352,7 +338,7 @@ public:
   std::deque<Buffer::OwnedImpl> bufs_;
 };
 
-typedef std::unique_ptr<HttpStream> HttpStreamPtr;
+using HttpStreamPtr = std::unique_ptr<HttpStream>;
 
 namespace {
 
@@ -369,24 +355,24 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   const bool http2 = http_version == HttpVersion::Http2;
 
   if (http2) {
-    client = absl::make_unique<Http2::TestClientConnectionImpl>(client_connection, client_callbacks,
-                                                                stats_store, client_http2settings,
-                                                                max_request_headers_kb);
+    client = std::make_unique<Http2::TestClientConnectionImpl>(client_connection, client_callbacks,
+                                                               stats_store, client_http2settings,
+                                                               max_request_headers_kb);
   } else {
-    client = absl::make_unique<Http1::ClientConnectionImpl>(client_connection, client_callbacks);
+    client = std::make_unique<Http1::ClientConnectionImpl>(client_connection, client_callbacks);
   }
 
   NiceMock<Network::MockConnection> server_connection;
   NiceMock<MockServerConnectionCallbacks> server_callbacks;
   if (http2) {
     const Http2Settings server_http2settings{fromHttp2Settings(input.h2_settings().server())};
-    server = absl::make_unique<Http2::TestServerConnectionImpl>(server_connection, server_callbacks,
-                                                                stats_store, server_http2settings,
-                                                                max_request_headers_kb);
+    server = std::make_unique<Http2::TestServerConnectionImpl>(server_connection, server_callbacks,
+                                                               stats_store, server_http2settings,
+                                                               max_request_headers_kb);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
-    server = absl::make_unique<Http1::ServerConnectionImpl>(server_connection, server_callbacks,
-                                                            server_http1settings);
+    server = std::make_unique<Http1::ServerConnectionImpl>(
+        server_connection, server_callbacks, server_http1settings, max_request_headers_kb);
   }
 
   ReorderBuffer client_write_buf{*server};

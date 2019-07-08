@@ -22,10 +22,9 @@ namespace Envoy {
 class ConfigValidation : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   ConfigValidation() {
-    Event::Libevent::Global::initialize();
-
     validation_ = std::make_unique<Api::ValidationImpl>(Thread::threadFactoryForTest(),
-                                                        stats_store_, test_time_.timeSystem());
+                                                        stats_store_, test_time_.timeSystem(),
+                                                        Filesystem::fileSystemForTest());
     dispatcher_ = validation_->allocateDispatcher();
   }
 

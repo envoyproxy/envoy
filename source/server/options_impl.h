@@ -6,9 +6,8 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/server/options.h"
-#include "envoy/stats/stats_options.h"
 
-#include "common/stats/stats_options_impl.h"
+#include "common/common/logger.h"
 
 #include "spdlog/spdlog.h"
 
@@ -16,12 +15,12 @@ namespace Envoy {
 /**
  * Implementation of Server::Options.
  */
-class OptionsImpl : public Server::Options {
+class OptionsImpl : public Server::Options, protected Logger::Loggable<Logger::Id::config> {
 public:
   /**
-   * Parameters are max_num_stats, max_stat_name_len, hot_restart_enabled
+   * Parameters are max_stat_name_len, hot_restart_enabled
    */
-  typedef std::function<std::string(uint64_t, uint64_t, bool)> HotRestartVersionCb;
+  using HotRestartVersionCb = std::function<std::string(bool)>;
 
   /**
    * @throw NoServingException if Envoy has already done everything specified by the argv (e.g.
@@ -65,20 +64,20 @@ public:
   }
   void setServiceNodeName(const std::string& service_node) { service_node_ = service_node; }
   void setServiceZone(const std::string& service_zone) { service_zone_ = service_zone; }
-  void setMaxStats(uint64_t max_stats) { max_stats_ = max_stats; }
-  void setStatsOptions(Stats::StatsOptionsImpl stats_options) { stats_options_ = stats_options; }
   void setHotRestartDisabled(bool hot_restart_disabled) {
     hot_restart_disabled_ = hot_restart_disabled;
   }
   void setSignalHandling(bool signal_handling_enabled) {
     signal_handling_enabled_ = signal_handling_enabled;
   }
+  void setCpusetThreads(bool cpuset_threads_enabled) { cpuset_threads_ = cpuset_threads_enabled; }
 
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
   uint32_t concurrency() const override { return concurrency_; }
   const std::string& configPath() const override { return config_path_; }
   const std::string& configYaml() const override { return config_yaml_; }
+  bool allowUnknownFields() const override { return allow_unknown_fields_; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
@@ -100,13 +99,13 @@ public:
   const std::string& serviceClusterName() const override { return service_cluster_; }
   const std::string& serviceNodeName() const override { return service_node_; }
   const std::string& serviceZone() const override { return service_zone_; }
-  uint64_t maxStats() const override { return max_stats_; }
-  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
+  bool libeventBufferEnabled() const override { return libevent_buffer_enabled_; }
   virtual Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
+  bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
   uint32_t count() const;
 
 private:
@@ -132,11 +131,11 @@ private:
   std::chrono::seconds drain_time_;
   std::chrono::seconds parent_shutdown_time_;
   Server::Mode mode_;
-  uint64_t max_stats_;
-  Stats::StatsOptionsImpl stats_options_;
   bool hot_restart_disabled_;
   bool signal_handling_enabled_;
   bool mutex_tracing_enabled_;
+  bool cpuset_threads_;
+  bool libevent_buffer_enabled_;
   uint32_t count_;
 };
 

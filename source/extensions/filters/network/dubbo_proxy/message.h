@@ -20,6 +20,11 @@ enum class SerializationType : uint8_t {
 enum class MessageType : uint8_t {
   Response = 0,
   Request = 1,
+  Oneway = 2,
+  Exception = 3,
+
+  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST MESSAGE TYPE
+  LastMessageType = Exception,
 };
 
 /**
@@ -39,9 +44,18 @@ enum class ResponseStatus : uint8_t {
   ServerThreadpoolExhaustedError = 100,
 };
 
+enum class RpcResponseType : uint8_t {
+  ResponseWithException = 0,
+  ResponseWithValue = 1,
+  ResponseWithNullValue = 2,
+  ResponseWithExceptionWithAttachments = 3,
+  ResponseValueWithAttachments = 4,
+  ResponseNullValueWithAttachments = 5,
+};
+
 class Message {
 public:
-  virtual ~Message() {}
+  virtual ~Message() = default;
   virtual MessageType messageType() const PURE;
   virtual int32_t bodySize() const PURE;
   virtual bool isEvent() const PURE;
@@ -51,20 +65,20 @@ public:
 
 class RequestMessage : public virtual Message {
 public:
-  virtual ~RequestMessage() {}
+  ~RequestMessage() override = default;
   virtual SerializationType serializationType() const PURE;
   virtual bool isTwoWay() const PURE;
 };
 
-typedef std::unique_ptr<RequestMessage> RequestMessagePtr;
+using RequestMessagePtr = std::unique_ptr<RequestMessage>;
 
 class ResponseMessage : public virtual Message {
 public:
-  virtual ~ResponseMessage() {}
+  ~ResponseMessage() override = default;
   virtual ResponseStatus responseStatus() const PURE;
 };
 
-typedef std::unique_ptr<ResponseMessage> ResponseMessagePtr;
+using ResponseMessagePtr = std::unique_ptr<ResponseMessage>;
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

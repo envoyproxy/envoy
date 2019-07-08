@@ -15,14 +15,30 @@ namespace Upstream {
 /**
  * Type of load balancing to perform.
  */
-enum class LoadBalancerType { RoundRobin, LeastRequest, Random, RingHash, OriginalDst, Maglev };
+enum class LoadBalancerType {
+  RoundRobin,
+  LeastRequest,
+  Random,
+  RingHash,
+  OriginalDst,
+  Maglev,
+  ClusterProvided
+};
+
+struct SubsetSelector {
+  std::set<std::string> selector_keys_;
+  envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+      fallback_policy_;
+};
+
+using SubsetSelectorPtr = std::shared_ptr<SubsetSelector>;
 
 /**
  * Load Balancer subset configuration.
  */
 class LoadBalancerSubsetInfo {
 public:
-  virtual ~LoadBalancerSubsetInfo() {}
+  virtual ~LoadBalancerSubsetInfo() = default;
 
   /**
    * @return bool true if load balancer subsets are configured.
@@ -46,7 +62,7 @@ public:
    * @return const std:vector<std:set<std::string>>& a vector of
    * sorted keys used to define load balancer subsets.
    */
-  virtual const std::vector<std::set<std::string>>& subsetKeys() const PURE;
+  virtual const std::vector<SubsetSelectorPtr>& subsetSelectors() const PURE;
 
   /*
    * @return bool whether routing to subsets should take locality weights into account.
@@ -64,6 +80,12 @@ public:
    * selection from the fallback subset fails.
    */
   virtual bool panicModeAny() const PURE;
+
+  /*
+   * @return bool whether matching metadata should attempt to match against any of the
+   * elements in a list value defined in endpoint metadata.
+   */
+  virtual bool listAsAny() const PURE;
 };
 
 } // namespace Upstream

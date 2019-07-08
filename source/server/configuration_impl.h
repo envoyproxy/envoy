@@ -21,8 +21,6 @@
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 
-#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
-
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -33,7 +31,7 @@ namespace Configuration {
  */
 class StatsSinkFactory {
 public:
-  virtual ~StatsSinkFactory() {}
+  virtual ~StatsSinkFactory() = default;
 
   /**
    * Create a particular Stats::Sink implementation. If the implementation is unable to produce a
@@ -73,9 +71,20 @@ public:
   /**
    * Given a ListenerFilterManager and a list of factories, create a new filter chain. Chain
    * creation will exit early if any filters immediately close the connection.
+   *
+   * TODO(sumukhs): Coalesce with the above as they are very similar
    */
   static bool buildFilterChain(Network::ListenerFilterManager& filter_manager,
                                const std::vector<Network::ListenerFilterFactoryCb>& factories);
+
+  /**
+   * Given a UdpListenerFilterManager and a list of factories, create a new filter chain. Chain
+   * creation will exit early if any filters immediately close the connection.
+   */
+  static bool
+  buildUdpFilterChain(Network::UdpListenerFilterManager& filter_manager,
+                      Network::UdpReadFilterCallbacks& callbacks,
+                      const std::vector<Network::UdpListenerFilterFactoryCb>& factories);
 };
 
 /**
@@ -128,7 +137,6 @@ private:
   std::chrono::milliseconds watchdog_megamiss_timeout_;
   std::chrono::milliseconds watchdog_kill_timeout_;
   std::chrono::milliseconds watchdog_multikill_timeout_;
-  Extensions::Filters::Common::RateLimit::ClientFactoryPtr ratelimit_client_factory_;
 };
 
 /**
@@ -141,7 +149,9 @@ public:
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
   absl::optional<std::string> flagsPath() override { return flags_path_; }
-  Runtime* runtime() override { return runtime_.get(); }
+  const envoy::config::bootstrap::v2::LayeredRuntime& runtime() override {
+    return layered_runtime_;
+  }
 
 private:
   struct AdminImpl : public Admin {
@@ -155,20 +165,9 @@ private:
     Network::Address::InstanceConstSharedPtr address_;
   };
 
-  struct RuntimeImpl : public Runtime {
-    // Server::Configuration::Runtime
-    const std::string& symlinkRoot() override { return symlink_root_; }
-    const std::string& subdirectory() override { return subdirectory_; }
-    const std::string& overrideSubdirectory() override { return override_subdirectory_; }
-
-    std::string symlink_root_;
-    std::string subdirectory_;
-    std::string override_subdirectory_;
-  };
-
   AdminImpl admin_;
   absl::optional<std::string> flags_path_;
-  std::unique_ptr<RuntimeImpl> runtime_;
+  envoy::config::bootstrap::v2::LayeredRuntime layered_runtime_;
 };
 
 } // namespace Configuration

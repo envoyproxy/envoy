@@ -5,7 +5,6 @@ Configuration reference
 
 .. toctree::
   :maxdepth: 2
-  :includehidden:
 
   overview/v2_overview
   listeners/listeners
@@ -14,6 +13,7 @@ Configuration reference
   http_conn_man/http_conn_man
   http_filters/http_filters
   thrift_filters/thrift_filters
+  dubbo_filters/dubbo_filters
   cluster_manager/cluster_manager
   health_checkers/health_checkers
   access_log
@@ -24,3 +24,4 @@ Configuration reference
   overload_manager/overload_manager
   secret
   well_known_dynamic_metadata
+  best_practices/best_practices

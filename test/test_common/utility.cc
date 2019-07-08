@@ -20,8 +20,13 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
+#include "envoy/service/discovery/v2/rtds.pb.h"
 
 #include "common/api/api_impl.h"
 #include "common/common/empty_string.h"
@@ -30,12 +35,12 @@
 #include "common/common/stack_array.h"
 #include "common/common/thread_impl.h"
 #include "common/common/utility.h"
-#include "common/config/bootstrap_json.h"
+#include "common/config/resources.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_options_impl.h"
 #include "common/filesystem/directory.h"
+#include "common/filesystem/filesystem_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
@@ -81,8 +86,8 @@ bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
         State* state = static_cast<State*>(context);
         const Http::HeaderEntry* entry =
-            state->lhs.get(Http::LowerCaseString(std::string(header.key().c_str())));
-        if (entry == nullptr || (entry->value() != header.value().c_str())) {
+            state->lhs.get(Http::LowerCaseString(std::string(header.key().getStringView())));
+        if (entry == nullptr || (entry->value() != header.value().getStringView())) {
           state->equal = false;
           return Http::HeaderMap::Iterate::Break;
         }
@@ -98,23 +103,30 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
     return false;
   }
 
+  // Check whether the two buffers contain the same content. It is valid for the content
+  // to be arranged differently in the buffers. For example, lhs could have one slice
+  // containing 10 bytes while rhs has ten slices containing one byte each.
   uint64_t lhs_num_slices = lhs.getRawSlices(nullptr, 0);
   uint64_t rhs_num_slices = rhs.getRawSlices(nullptr, 0);
-  if (lhs_num_slices != rhs_num_slices) {
-    return false;
-  }
-
   STACK_ARRAY(lhs_slices, Buffer::RawSlice, lhs_num_slices);
   lhs.getRawSlices(lhs_slices.begin(), lhs_num_slices);
   STACK_ARRAY(rhs_slices, Buffer::RawSlice, rhs_num_slices);
   rhs.getRawSlices(rhs_slices.begin(), rhs_num_slices);
-  for (size_t i = 0; i < lhs_num_slices; i++) {
-    if (lhs_slices[i].len_ != rhs_slices[i].len_) {
-      return false;
-    }
-
-    if (0 != memcmp(lhs_slices[i].mem_, rhs_slices[i].mem_, lhs_slices[i].len_)) {
-      return false;
+  size_t rhs_slice = 0;
+  size_t rhs_offset = 0;
+  for (size_t lhs_slice = 0; lhs_slice < lhs_num_slices; lhs_slice++) {
+    for (size_t lhs_offset = 0; lhs_offset < lhs_slices[lhs_slice].len_; lhs_offset++) {
+      while (rhs_offset >= rhs_slices[rhs_slice].len_) {
+        rhs_slice++;
+        ASSERT(rhs_slice < rhs_num_slices);
+        rhs_offset = 0;
+      }
+      auto lhs_str = static_cast<const uint8_t*>(lhs_slices[lhs_slice].mem_);
+      auto rhs_str = static_cast<const uint8_t*>(rhs_slices[rhs_slice].mem_);
+      if (lhs_str[lhs_offset] != rhs_str[rhs_offset]) {
+        return false;
+      }
+      rhs_offset++;
     }
   }
 
@@ -141,11 +153,40 @@ Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::str
   return findByName(store.gauges(), name);
 }
 
-std::list<Network::Address::InstanceConstSharedPtr>
-TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
-  std::list<Network::Address::InstanceConstSharedPtr> ret;
+void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
+                                   Event::TestTimeSystem& time_system) {
+  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+void TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
+                                   Event::TestTimeSystem& time_system) {
+  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+void TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
+                                 Event::TestTimeSystem& time_system) {
+  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+void TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
+                                 Event::TestTimeSystem& time_system) {
+  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+std::list<Network::DnsResponse>
+TestUtility::makeDnsResponse(const std::list<std::string>& addresses, std::chrono::seconds ttl) {
+  std::list<Network::DnsResponse> ret;
   for (const auto& address : addresses) {
-    ret.emplace_back(Network::Utility::parseInternetAddress(address));
+
+    ret.emplace_back(Network::DnsResponse(Network::Utility::parseInternetAddress(address), ttl));
   }
   return ret;
 }
@@ -167,13 +208,34 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
   return file_names;
 }
 
-envoy::config::bootstrap::v2::Bootstrap
-TestUtility::parseBootstrapFromJson(const std::string& json_string) {
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Stats::StatsOptionsImpl stats_options;
-  Config::BootstrapJson::translateBootstrap(*json_object_ptr, bootstrap, stats_options);
-  return bootstrap;
+std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
+  if (resource.type_url() == Config::TypeUrl::get().Listener) {
+    return TestUtility::anyConvert<envoy::api::v2::Listener>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
+    return TestUtility::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().Cluster) {
+    return TestUtility::anyConvert<envoy::api::v2::Cluster>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
+    return TestUtility::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().VirtualHost) {
+    return TestUtility::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().Runtime) {
+    return TestUtility::anyConvert<envoy::service::discovery::v2::Runtime>(resource).name();
+  }
+  throw EnvoyException(
+      fmt::format("xdsResourceName does not know about type URL {}", resource.type_url()));
+}
+
+std::string TestUtility::addLeftAndRightPadding(absl::string_view to_pad, int desired_length) {
+  int line_fill_len = desired_length - to_pad.length();
+  int first_half_len = line_fill_len / 2;
+  int second_half_len = line_fill_len - first_half_len;
+  return absl::StrCat(std::string(first_half_len, '='), to_pad, std::string(second_half_len, '='));
 }
 
 std::vector<std::string> TestUtility::split(const std::string& source, char split) {
@@ -253,6 +315,19 @@ std::string TestUtility::convertTime(const std::string& input, const std::string
   return TestUtility::formatTime(TestUtility::parseTime(input, input_format), output_format);
 }
 
+// static
+bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges) {
+  // Returns true if all gauges are 0 except the circuit_breaker remaining resource
+  // gauges which default to the resource max.
+  std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
+  for (const Stats::GaugeSharedPtr& gauge : gauges) {
+    if (!std::regex_match(gauge->name(), omitted) && gauge->value() != 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void ConditionalInitializer::setReady() {
   Thread::LockGuard lock(mutex_);
   EXPECT_FALSE(ready_);
@@ -311,11 +386,10 @@ const uint32_t Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
 const uint32_t Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
 const uint32_t Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE;
 
-TestHeaderMapImpl::TestHeaderMapImpl() : HeaderMapImpl() {}
+TestHeaderMapImpl::TestHeaderMapImpl() = default;
 
 TestHeaderMapImpl::TestHeaderMapImpl(
-    const std::initializer_list<std::pair<std::string, std::string>>& values)
-    : HeaderMapImpl() {
+    const std::initializer_list<std::pair<std::string, std::string>>& values) {
   for (auto& value : values) {
     addCopy(value.first, value.second);
   }
@@ -350,7 +424,7 @@ std::string TestHeaderMapImpl::get_(const LowerCaseString& key) {
   if (!header) {
     return EMPTY_STRING;
   } else {
-    return header->value().c_str();
+    return std::string(header->value().getStringView());
   }
 }
 
@@ -359,39 +433,6 @@ bool TestHeaderMapImpl::has(const std::string& key) { return get(LowerCaseString
 bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nullptr; }
 
 } // namespace Http
-
-namespace Stats {
-
-MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options)
-    : TestAllocator(stats_options) {
-  ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
-    return TestAllocator::alloc(name);
-  }));
-
-  ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
-    return TestAllocator::free(data);
-  }));
-
-  EXPECT_CALL(*this, alloc(absl::string_view("stats.overflow")));
-}
-
-MockedTestAllocator::~MockedTestAllocator() {}
-
-} // namespace Stats
-
-namespace Thread {
-
-// TODO(sesmith177) Tests should get the ThreadFactory from the same location as the main code
-ThreadFactory& threadFactoryForTest() {
-#ifdef WIN32
-  static ThreadFactoryImplWin32* thread_factory = new ThreadFactoryImplWin32();
-#else
-  static ThreadFactoryImplPosix* thread_factory = new ThreadFactoryImplPosix();
-#endif
-  return *thread_factory;
-}
-
-} // namespace Thread
 
 namespace Api {
 
@@ -403,26 +444,34 @@ protected:
 
 class TestImpl : public TestImplProvider, public Impl {
 public:
-  TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
-      : Impl(thread_factory, stats_store, global_time_system_) {}
-  TestImpl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system)
-      : Impl(thread_factory, default_stats_store_, time_system) {}
-  TestImpl(Thread::ThreadFactory& thread_factory)
-      : Impl(thread_factory, default_stats_store_, global_time_system_) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
+           Filesystem::Instance& file_system)
+      : Impl(thread_factory, stats_store, global_time_system_, file_system) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system,
+           Filesystem::Instance& file_system)
+      : Impl(thread_factory, default_stats_store_, time_system, file_system) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
+      : Impl(thread_factory, default_stats_store_, global_time_system_, file_system) {}
 };
 
-ApiPtr createApiForTest() { return std::make_unique<TestImpl>(Thread::threadFactoryForTest()); }
+ApiPtr createApiForTest() {
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(),
+                                    Filesystem::fileSystemForTest());
+}
 
 ApiPtr createApiForTest(Stats::Store& stat_store) {
-  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), stat_store);
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), stat_store,
+                                    Filesystem::fileSystemForTest());
 }
 
 ApiPtr createApiForTest(Event::TimeSystem& time_system) {
-  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), time_system);
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), time_system,
+                                    Filesystem::fileSystemForTest());
 }
 
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
-  return std::make_unique<Impl>(Thread::threadFactoryForTest(), stat_store, time_system);
+  return std::make_unique<Impl>(Thread::threadFactoryForTest(), stat_store, time_system,
+                                Filesystem::fileSystemForTest());
 }
 
 } // namespace Api

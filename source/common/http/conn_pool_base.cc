@@ -24,7 +24,8 @@ ConnPoolImplBase::newPendingRequest(StreamDecoder& decoder, ConnectionPool::Call
 }
 
 void ConnPoolImplBase::purgePendingRequests(
-    const Upstream::HostDescriptionConstSharedPtr& host_description) {
+    const Upstream::HostDescriptionConstSharedPtr& host_description,
+    absl::string_view failure_reason) {
   // NOTE: We move the existing pending requests to a temporary list. This is done so that
   //       if retry logic submits a new request to the pool, we don't fail it inline.
   std::list<PendingRequestPtr> pending_requests_to_purge(std::move(pending_requests_));
@@ -33,7 +34,7 @@ void ConnPoolImplBase::purgePendingRequests(
         pending_requests_to_purge.front()->removeFromList(pending_requests_to_purge);
     host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
     request->callbacks_.onPoolFailure(ConnectionPool::PoolFailureReason::ConnectionFailure,
-                                      host_description);
+                                      failure_reason, host_description);
   }
 }
 

@@ -69,6 +69,13 @@ private:
   void encodeHeader(const char* key, uint32_t key_size, const char* value, uint32_t value_size);
 
   /**
+   * Called to encode an individual header.
+   * @param key supplies the header to encode as a string_view.
+   * @param value supplies the value to encode as a string_view.
+   */
+  void encodeHeader(absl::string_view key, absl::string_view value);
+
+  /**
    * Called to finalize a stream encode.
    */
   void endEncode();
@@ -165,7 +172,8 @@ public:
   bool maybeDirectDispatch(Buffer::Instance& data);
 
 protected:
-  ConnectionImpl(Network::Connection& connection, http_parser_type type);
+  ConnectionImpl(Network::Connection& connection, http_parser_type type,
+                 uint32_t max_request_headers_kb);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -273,6 +281,7 @@ private:
   Buffer::RawSlice reserved_iovec_;
   char* reserved_current_{};
   Protocol protocol_{Protocol::Http11};
+  const uint32_t max_headers_kb_;
 };
 
 /**
@@ -281,7 +290,7 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Http1Settings settings);
+                       Http1Settings settings, uint32_t max_request_headers_kb);
 
   virtual bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 
@@ -363,6 +372,9 @@ private:
   std::list<PendingResponse> pending_responses_;
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};
+
+  // The default limit of 80 KiB is the vanilla http_parser behaviour.
+  static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
 };
 
 } // namespace Http1

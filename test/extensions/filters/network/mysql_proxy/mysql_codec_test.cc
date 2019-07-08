@@ -19,10 +19,7 @@ constexpr int MYSQL_UT_LAST_ID = 0;
 constexpr int MYSQL_UT_SERVER_OK = 0;
 constexpr int MYSQL_UT_SERVER_WARNINGS = 0x0001;
 
-class MySQLCodecTest : public testing::Test, public MySQLTestUtils {
-protected:
-  uint64_t offset_{0};
-};
+class MySQLCodecTest : public testing::Test {};
 
 TEST_F(MySQLCodecTest, MySQLServerChallengeV9EncDec) {
   ServerGreeting mysql_greet_encode{};
@@ -36,7 +33,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeV9EncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
+  mysql_greet_decode.decode(*decode_data, GREETING_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_greet_decode.getSalt(), mysql_greet_encode.getSalt());
   EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
   EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
@@ -68,7 +65,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeV10EncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
+  mysql_greet_decode.decode(*decode_data, GREETING_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_greet_decode.getSalt(), mysql_greet_encode.getSalt());
   EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
   EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
@@ -89,7 +86,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeIncompleteProtocol) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
+  mysql_greet_decode.decode(*decode_data, GREETING_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_greet_decode.getProtocol(), 0);
 }
 
@@ -106,7 +103,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeIncompleteVersion) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
+  mysql_greet_decode.decode(*decode_data, GREETING_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_greet_decode.getVersion(), "");
   EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
 }
@@ -126,7 +123,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeIncompleteThreadId) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
+  mysql_greet_decode.decode(*decode_data, GREETING_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
   EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
   EXPECT_EQ(mysql_greet_decode.getThreadId(), 0);
@@ -148,7 +145,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeIncompleteSalt) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
+  mysql_greet_decode.decode(*decode_data, GREETING_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_greet_decode.getSalt(), "");
   EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
   EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
@@ -174,7 +171,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeIncompleteServerCap) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
+  mysql_greet_decode.decode(*decode_data, GREETING_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_greet_decode.getSalt(), mysql_greet_encode.getSalt());
   EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
   EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
@@ -204,7 +201,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeIncompleteServerStatus) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
+  mysql_greet_decode.decode(*decode_data, GREETING_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_greet_decode.getSalt(), mysql_greet_encode.getSalt());
   EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
   EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
@@ -237,7 +234,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeIncompleteExtServerCap) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
+  mysql_greet_decode.decode(*decode_data, GREETING_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_greet_decode.getSalt(), mysql_greet_encode.getSalt());
   EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
   EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
@@ -267,7 +264,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeP10ServerCapOnly) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};
-  mysql_greet_decode.decode(*decode_data, offset_, GREETING_SEQ_NUM, decode_data->length());
+  mysql_greet_decode.decode(*decode_data, GREETING_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_greet_decode.getSalt(), mysql_greet_encode.getSalt());
   EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
   EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
@@ -299,7 +296,7 @@ TEST_F(MySQLCodecTest, MySQLClLoginV41PluginAuthEncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.isResponse41(), true);
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
@@ -334,7 +331,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin41SecureConnEncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.isResponse41(), true);
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
@@ -364,7 +361,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin41EncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.isResponse41(), true);
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
@@ -393,7 +390,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320EncDec) {
   std::string data = mysql_clogin_encode.encode();
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.isResponse320(), true);
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
@@ -407,50 +404,46 @@ TEST_F(MySQLCodecTest, MySQLParseLengthEncodedInteger) {
   {
     // encode 2 byte value
     Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
-    uint64_t offset = 0;
     uint64_t input_val = 5;
     uint64_t output_val = 0;
     BufferHelper::addUint8(*buffer, LENENCODINT_2BYTES);
     BufferHelper::addUint16(*buffer, input_val);
-    EXPECT_EQ(BufferHelper::peekLengthEncodedInteger(*buffer, offset, output_val), MYSQL_SUCCESS);
+    EXPECT_EQ(BufferHelper::readLengthEncodedInteger(*buffer, output_val), MYSQL_SUCCESS);
     EXPECT_EQ(input_val, output_val);
   }
 
   {
     // encode 3 byte value
     Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
-    uint64_t offset = 0;
     uint64_t input_val = 5;
     uint64_t output_val = 0;
     BufferHelper::addUint8(*buffer, LENENCODINT_3BYTES);
     BufferHelper::addUint16(*buffer, input_val);
     BufferHelper::addUint8(*buffer, 0);
-    EXPECT_EQ(BufferHelper::peekLengthEncodedInteger(*buffer, offset, output_val), MYSQL_SUCCESS);
+    EXPECT_EQ(BufferHelper::readLengthEncodedInteger(*buffer, output_val), MYSQL_SUCCESS);
     EXPECT_EQ(input_val, output_val);
   }
 
   {
     // encode 8 byte value
     Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
-    uint64_t offset = 0;
     uint64_t input_val = 5;
     uint64_t output_val = 0;
     BufferHelper::addUint8(*buffer, LENENCODINT_8BYTES);
     BufferHelper::addUint32(*buffer, input_val);
     BufferHelper::addUint32(*buffer, 0);
-    EXPECT_EQ(BufferHelper::peekLengthEncodedInteger(*buffer, offset, output_val), MYSQL_SUCCESS);
+    EXPECT_EQ(BufferHelper::readLengthEncodedInteger(*buffer, output_val), MYSQL_SUCCESS);
     EXPECT_EQ(input_val, output_val);
   }
 
   {
     // encode invalid length header
     Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
-    uint64_t offset = 0;
     uint64_t input_val = 5;
     uint64_t output_val = 0;
     BufferHelper::addUint8(*buffer, 0xff);
     BufferHelper::addUint32(*buffer, input_val);
-    EXPECT_EQ(BufferHelper::peekLengthEncodedInteger(*buffer, offset, output_val), MYSQL_FAILURE);
+    EXPECT_EQ(BufferHelper::readLengthEncodedInteger(*buffer, output_val), MYSQL_FAILURE);
   }
 }
 
@@ -467,7 +460,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320IncompleteClientCap) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), 0);
 }
 
@@ -484,7 +477,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320IncompleteExtClientCap) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), 0);
 }
@@ -503,7 +496,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320IncompleteMaxPacket) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), 0);
@@ -525,7 +518,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320IncompleteCharset) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
@@ -551,7 +544,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320IncompleteUnsetBytes) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
@@ -577,7 +570,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320IncompleteUser) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
@@ -607,7 +600,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320IncompleteAuthLen) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
@@ -638,7 +631,7 @@ TEST_F(MySQLCodecTest, MySQLClientLogin320IncompleteAuthPasswd) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
@@ -669,7 +662,7 @@ TEST_F(MySQLCodecTest, MySQLClientSSLLoginIncompleteAuthLen) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
@@ -700,7 +693,7 @@ TEST_F(MySQLCodecTest, MySQLClientSSLLoginIncompleteAuthPasswd) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
@@ -731,7 +724,7 @@ TEST_F(MySQLCodecTest, MySQLClientLoginIncompleteAuthPasswd) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
@@ -762,7 +755,7 @@ TEST_F(MySQLCodecTest, MySQLClientLoginIncompleteConnectDb) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
@@ -790,7 +783,7 @@ TEST_F(MySQLCodecTest, MySQLClientLoginSSLEncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(*decode_data, offset_, CHALLENGE_SEQ_NUM, decode_data->length());
+  mysql_clogin_decode.decode(*decode_data, CHALLENGE_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_clogin_decode.isSSLRequest(), true);
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
@@ -813,7 +806,7 @@ TEST_F(MySQLCodecTest, MySQLLoginOkEncDec) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLoginResponse mysql_loginok_decode{};
-  mysql_loginok_decode.decode(*decode_data, offset_, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
+  mysql_loginok_decode.decode(*decode_data, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_loginok_decode.getRespCode(), mysql_loginok_encode.getRespCode());
   EXPECT_EQ(mysql_loginok_decode.getAffectedRows(), mysql_loginok_encode.getAffectedRows());
   EXPECT_EQ(mysql_loginok_decode.getLastInsertId(), mysql_loginok_encode.getLastInsertId());
@@ -834,7 +827,7 @@ TEST_F(MySQLCodecTest, MySQLLoginOldAuthSwitch) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLoginResponse mysql_loginok_decode{};
-  mysql_loginok_decode.decode(*decode_data, offset_, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
+  mysql_loginok_decode.decode(*decode_data, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_loginok_decode.getRespCode(), mysql_loginok_encode.getRespCode());
 }
 
@@ -845,11 +838,11 @@ TEST_F(MySQLCodecTest, MySQLLoginOldAuthSwitch) {
 TEST_F(MySQLCodecTest, MySQLLoginOkIncompleteRespCode) {
   ClientLoginResponse mysql_loginok_encode{};
   mysql_loginok_encode.setRespCode(MYSQL_UT_RESP_OK);
-  std::string data = "";
+  std::string data;
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLoginResponse mysql_loginok_decode{};
-  mysql_loginok_decode.decode(*decode_data, offset_, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
+  mysql_loginok_decode.decode(*decode_data, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_loginok_decode.getRespCode(), 0);
 }
 
@@ -866,7 +859,7 @@ TEST_F(MySQLCodecTest, MySQLLoginOkIncompleteAffectedRows) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLoginResponse mysql_loginok_decode{};
-  mysql_loginok_decode.decode(*decode_data, offset_, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
+  mysql_loginok_decode.decode(*decode_data, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_loginok_decode.getRespCode(), mysql_loginok_encode.getRespCode());
 }
 
@@ -884,7 +877,7 @@ TEST_F(MySQLCodecTest, MySQLLoginOkIncompleteLastInsertId) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLoginResponse mysql_loginok_decode{};
-  mysql_loginok_decode.decode(*decode_data, offset_, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
+  mysql_loginok_decode.decode(*decode_data, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_loginok_decode.getRespCode(), mysql_loginok_encode.getRespCode());
   EXPECT_EQ(mysql_loginok_decode.getAffectedRows(), mysql_loginok_encode.getAffectedRows());
 }
@@ -904,7 +897,7 @@ TEST_F(MySQLCodecTest, MySQLLoginOkIncompleteServerStatus) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLoginResponse mysql_loginok_decode{};
-  mysql_loginok_decode.decode(*decode_data, offset_, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
+  mysql_loginok_decode.decode(*decode_data, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_loginok_decode.getRespCode(), mysql_loginok_encode.getRespCode());
   EXPECT_EQ(mysql_loginok_decode.getAffectedRows(), mysql_loginok_encode.getAffectedRows());
   EXPECT_EQ(mysql_loginok_decode.getLastInsertId(), mysql_loginok_encode.getLastInsertId());
@@ -927,7 +920,7 @@ TEST_F(MySQLCodecTest, MySQLLoginOkIncompleteWarnings) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ClientLoginResponse mysql_loginok_decode{};
-  mysql_loginok_decode.decode(*decode_data, offset_, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
+  mysql_loginok_decode.decode(*decode_data, CHALLENGE_RESP_SEQ_NUM, decode_data->length());
   EXPECT_EQ(mysql_loginok_decode.getRespCode(), mysql_loginok_encode.getRespCode());
   EXPECT_EQ(mysql_loginok_decode.getAffectedRows(), mysql_loginok_encode.getAffectedRows());
   EXPECT_EQ(mysql_loginok_decode.getLastInsertId(), mysql_loginok_encode.getLastInsertId());
@@ -942,8 +935,8 @@ TEST_F(MySQLCodecTest, MySQLCommandError) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   Command mysql_cmd_decode{};
-  uint64_t offset = 4;
-  mysql_cmd_decode.decode(*decode_data, offset, 0, 0);
+  decode_data->drain(4);
+  mysql_cmd_decode.decode(*decode_data, 0, 0);
   EXPECT_EQ(mysql_cmd_decode.getCmd(), Command::Cmd::COM_NULL);
 }
 
@@ -958,8 +951,8 @@ TEST_F(MySQLCodecTest, MySQLCommandInitDb) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
   Command mysql_cmd_decode{};
-  uint64_t offset = 4;
-  mysql_cmd_decode.decode(*decode_data, offset, 0, db.length() + 1);
+  decode_data->drain(4);
+  mysql_cmd_decode.decode(*decode_data, 0, db.length() + 1);
   EXPECT_EQ(mysql_cmd_decode.getDb(), db);
 }
 
@@ -974,8 +967,8 @@ TEST_F(MySQLCodecTest, MySQLCommandCreateDb) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
   Command mysql_cmd_decode{};
-  uint64_t offset = 4;
-  mysql_cmd_decode.decode(*decode_data, offset, 0, db.length() + 1);
+  decode_data->drain(4);
+  mysql_cmd_decode.decode(*decode_data, 0, db.length() + 1);
   EXPECT_EQ(mysql_cmd_decode.getDb(), db);
 }
 
@@ -990,8 +983,8 @@ TEST_F(MySQLCodecTest, MySQLCommandDropDb) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
   Command mysql_cmd_decode{};
-  uint64_t offset = 4;
-  mysql_cmd_decode.decode(*decode_data, offset, 0, db.length() + 1);
+  decode_data->drain(4);
+  mysql_cmd_decode.decode(*decode_data, 0, db.length() + 1);
   EXPECT_EQ(mysql_cmd_decode.getDb(), db);
 }
 
@@ -1004,8 +997,8 @@ TEST_F(MySQLCodecTest, MySQLCommandOther) {
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
   Command mysql_cmd_decode{};
-  uint64_t offset = 4;
-  mysql_cmd_decode.decode(*decode_data, offset, 0, 0);
+  decode_data->drain(4);
+  mysql_cmd_decode.decode(*decode_data, 0, 0);
   EXPECT_EQ(mysql_cmd_decode.getCmd(), Command::Cmd::COM_FIELD_LIST);
 }
 

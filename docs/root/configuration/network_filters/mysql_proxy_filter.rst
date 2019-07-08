@@ -15,6 +15,11 @@ as operations performed on each table.
    development. Capabilities will be expanded over time and the
    configuration structures are likely to change.
 
+.. warning::
+
+   The mysql_proxy filter was tested with MySQL v5.5. The filter may not work
+   with other versions of MySQL due to differences in the protocol implementation.
+
 .. _config_network_filters_mysql_proxy_config:
 
 Configuration

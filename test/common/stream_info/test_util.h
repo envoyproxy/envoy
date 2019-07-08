@@ -31,6 +31,12 @@ public:
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
   absl::optional<uint32_t> responseCode() const override { return response_code_; }
+  const absl::optional<std::string>& responseCodeDetails() const override {
+    return response_code_details_;
+  }
+  void setResponseCodeDetails(absl::string_view rc_details) override {
+    response_code_details_.emplace(rc_details);
+  }
   void addBytesSent(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   uint64_t bytesSent() const override { return 2; }
   bool intersectResponseFlags(uint64_t response_flags) const override {
@@ -78,6 +84,18 @@ public:
   const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const override {
     return downstream_remote_address_;
   }
+
+  void setDownstreamSslConnection(const Ssl::ConnectionInfo* connection_info) override {
+    downstream_connection_info_ = connection_info;
+  }
+
+  const Ssl::ConnectionInfo* downstreamSslConnection() const override {
+    return downstream_connection_info_;
+  }
+  void setRouteName(absl::string_view route_name) override {
+    route_name_ = std::string(route_name);
+  }
+  const std::string& getRouteName() const override { return route_name_; }
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
@@ -156,6 +174,14 @@ public:
 
   const std::string& requestedServerName() const override { return requested_server_name_; }
 
+  void setUpstreamTransportFailureReason(absl::string_view failure_reason) override {
+    upstream_transport_failure_reason_ = std::string(failure_reason);
+  }
+
+  const std::string& upstreamTransportFailureReason() const override {
+    return upstream_transport_failure_reason_;
+  }
+
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
 
   SystemTime start_time_;
@@ -172,18 +198,22 @@ public:
 
   absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
   absl::optional<uint32_t> response_code_;
+  absl::optional<std::string> response_code_details_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
+  std::string route_name_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  const Ssl::ConnectionInfo* downstream_connection_info_{};
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
   Envoy::StreamInfo::FilterStateImpl filter_state_{};
   Envoy::StreamInfo::UpstreamTiming upstream_timing_;
   std::string requested_server_name_;
+  std::string upstream_transport_failure_reason_;
   DangerousDeprecatedTestTime test_time_;
 };
 

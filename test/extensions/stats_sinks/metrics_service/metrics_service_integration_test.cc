@@ -43,7 +43,7 @@ public:
       envoy::config::metrics::v2::MetricsServiceConfig config;
       setGrpcService(*config.mutable_grpc_service(), "metrics_service",
                      fake_upstreams_.back()->localAddress());
-      MessageUtil::jsonConvert(config, *metrics_sink->mutable_config());
+      TestUtility::jsonConvert(config, *metrics_sink->mutable_config());
       // Shrink reporting period down to 1s to make test not take forever.
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(100));
@@ -76,16 +76,16 @@ public:
     while (!(known_counter_exists && known_gauge_exists && known_histogram_exists)) {
       envoy::service::metrics::v2::StreamMetricsMessage request_msg;
       VERIFY_ASSERTION(metrics_service_request_->waitForGrpcMessage(*dispatcher_, request_msg));
-      EXPECT_STREQ("POST", metrics_service_request_->headers().Method()->value().c_str());
-      EXPECT_STREQ("/envoy.service.metrics.v2.MetricsService/StreamMetrics",
-                   metrics_service_request_->headers().Path()->value().c_str());
-      EXPECT_STREQ("application/grpc",
-                   metrics_service_request_->headers().ContentType()->value().c_str());
+      EXPECT_EQ("POST", metrics_service_request_->headers().Method()->value().getStringView());
+      EXPECT_EQ("/envoy.service.metrics.v2.MetricsService/StreamMetrics",
+                metrics_service_request_->headers().Path()->value().getStringView());
+      EXPECT_EQ("application/grpc",
+                metrics_service_request_->headers().ContentType()->value().getStringView());
       EXPECT_TRUE(request_msg.envoy_metrics_size() > 0);
       const Protobuf::RepeatedPtrField<::io::prometheus::client::MetricFamily>& envoy_metrics =
           request_msg.envoy_metrics();
 
-      for (::io::prometheus::client::MetricFamily metrics_family : envoy_metrics) {
+      for (const ::io::prometheus::client::MetricFamily& metrics_family : envoy_metrics) {
         if (metrics_family.name() == "cluster.cluster_0.membership_change" &&
             metrics_family.type() == ::io::prometheus::client::MetricType::COUNTER) {
           known_counter_exists = true;

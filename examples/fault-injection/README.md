@@ -8,6 +8,7 @@ support](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime) to c
 ## Usage
 ```
 # in terminal 1, launch Envoy and backend service containers.
+docker-compose pull
 docker-compose up
 
 # in terminal 2

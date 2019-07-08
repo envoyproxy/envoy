@@ -89,8 +89,8 @@ public:
     return timeSystem().waitFor(mutex, condvar, duration);
   }
 
-  SchedulerPtr createScheduler(Libevent::BasePtr& base_ptr) override {
-    return timeSystem().createScheduler(base_ptr);
+  SchedulerPtr createScheduler(Scheduler& base_scheduler) override {
+    return timeSystem().createScheduler(base_scheduler);
   }
   SystemTime systemTime() override { return timeSystem().systemTime(); }
   MonotonicTime monotonicTime() override { return timeSystem().monotonicTime(); }
@@ -120,7 +120,9 @@ private:
       return std::make_unique<TimeSystemVariant>();
     };
     auto time_system = dynamic_cast<TimeSystemVariant*>(&singleton_->timeSystem(make_time_system));
-    RELEASE_ASSERT(time_system, "Two different types of time-systems allocated");
+    RELEASE_ASSERT(time_system,
+                   "Two different types of time-systems allocated. If deriving from "
+                   "Event::TestUsingSimulatedTime make sure it is the first base class.");
     return *time_system;
   }
 

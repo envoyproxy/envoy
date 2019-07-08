@@ -28,13 +28,13 @@ SlotPtr InstanceImpl::allocateSlot() {
     if (slots_[i] == nullptr) {
       std::unique_ptr<SlotImpl> slot(new SlotImpl(*this, i));
       slots_[i] = slot.get();
-      return std::move(slot);
+      return slot;
     }
   }
 
   std::unique_ptr<SlotImpl> slot(new SlotImpl(*this, slots_.size()));
   slots_.push_back(slot.get());
-  return std::move(slot);
+  return slot;
 }
 
 ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() {
@@ -98,15 +98,15 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_c
   // all_threads_complete_cb method. Parallelism of main thread execution is being traded off
   // for programming simplicity here.
   cb();
-  std::shared_ptr<std::atomic<uint64_t>> worker_count =
-      std::make_shared<std::atomic<uint64_t>>(registered_threads_.size());
+
+  std::shared_ptr<Event::PostCb> cb_guard(new Event::PostCb(cb),
+                                          [this, all_threads_complete_cb](Event::PostCb* cb) {
+                                            main_thread_dispatcher_->post(all_threads_complete_cb);
+                                            delete cb;
+                                          });
+
   for (Event::Dispatcher& dispatcher : registered_threads_) {
-    dispatcher.post([this, worker_count, cb, all_threads_complete_cb]() -> void {
-      cb();
-      if (--*worker_count == 0) {
-        main_thread_dispatcher_->post(all_threads_complete_cb);
-      }
-    });
+    dispatcher.post([cb_guard]() -> void { (*cb_guard)(); });
   }
 }
 

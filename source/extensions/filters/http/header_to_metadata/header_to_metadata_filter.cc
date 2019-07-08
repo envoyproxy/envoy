@@ -30,7 +30,7 @@ Config::Config(const envoy::config::filter::http::header_to_metadata::v2::Config
 
 bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
                             HeaderToMetadataRules& vector) {
-  if (proto_rules.size() == 0) {
+  if (proto_rules.empty()) {
     ENVOY_LOG(debug, "no rules provided");
     return false;
   }
@@ -54,7 +54,7 @@ bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
 
 HeaderToMetadataFilter::HeaderToMetadataFilter(const ConfigSharedPtr config) : config_(config) {}
 
-HeaderToMetadataFilter::~HeaderToMetadataFilter() {}
+HeaderToMetadataFilter::~HeaderToMetadataFilter() = default;
 
 Http::FilterHeadersStatus HeaderToMetadataFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   if (config_->doRequest()) {
@@ -101,7 +101,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
   // Sane enough, add the key/value.
   switch (type) {
   case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_STRING:
-    val.set_string_value(ProtobufTypes::String(value));
+    val.set_string_value(std::string(value));
     break;
   case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_NUMBER: {
     double dval;
@@ -174,7 +174,7 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
   }
 
   // Any matching rules?
-  if (structs_by_namespace.size() > 0) {
+  if (!structs_by_namespace.empty()) {
     for (auto const& entry : structs_by_namespace) {
       callbacks.streamInfo().setDynamicMetadata(entry.first, entry.second);
     }

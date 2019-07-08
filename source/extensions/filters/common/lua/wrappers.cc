@@ -40,7 +40,7 @@ void MetadataMapHelper::setValue(lua_State* state, const ProtobufWkt::Value& val
     return lua_pushboolean(state, value.bool_value());
 
   case ProtobufWkt::Value::kStringValue: {
-    const auto string_value = value.string_value();
+    const auto& string_value = value.string_value();
     return lua_pushstring(state, string_value.c_str());
   }
 
@@ -49,7 +49,7 @@ void MetadataMapHelper::setValue(lua_State* state, const ProtobufWkt::Value& val
   }
 
   case ProtobufWkt::Value::kListValue: {
-    const auto list = value.list_value();
+    const auto& list = value.list_value();
     const int values_size = list.values_size();
 
     lua_createtable(state, values_size, 0);
@@ -76,9 +76,8 @@ void MetadataMapHelper::setValue(lua_State* state, const ProtobufWkt::Value& val
   }
 }
 
-void MetadataMapHelper::createTable(
-    lua_State* state,
-    const Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Value>& fields) {
+void MetadataMapHelper::createTable(lua_State* state,
+                                    const Protobuf::Map<std::string, ProtobufWkt::Value>& fields) {
   lua_createtable(state, 0, fields.size());
   for (const auto& field : fields) {
     int top = lua_gettop(state);

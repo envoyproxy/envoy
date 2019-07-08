@@ -6,22 +6,16 @@
 namespace Envoy {
 namespace Thread {
 
-ThreadIdImplWin32::ThreadIdImplWin32(DWORD id) : id_(id) {}
-
-std::string ThreadIdImplWin32::debugString() const { return std::to_string(id_); }
-
-bool ThreadIdImplWin32::isCurrentThreadId() const { return id_ == ::GetCurrentThreadId(); }
-
 ThreadImplWin32::ThreadImplWin32(std::function<void()> thread_routine)
     : thread_routine_(thread_routine) {
   RELEASE_ASSERT(Logger::Registry::initialized(), "");
-  thread_handle_ = reinterpret_cast<HANDLE>(
-      ::_beginthreadex(nullptr, 0,
-                       [](void* arg) -> unsigned int {
-                         static_cast<ThreadImplWin32*>(arg)->thread_routine_();
-                         return 0;
-                       },
-                       this, 0, nullptr));
+  thread_handle_ = reinterpret_cast<HANDLE>(::_beginthreadex(
+      nullptr, 0,
+      [](void* arg) -> unsigned int {
+        static_cast<ThreadImplWin32*>(arg)->thread_routine_();
+        return 0;
+      },
+      this, 0, nullptr));
   RELEASE_ASSERT(thread_handle_ != 0, "");
 }
 
@@ -36,8 +30,9 @@ ThreadPtr ThreadFactoryImplWin32::createThread(std::function<void()> thread_rout
   return std::make_unique<ThreadImplWin32>(thread_routine);
 }
 
-ThreadIdPtr ThreadFactoryImplWin32::currentThreadId() {
-  return std::make_unique<ThreadIdImplWin32>(::GetCurrentThreadId());
+ThreadId ThreadFactoryImplWin32::currentThreadId() {
+  // TODO(mhoran): test this in windows please.
+  return ThreadId(static_cast<int64_t>(::GetCurrentThreadId()));
 }
 
 } // namespace Thread

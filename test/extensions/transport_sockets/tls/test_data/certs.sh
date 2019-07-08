@@ -67,6 +67,9 @@ cat fake_ca_cert.pem ca_cert.pem > ca_certificates.pem
 generate_rsa_key no_san
 generate_x509_cert no_san ca
 
+# Concatenate no_san_cert.pem and Test Intermediate CA (intermediate_ca_cert.pem) to create valid certificate chain.
+cat no_san_cert.pem intermediate_ca_cert.pem > no_san_chain.pem
+
 # Generate san_dns_cert.pem.
 generate_rsa_key san_dns
 generate_x509_cert san_dns ca

@@ -29,17 +29,34 @@ public:
                               Upstream::ResourcePriority priority);
   ~RetryStateImpl();
 
-  static uint32_t parseRetryOn(absl::string_view config);
+  /**
+   * Returns the RetryPolicy extracted from the x-envoy-retry-on header.
+   * @param config is the value of the header.
+   * @return std::pair<uint32_t, bool> the uint32_t is a bitset representing the
+   *         valid retry policies in @param config. The bool is TRUE iff all the
+   *         policies specified in @param config are valid.
+   */
+  static std::pair<uint32_t, bool> parseRetryOn(absl::string_view config);
 
-  // Returns the RetryPolicy extracted from the x-envoy-retry-grpc-on header.
-  static uint32_t parseRetryGrpcOn(absl::string_view retry_grpc_on_header);
+  /**
+   * Returns the RetryPolicy extracted from the x-envoy-retry-grpc-on header.
+   * @param config is the value of the header.
+   * @return std::pair<uint32_t, bool> the uint32_t is a bitset representing the
+   *         valid retry policies in @param config. The bool is TRUE iff all the
+   *         policies specified in @param config are valid.
+   */
+  static std::pair<uint32_t, bool> parseRetryGrpcOn(absl::string_view retry_grpc_on_header);
 
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }
   RetryStatus shouldRetryHeaders(const Http::HeaderMap& response_headers,
                                  DoRetryCallback callback) override;
+  // Returns true if the retry policy would retry the passed headers. Does not
+  // take into account circuit breaking or remaining tries.
+  bool wouldRetryFromHeaders(const Http::HeaderMap& response_headers) override;
   RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason,
                                DoRetryCallback callback) override;
+  RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) override;
 
   void onHostAttempted(Upstream::HostDescriptionConstSharedPtr host) override {
     std::for_each(retry_host_predicates_.begin(), retry_host_predicates_.end(),
@@ -75,7 +92,6 @@ private:
   void enableBackoffTimer();
   void resetRetry();
   bool wouldRetryFromReset(const Http::StreamResetReason reset_reason);
-  bool wouldRetryFromHeaders(const Http::HeaderMap& response_headers);
   RetryStatus shouldRetry(bool would_retry, DoRetryCallback callback);
 
   const Upstream::ClusterInfo& cluster_;

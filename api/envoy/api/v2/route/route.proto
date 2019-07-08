@@ -21,6 +21,7 @@ import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
 option (gogoproto.equal_all) = true;
+option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: HTTP route]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
@@ -38,17 +39,21 @@ message VirtualHost {
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // A list of domains (host/authority header) that will be matched to this
-  // virtual host. Wildcard hosts are supported in the form of ``*.foo.com`` or
-  // ``*-bar.foo.com``.
+  // virtual host. Wildcard hosts are supported in the suffix or prefix form.
+  //
+  // Domain search order:
+  //  1. Exact domain names: ``www.foo.com``.
+  //  2. Suffix domain wildcards: ``*.foo.com`` or ``*-bar.foo.com``.
+  //  3. Prefix domain wildcards: ``foo.*`` or ``foo-*``.
+  //  4. Special wildcard ``*`` matching any domain.
   //
   // .. note::
   //
   //   The wildcard will not match the empty string.
   //   e.g. ``*-bar.foo.com`` will match ``baz-bar.foo.com`` but not ``-bar.foo.com``.
-  //   Additionally, a special entry ``*`` is allowed which will match any
-  //   host/authority header. Only a single virtual host in the entire route
-  //   configuration can match on ``*``. A domain must be unique across all virtual
-  //   hosts or the config will fail to load.
+  //   The longest wildcards match first.
+  //   Only a single virtual host in the entire route configuration can match on ``*``. A domain
+  //   must be unique across all virtual hosts or the config will fail to load.
   repeated string domains = 2 [(validate.rules).repeated .min_items = 1];
 
   // The list of routes that will be matched, in order, for incoming requests.
@@ -116,7 +121,7 @@ message VirtualHost {
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
   // for if and how it is utilized.
-  map<string, google.protobuf.Struct> per_filter_config = 12 [deprecated = true];
+  map<string, google.protobuf.Struct> per_filter_config = 12;
 
   // The per_filter_config field can be used to provide virtual host-specific
   // configurations for filters. The key should match the filter name, such as
@@ -143,7 +148,6 @@ message VirtualHost {
   // Indicates the hedge policy for all routes in this virtual host. Note that setting a
   // route level entry will take precedence over this config and it'll be treated
   // independently (e.g.: values are not inherited).
-  // [#not-implemented-hide:]
   HedgePolicy hedge_policy = 17;
 }
 
@@ -154,8 +158,11 @@ message VirtualHost {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_route.HeaderMatcher>`.
-// [#comment:next free field: 14]
+// [#comment:next free field: 15]
 message Route {
+  // Name for the route.
+  string name = 14;
+
   // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
 
@@ -189,7 +196,7 @@ message Route {
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
   // if and how it is utilized.
-  map<string, google.protobuf.Struct> per_filter_config = 8 [deprecated = true];
+  map<string, google.protobuf.Struct> per_filter_config = 8;
 
   // The per_filter_config field can be used to provide route-specific
   // configurations for filters. The key should match the filter name, such as
@@ -223,6 +230,10 @@ message Route {
   // Specifies a list of HTTP headers that should be removed from each response
   // to requests matching this route.
   repeated string response_headers_to_remove = 11;
+
+  // Presence of the object defines whether the connection manager's tracing configuration
+  // is overridden by this route specific instance.
+  Tracing tracing = 15;
 }
 
 // Compared to the :ref:`cluster <envoy_api_field_route.RouteAction.cluster>` field that specifies a
@@ -286,7 +297,7 @@ message WeightedCluster {
     // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
     // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
     // for if and how it is utilized.
-    map<string, google.protobuf.Struct> per_filter_config = 8 [deprecated = true];
+    map<string, google.protobuf.Struct> per_filter_config = 8;
 
     // The per_filter_config field can be used to provide weighted cluster-specific
     // configurations for filters. The key should match the filter name, such as
@@ -449,7 +460,7 @@ message CorsPolicy {
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#comment:next free field: 27]
+// [#comment:next free field: 30]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -537,6 +548,16 @@ message RouteAction {
     // type *strict_dns* or *logical_dns*. Setting this to true with other cluster
     // types has no effect.
     google.protobuf.BoolValue auto_host_rewrite = 7;
+
+    // Indicates that during forwarding, the host header will be swapped with the content of given
+    // downstream or :ref:`custom <config_http_conn_man_headers_custom_request_headers>` header.
+    // If header value is empty, host header is left intact.
+    //
+    // .. attention::
+    //
+    //   Pay attention to the potential security implications of using this option. Provided header
+    //   must come from trusted source.
+    string auto_host_rewrite_header = 29;
   }
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
@@ -569,8 +590,7 @@ message RouteAction {
   // fires, the stream is terminated with a 408 Request Timeout error code if no
   // upstream response header has been received, otherwise a stream reset
   // occurs.
-  google.protobuf.Duration idle_timeout = 24
-      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+  google.protobuf.Duration idle_timeout = 24 [(gogoproto.stdduration) = true];
 
   // Indicates that the route has a retry policy. Note that if this is set,
   // it'll take precedence over the virtual host level retry policy entirely
@@ -634,14 +654,9 @@ message RouteAction {
   // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
   core.RoutingPriority priority = 11;
 
-  // [#not-implemented-hide:]
-  repeated core.HeaderValueOption request_headers_to_add = 12 [deprecated = true];
-
-  // [#not-implemented-hide:]
-  repeated core.HeaderValueOption response_headers_to_add = 18 [deprecated = true];
-
-  // [#not-implemented-hide:]
-  repeated string response_headers_to_remove = 19 [deprecated = true];
+  reserved 12;
+  reserved 18;
+  reserved 19;
 
   // Specifies a set of rate limit configurations that could be applied to the
   // route.
@@ -766,6 +781,15 @@ message RouteAction {
   // time gaps between gRPC request and response in gRPC streaming mode.
   google.protobuf.Duration max_grpc_timeout = 23 [(gogoproto.stdduration) = true];
 
+  // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by subtracting
+  // the provided duration from the header. This is useful in allowing Envoy to set its global
+  // timeout to be less than that of the deadline imposed by the calling client, which makes it more
+  // likely that Envoy will handle the timeout instead of having the call canceled by the client.
+  // The offset will only be applied if the provided grpc_timeout is greater than the offset. This
+  // ensures that the offset will only ever decrease the timeout and never set it to 0 (meaning
+  // infinity).
+  google.protobuf.Duration grpc_timeout_offset = 28 [(gogoproto.stdduration) = true];
+
   // Allows enabling and disabling upgrades on a per-route basis.
   // This overrides any enabled/disabled upgrade filter chain specified in the
   // HttpConnectionManager
@@ -792,11 +816,11 @@ message RouteAction {
   // Indicates that the route has a hedge policy. Note that if this is set,
   // it'll take precedence over the virtual host level hedge policy entirely
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
-  // [#not-implemented-hide:]
   HedgePolicy hedge_policy = 27;
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
+// [#comment:next free field: 9]
 message RetryPolicy {
   // Specifies the conditions under which retry takes place. These are the same
   // conditions documented for :ref:`config_http_filters_router_x-envoy-retry-on` and
@@ -824,7 +848,7 @@ message RetryPolicy {
   message RetryPriority {
     string name = 1 [(validate.rules).string.min_bytes = 1];
     oneof config_type {
-      google.protobuf.Struct config = 2 [deprecated = true];
+      google.protobuf.Struct config = 2;
 
       google.protobuf.Any typed_config = 3;
     }
@@ -838,7 +862,7 @@ message RetryPolicy {
   message RetryHostPredicate {
     string name = 1 [(validate.rules).string.min_bytes = 1];
     oneof config_type {
-      google.protobuf.Struct config = 2 [deprecated = true];
+      google.protobuf.Struct config = 2;
 
       google.protobuf.Any typed_config = 3;
     }
@@ -857,24 +881,58 @@ message RetryPolicy {
 
   // HTTP status codes that should trigger a retry in addition to those specified by retry_on.
   repeated uint32 retriable_status_codes = 7;
+
+  message RetryBackOff {
+    // Specifies the base interval between retries. This parameter is required and must be greater
+    // than zero. Values less than 1 ms are rounded up to 1 ms.
+    // See :ref:`config_http_filters_router_x-envoy-max-retries` for a discussion of Envoy's
+    // back-off algorithm.
+    google.protobuf.Duration base_interval = 1 [
+      (validate.rules).duration = {
+        required: true,
+        gt: {seconds: 0}
+      },
+      (gogoproto.stdduration) = true
+    ];
+
+    // Specifies the maximum interval between retries. This parameter is optional, but must be
+    // greater than or equal to the `base_interval` if set. The default is 10 times the
+    // `base_interval`. See :ref:`config_http_filters_router_x-envoy-max-retries` for a discussion
+    // of Envoy's back-off algorithm.
+    google.protobuf.Duration max_interval = 2
+        [(validate.rules).duration.gt = {seconds: 0}, (gogoproto.stdduration) = true];
+  }
+
+  // Specifies parameters that control retry back off. This parameter is optional, in which case the
+  // default base interval is 25 milliseconds or, if set, the current value of the
+  // `upstream.base_retry_backoff_ms` runtime parameter. The default maximum interval is 10 times
+  // the base interval. The documentation for :ref:`config_http_filters_router_x-envoy-max-retries`
+  // describes Envoy's back-off algorithm.
+  RetryBackOff retry_back_off = 8;
 }
 
-// HTTP request hedging TODO(mpuncel) docs
-// [#not-implemented-hide:]
+// HTTP request hedging :ref:`architecture overview <arch_overview_http_routing_hedging>`.
 message HedgePolicy {
   // Specifies the number of initial requests that should be sent upstream.
   // Must be at least 1.
   // Defaults to 1.
+  // [#not-implemented-hide:]
   google.protobuf.UInt32Value initial_requests = 1 [(validate.rules).uint32.gte = 1];
 
   // Specifies a probability that an additional upstream request should be sent
   // on top of what is specified by initial_requests.
   // Defaults to 0.
+  // [#not-implemented-hide:]
   envoy.type.FractionalPercent additional_request_chance = 2;
 
   // Indicates that a hedged request should be sent when the per-try timeout
   // is hit. This will only occur if the retry policy also indicates that a
-  // timed out request should be retried. Defaults to false.
+  // timed out request should be retried.
+  // Once a timed out request is retried due to per try timeout, the router
+  // filter will ensure that it is not retried again even if the returned
+  // response headers would otherwise be retried according the specified
+  // :ref:`RetryPolicy <envoy_api_msg_route.RetryPolicy>`.
+  // Defaults to false.
   bool hedge_on_per_try_timeout = 3;
 }
 
@@ -961,6 +1019,34 @@ message Decorator {
   //   by the :ref:`x-envoy-decorator-operation
   //   <config_http_filters_router_x-envoy-decorator-operation>` header.
   string operation = 1 [(validate.rules).string.min_bytes = 1];
+}
+
+message Tracing {
+
+  // Target percentage of requests managed by this HTTP connection manager that will be force
+  // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
+  // header is set. This field is a direct analog for the runtime variable
+  // 'tracing.client_sampling' in the :ref:`HTTP Connection Manager
+  // <config_http_conn_man_runtime>`.
+  // Default: 100%
+  envoy.type.FractionalPercent client_sampling = 1;
+
+  // Target percentage of requests managed by this HTTP connection manager that will be randomly
+  // selected for trace generation, if not requested by the client or not forced. This field is
+  // a direct analog for the runtime variable 'tracing.random_sampling' in the
+  // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
+  // Default: 100%
+  envoy.type.FractionalPercent random_sampling = 2;
+
+  // Target percentage of requests managed by this HTTP connection manager that will be traced
+  // after all other sampling checks have been applied (client-directed, force tracing, random
+  // sampling). This field functions as an upper limit on the total configured sampling rate. For
+  // instance, setting client_sampling to 100% but overall_sampling to 1% will result in only 1%
+  // of client requests with the appropriate headers to be force traced. This field is a direct
+  // analog for the runtime variable 'tracing.global_enabled' in the
+  // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
+  // Default: 100%
+  envoy.type.FractionalPercent overall_sampling = 3;
 }
 
 // A virtual cluster is a way of specifying a regex matching rule against

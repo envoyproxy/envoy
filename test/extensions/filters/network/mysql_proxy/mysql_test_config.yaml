@@ -2,7 +2,7 @@ admin:
   access_log_path: /dev/null
   address:
     socket_address:
-      address: 127.0.0.1
+      address: "{}"
       port_value: 0
 static_resources:
   clusters:
@@ -15,13 +15,13 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.1
+                address: "{}"
                 port_value: 0
   listeners:
     name: listener_0
     address:
       socket_address:
-        address: 0.0.0.0
+        address: "{}"
         port_value: 0
     filter_chains:
       - filters:

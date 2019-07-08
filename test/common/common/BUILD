@@ -119,6 +119,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:mutex_tracer_lib",
         "//test/test_common:contention_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -181,17 +182,6 @@ envoy_cc_test(
     deps = ["//source/common/common:callback_impl_lib"],
 )
 
-envoy_cc_test(
-    name = "block_memory_hash_set_test",
-    srcs = ["block_memory_hash_set_test.cc"],
-    deps = [
-        "//include/envoy/stats:stats_interface",
-        "//source/common/common:block_memory_hash_set_lib",
-        "//source/common/common:hash_lib",
-        "//source/common/stats:stats_lib",
-    ],
-)
-
 envoy_cc_binary(
     name = "utility_speed_test",
     srcs = ["utility_speed_test.cc"],
@@ -211,5 +201,23 @@ envoy_cc_test(
     deps = [
         "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "thread_id_test",
+    srcs = ["thread_id_test.cc"],
+    external_deps = ["abseil_hash_testing"],
+    deps = [
+        "//source/common/common:thread_lib",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "stl_helpers_test",
+    srcs = ["stl_helpers_test.cc"],
+    deps = [
+        "//source/common/common:stl_helpers",
     ],
 )

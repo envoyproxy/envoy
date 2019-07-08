@@ -16,6 +16,20 @@ do
   TEST_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/${t}.yaml" "${PATH_CONFIG}/${t}.golden.json" "--details")
 done
 
+# Testing expected matches using --useproto
+# --useproto needs the test schema as a validation.proto message.
+TESTS+=("Runtime")
+for t in "${TESTS[@]}"
+do
+  TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/${t}.yaml" "-t" "${PATH_CONFIG}/${t}.golden.proto.json" "--details" "--useproto")
+done
+
+# Test the yaml test file support
+TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.yaml" "--details" "--useproto")
+
+# Test the proto text test file support
+TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.pb_text" "--details" "--useproto")
+
 # Bad config file
 echo testing bad config output
 BAD_CONFIG_OUTPUT=$(("${PATH_BIN}" "${PATH_CONFIG}/Redirect.golden.json" "${PATH_CONFIG}/TestRoutes.yaml") 2>&1) ||

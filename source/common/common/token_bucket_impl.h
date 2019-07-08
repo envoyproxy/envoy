@@ -20,9 +20,10 @@ public:
    */
   explicit TokenBucketImpl(uint64_t max_tokens, TimeSource& time_source, double fill_rate = 1);
 
-  bool consume(uint64_t tokens = 1) override;
-
-  uint64_t nextTokenAvailableMs() override;
+  // TokenBucket
+  uint64_t consume(uint64_t tokens, bool allow_partial) override;
+  std::chrono::milliseconds nextTokenAvailable() override;
+  void reset(uint64_t num_tokens) override;
 
 private:
   const double max_tokens_;

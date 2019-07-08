@@ -11,8 +11,6 @@ import sys
 
 API_DEPS = imp.load_source('api', 'api/bazel/repository_locations.bzl')
 DEPS = imp.load_source('deps', 'bazel/repository_locations.bzl')
-RECIPE_MAP = imp.load_source('deps', 'bazel/target_recipes.bzl')
-RECIPE_INFO = imp.load_source('recipes', 'ci/build_container/build_recipes/versions.py')
 
 
 def print_deps(deps):
@@ -29,14 +27,6 @@ if __name__ == '__main__':
         'identifier': key,
         'file-sha256': loc.get('sha256'),
         'file-url': loc.get('urls')[0],
-        'file-prefix': loc.get('strip_prefix', ''),
-    })
-
-  for key, loc in RECIPE_INFO.RECIPES.items():
-    deps.append({
-        'identifier': key,
-        'file-sha256': loc.get('sha256'),
-        'file-url': loc.get('url'),
         'file-prefix': loc.get('strip_prefix', ''),
     })
 
@@ -59,18 +49,6 @@ if __name__ == '__main__':
     match = repo_regex.match(line)
     if match:
       repos.add(match.group(1))
-
-  # Gather the build recipes repositories
-  # These are part of @envoy_deps repository ie @envoy_deps//:luajit
-  recipe_regex = re.compile('^@envoy_deps//:(\w+)$')
-  for line in output.split('\n'):
-    match = recipe_regex.match(line)
-    if not match:
-      continue
-    key = match.group(1)
-    repo = RECIPE_MAP.TARGET_RECIPES[key]
-    if repo:
-      repos.add(repo)
 
   deps = filter(lambda dep: dep['identifier'] in repos, deps)
   print_deps(deps)

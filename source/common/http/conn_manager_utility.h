@@ -53,19 +53,24 @@ public:
   static Network::Address::InstanceConstSharedPtr
   mutateRequestHeaders(HeaderMap& request_headers, Network::Connection& connection,
                        ConnectionManagerConfig& config, const Router::Config& route_config,
-                       Runtime::RandomGenerator& random, Runtime::Loader& runtime,
-                       const LocalInfo::LocalInfo& local_info);
+                       Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info);
 
   static void mutateResponseHeaders(HeaderMap& response_headers, const HeaderMap* request_headers,
                                     const std::string& via);
 
-private:
+  // Sanitize the path in the header map if forced by config.
+  // Side affect: the string view of Path header is invalidated.
+  // Return false if error happens during the sanitization.
+  static bool maybeNormalizePath(HeaderMap& request_headers, const ConnectionManagerConfig& config);
+
   /**
    * Mutate request headers if request needs to be traced.
    */
   static void mutateTracingRequestHeader(HeaderMap& request_headers, Runtime::Loader& runtime,
-                                         ConnectionManagerConfig& config);
+                                         ConnectionManagerConfig& config,
+                                         const Router::Route* route);
 
+private:
   static void mutateXfccRequestHeader(HeaderMap& request_headers, Network::Connection& connection,
                                       ConnectionManagerConfig& config);
 };

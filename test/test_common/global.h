@@ -117,6 +117,7 @@ template <class Type> class Global {
 public:
   Global() : singleton_(Globals::get<Type>()) {}
   Type& get() { return singleton_->ref<Type>(); }
+  const Type& get() const { return singleton_->ref<Type>(); }
   Type* operator->() { return singleton_->ptr<Type>(); }
   Type& operator*() { return singleton_->ref<Type>(); }
 

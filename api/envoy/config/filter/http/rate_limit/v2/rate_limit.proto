@@ -55,7 +55,6 @@ message RateLimit {
   // Configuration for an external rate limit service provider. If not
   // specified, any calls to the rate limit service will immediately return
   // success.
-  // [#comment:TODO(ramaraochavali): Make this required as part of cleanup of deprecated ratelimit
-  // service config in bootstrap.]
-  envoy.config.ratelimit.v2.RateLimitServiceConfig rate_limit_service = 7;
+  envoy.config.ratelimit.v2.RateLimitServiceConfig rate_limit_service = 7
+      [(validate.rules).message.required = true];
 }

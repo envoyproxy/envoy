@@ -67,7 +67,7 @@ void BaseThriftIntegrationTest::preparePayloads(const PayloadOptions& options,
     args.push_back(*options.service_name_);
   }
 
-  if (options.headers_.size() > 0) {
+  if (!options.headers_.empty()) {
     args.push_back("-H");
 
     std::vector<std::string> headers;

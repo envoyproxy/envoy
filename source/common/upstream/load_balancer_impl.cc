@@ -115,8 +115,7 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
 // - normalized total health is = 100%. It means there are enough healthy hosts to handle the load.
 //   Do not enter panic mode, even if a specific priority has low number of healthy hosts.
 // - normalized total health is < 100%. There are not enough healthy hosts to handle the load.
-// Continue
-//   distributing the load among priority sets, but turn on panic mode for a given priority
+// Continue distributing the load among priority sets, but turn on panic mode for a given priority
 //   if # of healthy hosts in priority set is low.
 // - normalized total health is 0%. All hosts are down. Redirect 100% of traffic to P=0 and enable
 // panic mode.
@@ -136,20 +135,21 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   // by the overprovisioning factor.
   HostSet& host_set = *priority_set.hostSetsPerPriority()[priority];
   per_priority_health.get()[priority] = 0;
-  if (host_set.hosts().size() > 0) {
+  per_priority_degraded.get()[priority] = 0;
+  const auto host_count = host_set.hosts().size() - host_set.excludedHosts().size();
+
+  if (host_count > 0) {
     // Each priority level's health is ratio of healthy hosts to total number of hosts in a priority
     // multiplied by overprovisioning factor of 1.4 and capped at 100%. It means that if all
     // hosts are healthy that priority's health is 100%*1.4=140% and is capped at 100% which results
     // in 100%. If 80% of hosts are healthy, that priority's health is still 100% (80%*1.4=112% and
     // capped at 100%).
-    per_priority_health.get()[priority] =
-        std::min<uint32_t>(100, (host_set.overprovisioningFactor() *
-                                 host_set.healthyHosts().size() / host_set.hosts().size()));
+    per_priority_health.get()[priority] = std::min<uint32_t>(
+        100, (host_set.overprovisioningFactor() * host_set.healthyHosts().size() / host_count));
 
     // We perform the same computation for degraded hosts.
-    per_priority_degraded.get()[priority] =
-        std::min<uint32_t>(100, (host_set.overprovisioningFactor() *
-                                 host_set.degradedHosts().size() / host_set.hosts().size()));
+    per_priority_degraded.get()[priority] = std::min<uint32_t>(
+        100, (host_set.overprovisioningFactor() * host_set.degradedHosts().size() / host_count));
   }
 
   // Now that we've updated health for the changed priority level, we need to calculate percentage
@@ -442,13 +442,12 @@ HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
 bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set) {
   uint64_t global_panic_threshold = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
-  double healthy_percent = host_set.hosts().size() == 0
-                               ? 0
-                               : 100.0 * host_set.healthyHosts().size() / host_set.hosts().size();
+  const auto host_count = host_set.hosts().size() - host_set.excludedHosts().size();
+  double healthy_percent =
+      host_count == 0 ? 0.0 : 100.0 * host_set.healthyHosts().size() / host_count;
 
-  double degraded_percent = host_set.hosts().size() == 0
-                                ? 0
-                                : 100.0 * host_set.degradedHosts().size() / host_set.hosts().size();
+  double degraded_percent =
+      host_count == 0 ? 0.0 : 100.0 * host_set.degradedHosts().size() / host_count;
   // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.
   if ((healthy_percent + degraded_percent) < global_panic_threshold) {
     return true;
@@ -463,6 +462,8 @@ void ZoneAwareLoadBalancerBase::calculateLocalityPercentage(
   for (const auto& locality_hosts : hosts_per_locality.get()) {
     total_hosts += locality_hosts.size();
   }
+
+  // TODO(snowp): Should we ignore excluded hosts here too?
 
   size_t i = 0;
   for (const auto& locality_hosts : hosts_per_locality.get()) {
@@ -538,7 +539,13 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   }
 
   // If we're doing locality weighted balancing, pick locality.
-  const absl::optional<uint32_t> locality = host_set.chooseLocality();
+  absl::optional<uint32_t> locality;
+  if (host_availability == HostAvailability::Degraded) {
+    locality = host_set.chooseDegradedLocality();
+  } else {
+    locality = host_set.chooseHealthyLocality();
+  }
+
   if (locality.has_value()) {
     hosts_source.source_type_ = localitySourceType(host_availability);
     hosts_source.locality_index_ = locality.value();
@@ -686,7 +693,7 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
     return host;
   } else {
     const HostVector& hosts_to_use = hostSourceToHosts(hosts_source);
-    if (hosts_to_use.size() == 0) {
+    if (hosts_to_use.empty()) {
       return nullptr;
     }
     return unweightedHostPick(hosts_to_use, hosts_source);

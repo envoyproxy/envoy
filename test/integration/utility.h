@@ -38,7 +38,8 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
   // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason) override;
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
@@ -51,14 +52,14 @@ private:
   std::function<void()> on_complete_cb_;
 };
 
-typedef std::unique_ptr<BufferingStreamDecoder> BufferingStreamDecoderPtr;
+using BufferingStreamDecoderPtr = std::unique_ptr<BufferingStreamDecoder>;
 
 /**
  * Basic driver for a raw connection.
  */
 class RawConnectionDriver {
 public:
-  typedef std::function<void(Network::ClientConnection&, const Buffer::Instance&)> ReadCallback;
+  using ReadCallback = std::function<void(Network::ClientConnection&, const Buffer::Instance&)>;
 
   RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
                       Network::Address::IpVersion version);
@@ -99,8 +100,8 @@ private:
     Network::ConnectionEvent last_connection_event_;
   };
 
-  Api::ApiPtr api_;
   Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;
@@ -182,6 +183,7 @@ public:
   }
   const std::string& data() { return data_; }
   bool readLastByte() { return read_end_stream_; }
+  void clearData() { data_.clear(); }
 
 private:
   Event::Dispatcher& dispatcher_;

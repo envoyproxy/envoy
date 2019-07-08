@@ -2,7 +2,6 @@
 
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/api/v2/auth/cert.pb.validate.h"
-#include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
 
@@ -47,6 +46,12 @@ ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {
 
 REGISTER_FACTORY(DownstreamSslSocketFactory,
                  Server::Configuration::DownstreamTransportSocketConfigFactory);
+
+Ssl::ContextManagerPtr SslContextManagerFactory::createContextManager(TimeSource& time_source) {
+  return std::make_unique<ContextManagerImpl>(time_source);
+}
+
+REGISTER_FACTORY(SslContextManagerFactory, Ssl::ContextManagerFactory);
 
 } // namespace Tls
 } // namespace TransportSockets

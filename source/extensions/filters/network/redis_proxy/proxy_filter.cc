@@ -7,6 +7,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/config/datasource.h"
 #include "common/config/utility.h"
 
 namespace Envoy {
@@ -16,22 +17,26 @@ namespace RedisProxy {
 
 ProxyFilterConfig::ProxyFilterConfig(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy& config, Stats::Scope& scope,
-    const Network::DrainDecision& drain_decision, Runtime::Loader& runtime)
-    : drain_decision_(drain_decision), runtime_(runtime), cluster_name_(config.cluster()),
+    const Network::DrainDecision& drain_decision, Runtime::Loader& runtime, Api::Api& api)
+    : drain_decision_(drain_decision), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
-      stats_(generateStats(stat_prefix_, scope)) {}
+      stats_(generateStats(stat_prefix_, scope)),
+      downstream_auth_password_(
+          Config::DataSource::read(config.downstream_auth_password(), true, api)) {}
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   return {
       ALL_REDIS_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix))};
 }
 
-ProxyFilter::ProxyFilter(DecoderFactory& factory, EncoderPtr&& encoder,
-                         CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config)
+ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
+                         Common::Redis::EncoderPtr&& encoder, CommandSplitter::Instance& splitter,
+                         ProxyFilterConfigSharedPtr config)
     : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter),
       config_(config) {
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
+  connection_allowed_ = config_->downstream_auth_password_.empty();
 }
 
 ProxyFilter::~ProxyFilter() {
@@ -49,10 +54,10 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
                                                nullptr, nullptr});
 }
 
-void ProxyFilter::onRespValue(RespValuePtr&& value) {
+void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
   pending_requests_.emplace_back(*this);
   PendingRequest& request = pending_requests_.back();
-  CommandSplitter::SplitRequestPtr split = splitter_.makeRequest(*value, request);
+  CommandSplitter::SplitRequestPtr split = splitter_.makeRequest(std::move(value), request);
   if (split) {
     // The splitter can immediately respond and destroy the pending request. Only store the handle
     // if the request is still alive.
@@ -72,7 +77,24 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void ProxyFilter::onResponse(PendingRequest& request, RespValuePtr&& value) {
+void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
+  Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
+  if (config_->downstream_auth_password_.empty()) {
+    response->type(Common::Redis::RespType::Error);
+    response->asString() = "ERR Client sent AUTH, but no password is set";
+  } else if (password == config_->downstream_auth_password_) {
+    response->type(Common::Redis::RespType::SimpleString);
+    response->asString() = "OK";
+    connection_allowed_ = true;
+  } else {
+    response->type(Common::Redis::RespType::Error);
+    response->asString() = "ERR invalid password";
+    connection_allowed_ = false;
+  }
+  request.onResponse(std::move(response));
+}
+
+void ProxyFilter::onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value) {
   ASSERT(!pending_requests_.empty());
   request.pending_response_ = std::move(value);
   request.request_handle_ = nullptr;
@@ -100,10 +122,10 @@ Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data, bool) {
   try {
     decoder_->decode(data);
     return Network::FilterStatus::Continue;
-  } catch (ProtocolError&) {
+  } catch (Common::Redis::ProtocolError&) {
     config_->stats_.downstream_cx_protocol_error_.inc();
-    RespValue error;
-    error.type(RespType::Error);
+    Common::Redis::RespValue error;
+    error.type(Common::Redis::RespType::Error);
     error.asString() = "downstream protocol error";
     encoder_->encode(error, encoder_buffer_);
     callbacks_->connection().write(encoder_buffer_, false);

@@ -15,21 +15,31 @@ namespace Envoy {
  */
 class TokenBucket {
 public:
-  virtual ~TokenBucket() {}
+  virtual ~TokenBucket() = default;
 
   /**
-   * @param tokens supplies the number of tokens to be consumed. Default is 1.
-   * @return true if bucket is not empty, otherwise it returns false.
+   * @param tokens supplies the number of tokens to be consumed.
+   * @param allow_partial supplies whether the token bucket will allow consumption of less tokens
+   *                      than asked for. If allow_partial is true, the bucket contains 3 tokens,
+   *                      and the caller asks for 5, the bucket will return 3 tokens and now be
+   *                      empty.
+   * @return the number of tokens actually consumed.
    */
-  virtual bool consume(uint64_t tokens = 1) PURE;
+  virtual uint64_t consume(uint64_t tokens, bool allow_partial) PURE;
 
   /**
    * @return returns the approximate time until a next token is available. Currently it
    * returns the upper bound on the amount of time until a next token is available.
    */
-  virtual uint64_t nextTokenAvailableMs() PURE;
+  virtual std::chrono::milliseconds nextTokenAvailable() PURE;
+
+  /**
+   * Reset the bucket with a specific number of tokens. Refill will begin again from the time that
+   * this routine is called.
+   */
+  virtual void reset(uint64_t num_tokens) PURE;
 };
 
-typedef std::unique_ptr<TokenBucket> TokenBucketPtr;
+using TokenBucketPtr = std::unique_ptr<TokenBucket>;
 
 }; // namespace Envoy

@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/init/init.h"
+#include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/runtime/runtime.h"
@@ -25,7 +25,7 @@ namespace Configuration {
  */
 class TransportSocketFactoryContext {
 public:
-  virtual ~TransportSocketFactoryContext() {}
+  virtual ~TransportSocketFactoryContext() = default;
 
   /**
    * @return Server::Admin& the server's admin interface.
@@ -95,6 +95,12 @@ public:
   virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
 
   /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
    * @return reference to the Api object
    */
   virtual Api::Api& api() PURE;
@@ -102,7 +108,7 @@ public:
 
 class TransportSocketConfigFactory {
 public:
-  virtual ~TransportSocketConfigFactory() {}
+  virtual ~TransportSocketConfigFactory() = default;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message. The transport socket

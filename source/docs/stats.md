@@ -9,31 +9,12 @@ binary program restarts. The metrics are tracked as:
    data accumulates. Unliked counters and gauges, histogram data is not retained across
    binary program restarts.
 
-## Hot-restart: `RawStatData` vs `HeapStatData`
-
 In order to support restarting the Envoy binary program without losing counter and gauge
-values, they are stored in a shared-memory block, including stats that are
-created dynamically at runtime in response to discovery of new clusters at
-runtime. To simplify memory management, each stat is allocated a fixed amount
-of storage, controlled via [command-line
-flags](https://www.envoyproxy.io/docs/envoy/latest/operations/cli):
-`--max-stats` and `--max-obj-name-len`, which determine the size of the pre-allocated
-shared-memory block. See
-[RawStatData](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/raw_stat_data.h).
-
-Note in particular that the full stat name is retained in shared-memory, making
-it easy to correlate stats across restarts even as the dynamic cluster
-configuration changes.
-
-One challenge with this fixed memory allocation strategy is that it limits
-cluster scalability. A deployment wishing to use a single Envoy instance to
-manage tens of thousands of clusters, each with its own set of scoped stats,
-will use more memory than is ideal.
-
-A flag `--disable-hot-restart` pivots the system toward an alternate heap-based
-stat allocator that allocates stats on demand in the heap, with no preset limits
-on the number of stats or their length. See
-[HeapStatData](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/heap_stat_data.h).
+values, they are passed from parent to child in an RPC protocol.
+They were previously held in shared memory, which imposed various restrictions.
+Unlike the shared memory implementation, the RPC passing *requires special indication
+in source/common/stats/stat_merger.cc when simple addition is not appropriate for
+combining two instances of a given stat*.
 
 ## Performance and Thread Local Storage
 
@@ -67,10 +48,8 @@ This implementation is complicated so here is a rough overview of the threading 
    reference the old scope which may be about to be cache flushed.
  * Since it's possible to have overlapping scopes, we de-dup stats when counters() or gauges() is
    called since these are very uncommon operations.
- * Though this implementation is designed to work with a fixed shared memory space, it will fall
-   back to heap allocated stats if needed. NOTE: In this case, overlapping scopes will not share
-   the same backing store. This is to keep things simple, it could be done in the future if
-   needed.
+ * Overlapping scopes will not share the same backing store. This is to keep things simple,
+   it could be done in the future if needed.
 
 ### Histogram threading model
 
@@ -101,7 +80,7 @@ followed.
 
 Stat names are replicated in several places in various forms.
 
- * Held fully elaborated next to the values, in `RawStatData` and `HeapStatData`
+ * Held with the stat values, in `HeapStatData`
  * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/metric_impl.h)
    in a transformed state, with tags extracted into vectors of name/value strings.
  * In static strings across the codebase where stats are referenced
@@ -110,16 +89,67 @@ Stat names are replicated in several places in various forms.
    used to perform tag extraction.
 
 There are stat maps in `ThreadLocalStore` for capturing all stats in a scope,
-and each per-thread caches. However, they don't duplicate the stat
-names. Instead, they reference the `char*` held in the `RawStatData` or
-`HeapStatData itself, and thus are relatively cheap; effectively those maps are
-all pointer-to-pointer.
+and each per-thread caches. However, they don't duplicate the stat names.
+Instead, they reference the `char*` held in the `HeapStatData` itself, and thus
+are relatively cheap; effectively those maps are all pointer-to-pointer.
 
 For this to be safe, cache lookups from locally scoped strings must use `.find`
 rather than `operator[]`, as the latter would insert a pointer to a temporary as
 the key. If the `.find` fails, the actual stat must be constructed first, and
 then inserted into the map using its key storage. This strategy saves
 duplication of the keys, but costs an extra map lookup on each miss.
+
+### Naming Representation
+
+When stored as flat strings, stat names can dominate Envoy memory usage when
+there are a large number of clusters. Stat names typically combine a small
+number of keywords, cluster names, host names, and response codes, separated by
+`.`. For example `CLUSTER.upstream_cx_connect_attempts_exceeded`. There may be
+thousands of clusters, and roughly 100 stats per cluster. Thus, the number
+of combinations can be large. It is significantly more efficient to symbolize
+each `.`-delimited token and represent stats as arrays of symbols.
+
+The transformation between flattened string and symbolized form is CPU-intensive
+at scale. It requires parsing, encoding, and lookups in a shared map, which must
+be mutex-protected. To avoid adding latency and CPU overhead while serving
+requests, the tokens can be symbolized and saved in context classes, such as
+[Http::CodeStatsImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/http/codes.h).
+Symbolization can occur on startup or when new hosts or clusters are configured
+dynamically. Users of stats that are allocated dynamically per cluster, host,
+etc, must explicitly store partial stat-names their class instances, which later
+can be composed dynamically at runtime in order to fully elaborate counters,
+gauges, etc, without taking symbol-table locks, via `SymbolTable::join()`.
+
+### Current State and Strategy To Deploy Symbol Tables
+
+As of April 1, 2019, there are a fairly large number of files that directly
+lookup stats by name, e.g. via `Stats::Scope::counter(const std::string&)` in
+the request path. In most cases, this runtime lookup concatenates the scope name
+with a string literal or other request-dependent token to form the stat name, so
+it is not possible to fully memoize the stats at startup; there must be a
+runtime name lookup.
+
+If a PR is issued that changes the underlying representation of a stat name to
+be a symbol table entry then each stat-name will need to be transformed
+whenever names are looked up, which would add CPU overhead and lock contention
+in the request-path, violating one of the principles of Envoy's [threading
+model](https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310). Before
+issuing such a PR we need to first iterate through the codebase memoizing the
+symbols that are used to form stat-names.
+
+To resolve this chicken-and-egg challenge of switching to symbol-table stat-name
+representation without suffering a temporary loss of performance, we employ a
+["fake" symbol table
+implementation](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/fake_symbol_table_impl.h).
+This implemenation uses elaborated strings as an underlying representation, but
+implements the same API as the ["real"
+implemention](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/symbol_table_impl.h).
+The underlying string representation means that there is minimal runtime
+overhead compared to the current state. But once all stat-allocation call-sites
+have been converted to use the abstract [SymbolTable
+API](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/symbol_table.h),
+the real implementation can be swapped in, the space savings realized, and the
+fake implementation deleted.
 
 ## Tags and Tag Extraction
 

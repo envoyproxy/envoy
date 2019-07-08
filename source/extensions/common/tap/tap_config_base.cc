@@ -74,7 +74,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& p
 }
 
 const Matcher& TapConfigBaseImpl::rootMatcher() const {
-  ASSERT(matchers_.size() >= 1);
+  ASSERT(!matchers_.empty());
   return *matchers_[0];
 }
 
@@ -139,14 +139,13 @@ void Utility::bodyBytesToString(envoy::data::tap::v2alpha::TraceWrapper& trace,
   }
 }
 
-void TapConfigBaseImpl::PerTapSinkHandleManagerImpl::submitTrace(
-    const TraceWrapperSharedPtr& trace) {
+void TapConfigBaseImpl::PerTapSinkHandleManagerImpl::submitTrace(TraceWrapperPtr&& trace) {
   Utility::bodyBytesToString(*trace, parent_.sink_format_);
-  handle_->submitTrace(trace, parent_.sink_format_);
+  handle_->submitTrace(std::move(trace), parent_.sink_format_);
 }
 
 void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
-    const TraceWrapperSharedPtr& trace, envoy::service::tap::v2alpha::OutputSink::Format format) {
+    TraceWrapperPtr&& trace, envoy::service::tap::v2alpha::OutputSink::Format format) {
   if (!output_file_.is_open()) {
     std::string path = fmt::format("{}_{}", parent_.config_.path_prefix(), trace_id_);
     switch (format) {

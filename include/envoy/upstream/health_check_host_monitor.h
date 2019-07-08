@@ -15,7 +15,7 @@ namespace Upstream {
  */
 class HealthCheckHostMonitor {
 public:
-  virtual ~HealthCheckHostMonitor() {}
+  virtual ~HealthCheckHostMonitor() = default;
 
   /**
    * Mark the host as unhealthy. Note that this may not be immediate as events may need to be
@@ -24,7 +24,7 @@ public:
   virtual void setUnhealthy() PURE;
 };
 
-typedef std::unique_ptr<HealthCheckHostMonitor> HealthCheckHostMonitorPtr;
+using HealthCheckHostMonitorPtr = std::unique_ptr<HealthCheckHostMonitor>;
 
 } // namespace Upstream
 } // namespace Envoy

@@ -1,0 +1,38 @@
+version: "3.7"
+services:
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy
+    volumes:
+      - ./envoy.yaml:/etc/envoy.yaml
+    networks:
+      envoymesh:
+        aliases:
+          - envoy
+    expose:
+      - "1999"
+      - "8001"
+    ports:
+      - "1999:1999"
+      - "8001:8001"
+
+  mysql:
+    build:
+      context: .
+      dockerfile: Dockerfile-mysql
+    networks:
+      envoymesh:
+        aliases:
+          - mysql
+    environment:
+      - MYSQL_ALLOW_EMPTY_PASSWORD=yes
+    expose:
+      - "3306"
+    ports:
+      - "3306:3306"
+
+networks:
+  envoymesh:
+    name: envoymesh

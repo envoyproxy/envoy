@@ -7,6 +7,7 @@
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 
@@ -27,20 +28,20 @@ class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
   using MockAccessLogStream = Grpc::MockAsyncStream;
   using AccessLogCallbacks =
-      Grpc::TypedAsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>;
+      Grpc::AsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>;
 
   GrpcAccessLogStreamerImplTest() {
     EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
-      return Grpc::AsyncClientPtr{async_client_};
+      return Grpc::RawAsyncClientPtr{async_client_};
     }));
     streamer_ = std::make_unique<GrpcAccessLogStreamerImpl>(Grpc::AsyncClientFactoryPtr{factory_},
                                                             tls_, local_info_);
   }
 
   void expectStreamStart(MockAccessLogStream& stream, AccessLogCallbacks** callbacks_to_set) {
-    EXPECT_CALL(*async_client_, start(_, _))
-        .WillOnce(Invoke([&stream, callbacks_to_set](const Protobuf::MethodDescriptor&,
-                                                     Grpc::AsyncStreamCallbacks& callbacks) {
+    EXPECT_CALL(*async_client_, startRaw(_, _, _))
+        .WillOnce(Invoke([&stream, callbacks_to_set](absl::string_view, absl::string_view,
+                                                     Grpc::RawAsyncStreamCallbacks& callbacks) {
           *callbacks_to_set = dynamic_cast<AccessLogCallbacks*>(&callbacks);
           return &stream;
         }));
@@ -62,12 +63,12 @@ TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
   AccessLogCallbacks* callbacks1;
   expectStreamStart(stream1, &callbacks1);
   EXPECT_CALL(local_info_, node());
-  EXPECT_CALL(stream1, sendMessage(_, false));
+  EXPECT_CALL(stream1, sendMessageRaw_(_, false));
   envoy::service::accesslog::v2::StreamAccessLogsMessage message_log1;
   streamer_->send(message_log1, "log1");
 
   message_log1.Clear();
-  EXPECT_CALL(stream1, sendMessage(_, false));
+  EXPECT_CALL(stream1, sendMessageRaw_(_, false));
   streamer_->send(message_log1, "log1");
 
   // Start a stream for the second log.
@@ -75,7 +76,7 @@ TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
   AccessLogCallbacks* callbacks2;
   expectStreamStart(stream2, &callbacks2);
   EXPECT_CALL(local_info_, node());
-  EXPECT_CALL(stream2, sendMessage(_, false));
+  EXPECT_CALL(stream2, sendMessageRaw_(_, false));
   envoy::service::accesslog::v2::StreamAccessLogsMessage message_log2;
   streamer_->send(message_log2, "log2");
 
@@ -87,7 +88,7 @@ TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
   callbacks2->onRemoteClose(Grpc::Status::Internal, "bad");
   expectStreamStart(stream2, &callbacks2);
   EXPECT_CALL(local_info_, node());
-  EXPECT_CALL(stream2, sendMessage(_, false));
+  EXPECT_CALL(stream2, sendMessageRaw_(_, false));
   streamer_->send(message_log2, "log2");
 }
 
@@ -95,9 +96,9 @@ TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
 TEST_F(GrpcAccessLogStreamerImplTest, StreamFailure) {
   InSequence s;
 
-  EXPECT_CALL(*async_client_, start(_, _))
-      .WillOnce(
-          Invoke([](const Protobuf::MethodDescriptor&, Grpc::AsyncStreamCallbacks& callbacks) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _))
+      .WillOnce(Invoke(
+          [](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks) {
             callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
             return nullptr;
           }));
@@ -128,13 +129,43 @@ public:
     }
 
     envoy::service::accesslog::v2::StreamAccessLogsMessage expected_request_msg;
-    MessageUtil::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
+    TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
     EXPECT_CALL(*streamer_, send(_, "hello_log"))
         .WillOnce(Invoke(
             [expected_request_msg](envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
                                    const std::string&) {
               EXPECT_EQ(message.DebugString(), expected_request_msg.DebugString());
             }));
+  }
+
+  void expectLogRequestMethod(const std::string& request_method) {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+
+    Http::TestHeaderMapImpl request_headers{
+        {":method", request_method},
+    };
+
+    expectLog(fmt::format(R"EOF(
+    http_logs:
+      log_entry:
+        common_properties:
+          downstream_remote_address:
+            socket_address:
+              address: "127.0.0.1"
+              port_value: 0
+          downstream_local_address:
+            socket_address:
+              address: "127.0.0.2"
+              port_value: 0
+          start_time: {{}}
+        request:
+          request_method: {}
+          request_headers_bytes: {}
+        response: {{}}
+    )EOF",
+                          request_method, request_method.length() + 7));
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
 
   AccessLog::MockFilter* filter_{new NiceMock<AccessLog::MockFilter>()};
@@ -226,6 +257,9 @@ http_logs:
     stream_info.addBytesReceived(10);
     stream_info.addBytesSent(20);
     stream_info.response_code_ = 200;
+    stream_info.response_code_details_ = "via_upstream";
+    absl::string_view route_name_view("route-name-test");
+    stream_info.setRouteName(route_name_view);
     ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
 
@@ -281,6 +315,7 @@ http_logs:
       upstream_cluster: "fake_cluster"
       response_flags:
         fault_injected: true
+      route_name: "route-name-test"
     protocol_version: HTTP10
     request:
       scheme: "scheme_value"
@@ -299,6 +334,7 @@ http_logs:
         value: 200
       response_headers_bytes: 10
       response_body_bytes: 20
+      response_code_details: "via_upstream"
 )EOF");
     access_log_->log(&request_headers, &response_headers, nullptr, stream_info);
   }
@@ -307,6 +343,7 @@ http_logs:
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.host_ = nullptr;
     stream_info.start_time_ = SystemTime(1h);
+    stream_info.upstream_transport_failure_reason_ = "TLS error";
 
     Http::TestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -326,6 +363,240 @@ http_logs:
           port_value: 0
       start_time:
         seconds: 3600
+      upstream_transport_failure_reason: "TLS error"
+    request:
+      request_method: "METHOD_UNSPECIFIED"
+      request_headers_bytes: 16
+    response: {}
+)EOF");
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
+
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    const std::vector<std::string> peerSans{"peerSan1", "peerSan2"};
+    ON_CALL(connection_info, uriSanPeerCertificate()).WillByDefault(Return(peerSans));
+    const std::vector<std::string> localSans{"localSan1", "localSan2"};
+    ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return(localSans));
+    ON_CALL(connection_info, subjectPeerCertificate()).WillByDefault(Return("peerSubject"));
+    ON_CALL(connection_info, subjectLocalCertificate()).WillByDefault(Return("localSubject"));
+    ON_CALL(connection_info, sessionId())
+        .WillByDefault(Return("D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B"));
+    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1.3"));
+    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2CC0));
+    stream_info.setDownstreamSslConnection(&connection_info);
+    stream_info.requested_server_name_ = "sni";
+
+    Http::TestHeaderMapImpl request_headers{
+        {":method", "WHACKADOO"},
+    };
+
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: "127.0.0.1"
+          port_value: 0
+      downstream_local_address:
+        socket_address:
+          address: "127.0.0.2"
+          port_value: 0
+      start_time:
+        seconds: 3600
+      tls_properties:
+        tls_version: TLSv1_3
+        tls_cipher_suite: 0x2cc0
+        tls_sni_hostname: sni
+        local_certificate_properties:
+          subject_alt_name:
+          - uri: localSan1
+          - uri: localSan2
+          subject: localSubject
+        peer_certificate_properties:
+          subject_alt_name:
+          - uri: peerSan1
+          - uri: peerSan2
+          subject: peerSubject
+        tls_session_id: D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B
+    request:
+      request_method: "METHOD_UNSPECIFIED"
+      request_headers_bytes: 16
+    response: {}
+)EOF");
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+  }
+
+  // TLSv1.2
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
+
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1.2"));
+    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
+    stream_info.setDownstreamSslConnection(&connection_info);
+    stream_info.requested_server_name_ = "sni";
+
+    Http::TestHeaderMapImpl request_headers{
+        {":method", "WHACKADOO"},
+    };
+
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: "127.0.0.1"
+          port_value: 0
+      downstream_local_address:
+        socket_address:
+          address: "127.0.0.2"
+          port_value: 0
+      start_time:
+        seconds: 3600
+      tls_properties:
+        tls_version: TLSv1_2
+        tls_cipher_suite: 0x2f
+        tls_sni_hostname: sni
+        local_certificate_properties: {}
+        peer_certificate_properties: {}
+    request:
+      request_method: "METHOD_UNSPECIFIED"
+    response: {}
+)EOF");
+    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  }
+
+  // TLSv1.1
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
+
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1.1"));
+    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
+    stream_info.setDownstreamSslConnection(&connection_info);
+    stream_info.requested_server_name_ = "sni";
+
+    Http::TestHeaderMapImpl request_headers{
+        {":method", "WHACKADOO"},
+    };
+
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: "127.0.0.1"
+          port_value: 0
+      downstream_local_address:
+        socket_address:
+          address: "127.0.0.2"
+          port_value: 0
+      start_time:
+        seconds: 3600
+      tls_properties:
+        tls_version: TLSv1_1
+        tls_cipher_suite: 0x2f
+        tls_sni_hostname: sni
+        local_certificate_properties: {}
+        peer_certificate_properties: {}
+    request:
+      request_method: "METHOD_UNSPECIFIED"
+    response: {}
+)EOF");
+    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  }
+
+  // TLSv1
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
+
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1"));
+    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
+    stream_info.setDownstreamSslConnection(&connection_info);
+    stream_info.requested_server_name_ = "sni";
+
+    Http::TestHeaderMapImpl request_headers{
+        {":method", "WHACKADOO"},
+    };
+
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: "127.0.0.1"
+          port_value: 0
+      downstream_local_address:
+        socket_address:
+          address: "127.0.0.2"
+          port_value: 0
+      start_time:
+        seconds: 3600
+      tls_properties:
+        tls_version: TLSv1
+        tls_cipher_suite: 0x2f
+        tls_sni_hostname: sni
+        local_certificate_properties: {}
+        peer_certificate_properties: {}
+    request:
+      request_method: "METHOD_UNSPECIFIED"
+    response: {}
+)EOF");
+    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  }
+
+  // Unknown TLS version (TLSv1.4)
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
+
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1.4"));
+    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
+    stream_info.setDownstreamSslConnection(&connection_info);
+    stream_info.requested_server_name_ = "sni";
+
+    Http::TestHeaderMapImpl request_headers{
+        {":method", "WHACKADOO"},
+    };
+
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: "127.0.0.1"
+          port_value: 0
+      downstream_local_address:
+        socket_address:
+          address: "127.0.0.2"
+          port_value: 0
+      start_time:
+        seconds: 3600
+      tls_properties:
+        tls_version: VERSION_UNSPECIFIED
+        tls_cipher_suite: 0x2f
+        tls_sni_hostname: sni
+        local_certificate_properties: {}
+        peer_certificate_properties: {}
     request:
       request_method: "METHOD_UNSPECIFIED"
     response: {}
@@ -445,8 +716,22 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->set_downstream_connection_termination(true);
   common_access_log_expected.mutable_response_flags()->set_upstream_retry_limit_exceeded(true);
   common_access_log_expected.mutable_response_flags()->set_stream_idle_timeout(true);
+  common_access_log_expected.mutable_response_flags()->set_invalid_envoy_request_headers(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
+}
+
+TEST_F(HttpGrpcAccessLogTest, LogWithRequestMethod) {
+  InSequence s;
+  expectLogRequestMethod("GET");
+  expectLogRequestMethod("HEAD");
+  expectLogRequestMethod("POST");
+  expectLogRequestMethod("PUT");
+  expectLogRequestMethod("DELETE");
+  expectLogRequestMethod("CONNECT");
+  expectLogRequestMethod("OPTIONS");
+  expectLogRequestMethod("TRACE");
+  expectLogRequestMethod("PATCH");
 }
 
 } // namespace

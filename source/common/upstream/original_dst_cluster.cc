@@ -69,7 +69,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
       if (host) {
         ENVOY_LOG(debug, "Using existing host {}.", host->address()->asString());
         host->used(true); // Mark as used.
-        return std::move(host);
+        return host;
       }
       // Add a new host
       const Network::Address::Ip* dst_ip = dst_addr.ip();
@@ -100,7 +100,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
           });
         }
 
-        return std::move(host);
+        return host;
       } else {
         ENVOY_LOG(debug, "Failed to create host for {}.", dst_addr.asString());
       }
@@ -117,8 +117,10 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
   const Http::HeaderMap* downstream_headers = context->downstreamHeaders();
   if (downstream_headers &&
       downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost) != nullptr) {
-    const std::string& request_override_host =
-        downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost)->value().c_str();
+    const std::string request_override_host(
+        downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost)
+            ->value()
+            .getStringView());
     try {
       request_host = Network::Utility::parseInternetAddressAndPort(request_override_host, false);
       ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
@@ -139,7 +141,10 @@ OriginalDstCluster::OriginalDstCluster(
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })) {
-
+  // TODO(dio): Remove hosts check once the hosts field is removed.
+  if (config.has_load_assignment() || !config.hosts().empty()) {
+    throw EnvoyException("ORIGINAL_DST clusters must have no load assignment or hosts configured");
+  }
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
 
@@ -160,20 +165,22 @@ void OriginalDstCluster::cleanup() {
   // Given the current config, only EDS clusters support multiple priorities.
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
   const auto& host_set = priority_set_.getOrCreateHostSet(0);
-
-  ENVOY_LOG(debug, "Cleaning up stale original dst hosts.");
-  for (const HostSharedPtr& host : host_set.hosts()) {
-    if (host->used()) {
-      ENVOY_LOG(debug, "Keeping active host {}.", host->address()->asString());
-      new_hosts->emplace_back(host);
-      host->used(false); // Mark to be removed during the next round.
-    } else {
-      ENVOY_LOG(debug, "Removing stale host {}.", host->address()->asString());
-      to_be_removed.emplace_back(host);
+  ENVOY_LOG(trace, "Stale original dst hosts cleanup triggered.");
+  if (!host_set.hosts().empty()) {
+    ENVOY_LOG(debug, "Cleaning up stale original dst hosts.");
+    for (const HostSharedPtr& host : host_set.hosts()) {
+      if (host->used()) {
+        ENVOY_LOG(debug, "Keeping active host {}.", host->address()->asString());
+        new_hosts->emplace_back(host);
+        host->used(false); // Mark to be removed during the next round.
+      } else {
+        ENVOY_LOG(debug, "Removing stale host {}.", host->address()->asString());
+        to_be_removed.emplace_back(host);
+      }
     }
   }
 
-  if (to_be_removed.size() > 0) {
+  if (!to_be_removed.empty()) {
     priority_set_.updateHosts(0,
                               HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()),
                               {}, {}, to_be_removed, absl::nullopt);
@@ -181,6 +188,34 @@ void OriginalDstCluster::cleanup() {
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
+
+std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+OriginalDstClusterFactory::createClusterImpl(
+    const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    Stats::ScopePtr&& stats_scope) {
+  if (cluster.lb_policy() != envoy::api::v2::Cluster::ORIGINAL_DST_LB) {
+    throw EnvoyException(fmt::format(
+        "cluster: cluster type 'original_dst' may only be used with LB type 'original_dst_lb'"));
+  }
+  if (cluster.has_lb_subset_config() && cluster.lb_subset_config().subset_selectors_size() != 0) {
+    throw EnvoyException(
+        fmt::format("cluster: cluster type 'original_dst' may not be used with lb_subset_config"));
+  }
+
+  // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
+  //                     the cluster should directly supply the load balancer. This will remove
+  //                     a special case and allow this cluster to be compiled out as an extension.
+  return std::make_pair(
+      std::make_shared<OriginalDstCluster>(cluster, context.runtime(), socket_factory_context,
+                                           std::move(stats_scope), context.addedViaApi()),
+      nullptr);
+}
+
+/**
+ * Static registration for the strict dns cluster factory. @see RegisterFactory.
+ */
+REGISTER_FACTORY(OriginalDstClusterFactory, ClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

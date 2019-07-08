@@ -24,6 +24,8 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 void BufferingStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!complete_);
@@ -52,7 +54,9 @@ void BufferingStreamDecoder::onComplete() {
   on_complete_cb_();
 }
 
-void BufferingStreamDecoder::onResetStream(Http::StreamResetReason) { ADD_FAILURE(); }
+void BufferingStreamDecoder::onResetStream(Http::StreamResetReason, absl::string_view) {
+  ADD_FAILURE();
+}
 
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,
@@ -62,7 +66,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
 
   NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
   Event::GlobalTimeSystem time_system;
-  Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system);
+  Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
+                Filesystem::fileSystemForTest());
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{
@@ -137,7 +142,7 @@ Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data, bool 
   data_.append(data.toString());
   data.drain(data.length());
   read_end_stream_ = end_stream;
-  if ((!data_to_wait_for_.empty() && data_.find(data_to_wait_for_) == 0) ||
+  if ((!data_to_wait_for_.empty() && absl::StartsWith(data_, data_to_wait_for_)) ||
       (exact_match_ == false && data_.find(data_to_wait_for_) != std::string::npos) || end_stream) {
     data_to_wait_for_.clear();
     dispatcher_.exit();

@@ -7,7 +7,4 @@ ReadyWatcher::~ReadyWatcher() {}
 MockTimeSystem::MockTimeSystem() {}
 MockTimeSystem::~MockTimeSystem() {}
 
-MockTokenBucket::MockTokenBucket() {}
-MockTokenBucket::~MockTokenBucket() {}
-
 } // namespace Envoy

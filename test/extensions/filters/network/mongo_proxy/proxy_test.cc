@@ -25,6 +25,7 @@ using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Invoke;
+using testing::Matcher;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
@@ -82,7 +83,7 @@ public:
 
   void initializeFilter(bool emit_dynamic_metadata = false) {
     filter_ = std::make_unique<TestProxyFilter>("test.", store_, runtime_, access_log_,
-                                                fault_config_, drain_decision_, generator_,
+                                                fault_config_, drain_decision_,
                                                 dispatcher_.timeSource(), emit_dynamic_metadata);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
@@ -93,15 +94,16 @@ public:
   }
 
   void setupDelayFault(bool enable_fault) {
-    envoy::config::filter::fault::v2::FaultDelay fault{};
+    envoy::config::filter::fault::v2::FaultDelay fault;
     fault.mutable_percentage()->set_numerator(50);
     fault.mutable_percentage()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
     fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
 
-    fault_config_.reset(new FaultConfig(fault));
+    fault_config_.reset(new Filters::Common::Fault::FaultDelayConfig(fault));
 
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled(_, _, _, 100)).Times(AnyNumber());
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("mongo.fault.fixed_delay.percent", 50, _, 100))
+    EXPECT_CALL(runtime_.snapshot_,
+                featureEnabled("mongo.fault.fixed_delay.percent",
+                               Matcher<const envoy::type::FractionalPercent&>(Percent(50))))
         .WillOnce(Return(enable_fault));
 
     if (enable_fault) {
@@ -117,12 +119,11 @@ public:
   std::shared_ptr<Envoy::AccessLog::MockAccessLogFile> file_{
       new NiceMock<Envoy::AccessLog::MockAccessLogFile>()};
   AccessLogSharedPtr access_log_;
-  FaultConfigSharedPtr fault_config_;
+  Filters::Common::Fault::FaultDelayConfigSharedPtr fault_config_;
   std::unique_ptr<TestProxyFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   Envoy::AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
-  NiceMock<Runtime::MockRandomGenerator> generator_;
   TestStreamInfo stream_info_;
 };
 
@@ -532,7 +533,7 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
     filter_->callbacks_->decodeQuery(std::move(message));
   }));
   filter_->onData(fake_data_, false);
-  EXPECT_EQ(2U, store_.gauge("test.op_query_active").value());
+  EXPECT_EQ(2U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
 
   Event::MockTimer* drain_timer = nullptr;
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
@@ -559,7 +560,7 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->callback_();
 
-  EXPECT_EQ(0U, store_.gauge("test.op_query_active").value());
+  EXPECT_EQ(0U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
   EXPECT_EQ(1U, store_.counter("test.cx_drain_close").value());
 }
 

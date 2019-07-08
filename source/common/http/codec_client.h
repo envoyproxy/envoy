@@ -25,7 +25,7 @@ namespace Http {
  */
 class CodecClientCallbacks {
 public:
-  virtual ~CodecClientCallbacks() {}
+  virtual ~CodecClientCallbacks() = default;
 
   /**
    * Called every time an owned stream is destroyed, whether complete or not.
@@ -77,6 +77,16 @@ public:
    * @return the underlying connection ID.
    */
   uint64_t id() { return connection_->id(); }
+
+  /**
+   * @return the underlying codec protocol.
+   */
+  Protocol protocol() { return codec_->protocol(); }
+
+  /**
+   * @return the underlying connection error.
+   */
+  absl::string_view connectionFailureReason() { return connection_->transportFailureReason(); }
 
   /**
    * @return size_t the number of outstanding requests that have not completed or been reset.
@@ -179,7 +189,9 @@ private:
         : StreamDecoderWrapper(inner), parent_(parent) {}
 
     // StreamCallbacks
-    void onResetStream(StreamResetReason reason) override { parent_.onReset(*this, reason); }
+    void onResetStream(StreamResetReason reason, absl::string_view) override {
+      parent_.onReset(*this, reason);
+    }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -191,7 +203,7 @@ private:
     CodecClient& parent_;
   };
 
-  typedef std::unique_ptr<ActiveRequest> ActiveRequestPtr;
+  using ActiveRequestPtr = std::unique_ptr<ActiveRequest>;
 
   /**
    * Called when a response finishes decoding. This is called *before* forwarding on to the
@@ -221,7 +233,7 @@ private:
   bool remote_closed_{};
 };
 
-typedef std::unique_ptr<CodecClient> CodecClientPtr;
+using CodecClientPtr = std::unique_ptr<CodecClient>;
 
 /**
  * Production implementation that installs a real codec.

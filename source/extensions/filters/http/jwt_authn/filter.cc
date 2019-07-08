@@ -11,7 +11,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-Filter::Filter(FilterConfigSharedPtr config) : stats_(config->stats()), config_(config) {}
+struct RcDetailsValues {
+  // The jwt_authn filter rejected the request
+  const std::string JwtAuthnAccessDenied = "jwt_authn_access_denied";
+};
+using RcDetails = ConstSingleton<RcDetailsValues>;
+
+Filter::Filter(FilterConfigSharedPtr config)
+    : stats_(config->stats()), config_(std::move(config)) {}
 
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
@@ -26,7 +33,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   state_ = Calling;
   stopped_ = false;
   // Verify the JWT token, onComplete() will be called when completed.
-  const auto* verifier = config_->findVerifier(headers);
+  const auto* verifier =
+      config_->findVerifier(headers, decoder_callbacks_->streamInfo().filterState());
   if (!verifier) {
     onComplete(Status::Ok);
   } else {
@@ -59,7 +67,7 @@ void Filter::onComplete(const Status& status) {
     Http::Code code = Http::Code::Unauthorized;
     // return failure reason as message body
     decoder_callbacks_->sendLocalReply(code, ::google::jwt_verify::getStatusString(status), nullptr,
-                                       absl::nullopt);
+                                       absl::nullopt, RcDetails::get().JwtAuthnAccessDenied);
     return;
   }
   stats_.allowed_.inc();

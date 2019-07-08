@@ -22,7 +22,7 @@ filter_enabled
   The % of requests for which the filter is enabled. The default is
   100/:ref:`HUNDRED <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
 
-  To utilize runtime to enabled/disable the CORS filter set the
+  To utilize runtime to enable/disable the CORS filter set the
   :ref:`runtime_key <envoy_api_msg_core.runtimefractionalpercent>`
   value of the :ref:`filter_enabled <envoy_api_field_route.CorsPolicy.filter_enabled>`
   field.
@@ -37,7 +37,7 @@ shadow_enabled
   If present, this will evaluate a request's *Origin* to determine if it's valid
   but will not enforce any policies.
 
-  To utilize runtime to enabled/disable the CORS filter's shadow mode set the
+  To utilize runtime to enable/disable the CORS filter's shadow mode set the
   :ref:`runtime_key <envoy_api_msg_core.runtimefractionalpercent>`
   value of the :ref:`shadow_enabled <envoy_api_field_route.CorsPolicy.shadow_enabled>`
   field.

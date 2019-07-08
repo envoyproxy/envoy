@@ -1,20 +1,28 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":genrule_repository.bzl", "genrule_repository")
-load("//api/bazel:envoy_http_archive.bzl", "envoy_http_archive")
+load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
-load(":target_recipes.bzl", "TARGET_RECIPES")
 load(
     "@bazel_tools//tools/cpp:windows_cc_configure.bzl",
     "find_vc_path",
     "setup_vc_env_vars",
 )
 load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
+load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
+NOBORINGSSL_SKIP_TARGETS = {
+    # The lua filter depends on BoringSSL
+    "lua": "envoy.filters.http.lua",
+
+    # These two extensions are supposed to be replaced with alternative extensions.
+    "tls": "envoy.transport_sockets.tls",
+    "tls_inspector": "envoy.filters.listener.tls_inspector",
+}
 
 # go version for rules_go
-GO_VERSION = "1.10.4"
+GO_VERSION = "1.12.5"
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
@@ -27,46 +35,6 @@ def _repository_impl(name, **kwargs):
         **kwargs
     )
 
-def _build_recipe_repository_impl(ctxt):
-    # on Windows, all deps use rules_foreign_cc
-    if ctxt.os.name.upper().startswith("WINDOWS"):
-        return
-
-    # modify the recipes list based on the build context
-    recipes = _apply_dep_blacklist(ctxt, ctxt.attr.recipes)
-
-    # Setup the build directory with links to the relevant files.
-    ctxt.symlink(Label("//bazel:repositories.sh"), "repositories.sh")
-    ctxt.symlink(
-        Label("//ci/build_container:build_and_install_deps.sh"),
-        "build_and_install_deps.sh",
-    )
-    ctxt.symlink(Label("//ci/build_container:recipe_wrapper.sh"), "recipe_wrapper.sh")
-    ctxt.symlink(Label("//ci/build_container:Makefile"), "Makefile")
-    for r in recipes:
-        ctxt.symlink(
-            Label("//ci/build_container/build_recipes:" + r + ".sh"),
-            "build_recipes/" + r + ".sh",
-        )
-    ctxt.symlink(Label("//ci/prebuilt:BUILD"), "BUILD")
-
-    # Run the build script.
-    print("Fetching external dependencies...")
-    result = ctxt.execute(
-        ["./repositories.sh"] + recipes,
-        quiet = False,
-    )
-    print(result.stdout)
-    print(result.stderr)
-    print("External dep build exited with return code: %d" % result.return_code)
-    if result.return_code != 0:
-        print("\033[31;1m\033[48;5;226m External dependency build failed, check above log " +
-              "for errors and ensure all prerequisites at " +
-              "https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers are met.")
-
-        # This error message doesn't appear to the user :( https://github.com/bazelbuild/bazel/issues/3683
-        fail("External dep build failed")
-
 def _default_envoy_build_config_impl(ctx):
     ctx.file("WORKSPACE", "")
     ctx.file("BUILD.bazel", "")
@@ -76,27 +44,6 @@ _default_envoy_build_config = repository_rule(
     implementation = _default_envoy_build_config_impl,
     attrs = {
         "config": attr.label(default = "@envoy//source/extensions:extensions_build_config.bzl"),
-    },
-)
-
-def _default_envoy_api_impl(ctx):
-    ctx.file("WORKSPACE", "")
-    ctx.file("BUILD.bazel", "")
-    api_dirs = [
-        "bazel",
-        "docs",
-        "envoy",
-        "examples",
-        "test",
-        "tools",
-    ]
-    for d in api_dirs:
-        ctx.symlink(ctx.path(ctx.attr.api).dirname.get_child(d), d)
-
-_default_envoy_api = repository_rule(
-    implementation = _default_envoy_api_impl,
-    attrs = {
-        "api": attr.label(default = "@envoy//api:BUILD"),
     },
 )
 
@@ -135,6 +82,14 @@ def _python_deps():
         name = "com_github_twitter_common_finagle_thrift",
         build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
     )
+    _repository_impl(
+        name = "six_archive",
+        build_file = "@com_google_protobuf//:six.BUILD",
+    )
+    native.bind(
+        name = "six",
+        actual = "@six_archive//:six",
+    )
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
@@ -152,82 +107,10 @@ def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
     # it to exclude the Go rules.
     if "io_bazel_rules_go" not in skip_targets:
-        _repository_impl(
-            name = "com_github_golang_protobuf",
-            # These patches are to add BUILD files to golang/protobuf.
-            # TODO(sesmith177): Remove this dependency when both:
-            #   1. There's a release of golang/protobuf that includes
-            #      https://github.com/golang/protobuf/commit/31e0d063dd98c052257e5b69eeb006818133f45c
-            #   2. That release is included in rules_go
-            patches = [
-                "@io_bazel_rules_go//third_party:com_github_golang_protobuf-gazelle.patch",
-                "@io_bazel_rules_go//third_party:com_github_golang_protobuf-extras.patch",
-            ],
-            patch_args = ["-p1"],
-        )
         _repository_impl("io_bazel_rules_go")
         _repository_impl("bazel_gazelle")
 
-def _envoy_api_deps():
-    # Treat the data plane API as an external repo, this simplifies exporting the API to
-    # https://github.com/envoyproxy/data-plane-api.
-    if "envoy_api" not in native.existing_rules().keys():
-        _default_envoy_api(name = "envoy_api")
-
-    native.bind(
-        name = "api_httpbody_protos",
-        actual = "@googleapis//:api_httpbody_protos",
-    )
-    native.bind(
-        name = "http_api_protos",
-        actual = "@googleapis//:http_api_protos",
-    )
-    _repository_impl(
-        name = "six_archive",
-        build_file = "@com_google_protobuf//:six.BUILD",
-    )
-    native.bind(
-        name = "six",
-        actual = "@six_archive//:six",
-    )
-
-def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
-    envoy_repository = repository_rule(
-        implementation = _build_recipe_repository_impl,
-        environ = [
-            "CC",
-            "CXX",
-            "CFLAGS",
-            "CXXFLAGS",
-            "LD_LIBRARY_PATH",
-        ],
-        # Don't pretend we're in the sandbox, we do some evil stuff with envoy_dep_cache.
-        local = True,
-        attrs = {
-            "recipes": attr.string_list(),
-        },
-    )
-
-    # Ideally, we wouldn't have a single repository target for all dependencies, but instead one per
-    # dependency, as suggested in #747. However, it's much faster to build all deps under a single
-    # recursive make job and single make jobserver.
-    recipes = depset()
-    for t in TARGET_RECIPES:
-        if t not in skip_targets:
-            recipes += depset([TARGET_RECIPES[t]])
-
-    envoy_repository(
-        name = "envoy_deps",
-        recipes = recipes.to_list(),
-    )
-
-    for t in TARGET_RECIPES:
-        if t not in skip_targets:
-            native.bind(
-                name = t,
-                actual = path + ":" + t,
-            )
-
+def envoy_dependencies(skip_targets = []):
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
@@ -249,33 +132,37 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
-    _com_google_absl()
-    _com_github_circonus_labs_libcircllhist()
     _com_github_c_ares_c_ares()
+    _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
+    _com_github_datadog_dd_opentracing_cpp()
     _com_github_eile_tclap()
+    _com_github_envoyproxy_sqlparser()
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
     _com_github_gcovr_gcovr()
-    _com_github_google_libprotobuf_mutator()
-    _io_opentracing_cpp()
-    _com_lightstep_tracer_cpp()
-    _com_github_datadog_dd_opentracing_cpp()
-    _com_github_grpc_grpc()
     _com_github_google_benchmark()
     _com_github_google_jwt_verify()
+    _com_github_google_libprotobuf_mutator()
     _com_github_gperftools_gperftools()
+    _com_github_grpc_grpc()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
-    _com_github_madler_zlib()
+    _com_github_luajit_luajit()
     _com_github_nanopb_nanopb()
     _com_github_nghttp2_nghttp2()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
+    _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
+    _io_opencensus_cpp()
+    _com_github_curl()
     _com_github_envoyproxy_sqlparser()
     _com_googlesource_quiche()
+    _com_lightstep_tracer_cpp()
+    _io_opentracing_cpp()
+    _net_zlib()
 
     # Used for bundling gcovr into a relocatable .par file.
     _repository_impl("subpar")
@@ -283,7 +170,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _python_deps()
     _cc_deps()
     _go_deps(skip_targets)
-    _envoy_api_deps()
+    api_dependencies()
 
 def _boringssl():
     _repository_impl("boringssl")
@@ -425,11 +312,15 @@ def _com_github_libevent_libevent():
         actual = "@envoy//bazel/foreign_cc:event",
     )
 
-def _com_github_madler_zlib():
-    location = REPOSITORY_LOCATIONS["com_github_madler_zlib"]
+def _net_zlib():
+    location = REPOSITORY_LOCATIONS["net_zlib"]
     http_archive(
-        name = "com_github_madler_zlib",
+        name = "net_zlib",
         build_file_content = BUILD_ALL_CONTENT,
+        # The patch is only needed due to https://github.com/madler/zlib/pull/420
+        # TODO(htuch): remove this when zlib #420 merges.
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
         **location
     )
     native.bind(
@@ -459,10 +350,13 @@ def _io_opentracing_cpp():
     )
 
 def _com_lightstep_tracer_cpp():
+    location = REPOSITORY_LOCATIONS["com_lightstep_tracer_cpp"]
     _repository_impl("com_lightstep_tracer_cpp")
-    _repository_impl(
-        name = "lightstep_vendored_googleapis",
-        build_file = "@com_lightstep_tracer_cpp//:lightstep-tracer-common/third_party/googleapis/BUILD",
+    http_archive(
+        name = "com_lightstep_tracer_cpp",
+        patch_args = ["-p0"],
+        patches = ["@envoy//bazel/foreign_cc:com_lightstep_tracer_cpp.patch"],
+        **location
     )
     native.bind(
         name = "lightstep",
@@ -534,6 +428,10 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/hash:hash",
     )
     native.bind(
+        name = "abseil_hash_testing",
+        actual = "@com_google_absl//absl/hash:hash_testing",
+    )
+    native.bind(
         name = "abseil_inlined_vector",
         actual = "@com_google_absl//absl/container:inlined_vector",
     )
@@ -586,7 +484,14 @@ def _com_google_absl():
     )
 
 def _com_google_protobuf():
-    _repository_impl("com_google_protobuf")
+    _repository_impl(
+        "com_google_protobuf",
+        # The patch is only needed until
+        # https://github.com/protocolbuffers/protobuf/pull/5901 is available.
+        # TODO(htuch): remove this when > protobuf 3.7.1 is released.
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:protobuf.patch"],
+    )
 
     # Needed for cc_proto_library, Bazel doesn't support aliases today for repos,
     # see https://groups.google.com/forum/#!topic/bazel-discuss/859ybHQZnuI and
@@ -594,6 +499,11 @@ def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf_cc",
         repository_key = "com_google_protobuf",
+        # The patch is only needed until
+        # https://github.com/protocolbuffers/protobuf/pull/5901 is available.
+        # TODO(htuch): remove this when > protobuf 3.7.1 is released.
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:protobuf.patch"],
     )
     native.bind(
         name = "protobuf",
@@ -617,6 +527,58 @@ def _com_google_protobuf():
     native.bind(
         name = "python_headers",
         actual = "@com_google_protobuf//util/python:python_headers",
+    )
+
+def _io_opencensus_cpp():
+    location = REPOSITORY_LOCATIONS["io_opencensus_cpp"]
+    http_archive(
+        name = "io_opencensus_cpp",
+        patch_args = ["-p0"],
+        patches = ["@envoy//bazel/foreign_cc:io_opencensus_cpp.patch"],
+        **location
+    )
+    native.bind(
+        name = "opencensus_trace",
+        actual = "@io_opencensus_cpp//opencensus/trace",
+    )
+    native.bind(
+        name = "opencensus_trace_cloud_trace_context",
+        actual = "@io_opencensus_cpp//opencensus/trace:cloud_trace_context",
+    )
+    native.bind(
+        name = "opencensus_trace_grpc_trace_bin",
+        actual = "@io_opencensus_cpp//opencensus/trace:grpc_trace_bin",
+    )
+    native.bind(
+        name = "opencensus_trace_trace_context",
+        actual = "@io_opencensus_cpp//opencensus/trace:trace_context",
+    )
+    native.bind(
+        name = "opencensus_exporter_stdout",
+        actual = "@io_opencensus_cpp//opencensus/exporters/trace/stdout:stdout_exporter",
+    )
+    native.bind(
+        name = "opencensus_exporter_stackdriver",
+        actual = "@io_opencensus_cpp//opencensus/exporters/trace/stackdriver:stackdriver_exporter",
+    )
+    native.bind(
+        name = "opencensus_exporter_zipkin",
+        actual = "@io_opencensus_cpp//opencensus/exporters/trace/zipkin:zipkin_exporter",
+    )
+
+def _com_github_curl():
+    # Used by OpenCensus Zipkin exporter.
+    location = REPOSITORY_LOCATIONS["com_github_curl"]
+    http_archive(
+        name = "com_github_curl",
+        build_file_content = BUILD_ALL_CONTENT + """
+cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
+""",
+        **location
+    )
+    native.bind(
+        name = "curl",
+        actual = "@envoy//bazel/foreign_cc:curl",
     )
 
 def _com_googlesource_quiche():
@@ -697,6 +659,22 @@ def _com_github_google_jwt_verify():
         actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
     )
 
+def _com_github_luajit_luajit():
+    location = REPOSITORY_LOCATIONS["com_github_luajit_luajit"]
+    http_archive(
+        name = "com_github_luajit_luajit",
+        build_file_content = BUILD_ALL_CONTENT,
+        patches = ["@envoy//bazel/foreign_cc:luajit.patch"],
+        patch_args = ["-p1"],
+        patch_cmds = ["chmod u+x build.py"],
+        **location
+    )
+
+    native.bind(
+        name = "luajit",
+        actual = "@envoy//bazel/foreign_cc:luajit",
+    )
+
 def _com_github_gperftools_gperftools():
     location = REPOSITORY_LOCATIONS["com_github_gperftools_gperftools"]
     http_archive(
@@ -713,16 +691,6 @@ def _com_github_gperftools_gperftools():
 
 def _foreign_cc_dependencies():
     _repository_impl("rules_foreign_cc")
-
-def _apply_dep_blacklist(ctxt, recipes):
-    newlist = []
-    skip_list = []
-    if _is_linux_ppc(ctxt):
-        skip_list += PPC_SKIP_TARGETS.keys()
-    for t in recipes:
-        if t not in skip_list:
-            newlist.append(t)
-    return newlist
 
 def _is_linux(ctxt):
     return ctxt.os.name == "linux"

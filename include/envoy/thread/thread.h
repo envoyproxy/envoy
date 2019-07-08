@@ -1,7 +1,9 @@
 #pragma once
 
 #include <functional>
+#include <limits>
 #include <memory>
+#include <string>
 
 #include "envoy/common/pure.h"
 
@@ -10,19 +12,29 @@
 namespace Envoy {
 namespace Thread {
 
+/**
+ * An id for a thread.
+ */
 class ThreadId {
 public:
-  virtual ~ThreadId() {}
+  ThreadId() : id_(std::numeric_limits<int64_t>::min()) {}
+  explicit ThreadId(int64_t id) : id_(id) {}
 
-  virtual std::string debugString() const PURE;
-  virtual bool isCurrentThreadId() const PURE;
+  std::string debugString() const { return std::to_string(id_); }
+  bool isEmpty() const { return *this == ThreadId(); }
+  friend bool operator==(ThreadId lhs, ThreadId rhs) { return lhs.id_ == rhs.id_; }
+  friend bool operator!=(ThreadId lhs, ThreadId rhs) { return lhs.id_ != rhs.id_; }
+  template <typename H> friend H AbslHashValue(H h, ThreadId id) {
+    return H::combine(std::move(h), id.id_);
+  }
+
+private:
+  int64_t id_;
 };
-
-typedef std::unique_ptr<ThreadId> ThreadIdPtr;
 
 class Thread {
 public:
-  virtual ~Thread() {}
+  virtual ~Thread() = default;
 
   /**
    * Join on thread exit.
@@ -30,14 +42,14 @@ public:
   virtual void join() PURE;
 };
 
-typedef std::unique_ptr<Thread> ThreadPtr;
+using ThreadPtr = std::unique_ptr<Thread>;
 
 /**
  * Interface providing a mechanism for creating threads.
  */
 class ThreadFactory {
 public:
-  virtual ~ThreadFactory() {}
+  virtual ~ThreadFactory() = default;
 
   /**
    * Create a thread.
@@ -48,35 +60,7 @@ public:
   /**
    * Return the current system thread ID
    */
-  virtual ThreadIdPtr currentThreadId() PURE;
-};
-
-/**
- * A static singleton to the ThreadFactory corresponding to the build platform.
- *
- * The singleton must be initialized via set() early in main() with the appropriate ThreadFactory
- * (see source/exe/{posix,win32}/platform_impl.h).
- *
- * This static singleton is an exception to Envoy's established practice for handling of singletons,
- * which are typically registered with and accessed via the Envoy::Singleton::Manager. Reasons for
- * the exception include drastic simplification of thread safety assertions; e.g.:
- *   ASSERT(ThreadFactorySingleton::get()->currentThreadId() == original_thread_id_);
- */
-class ThreadFactorySingleton {
-public:
-  /**
-   * Returns a reference to the platform dependent ThreadFactory.
-   */
-  static ThreadFactory& get() { return *thread_factory_; }
-
-  /**
-   * Sets the singleton to the supplied thread_factory.
-   * @param thread_factory the ThreadFactory instance to be pointed to by this singleton.
-   */
-  static void set(ThreadFactory* thread_factory);
-
-private:
-  static ThreadFactory* thread_factory_;
+  virtual ThreadId currentThreadId() PURE;
 };
 
 /**
@@ -85,7 +69,7 @@ private:
  */
 class LOCKABLE BasicLockable {
 public:
-  virtual ~BasicLockable() {}
+  virtual ~BasicLockable() = default;
 
   virtual void lock() EXCLUSIVE_LOCK_FUNCTION() PURE;
   virtual bool tryLock() EXCLUSIVE_TRYLOCK_FUNCTION(true) PURE;

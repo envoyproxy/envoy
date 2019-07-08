@@ -23,7 +23,7 @@ namespace MySQLProxy {
  */
 class DecoderCallbacks {
 public:
-  virtual ~DecoderCallbacks() {}
+  virtual ~DecoderCallbacks() = default;
 
   virtual void onProtocolError() PURE;
   virtual void onNewMessage(MySQLSession::State) PURE;
@@ -41,13 +41,13 @@ public:
  */
 class Decoder {
 public:
-  virtual ~Decoder() {}
+  virtual ~Decoder() = default;
 
   virtual void onData(Buffer::Instance& data) PURE;
   virtual MySQLSession& getSession() PURE;
 };
 
-typedef std::unique_ptr<Decoder> DecoderPtr;
+using DecoderPtr = std::unique_ptr<Decoder>;
 
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
 public:
@@ -58,8 +58,8 @@ public:
   MySQLSession& getSession() override { return session_; }
 
 private:
-  void decode(Buffer::Instance& data, uint64_t& offset);
-  void parseMessage(Buffer::Instance& message, uint64_t& offset, int seq, int len);
+  bool decode(Buffer::Instance& data);
+  void parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t len);
 
   DecoderCallbacks& callbacks_;
   MySQLSession session_;

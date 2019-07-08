@@ -7,6 +7,7 @@ api_proto_library_internal(
     srcs = ["http_connection_manager.proto"],
     deps = [
         "//envoy/api/v2:rds",
+        "//envoy/api/v2:srds",
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/core:config_source",
         "//envoy/api/v2/core:protocol",
@@ -20,6 +21,7 @@ api_go_proto_library(
     proto = ":http_connection_manager",
     deps = [
         "//envoy/api/v2:rds_go_grpc",
+        "//envoy/api/v2:srds_go_grpc",
         "//envoy/api/v2/core:base_go_proto",
         "//envoy/api/v2/core:config_source_go_proto",
         "//envoy/api/v2/core:protocol_go_proto",

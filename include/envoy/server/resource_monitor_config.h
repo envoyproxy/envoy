@@ -13,7 +13,7 @@ namespace Configuration {
 
 class ResourceMonitorFactoryContext {
 public:
-  virtual ~ResourceMonitorFactoryContext() {}
+  virtual ~ResourceMonitorFactoryContext() = default;
 
   /**
    * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used
@@ -33,7 +33,7 @@ public:
  */
 class ResourceMonitorFactory {
 public:
-  virtual ~ResourceMonitorFactory() {}
+  virtual ~ResourceMonitorFactory() = default;
 
   /**
    * Create a particular resource monitor implementation.

@@ -2,16 +2,16 @@
 
 Two flavors of Envoy Docker images, based on Ubuntu and Alpine Linux, are built.
 
-## Ubuntu envoy image
+## Ubuntu Envoy image
 The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CircleCI checks,
 where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/master/ci/envoy_build_sha.sh). Developers
 may work with `envoyproxy/envoy-build:latest` to provide a self-contained environment for building Envoy binaries and
 running tests that reflects the latest built Ubuntu Envoy image. Moreover, the Docker image
 at [`envoyproxy/envoy:<hash>`](https://hub.docker.com/r/envoyproxy/envoy/) is an image that has an Envoy binary at `/usr/local/bin/envoy`. The `<hash>`
-corresponds to the master commit at which the binary was compiled. Lastly, `envoyproxy/envoy:latest` contains an Envoy
+corresponds to the master commit at which the binary was compiled. Lastly, `envoyproxy/envoy-dev:latest` contains an Envoy
 binary built from the latest tip of master that passed tests.
 
-## Alpine envoy image
+## Alpine Envoy image
 
 Minimal images based on Alpine Linux allow for quicker deployment of Envoy. Two Alpine based images are built,
 one with an Envoy binary with debug (`envoyproxy/envoy-alpine-debug`) symbols and one stripped of them (`envoyproxy/envoy-alpine`).
@@ -25,7 +25,7 @@ Currently there are three build images:
 * `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
 * `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 16.04 (Xenial) which uses the GCC 5.4 compiler.
 
-We also install and use the clang-7 compiler for some sanitizing runs.
+We also install and use the clang-8 compiler for some sanitizing runs.
 
 # Building and running tests as a developer
 
@@ -80,19 +80,28 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
 * `bazel.api` &mdash; build and run API tests under `-c fastbuild` with clang.
 * `bazel.asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang.
+* `bazel.asan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-asan` with clang.
 * `bazel.debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
+* `bazel.debug <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c dbg`.
 * `bazel.debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
 * `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with clang.
-* `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt` with gcc.
-* `bazel.release <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt` with gcc.
-* `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with gcc.
+* `bazel.dev <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c fastbuild` with clang.
+* `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt` with clang.
+* `bazel.release <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt` with clang.
+* `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with clang.
+* `bazel.sizeopt` &mdash; build Envoy static binary and run tests under `-c opt --config=sizeopt` with clang.
+* `bazel.sizeopt <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt --config=sizeopt` with clang.
+* `bazel.sizeopt.server_only` &mdash; build Envoy static binary under `-c opt --config=sizeopt` with clang.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
+* `bazel.coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `bazel.coverity` &mdash; build Envoy static binary and run Coverity Scan static analysis.
 * `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
-* `bazel.compile_time_options` &mdash; build Envoy and test with various compile-time options toggled to their non-default state, to ensure they still build.
+* `bazel.tsan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-tsan` with clang.
+* `bazel.compile_time_options` &mdash; build Envoy and run tests with various compile-time options toggled to their non-default state, to ensure they still build.
+* `bazel.compile_time_options <test>` &mdash; build Envoy and run a specified test or test dir with various compile-time options toggled to their non-default state, to ensure they still build.
 * `bazel.clang_tidy` &mdash; build and run clang-tidy over all source files.
-* `check_format`&mdash; run `clang-format-6.0` and `buildifier` on entire source tree.
-* `fix_format`&mdash; run and enforce `clang-format-6.0` and `buildifier` on entire source tree.
+* `check_format`&mdash; run `clang-format` and `buildifier` on entire source tree.
+* `fix_format`&mdash; run and enforce `clang-format` and `buildifier` on entire source tree.
 * `check_spelling`&mdash; run `misspell` on entire project.
 * `fix_spelling`&mdash; run and enforce `misspell` on entire project.
 * `check_spelling_pedantic`&mdash; run `aspell` on C++ and proto comments.

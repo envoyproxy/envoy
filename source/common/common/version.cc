@@ -4,6 +4,7 @@
 
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
+#include "common/common/version_linkstamp.h"
 
 extern const char build_scm_revision[];
 extern const char build_scm_status[];
@@ -23,6 +24,11 @@ std::string VersionInfo::version() {
 #else
                      "DEBUG",
 #endif
-                     ENVOY_SSL_VERSION);
+#ifdef ENVOY_SSL_VERSION
+                     ENVOY_SSL_VERSION
+#else
+                     "no-ssl"
+#endif
+  );
 }
 } // namespace Envoy

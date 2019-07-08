@@ -27,11 +27,9 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
                                    context.dispatcher().timeSource()));
   }
 
-  FaultConfigSharedPtr fault_config;
+  Filters::Common::Fault::FaultDelayConfigSharedPtr fault_config;
   if (proto_config.has_delay()) {
-    auto delay = proto_config.delay();
-    ASSERT(delay.has_fixed_delay());
-    fault_config = std::make_shared<FaultConfig>(proto_config.delay());
+    fault_config = std::make_shared<Filters::Common::Fault::FaultDelayConfig>(proto_config.delay());
   }
 
   const bool emit_dynamic_metadata = proto_config.emit_dynamic_metadata();
@@ -39,8 +37,7 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
           emit_dynamic_metadata](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<ProdProxyFilter>(
         stat_prefix, context.scope(), context.runtime(), access_log, fault_config,
-        context.drainDecision(), context.random(), context.dispatcher().timeSource(),
-        emit_dynamic_metadata));
+        context.drainDecision(), context.dispatcher().timeSource(), emit_dynamic_metadata));
   };
 }
 
