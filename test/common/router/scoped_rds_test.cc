@@ -67,8 +67,6 @@ protected:
               auto provider = std::make_unique<NiceMock<MockRouteConfigProvider>>();
               EXPECT_CALL(*provider, config())
                   .WillRepeatedly(Invoke([this, rds]() -> ConfigConstSharedPtr {
-                    std::cerr << "DDD returns config() for :" << rds.route_config_name()
-                              << std::endl;
                     return cached_route_configs_[rds.route_config_name()];
                   }));
               return provider;

@@ -253,6 +253,10 @@ TEST(ScopeKeyTest, Unmatches) {
 
   EXPECT_EQ(makeKey({"a", "b", "c"}), makeKey({"a", "b", "c"}));
 
+  // Order matters.
+  EXPECT_EQ(makeKey({"a", "b", "c"}), makeKey({"a", "b", "c"}));
+  EXPECT_NE(makeKey({"a", "c", "b"}), makeKey({"a", "b", "c"}));
+
   // Two keys of different length won't match.
   EXPECT_NE(makeKey({"a", "b"}), makeKey({"a", "b", "c"}));
 
@@ -265,7 +269,7 @@ TEST(ScopeKeyTest, Matches) {
   EXPECT_EQ(makeKey({"", ""}), makeKey({"", ""}));
   EXPECT_EQ(makeKey({"a", "", ""}), makeKey({"a", "", ""}));
 
-  // Non empty fragments  comparison.
+  // Non empty fragments comparison.
   EXPECT_EQ(makeKey({"A", "b"}), makeKey({"A", "b"}));
 }
 
@@ -357,8 +361,11 @@ public:
 
     route_config_provider_ = std::make_shared<MockRouteConfigProvider>();
     EXPECT_CALL(*route_config_provider_, config()).WillRepeatedly(Return(route_config_));
+    EXPECT_CALL(*route_config_provider_, configInfo())
+        .WillRepeatedly(Return(RouteConfigProvider::ConfigInfo{route_configuration_, ""}));
   }
 
+  envoy::api::v2::RouteConfiguration route_configuration_;
   envoy::api::v2::ScopedRouteConfiguration scoped_route_config_;
   std::shared_ptr<MockConfig> route_config_;
   std::unique_ptr<ScopedRouteInfo> info_;
@@ -430,7 +437,7 @@ public:
     route_config->name_ = scoped_route_config.route_configuration_name();
 
     std::shared_ptr<MockRouteConfigProvider> route_config_provider =
-        std::make_shared<MockRouteConfigProvider>();
+        std::make_shared<NiceMock<MockRouteConfigProvider>>();
     EXPECT_CALL(*route_config_provider, config()).WillRepeatedly(Return(route_config));
     return std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), route_config_provider);
   }

@@ -148,7 +148,8 @@ public:
                   std::shared_ptr<RouteConfigProvider>&& route_provider)
       : config_proto_(std::move(config_proto)), route_provider_(std::move(route_provider)) {
     ASSERT(route_provider_ != nullptr, "ScopedRouteInfo expects a valid RouteConfigProvider.");
-    ASSERT(route_provider_->config()->name() == config_proto_.route_configuration_name(),
+    ASSERT(!route_provider_->configInfo().has_value() ||
+               route_provider_->config()->name() == config_proto_.route_configuration_name(),
            absl::StrFormat(
                "RouteConfigProvider's name '%s' doesn't match route_configuration_name '%s'.",
                route_provider_->config()->name(), config_proto_.route_configuration_name()));

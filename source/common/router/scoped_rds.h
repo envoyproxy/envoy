@@ -198,10 +198,6 @@ public:
   getRouteConfigProvider(Server::Configuration::FactoryContext& factory_context,
                          envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
                          std::string stat_name) {
-    //    envoy::config::filter::network::http_connection_manager::v2::Rds rds;
-    //    rds.set_route_config_name(std::move(route_config_name));
-    //    rds.mutable_config_source()->MergeFrom(rds_config_source);
-    // Unique ID for a (rds_config_source, route_config_name).
     const uint64_t route_provider_id = MessageUtil::hash(rds);
     auto iter = cached_route_providers_.find(route_provider_id);
     if (iter != cached_route_providers_.end()) {
