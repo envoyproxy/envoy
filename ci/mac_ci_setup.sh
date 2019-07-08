@@ -25,7 +25,7 @@ if ! brew update; then
     exit 1
 fi
 
-DEPS="automake bazelbuild/tap/bazel cmake coreutils go libtool wget ninja"
+DEPS="automake bazelbuild/tap/bazel cmake coreutils go wget ninja"
 for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"
