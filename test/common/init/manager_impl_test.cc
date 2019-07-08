@@ -37,6 +37,41 @@ TEST(InitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
   expectInitialized(m);
 }
 
+TEST(InitManagerImplTest, AddReadyTarget) {
+  InSequence s;
+
+  ManagerImpl m("test");
+  expectUninitialized(m);
+
+  ExpectableTargetImpl t1("t1");
+  t1.ready();
+  m.add(t1);
+
+  ExpectableWatcherImpl w;
+
+  w.expectReady();
+  m.initialize(w);
+  expectInitialized(m);
+}
+
+TEST(InitManagerImplTest, AddTargetAndMarkReadyBeforeIntialization) {
+  InSequence s;
+
+  ManagerImpl m("test");
+  expectUninitialized(m);
+
+  ExpectableTargetImpl t1("t1");
+  m.add(t1);
+  t1.ready();
+
+  ExpectableWatcherImpl w;
+
+  t1.expectInitialize();
+  w.expectReady();
+  m.initialize(w);
+  expectInitialized(m);
+}
+
 TEST(InitManagerImplTest, AddAsyncTargetsWhenUninitialized) {
   InSequence s;
 

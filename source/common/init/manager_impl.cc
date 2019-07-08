@@ -16,16 +16,26 @@ void ManagerImpl::add(const Target& target) {
   TargetHandlePtr target_handle(target.createHandle(name_));
   switch (state_) {
   case State::Uninitialized:
-    // If the manager isn't initialized yet, save the target handle to be initialized later.
-    ENVOY_LOG(debug, "added {} to {}", target.name(), name_);
-    target_handles_.push_back(std::move(target_handle));
+    if (target_handle == nullptr) {
+      --count_;
+      ENVOY_LOG(debug, "added ready target {} to {}", target.name(), name_);
+    } else {
+      // If the manager isn't initialized yet, save the target handle to be initialized later.
+      ENVOY_LOG(debug, "added {} to {}", target.name(), name_);
+      target_handles_.push_back(std::move(target_handle));
+    }
     return;
   case State::Initializing:
-    // If the manager is already initializing, initialize the new target immediately. Note that
-    // it's important in this case that count_ was incremented above before calling the target,
-    // because if the target calls the init manager back immediately, count_ will be decremented
-    // here (see the definition of watcher_ above).
-    target_handle->initialize(watcher_);
+    if (target_handle == nullptr) {
+      --count_;
+      ENVOY_LOG(debug, "added ready target {} to {}", target.name(), name_);
+    } else {
+      // If the manager is already initializing, initialize the new target immediately. Note that
+      // it's important in this case that count_ was incremented above before calling the target,
+      // because if the target calls the init manager back immediately, count_ will be decremented
+      // here (see the definition of watcher_ above).
+      target_handle->initialize(watcher_);
+    }
     return;
   case State::Initialized:
     // If the manager has already completed initialization, consider this a programming error.

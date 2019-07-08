@@ -68,8 +68,9 @@ public:
 
   /**
    * Signal to the init manager that this target has finished initializing. This is safe to call
-   * any time. Calling it before initialization begins or after initialization has already ended
-   * will have no effect.
+   * any time.
+   * Notes: Calling it before initialization begins is allowed.
+   *        Calling it after initialization has already ended will have no effect.
    * @return true if the init manager received this call, false otherwise.
    */
   bool ready();
@@ -77,6 +78,9 @@ public:
 private:
   // Human-readable name for logging
   const std::string name_;
+
+  // True if this target is currently ready
+  bool is_ready_{};
 
   // Handle to the ManagerImpl's internal watcher, to call when this target is initialized
   WatcherHandlePtr watcher_handle_;
