@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <memory>
@@ -37,9 +38,8 @@ public:
   std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
     std::vector<std::string> words = TestUtility::split(args, ' ');
     std::vector<const char*> argv;
-    for (const std::string& s : words) {
-      argv.push_back(s.c_str());
-    }
+    std::transform(words.cbegin(), words.cend(), std::back_inserter(argv),
+                   [](const std::string& arg) { return arg.c_str(); });
     return std::make_unique<OptionsImpl>(
         argv.size(), argv.data(), [](bool) { return "1"; }, spdlog::level::warn);
   }
