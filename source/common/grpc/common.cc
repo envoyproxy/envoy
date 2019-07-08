@@ -54,13 +54,13 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
 
   uint64_t grpc_status_code;
   if (!grpc_status_header || grpc_status_header->value().empty()) {
-    return absl::optional<Status::GrpcStatus>();
+    return {};
   }
   if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
       grpc_status_code > Status::GrpcStatus::MaximumValid) {
-    return absl::optional<Status::GrpcStatus>(Status::GrpcStatus::InvalidCode);
+    return {Status::GrpcStatus::InvalidCode};
   }
-  return absl::optional<Status::GrpcStatus>(static_cast<Status::GrpcStatus>(grpc_status_code));
+  return {static_cast<Status::GrpcStatus>(grpc_status_code)};
 }
 
 std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {

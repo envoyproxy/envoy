@@ -716,6 +716,7 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->set_downstream_connection_termination(true);
   common_access_log_expected.mutable_response_flags()->set_upstream_retry_limit_exceeded(true);
   common_access_log_expected.mutable_response_flags()->set_stream_idle_timeout(true);
+  common_access_log_expected.mutable_response_flags()->set_invalid_envoy_request_headers(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }

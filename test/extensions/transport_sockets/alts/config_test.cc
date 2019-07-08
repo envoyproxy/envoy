@@ -24,7 +24,7 @@ namespace {
 
 TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
   MockTransportSocketFactoryContext factory_context;
-  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest().currentThreadId()};
+  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
   EXPECT_CALL(factory_context, singletonManager()).WillRepeatedly(ReturnRef(singleton_manager));
   UpstreamAltsTransportSocketConfigFactory factory;
 
@@ -44,7 +44,7 @@ TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
 
 TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
   MockTransportSocketFactoryContext factory_context;
-  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest().currentThreadId()};
+  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
   EXPECT_CALL(factory_context, singletonManager()).WillRepeatedly(ReturnRef(singleton_manager));
   DownstreamAltsTransportSocketConfigFactory factory;
 

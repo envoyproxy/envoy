@@ -65,6 +65,11 @@ message ValidationInput {
   // The “:authority”, “:path”, “:method”, “x-forwarded-proto”, and “x-envoy-internal” fields are
   // specified by the other config options and should not be set here.
   repeated envoy.api.v2.core.HeaderValue additional_headers = 8;
+
+  // Runtime setting key to enable for the test case.
+  // If a route depends on the runtime, the route will be enabled based on the random_value defined
+  // in the test. Only a random_value less than the fractional percentage will enable the route.
+  string runtime = 9;
 }
 
 // The validate object specifies the returned route parameters to match.

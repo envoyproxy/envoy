@@ -13,45 +13,45 @@ DecoderStateMachine::DecoderStatus
 DecoderStateMachine::onTransportBegin(Buffer::Instance& buffer, Protocol::Context& context) {
   if (!protocol_.decode(buffer, &context, metadata_)) {
     ENVOY_LOG(debug, "dubbo decoder: need more data for {} protocol", protocol_.name());
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
   if (context.is_heartbeat_) {
     ENVOY_LOG(debug, "dubbo decoder: this is the {} heartbeat message", protocol_.name());
     buffer.drain(context.header_size_);
     decoder_callbacks_.onHeartbeat(metadata_);
-    return DecoderStatus(ProtocolState::Done, Network::FilterStatus::Continue);
+    return {ProtocolState::Done, Network::FilterStatus::Continue};
   } else {
     handler_ = decoder_callbacks_.newDecoderEventHandler();
   }
-  return DecoderStatus(ProtocolState::OnTransferHeaderTo, handler_->transportBegin());
+  return {ProtocolState::OnTransferHeaderTo, handler_->transportBegin()};
 }
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::onTransportEnd() {
   ENVOY_LOG(debug, "dubbo decoder: complete protocol processing");
-  return DecoderStatus(ProtocolState::Done, handler_->transportEnd());
+  return {ProtocolState::Done, handler_->transportEnd()};
 }
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::onTransferHeaderTo(Buffer::Instance& buffer,
                                                                            size_t length) {
   ENVOY_LOG(debug, "dubbo decoder: transfer protocol header, buffer size {}, header size {}",
             buffer.length(), length);
-  return DecoderStatus(ProtocolState::OnMessageBegin, handler_->transferHeaderTo(buffer, length));
+  return {ProtocolState::OnMessageBegin, handler_->transferHeaderTo(buffer, length)};
 }
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::onTransferBodyTo(Buffer::Instance& buffer,
                                                                          int32_t length) {
   ENVOY_LOG(debug, "dubbo decoder: transfer protocol body, buffer size {}, body size {}",
             buffer.length(), length);
-  return DecoderStatus(ProtocolState::OnTransportEnd, handler_->transferBodyTo(buffer, length));
+  return {ProtocolState::OnTransportEnd, handler_->transferBodyTo(buffer, length)};
 }
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::onMessageBegin() {
   ENVOY_LOG(debug, "dubbo decoder: start deserializing messages, deserializer name {}",
             deserializer_.name());
-  return DecoderStatus(ProtocolState::OnMessageEnd,
-                       handler_->messageBegin(metadata_->message_type(), metadata_->request_id(),
-                                              metadata_->serialization_type()));
+  return {ProtocolState::OnMessageEnd,
+          handler_->messageBegin(metadata_->message_type(), metadata_->request_id(),
+                                 metadata_->serialization_type())};
 }
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::onMessageEnd(Buffer::Instance& buffer,
@@ -61,7 +61,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::onMessageEnd(Buffer::Ins
   if (buffer.length() < static_cast<uint64_t>(message_size)) {
     ENVOY_LOG(debug, "dubbo decoder: need more data for {} deserialization, current size {}",
               deserializer_.name(), buffer.length());
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
   switch (metadata_->message_type()) {
@@ -81,7 +81,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::onMessageEnd(Buffer::Ins
   }
 
   ENVOY_LOG(debug, "dubbo decoder: ends the deserialization of the message");
-  return DecoderStatus(ProtocolState::OnTransferBodyTo, handler_->messageEnd(metadata_));
+  return {ProtocolState::OnTransferBodyTo, handler_->messageEnd(metadata_)};
 }
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Instance& buffer) {

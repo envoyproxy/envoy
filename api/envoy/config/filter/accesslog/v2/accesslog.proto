@@ -206,7 +206,8 @@ message ResponseFlagFilter {
       "RLSE",
       "DC",
       "URX",
-      "SI"
+      "SI",
+      "IH"
     ]
   }];
 }
