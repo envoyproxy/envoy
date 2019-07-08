@@ -699,7 +699,7 @@ ClusterInfoImpl::ClusterInfoImpl(
   auto filters = config.filters();
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
-    const ProtobufTypes::String name = proto_config.name();
+    const std::string name = proto_config.name();
     const Json::ObjectSharedPtr filter_config =
         MessageUtil::getJsonObjectFromMessage(proto_config.config());
     ENVOY_LOG(debug, "filter #{} name: {} config: {}", i, name, filter_config->asJsonString());
@@ -707,14 +707,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedNetworkFilterConfigFactory>(
             name);
-    Network::FilterFactoryCb callback;
-    if (filter_config->getBoolean("deprecated_v1", false)) {
-      callback =
-          factory.createFilterFactory(*filter_config->getObject("value", true), *factory_context_);
-    } else {
-      auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
-      callback = factory.createFilterFactoryFromProto(*message, *factory_context_);
-    }
+    Network::FilterFactoryCb callback = factory.createFilterFactory(*filter_config->getObject("value", true), *factory_context_);
     filter_factories_.push_back(callback);
   }
 }

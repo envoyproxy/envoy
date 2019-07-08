@@ -52,7 +52,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 40]
+// [#comment:next free field: 41]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -636,7 +636,7 @@ message Cluster {
   // An optional list of network filters that make up the filter chain for
   // outgoing connections made by the cluster. Order matters as the filters are
   // processed sequentially as connection events happen.
-  repeated cluster.Filter filters = 38 [(gogoproto.nullable) = false];
+  repeated cluster.Filter filters = 40 [(gogoproto.nullable) = false];
 }
 
 // An extensible structure containing the address Envoy should bind to when
