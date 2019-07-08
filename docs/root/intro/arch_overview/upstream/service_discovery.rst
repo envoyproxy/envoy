@@ -39,6 +39,12 @@ This means that care should be taken if active health checking is used with DNS 
 to the same IPs: if an IP is repeated many times between DNS names it might cause undue load on the
 upstream host.
 
+If :ref:`respect_dns_ttl <envoy_api_field_Cluster.respect_dns_ttl>` is enabled, DNS record TTLs and 
+:ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` are used to control DNS refresh rate. 
+For strict DNS cluster, if the minimum of all record TTLs is 0, :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
+will be used as the cluster's DNS refresh rate. :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
+defaults to 5000ms if not specified.
+
 .. _arch_overview_service_discovery_types_logical_dns:
 
 Logical DNS
@@ -57,6 +63,12 @@ connection cycling, etc. Instead, with logical DNS, connections stay alive until
 When interacting with large scale web services, this is the best of all possible worlds:
 asynchronous/eventually consistent DNS resolution, long lived connections, and zero blocking in the
 forwarding path.
+
+If :ref:`respect_dns_ttl <envoy_api_field_Cluster.respect_dns_ttl>` is enabled, DNS record TTLs and 
+:ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` are used to control DNS refresh rate. 
+For logical DNS cluster, if the TTL of first record is 0, :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
+will be used as the cluster's DNS refresh rate. :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
+defaults to 5000ms if not specified.
 
 .. _arch_overview_service_discovery_types_original_destination:
 

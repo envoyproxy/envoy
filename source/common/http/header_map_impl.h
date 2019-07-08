@@ -81,6 +81,7 @@ public:
   void removePrefix(const LowerCaseString& key) override;
   size_t size() const override { return headers_.size(); }
   bool empty() const override { return headers_.empty(); }
+  void dumpState(std::ostream& os, int indent_level = 0) const override;
 
 protected:
   // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.

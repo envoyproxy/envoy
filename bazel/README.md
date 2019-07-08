@@ -350,6 +350,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * Hot restart with `--define hot_restart=disabled`
 * Google C++ gRPC client with `--define google_grpc=disabled`
 * Backtracing on signals with `--define signal_trace=disabled`
+* Active stream state dump on signals with `--define signal_trace=disabled` or `--define disable_object_dump_on_signal_trace=disabled`
 * tcmalloc with `--define tcmalloc=disabled`
 
 ## Enabling optional features

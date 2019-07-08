@@ -181,11 +181,12 @@ void TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, u
   }
 }
 
-std::list<Network::Address::InstanceConstSharedPtr>
-TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
-  std::list<Network::Address::InstanceConstSharedPtr> ret;
+std::list<Network::DnsResponse>
+TestUtility::makeDnsResponse(const std::list<std::string>& addresses, std::chrono::seconds ttl) {
+  std::list<Network::DnsResponse> ret;
   for (const auto& address : addresses) {
-    ret.emplace_back(Network::Utility::parseInternetAddress(address));
+
+    ret.emplace_back(Network::DnsResponse(Network::Utility::parseInternetAddress(address), ttl));
   }
   return ret;
 }

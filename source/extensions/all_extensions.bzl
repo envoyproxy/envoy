@@ -6,7 +6,6 @@ def envoy_all_extensions(blacklist = dict()):
     # Envoy build.
     all_extensions = [
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/extensions/transport_sockets/tls:config",
     ]
 
     # These extensions can be removed on a site specific basis.

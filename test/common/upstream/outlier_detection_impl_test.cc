@@ -16,6 +16,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
@@ -118,23 +119,20 @@ public:
 };
 
 TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
-  const std::string json = R"EOF(
-  {
-    "interval_ms" : 100,
-    "base_ejection_time_ms" : 10000,
-    "consecutive_5xx" : 10,
-    "max_ejection_percent" : 50,
-    "enforcing_consecutive_5xx" : 10,
-    "enforcing_success_rate": 20,
-    "success_rate_minimum_hosts": 50,
-    "success_rate_request_volume": 200,
-    "success_rate_stdev_factor": 3000
-  }
+  const std::string yaml = R"EOF(
+interval: 0.1s
+base_ejection_time: 10s
+consecutive_5xx: 10
+max_ejection_percent: 50
+enforcing_consecutive_5xx: 10
+enforcing_success_rate: 20
+success_rate_minimum_hosts: 50
+success_rate_request_volume: 200
+success_rate_stdev_factor: 3000
   )EOF";
 
   envoy::api::v2::cluster::OutlierDetection outlier_detection;
-  Json::ObjectSharedPtr custom_config = Json::Factory::loadFromString(json);
-  Config::CdsJson::translateOutlierDetection(*custom_config, outlier_detection);
+  TestUtility::loadFromYaml(yaml, outlier_detection);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100)));
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
       cluster_, outlier_detection, dispatcher_, runtime_, time_system_, event_logger_));

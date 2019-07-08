@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/signal.h"
@@ -199,6 +200,17 @@ public:
    * @return the watermark buffer factory for this dispatcher.
    */
   virtual Buffer::WatermarkFactory& getWatermarkFactory() PURE;
+
+  /**
+   * Sets a tracked object, which is currently operating in this Dispatcher.
+   * This should be cleared with another call to setTrackedObject() when the object is done doing
+   * work. Calling setTrackedObject(nullptr) results in no object being tracked.
+   *
+   * This is optimized for performance, to avoid allocation where we do scoped object tracking.
+   *
+   * @return The previously tracked object or nullptr if there was none.
+   */
+  virtual const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;
