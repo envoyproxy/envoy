@@ -50,8 +50,8 @@ void RemoteDataFetcher::onSuccess(Http::MessagePtr&& response) {
         ENVOY_LOG(debug, "fetch remote data [uri = {}]: data is invalid", uri_.uri());
         callback_.onFailure(Failure::InvalidData);
       } else {
-        const auto body = std::string(static_cast<char*>(response->body()->linearize(len)), len);
-        callback_.onSuccess(body);
+        callback_.onSuccess(
+            absl::string_view(static_cast<char*>(response->body()->linearize(len)), len));
       }
     } else {
       ENVOY_LOG(debug, "fetch remote data [uri = {}]: body is empty", uri_.uri());

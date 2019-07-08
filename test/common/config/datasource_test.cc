@@ -48,7 +48,7 @@ TEST_F(AsyncDataSourceTest, loadLocalDataSource) {
     init_target_handle_ = target.createHandle("test");
   }));
 
-  auto provider = Config::DataSource::LocalAsyncDataProvider::create(
+  auto provider = std::make_unique<Config::DataSource::LocalAsyncDataProvider>(
       init_manager_, config.local(), true, *api_, [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, "xxxxxx");
@@ -92,7 +92,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceReturnFailure) {
   }));
 
   std::string async_data = "non-empty";
-  auto provider = Config::DataSource::RemoteAsyncDataProvider::create(
+  auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
       cm_, init_manager_, config.remote(), true, [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, EMPTY_STRING);
@@ -137,7 +137,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessWith503) {
   }));
 
   std::string async_data = "non-empty";
-  auto provider = Config::DataSource::RemoteAsyncDataProvider::create(
+  auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
       cm_, init_manager_, config.remote(), true, [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, EMPTY_STRING);
@@ -181,7 +181,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessWithEmptyBody) {
   }));
 
   std::string async_data = "non-empty";
-  auto provider = Config::DataSource::RemoteAsyncDataProvider::create(
+  auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
       cm_, init_manager_, config.remote(), true, [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, EMPTY_STRING);
@@ -231,7 +231,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessIncorrectSha256) {
   }));
 
   std::string async_data = "non-empty";
-  auto provider = Config::DataSource::RemoteAsyncDataProvider::create(
+  auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
       cm_, init_manager_, config.remote(), true, [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, EMPTY_STRING);
@@ -280,7 +280,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccess) {
   }));
 
   std::string async_data = "non-empty";
-  auto provider = Config::DataSource::RemoteAsyncDataProvider::create(
+  auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
       cm_, init_manager_, config.remote(), true, [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, body);
@@ -323,7 +323,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectNetworkFailure) {
     init_target_handle_ = target.createHandle("test");
   }));
 
-  auto provider = Config::DataSource::RemoteAsyncDataProvider::create(
+  auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
       cm_, init_manager_, config.remote(), false, [](const std::string&) {});
 
   EXPECT_THROW_WITH_MESSAGE(init_target_handle_->initialize(init_watcher_), EnvoyException,
@@ -365,7 +365,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectInvalidData) {
     init_target_handle_ = target.createHandle("test");
   }));
 
-  auto provider = Config::DataSource::RemoteAsyncDataProvider::create(
+  auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
       cm_, init_manager_, config.remote(), false, [](const std::string&) {});
 
   EXPECT_THROW_WITH_MESSAGE(init_target_handle_->initialize(init_watcher_), EnvoyException,

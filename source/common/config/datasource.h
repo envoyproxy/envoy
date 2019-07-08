@@ -37,12 +37,6 @@ absl::optional<std::string> getPath(const envoy::api::v2::core::DataSource& sour
  */
 using AsyncDataSourceCb = std::function<void(std::string)>;
 
-class LocalAsyncDataProvider;
-using LocalAsyncDataProviderPtr = std::unique_ptr<LocalAsyncDataProvider>;
-
-class RemoteAsyncDataProvider;
-using RemoteAsyncDataProviderPtr = std::unique_ptr<RemoteAsyncDataProvider>;
-
 class LocalAsyncDataProvider {
 public:
   LocalAsyncDataProvider(Init::Manager& manager, const envoy::api::v2::core::DataSource& source,
@@ -56,27 +50,11 @@ public:
 
   ~LocalAsyncDataProvider() { init_target_.ready(); }
 
-  /**
-   * Create async data provider for local data source.
-   * @param manager init manager for coordinating initialization
-   * @param source data source configuration
-   * @param allow_empty if the data is allowed empty
-   * @param api "Public" API that different components use to interact with the various system
-   * abstractions
-   * @param callback data provider callback
-   * @return data provider for local data source
-   */
-  static LocalAsyncDataProviderPtr create(Init::Manager& manager,
-                                          const envoy::api::v2::core::DataSource& source,
-                                          bool allow_empty, Api::Api& api,
-                                          AsyncDataSourceCb callback) {
-    return std::make_unique<LocalAsyncDataProvider>(manager, source, allow_empty, api,
-                                                    std::move(callback));
-  }
-
 private:
   Init::TargetImpl init_target_;
 };
+
+using LocalAsyncDataProviderPtr = std::unique_ptr<LocalAsyncDataProvider>;
 
 class RemoteAsyncDataProvider : public Config::DataFetcher::RemoteDataFetcherCallback {
 public:
@@ -93,8 +71,8 @@ public:
   ~RemoteAsyncDataProvider() { init_target_.ready(); }
 
   // Config::DataFetcher::RemoteDataFetcherCallback
-  void onSuccess(const std::string& data) {
-    callback_(data);
+  void onSuccess(absl::string_view data) {
+    callback_(std::string(data));
     init_target_.ready();
   }
 
@@ -109,22 +87,6 @@ public:
     }
   }
 
-  /**
-   * Create async data provider for remote data source.
-   * @param cm cluster manager for remote data fetch
-   * @param manager init manager for coordinating initialization
-   * @param source data source configuration
-   * @param allow_empty allow data to be empty
-   * @param callback data provider callback
-   * @return data provider for remote data source
-   */
-  static RemoteAsyncDataProviderPtr create(Upstream::ClusterManager& cm, Init::Manager& manager,
-                                           const envoy::api::v2::core::RemoteDataSource& source,
-                                           bool allow_empty, AsyncDataSourceCb callback) {
-    return std::make_unique<RemoteAsyncDataProvider>(cm, manager, source, allow_empty,
-                                                     std::move(callback));
-  }
-
 private:
   void start() { fetcher_->fetch(); }
 
@@ -133,6 +95,8 @@ private:
   const Config::DataFetcher::RemoteDataFetcherPtr fetcher_;
   Init::TargetImpl init_target_;
 };
+
+using RemoteAsyncDataProviderPtr = std::unique_ptr<RemoteAsyncDataProvider>;
 
 } // namespace DataSource
 } // namespace Config
