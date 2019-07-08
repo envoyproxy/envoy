@@ -12,24 +12,26 @@ using spdy::SpdyHeaderBlock;
 namespace quic {
 
 // static
-std::string SpdyServerPushUtils::GetPromisedUrlFromHeaders(const SpdyHeaderBlock& /*headers*/){
-    NOT_REACHED_GCOVR_EXCL_LINE}
-
-// static
-std::string
-    SpdyServerPushUtils::GetPromisedHostNameFromHeaders(const SpdyHeaderBlock& /*headers*/) {
-  NOT_REACHED_GCOVR_EXCL_LINE
+std::string SpdyServerPushUtils::GetPromisedUrlFromHeaders(const SpdyHeaderBlock& /*headers*/) {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
 // static
-bool SpdyServerPushUtils::PromisedUrlIsValid(const SpdyHeaderBlock& /*headers*/){
-    NOT_REACHED_GCOVR_EXCL_LINE}
+std::string
+SpdyServerPushUtils::GetPromisedHostNameFromHeaders(const SpdyHeaderBlock& /*headers*/) {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
+
+// static
+bool SpdyServerPushUtils::PromisedUrlIsValid(const SpdyHeaderBlock& /*headers*/) {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
 
 // static
 std::string SpdyServerPushUtils::GetPushPromiseUrl(QuicStringPiece /*scheme*/,
                                                    QuicStringPiece /*authority*/,
                                                    QuicStringPiece /*path*/) {
-  NOT_REACHED_GCOVR_EXCL_LINE
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
 } // namespace quic
