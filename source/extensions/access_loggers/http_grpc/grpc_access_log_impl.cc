@@ -3,7 +3,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
-#include "common/http/header_map_impl.h"
 #include "common/network/utility.h"
 #include "common/stream_info/utility.h"
 

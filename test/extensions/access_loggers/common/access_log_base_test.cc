@@ -20,23 +20,23 @@ class TestImpl : public ImplBase {
 public:
   TestImpl(FilterPtr filter) : ImplBase(std::move(filter)) {}
 
-  int n() { return n_; };
+  int count() { return count_; };
 
 private:
   void emitLog(const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
                const StreamInfo::StreamInfo&) override {
-    n_++;
+    count_++;
   }
 
-  int n_ = 0;
+  int count_ = 0;
 };
 
 TEST(AccessLogBaseTest, NoFilter) {
   StreamInfo::MockStreamInfo stream_info;
   TestImpl logger(nullptr);
-  EXPECT_EQ(logger.n(), 0);
+  EXPECT_EQ(logger.count(), 0);
   logger.log(nullptr, nullptr, nullptr, stream_info);
-  EXPECT_EQ(logger.n(), 1);
+  EXPECT_EQ(logger.count(), 1);
 }
 
 TEST(AccessLogBaseTest, FilterReject) {
@@ -45,9 +45,9 @@ TEST(AccessLogBaseTest, FilterReject) {
   std::unique_ptr<MockFilter> filter = std::make_unique<MockFilter>();
   EXPECT_CALL(*filter, evaluate(_, _, _, _)).WillOnce(Return(false));
   TestImpl logger(std::move(filter));
-  EXPECT_EQ(logger.n(), 0);
+  EXPECT_EQ(logger.count(), 0);
   logger.log(nullptr, nullptr, nullptr, stream_info);
-  EXPECT_EQ(logger.n(), 0);
+  EXPECT_EQ(logger.count(), 0);
 }
 
 } // namespace

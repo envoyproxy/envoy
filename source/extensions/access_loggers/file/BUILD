@@ -16,7 +16,6 @@ envoy_cc_library(
     srcs = ["file_access_log_impl.cc"],
     hdrs = ["file_access_log_impl.h"],
     deps = [
-        "//source/common/http:header_map_lib",
         "//source/extensions/access_loggers/common:access_log_base",
     ],
 )

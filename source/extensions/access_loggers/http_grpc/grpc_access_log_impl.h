@@ -3,7 +3,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/access_log/access_log.h"
 #include "envoy/config/accesslog/v2/als.pb.h"
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 #include "envoy/grpc/async_client.h"
