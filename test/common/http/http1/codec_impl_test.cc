@@ -171,7 +171,7 @@ TEST_F(Http1ServerConnectionImplTest, Http10MultipleResponses) {
     EXPECT_EQ(Protocol::Http10, codec_->protocol());
   }
 
-  // Now send an HTTP/1.1 request and make sure it the protocol is tracked correctly.
+  // Now send an HTTP/1.1 request and make sure the protocol is tracked correctly.
   {
     TestHeaderMapImpl expected_headers{
         {":authority", "www.somewhere.com"}, {":path", "/foobar"}, {":method", "GET"}};
