@@ -19,7 +19,7 @@ RemoteDataFetcher::RemoteDataFetcher(Upstream::ClusterManager& cm,
 RemoteDataFetcher::~RemoteDataFetcher() { cancel(); }
 
 void RemoteDataFetcher::cancel() {
-  if (request_ && !complete_) {
+  if (request_) {
     request_->cancel();
     ENVOY_LOG(debug, "fetch remote data [uri = {}]: canceled", uri_.uri());
   }
@@ -28,8 +28,6 @@ void RemoteDataFetcher::cancel() {
 }
 
 void RemoteDataFetcher::fetch() {
-  complete_ = false;
-
   Http::MessagePtr message = Http::Utility::prepareHeaders(uri_);
   message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   ENVOY_LOG(debug, "fetch remote data from [uri = {}]: start", uri_.uri());
@@ -40,7 +38,6 @@ void RemoteDataFetcher::fetch() {
 }
 
 void RemoteDataFetcher::onSuccess(Http::MessagePtr&& response) {
-  complete_ = true;
   const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
   if (status_code == enumToInt(Http::Code::OK)) {
     ENVOY_LOG(debug, "fetch remote data [uri = {}]: success", uri_.uri());
@@ -71,10 +68,8 @@ void RemoteDataFetcher::onSuccess(Http::MessagePtr&& response) {
 
 void RemoteDataFetcher::onFailure(Http::AsyncClient::FailureReason reason) {
   ENVOY_LOG(debug, "fetch remote data [uri = {}]: network error {}", uri_.uri(), enumToInt(reason));
-  complete_ = true;
-  callback_.onFailure(Failure::Network);
-
   request_ = nullptr;
+  callback_.onFailure(Failure::Network);
 }
 
 } // namespace DataFetcher

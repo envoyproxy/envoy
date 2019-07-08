@@ -67,8 +67,6 @@ public:
   void cancel();
 
 private:
-  bool complete_{};
-
   Upstream::ClusterManager& cm_;
   const envoy::api::v2::core::HttpUri& uri_;
   const std::string content_hash_;
