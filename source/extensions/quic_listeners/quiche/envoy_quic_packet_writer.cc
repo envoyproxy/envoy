@@ -36,7 +36,7 @@ quic::WriteResult EnvoyQuicPacketWriter::WritePacket(const char* buffer, size_t 
                                  buffer_wrapper};
   Api::IoCallUint64Result result = listener_.send(send_data);
   if (result.ok()) {
-    return quic::WriteResult(quic::WRITE_STATUS_OK, result.rc_);
+    return {quic::WRITE_STATUS_OK, static_cast<int>(result.rc_)};
   }
   quic::WriteStatus status = result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again
                                  ? quic::WRITE_STATUS_BLOCKED
