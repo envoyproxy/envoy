@@ -277,6 +277,8 @@ private:
   std::unique_ptr<ProcessContext> process_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   const std::thread::id main_thread_id_;
+  // initialization_time is a histogram for tracking the initialization time across hot restarts
+  // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
 
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
