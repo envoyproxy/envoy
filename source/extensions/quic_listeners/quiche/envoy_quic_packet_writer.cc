@@ -44,7 +44,7 @@ quic::WriteResult EnvoyQuicPacketWriter::WritePacket(const char* buffer, size_t 
   if (quic::IsWriteBlockedStatus(status)) {
     write_blocked_ = true;
   }
-  return quic::WriteResult(status, static_cast<int>(result.err_->getErrorCode()));
+  return {status, static_cast<int>(result.err_->getErrorCode())};
 }
 
 } // namespace Quic

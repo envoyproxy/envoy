@@ -134,7 +134,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
 #ifndef IP_SENDSRCADDR
       cmsg->cmsg_len = CMSG_LEN(sizeof(in_pktinfo));
       cmsg->cmsg_type = IP_PKTINFO;
-      in_pktinfo* pktinfo = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
+      auto pktinfo = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
       pktinfo->ipi_ifindex = 0;
       pktinfo->ipi_spec_dst.s_addr = self_ip->ipv4()->address();
 #else
@@ -146,7 +146,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
       cmsg->cmsg_len = CMSG_LEN(sizeof(in6_pktinfo));
       cmsg->cmsg_level = IPPROTO_IPV6;
       cmsg->cmsg_type = IPV6_PKTINFO;
-      in6_pktinfo* pktinfo = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
+      auto pktinfo = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
       pktinfo->ipi6_ifindex = 0;
       *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) = self_ip->ipv6()->address();
     }
@@ -175,33 +175,33 @@ IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& re
 Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const struct cmsghdr& cmsg,
                                                              uint32_t self_port) {
   if (cmsg.cmsg_type == IPV6_PKTINFO) {
-    const struct in6_pktinfo* info = reinterpret_cast<const in6_pktinfo*>(CMSG_DATA(&cmsg));
+    auto info = reinterpret_cast<const in6_pktinfo*>(CMSG_DATA(&cmsg));
     sockaddr_storage ss;
-    sockaddr_in6& ipv6_addr = reinterpret_cast<sockaddr_in6&>(ss);
-    memset(&ipv6_addr, 0, sizeof(sockaddr_in6));
-    ipv6_addr.sin6_family = AF_INET6;
-    ipv6_addr.sin6_addr = info->ipi6_addr;
-    ipv6_addr.sin6_port = htons(self_port);
+    auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
+    memset(ipv6_addr, 0, sizeof(sockaddr_in6));
+    ipv6_addr->sin6_family = AF_INET6;
+    ipv6_addr->sin6_addr = info->ipi6_addr;
+    ipv6_addr->sin6_port = htons(self_port);
     return Address::addressFromSockAddr(ss, sizeof(sockaddr_in6), /*v6only=*/false);
   }
 #ifndef IP_RECVDSTADDR
   if (cmsg.cmsg_type == IP_PKTINFO) {
-    const struct in_pktinfo* info = reinterpret_cast<const in_pktinfo*>(CMSG_DATA(&cmsg));
+    auto info = reinterpret_cast<const in_pktinfo*>(CMSG_DATA(&cmsg));
 #else
   if (cmsg.cmsg_type == IP_RECVDSTADDR) {
-    const struct in_addr* addr = reinterpret_cast<const in_addr*>(CMSG_DATA(&cmsg));
+    auto addr = reinterpret_cast<const in_addr*>(CMSG_DATA(&cmsg));
 #endif
     sockaddr_storage ss;
-    sockaddr_in& ipv4_addr = reinterpret_cast<sockaddr_in&>(ss);
-    memset(&ipv4_addr, 0, sizeof(sockaddr_in));
-    ipv4_addr.sin_family = AF_INET;
-    ipv4_addr.sin_addr =
+    auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
+    memset(ipv4_addr, 0, sizeof(sockaddr_in));
+    ipv4_addr->sin_family = AF_INET;
+    ipv4_addr->sin_addr =
 #ifndef IP_RECVDSTADDR
         info->ipi_addr;
 #else
         *addr;
 #endif
-    ipv4_addr.sin_port = htons(self_port);
+    ipv4_addr->sin_port = htons(self_port);
     return Address::addressFromSockAddr(ss, sizeof(sockaddr_in), /*v6only=*/false);
   }
   return nullptr;
@@ -249,7 +249,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   hdr.msg_iovlen = num_slices_for_read;
   hdr.msg_flags = 0;
 
-  struct cmsghdr* cmsg = reinterpret_cast<struct cmsghdr*>(cbuf.begin());
+  auto cmsg = reinterpret_cast<struct cmsghdr*>(cbuf.begin());
   cmsg->cmsg_len = cmsg_space;
   hdr.msg_control = cmsg;
   hdr.msg_controllen = cmsg_space;

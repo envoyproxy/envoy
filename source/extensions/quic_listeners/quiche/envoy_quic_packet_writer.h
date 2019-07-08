@@ -39,7 +39,7 @@ public:
                              const quic::QuicSocketAddress& /*peer_address*/) override {
     return nullptr;
   }
-  quic::WriteResult Flush() override { return quic::WriteResult(quic::WRITE_STATUS_OK, 0); }
+  quic::WriteResult Flush() override { return {quic::WRITE_STATUS_OK, 0}; }
 
 private:
   // Modified by WritePacket() to indicate underlying IoHandle status.
