@@ -314,6 +314,8 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   auto server_thread = startTestServer("test/server/node_bootstrap.yaml", false);
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
+  // Validate that initialization_time histogram value has been set.
+  EXPECT_TRUE(stats_store_.histogram("server.initialization_time").used());
 }
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
