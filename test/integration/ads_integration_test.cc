@@ -968,9 +968,11 @@ TEST_P(AdsIntegrationTest, ListenerDrainBeforeServerStart) {
   sendDiscoveryResponse<envoy::api::v2::Listener>(
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {}, "1");
+  test_server_->waitForGaugeGe("listener_manager.total_listeners_active", 1);
 
   // Remove listener.
   sendDiscoveryResponse<envoy::api::v2::Listener>(Config::TypeUrl::get().Listener, {}, {}, {}, "1");
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 0);
 }
 
 } // namespace
