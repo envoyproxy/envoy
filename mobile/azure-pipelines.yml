@@ -55,6 +55,76 @@ stages:
           - checkout: self
           - script: ./ci/kotlin_lint.sh
             displayName: 'Run Kotlin lint'
+  # Note: the size regression jobs are not ideal.
+  # The size analysis described in the docs was ran on arm64 machines.
+  # However, it seems that azure pipelines will support arm64 machines sometime soon.
+  # Whenever that is available this jobs should be moved to that architecture.
+  # Issue: https://github.com/lyft/envoy-mobile/issues/216
+  - stage: performance
+    dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    jobs:
+      - job: size_current
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'Ubuntu 16.04'
+        steps:
+          - checkout: self
+            submodules: true
+          - script: ./ci/linux_ci_setup.sh
+            displayName: 'Install dependencies'
+          - script: bazel build //test/performance:test_binary_size --config=sizeopt
+            displayName: 'Build test binary'
+          - task: PublishPipelineArtifact@0
+            displayName: 'Publish current test binary'
+            inputs:
+              artifactName: 'current'
+              targetPath: bazel-bin/test/performance/test_binary_size
+      - job: size_master
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'Ubuntu 16.04'
+        steps:
+          - checkout: self
+            submodules: true
+          - script: git checkout master && git pull origin master
+          - script: ./ci/linux_ci_setup.sh
+            displayName: 'Install dependencies'
+          - script: bazel build //test/performance:test_binary_size --config=sizeopt
+            displayName: 'Build test binary'
+          - task: PublishPipelineArtifact@0
+            displayName: 'Publish master test binary'
+            inputs:
+              artifactName: 'master'
+              targetPath: bazel-bin/test/performance/test_binary_size
+      - job: size_compare
+        dependsOn:
+          - size_current
+          - size_master
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'Ubuntu 16.04'
+        steps:
+          - script: mkdir -p dist/master && mkdir -p dist/current
+          - script: ./ci/linux_ci_setup.sh
+            displayName: 'Install dependencies'
+          - task: DownloadPipelineArtifact@0
+            displayName: 'Download current test binary'
+            inputs:
+              artifactName: 'current'
+              targetPath: dist/current
+          - task: DownloadPipelineArtifact@0
+            displayName: 'Download master test binary'
+            inputs:
+              artifactName: 'master'
+              targetPath: dist/master
+          - script: |
+              strip -s -o dist/master/test_binary_size.stripped dist/master/test_binary_size
+              strip -s -o dist/current/test_binary_size.stripped dist/current/test_binary_size
+              zip -9 dist/master.zip dist/master/test_binary_size.stripped
+              zip -9 dist/current.zip dist/current/test_binary_size.stripped
+            displayName: 'Strip and Zip binary'
+          - script: ./ci/test_size_regression.sh dist/master.zip dist/current.zip
+            displayName: 'Test size regression'
   - stage: android
     dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
     jobs:
