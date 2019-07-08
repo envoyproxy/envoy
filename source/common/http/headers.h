@@ -18,15 +18,19 @@ namespace Http {
 class PrefixValue {
 public:
   const char* prefix() {
-    absl::ReaderMutexLock lock(&m_);
+    absl::WriterMutexLock lock(&m_);
+    read_ = true;
     return prefix_;
   }
   void setPrefix(const char* prefix) {
     absl::WriterMutexLock lock(&m_);
+    RELEASE_ASSERT(!read_ || absl::string_view(prefix_) == absl::string_view(prefix),
+                   "Attempting to change the header prefix after it has been used!");
     prefix_ = prefix;
   }
 
 private:
+  bool read_ = false;
   const char* default_prefix_ = "x-envoy";
   const char* prefix_ = default_prefix_;
   absl::Mutex m_;

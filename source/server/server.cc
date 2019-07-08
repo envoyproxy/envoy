@@ -273,11 +273,8 @@ void InstanceImpl::initialize(const Options& options,
   // Immediate after the bootstrap has been loaded, override the header prefix, if configured to
   // do so. This must be set before any other code block references the HeaderValues ConstSingleton.
   if (!bootstrap_.header_prefix().empty()) {
+    // setPrefix has a release assert verifying that setPrefix() is not called after prefix()
     ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix(bootstrap_.header_prefix().c_str());
-    // Verify that the header singleton was initialized with the correct prefix.
-    RELEASE_ASSERT(absl::StartsWith(Http::Headers::get().EnvoyAttemptCount.get().c_str(),
-                                    bootstrap_.header_prefix()),
-                   "Header construct initialized with incorrect prefix.");
   }
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
