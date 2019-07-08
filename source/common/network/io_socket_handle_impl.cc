@@ -162,6 +162,7 @@ IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& re
     return Api::IoCallUint64Result(result.rc_,
                                    Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
   }
+  RELEASE_ASSERT(result.errno_ != EINVAL, "Invalid argument passed in.");
   return Api::IoCallUint64Result(
       /*rc=*/0,
       (result.errno_ == EAGAIN

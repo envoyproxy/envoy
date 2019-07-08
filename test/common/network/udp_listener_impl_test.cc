@@ -394,13 +394,6 @@ TEST_P(UdpListenerImplTest, SendData) {
 
   EXPECT_TRUE(send_result.ok()) << "send() failed : " << send_result.err_->getErrorDetails();
 
-  // This is trigerred on opening the listener on registering the event
-  EXPECT_CALL(listener_callbacks_, onWriteReady_(_)).WillOnce(Invoke([&](const Socket& socket) {
-    EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
-  }));
-
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-
   const uint64_t bytes_to_read = payload.length();
   // Make receive buffer 1 byte larger for trailling '\0'.
   auto recv_buf = std::make_unique<char[]>(bytes_to_read + 1);
@@ -446,19 +439,19 @@ TEST_P(UdpListenerImplTest, SendDataError) {
   // send data to itself
   UdpSendData send_data{send_to_addr_->ip(), *server_socket_->localAddress(), *buffer};
 
-  // This is trigerred on opening the listener on registering the event
-  EXPECT_CALL(listener_callbacks_, onWriteReady_(_)).WillOnce(Invoke([&](const Socket& socket) {
-    EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
-  }));
   // Inject mocked OsSysCalls implementation to mock a write failure.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, ENOTSUP}));
   auto send_result = listener_->send(send_data);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(send_result.ok());
   EXPECT_EQ(send_result.err_->getErrorCode(), Api::IoError::IoErrorCode::NoSupport);
-  dispatcher_->exit();
+  // Failed write shouldn't drain the data.
+  EXPECT_EQ(payload.length(), buffer->length());
+
+  ON_CALL(os_sys_calls, sendmsg(_, _, _)).WillByDefault(Return(Api::SysCallSizeResult{-1, EINVAL}));
+  // EINVAL should cause RELEASE_ASSERT.
+  EXPECT_DEATH(listener_->send(send_data), "Invalid argument passed in");
 }
 
 } // namespace

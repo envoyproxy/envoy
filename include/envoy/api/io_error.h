@@ -29,8 +29,6 @@ public:
     MessageTooBig,
     // Kernel interrupt.
     Interrupt,
-    // Given argument is not valid.
-    InvalidArgument,
     // Requested a nonexistent interface or a non-local source address.
     AddressNotAvailable,
     // Other error codes cannot be mapped to any one above in getErrorCode().

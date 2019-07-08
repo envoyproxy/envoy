@@ -23,8 +23,6 @@ Api::IoError::IoErrorCode IoSocketError::getErrorCode() const {
     return IoErrorCode::MessageTooBig;
   case EINTR:
     return IoErrorCode::Interrupt;
-  case EINVAL:
-    return IoErrorCode::InvalidArgument;
   case EADDRNOTAVAIL:
     return IoErrorCode::AddressNotAvailable;
   default:
