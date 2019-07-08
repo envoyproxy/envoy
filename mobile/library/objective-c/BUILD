@@ -1,18 +1,20 @@
 licenses(["notice"])  # Apache 2
 
+exports_files(["EnvoyEngine.h"])
+
 filegroup(
-    name = "envoy_framework_headers",
-    srcs = [
-        "Envoy.h",
-    ],
+    name = "envoy_engine_hdrs",
+    srcs = ["EnvoyEngine.h"],
     visibility = ["//visibility:public"],
 )
 
 objc_library(
-    name = "envoy_objc_interface_lib",
+    name = "envoy_engine_objc_lib",
     srcs = [
-        "Envoy.h",
-        "Envoy.mm",
+        "EnvoyEngine.mm",
+    ],
+    hdrs = [
+        "EnvoyEngine.h",
     ],
     copts = ["-std=c++14"],
     visibility = ["//visibility:public"],
