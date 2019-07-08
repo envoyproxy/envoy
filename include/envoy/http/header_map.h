@@ -528,18 +528,22 @@ public:
   virtual bool empty() const PURE;
 
   /**
+   * Dump the header map to the ostream specified
+   *
+   * @param os the stream to dump state to
+   * @param indent_level the depth, for pretty-printing.
+   *
+   * This function is called on Envoy fatal errors so should avoid memory allocation where possible.
+   */
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  /**
    * Allow easy pretty-printing of the key/value pairs in HeaderMap
    * @param os supplies the ostream to print to.
    * @param headers the headers to print.
    */
   friend std::ostream& operator<<(std::ostream& os, const HeaderMap& headers) {
-    headers.iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          *static_cast<std::ostream*>(context) << "'" << header.key().getStringView() << "', '"
-                                               << header.value().getStringView() << "'\n";
-          return HeaderMap::Iterate::Continue;
-        },
-        &os);
+    headers.dumpState(os);
     return os;
   }
 };

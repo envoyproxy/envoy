@@ -38,8 +38,6 @@
 #include "server/overload_manager_impl.h"
 #include "server/worker_impl.h"
 
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
@@ -250,7 +248,7 @@ private:
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorPtr random_generator_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
-  std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> ssl_context_manager_;
+  std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;

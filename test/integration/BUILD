@@ -408,7 +408,7 @@ envoy_cc_test_library(
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tap:config",
-        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/extensions/transport_sockets/tls:config",
         "//source/server:connection_handler_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:listener_hooks_lib",
