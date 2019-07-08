@@ -15,29 +15,46 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+using Upstream::ConnectionRequestPolicy;
+
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnPoolImplBase(std::move(host), std::move(priority)), dispatcher_(dispatcher),
       socket_options_(options) {}
 
+void ConnPoolImpl::applyToEachClient(std::list<ActiveClientPtr>& client_list,
+                                     const std::function<void(const ActiveClientPtr&)>& fn) {
+  for_each(client_list.begin(), client_list.end(), fn);
+}
+
 ConnPoolImpl::~ConnPoolImpl() {
-  if (primary_client_) {
-    primary_client_->client_->close();
-  }
-
-  if (draining_client_) {
-    draining_client_->client_->close();
-  }
-
-  // Make sure all clients are destroyed before we are destroyed.
+  drainConnections();
   dispatcher_.clearDeferredDeleteList();
 }
 
 void ConnPoolImpl::ConnPoolImpl::drainConnections() {
-  if (primary_client_ != nullptr) {
-    movePrimaryClientToDraining();
-  }
+  applyToEachClient(connecting_clients_, [this](const ActiveClientPtr& client) {
+    client->state_ = ConnectionRequestPolicy::State::Drain;
+    client->moveBetweenLists(connecting_clients_, drain_clients_);
+  });
+
+  applyToEachClient(ready_clients_, [this](const ActiveClientPtr& client) {
+    client->state_ = ConnectionRequestPolicy::State::Drain;
+    client->moveBetweenLists(ready_clients_, drain_clients_);
+  });
+
+  applyToEachClient(overflow_clients_, [this](const ActiveClientPtr& client) {
+    client->state_ = ConnectionRequestPolicy::State::Drain;
+    client->moveBetweenLists(overflow_clients_, drain_clients_);
+  });
+
+  applyToEachClient(busy_clients_, [this](const ActiveClientPtr& client) {
+    client->state_ = ConnectionRequestPolicy::State::Drain;
+    client->moveBetweenLists(busy_clients_, drain_clients_);
+  });
+
+  checkForDrained();
 }
 
 void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
@@ -45,102 +62,132 @@ void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
   checkForDrained();
 }
 
+Upstream::ResourceManager& ConnPoolImpl::ActiveClient::resourceManager() const {
+  return parent_.host()->cluster().resourceManager(parent_.resourcePriority());
+}
+
 bool ConnPoolImpl::hasActiveConnections() const {
-  if (primary_client_ && primary_client_->client_->numActiveRequests() > 0) {
-    return true;
-  }
-
-  if (draining_client_ && draining_client_->client_->numActiveRequests() > 0) {
-    return true;
-  }
-
-  return !pending_requests_.empty();
+  return !pending_requests_.empty() || !busy_clients_.empty() || !overflow_clients_.empty() ||
+         !drain_clients_.empty();
 }
 
 void ConnPoolImpl::checkForDrained() {
-  if (drained_callbacks_.empty()) {
-    return;
-  }
-
-  bool drained = true;
-  if (primary_client_) {
-    if (primary_client_->client_->numActiveRequests() == 0) {
-      primary_client_->client_->close();
-      ASSERT(!primary_client_);
-    } else {
-      drained = false;
+  for (auto it = drain_clients_.begin(); it != drain_clients_.end();) {
+    auto& client = *it++;
+    if (client->client_ && client->client_->numActiveRequests() == 0 &&
+        !client->client_->remoteClosed()) {
+      ENVOY_CONN_LOG(debug, "adding to close list", *client->client_);
+      client->moveBetweenLists(drain_clients_, to_close_clients_);
     }
   }
 
-  ASSERT(!draining_client_ || (draining_client_->client_->numActiveRequests() > 0));
-  if (draining_client_ && draining_client_->client_->numActiveRequests() > 0) {
-    drained = false;
+  while (!to_close_clients_.empty()) {
+    auto& client = to_close_clients_.front();
+    ENVOY_CONN_LOG(debug, "closing from drained list", *client->client_);
+    client->client_->close();
   }
 
-  if (drained) {
-    ENVOY_LOG(debug, "invoking drained callbacks");
+  if (!drained_callbacks_.empty() && pending_requests_.empty() && busy_clients_.empty() &&
+      overflow_clients_.empty()) {
+    ENVOY_LOG(debug, "draining ready clients");
+
+    while (!ready_clients_.empty()) {
+      ready_clients_.front()->client_->close();
+    }
+
     for (const DrainedCb& cb : drained_callbacks_) {
       cb();
     }
   }
 }
 
-void ConnPoolImpl::newClientStream(Http::StreamDecoder& response_decoder,
-                                   ConnectionPool::Callbacks& callbacks) {
-  if (!host_->cluster().resourceManager(priority_).requests().canCreate()) {
-    ENVOY_LOG(debug, "max requests overflow");
-    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, absl::string_view(),
-                            nullptr);
-    host_->cluster().stats().upstream_rq_pending_overflow_.inc();
-  } else {
-    ENVOY_CONN_LOG(debug, "creating stream", *primary_client_->client_);
-    primary_client_->total_streams_++;
-    host_->stats().rq_total_.inc();
-    host_->stats().rq_active_.inc();
-    host_->cluster().stats().upstream_rq_total_.inc();
-    host_->cluster().stats().upstream_rq_active_.inc();
-    host_->cluster().resourceManager(priority_).requests().inc();
-    callbacks.onPoolReady(primary_client_->client_->newStream(response_decoder),
-                          primary_client_->real_host_description_);
+void ConnPoolImpl::attachRequestToClient(ConnPoolImpl::ActiveClient& client,
+                                         StreamDecoder& response_decoder,
+                                         ConnectionPool::Callbacks& callbacks) {
+  ENVOY_CONN_LOG(debug, "attaching request to connection", *client.client_);
+  client.total_streams_++;
+
+  if (client.state_ == ConnectionRequestPolicy::State::Ready) {
+    client.idle_timer_->disableTimer();
+    client.idle_timer_.reset();
   }
+
+  host_->stats().rq_total_.inc();
+  host_->stats().rq_active_.inc();
+  host_->cluster().stats().upstream_rq_total_.inc();
+  host_->cluster().stats().upstream_rq_active_.inc();
+  host_->cluster().resourceManager(priority_).requests().inc();
+  callbacks.onPoolReady(client.client_->newStream(response_decoder), client.real_host_description_);
+}
+
+void ConnPoolImpl::createNewConnection() {
+  ENVOY_LOG(debug, "creating a new connection");
+  ActiveClientPtr client(new ActiveClient(*this));
+  client->state_ = ConnectionRequestPolicy::State::Init;
+  ENVOY_CONN_LOG(debug, "Moving new connection to connecting_clients list", *client->client_);
+  client->moveIntoList(std::move(client), connecting_clients_);
 }
 
 ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& response_decoder,
                                                      ConnectionPool::Callbacks& callbacks) {
-  ASSERT(drained_callbacks_.empty());
+  ENVOY_LOG(debug, "new stream");
+  std::list<ActiveClientPtr>* client_list = nullptr;
 
-  // First see if we need to handle max streams rollover.
-  uint64_t max_streams = host_->cluster().maxRequestsPerConnection();
-  if (max_streams == 0) {
-    max_streams = maxTotalStreams();
+  if (!busy_clients_.empty()) {
+    client_list = &busy_clients_;
+  } else if (!ready_clients_.empty()) {
+    client_list = &ready_clients_;
   }
 
-  if (primary_client_ && primary_client_->total_streams_ >= max_streams) {
-    movePrimaryClientToDraining();
-  }
+  if (client_list) {
+    auto& client = client_list->front();
 
-  if (!primary_client_) {
-    primary_client_ = std::make_unique<ActiveClient>(*this);
-  }
+    ENVOY_CONN_LOG(debug, "using existing connection", *client->client_);
+    attachRequestToClient(*client, response_decoder, callbacks);
 
-  // If the primary client is not connected yet, queue up the request.
-  if (!primary_client_->upstream_ready_) {
-    // If we're not allowed to enqueue more requests, fail fast.
-    if (!host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
-      ENVOY_LOG(debug, "max pending requests overflow");
-      callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, absl::string_view(),
-                              nullptr);
-      host_->cluster().stats().upstream_rq_pending_overflow_.inc();
-      return nullptr;
+    ENVOY_LOG(debug, "cluster: {}", host_->cluster().name());
+    ENVOY_LOG(debug, "max requests per connection for cluster {}",
+              host_->cluster().maxRequestsPerConnection());
+
+    const auto state = host_->cluster().connectionPolicy().onNewStream(*client);
+    switch (state) {
+    case ConnectionRequestPolicy::State::Active:
+      ENVOY_CONN_LOG(debug, "moving to active list after attaching request", *client->client_);
+      client->moveBetweenLists(*client_list, busy_clients_);
+      break;
+    case ConnectionRequestPolicy::State::Overflow:
+      ENVOY_CONN_LOG(debug, "moving to overflow list after attaching request", *client->client_);
+      client->moveBetweenLists(*client_list, overflow_clients_);
+      break;
+    case ConnectionRequestPolicy::State::Drain:
+      ENVOY_CONN_LOG(debug, "moving to drain list after attaching request", *client->client_);
+      client->moveBetweenLists(*client_list, drain_clients_);
+      break;
+    default:
+      ASSERT(false);
     }
 
-    return newPendingRequest(response_decoder, callbacks);
+    client->state_ = state;
+
+    return nullptr;
   }
 
-  // We already have an active client that's connected to upstream, so attempt to establish a
-  // new stream.
-  newClientStream(response_decoder, callbacks);
-  return nullptr;
+  if (!host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
+    ENVOY_LOG(debug, "max pending requests overflow");
+    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, absl::string_view(),
+                            nullptr);
+    host_->cluster().stats().upstream_rq_pending_overflow_.inc();
+    return nullptr;
+  }
+
+  // If we have no connections at all, make one no matter what so we don't starve.
+  if ((ready_clients_.empty() && busy_clients_.empty())) {
+    ENVOY_LOG(debug, "no ready or busy clients available for new stream");
+    createNewConnection();
+  }
+
+  ENVOY_LOG(debug, "queueing request as no connection available");
+  return newPendingRequest(response_decoder, callbacks);
 }
 
 void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event) {
@@ -148,43 +195,80 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       event == Network::ConnectionEvent::LocalClose) {
     ENVOY_CONN_LOG(debug, "client disconnected", *client.client_);
 
+    ENVOY_CONN_LOG(debug, "Got close event , remote: {}", *client.client_,
+                   event == Network::ConnectionEvent::RemoteClose);
     Envoy::Upstream::reportUpstreamCxDestroy(host_, event);
     if (client.closed_with_active_rq_) {
       Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
     }
 
-    if (client.connect_timer_) {
+    if (event == Network::ConnectionEvent::RemoteClose) {
+      client.remote_closed_ = true;
+    }
+
+    ActiveClientPtr removed;
+    bool check_for_drained = true;
+
+    if (!client.connect_timer_) {
+      // if not in ready list
+      switch (client.state_) {
+      case ConnectionRequestPolicy::State::Overflow: {
+        removed = client.removeFromList(overflow_clients_);
+        break;
+      }
+      case ConnectionRequestPolicy::State::Drain: {
+        if (!client.remote_closed_) {
+          ENVOY_CONN_LOG(debug, "client removed from drain list", *client.client_);
+          removed = client.removeFromList(to_close_clients_);
+        }
+
+        break;
+      }
+      case ConnectionRequestPolicy::State::Active: {
+        ENVOY_CONN_LOG(debug, "client removed from busy list", *client.client_);
+        removed = client.removeFromList(busy_clients_);
+        break;
+      }
+      default:
+        ENVOY_CONN_LOG(debug, "client removed from busy list", *client.client_);
+        removed = client.removeFromList(busy_clients_);
+        break;
+      }
+    } else {
+      // in ready list
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
+
+      ENVOY_CONN_LOG(debug, "client removed from connecting list", *client.client_);
+      removed = client.removeFromList(connecting_clients_);
+      check_for_drained = false;
 
       // Raw connect failures should never happen under normal circumstances. If we have an upstream
       // that is behaving badly, requests can get stuck here in the pending state. If we see a
       // connect failure, we purge all pending requests so that calling code can determine what to
       // do with the request.
-      // NOTE: We move the existing pending requests to a temporary list. This is done so that
-      //       if retry logic submits a new request to the pool, we don't fail it inline.
       purgePendingRequests(client.real_host_description_,
                            client.client_->connectionFailureReason());
     }
 
-    if (&client == primary_client_.get()) {
-      ENVOY_CONN_LOG(debug, "destroying primary client", *client.client_);
-      dispatcher_.deferredDelete(std::move(primary_client_));
-    } else {
-      ENVOY_CONN_LOG(debug, "destroying draining client", *client.client_);
-      dispatcher_.deferredDelete(std::move(draining_client_));
+    dispatcher_.deferredDelete(std::move(removed));
+
+    // If we have pending requests and we just lost a connection we should make a new one.
+    if (pending_requests_.size() > (ready_clients_.size() + busy_clients_.size())) {
+      createNewConnection();
     }
 
-    if (client.closed_with_active_rq_) {
+    if (check_for_drained) {
       checkForDrained();
     }
   }
 
   if (event == Network::ConnectionEvent::Connected) {
+    ENVOY_CONN_LOG(debug, "Got connected event", *client.client_);
     conn_connect_ms_->complete();
 
     client.upstream_ready_ = true;
-    onUpstreamReady();
+    onUpstreamReady(client);
   }
 
   if (client.connect_timer_) {
@@ -193,39 +277,51 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
   }
 }
 
-void ConnPoolImpl::movePrimaryClientToDraining() {
-  ENVOY_CONN_LOG(debug, "moving primary to draining", *primary_client_->client_);
-  if (draining_client_) {
-    // This should pretty much never happen, but is possible if we start draining and then get
-    // a goaway for example. In this case just kill the current draining connection. It's not
-    // worth keeping a list.
-    draining_client_->client_->close();
-  }
-
-  ASSERT(!draining_client_);
-  if (primary_client_->client_->numActiveRequests() == 0) {
-    // If we are making a new connection and the primary does not have any active requests just
-    // close it now.
-    primary_client_->client_->close();
-  } else {
-    draining_client_ = std::move(primary_client_);
-  }
-
-  ASSERT(!primary_client_);
+void ConnPoolImpl::onIdleTimeout(ActiveClient& client) {
+  ENVOY_CONN_LOG(debug, "idle timeout", *client.client_);
+  client.moveBetweenLists(ready_clients_, drain_clients_);
+  client.state_ = ConnectionRequestPolicy::State::Drain;
+  checkForDrained();
 }
 
 void ConnPoolImpl::onConnectTimeout(ActiveClient& client) {
   ENVOY_CONN_LOG(debug, "connect timeout", *client.client_);
   host_->cluster().stats().upstream_cx_connect_timeout_.inc();
-  client.client_->close();
+
+  if (client.state_ == ConnectionRequestPolicy::State::Active) {
+    client.moveBetweenLists(busy_clients_, drain_clients_);
+  }
+  if (client.state_ == ConnectionRequestPolicy::State::Init) {
+    client.moveBetweenLists(connecting_clients_, drain_clients_);
+  }
+
+  client.state_ = ConnectionRequestPolicy::State::Drain;
+
+  client.connect_timer_->disableTimer();
+  client.connect_timer_.reset();
+
+  checkForDrained();
 }
 
 void ConnPoolImpl::onGoAway(ActiveClient& client) {
   ENVOY_CONN_LOG(debug, "remote goaway", *client.client_);
   host_->cluster().stats().upstream_cx_close_notify_.inc();
-  if (&client == primary_client_.get()) {
-    movePrimaryClientToDraining();
+
+  switch (client.state_) {
+  case ConnectionRequestPolicy::State::Overflow: {
+    client.moveBetweenLists(overflow_clients_, drain_clients_);
+    break;
   }
+  case ConnectionRequestPolicy::State::Active: {
+    client.moveBetweenLists(busy_clients_, drain_clients_);
+    break;
+  }
+  default:
+    ASSERT(client.state_ == ConnectionRequestPolicy::State::Drain);
+    break;
+  }
+
+  client.state_ = ConnectionRequestPolicy::State::Drain;
 }
 
 void ConnPoolImpl::onStreamDestroy(ActiveClient& client) {
@@ -234,15 +330,48 @@ void ConnPoolImpl::onStreamDestroy(ActiveClient& client) {
   host_->stats().rq_active_.dec();
   host_->cluster().stats().upstream_rq_active_.dec();
   host_->cluster().resourceManager(priority_).requests().dec();
-  if (&client == draining_client_.get() && client.client_->numActiveRequests() == 0) {
-    // Close out the draining client if we no long have active requests.
-    client.client_->close();
+  client.total_streams_--;
+
+  bool check_drained = false;
+  const auto state = host_->cluster().connectionPolicy().onStreamReset(client, client.state_);
+  switch (state) {
+  case ConnectionRequestPolicy::State::Active: {
+    if (client.state_ == ConnectionRequestPolicy::State::Overflow) {
+      client.moveBetweenLists(overflow_clients_, busy_clients_);
+    }
+    if (client.state_ == ConnectionRequestPolicy::State::Drain) {
+      client.moveBetweenLists(drain_clients_, busy_clients_);
+    }
+
+    break;
+  }
+  case ConnectionRequestPolicy::State::Drain: {
+    if (client.state_ == ConnectionRequestPolicy::State::Overflow) {
+      ENVOY_CONN_LOG(debug, "moving to drain list", *client.client_);
+      check_drained = true;
+      client.moveBetweenLists(overflow_clients_, drain_clients_);
+    }
+
+    if (client.state_ == ConnectionRequestPolicy::State::Active) {
+      ENVOY_CONN_LOG(debug, "moving to drain list", *client.client_);
+      check_drained = true;
+      client.moveBetweenLists(overflow_clients_, drain_clients_);
+    }
+
+    if (client.state_ == ConnectionRequestPolicy::State::Drain) {
+      ENVOY_CONN_LOG(debug, "moving to drain list", *client.client_);
+      check_drained = true;
+    }
+    break;
+  }
+  default:
+    ASSERT(false);
+    break;
   }
 
-  // If we are destroying this stream because of a disconnect, do not check for drain here. We will
-  // wait until the connection has been fully drained of streams and then check in the connection
-  // event callback.
-  if (!client.closed_with_active_rq_) {
+  client.state_ = state;
+
+  if (check_drained) {
     checkForDrained();
   }
 }
@@ -259,17 +388,60 @@ void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason r
   }
 }
 
-void ConnPoolImpl::onUpstreamReady() {
-  // Establishes new codec streams for each pending request.
-  while (!pending_requests_.empty()) {
-    newClientStream(pending_requests_.back()->decoder_, pending_requests_.back()->callbacks_);
-    pending_requests_.pop_back();
+void ConnPoolImpl::onUpstreamReady(ActiveClient& client) {
+  if (client.state_ == ConnectionRequestPolicy::State::Init) {
+    if (pending_requests_.empty()) {
+      // There is nothing to service or delayed processing is requested, so just move the connection
+      // into the ready list.
+      ENVOY_CONN_LOG(debug, "moving to ready", *client.client_);
+      client.moveBetweenLists(connecting_clients_, ready_clients_);
+      client.state_ = ConnectionRequestPolicy::State::Ready;
+      client.idle_timer_->enableTimer(std::chrono::milliseconds(500));
+    } else {
+      client.moveBetweenLists(connecting_clients_, busy_clients_);
+      client.state_ = ConnectionRequestPolicy::State::Active;
+
+      // There is work to do immediately so bind a request to the client and move it to the busy
+      // list. Pending requests are pushed onto the front, so pull from the back.
+      ENVOY_CONN_LOG(debug, "attaching to next request", *client.client_);
+      attachRequestToClient(client, pending_requests_.back()->decoder_,
+                            pending_requests_.back()->callbacks_);
+      pending_requests_.pop_back();
+
+      const auto state = host_->cluster().connectionPolicy().onNewStream(client);
+      switch (state) {
+      case ConnectionRequestPolicy::State::Active:
+        ENVOY_CONN_LOG(debug, "is active", *client.client_);
+        break;
+      case ConnectionRequestPolicy::State::Overflow:
+        ENVOY_CONN_LOG(debug, "moving to overflow list after attaching request", *client.client_);
+        client.moveBetweenLists(busy_clients_, overflow_clients_);
+        break;
+      case ConnectionRequestPolicy::State::Drain:
+        ENVOY_CONN_LOG(debug, "moving to drain list after attaching request", *client.client_);
+        client.moveBetweenLists(busy_clients_, drain_clients_);
+        break;
+      default:
+        ENVOY_CONN_LOG(warn, "in unexpected state: {}", *client.client_, static_cast<int>(state));
+        ASSERT(false);
+      }
+
+      client.state_ = state;
+    }
   }
+
+  if (ready_clients_.empty() && busy_clients_.empty() && connecting_clients_.empty()) {
+    ENVOY_LOG(debug, "creating new connection as no exiting ready or busy clients");
+    createNewConnection();
+  }
+
+  ENVOY_LOG(debug, "handled onUpsreamReady");
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : parent_(parent),
-      connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })) {
+      connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
+      idle_timer_(parent_.dispatcher_.createTimer([this]() -> void { onIdleTimeout(); })) {
   parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan>(
       parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
   Upstream::Host::CreateConnectionData data =

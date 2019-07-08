@@ -34,19 +34,25 @@ public:
   void addDrainedCallback(DrainedCb cb) override;
   void drainConnections() override;
   bool hasActiveConnections() const override;
+  /*
   ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
+                                         */
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; };
+  const Upstream::ResourcePriority& resourcePriority() const { return priority_; };
 
 protected:
-  struct ActiveClient : public Network::ConnectionCallbacks,
+  struct ActiveClient : LinkedObject<ActiveClient>,
+                        public Network::ConnectionCallbacks,
                         public CodecClientCallbacks,
                         public Event::DeferredDeletable,
-                        public Http::ConnectionCallbacks {
+                        public Http::ConnectionCallbacks,
+                        public Upstream::ConnectionRequestPolicySubscriber {
     ActiveClient(ConnPoolImpl& parent);
     ~ActiveClient() override;
 
     void onConnectTimeout() { parent_.onConnectTimeout(*this); }
+    void onIdleTimeout() { parent_.onIdleTimeout(*this); }
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
@@ -64,14 +70,21 @@ protected:
     // Http::ConnectionCallbacks
     void onGoAway() override { parent_.onGoAway(*this); }
 
+    // Upstream::ConnectionRequestPolicySubscriber
+    uint64_t requestCount() const override { return total_streams_; };
+    Upstream::ResourceManager& resourceManager() const override;
+
     ConnPoolImpl& parent_;
     CodecClientPtr client_;
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
     uint64_t total_streams_{};
     Event::TimerPtr connect_timer_;
+    Event::TimerPtr idle_timer_;
     bool upstream_ready_{};
     Stats::TimespanPtr conn_length_;
     bool closed_with_active_rq_{};
+    Upstream::ConnectionRequestPolicy::State state_;
+    bool remote_closed_ = {false};
   };
 
   using ActiveClientPtr = std::unique_ptr<ActiveClient>;
@@ -81,17 +94,63 @@ protected:
 
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   virtual uint32_t maxTotalStreams() PURE;
+  /*
   void movePrimaryClientToDraining();
+  */
   void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event);
   void onConnectTimeout(ActiveClient& client);
+  void onIdleTimeout(ActiveClient& client);
   void onGoAway(ActiveClient& client);
   void onStreamDestroy(ActiveClient& client);
   void onStreamReset(ActiveClient& client, Http::StreamResetReason reason);
-  void newClientStream(Http::StreamDecoder& response_decoder, ConnectionPool::Callbacks& callbacks);
-  void onUpstreamReady();
+  void attachRequestToClient(ActiveClient& client, Http::StreamDecoder& response_decoder,
+                             ConnectionPool::Callbacks& callbacks);
+  void createNewConnection();
+  void onUpstreamReady(ActiveClient& client);
+  ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
+                                         ConnectionPool::Callbacks& callbacks);
 
+  void applyToEachClient(std::list<ActiveClientPtr>& client_list,
+                         const std::function<void(const ActiveClientPtr&)>& fn);
   Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
+
+  // Connecting clients list. Connections remain in the list till either:
+  //   - Connection is established
+  //   - Connection time out
+  //   - Connection terminated (by remote)
+  std::list<ActiveClientPtr> connecting_clients_;
+
+  // Connected clients waiting for requests. Connections remain in this list
+  // till:
+  //  - Request is attached
+  //  - Connection terminated
+  std::list<ActiveClientPtr> ready_clients_;
+
+  // Connections serving at least one request. Connections remain in this list
+  // till:
+  //  - Max requests per connection is exceeded
+  //  - Connection terminated
+  std::list<ActiveClientPtr> busy_clients_;
+
+  // Connections with number of requests >= max requests per connection. Connections
+  // remain in this list till:
+  //  - Excess requests in the connections finish.
+  //  - Connection terminated
+  std::list<ActiveClientPtr> overflow_clients_;
+
+  // Connections that have active requests but can no longer accept new
+  // requests. Depending on the connection policy, these connections could be moved to
+  // `to_close_clients` list. Connections could also be moved to this list upon:
+  //    - timeout.
+  //    - if requests exceed the max allowed by connection policy.
+  std::list<ActiveClientPtr> drain_clients_;
+
+  // Connections that are waiting to be closed. Connections are moved to this
+  // list when drain clients does not have any more requests being served.
+  // Connections remain in this list till:
+  //  - Connection is closed.
+  std::list<ActiveClientPtr> to_close_clients_;
   ActiveClientPtr primary_client_;
   ActiveClientPtr draining_client_;
   std::list<DrainedCb> drained_callbacks_;

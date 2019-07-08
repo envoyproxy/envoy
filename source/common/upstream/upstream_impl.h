@@ -501,6 +501,20 @@ private:
   };
 };
 
+class AggregateRequestsConnectionPolicy : public ConnectionRequestPolicy {
+public:
+  using State = ConnectionRequestPolicy::State;
+
+  AggregateRequestsConnectionPolicy(const ClusterInfo&);
+
+  virtual State onNewStream(const ConnectionRequestPolicySubscriber&) const override;
+  virtual State onStreamReset(const ConnectionRequestPolicySubscriber&,
+                              const State&) const override;
+
+private:
+  const ClusterInfo& cluster_;
+};
+
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */
@@ -580,6 +594,8 @@ public:
 
   void createNetworkFilterChain(Network::Connection&) const override;
 
+  const ConnectionRequestPolicy& connectionPolicy() const override;
+
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -627,6 +643,7 @@ private:
   const absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
+  mutable std::unique_ptr<ConnectionRequestPolicy> connection_policy_;
 };
 
 /**

@@ -646,6 +646,25 @@ using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOption
  */
 class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
+class ConnectionRequestPolicySubscriber {
+public:
+  virtual ~ConnectionRequestPolicySubscriber() = default;
+  virtual uint64_t requestCount() const PURE;
+  virtual ResourceManager& resourceManager() const PURE;
+};
+
+class ConnectionRequestPolicy {
+public:
+  enum class State { Init, Ready, Active, Overflow, Drain };
+
+  virtual ~ConnectionRequestPolicy() = default;
+
+  virtual State onNewStream(const ConnectionRequestPolicySubscriber&) const PURE;
+  virtual State onStreamReset(const ConnectionRequestPolicySubscriber&, const State&) const PURE;
+
+  // virtual Action onNewConnection(const ConnectionRequestPolicySubscriber&) PURE;
+};
+
 /**
  * Information about a given upstream cluster.
  */
@@ -847,6 +866,11 @@ public:
    * Create network filters on a new upstream connection.
    */
   virtual void createNetworkFilterChain(Network::Connection& connection) const PURE;
+
+  /*
+   * Connection policy for the cluster.
+   */
+  virtual const ConnectionRequestPolicy& connectionPolicy() const PURE;
 
 protected:
   /**

@@ -715,6 +715,14 @@ ClusterInfoImpl::extensionProtocolOptions(const std::string& name) const {
   return nullptr;
 }
 
+const ConnectionRequestPolicy& ClusterInfoImpl::connectionPolicy() const {
+  if (!connection_policy_) {
+    connection_policy_ = std::make_unique<AggregateRequestsConnectionPolicy>(*this);
+  }
+
+  return *connection_policy_;
+}
+
 Network::TransportSocketFactoryPtr createTransportSocketFactory(
     const envoy::api::v2::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
@@ -1371,6 +1379,42 @@ void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSh
   } else {
     host->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
   }
+}
+
+AggregateRequestsConnectionPolicy::AggregateRequestsConnectionPolicy(const ClusterInfo& cluster)
+    : cluster_(cluster) {}
+
+ConnectionRequestPolicy::State AggregateRequestsConnectionPolicy::onNewStream(
+    const ConnectionRequestPolicySubscriber& subscriber) const {
+  // TODO (conqerAtappple): Make this more config driven.
+  auto maxRequests = cluster_.maxRequestsPerConnection();
+  if (maxRequests == 0) {
+    maxRequests = (1U << 29);
+  }
+  if (subscriber.requestCount() >= maxRequests) {
+    return State::Drain;
+  }
+
+  return State::Active;
+}
+
+ConnectionRequestPolicy::State AggregateRequestsConnectionPolicy::onStreamReset(
+    const ConnectionRequestPolicySubscriber& subscriber,
+    const ConnectionRequestPolicy::State& current_state) const {
+  // TODO (conqerAtappple): Make this more config+policy driven.
+  switch (current_state) {
+  case ConnectionRequestPolicy::State::Overflow:
+    if (subscriber.requestCount() < cluster_.maxRequestsPerConnection()) {
+      return ConnectionRequestPolicy::State::Active;
+    }
+
+    break;
+  default:
+    return current_state;
+    break;
+  }
+
+  return current_state;
 }
 
 } // namespace Upstream
