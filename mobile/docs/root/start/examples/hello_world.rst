@@ -60,6 +60,11 @@ Open it up, and requests will start flowing!
 Objective-C
 -----------
 
+.. attention::
+
+  As of `this PR <https://github.com/lyft/envoy-mobile/pull/188>`_ the objective-c demo cannot be built.
+  We have filed an :issue:`issue 230 <230>` and will fix as expediently as possible.
+
 First, build the :ref:`ios_framework` artifact.
 
 Next, run the :repo:`sample app <examples/objective-c/hello_world>` using the following Bazel build

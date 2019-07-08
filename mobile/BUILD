@@ -6,15 +6,9 @@ load("@io_bazel_rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolch
 
 envoy_package()
 
-ios_static_framework(
+alias(
     name = "ios_framework",
-    hdrs = [
-        "//library/objective-c:envoy_framework_headers",
-    ],
-    bundle_name = "Envoy",
-    minimum_os_version = "10.0",
-    visibility = ["//visibility:public"],
-    deps = ["//library/objective-c:envoy_objc_interface_lib"],
+    actual = "//library/swift:ios_framework",
 )
 
 genrule(
