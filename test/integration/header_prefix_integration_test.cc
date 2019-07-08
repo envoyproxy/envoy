@@ -11,10 +11,13 @@ namespace Envoy {
 //
 // Instead, set the value early and regression test the bootstrap proto's validation of prefix
 // injection.
+
+static const char* custom_prefix_ = "x-custom";
+
 class HeaderPrefixIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   static void SetUpTestSuite() {
-    ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix("x-custom");
+    ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix(custom_prefix_);
   }
 };
 
