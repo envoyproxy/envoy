@@ -368,7 +368,7 @@ ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
     return absl::nullopt;
   }
 
-  return std::cref(*iter->second.get());
+  return std::cref(*iter->second);
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
