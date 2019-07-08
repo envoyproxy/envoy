@@ -247,8 +247,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/curl/curl/releases/download/curl-7_65_1/curl-7.65.1.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/8f3a576515ada564d3e2b560220649f49a21dec1.tar.gz
-        sha256 = "ae2f3ecd7a87154ae4668f7b1876846c1cf4efa8abc987511809433f73914a68",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/8f3a576515ada564d3e2b560220649f49a21dec1.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/2a930469533c3b541443488a629fe25cd8ff53d0.tar.gz
+        sha256 = "fcdebf54c89d839ffa7eefae166c8e4b551c765559db13ff15bff98047f344fb",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/2a930469533c3b541443488a629fe25cd8ff53d0.tar.gz"],
     ),
 )

@@ -55,3 +55,13 @@ envoy_cc_library(
         "@com_googlesource_quiche//:quic_core_versions_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "spdy_server_push_utils_for_envoy_lib",
+    srcs = ["spdy_server_push_utils_for_envoy.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "@com_googlesource_quiche//:quic_core_http_spdy_server_push_utils_header",
+    ],
+)
