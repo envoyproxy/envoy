@@ -102,6 +102,20 @@ git_repository(
     shallow_since = "1552938175 -0400",
 )
 
+load("@rules_jvm_external//:defs.bzl", "maven_install")
+
+maven_install(
+    artifacts = [
+        # Test artifacts
+        "org.assertj:assertj-core:3.9.0",
+        "junit:junit:4.12"
+    ],
+    repositories = [
+        "https://repo1.maven.org/maven2",
+        "https://jcenter.bintray.com/",
+    ]
+)
+
 # Bazel Kotlin 1.3 patch: https://github.com/bazelbuild/rules_kotlin/issues/159
 # bazelbuild/rules_kotlin currently doesn't work with Kotlin 1.3
 # TODO: https://github.com/lyft/envoy-mobile/issues/68
