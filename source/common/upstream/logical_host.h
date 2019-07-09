@@ -101,7 +101,8 @@ private:
 };
 
 /**
- * fixfix
+ * Pass-through wrapper for cluster info. Derived classes can you use this class as a base if they
+ * need to override individual methods.
  */
 class ClusterInfoWrapper : public Upstream::ClusterInfo {
 public:
