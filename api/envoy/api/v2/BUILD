@@ -87,6 +87,7 @@ api_go_grpc_library(
         ":eds_go_grpc",
         "//envoy/api/v2/auth:cert_go_proto",
         "//envoy/api/v2/cluster:circuit_breaker_go_proto",
+        "//envoy/api/v2/cluster:filter_go_proto",
         "//envoy/api/v2/cluster:outlier_detection_go_proto",
         "//envoy/api/v2/core:address_go_proto",
         "//envoy/api/v2/core:base_go_proto",
