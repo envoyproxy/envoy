@@ -7,95 +7,19 @@ namespace Extensions {
 namespace Clusters {
 namespace DynamicForwardProxy {
 
-class ClusterInfoWithOverridenTls : public Upstream::ClusterInfo {
+class ClusterInfoWithOverridenTls : public Upstream::ClusterInfoWrapper {
 public:
   ClusterInfoWithOverridenTls(const Upstream::ClusterInfoConstSharedPtr& real_cluster_info,
                               Network::TransportSocketFactoryPtr&& transport_socket_factory)
-      : real_cluster_info_(real_cluster_info),
+      : ClusterInfoWrapper(real_cluster_info),
         transport_socket_factory_(std::move(transport_socket_factory)) {}
 
   // Upstream::ClusterInfo
-  bool addedViaApi() const override { return real_cluster_info_->addedViaApi(); }
-  std::chrono::milliseconds connectTimeout() const override {
-    return real_cluster_info_->connectTimeout();
-  }
-  const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
-    return real_cluster_info_->idleTimeout();
-  }
-  uint32_t perConnectionBufferLimitBytes() const override {
-    return real_cluster_info_->perConnectionBufferLimitBytes();
-  }
-  uint64_t features() const override { return real_cluster_info_->features(); }
-  const Http::Http2Settings& http2Settings() const override {
-    return real_cluster_info_->http2Settings();
-  }
-  const envoy::api::v2::Cluster::CommonLbConfig& lbConfig() const override {
-    return real_cluster_info_->lbConfig();
-  }
-  Upstream::LoadBalancerType lbType() const override { return real_cluster_info_->lbType(); }
-  envoy::api::v2::Cluster::DiscoveryType type() const override {
-    return real_cluster_info_->type();
-  }
-  const absl::optional<envoy::api::v2::Cluster::CustomClusterType>& clusterType() const override {
-    return real_cluster_info_->clusterType();
-  }
-  const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>&
-  lbLeastRequestConfig() const override {
-    return real_cluster_info_->lbLeastRequestConfig();
-  }
-  const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&
-  lbRingHashConfig() const override {
-    return real_cluster_info_->lbRingHashConfig();
-  }
-  const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>&
-  lbOriginalDstConfig() const override {
-    return real_cluster_info_->lbOriginalDstConfig();
-  }
-  bool maintenanceMode() const override { return real_cluster_info_->maintenanceMode(); }
-  uint64_t maxRequestsPerConnection() const override {
-    return real_cluster_info_->maxRequestsPerConnection();
-  }
-  const std::string& name() const override { return real_cluster_info_->name(); }
-  Upstream::ResourceManager& resourceManager(Upstream::ResourcePriority priority) const override {
-    return real_cluster_info_->resourceManager(priority);
-  }
   Network::TransportSocketFactory& transportSocketFactory() const override {
     return *transport_socket_factory_;
   }
-  Upstream::ClusterStats& stats() const override { return real_cluster_info_->stats(); }
-  Stats::Scope& statsScope() const override { return real_cluster_info_->statsScope(); }
-  Upstream::ClusterLoadReportStats& loadReportStats() const override {
-    return real_cluster_info_->loadReportStats();
-  }
-  const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
-    return real_cluster_info_->sourceAddress();
-  }
-  const Upstream::LoadBalancerSubsetInfo& lbSubsetInfo() const override {
-    return real_cluster_info_->lbSubsetInfo();
-  }
-  const envoy::api::v2::core::Metadata& metadata() const override {
-    return real_cluster_info_->metadata();
-  }
-  const Envoy::Config::TypedMetadata& typedMetadata() const override {
-    return real_cluster_info_->typedMetadata();
-  }
-  const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const override {
-    return real_cluster_info_->clusterSocketOptions();
-  }
-  bool drainConnectionsOnHostRemoval() const override {
-    return real_cluster_info_->drainConnectionsOnHostRemoval();
-  }
-  bool warmHosts() const override { return real_cluster_info_->warmHosts(); }
-  absl::optional<std::string> eds_service_name() const override {
-    return real_cluster_info_->eds_service_name();
-  }
-  Upstream::ProtocolOptionsConfigConstSharedPtr
-  extensionProtocolOptions(const std::string& name) const override {
-    return real_cluster_info_->extensionProtocolOptions(name);
-  }
 
 private:
-  const Upstream::ClusterInfoConstSharedPtr real_cluster_info_;
   const Network::TransportSocketFactoryPtr transport_socket_factory_;
 };
 
@@ -183,8 +107,7 @@ void Cluster::onDnsHostAddOrUpdate(
     // SAN verification for the resolved host if the cluster has been configured with TLS.
     // TODO(mattklein123): The fact that we are copying the cluster config, etc. is not very clean.
     //                     consider streamlining this in the future.
-    // TODO(mattklein123): If the host is an IP address should we be setting SNI? IP addresses in
-    //                     hosts needs to be revisited so this can be handled in a follow up.
+    // TODO(mattklein123): If the host is an IP address we should not set SNI.
     envoy::api::v2::Cluster override_cluster = cluster_config_;
     override_cluster.mutable_tls_context()->set_sni(host_info->resolvedHost());
     override_cluster.mutable_tls_context()

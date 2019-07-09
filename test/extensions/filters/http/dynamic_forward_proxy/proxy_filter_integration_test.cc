@@ -84,10 +84,10 @@ typed_config:
     envoy::api::v2::auth::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
     auto* tls_cert = common_tls_context->add_tls_certificates();
-    tls_cert->mutable_certificate_chain()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
-    tls_cert->mutable_private_key()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
+    tls_cert->mutable_certificate_chain()->set_filename(TestEnvironment::runfilesPath(
+        fmt::format("test/config/integration/certs/{}cert.pem", upstream_cert_name_)));
+    tls_cert->mutable_private_key()->set_filename(TestEnvironment::runfilesPath(
+        fmt::format("test/config/integration/certs/{}key.pem", upstream_cert_name_)));
 
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
@@ -98,6 +98,7 @@ typed_config:
   }
 
   bool upstream_tls_{};
+  std::string upstream_cert_name_{"upstreamlocalhost"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
@@ -206,6 +207,28 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
   checkSimpleRequestSuccess(0, 0, response.get());
+}
+
+// Verify that auto-SAN verification fails with an incorrect certificate.
+TEST_P(ProxyFilterIntegrationTest, UpstreamTlsInvalidSAN) {
+  upstream_tls_ = true;
+  upstream_cert_name_ = "upstream";
+  setup();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ssl.fail_verify_san")->value());
 }
 
 } // namespace
