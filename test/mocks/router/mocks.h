@@ -392,7 +392,7 @@ public:
   MOCK_CONST_METHOD0(lastUpdated, SystemTime());
   MOCK_METHOD0(onConfigUpdate, void());
 
-  std::shared_ptr<NiceMock<MockConfig>> route_config_{new NiceMock<Router::MockConfig>()};
+  std::shared_ptr<NiceMock<MockConfig>> route_config_{new NiceMock<MockConfig>()};
 };
 
 class MockRouteConfigProviderManager : public RouteConfigProviderManager {
@@ -417,7 +417,7 @@ public:
 
   MOCK_CONST_METHOD1(getRouteConfig, ConfigConstSharedPtr(const Http::HeaderMap& headers));
 
-  std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
+  std::shared_ptr<MockConfig> route_config_{new NiceMock<MockConfig>()};
 };
 
 class MockScopedRouteConfigProvider : public Envoy::Config::ConfigProvider {

@@ -194,33 +194,18 @@ public:
     return route_config_provider_manager_;
   }
 
-  std::shared_ptr<RouteConfigProvider>
-  getRouteConfigProvider(Server::Configuration::FactoryContext& factory_context,
-                         envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-                         std::string stat_name) {
-    const uint64_t route_provider_id = MessageUtil::hash(rds);
-    auto iter = cached_route_providers_.find(route_provider_id);
-    if (iter != cached_route_providers_.end()) {
-      return iter->second;
-    }
-    std::shared_ptr<RouteConfigProvider> provider =
-        route_config_provider_manager_.createRdsRouteConfigProvider(rds, factory_context,
-                                                                    stat_name);
-    cached_route_providers_.try_emplace(route_provider_id, provider);
-    return provider;
-  }
-  void
-  deleteRouteConfigSource(envoy::config::filter::network::http_connection_manager::v2::Rds& rds) {
-    const uint64_t route_provider_id = MessageUtil::hash(rds);
-    if (!cached_route_providers_.erase(route_provider_id)) {
-      ENVOY_LOG_MISC(warn, "Try to delete non-existing route config source {}", rds.DebugString());
-    }
+  std::shared_ptr<RouteConfigProvider> createRouteConfigProvider(
+      Server::Configuration::FactoryContext& factory_context,
+      const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+      const std::string& stat_name) {
+    return route_config_provider_manager_.createRdsRouteConfigProvider(rds, factory_context,
+                                                                       stat_name);
   }
 
 private:
   RouteConfigProviderManager& route_config_provider_manager_;
   // From ConfigSource fingerprint to shared RouteConfigProvider.
-  absl::flat_hash_map<uint64_t, std::shared_ptr<RouteConfigProvider>> cached_route_providers_;
+  absl::flat_hash_map<std::string, std::shared_ptr<RouteConfigProvider>> cached_route_providers_;
 };
 
 // The optional argument passed to the ConfigProviderManager::create*() functions.

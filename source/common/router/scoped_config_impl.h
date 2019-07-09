@@ -77,12 +77,14 @@ private:
 // String fragment.
 class StringKeyFragment : public ScopeKeyFragmentBase {
 public:
-  explicit StringKeyFragment(absl::string_view value) : value_(value) {}
+  explicit StringKeyFragment(absl::string_view value)
+      : value_(value), hash_(HashUtil::xxHash64(value_)) {}
 
-  uint64_t hash() const override { return HashUtil::xxHash64(value_); }
+  uint64_t hash() const override { return hash_; }
 
 private:
   const std::string value_;
+  const uint64_t hash_;
 };
 
 /**
@@ -148,11 +150,11 @@ public:
                   std::shared_ptr<RouteConfigProvider>&& route_provider)
       : config_proto_(std::move(config_proto)), route_provider_(std::move(route_provider)) {
     ASSERT(route_provider_ != nullptr, "ScopedRouteInfo expects a valid RouteConfigProvider.");
-    ASSERT(!route_provider_->configInfo().has_value() ||
-               route_provider_->config()->name() == config_proto_.route_configuration_name(),
-           absl::StrFormat(
-               "RouteConfigProvider's name '%s' doesn't match route_configuration_name '%s'.",
-               route_provider_->config()->name(), config_proto_.route_configuration_name()));
+    ASSERT(
+        !route_provider_->configInfo().has_value() ||
+            route_provider_->config()->name() == config_proto_.route_configuration_name(),
+        fmt::format("RouteConfigProvider's name '{}' doesn't match route_configuration_name '{}'.",
+                    route_provider_->config()->name(), config_proto_.route_configuration_name()));
     // TODO(stevenzzzz): Maybe worth a KeyBuilder abstraction when there are more than one type of
     // Fragment.
     for (const auto& fragment : config_proto_.key().fragments()) {

@@ -107,6 +107,7 @@ void ThreadLocalScopedConfigImpl::addOrUpdateRoutingScope(
 void ThreadLocalScopedConfigImpl::removeRoutingScope(const std::string& scope_name) {
   const auto iter = scoped_route_info_by_name_.find(scope_name);
   if (iter != scoped_route_info_by_name_.end()) {
+    ASSERT(scoped_route_info_by_key_.count(iter->second->scopeKey().hash()) == 1);
     scoped_route_info_by_key_.erase(iter->second->scopeKey().hash());
     scoped_route_info_by_name_.erase(iter);
   }

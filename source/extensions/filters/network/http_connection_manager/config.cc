@@ -7,7 +7,6 @@
 
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
-#include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
 
 #include "common/access_log/access_log_impl.h"
@@ -104,7 +103,8 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
-  // Keep in mind the lambda capture list **doesn't** determine the destruction order, the
+  // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
+  // as these captured objects are also global singletons.
   return [scoped_routes_config_provider_manager, route_config_provider_manager, date_provider,
           filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(

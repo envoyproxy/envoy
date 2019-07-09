@@ -7,6 +7,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/common/utility.h"
 
 // Types are deeply nested under Envoy::Config::ConfigProvider; use 'using-directives' across all
 // ConfigProvider related types for consistency.
@@ -99,76 +100,89 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
 
-  // Dedup.
+  // TODO(stevenzzzzz): we need to discuss about what to do when two ScopedRouteConfiguration
+  // which has the same ScopeKey.
+  bool any_applied = false;
+  std::vector<std::string> exception_msgs;
   absl::flat_hash_set<std::string> unique_resource_names;
-  for (const auto& resource : added_resources) {
-    // TODO(stevenzzzzz): we need to discuss about what to do when two ScopedRouteConfiguration
-    // which has the same ScopeKey.
-    if (!unique_resource_names.insert(resource.name()).second) {
-      throw EnvoyException(
-          fmt::format("duplicate scoped route configuration {} found", resource.name()));
-    }
-  }
-
-  std::vector<envoy::api::v2::ScopedRouteConfiguration> scoped_route_configs;
-  for (const auto& resource : added_resources) {
-    auto scoped_route_config = MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
-        resource.resource(), validation_visitor_);
-    MessageUtil::validate(scoped_route_config);
-    scoped_route_configs.emplace_back(std::move(scoped_route_config));
-  }
-
   envoy::config::filter::network::http_connection_manager::v2::Rds rds;
   rds.mutable_config_source()->MergeFrom(rds_config_source_);
-  for (auto& scoped_route_config : scoped_route_configs) {
-    ENVOY_LOG(debug, "srds: add/update scoped_route '{}'", scoped_route_config.name());
-    rds.set_route_config_name(scoped_route_config.route_configuration_name());
-    ScopedRouteInfoConstSharedPtr scoped_route_info = std::make_shared<ScopedRouteInfo>(
-        std::move(scoped_route_config),
-        srds_config_provider_manager_.getRouteConfigProvider(factory_context_, rds, stat_prefix_));
-    scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
-    applyDeltaConfigUpdate([scoped_route_info](const ConfigProvider::ConfigConstSharedPtr& config) {
-      auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
-          static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
+  for (const auto& resource : added_resources) {
+    envoy::api::v2::ScopedRouteConfiguration scoped_route_config;
+    try {
+      scoped_route_config = MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
+          resource.resource(), validation_visitor_);
+      MessageUtil::validate(scoped_route_config);
+      if (!unique_resource_names.insert(scoped_route_config.name()).second) {
+        throw EnvoyException(fmt::format("duplicate scoped route configuration {} found",
+                                         scoped_route_config.name()));
+      }
+      const std::string scope_name = scoped_route_config.name();
+      rds.set_route_config_name(scoped_route_config.route_configuration_name());
+      ScopedRouteInfoConstSharedPtr scoped_route_info = std::make_shared<ScopedRouteInfo>(
+          std::move(scoped_route_config), srds_config_provider_manager_.createRouteConfigProvider(
+                                              factory_context_, rds, stat_prefix_));
+      scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
+      applyDeltaConfigUpdate(
+          [scoped_route_info](const ConfigProvider::ConfigConstSharedPtr& config) {
+            auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
+                static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
 
-      thread_local_scoped_config->addOrUpdateRoutingScope(scoped_route_info);
-    });
+            thread_local_scoped_config->addOrUpdateRoutingScope(scoped_route_info);
+          });
+      any_applied = true;
+      ENVOY_LOG(debug, "srds: add/update scoped_route '{}'", scope_name);
+    } catch (const EnvoyException& e) {
+      exception_msgs.emplace_back(fmt::format("{}", e.what()));
+    }
   }
-  for (const auto& scoped_route_name : removed_resources) {
-    ENVOY_LOG(debug, "srds: remove scoped route '{}'", scoped_route_name);
-    scoped_route_map_.erase(scoped_route_name);
-    applyDeltaConfigUpdate([scoped_route_name](const ConfigProvider::ConfigConstSharedPtr& config) {
+  for (const auto& scope_name : removed_resources) {
+    scoped_route_map_.erase(scope_name);
+    applyDeltaConfigUpdate([scope_name](const ConfigProvider::ConfigConstSharedPtr& config) {
       auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
           static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
-      thread_local_scoped_config->removeRoutingScope(scoped_route_name);
+      thread_local_scoped_config->removeRoutingScope(scope_name);
     });
+    any_applied = true;
+    ENVOY_LOG(debug, "srds: remove scoped route '{}'", scope_name);
   }
   ConfigSubscriptionCommonBase::onConfigUpdate();
-  setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
+  if (any_applied) {
+    setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
+  }
   stats_.config_reload_.inc();
+  if (!exception_msgs.empty()) {
+    throw EnvoyException(fmt::format("Error adding/updating scoped route(s): {}",
+                                     StringUtil::join(exception_msgs, ", ")));
+  }
 }
 
+// TODO(stevenzzzz): consider generalizing this function as it overlaps with
+// CdsApiImpl::onConfigUpdate.
 void ScopedRdsConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
-  std::vector<envoy::api::v2::ScopedRouteConfiguration> scoped_routes;
+  absl::flat_hash_map<std::string, envoy::api::v2::ScopedRouteConfiguration> scoped_routes;
   for (const auto& resource_any : resources) {
+    // Throws (thus rejects all) on any error.
     auto scoped_route = MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
         resource_any, validation_visitor_);
     MessageUtil::validate(scoped_route);
-    scoped_routes.emplace_back(std::move(scoped_route));
+    if (!scoped_routes.try_emplace(scoped_route.name(), std::move(scoped_route)).second) {
+      throw EnvoyException(
+          fmt::format("duplicate scoped route configuration {} found", scoped_route.name()));
+    }
   }
   ScopedRouteMap scoped_routes_to_remove = scoped_route_map_;
   Protobuf::RepeatedPtrField<envoy::api::v2::Resource> to_add_repeated;
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
-
-  for (auto& scoped_route : scoped_routes) {
-    const std::string& scoped_route_name = scoped_route.name();
-    scoped_routes_to_remove.erase(scoped_route_name);
+  for (auto& iter : scoped_routes) {
+    const std::string& scope_name = iter.first;
+    scoped_routes_to_remove.erase(scope_name);
     auto* to_add = to_add_repeated.Add();
-    to_add->set_name(scoped_route.name());
+    to_add->set_name(scope_name);
     to_add->set_version(version_info);
-    to_add->mutable_resource()->PackFrom(scoped_route);
+    to_add->mutable_resource()->PackFrom(iter.second);
   }
 
   for (const auto& scoped_route : scoped_routes_to_remove) {

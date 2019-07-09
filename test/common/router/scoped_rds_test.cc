@@ -111,7 +111,7 @@ name: foo_scoped_routes
 scope_key_builder:
   fragments:
     - header_value_extractor:
-        name: X-Google-VIP
+        name: Addr
         element:
           key: x-foo-key
           separator: ;
@@ -145,8 +145,10 @@ key:
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
   EXPECT_THROW(subscription_callbacks_->onConfigUpdate(resources, "1"), ProtoValidationException);
 
-  EXPECT_THROW(subscription_callbacks_->onConfigUpdate(anyToResource(resources, "1"), {}, "1"),
-               ProtoValidationException);
+  EXPECT_THROW_WITH_REGEX(
+      subscription_callbacks_->onConfigUpdate(anyToResource(resources, "1"), {}, "1"),
+      EnvoyException,
+      "Error adding/updating scoped route\\(s\\): Proto constraint validation failed.*");
 
   // 'route_configuration_name' validation: value must be > 1 byte.
   const std::string config_yaml2 = R"EOF(
@@ -159,8 +161,10 @@ key:
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources2;
   parseScopedRouteConfigurationFromYaml(*resources2.Add(), config_yaml2);
   EXPECT_THROW(subscription_callbacks_->onConfigUpdate(resources2, "1"), ProtoValidationException);
-  EXPECT_THROW(subscription_callbacks_->onConfigUpdate(anyToResource(resources2, "1"), {}, "1"),
-               ProtoValidationException);
+  EXPECT_THROW_WITH_REGEX(
+      subscription_callbacks_->onConfigUpdate(anyToResource(resources2, "1"), {}, "1"),
+      EnvoyException,
+      "Error adding/updating scoped route\\(s\\): Proto constraint validation failed.*");
 
   // 'key' validation: must define at least 1 fragment.
   const std::string config_yaml3 = R"EOF(
@@ -171,8 +175,11 @@ key:
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources3;
   parseScopedRouteConfigurationFromYaml(*resources3.Add(), config_yaml3);
   EXPECT_THROW(subscription_callbacks_->onConfigUpdate(resources3, "1"), ProtoValidationException);
-  EXPECT_THROW(subscription_callbacks_->onConfigUpdate(anyToResource(resources3, "1"), {}, "1"),
-               ProtoValidationException);
+  EXPECT_THROW_WITH_REGEX(
+      subscription_callbacks_->onConfigUpdate(anyToResource(resources3, "1"), {}, "1"),
+      EnvoyException,
+      "Error adding/updating scoped route\\(s\\): Proto constraint validation failed .*value is "
+      "required.*");
 }
 
 // Tests that multiple uniquely named resources are allowed in config updates.
@@ -227,7 +234,9 @@ key:
 
   EXPECT_THROW_WITH_MESSAGE(
       subscription_callbacks_->onConfigUpdate(anyToResource(resources, "1"), {}, "1"),
-      EnvoyException, "duplicate scoped route configuration foo_scope found");
+      EnvoyException,
+      "Error adding/updating scoped route(s): duplicate scoped route configuration foo_scope "
+      "found");
 }
 
 // Tests a config update failure.
@@ -277,7 +286,7 @@ scoped_routes:
   scope_key_builder:
     fragments:
       - header_value_extractor:
-          name: X-Google-VIP
+          name: Addr
           index: 0
 $1
 )EOF";
