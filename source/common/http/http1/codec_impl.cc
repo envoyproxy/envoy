@@ -477,6 +477,10 @@ void ConnectionImpl::onMessageCompleteBase() {
 
 void ConnectionImpl::onMessageBeginBase() {
   ENVOY_CONN_LOG(trace, "message begin", connection_);
+  // Make sure that if HTTP/1.0 and HTTP/1.1 requests share a connection Envoy correctly sets
+  // protocol for each request. Envoy defaults to 1.1 but sets the protocol to 1.0 where applicable
+  // in onHeadersCompleteBase
+  protocol_ = Protocol::Http11;
   ASSERT(!current_header_map_);
   current_header_map_ = std::make_unique<HeaderMapImpl>();
   header_parsing_state_ = HeaderParsingState::Field;

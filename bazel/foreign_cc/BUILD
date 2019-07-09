@@ -99,6 +99,13 @@ envoy_cmake_external(
         # doesn't respect custom toolchains such as the Android NDK,
         # see https://github.com/bazelbuild/rules_foreign_cc/issues/252
         "CMAKE_RANLIB": "",
+        # Force _GNU_SOURCE on for Android builds. This would be contained in
+        # a 'select' but the downstream macro uses a select on all of these
+        # options, and they cannot be nested.
+        # If https://github.com/bazelbuild/rules_foreign_cc/issues/289 is fixed
+        # this can be removed.
+        # More details https://github.com/lyft/envoy-mobile/issues/116
+        "_GNU_SOURCE": "on",
     },
     copy_pdb = True,
     lib_source = "@com_github_libevent_libevent//:all",
