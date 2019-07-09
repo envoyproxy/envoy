@@ -24,13 +24,9 @@ public:
   }
   void setPrefix(const char* prefix) {
     absl::WriterMutexLock lock(&m_);
-    bool same_string = absl::string_view(prefix_) == absl::string_view(prefix);
-    RELEASE_ASSERT(!read_ || same_string,
+    RELEASE_ASSERT(!read_ || absl::string_view(prefix_) == absl::string_view(prefix),
                    "Attempting to change the header prefix after it has been used!");
-    // Don't bother swapping if there is no actual change.
-    if (!same_string) {
-      prefix_ = prefix;
-    }
+    prefix_ = prefix;
   }
 
 private:
