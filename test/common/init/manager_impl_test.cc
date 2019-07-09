@@ -49,18 +49,21 @@ TEST(InitManagerImplTest, AddReadyTarget) {
 
   ExpectableWatcherImpl w;
 
+  t1.expectInitialize();
   w.expectReady();
   m.initialize(w);
   expectInitialized(m);
 }
 
-TEST(InitManagerImplTest, AddTargetAndMarkReadyBeforeIntialization) {
+TEST(InitManagerImplTest, AddTargetAndMarkReadyBeforeInitialization) {
   InSequence s;
 
   ManagerImpl m("test");
   expectUninitialized(m);
 
   ExpectableTargetImpl t1("t1");
+  // vs AddReadyTarget case:
+  // Swap the add() and ready() order but still before m.initialize().
   m.add(t1);
   t1.ready();
 

@@ -27,6 +27,7 @@ TargetImpl::TargetImpl(absl::string_view name, InitializeFn fn)
       fn_(std::make_shared<InternalInitalizeFn>([this, fn](WatcherHandlePtr watcher_handle) {
         watcher_handle_ = std::move(watcher_handle);
         fn();
+        // It is possible that fn() mutates the is_ready_.
         if (is_ready_) {
           ready();
         }
@@ -37,10 +38,6 @@ TargetImpl::~TargetImpl() { ENVOY_LOG(debug, "{} destroyed", name_); }
 absl::string_view TargetImpl::name() const { return name_; }
 
 TargetHandlePtr TargetImpl::createHandle(absl::string_view handle_name) const {
-  if (is_ready_) {
-    // Init::Manager should handle a nullptr return value as the target is ready.
-    return nullptr;
-  }
   // Note: can't use std::make_unique here because TargetHandleImpl ctor is private.
   return std::unique_ptr<TargetHandle>(
       new TargetHandleImpl(handle_name, name_, std::weak_ptr<InternalInitalizeFn>(fn_)));

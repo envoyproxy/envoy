@@ -16,26 +16,16 @@ void ManagerImpl::add(const Target& target) {
   TargetHandlePtr target_handle(target.createHandle(name_));
   switch (state_) {
   case State::Uninitialized:
-    if (target_handle == nullptr) {
-      --count_;
-      ENVOY_LOG(debug, "added ready target {} to {}", target.name(), name_);
-    } else {
-      // If the manager isn't initialized yet, save the target handle to be initialized later.
-      ENVOY_LOG(debug, "added {} to {}", target.name(), name_);
-      target_handles_.push_back(std::move(target_handle));
-    }
+    // If the manager isn't initialized yet, save the target handle to be initialized later.
+    ENVOY_LOG(debug, "added {} to {}", target.name(), name_);
+    target_handles_.push_back(std::move(target_handle));
     return;
   case State::Initializing:
-    if (target_handle == nullptr) {
-      --count_;
-      ENVOY_LOG(debug, "added ready target {} to {}", target.name(), name_);
-    } else {
-      // If the manager is already initializing, initialize the new target immediately. Note that
-      // it's important in this case that count_ was incremented above before calling the target,
-      // because if the target calls the init manager back immediately, count_ will be decremented
-      // here (see the definition of watcher_ above).
-      target_handle->initialize(watcher_);
-    }
+    // If the manager is already initializing, initialize the new target immediately. Note that
+    // it's important in this case that count_ was incremented above before calling the target,
+    // because if the target calls the init manager back immediately, count_ will be decremented
+    // here (see the definition of watcher_ above).
+    target_handle->initialize(watcher_);
     return;
   case State::Initialized:
     // If the manager has already completed initialization, consider this a programming error.
@@ -61,12 +51,12 @@ void ManagerImpl::initialize(const Watcher& watcher) {
 
     // Attempt to initialize each target. If a target is unavailable, treat it as though it
     // completed immediately.
-    for (auto iter = target_handles_.begin(); iter != target_handles_.end();
-         iter = target_handles_.erase(iter)) {
-      if (!(*iter)->initialize(watcher_)) {
+    for (const auto& target_handle : target_handles_) {
+      if (!target_handle->initialize(watcher_)) {
         onTargetReady();
       }
     }
+    target_handles_.clear();
   }
 }
 
