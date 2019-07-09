@@ -13,7 +13,10 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/init/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/printers.h"
 
@@ -40,7 +43,8 @@ public:
     // Create a runtime loader, so that tests can manually manipulate runtime
     // guarded features.
     loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(Runtime::LoaderPtr{
-        new Runtime::LoaderImpl(dispatcher_, tls_, config, "", store_, generator_, *api_)});
+        new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, init_manager_, store_,
+                                generator_, validation_visitor_, *api_)});
   }
 
   void initialize() {
@@ -67,6 +71,9 @@ protected:
   Stats::IsolatedStoreImpl store_;
   Runtime::MockRandomGenerator generator_;
   Api::ApiPtr api_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Init::MockManager init_manager_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
 };
 
@@ -849,7 +856,8 @@ public:
     // Create a runtime loader, so that tests can manually manipulate runtime
     // guarded features.
     loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(Runtime::LoaderPtr{
-        new Runtime::LoaderImpl(dispatcher_, tls_, config, "", store_, generator_, *api_)});
+        new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, init_manager_, store_,
+                                generator_, validation_visitor_, *api_)});
   }
 
   void initialize() {
@@ -869,6 +877,9 @@ protected:
   Stats::IsolatedStoreImpl store_;
   Runtime::MockRandomGenerator generator_;
   Api::ApiPtr api_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Init::MockManager init_manager_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
   bool validate_header_values_;
 };
