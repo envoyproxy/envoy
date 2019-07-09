@@ -53,6 +53,9 @@ public:
   AddedRemoved updateWatchInterest(Watch* watch,
                                    const std::set<std::string>& update_to_these_names) override;
 
+  WatchMapImpl(const WatchMapImpl&) = delete;
+  WatchMapImpl& operator=(const WatchMapImpl&) = delete;
+
 private:
   friend struct Watch;
   // Meant to be called only by ~Watch().
@@ -61,18 +64,15 @@ private:
   void removeWatch(Watch* watch) override;
 
   // SubscriptionCallbacks
-  virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                              const std::string& version_info) override;
-  virtual void
-  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                 const std::string& system_version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string& system_version_info) override;
 
-  virtual void onConfigUpdateFailed(const EnvoyException* e) override;
+  void onConfigUpdateFailed(const EnvoyException* e) override;
 
-  virtual std::string resourceName(const ProtobufWkt::Any&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  std::string resourceName(const ProtobufWkt::Any&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   // Given a list of names that are new to an individual watch, returns those names that are in fact
   // new to the entire subscription.
@@ -96,9 +96,6 @@ private:
   // 1) Acts as a reference count; no watches care anymore ==> the resource can be removed.
   // 2) Enables efficient lookup of all interested watches when a resource has been updated.
   absl::flat_hash_map<std::string, absl::flat_hash_set<Watch*>> watch_interest_;
-
-  WatchMapImpl(const WatchMapImpl&) = delete;
-  WatchMapImpl& operator=(const WatchMapImpl&) = delete;
 };
 
 } // namespace Config

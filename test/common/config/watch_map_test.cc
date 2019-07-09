@@ -32,10 +32,10 @@ public:
 // Specifically, as a simplification for these tests, every still-present resource is updated in
 // every update. Therefore, a resource can never show up in the SotW update but not the delta
 // update. We can therefore use the same expected_resources for both.
-void expectDeltaAndSotwUpdate(NamedMockSubscriptionCallbacks& callbacks,
-                              std::vector<envoy::api::v2::ClusterLoadAssignment> expected_resources,
-                              std::vector<std::string> expected_removals,
-                              const std::string& version) {
+void expectDeltaAndSotwUpdate(
+    NamedMockSubscriptionCallbacks& callbacks,
+    const std::vector<envoy::api::v2::ClusterLoadAssignment>& expected_resources,
+    const std::vector<std::string>& expected_removals, const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, version))
       .WillOnce(Invoke(
           [expected_resources](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& gotten_resources,
@@ -94,14 +94,15 @@ wrapInResource(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& anys,
 // Similar to expectDeltaAndSotwUpdate(), but making the onConfigUpdate() happen, rather than
 // EXPECTing it.
 void doDeltaAndSotwUpdate(SubscriptionCallbacks& watch_map,
-                          Protobuf::RepeatedPtrField<ProtobufWkt::Any> sotw_resources,
-                          std::vector<std::string> removed_names, std::string version) {
+                          const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& sotw_resources,
+                          const std::vector<std::string>& removed_names,
+                          const std::string& version) {
   watch_map.onConfigUpdate(sotw_resources, version);
 
   Protobuf::RepeatedPtrField<envoy::api::v2::Resource> delta_resources =
       wrapInResource(sotw_resources, version);
   Protobuf::RepeatedPtrField<std::string> removed_names_proto;
-  for (auto n : removed_names) {
+  for (const auto& n : removed_names) {
     *removed_names_proto.Add() = n;
   }
   watch_map.onConfigUpdate(delta_resources, removed_names_proto, "version1");
