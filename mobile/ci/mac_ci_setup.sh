@@ -25,10 +25,3 @@ for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"
 done
-
-# Install bazel manually until https://github.com/bazelbuild/continuous-integration/issues/128 is fixed.
-# Otherwise we always pull the latest release automatically.
-wget -c https://github.com/bazelbuild/bazel/releases/download/0.26.1/bazel-0.26.1-installer-darwin-x86_64.sh
-chmod +x bazel-0.26.1-installer-darwin-x86_64.sh
-sudo ./bazel-0.26.1-installer-darwin-x86_64.sh
-bazel version
