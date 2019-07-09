@@ -72,7 +72,7 @@ ConfigUtility::parseDirectResponseCode(const envoy::api::v2::route::Route& route
   } else if (route.has_direct_response()) {
     return static_cast<Http::Code>(route.direct_response().status());
   }
-  return absl::optional<Http::Code>();
+  return {};
 }
 
 std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::route::Route& route,

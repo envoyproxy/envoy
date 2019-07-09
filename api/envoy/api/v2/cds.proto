@@ -51,7 +51,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 39]
+// [#comment:next free field: 40]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -273,6 +273,11 @@ message Cluster {
   // this setting is ignored.
   google.protobuf.Duration dns_refresh_rate = 16
       [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+
+  // Optional configuration for setting cluster's DNS refresh rate. If the value is set to true,
+  // cluster's DNS refresh rate will be set to resource record's TTL which comes from DNS
+  // resolution.
+  bool respect_dns_ttl = 39;
 
   // When V4_ONLY is selected, the DNS resolver will only perform a lookup for
   // addresses in the IPv4 family. If V6_ONLY is selected, the DNS resolver will

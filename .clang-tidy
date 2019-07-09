@@ -1,7 +1,38 @@
-Checks:          'clang-diagnostic-*,clang-analyzer-*,abseil-*,bugprone-*,modernize-*,performance-*,readability-redundant-*,readability-braces-around-statements,readability-container-size-empty'
+Checks:          'abseil-*,
+                  bugprone-*,
+                  clang-analyzer-*,
+                  clang-diagnostic-*,
+                  modernize-*,
+                  performance-*,
+                  readability-braces-around-statements,
+                  readability-container-size-empty,
+                  readability-redundant-*'
 
 #TODO(lizan): grow this list, fix possible warnings and make more checks as error
-WarningsAsErrors: 'bugprone-assert-side-effect,bugprone-use-after-move,modernize-make-shared,modernize-make-unique,modernize-use-using,performance-faster-string-find,performance-for-range-copy,performance-noexcept-move-constructor,performance-unnecessary-copy-initialization,readability-braces-around-statements,readability-container-size-empty,readability-redundant-smartptr-get,readability-redundant-string-cstr'
+WarningsAsErrors: 'abseil-duration-*,
+                   abseil-faster-strsplit-delimiter,
+                   abseil-no-namespace,
+                   abseil-redundant-strcat-calls,
+                   abseil-str-cat-append,
+                   abseil-string-find-startswith,
+                   abseil-upgrade-duration-conversions,
+                   bugprone-assert-side-effect,
+                   bugprone-use-after-move,
+                   modernize-make-shared,
+                   modernize-make-unique,
+                   modernize-return-braced-init-list,
+                   modernize-use-using,
+                   performance-faster-string-find,
+                   performance-for-range-copy,
+                   performance-inefficient-vector-operation,
+                   performance-noexcept-move-constructor,
+                   performance-unnecessary-copy-initialization,
+                   readability-braces-around-statements,
+                   readability-container-size-empty,
+                   readability-redundant-control-flow,
+                   readability-redundant-member-init,
+                   readability-redundant-smartptr-get,
+                   readability-redundant-string-cstr'
 
 CheckOptions:
   - key:             bugprone-assert-side-effect.AssertMacros

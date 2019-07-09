@@ -408,7 +408,7 @@ envoy_cc_test_library(
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tap:config",
-        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/extensions/transport_sockets/tls:config",
         "//source/server:connection_handler_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:listener_hooks_lib",
@@ -803,6 +803,26 @@ envoy_cc_test(
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "aws_metadata_fetcher_integration_test",
+    srcs = [
+        "aws_metadata_fetcher_integration_test.cc",
+    ],
+    tags = ["exclusive"],
+    deps = [
+        ":integration_lib",
+        "//source/common/common:fmt_lib",
+        "//source/extensions/filters/http/common/aws:utility_lib",
+        "//source/extensions/filters/http/fault:config",
+        "//source/extensions/filters/http/fault:fault_filter_lib",
+        "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/network/echo:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
+        "//test/server:utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

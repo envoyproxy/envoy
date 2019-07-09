@@ -30,6 +30,7 @@ REPOSITORIES_BZL = "bazel/repositories.bzl"
 # definitions for real-world time, the construction of them in main(), and perf annotation.
 # For now it includes the validation server but that really should be injected too.
 REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
+                       "./source/extensions/filters/http/common/aws/utility.cc",
                        "./source/common/event/real_time_system.cc",
                        "./source/common/event/real_time_system.h", "./source/exe/main_common.cc",
                        "./source/exe/main_common.h", "./source/server/config_validation/server.cc",
@@ -84,7 +85,6 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/http/ratelimit",
   "extensions/filters/http/buffer",
   "extensions/filters/http/grpc_http1_bridge",
-  "extensions/filters/http/grpc_http1_reverse_bridge",
   "extensions/filters/http/rbac",
   "extensions/filters/http/gzip",
   "extensions/filters/http/ip_tagging",
@@ -829,35 +829,40 @@ if __name__ == "__main__":
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
 
-  # Returns the list of directories with owners listed in CODEOWNERS
-  def ownedDirectories():
+  # Check whether all needed external tools are available.
+  ct_error_messages = checkTools()
+  if checkErrorMessages(ct_error_messages):
+    sys.exit(1)
+
+  # Returns the list of directories with owners listed in CODEOWNERS. May append errors to
+  # error_messages.
+  def ownedDirectories(error_messages):
     owned = []
     try:
       with open('./CODEOWNERS') as f:
         for line in f:
           # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
           # name and store it in the list of directories with documented owners.
-          m = re.search(r'..*(extensions[^@]* )@.*@.*', line)
-          if m is not None:
+          m = re.search(r'.*(extensions[^@]*\s+)(@.*)', line)
+          if m is not None and not line.startswith('#'):
             owned.append(m.group(1).strip())
+            owners = re.findall('@\S+', m.group(2).strip())
+            if len(owners) < 2:
+              error_messages.append("Extensions require at least 2 owners in CODEOWNERS:\n"
+                                    "    {}".format(line))
       return owned
     except IOError:
       return []  # for the check format tests.
 
   # Calculate the list of owned directories once per run.
-  owned_directories = ownedDirectories()
-
-  # Check whether all needed external tools are available.
-  ct_error_messages = checkTools()
-  if checkErrorMessages(ct_error_messages):
-    sys.exit(1)
+  error_messages = []
+  owned_directories = ownedDirectories(error_messages)
 
   if os.path.isfile(target_path):
-    error_messages = checkFormat("./" + target_path)
+    error_messages += checkFormat("./" + target_path)
   else:
     pool = multiprocessing.Pool(processes=args.num_workers)
     results = []
-    error_messages = []
     # For each file in target_path, start a new task in the pool and collect the
     # results (results is passed by reference, and is used as an output).
     os.path.walk(target_path, checkFormatVisitor,
