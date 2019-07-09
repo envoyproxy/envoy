@@ -7,7 +7,7 @@ envoy_api_dependencies()
 load("//bazel:repositories.bzl", "GO_VERSION", "envoy_dependencies")
 load("//bazel:cc_configure.bzl", "cc_configure")
 
-envoy_dependencies()
+envoy_dependencies(skip_targets=["tcmalloc_and_profiler","tcmalloc_debug"])
 
 load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependencies")
 
