@@ -25,11 +25,12 @@ bool TargetHandleImpl::initialize(const Watcher& watcher) const {
 TargetImpl::TargetImpl(absl::string_view name, InitializeFn fn)
     : name_(fmt::format("target {}", name)),
       fn_(std::make_shared<InternalInitalizeFn>([this, fn](WatcherHandlePtr watcher_handle) {
-        watcher_handle_ = std::move(watcher_handle);
-        fn();
-        // It is possible that fn() mutates the is_ready_.
         if (is_ready_) {
-          ready();
+          fn();
+          watcher_handle->ready();
+        } else {
+          watcher_handle_ = std::move(watcher_handle);
+          fn();
         }
       })) {}
 
