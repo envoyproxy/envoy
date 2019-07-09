@@ -117,7 +117,10 @@ private:
         .name();
   }
 
+  // ScopedRouteInfo by scope name.
   ScopedRouteMap scoped_route_map_;
+  // A map of (hash, scope-name), used to detect the key conflict between scopes.
+  absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash_;
   // For creating RDS subscriptions.
   Server::Configuration::FactoryContext& factory_context_;
   const std::string name_;

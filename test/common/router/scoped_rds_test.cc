@@ -182,8 +182,41 @@ key:
       "required.*");
 }
 
-// Tests that multiple uniquely named resources are allowed in config updates.
+// Tests that multiple uniquely named non-conflict resources are allowed in config updates.
 TEST_F(ScopedRdsTest, MultipleResources) {
+  setup();
+
+  const std::string config_yaml = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+  parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
+  const std::string config_yaml2 = R"EOF(
+name: foo_scope2
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
+  EXPECT_NO_THROW(subscription_callbacks_->onConfigUpdate(resources, "1"));
+  EXPECT_EQ(
+      1UL,
+      factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
+
+  // Delta API.
+  EXPECT_NO_THROW(subscription_callbacks_->onConfigUpdate(anyToResource(resources, "2"), {}, "2"));
+  EXPECT_EQ(
+      2UL,
+      factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
+}
+
+// Tests that conflict resources are detected.
+TEST_F(ScopedRdsTest, MultipleResourcesWithKeyConflict) {
   setup();
 
   const std::string config_yaml = R"EOF(
@@ -203,15 +236,22 @@ key:
     - string_key: x-foo-key
 )EOF";
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
-  EXPECT_NO_THROW(subscription_callbacks_->onConfigUpdate(resources, "1"));
+  EXPECT_THROW_WITH_REGEX(
+      subscription_callbacks_->onConfigUpdate(resources, "1"), EnvoyException,
+      ".*scope key conflict found, first scope is 'foo_scope', second scope is 'foo_scope2'");
   EXPECT_EQ(
-      1UL,
+      // Fully rejected.
+      0UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
 
   // Delta API.
-  EXPECT_NO_THROW(subscription_callbacks_->onConfigUpdate(anyToResource(resources, "2"), {}, "2"));
+  EXPECT_THROW_WITH_REGEX(
+      subscription_callbacks_->onConfigUpdate(anyToResource(resources, "2"), {}, "2"),
+      EnvoyException,
+      ".*scope key conflict found, first scope is 'foo_scope', second scope is 'foo_scope2'");
   EXPECT_EQ(
-      2UL,
+      // Partially reject.
+      1UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
 }
 
@@ -230,12 +270,12 @@ key:
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
   EXPECT_THROW_WITH_MESSAGE(subscription_callbacks_->onConfigUpdate(resources, "1"), EnvoyException,
-                            "duplicate scoped route configuration foo_scope found");
+                            "duplicate scoped route configuration 'foo_scope' found");
 
   EXPECT_THROW_WITH_MESSAGE(
       subscription_callbacks_->onConfigUpdate(anyToResource(resources, "1"), {}, "1"),
       EnvoyException,
-      "Error adding/updating scoped route(s): duplicate scoped route configuration foo_scope "
+      "Error adding/updating scoped route(s): duplicate scoped route configuration 'foo_scope' "
       "found");
 }
 

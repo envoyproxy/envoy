@@ -99,9 +99,6 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
-
-  // TODO(stevenzzzzz): we need to discuss about what to do when two ScopedRouteConfiguration
-  // which has the same ScopeKey.
   bool any_applied = false;
   std::vector<std::string> exception_msgs;
   absl::flat_hash_set<std::string> unique_resource_names;
@@ -114,14 +111,21 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
           resource.resource(), validation_visitor_);
       MessageUtil::validate(scoped_route_config);
       if (!unique_resource_names.insert(scoped_route_config.name()).second) {
-        throw EnvoyException(fmt::format("duplicate scoped route configuration {} found",
+        throw EnvoyException(fmt::format("duplicate scoped route configuration '{}' found",
                                          scoped_route_config.name()));
       }
-      const std::string scope_name = scoped_route_config.name();
       rds.set_route_config_name(scoped_route_config.route_configuration_name());
       ScopedRouteInfoConstSharedPtr scoped_route_info = std::make_shared<ScopedRouteInfo>(
           std::move(scoped_route_config), srds_config_provider_manager_.createRouteConfigProvider(
                                               factory_context_, rds, stat_prefix_));
+      // Detect if there is key conflict between two scopes.
+      auto iter = scope_name_by_hash_.find(scoped_route_info->scopeKey().hash());
+      if (iter != scope_name_by_hash_.end() && iter->second != scoped_route_info->scopeName()) {
+        throw EnvoyException(
+            fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
+                        iter->second, scoped_route_info->scopeName()));
+      }
+      scope_name_by_hash_[scoped_route_info->scopeKey().hash()] = scoped_route_info->scopeName();
       scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
       applyDeltaConfigUpdate(
           [scoped_route_info](const ConfigProvider::ConfigConstSharedPtr& config) {
@@ -131,20 +135,24 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
             thread_local_scoped_config->addOrUpdateRoutingScope(scoped_route_info);
           });
       any_applied = true;
-      ENVOY_LOG(debug, "srds: add/update scoped_route '{}'", scope_name);
+      ENVOY_LOG(debug, "srds: add/update scoped_route '{}'", scoped_route_info->scopeName());
     } catch (const EnvoyException& e) {
       exception_msgs.emplace_back(fmt::format("{}", e.what()));
     }
   }
   for (const auto& scope_name : removed_resources) {
-    scoped_route_map_.erase(scope_name);
-    applyDeltaConfigUpdate([scope_name](const ConfigProvider::ConfigConstSharedPtr& config) {
-      auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
-          static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
-      thread_local_scoped_config->removeRoutingScope(scope_name);
-    });
-    any_applied = true;
-    ENVOY_LOG(debug, "srds: remove scoped route '{}'", scope_name);
+    auto iter = scoped_route_map_.find(scope_name);
+    if (iter != scoped_route_map_.end()) {
+      scope_name_by_hash_.erase(iter->second->scopeKey().hash());
+      scoped_route_map_.erase(iter);
+      applyDeltaConfigUpdate([scope_name](const ConfigProvider::ConfigConstSharedPtr& config) {
+        auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
+            static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
+        thread_local_scoped_config->removeRoutingScope(scope_name);
+      });
+      any_applied = true;
+      ENVOY_LOG(debug, "srds: remove scoped route '{}'", scope_name);
+    }
   }
   ConfigSubscriptionCommonBase::onConfigUpdate();
   if (any_applied) {
@@ -163,14 +171,25 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
   absl::flat_hash_map<std::string, envoy::api::v2::ScopedRouteConfiguration> scoped_routes;
+  absl::flat_hash_map<uint64_t, std::string> scope_key_by_key_hash;
   for (const auto& resource_any : resources) {
     // Throws (thus rejects all) on any error.
     auto scoped_route = MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
         resource_any, validation_visitor_);
     MessageUtil::validate(scoped_route);
-    if (!scoped_routes.try_emplace(scoped_route.name(), std::move(scoped_route)).second) {
+    const std::string scope_name = scoped_route.name();
+    auto scope_config_inserted = scoped_routes.try_emplace(scope_name, std::move(scoped_route));
+    if (!scope_config_inserted.second) {
       throw EnvoyException(
-          fmt::format("duplicate scoped route configuration {} found", scoped_route.name()));
+          fmt::format("duplicate scoped route configuration '{}' found", scoped_route.name()));
+    }
+    const envoy::api::v2::ScopedRouteConfiguration& scoped_route_config =
+        scope_config_inserted.first->second;
+    uint64_t key_fingerprint = MessageUtil::hash(scoped_route_config.key());
+    if (!scope_key_by_key_hash.try_emplace(key_fingerprint, scope_name).second) {
+      throw EnvoyException(
+          fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
+                      scope_key_by_key_hash[key_fingerprint], scope_name));
     }
   }
   ScopedRouteMap scoped_routes_to_remove = scoped_route_map_;
