@@ -51,7 +51,7 @@ envoy_cc_test(
         "@com_googlesource_quiche//:quic_core_types_lib",
         "@com_googlesource_quiche//:quic_platform_expect_bug",
         "@com_googlesource_quiche//:quic_platform_mem_slice_span",
-        "@com_googlesource_quiche//:quic_platform_mem_slice_storage_lib",
+        "@com_googlesource_quiche//:quic_platform_mem_slice_storage",
         "@com_googlesource_quiche//:quic_platform_mock_log",
         "@com_googlesource_quiche//:quic_platform_port_utils",
         "@com_googlesource_quiche//:quic_platform_sleep",
@@ -207,6 +207,11 @@ envoy_cc_test_library(
     deps = [
         ":quic_platform_expect_bug_impl_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "spdy_platform_test_impl_lib",
+    hdrs = ["spdy_test_impl.h"],
 )
 
 envoy_cc_test(

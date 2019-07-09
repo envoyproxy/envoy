@@ -1,0 +1,20 @@
+{#
+  Template for top-level structure representing a response in Kafka protocol
+  (e.g. ProduceResponse).
+  Rendered templates for each response in Kafka protocol will be put into 'responses.h' file.
+
+  This template handles binding the top-level structure deserializer
+  (e.g. ProduceResponseV0Deserializer) with ResponseDataParser.
+  These parsers are then used by ResponseParserResolver instance depending on received Kafka
+  api key & api version (see 'kafka_response_resolver_cc.j2').
+#}
+
+{% for version in complex_type.versions %}class {{ complex_type.name }}V{{ version }}Parser:
+  public ResponseDataParser<
+    {{ complex_type.name }}, {{ complex_type.name }}V{{ version }}Deserializer>{
+public:
+  {{ complex_type.name }}V{{ version }}Parser(ResponseContextSharedPtr context):
+    ResponseDataParser{context} {};
+};
+
+{% endfor %}

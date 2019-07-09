@@ -120,7 +120,7 @@ OverloadManagerImpl::OverloadManagerImpl(
     }
 
     for (const auto& trigger : action.triggers()) {
-      const std::string resource = trigger.name();
+      const std::string& resource = trigger.name();
 
       if (resources_.find(resource) == resources_.end()) {
         throw EnvoyException(

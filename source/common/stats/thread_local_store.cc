@@ -313,9 +313,9 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
 
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
-    StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
+    StatName name, StatMap<RefcountPtr<StatType>>& central_cache_map,
     StatNameStorageSet& central_rejected_stats, MakeStatFn<StatType> make_stat,
-    StatMap<std::shared_ptr<StatType>>* tls_cache, StatNameHashSet* tls_rejected_stats,
+    StatMap<RefcountPtr<StatType>>* tls_cache, StatNameHashSet* tls_rejected_stats,
     StatType& null_stat) {
 
   if (tls_rejected_stats != nullptr &&
@@ -335,7 +335,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   // central store location. It might contain nothing. In this case, we allocate a new stat.
   Thread::LockGuard lock(parent_.lock_);
   auto iter = central_cache_map.find(name);
-  std::shared_ptr<StatType>* central_ref = nullptr;
+  RefcountPtr<StatType>* central_ref = nullptr;
   if (iter != central_cache_map.end()) {
     central_ref = &(iter->second);
   } else if (parent_.checkAndRememberRejection(name, central_rejected_stats, tls_rejected_stats)) {
@@ -343,7 +343,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     return null_stat;
   } else {
     TagExtraction extraction(parent_, name);
-    std::shared_ptr<StatType> stat =
+    RefcountPtr<StatType> stat =
         make_stat(parent_.alloc_, name, extraction.tagExtractedName(), extraction.tags());
     ASSERT(stat != nullptr);
     central_ref = &central_cache_map[stat->statName()];
@@ -362,13 +362,13 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 template <class StatType>
 absl::optional<std::reference_wrapper<const StatType>>
 ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
-    StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map) const {
+    StatName name, StatMap<RefcountPtr<StatType>>& central_cache_map) const {
   auto iter = central_cache_map.find(name);
   if (iter == central_cache_map.end()) {
     return absl::nullopt;
   }
 
-  return std::cref(*iter->second.get());
+  return std::cref(*iter->second);
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
@@ -501,8 +501,9 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name)
     return parent_.null_histogram_;
   } else {
     TagExtraction extraction(parent_, final_stat_name);
-    auto stat = std::make_shared<ParentHistogramImpl>(
-        final_stat_name, parent_, *this, extraction.tagExtractedName(), extraction.tags());
+
+    RefcountPtr<ParentHistogramImpl> stat(new ParentHistogramImpl(
+        final_stat_name, parent_, *this, extraction.tagExtractedName(), extraction.tags()));
     central_ref = &central_cache_.histograms_[stat->statName()];
     *central_ref = stat;
   }
@@ -530,8 +531,8 @@ ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
     return absl::nullopt;
   }
 
-  std::shared_ptr<Histogram> histogram_ref(iter->second);
-  return std::cref(*histogram_ref.get());
+  RefcountPtr<Histogram> histogram_ref(iter->second);
+  return std::cref(*histogram_ref);
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
@@ -554,8 +555,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
   std::vector<Tag> tags;
   std::string tag_extracted_name =
       parent_.tagProducer().produceTags(symbolTable().toString(name), tags);
-  TlsHistogramSharedPtr hist_tls_ptr =
-      std::make_shared<ThreadLocalHistogramImpl>(name, tag_extracted_name, tags, symbolTable());
+  TlsHistogramSharedPtr hist_tls_ptr(
+      new ThreadLocalHistogramImpl(name, tag_extracted_name, tags, symbolTable()));
 
   parent.addTlsHistogram(hist_tls_ptr);
 
@@ -566,19 +567,17 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
 }
 
 ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name,
-                                                   absl::string_view tag_extracted_name,
+                                                   const std::string& tag_extracted_name,
                                                    const std::vector<Tag>& tags,
                                                    SymbolTable& symbol_table)
-    : MetricImpl(tag_extracted_name, tags, symbol_table), current_active_(0), used_(false),
-      created_thread_id_(std::this_thread::get_id()), name_(name, symbol_table),
-      symbol_table_(symbol_table) {
+    : HistogramImplHelper(name, tag_extracted_name, tags, symbol_table), current_active_(0),
+      used_(false), created_thread_id_(std::this_thread::get_id()), symbol_table_(symbol_table) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();
 }
 
 ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
-  MetricImpl::clear();
-  name_.free(symbolTable());
+  MetricImpl::clear(symbolTable());
   hist_free(histograms_[0]);
   hist_free(histograms_[1]);
 }
@@ -598,14 +597,13 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
 ParentHistogramImpl::ParentHistogramImpl(StatName name, Store& parent, TlsScope& tls_scope,
                                          absl::string_view tag_extracted_name,
                                          const std::vector<Tag>& tags)
-    : MetricImpl(tag_extracted_name, tags, parent.symbolTable()), parent_(parent),
+    : MetricImpl(name, tag_extracted_name, tags, parent.symbolTable()), parent_(parent),
       tls_scope_(tls_scope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_),
-      merged_(false), name_(name, parent.symbolTable()) {}
+      merged_(false) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
-  MetricImpl::clear();
-  name_.free(symbolTable());
+  MetricImpl::clear(symbolTable());
   hist_free(interval_histogram_);
   hist_free(cumulative_histogram_);
 }

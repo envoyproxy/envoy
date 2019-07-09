@@ -29,10 +29,23 @@ public:
                               Upstream::ResourcePriority priority);
   ~RetryStateImpl();
 
-  static uint32_t parseRetryOn(absl::string_view config);
+  /**
+   * Returns the RetryPolicy extracted from the x-envoy-retry-on header.
+   * @param config is the value of the header.
+   * @return std::pair<uint32_t, bool> the uint32_t is a bitset representing the
+   *         valid retry policies in @param config. The bool is TRUE iff all the
+   *         policies specified in @param config are valid.
+   */
+  static std::pair<uint32_t, bool> parseRetryOn(absl::string_view config);
 
-  // Returns the RetryPolicy extracted from the x-envoy-retry-grpc-on header.
-  static uint32_t parseRetryGrpcOn(absl::string_view retry_grpc_on_header);
+  /**
+   * Returns the RetryPolicy extracted from the x-envoy-retry-grpc-on header.
+   * @param config is the value of the header.
+   * @return std::pair<uint32_t, bool> the uint32_t is a bitset representing the
+   *         valid retry policies in @param config. The bool is TRUE iff all the
+   *         policies specified in @param config are valid.
+   */
+  static std::pair<uint32_t, bool> parseRetryGrpcOn(absl::string_view retry_grpc_on_header);
 
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }

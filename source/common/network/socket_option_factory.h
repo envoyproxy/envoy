@@ -31,6 +31,8 @@ public:
   static std::unique_ptr<Socket::Options> buildTcpFastOpenOptions(uint32_t queue_length);
   static std::unique_ptr<Socket::Options> buildLiteralOptions(
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::SocketOption>& socket_options);
+  static std::unique_ptr<Socket::Options> buildIpPacketInfoOptions();
+  static std::unique_ptr<Socket::Options> buildRxQueueOverFlowOptions();
 };
 } // namespace Network
 } // namespace Envoy

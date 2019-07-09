@@ -26,6 +26,7 @@ LogicalDnsCluster::LogicalDnsCluster(
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
+      respect_dns_ttl_(cluster.respect_dns_ttl()),
       resolve_timer_(
           factory_context.dispatcher().createTimer([this]() -> void { startResolve(); })),
       local_info_(factory_context.localInfo()),
@@ -70,18 +71,23 @@ void LogicalDnsCluster::startResolve() {
 
   active_dns_query_ = dns_resolver_->resolve(
       dns_address, dns_lookup_family_,
-      [this,
-       dns_address](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+      [this, dns_address](std::list<Network::DnsResponse>&& response) -> void {
         active_dns_query_ = nullptr;
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address);
         info_->stats().update_success_.inc();
 
-        if (!address_list.empty()) {
+        std::chrono::milliseconds refresh_rate = dns_refresh_rate_ms_;
+        if (!response.empty()) {
           // TODO(mattklein123): Move port handling into the DNS interface.
-          ASSERT(address_list.front() != nullptr);
+          ASSERT(response.front().address_ != nullptr);
           Network::Address::InstanceConstSharedPtr new_address =
-              Network::Utility::getAddressWithPort(*address_list.front(),
+              Network::Utility::getAddressWithPort(*(response.front().address_),
                                                    Network::Utility::portFromTcpUrl(dns_url_));
+
+          if (respect_dns_ttl_ && response.front().ttl_ != std::chrono::seconds(0)) {
+            refresh_rate = response.front().ttl_;
+          }
+
           if (!logical_host_) {
             logical_host_.reset(
                 new LogicalHost(info_, hostname_, new_address, localityLbEndpoint(), lbEndpoint()));
@@ -107,7 +113,7 @@ void LogicalDnsCluster::startResolve() {
         }
 
         onPreInitComplete();
-        resolve_timer_->enableTimer(dns_refresh_rate_ms_);
+        resolve_timer_->enableTimer(refresh_rate);
       });
 }
 

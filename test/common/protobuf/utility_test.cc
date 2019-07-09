@@ -295,7 +295,7 @@ TEST_F(ProtobufUtilityTest, HashedValue) {
   EXPECT_EQ(hv1, hv2);
   EXPECT_NE(hv1, hv3);
 
-  HashedValue copy(hv1);
+  HashedValue copy(hv1); // NOLINT(performance-unnecessary-copy-initialization)
   EXPECT_EQ(hv1, copy);
 }
 

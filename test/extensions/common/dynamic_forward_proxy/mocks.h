@@ -14,13 +14,20 @@ public:
   MockDnsCache();
   ~MockDnsCache();
 
-  LoadDnsCacheHandlePtr loadDnsCache(absl::string_view host, uint16_t default_port,
-                                     LoadDnsCacheCallbacks& callbacks) override {
-    return LoadDnsCacheHandlePtr{loadDnsCache_(host, default_port, callbacks)};
+  struct MockLoadDnsCacheEntryResult {
+    LoadDnsCacheEntryStatus status_;
+    LoadDnsCacheEntryHandle* handle_;
+  };
+
+  LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
+                                            LoadDnsCacheEntryCallbacks& callbacks) override {
+    MockLoadDnsCacheEntryResult result = loadDnsCacheEntry_(host, default_port, callbacks);
+    return {result.status_, LoadDnsCacheEntryHandlePtr{result.handle_}};
   }
-  MOCK_METHOD3(loadDnsCache_,
-               DnsCache::LoadDnsCacheHandle*(absl::string_view host, uint16_t default_port,
-                                             LoadDnsCacheCallbacks& callbacks));
+  MOCK_METHOD3(loadDnsCacheEntry_,
+               MockLoadDnsCacheEntryResult(absl::string_view host, uint16_t default_port,
+                                           LoadDnsCacheEntryCallbacks& callbacks));
+
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override {
     return AddUpdateCallbacksHandlePtr{addUpdateCallbacks_(callbacks)};
   }
@@ -28,10 +35,10 @@ public:
                DnsCache::AddUpdateCallbacksHandle*(UpdateCallbacks& callbacks));
 };
 
-class MockLoadDnsCacheHandle : public DnsCache::LoadDnsCacheHandle {
+class MockLoadDnsCacheEntryHandle : public DnsCache::LoadDnsCacheEntryHandle {
 public:
-  MockLoadDnsCacheHandle();
-  ~MockLoadDnsCacheHandle();
+  MockLoadDnsCacheEntryHandle();
+  ~MockLoadDnsCacheEntryHandle();
 
   MOCK_METHOD0(onDestroy, void());
 };
@@ -70,10 +77,10 @@ public:
   MOCK_METHOD1(onDnsHostRemove, void(const std::string& host));
 };
 
-class MockLoadDnsCacheCallbacks : public DnsCache::LoadDnsCacheCallbacks {
+class MockLoadDnsCacheEntryCallbacks : public DnsCache::LoadDnsCacheEntryCallbacks {
 public:
-  MockLoadDnsCacheCallbacks();
-  ~MockLoadDnsCacheCallbacks();
+  MockLoadDnsCacheEntryCallbacks();
+  ~MockLoadDnsCacheEntryCallbacks();
 
   MOCK_METHOD0(onLoadDnsCacheComplete, void());
 };

@@ -145,6 +145,50 @@ TEST_F(Http1ServerConnectionImplTest, Http10Absolute) {
   expectHeadersTest(Protocol::Http10, true, buffer, expected_headers);
 }
 
+TEST_F(Http1ServerConnectionImplTest, Http10MultipleResponses) {
+  initialize();
+
+  Http::MockStreamDecoder decoder;
+  // Send a full HTTP/1.0 request and proxy a response.
+  {
+    Buffer::OwnedImpl buffer(
+        "GET /foobar HTTP/1.0\r\nHost: www.somewhere.com\r\nconnection: keep-alive\r\n\r\n");
+    Http::StreamEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+
+    EXPECT_CALL(decoder, decodeHeaders_(_, true)).Times(1);
+    codec_->dispatch(buffer);
+
+    std::string output;
+    ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+    TestHeaderMapImpl headers{{":status", "200"}};
+    response_encoder->encodeHeaders(headers, true);
+    EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+    EXPECT_EQ(Protocol::Http10, codec_->protocol());
+  }
+
+  // Now send an HTTP/1.1 request and make sure the protocol is tracked correctly.
+  {
+    TestHeaderMapImpl expected_headers{
+        {":authority", "www.somewhere.com"}, {":path", "/foobar"}, {":method", "GET"}};
+    Buffer::OwnedImpl buffer("GET /foobar HTTP/1.1\r\nHost: www.somewhere.com\r\n\r\n");
+
+    Http::StreamEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+    EXPECT_CALL(decoder, decodeHeaders_(_, true)).Times(1);
+    codec_->dispatch(buffer);
+    EXPECT_EQ(Protocol::Http11, codec_->protocol());
+  }
+}
+
 TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath1) {
   initialize();
 

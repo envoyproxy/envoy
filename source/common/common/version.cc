@@ -24,6 +24,11 @@ std::string VersionInfo::version() {
 #else
                      "DEBUG",
 #endif
-                     ENVOY_SSL_VERSION);
+#ifdef ENVOY_SSL_VERSION
+                     ENVOY_SSL_VERSION
+#else
+                     "no-ssl"
+#endif
+  );
 }
 } // namespace Envoy

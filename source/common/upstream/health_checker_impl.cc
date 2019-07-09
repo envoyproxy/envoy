@@ -249,7 +249,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
                   response_headers_->EnvoyUpstreamHealthCheckedCluster()->value().getStringView())
             : EMPTY_STRING;
 
-    if (service_cluster_healthchecked.find(parent_.service_name_.value()) == 0) {
+    if (absl::StartsWith(service_cluster_healthchecked, parent_.service_name_.value())) {
       return degraded ? HealthCheckResult::Degraded : HealthCheckResult::Succeeded;
     } else {
       return HealthCheckResult::Failed;

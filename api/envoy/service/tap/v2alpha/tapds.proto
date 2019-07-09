@@ -8,7 +8,7 @@ package envoy.service.tap.v2alpha;
 
 import "google/api/annotations.proto";
 
-option java_outer_classname = "CommonProto";
+option java_outer_classname = "TapDsProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.service.tap.v2alpha";
 

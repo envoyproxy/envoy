@@ -112,11 +112,10 @@ std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sa
       }
     }
   } else {
-    return std::pair<SpanContext, bool>(SpanContext(), false);
+    return {SpanContext(), false};
   }
 
-  return std::pair<SpanContext, bool>(
-      SpanContext(trace_id_high, trace_id, span_id, parent_id, is_sampled), true);
+  return {SpanContext(trace_id_high, trace_id, span_id, parent_id, is_sampled), true};
 }
 
 std::pair<SpanContext, bool>
@@ -219,8 +218,7 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
     }
   }
 
-  return std::pair<SpanContext, bool>(
-      SpanContext(trace_id_high, trace_id, span_id, parent_id, is_sampled), true);
+  return {SpanContext(trace_id_high, trace_id, span_id, parent_id, is_sampled), true};
 }
 
 } // namespace Zipkin

@@ -72,7 +72,7 @@ ConfigUtility::parseDirectResponseCode(const envoy::api::v2::route::Route& route
   } else if (route.has_direct_response()) {
     return static_cast<Http::Code>(route.direct_response().status());
   }
-  return absl::optional<Http::Code>();
+  return {};
 }
 
 std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::route::Route& route,
@@ -82,7 +82,7 @@ std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::route::
     return EMPTY_STRING;
   }
   const auto& body = route.direct_response().body();
-  const std::string filename = body.filename();
+  const std::string& filename = body.filename();
   if (!filename.empty()) {
     if (!api.fileSystem().fileExists(filename)) {
       throw EnvoyException(fmt::format("response body file {} does not exist", filename));

@@ -201,6 +201,20 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
   EXPECT_TRUE(json.find("\"another_key\":\"another_value\"") != std::string::npos);
 }
 
+TEST_F(StreamInfoImplTest, DumpStateTest) {
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
+  std::string prefix = "";
+
+  for (int i = 0; i < 7; ++i) {
+    std::stringstream out;
+    stream_info.dumpState(out, i);
+    std::string state = out.str();
+    EXPECT_TRUE(absl::StartsWith(state, prefix));
+    EXPECT_THAT(state, testing::HasSubstr("protocol_: 2"));
+    prefix = prefix + "  ";
+  }
+}
+
 } // namespace
 } // namespace StreamInfo
 } // namespace Envoy

@@ -24,6 +24,7 @@
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time_system.h"
 #include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/time/time.h"
@@ -179,11 +180,52 @@ public:
   static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
 
   /**
+   * Wait till Counter value is equal to the passed ion value.
+   * @param store supplies the stats store.
+   * @param name supplies the name of the counter to wait for.
+   * @param value supplies the value of the counter.
+   * @param time_system the time system to use for waiting.
+   */
+  static void waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
+                               Event::TestTimeSystem& time_system);
+
+  /**
+   * Wait for a counter to >= a given value.
+   * @param store supplies the stats store.
+   * @param name counter name.
+   * @param value target value.
+   * @param time_system the time system to use for waiting.
+   */
+  static void waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
+                               Event::TestTimeSystem& time_system);
+
+  /**
+   * Wait for a gauge to >= a given value.
+   * @param store supplies the stats store.
+   * @param name gauge name.
+   * @param value target value.
+   * @param time_system the time system to use for waiting.
+   */
+  static void waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
+                             Event::TestTimeSystem& time_system);
+
+  /**
+   * Wait for a gauge to == a given value.
+   * @param store supplies the stats store.
+   * @param name gauge name.
+   * @param value target value.
+   * @param time_system the time system to use for waiting.
+   */
+  static void waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
+                             Event::TestTimeSystem& time_system);
+
+  /**
    * Convert a string list of IP addresses into a list of network addresses usable for DNS
    * response testing.
    */
-  static std::list<Network::Address::InstanceConstSharedPtr>
-  makeDnsResponse(const std::list<std::string>& addresses);
+  static std::list<Network::DnsResponse>
+  makeDnsResponse(const std::list<std::string>& addresses,
+                  std::chrono::seconds = std::chrono::seconds(0));
 
   /**
    * List files in a given directory path

@@ -729,9 +729,9 @@ public:
   ~QuicMemSliceTest() override {}
 };
 
-INSTANTIATE_TEST_CASE_P(QuicMemSliceTests, QuicMemSliceTest,
-                        testing::ValuesIn({Envoy::Buffer::BufferImplementation::Old,
-                                           Envoy::Buffer::BufferImplementation::New}));
+INSTANTIATE_TEST_SUITE_P(QuicMemSliceTests, QuicMemSliceTest,
+                         testing::ValuesIn({Envoy::Buffer::BufferImplementation::Old,
+                                            Envoy::Buffer::BufferImplementation::New}));
 
 TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');
@@ -755,7 +755,7 @@ TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
   quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer, str2.length())};
   EXPECT_EQ(str.length(), buffer.length());
   EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
-  std::string str2_old = str2;
+  std::string str2_old = str2; // NOLINT(performance-unnecessary-copy-initialization)
   // slice1 is released, but str2 should not be affected.
   slice1.Reset();
   EXPECT_TRUE(slice1.empty());
