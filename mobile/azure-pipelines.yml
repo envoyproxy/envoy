@@ -72,7 +72,7 @@ stages:
             submodules: true
           - script: ./ci/linux_ci_setup.sh
             displayName: 'Install dependencies'
-          - script: bazel build //test/performance:test_binary_size --config=sizeopt
+          - script: ./bazelw build //test/performance:test_binary_size --config=sizeopt
             displayName: 'Build test binary'
           - task: PublishPipelineArtifact@0
             displayName: 'Publish current test binary'
@@ -145,7 +145,7 @@ stages:
               export CXX=clang++
             displayName: 'Set up clang toolchain'
           - script: |
-              bazel build --fat_apk_cpu=x86 //:android_dist
+              ./bazelw build --fat_apk_cpu=x86 //:android_dist
             displayName: 'Build envoy.aar distributable'
           - task: PublishPipelineArtifact@0
             displayName: 'Publish envoy.aar distributable'
@@ -169,7 +169,7 @@ stages:
             inputs:
               artifactName: 'envoy-linux.aar'
               targetPath: dist
-          - script: bazel build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
+          - script: ./bazelw build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
             displayName: 'Build java app'
       - job: linux_kotlin_helloworld
         dependsOn: linux_dist
@@ -188,7 +188,7 @@ stages:
             inputs:
               artifactName: 'envoy-linux.aar'
               targetPath: dist
-          - script: bazel build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
+          - script: ./bazelw build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
             displayName: 'Build kotlin app'
       - job: mac_dist
         timeoutInMinutes: 60
@@ -199,7 +199,7 @@ stages:
             submodules: true
           - script: ./ci/mac_ci_setup.sh
             displayName: 'Install dependencies'
-          - script: bazel build --fat_apk_cpu=x86 //:android_dist
+          - script: ./bazelw build --fat_apk_cpu=x86 //:android_dist
             displayName: 'Build envoy.aar distributable'
           - task: PublishPipelineArtifact@0
             displayName: 'Publish envoy.aar distributable'
@@ -222,7 +222,7 @@ stages:
               artifactName: 'envoy-mac.aar'
               targetPath: dist
           - template: ci/templates/start_android_emulator.yaml
-          - script: bazel mobile-install --fat_apk_cpu=x86 --start_app //examples/java/hello_world:hello_envoy
+          - script: ./bazelw mobile-install --fat_apk_cpu=x86 --start_app //examples/java/hello_world:hello_envoy
             displayName: 'Start java app'
           - script: adb logcat -e "successful response!" -m 1
             displayName: 'Check liveliness'
@@ -242,7 +242,7 @@ stages:
               artifactName: 'envoy-mac.aar'
               targetPath: dist
           - template: ci/templates/start_android_emulator.yaml
-          - script: bazel mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+          - script: ./bazelw mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
             displayName: 'Start kotlin app'
           - script: adb logcat -e "successful response!" -m 1
             displayName: 'Check liveliness'
@@ -258,7 +258,7 @@ stages:
             submodules: true
           - script: ./ci/mac_ci_setup.sh
             displayName: 'Install dependencies'
-          - script: bazel build --config=ios //:ios_dist
+          - script: ./bazelw build --config=ios //:ios_dist
             displayName: 'Build Envoy.framework distributable'
           - task: PublishPipelineArtifact@0
             displayName: 'Publish Envoy.framework distributable'
@@ -282,7 +282,7 @@ stages:
       #      inputs:
       #        artifactName: Envoy.framework
       #        targetPath: dist/Envoy.framework
-      #    - script: bazel build --config=ios //examples/objective-c/hello_world:app
+      #    - script: ./bazelw build --config=ios //examples/objective-c/hello_world:app
       #      displayName: 'Build objective-c app'
       #    # Now check that the app actually runs on the simulator.
       #    # This is a non-ideal way to check for liveliness, but works for now.
@@ -292,7 +292,7 @@ stages:
       #    - script: npm install -g ios-sim && ios-sim start --devicetypeid "iPhone-X, 12.2"
       #      displayName: 'Start the iOS simulator'
       #    # Run the app in the background and redirect logs.
-      #    - script: bazel run --config=ios //examples/objective-c/hello_world:app &> /tmp/envoy.log &
+      #    - script: ./bazelw run --config=ios //examples/objective-c/hello_world:app &> /tmp/envoy.log &
       #      displayName: 'Run objective-c app'
       #    # Wait for the app to start and get some requests/responses.
       #    - script: sleep 60
@@ -317,7 +317,7 @@ stages:
             inputs:
               artifactName: Envoy.framework
               targetPath: dist/Envoy.framework
-          - script: bazel build --config=ios //examples/swift/hello_world:app
+          - script: ./bazelw build --config=ios //examples/swift/hello_world:app
             displayName: 'Build swift app'
           # Now check that the app actually runs on the simulator.
           # This is a non-ideal way to check for liveliness, but works for now.
@@ -327,7 +327,7 @@ stages:
           - script: npm install -g ios-sim && ios-sim start --devicetypeid "iPhone-X, 12.2"
             displayName: 'Start the iOS simulator'
           # Run the app in the background and redirect logs.
-          - script: bazel run --config=ios //examples/swift/hello_world:app &> /tmp/envoy.log &
+          - script: ./bazelw run --config=ios //examples/swift/hello_world:app &> /tmp/envoy.log &
             displayName: 'Run swift app'
           # Wait for the app to start and get some requests/responses.
           - script: sleep 60

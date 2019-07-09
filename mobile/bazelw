@@ -1,0 +1,46 @@
+#!/bin/bash
+
+set -euo pipefail
+
+readonly bazel_version="0.26.1"
+if [[ $OSTYPE == darwin* ]]; then
+  readonly bazel_platform="darwin"
+  readonly bazel_version_sha="9b416e0c9bde5fd59264eacc35d518d2465b5591fbaf3656e386970c045d4747"
+else
+  readonly bazel_platform="linux"
+  readonly bazel_version_sha="6c50e142a0a405d3d8598050d6c1b3920c8cdb82a7ffca6fc067cb474275148f"
+fi
+
+readonly bazel_version_url="https://github.com/bazelbuild/bazel/releases/download/$bazel_version/bazel-$bazel_version-$bazel_platform-x86_64"
+readonly script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly bazel_root="$script_root/tmp/bazel/versions/$bazel_version-$bazel_platform"
+readonly bazel_executable="$bazel_root/bin/bazel"
+
+if [[ ! -x "$bazel_executable" ]]; then
+  echo "Installing bazel..." >&2
+  mkdir -p "$(dirname "$bazel_executable")"
+  extra_curl_args=""
+  if [[ -n "${BUILD_BUILDID:-}" ]]; then
+    extra_curl_args="--silent"
+  fi
+
+  curl \
+    --show-error \
+    $extra_curl_args \
+    --progress-bar \
+    --retry 3 \
+    --fail \
+    --location \
+    --output "$bazel_executable" \
+    "$bazel_version_url"
+
+  if echo "$bazel_version_sha  $bazel_executable" | shasum --check --status; then
+    chmod +x "$bazel_executable"
+  else
+    echo "Bazel installer sha mismatch" >&2
+    rm -f "$bazel_executable"
+    exit 1
+  fi
+fi
+
+exec "$bazel_executable" "$@"

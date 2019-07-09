@@ -9,3 +9,4 @@
 *.pyc
 tags
 .vscode
+/tmp/

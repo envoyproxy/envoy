@@ -19,8 +19,3 @@ sudo update-alternatives --remove-all clang
 sudo update-alternatives --remove-all clang++
 sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-8 100
 sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-8 100
-
-# Bazel.
-wget -c https://github.com/bazelbuild/bazel/releases/download/0.26.1/bazel-0.26.1-installer-linux-x86_64.sh
-chmod +x bazel-0.26.1-installer-linux-x86_64.sh
-sudo ./bazel-0.26.1-installer-linux-x86_64.sh
