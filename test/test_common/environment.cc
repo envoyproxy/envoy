@@ -3,7 +3,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#if defined(_LIBCPP_VERSION) && TEST_STD_VER < 17
+#if defined(_LIBCPP_VERSION) && TEST_STD_VER < 17 && !defined(__APPLE__)
 #include <filesystem>
 #elif defined __has_include
 // TODO(asraa): Remove this when Envoy requires Clang >= 9.
