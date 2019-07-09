@@ -61,8 +61,9 @@ void ManagerImpl::initialize(const Watcher& watcher) {
 
     // Attempt to initialize each target. If a target is unavailable, treat it as though it
     // completed immediately.
-    for (const auto& target_handle : target_handles_) {
-      if (!target_handle->initialize(watcher_)) {
+    for (auto iter = target_handles_.begin(); iter != target_handles_.end();
+         iter = target_handles_.erase(iter)) {
+      if (!(*iter)->initialize(watcher_)) {
         onTargetReady();
       }
     }
