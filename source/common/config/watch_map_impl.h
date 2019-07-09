@@ -53,11 +53,13 @@ public:
   AddedRemoved updateWatchInterest(Watch* watch,
                                    const std::set<std::string>& update_to_these_names) override;
 
+private:
+  friend struct Watch;
+  // Meant to be called only by ~Watch().
   // Expects that the watch to be removed has already had all of its resource names removed via
   // updateWatchInterest().
   void removeWatch(Watch* watch) override;
 
-private:
   // SubscriptionCallbacks
   virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                               const std::string& version_info) override;
