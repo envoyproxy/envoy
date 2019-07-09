@@ -125,6 +125,34 @@ jobs:
        - run: ci/do_circle_ci.sh check_repositories
        - run: ci/do_circle_ci.sh check_spelling
        - run: ci/do_circle_ci.sh check_spelling_pedantic
+   fuzzit_sanity:
+     docker:
+       - image: gcr.io/fuzzit-public/envoy:3c3ec56
+         environment:
+           # See comment in do_circle_ci.sh for why we do this.
+           NUM_CPUS: 8
+     working_directory: /src/envoy
+     resource_class: xlarge
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: echo $CIRCLE_SHA1
+       - run: echo $CIRCLE_PR_NUMBER
+       - run: ci/run_fuzzit.sh sanity
+   fuzzit_fuzzing:
+     docker:
+       - image: gcr.io/fuzzit-public/envoy:3c3ec56
+         environment:
+           # See comment in do_circle_ci.sh for why we do this.
+           NUM_CPUS: 8
+     working_directory: /src/envoy
+     resource_class: xlarge
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: echo $CIRCLE_SHA1
+       - run: echo $CIRCLE_PR_NUMBER
+       - run: ci/run_fuzzit.sh fuzzing
    build_image:
      docker:
        - image: google/cloud-sdk
@@ -165,6 +193,7 @@ workflows:
       - coverage
       - coverage_publish:
           requires: [coverage]
+      - fuzzit_sanity
       - format
       - clang_tidy
       - build_image
@@ -172,3 +201,14 @@ workflows:
           filters:
             tags:
               only: /^v.*/
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - fuzzit_fuzzing
+
