@@ -22,6 +22,9 @@ public:
     read_ = true;
     return prefix_;
   }
+
+  // The char* prefix is used directly, so must be available for the interval where prefix() may be
+  // called.
   void setPrefix(const char* prefix) {
     absl::WriterMutexLock lock(&m_);
     RELEASE_ASSERT(!read_ || absl::string_view(prefix_) == absl::string_view(prefix),
