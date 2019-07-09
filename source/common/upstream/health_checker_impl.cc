@@ -12,6 +12,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
 #include "common/router/router.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/upstream/host_utility.h"
 
 // TODO(dio): Remove dependency to extension health checkers when redis_health_check is removed.
@@ -742,9 +743,12 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
 
 Http::CodecClientPtr
 ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  return std::make_unique<Http::CodecClientProd>(Http::CodecClient::Type::HTTP2,
-                                                 std::move(data.connection_),
-                                                 data.host_description_, dispatcher_, false);
+
+  const bool validate_header_values =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_header_values");
+  return std::make_unique<Http::CodecClientProd>(
+      Http::CodecClient::Type::HTTP2, std::move(data.connection_), data.host_description_,
+      dispatcher_, validate_header_values);
 }
 
 std::ostream& operator<<(std::ostream& out, HealthState state) {

@@ -405,10 +405,11 @@ invert_match: true
 
 TEST(HeaderIsValidTest, InvalidHeaderValuesAreRejected) {
   // ASCII values 1-31 are control characters (with the exception of ASCII
-  // value 9, which is a horizontal tab), and are not valid in an HTTP header,
-  // per RFC 7230, section 3.2
-  for (uint i = 1; i < 32; i++) {
-    if (i == 9 || i == 13 || i == 10) {
+  // values 9, 10, and 13 which are a horizontal tab, line feed, and carriage
+  // return, respectively), and are not valid in an HTTP header, per
+  // RFC 7230, section 3.2
+  for (uint i = 0; i < 32; i++) {
+    if (i == 9) {
       continue;
     }
 
