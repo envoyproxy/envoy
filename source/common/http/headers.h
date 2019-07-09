@@ -14,29 +14,30 @@ namespace Http {
 // so that servers can configure their own x-custom-string prefix.
 //
 // Once the HeaderValues const singleton has been created, changing the prefix
-// will have no further effect.
+// is disallowed. Essentially this is write-once then read-only.
 class PrefixValue {
 public:
   const char* prefix() {
     absl::WriterMutexLock lock(&m_);
     read_ = true;
-    return prefix_;
+    return prefix_.c_str();
   }
 
   // The char* prefix is used directly, so must be available for the interval where prefix() may be
   // called.
   void setPrefix(const char* prefix) {
     absl::WriterMutexLock lock(&m_);
-    RELEASE_ASSERT(!read_ || absl::string_view(prefix_) == absl::string_view(prefix),
+    RELEASE_ASSERT(!read_ || prefix_ == std::string(prefix),
                    "Attempting to change the header prefix after it has been used!");
-    prefix_ = prefix;
+    if (!read_) {
+      prefix_ = prefix;
+    }
   }
 
 private:
-  bool read_ = false;
-  const char* default_prefix_ = "x-envoy";
-  const char* prefix_ = default_prefix_;
   absl::Mutex m_;
+  bool read_ = false;
+  std::string prefix_ = "x-envoy";
 };
 
 /**

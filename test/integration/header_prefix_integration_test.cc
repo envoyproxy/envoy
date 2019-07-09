@@ -19,12 +19,6 @@ public:
   static void SetUpTestSuite() {
     ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix(custom_prefix_);
   }
-  void TearDown() {
-    // Because server.cc calls setPrefix using bootstrap, make sure to setPrefix with something
-    // which will live beyond the test lifetime before the bootstrap goes away.
-    ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix(custom_prefix_);
-    HttpProtocolIntegrationTest::TearDown();
-  }
 };
 
 TEST_P(HeaderPrefixIntegrationTest, CustomHeaderPrefix) {
