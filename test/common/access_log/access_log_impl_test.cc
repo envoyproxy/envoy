@@ -1136,7 +1136,7 @@ config:
 
 class TestHeaderFilterFactory : public ExtensionFilterFactory {
 public:
-  virtual ~TestHeaderFilterFactory() = default;
+  ~TestHeaderFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
                          Runtime::Loader& /* runtime */,
@@ -1193,10 +1193,12 @@ public:
                 const Http::HeaderMap& /* request_headers */,
                 const Http::HeaderMap& /* response_headers */,
                 const Http::HeaderMap& /* response_trailers */) override {
-    if (current_++ == 0)
+    if (current_++ == 0) {
       return true;
-    if (current_ >= sample_rate_)
+    }
+    if (current_ >= sample_rate_) {
       current_ = 0;
+    }
     return false;
   }
 
@@ -1210,7 +1212,7 @@ private:
  */
 class SampleExtensionFilterFactory : public ExtensionFilterFactory {
 public:
-  virtual ~SampleExtensionFilterFactory() = default;
+  ~SampleExtensionFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
                          Runtime::Loader& /* runtime */,
