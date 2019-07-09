@@ -291,7 +291,7 @@ private:
         std::unordered_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>;
 
     struct ClusterEntry : public ThreadLocalCluster {
-      ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
+      ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterSharedPtr cluster,
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry();
 

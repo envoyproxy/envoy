@@ -170,6 +170,36 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   cleanupUpstreamAndDownstream();
 }
 
+TEST_P(CdsIntegrationTest, CdsOriginalDstClusterCreateDelete) {
+  // Calls our initialize(), which includes establishing a listener, route, and cluster.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
+
+  const char ClusterName3[] = "cluster_3";
+  envoy::api::v2::Cluster cluster3_ =
+      TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(R"EOF(
+      name: {}
+      connect_timeout: 5s
+      type: original_dst
+      lb_policy: ORIGINAL_DST_LB
+    )EOF",
+                                                                  ClusterName3));
+
+  // remove cluster_1 which created in initialize()
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                 {ClusterName1}, "42");
+  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+
+  for (int i = 0; i < 5; ++i) {
+    sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster, {cluster3_},
+                                                   {cluster3_}, {}, "500");
+    sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                   {ClusterName3}, "501");
+  }
+
+  cleanupUpstreamAndDownstream();
+}
+
 // Tests adding a cluster, adding another, then removing the first.
 TEST_P(CdsIntegrationTest, TwoClusters) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.

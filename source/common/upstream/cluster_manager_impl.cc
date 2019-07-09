@@ -516,20 +516,21 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
 }
 
 void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) {
-  tls_->runOnAllThreads([this, new_cluster = cluster.cluster_->info(),
+  tls_->runOnAllThreads([this, new_cluster = cluster.cluster_,
                          thread_aware_lb_factory = cluster.loadBalancerFactory()]() -> void {
     ThreadLocalClusterManagerImpl& cluster_manager =
         tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
-    if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
-      ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
+    auto cluster_info = new_cluster->info();
+    if (cluster_manager.thread_local_clusters_.count(cluster_info->name()) > 0) {
+      ENVOY_LOG(info, "updating TLS cluster {}", cluster_info->name());
     } else {
-      ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
+      ENVOY_LOG(debug, "adding TLS cluster {}", cluster_info->name());
     }
 
     auto thread_local_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
         cluster_manager, new_cluster, thread_aware_lb_factory);
-    cluster_manager.thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
+    cluster_manager.thread_local_clusters_[cluster_info->name()].reset(thread_local_cluster);
     for (auto& cb : cluster_manager.update_callbacks_) {
       cb->onClusterAddOrUpdate(*thread_local_cluster);
     }
@@ -823,7 +824,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
     ENVOY_LOG(debug, "adding TLS local cluster {}", local_cluster_name.value());
     auto& local_cluster = parent.active_clusters_.at(local_cluster_name.value());
     thread_local_clusters_[local_cluster_name.value()] = std::make_unique<ClusterEntry>(
-        *this, local_cluster->cluster_->info(), local_cluster->loadBalancerFactory());
+        *this, local_cluster->cluster_, local_cluster->loadBalancerFactory());
   }
 
   local_priority_set_ = local_cluster_name
@@ -839,7 +840,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
     ENVOY_LOG(debug, "adding TLS initial cluster {}", cluster.first);
     ASSERT(thread_local_clusters_.count(cluster.first) == 0);
     thread_local_clusters_[cluster.first] = std::make_unique<ClusterEntry>(
-        *this, cluster.second->cluster_->info(), cluster.second->loadBalancerFactory());
+        *this, cluster.second->cluster_, cluster.second->loadBalancerFactory());
   }
 }
 
@@ -1072,10 +1073,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
-    ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
+    ThreadLocalClusterManagerImpl& parent, ClusterSharedPtr cluster,
     const LoadBalancerFactorySharedPtr& lb_factory)
-    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
-      http_async_client_(cluster, parent.parent_.stats_, parent.thread_local_dispatcher_,
+    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster->info()),
+      http_async_client_(cluster->info(), parent.parent_.stats_, parent.thread_local_dispatcher_,
                          parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
                          parent.parent_.random_,
                          Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)},
@@ -1084,33 +1085,34 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
 
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
   // benefit given the healthy panic, locality, and priority calculations that take place.
-  if (cluster->lbSubsetInfo().isEnabled()) {
+  if (cluster_info_->lbSubsetInfo().isEnabled()) {
     lb_ = std::make_unique<SubsetLoadBalancer>(
-        cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
-        cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
-        cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbLeastRequestConfig(),
-        cluster->lbConfig());
+        cluster_info_->lbType(), priority_set_, parent_.local_priority_set_, cluster_info_->stats(),
+        cluster_info_->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
+        cluster_info_->lbSubsetInfo(), cluster_info_->lbRingHashConfig(),
+        cluster_info_->lbLeastRequestConfig(), cluster_info_->lbConfig());
   } else {
-    switch (cluster->lbType()) {
+    switch (cluster_info_->lbType()) {
     case LoadBalancerType::LeastRequest: {
       ASSERT(lb_factory_ == nullptr);
       lb_ = std::make_unique<LeastRequestLoadBalancer>(
-          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
-          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig());
+          priority_set_, parent_.local_priority_set_, cluster_info_->stats(),
+          parent.parent_.runtime_, parent.parent_.random_, cluster_info_->lbConfig(),
+          cluster_info_->lbLeastRequestConfig());
       break;
     }
     case LoadBalancerType::Random: {
       ASSERT(lb_factory_ == nullptr);
       lb_ = std::make_unique<RandomLoadBalancer>(priority_set_, parent_.local_priority_set_,
-                                                 cluster->stats(), parent.parent_.runtime_,
-                                                 parent.parent_.random_, cluster->lbConfig());
+                                                 cluster_info_->stats(), parent.parent_.runtime_,
+                                                 parent.parent_.random_, cluster_info_->lbConfig());
       break;
     }
     case LoadBalancerType::RoundRobin: {
       ASSERT(lb_factory_ == nullptr);
-      lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set_, parent_.local_priority_set_,
-                                                     cluster->stats(), parent.parent_.runtime_,
-                                                     parent.parent_.random_, cluster->lbConfig());
+      lb_ = std::make_unique<RoundRobinLoadBalancer>(
+          priority_set_, parent_.local_priority_set_, cluster_info_->stats(),
+          parent.parent_.runtime_, parent.parent_.random_, cluster_info_->lbConfig());
       break;
     }
     case LoadBalancerType::ClusterProvided:
@@ -1123,8 +1125,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::OriginalDst: {
       ASSERT(lb_factory_ == nullptr);
       lb_ = std::make_unique<OriginalDstCluster::LoadBalancer>(
-          priority_set_, parent.parent_.active_clusters_.at(cluster->name())->cluster_,
-          cluster->lbOriginalDstConfig());
+          priority_set_, cluster, cluster_info_->lbOriginalDstConfig());
       break;
     }
     }
