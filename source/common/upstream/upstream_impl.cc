@@ -705,16 +705,16 @@ ClusterInfoImpl::ClusterInfoImpl(
   auto filters = config.filters();
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
-    const std::string name = proto_config.name();
-    const Json::ObjectSharedPtr filter_config =
-        MessageUtil::getJsonObjectFromMessage(proto_config.config());
-    ENVOY_LOG(debug, "filter #{} name: {} config: {}", i, name, filter_config->asJsonString());
-    // Now see if there is a factory that will accept the config.
+    const std::string& string_name = proto_config.name();
+    ENVOY_LOG(debug, "  filter #{}:", i);
+    ENVOY_LOG(debug, "    name: {}", string_name);
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedNetworkFilterConfigFactory>(
-            name);
+            string_name);
+    auto message =
+        Config::Utility::translateToFactoryConfig(proto_config, validation_visitor, factory);
     Network::FilterFactoryCb callback =
-        factory.createFilterFactory(*filter_config->getObject("value", true), *factory_context_);
+        factory.createFilterFactoryFromProto(*message, *factory_context_);
     filter_factories_.push_back(callback);
   }
 }
