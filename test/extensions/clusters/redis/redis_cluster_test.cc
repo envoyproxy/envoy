@@ -254,6 +254,64 @@ protected:
     return response;
   }
 
+  NetworkFilters::Common::Redis::RespValuePtr twoSlotsMastersWithSlave() const {
+    std::vector<NetworkFilters::Common::Redis::RespValue> master_1(2);
+    master_1[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+    master_1[0].asString() = "127.0.0.1";
+    master_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    master_1[1].asInteger() = 22120;
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> master_2(2);
+    master_2[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+    master_2[0].asString() = "127.0.0.2";
+    master_2[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    master_2[1].asInteger() = 22120;
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slave_1(2);
+    slave_1[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+    slave_1[0].asString() = "127.0.0.3";
+    slave_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slave_1[1].asInteger() = 22120;
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slave_2(2);
+    slave_2[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+    slave_2[0].asString() = "127.0.0.4";
+    slave_2[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slave_2[1].asInteger() = 22120;
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slot_1(4);
+    slot_1[0].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_1[0].asInteger() = 0;
+    slot_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_1[1].asInteger() = 9999;
+    slot_1[2].type(NetworkFilters::Common::Redis::RespType::Array);
+    slot_1[2].asArray().swap(master_1);
+    slot_1[3].type(NetworkFilters::Common::Redis::RespType::Array);
+    slot_1[3].asArray().swap(slave_1);
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slot_2(4);
+    slot_2[0].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_2[0].asInteger() = 10000;
+    slot_2[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_2[1].asInteger() = 16383;
+    slot_2[2].type(NetworkFilters::Common::Redis::RespType::Array);
+    slot_2[2].asArray().swap(master_2);
+    slot_2[3].type(NetworkFilters::Common::Redis::RespType::Array);
+    slot_2[3].asArray().swap(slave_2);
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slots(2);
+    slots[0].type(NetworkFilters::Common::Redis::RespType::Array);
+    slots[0].asArray().swap(slot_1);
+    slots[1].type(NetworkFilters::Common::Redis::RespType::Array);
+    slots[1].asArray().swap(slot_2);
+
+    NetworkFilters::Common::Redis::RespValuePtr response(
+        new NetworkFilters::Common::Redis::RespValue());
+    response->type(NetworkFilters::Common::Redis::RespType::Array);
+    response->asArray().swap(slots);
+    return response;
+  }
+
   NetworkFilters::Common::Redis::RespValue
   createStringField(bool is_correct_type, const std::string& correct_value) const {
     NetworkFilters::Common::Redis::RespValue respValue;
@@ -369,10 +427,9 @@ protected:
 
     EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
     expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
-    // TODO(hyang): this will change once we register slaves as well
-    expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
+    expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
-    // Add new host.
+    // Promote slave to master
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
     resolve_timer_->callback_();
@@ -387,13 +444,30 @@ protected:
     expectClusterSlotResponse(twoSlotsMasters());
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
-    // Remove host.
+    // Add slaves to masters
+    expectRedisResolve();
+    EXPECT_CALL(membership_updated_, ready());
+    resolve_timer_->callback_();
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
+    expectClusterSlotResponse(twoSlotsMastersWithSlave());
+    expectHealthyHosts(std::list<std::string>(
+        {"127.0.0.1:22120", "127.0.0.3:22120", "127.0.0.2:22120", "127.0.0.4:22120"}));
+
+    // No change.
+    expectRedisResolve();
+    resolve_timer_->callback_();
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1).WillOnce(Return(false));
+    expectClusterSlotResponse(twoSlotsMastersWithSlave());
+    expectHealthyHosts(std::list<std::string>(
+        {"127.0.0.1:22120", "127.0.0.3:22120", "127.0.0.2:22120", "127.0.0.4:22120"}));
+
+    // Remove 2nd shard.
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
     resolve_timer_->callback_();
     EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
     expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
-    expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
+    expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
   }
 
   void exerciseStubs() {
@@ -627,13 +701,13 @@ TEST_F(RedisClusterTest, RedisResolveFailure) {
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
   expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
-  expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
+  expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
   // Expect no change if resolve failed.
   expectRedisResolve();
   resolve_timer_->callback_();
   expectClusterSlotFailure();
-  expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
+  expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
   EXPECT_EQ(3U, cluster_->info()->stats().update_attempt_.value());
   EXPECT_EQ(2U, cluster_->info()->stats().update_failure_.value());
 }
@@ -694,7 +768,8 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
-  expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
+  std::bitset<10> single_slot_master(0x7ff);
+  expectClusterSlotResponse(createResponse(single_slot_master));
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
 
   // Expect no change if resolve failed.
