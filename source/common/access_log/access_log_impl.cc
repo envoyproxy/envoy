@@ -80,9 +80,9 @@ FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFi
   case envoy::config::filter::accesslog::v2::AccessLogFilter::kExtensionFilter:
     MessageUtil::validate(config);
     {
-      auto& factory =
-          Config::Utility::getAndCheckFactory<FilterFactory>(config.extension_filter().name());
-      return factory.createFilter(config, runtime, random);
+      auto& factory = Config::Utility::getAndCheckFactory<ExtensionFilterFactory>(
+          config.extension_filter().name());
+      return factory.createFilter(config.extension_filter(), runtime, random);
     }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

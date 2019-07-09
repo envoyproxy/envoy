@@ -674,53 +674,6 @@ config:
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
-class MockFilterFactory : public FilterFactory {
-public:
-  virtual ~MockFilterFactory() = default;
-
-  FilterPtr createFilter(const envoy::config::filter::accesslog::v2::AccessLogFilter& config,
-                         Runtime::Loader& /* runtime */,
-                         Runtime::RandomGenerator& /* random */) override {
-    auto factory_config = Config::Utility::translateToFactoryConfig(
-        config.extension_filter(), Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
-    const auto& header_config =
-        MessageUtil::downcastAndValidate<const envoy::config::filter::accesslog::v2::HeaderFilter&>(
-            *factory_config);
-    return FilterPtr{new HeaderFilter(header_config)};
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::filter::accesslog::v2::HeaderFilter>();
-  }
-
-  std::string name() const override { return "mock_filter"; }
-};
-
-TEST_F(AccessLogImplTest, MockFilterHeaderPresence) {
-  Registry::RegisterFactory<MockFilterFactory, FilterFactory> registered;
-
-  const std::string yaml = R"EOF(
-name: envoy.file_access_log
-filter:
-  extension_filter:
-    name: mock_filter
-    config:
-      header:
-        name: test-header
-config:
-  path: /dev/null
-  )EOF";
-
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
-
-  EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-
-  request_headers_.addCopy("test-header", "present");
-  EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-}
-
 TEST_F(AccessLogImplTest, HeaderExactMatch) {
   const std::string yaml = R"EOF(
 name: envoy.file_access_log
@@ -1179,6 +1132,157 @@ config:
 
   response_headers_.addCopy(Http::Headers::get().GrpcStatus, "0");
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+}
+
+class TestHeaderFilterFactory : public ExtensionFilterFactory {
+public:
+  virtual ~TestHeaderFilterFactory() = default;
+
+  FilterPtr createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
+                         Runtime::Loader& /* runtime */,
+                         Runtime::RandomGenerator& /* random */) override {
+    auto factory_config = Config::Utility::translateToFactoryConfig(
+        config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
+    const auto& header_config =
+        MessageUtil::downcastAndValidate<const envoy::config::filter::accesslog::v2::HeaderFilter&>(
+            *factory_config);
+    return FilterPtr{new HeaderFilter(header_config)};
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::filter::accesslog::v2::HeaderFilter>();
+  }
+
+  std::string name() const override { return "test_header_filter"; }
+};
+
+TEST_F(AccessLogImplTest, TestHeaderFilterPresence) {
+  Registry::RegisterFactory<TestHeaderFilterFactory, ExtensionFilterFactory> registered;
+
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  extension_filter:
+    name: test_header_filter
+    config:
+      header:
+        name: test-header
+config:
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+
+  request_headers_.addCopy("test-header", "present");
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+}
+
+/**
+ * Sample extension filter which allows every sample_rate-th request.
+ */
+class SampleExtensionFilter : public Filter {
+public:
+  SampleExtensionFilter(size_t sample_rate) : sample_rate_(sample_rate) {}
+
+  // AccessLog::Filter
+  bool evaluate(const StreamInfo::StreamInfo& /* info */,
+                const Http::HeaderMap& /* request_headers */,
+                const Http::HeaderMap& /* response_headers */,
+                const Http::HeaderMap& /* response_trailers */) override {
+    if (current_++ == 0)
+      return true;
+    if (current_ >= sample_rate_)
+      current_ = 0;
+    return false;
+  }
+
+private:
+  size_t current_ = 0;
+  size_t sample_rate_;
+};
+
+/**
+ * Sample extension filter factory which creates SampleExtensionFilter.
+ */
+class SampleExtensionFilterFactory : public ExtensionFilterFactory {
+public:
+  virtual ~SampleExtensionFilterFactory() = default;
+
+  FilterPtr createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
+                         Runtime::Loader& /* runtime */,
+                         Runtime::RandomGenerator& /* random */) override {
+    auto factory_config = Config::Utility::translateToFactoryConfig(
+        config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
+    const Json::ObjectSharedPtr filter_config =
+        MessageUtil::getJsonObjectFromMessage(*factory_config);
+    return FilterPtr{new SampleExtensionFilter(filter_config->getInteger("rate"))};
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
+
+  std::string name() const override { return "sample_extension_filter"; }
+};
+
+TEST_F(AccessLogImplTest, SampleExtensionFilter) {
+  Registry::RegisterFactory<SampleExtensionFilterFactory, ExtensionFilterFactory> registered;
+
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  extension_filter:
+    name: sample_extension_filter
+    config:
+      rate: 5
+config:
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  // For rate=5 expect 1st request to be recorded, 2nd-5th skipped, and 6th recorded.
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  for (int i = 2; i <= 5; ++i) {
+    EXPECT_CALL(*file_, write(_)).Times(0);
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  }
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+}
+
+TEST_F(AccessLogImplTest, UnregisteredExtensionFilter) {
+  {
+    const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  extension_filter:
+    name: unregistered_extension_filter
+    config:
+      foo: bar
+config:
+  path: /dev/null
+  )EOF";
+
+    EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_),
+                 EnvoyException);
+  }
+
+  {
+    const std::string json = R"EOF(
+      {
+        "path": "/dev/null",
+        "filter": {"type": "extension_filter", "foo": "bar"}
+      }
+    )EOF";
+
+    EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_),
+                 EnvoyException);
+  }
 }
 
 } // namespace

@@ -24,32 +24,6 @@ namespace AccessLog {
  */
 class FilterFactory {
 public:
-  virtual ~FilterFactory() = default;
-
-  /**
-   * Create a particular Filter implementation from a config proto. If the
-   * implementation is unable to produce a factory with the provided parameters, it should throw an
-   * EnvoyException. The returned pointer should never be nullptr.
-   * @param config the custom configuration for this filter type.
-   * @param runtime ...
-   * @param random ....
-   */
-  virtual FilterPtr
-  createFilter(const envoy::config::filter::accesslog::v2::AccessLogFilter& config,
-               Runtime::Loader& runtime, Runtime::RandomGenerator& random) PURE;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The config, which
-   * arrives in an opaque google.protobuf.Struct message, will be converted to JSON and then parsed
-   * into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular Filter implementation
-   * produced by the factory.
-   */
-  virtual std::string name() const PURE;
   /**
    * Read a filter definition from proto and instantiate a concrete filter class.
    */
@@ -246,6 +220,39 @@ private:
    */
   Grpc::Status::GrpcStatus
   protoToGrpcStatus(envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status status) const;
+};
+
+/**
+ * Extension filter factory that reads from ExtensionFilter proto.
+ */
+class ExtensionFilterFactory {
+public:
+  virtual ~ExtensionFilterFactory() = default;
+
+  /**
+   * Create a particular extension filter implementation from a config proto. If the
+   * implementation is unable to produce a filter with the provided parameters, it should throw an
+   * EnvoyException. The returned pointer should never be nullptr.
+   * @param config the custom configuration for this filter type.
+   * @param runtime passed through from FilterFactory.
+   * @param random passed through from FilterFactory
+   */
+  virtual FilterPtr
+  createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
+               Runtime::Loader& runtime, Runtime::RandomGenerator& random) PURE;
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The config, which
+   * arrives in an opaque google.protobuf.Struct message, will be converted to JSON and then parsed
+   * into this empty proto.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+
+  /**
+   * @return std::string the identifying name for a particular Filter implementation
+   * produced by the factory.
+   */
+  virtual std::string name() const PURE;
 };
 
 /**
