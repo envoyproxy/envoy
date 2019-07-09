@@ -17,3 +17,17 @@ index 3844fa6b8b..5486887295 100644
    }
    return FastUInt32ToBufferLeft(u, buffer);
  }
+
+diff --git a/BUILD b/BUILD
+index 6665de94..55f28582 100644
+--- a/BUILD
++++ b/BUILD
+@@ -19,6 +19,6 @@ config_setting(
+ # ZLIB configuration
+ ################################################################################
+ 
+-ZLIB_DEPS = ["@zlib//:zlib"]
++ZLIB_DEPS = ["//external:zlib"]
+ 
+ ################################################################################
+ # Protobuf Runtime Library
