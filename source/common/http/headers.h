@@ -27,6 +27,8 @@ public:
   // called.
   void setPrefix(const char* prefix) {
     absl::WriterMutexLock lock(&m_);
+    // The check for unchanged string is purely for integration tests - this
+    // should not happen in production.
     RELEASE_ASSERT(!read_ || prefix_ == std::string(prefix),
                    "Attempting to change the header prefix after it has been used!");
     if (!read_) {
