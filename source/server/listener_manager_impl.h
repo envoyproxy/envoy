@@ -275,6 +275,15 @@ public:
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
 
+  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) {
+    ensureSocketOptions();
+    listen_socket_options_->emplace_back(std::move(option));
+  }
+  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
+    ensureSocketOptions();
+    Network::Socket::appendOptions(listen_socket_options_, options);
+  }
+
   // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {
     return parent_.server_.accessLogManager();
@@ -304,14 +313,6 @@ public:
       listen_socket_options_ =
           std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
     }
-  }
-  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) override {
-    ensureSocketOptions();
-    listen_socket_options_->emplace_back(std::move(option));
-  }
-  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
-    ensureSocketOptions();
-    Network::Socket::appendOptions(listen_socket_options_, options);
   }
   const Network::ListenerConfig& listenerConfig() const override { return *this; }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
