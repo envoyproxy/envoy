@@ -35,7 +35,7 @@ absl::optional<std::string> getPath(const envoy::api::v2::core::DataSource& sour
 /**
  * Callback for async data source.
  */
-using AsyncDataSourceCb = std::function<void(std::string)>;
+using AsyncDataSourceCb = std::function<void(const std::string&)>;
 
 class LocalAsyncDataProvider {
 public:
@@ -71,13 +71,13 @@ public:
   ~RemoteAsyncDataProvider() { init_target_.ready(); }
 
   // Config::DataFetcher::RemoteDataFetcherCallback
-  void onSuccess(absl::string_view data) {
+  void onSuccess(absl::string_view data) override {
     callback_(std::string(data));
     init_target_.ready();
   }
 
   // Config::DataFetcher::RemoteDataFetcherCallback
-  void onFailure(Config::DataFetcher::Failure failure) {
+  void onFailure(Config::DataFetcher::FailureReason failure) override {
     if (allow_empty_) {
       callback_(EMPTY_STRING);
       init_target_.ready();

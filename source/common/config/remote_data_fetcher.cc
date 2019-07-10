@@ -48,19 +48,19 @@ void RemoteDataFetcher::onSuccess(Http::MessagePtr&& response) {
 
       if (content_hash_ != content_hash) {
         ENVOY_LOG(debug, "fetch remote data [uri = {}]: data is invalid", uri_.uri());
-        callback_.onFailure(Failure::InvalidData);
+        callback_.onFailure(FailureReason::InvalidData);
       } else {
         callback_.onSuccess(
             absl::string_view(static_cast<char*>(response->body()->linearize(len)), len));
       }
     } else {
       ENVOY_LOG(debug, "fetch remote data [uri = {}]: body is empty", uri_.uri());
-      callback_.onFailure(Failure::Network);
+      callback_.onFailure(FailureReason::Network);
     }
   } else {
     ENVOY_LOG(debug, "fetch remote data [uri = {}]: response status code {}", uri_.uri(),
               status_code);
-    callback_.onFailure(Failure::Network);
+    callback_.onFailure(FailureReason::Network);
   }
 
   request_ = nullptr;
@@ -69,7 +69,7 @@ void RemoteDataFetcher::onSuccess(Http::MessagePtr&& response) {
 void RemoteDataFetcher::onFailure(Http::AsyncClient::FailureReason reason) {
   ENVOY_LOG(debug, "fetch remote data [uri = {}]: network error {}", uri_.uri(), enumToInt(reason));
   request_ = nullptr;
-  callback_.onFailure(Failure::Network);
+  callback_.onFailure(FailureReason::Network);
 }
 
 } // namespace DataFetcher

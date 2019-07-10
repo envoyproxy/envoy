@@ -11,7 +11,7 @@ namespace DataFetcher {
 /**
  * Failure reason.
  */
-enum class Failure {
+enum class FailureReason {
   /* A network error occurred causing remote data retrieval failure. */
   Network,
   /* A failure occurred when trying to verify remote data using sha256. */
@@ -29,13 +29,13 @@ public:
    * This function will be called when data is fetched successfully from remote.
    * @param data remote data
    */
-  virtual void onSuccess(const absl::string_view data) PURE;
+  virtual void onSuccess(absl::string_view data) PURE;
 
   /**
    * This function is called when error happens during fetching data.
    * @param reason failure reason.
    */
-  virtual void onFailure(Failure reason) PURE;
+  virtual void onFailure(FailureReason reason) PURE;
 };
 
 /**
