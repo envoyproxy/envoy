@@ -1,6 +1,7 @@
 import Foundation
 
-public final class Envoy {
+@objcMembers
+public final class Envoy: NSObject {
   private let runner: EnvoyRunner
 
   public var isRunning: Bool {
