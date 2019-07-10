@@ -165,8 +165,6 @@ envoy_sh_test(
     data = [
         "test_utility.sh",
         "//source/exe:envoy-static",
-        "//test/common/runtime:filesystem_setup.sh",
-        "//test/common/runtime:filesystem_test_data",
         "//test/config/integration:server_config_files",
         "//tools:socket_passing",
     ],
@@ -178,8 +176,6 @@ envoy_sh_test(
     data = [
         "test_utility.sh",
         "//source/exe:envoy-static",
-        "//test/common/runtime:filesystem_setup.sh",
-        "//test/common/runtime:filesystem_test_data",
         "//test/config/integration:server_config_files",
     ],
 )
