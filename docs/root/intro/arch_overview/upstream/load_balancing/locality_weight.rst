@@ -64,7 +64,14 @@ cluster configuration and providing weights in :ref:`LocalityLbEndpoints
 <envoy_api_msg_endpoint.LocalityLbEndpoints>` via :ref:`load_balancing_weight
 <envoy_api_field_endpoint.LocalityLbEndpoints.load_balancing_weight>`.
 
-This feature is not compatible with :ref:`load balancer subsetting
-<arch_overview_load_balancer_subsets>`, since it is not straightforward to
-reconcile locality level weighting with sensible weights for individual subsets.
+By setting :ref:`locality_weight_aware
+<Cluster.LbSubsetConfig.locality_weight_aware>`, this feature can be made
+compatible with :ref:`load balancer subsetting
+<arch_overview_load_balancer_subsets>`. Take care when enabling both load
+balancer subsetting and locality weighted load balancing as the resulting
+traffic split may be undesirable.
 
+It's possible to smooth out the weighting of a given locality when using
+subsets by setting :ref:`scale_locality_weight
+<Cluster.LbSubsetConfig.scale_locality_weight>`, which scales the weights by
+proportionally to the number of hosts in the subset predicate.
