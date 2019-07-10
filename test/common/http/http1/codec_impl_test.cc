@@ -19,6 +19,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -36,7 +37,7 @@ namespace Http1 {
 
 class Http1ServerConnectionImplTest : public testing::Test {
 public:
-  Http1ServerConnectionImplTest() {
+  Http1ServerConnectionImplTest() : api_(Api::createApiForTest()) {
     envoy::config::bootstrap::v2::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
 
@@ -850,7 +851,7 @@ TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
 
 class Http1ClientConnectionImplTest : public testing::Test {
 public:
-  Http1ClientConnectionImplTest() {
+  Http1ClientConnectionImplTest() : api_(Api::createApiForTest()) {
     envoy::config::bootstrap::v2::LayeredRuntime config;
 
     // Create a runtime loader, so that tests can manually manipulate runtime
