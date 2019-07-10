@@ -1,11 +1,11 @@
 #pragma once
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/config/filter/http/tap/v2alpha/tap.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "extensions/access_loggers/common/access_log_base.h"
 #include "extensions/common/tap/extension_config_base.h"
 #include "extensions/filters/http/tap/tap_config.h"
 

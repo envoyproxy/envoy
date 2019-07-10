@@ -20,7 +20,7 @@ namespace AccessLoggers {
 namespace Common {
 
 /**
- * Base of access logger handles common filter logic.
+ * Base implementation of Accesslog::Instance handles common filter logic.
  */
 class ImplBase : public AccessLog::Instance {
 public:
