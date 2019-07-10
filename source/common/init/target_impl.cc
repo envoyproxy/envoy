@@ -22,29 +22,51 @@ bool TargetHandleImpl::initialize(const Watcher& watcher) const {
   }
 }
 
-TargetImpl::TargetImpl(absl::string_view name, InitializeFn fn)
-    : name_(fmt::format("target {}", name)),
-      fn_(std::make_shared<InternalInitalizeFn>([this, fn](WatcherHandlePtr watcher_handle) {
-        if (is_ready_) {
-          fn();
-          watcher_handle->ready();
-        } else {
-          watcher_handle_ = std::move(watcher_handle);
-          fn();
-        }
-      })) {}
+AbstractTarget::AbstractTarget(absl::string_view name, std::shared_ptr<InternalInitalizeFn> fn)
+    : name_(fmt::format("target {}", name)), fn_(fn) {}
+absl::string_view AbstractTarget::name() const { return name_; }
 
-TargetImpl::~TargetImpl() { ENVOY_LOG(debug, "{} destroyed", name_); }
-
-absl::string_view TargetImpl::name() const { return name_; }
-
-TargetHandlePtr TargetImpl::createHandle(absl::string_view handle_name) const {
+TargetHandlePtr AbstractTarget::createHandle(absl::string_view handle_name) const {
   // Note: can't use std::make_unique here because TargetHandleImpl ctor is private.
   return std::unique_ptr<TargetHandle>(
       new TargetHandleImpl(handle_name, name_, std::weak_ptr<InternalInitalizeFn>(fn_)));
 }
 
+TargetImpl::TargetImpl(absl::string_view name, InitializeFn fn)
+    : AbstractTarget(
+          name, std::make_shared<InternalInitalizeFn>([this, fn](WatcherHandlePtr watcher_handle) {
+            watcher_handle_ = std::move(watcher_handle);
+            fn();
+          })) {}
+
+TargetImpl::~TargetImpl() { ENVOY_LOG(debug, "{} destroyed", name_); }
+
 bool TargetImpl::ready() {
+  if (watcher_handle_) {
+    // If we have a handle for the ManagerImpl's watcher, signal it and then reset so it can't be
+    // accidentally signaled again.
+    const bool result = watcher_handle_->ready();
+    watcher_handle_.reset();
+    return result;
+  }
+  return false;
+}
+
+EagerTargetImpl::EagerTargetImpl(absl::string_view name, InitializeFn fn)
+    : AbstractTarget(
+          name, std::make_shared<InternalInitalizeFn>([this, fn](WatcherHandlePtr watcher_handle) {
+            if (is_ready_) {
+              fn();
+              watcher_handle->ready();
+            } else {
+              watcher_handle_ = std::move(watcher_handle);
+              fn();
+            }
+          })) {}
+
+EagerTargetImpl::~EagerTargetImpl() { ENVOY_LOG(debug, "{} destroyed", name_); }
+
+bool EagerTargetImpl::ready() {
   is_ready_ = true;
   if (watcher_handle_) {
     // If we have a handle for the ManagerImpl's watcher, signal it and then reset so it can't be

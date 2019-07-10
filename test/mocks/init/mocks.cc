@@ -21,5 +21,14 @@ ExpectableTargetImpl::expectInitializeWillCallReady() {
   return expectInitialize().WillOnce(Invoke([this]() { ready(); }));
 }
 
+ExpectableEagerTargetImpl::ExpectableEagerTargetImpl(absl::string_view name)
+    : EagerTargetImpl(name, {[this]() { initialize(); }}) {}
+::testing::internal::TypedExpectation<void()>& ExpectableEagerTargetImpl::expectInitialize() {
+  return EXPECT_CALL(*this, initialize());
+}
+::testing::internal::TypedExpectation<void()>&
+ExpectableEagerTargetImpl::expectInitializeWillCallReady() {
+  return expectInitialize().WillOnce(Invoke([this]() { ready(); }));
+}
 } // namespace Init
 } // namespace Envoy

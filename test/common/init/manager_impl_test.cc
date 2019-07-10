@@ -43,7 +43,7 @@ TEST(InitManagerImplTest, AddReadyTarget) {
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  ExpectableTargetImpl t1("t1");
+  ExpectableEagerTargetImpl t1("t1");
   t1.ready();
   m.add(t1);
 
@@ -61,7 +61,7 @@ TEST(InitManagerImplTest, AddTargetAndMarkReadyBeforeInitialization) {
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  ExpectableTargetImpl t1("t1");
+  ExpectableEagerTargetImpl t1("t1");
   // vs AddReadyTarget case:
   // Swap the add() and ready() order but still before m.initialize().
   m.add(t1);
