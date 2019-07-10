@@ -395,7 +395,7 @@ TEST_P(UdpListenerImplTest, SendData) {
   EXPECT_TRUE(send_result.ok()) << "send() failed : " << send_result.err_->getErrorDetails();
 
   const uint64_t bytes_to_read = payload.length();
-  // Make receive buffer 1 byte larger for trailling '\0'.
+  // Make receive buffer 1 byte larger for trailing '\0'.
   auto recv_buf = std::make_unique<char[]>(bytes_to_read + 1);
   uint64_t bytes_read = 0;
   int retry = 0;
