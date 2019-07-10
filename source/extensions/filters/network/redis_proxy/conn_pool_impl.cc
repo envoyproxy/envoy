@@ -16,7 +16,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 namespace ConnPool {
-
 namespace {
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
 } // namespace
@@ -27,7 +26,8 @@ InstanceImpl::InstanceImpl(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
     Api::Api& api, Stats::ScopePtr&& stats_scope)
     : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config),
-      api_(api), stats_scope_(std::move(stats_scope)) {
+      api_(api), stats_scope_(std::move(stats_scope)), redis_cluster_stats_{REDIS_CLUSTER_STATS(
+                                                           POOL_COUNTER(*stats_scope_))} {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
@@ -113,10 +113,6 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   is_redis_cluster_ = info->lbType() == Upstream::LoadBalancerType::ClusterProvided &&
                       cluster_type.has_value() &&
                       cluster_type->name() == Extensions::Clusters::ClusterTypes::get().Redis;
-  if (is_redis_cluster_) {
-    // "Register" a new statistic so it shows up in statistics with a zero value now.
-    parent_.stats_scope_->counter("upstream_cx_drained");
-  }
 }
 
 void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_name) {
@@ -147,11 +143,11 @@ void InstanceImpl::ThreadLocalPool::onHostsAdded(
     std::string host_address = host->address()->asString();
     // Insert new host into address map, possibly overwriting a previous host's entry.
     host_address_map_[host_address] = host;
-    for (const auto& created_host : created_hosts_) {
+    for (const auto& created_host : created_via_redirect_hosts_) {
       if (created_host->address()->asString() == host_address) {
         // Remove our "temporary" host created in makeRequestToHost().
         onHostsRemoved({created_host});
-        created_hosts_.remove(created_host);
+        created_via_redirect_hosts_.remove(created_host);
         break;
       }
     }
@@ -168,7 +164,7 @@ void InstanceImpl::ThreadLocalPool::onHostsRemoved(
         clients_to_drain_.push_back(std::move(it->second));
         client_map_.erase(it);
         if (!drain_timer_->enabled()) {
-          drain_timer_->enableTimer(parent_.config_.upstreamDrainPollIntervalInMs());
+          drain_timer_->enableTimer(parent_.config_.upstreamDrainPollInterval());
         }
       } else {
         // There are no pending requests so close the connection.
@@ -190,7 +186,7 @@ void InstanceImpl::ThreadLocalPool::drainClients() {
     (*clients_to_drain_.begin())->redis_client_->close();
   }
   if (!clients_to_drain_.empty()) {
-    drain_timer_->enableTimer(parent_.config_.upstreamDrainPollIntervalInMs());
+    drain_timer_->enableTimer(parent_.config_.upstreamDrainPollInterval());
   }
 }
 
@@ -273,7 +269,7 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
   auto it = host_address_map_.find(host_address_map_key);
   if (it == host_address_map_.end()) {
     // This host is not known to the cluster manager. Create a new host and insert it into the map.
-    if (created_hosts_.size() == parent_.config_.maxUpstreamUnknownConnections()) {
+    if (created_via_redirect_hosts_.size() == parent_.config_.maxUpstreamUnknownConnections()) {
       // Too many upstream connections to unknown hosts have been created.
       return nullptr;
     }
@@ -296,7 +292,7 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
         envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
         envoy::api::v2::core::HealthStatus::UNKNOWN)};
     host_address_map_[host_address_map_key] = new_host;
-    created_hosts_.push_back(new_host);
+    created_via_redirect_hosts_.push_back(new_host);
     it = host_address_map_.find(host_address_map_key);
   }
 
@@ -317,7 +313,7 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
            it++) {
         if ((*it).get() == this) {
           if (!redis_client_->active()) {
-            parent_.parent_.stats_scope_->counter("upstream_cx_drained").inc();
+            parent_.parent_.redis_cluster_stats_.upstream_cx_drained_.inc();
           }
           parent_.dispatcher_.deferredDelete(std::move(redis_client_));
           parent_.clients_to_drain_.erase(it);

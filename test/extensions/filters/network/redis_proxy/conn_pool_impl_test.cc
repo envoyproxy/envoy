@@ -50,6 +50,16 @@ public:
 
     std::unique_ptr<NiceMock<Stats::MockStore>> store =
         std::make_unique<NiceMock<Stats::MockStore>>();
+    upstream_cx_drained_.value_ = 0;
+    ON_CALL(*store, counter(Eq("upstream_cx_drained")))
+        .WillByDefault(ReturnRef(upstream_cx_drained_));
+    ON_CALL(upstream_cx_drained_, value()).WillByDefault(Invoke([&]() -> uint64_t {
+      return upstream_cx_drained_.value_;
+    }));
+    ON_CALL(upstream_cx_drained_, inc()).WillByDefault(Invoke([&]() {
+      upstream_cx_drained_.value_++;
+    }));
+
     std::unique_ptr<InstanceImpl> conn_pool_impl = std::make_unique<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
         Common::Redis::Client::createConnPoolSettings(20, hashtagging, true, max_unknown_conns),
@@ -58,16 +68,6 @@ public:
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
     conn_pool_ = std::move(conn_pool_impl);
     test_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
-
-    upstream_cx_drained_.value_ = 0;
-    ON_CALL(*statsScope(), counter(Eq("upstream_cx_drained")))
-        .WillByDefault(ReturnRef(upstream_cx_drained_));
-    ON_CALL(upstream_cx_drained_, value()).WillByDefault(Invoke([&]() -> uint64_t {
-      return upstream_cx_drained_.value_;
-    }));
-    ON_CALL(upstream_cx_drained_, inc()).WillByDefault(Invoke([&]() {
-      upstream_cx_drained_.value_++;
-    }));
   }
 
   void makeSimpleRequest(bool create_client, const std::string& hash_key, uint64_t hash_value) {
@@ -115,9 +115,10 @@ public:
     return conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().host_address_map_;
   }
 
-  std::list<Upstream::HostSharedPtr>& createdHosts() {
+  std::list<Upstream::HostSharedPtr>& createdViaRedirectHosts() {
     InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
-    return conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().created_hosts_;
+    return conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>()
+        .created_via_redirect_hosts_;
   }
 
   std::list<InstanceImpl::ThreadLocalActiveClientPtr>& clientsToDrain() {
@@ -137,7 +138,7 @@ public:
 
   Stats::Counter& upstreamCxDrained() {
     InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
-    return conn_pool_impl->stats_scope_->counter("upstream_cx_drained");
+    return conn_pool_impl->redis_cluster_stats_.upstream_cx_drained_;
   }
 
   NiceMock<Stats::MockStore>* statsScope() {
@@ -295,7 +296,6 @@ TEST_F(RedisConnPoolImplTest, HashtaggingNotEnabled) {
 
 // ConnPool created when no cluster exists at creation time. Dynamic cluster creation and removal
 // work correctly.
-
 TEST_F(RedisConnPoolImplTest, NoClusterAtConstruction) {
   InSequence s;
 
@@ -347,7 +347,6 @@ TEST_F(RedisConnPoolImplTest, NoClusterAtConstruction) {
 
 // This test removes a single host from the ConnPool after learning about 2 hosts from the
 // associated load balancer.
-
 TEST_F(RedisConnPoolImplTest, HostRemove) {
   InSequence s;
 
@@ -394,7 +393,6 @@ TEST_F(RedisConnPoolImplTest, HostRemove) {
 
 // This test removes a host from a ConnPool that was never added in the first place. No errors
 // should be encountered.
-
 TEST_F(RedisConnPoolImplTest, HostRemovedNeverAdded) {
   InSequence s;
 
@@ -458,7 +456,7 @@ TEST_F(RedisConnPoolImplTest, RemoteClose) {
   tls_.shutdownThread();
 }
 
-TEST_F(RedisConnPoolImplTest, makeRequestToHost) {
+TEST_F(RedisConnPoolImplTest, MakeRequestToHost) {
   InSequence s;
 
   setup(false);
@@ -518,7 +516,7 @@ TEST_F(RedisConnPoolImplTest, makeRequestToHost) {
   tls_.shutdownThread();
 }
 
-TEST_F(RedisConnPoolImplTest, makeRequestToHostWithZeroMaxUnknownUpstreamConnectionLimit) {
+TEST_F(RedisConnPoolImplTest, MakeRequestToHostWithZeroMaxUnknownUpstreamConnectionLimit) {
   InSequence s;
 
   // Create a ConnPool with a max_upstream_unknown_connections setting of 0.
@@ -532,7 +530,7 @@ TEST_F(RedisConnPoolImplTest, makeRequestToHostWithZeroMaxUnknownUpstreamConnect
   tls_.shutdownThread();
 }
 
-TEST_F(RedisConnPoolImplTest, makeRequestToHostWithAuthPassword) {
+TEST_F(RedisConnPoolImplTest, MakeRequestToHostWithAuthPassword) {
   InSequence s;
 
   auth_password_ = "superduperpassword";
@@ -589,7 +587,6 @@ TEST_F(RedisConnPoolImplTest, makeRequestToHostWithAuthPassword) {
 // address) and pending requests using makeRequestToHost(). After their creation, "new" hosts are
 // discovered, and the original hosts are put aside to drain. The test then verifies the drain
 // logic.
-
 TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
   setup();
 
@@ -631,7 +628,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
   EXPECT_NE(clientMap().find(host1), clientMap().end());
   EXPECT_NE(clientMap().find(host2), clientMap().end());
   void* host1_active_client = clientMap(host1);
-  EXPECT_EQ(createdHosts().size(), 2);
+  EXPECT_EQ(createdViaRedirectHosts().size(), 2);
   EXPECT_EQ(clientsToDrain().size(), 0);
   EXPECT_EQ(drainTimer()->enabled(), false);
 
@@ -653,7 +650,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
   EXPECT_EQ(host_address_map[new_host1_test_address->asString()], new_host1);
   EXPECT_EQ(host_address_map[new_host2_test_address->asString()], new_host2);
   EXPECT_EQ(clientMap().size(), 0);
-  EXPECT_EQ(createdHosts().size(), 0);
+  EXPECT_EQ(createdViaRedirectHosts().size(), 0);
   EXPECT_EQ(clientsToDrain().size(), 1); // client2 has already been drained.
   EXPECT_EQ(clientsToDrain().front().get(), host1_active_client); // client1 is still active.
   EXPECT_EQ(drainTimer()->enabled(), true);
@@ -663,7 +660,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
 
   EXPECT_EQ(host_address_map.size(), 0); // new_host1 and new_host2 have been removed.
   EXPECT_EQ(clientMap().size(), 0);
-  EXPECT_EQ(createdHosts().size(), 0);
+  EXPECT_EQ(createdViaRedirectHosts().size(), 0);
   EXPECT_EQ(clientsToDrain().size(), 1);
   EXPECT_EQ(clientsToDrain().front().get(), host1_active_client);
   EXPECT_EQ(drainTimer()->enabled(), true);
@@ -690,7 +687,6 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
 // address) and pending requests using makeRequestToHost(). After their creation, "new" hosts are
 // discovered (added), and the original hosts are put aside to drain. Destructors are then
 // called on these not yet drained clients, and the underlying connections should be closed.
-
 TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
   setup();
 
@@ -731,7 +727,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
   EXPECT_EQ(clientMap().size(), 2);
   EXPECT_NE(clientMap().find(host1), clientMap().end());
   EXPECT_NE(clientMap().find(host2), clientMap().end());
-  EXPECT_EQ(createdHosts().size(), 2);
+  EXPECT_EQ(createdViaRedirectHosts().size(), 2);
   EXPECT_EQ(clientsToDrain().size(), 0);
   EXPECT_EQ(drainTimer()->enabled(), false);
 
@@ -752,7 +748,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
   EXPECT_EQ(host_address_map[new_host1_test_address->asString()], new_host1);
   EXPECT_EQ(host_address_map[new_host2_test_address->asString()], new_host2);
   EXPECT_EQ(clientMap().size(), 0);
-  EXPECT_EQ(createdHosts().size(), 0);
+  EXPECT_EQ(createdViaRedirectHosts().size(), 0);
   EXPECT_EQ(clientsToDrain().size(), 2); // host1 and host2 have been put aside to drain.
   EXPECT_EQ(drainTimer()->enabled(), true);
 
@@ -770,7 +766,6 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
 // address) and pending requests using makeRequestToHost(). After their creation, "new" hosts are
 // discovered (added), and the original hosts are put aside to drain. The cluster is removed and the
 // underlying connections should be closed.
-
 TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
   setup();
 
@@ -811,7 +806,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
   EXPECT_EQ(clientMap().size(), 2);
   EXPECT_NE(clientMap().find(host1), clientMap().end());
   EXPECT_NE(clientMap().find(host2), clientMap().end());
-  EXPECT_EQ(createdHosts().size(), 2);
+  EXPECT_EQ(createdViaRedirectHosts().size(), 2);
   EXPECT_EQ(clientsToDrain().size(), 0);
   EXPECT_EQ(drainTimer()->enabled(), false);
 
@@ -832,7 +827,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
   EXPECT_EQ(host_address_map[new_host1_test_address->asString()], new_host1);
   EXPECT_EQ(host_address_map[new_host2_test_address->asString()], new_host2);
   EXPECT_EQ(clientMap().size(), 0);
-  EXPECT_EQ(createdHosts().size(), 0);
+  EXPECT_EQ(createdViaRedirectHosts().size(), 0);
   EXPECT_EQ(clientsToDrain().size(), 2); // host1 and host2 have been put aside to drain.
   EXPECT_EQ(drainTimer()->enabled(), true);
 

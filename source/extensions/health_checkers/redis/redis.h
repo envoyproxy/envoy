@@ -78,7 +78,7 @@ private:
     }
 
     // Redirection connection and draining controls.
-    std::chrono::milliseconds upstreamDrainPollIntervalInMs() const override {
+    std::chrono::milliseconds upstreamDrainPollInterval() const override {
       return std::chrono::milliseconds(0);
     }
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }

@@ -127,21 +127,11 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
 
-    if (event == Network::ConnectionEvent::RemoteClose) {
-      host_->cluster().stats().upstream_cx_destroy_remote_.inc();
-    } else if (event == Network::ConnectionEvent::LocalClose) {
-      host_->cluster().stats().upstream_cx_destroy_local_.inc();
-    }
-    host_->cluster().stats().upstream_cx_destroy_.inc();
-
+    Upstream::reportUpstreamCxDestroy(host_, event);
     if (!pending_requests_.empty()) {
-      host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
+      Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
       if (event == Network::ConnectionEvent::RemoteClose) {
         putOutlierEvent(Upstream::Outlier::Result::SERVER_FAILURE);
-        host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
-      }
-      if (event == Network::ConnectionEvent::LocalClose) {
-        host_->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
       }
     }
 

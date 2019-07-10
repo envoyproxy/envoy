@@ -403,7 +403,7 @@ protected:
     RedisCluster::RedisDiscoverySession discovery_session(*cluster_, *this);
     EXPECT_FALSE(discovery_session.enableHashtagging());
     EXPECT_EQ(discovery_session.bufferFlushTimeoutInMs(), std::chrono::milliseconds(0));
-    EXPECT_EQ(discovery_session.upstreamDrainPollIntervalInMs(), std::chrono::milliseconds(0));
+    EXPECT_EQ(discovery_session.upstreamDrainPollInterval(), std::chrono::milliseconds(0));
     EXPECT_EQ(discovery_session.maxUpstreamUnknownConnections(), 0);
 
     NetworkFilters::Common::Redis::RespValue dummy_value;

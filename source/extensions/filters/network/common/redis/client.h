@@ -143,9 +143,8 @@ public:
 
   /**
    * @return interval for checking the state of draining upstream connections.
-   *
    */
-  virtual std::chrono::milliseconds upstreamDrainPollIntervalInMs() const PURE;
+  virtual std::chrono::milliseconds upstreamDrainPollInterval() const PURE;
 
   /**
    * @return the maximum number of upstream connections to unknown hosts when enableRedirection() is

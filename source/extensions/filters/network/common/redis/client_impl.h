@@ -12,6 +12,7 @@
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
 #include "common/upstream/load_balancer_impl.h"
+#include "common/upstream/upstream_impl.h"
 
 #include "extensions/filters/network/common/redis/client.h"
 
@@ -45,7 +46,7 @@ public:
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return buffer_flush_timeout_;
   }
-  std::chrono::milliseconds upstreamDrainPollIntervalInMs() const override {
+  std::chrono::milliseconds upstreamDrainPollInterval() const override {
     return upstream_drain_poll_interval_;
   }
   uint32_t maxUpstreamUnknownConnections() const override {
