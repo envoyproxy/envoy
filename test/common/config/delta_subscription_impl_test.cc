@@ -8,7 +8,7 @@ namespace {
 
 class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness, public testing::Test {
 protected:
-  DeltaSubscriptionImplTest() : DeltaSubscriptionTestHarness() {}
+  DeltaSubscriptionImplTest() {}
 
   // We need to destroy the subscription before the test's destruction, because the subscription's
   // destructor removes its watch from the NewGrpcMuxImpl, and that removal process involves

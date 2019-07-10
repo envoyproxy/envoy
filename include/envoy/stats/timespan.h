@@ -37,7 +37,7 @@ public:
   /**
    * Complete the timespan and send the time to the histogram.
    */
-  void complete() { histogram_.recordValue(getRawDuration().count()); }
+  void complete() override { histogram_.recordValue(getRawDuration().count()); }
 
   /**
    * Get duration in the time unit since the creation of the span.

@@ -175,7 +175,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
         continue;
       }
       Protobuf::RepeatedPtrField<ProtobufWkt::Any> found_resources;
-      for (auto watched_resource_name : watch->resources_) {
+      for (const auto& watched_resource_name : watch->resources_) {
         auto it = resources.find(watched_resource_name);
         if (it != resources.end()) {
           found_resources.Add()->MergeFrom(it->second);
@@ -205,7 +205,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
 void GrpcMuxImpl::onWriteable() { drainRequests(); }
 
 void GrpcMuxImpl::onStreamEstablished() {
-  for (const auto type_url : subscriptions_) {
+  for (const auto& type_url : subscriptions_) {
     queueDiscoveryRequest(type_url);
   }
 }

@@ -14,9 +14,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
-#include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -422,24 +420,9 @@ protected:
           return &active_dns_query_;
         }));
     ;
-    resolver_target.startResolve();
+    resolver_target.startResolveDns();
 
     EXPECT_CALL(active_dns_query_, cancel());
-  }
-
-  void testRedisResolve() {
-    EXPECT_CALL(dispatcher_, createTimer_(_));
-    RedisCluster::RedisDiscoverySession discovery_session(*cluster_, *this);
-    discovery_session.registerDiscoveryAddress(
-        TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"})), 22120);
-    expectRedisResolve(true);
-    discovery_session.startResolve();
-
-    // 2nd startResolve() call will be a no-opt until the first startResolve is done.
-    discovery_session.startResolve();
-
-    // Make sure cancel is called.
-    EXPECT_CALL(pool_request_, cancel());
   }
 
   Stats::IsolatedStoreImpl stats_store_;
@@ -455,7 +438,7 @@ protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   std::shared_ptr<Upstream::MockClusterMockPrioritySet> hosts_;
@@ -550,6 +533,30 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
   cluster_->initialize([&]() -> void { initialized_.ready(); });
 
   expectHealthyHosts(std::get<3>(GetParam()));
+}
+
+TEST_F(RedisClusterTest, EmptyDnsResponse) {
+  Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  setupFromV2Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{};
+  EXPECT_CALL(*dns_timer, enableTimer(_));
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1U, cluster_->info()->stats().update_empty_.value());
+
+  // Does not recreate the timer on subsequent DNS resolve calls.
+  EXPECT_CALL(*dns_timer, enableTimer(_));
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  dns_timer->invokeCallback();
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(2U, cluster_->info()->stats().update_empty_.value());
 }
 
 TEST_F(RedisClusterTest, Basic) {
@@ -699,9 +706,53 @@ TEST_F(RedisClusterTest, DnsDiscoveryResolverBasic) {
   testDnsResolve("foo.bar.com", 22120);
 }
 
-TEST_F(RedisClusterTest, RedisDiscoveryResolverBasic) {
-  setupFromV2Yaml(BasicConfig);
-  testRedisResolve();
+TEST_F(RedisClusterTest, MultipleDnsDiscovery) {
+  const std::string config = R"EOF(
+  name: name
+  connect_timeout: 0.25s
+  dns_lookup_family: V4_ONLY
+  hosts:
+  - socket_address:
+      address: foo.bar.com
+      port_value: 22120
+  - socket_address:
+      address: foo1.bar.com
+      port_value: 22120
+  cluster_type:
+    name: envoy.clusters.redis
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        cluster_refresh_rate: 4s
+        cluster_refresh_timeout: 0.25s
+  )EOF";
+
+  setupFromV2Yaml(config);
+
+  // Only single in-flight "cluster slots" call.
+  expectRedisResolve(true);
+
+  ReadyWatcher dns_resolve_1;
+  ReadyWatcher dns_resolve_2;
+
+  EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", _, _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        cb(TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"})));
+        return nullptr;
+      }));
+
+  EXPECT_CALL(*dns_resolver_, resolve("foo1.bar.com", _, _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        cb(TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.3", "127.0.0.4"})));
+        return nullptr;
+      }));
+
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+
+  // Pending RedisResolve will call cancel in the destructor.
+  EXPECT_CALL(pool_request_, cancel());
 }
 
 } // namespace Redis

@@ -201,7 +201,7 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
         const char fatal_error[] =
             " If continued use of this field is absolutely necessary, see "
             "https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime"
-            "#using-runtime-overrides-for-deprecated-features for how to apply a temporary and"
+            "#using-runtime-overrides-for-deprecated-features for how to apply a temporary and "
             "highly discouraged override.";
         throw ProtoValidationException(err + fatal_error, message);
       }

@@ -3,6 +3,8 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/stats/isolated_store_impl.h"
+#include "common/stats/null_counter.h"
+#include "common/stats/null_gauge.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -184,9 +186,11 @@ TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
 }
 
 TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {
-  NullCounterImpl c(store_.symbolTable());
-  EXPECT_EQ(0, c.latch());
-  NullGaugeImpl g(store_.symbolTable());
+  NullCounterImpl& c = store_.nullCounter();
+  c.inc();
+  EXPECT_EQ(0, c.value());
+  NullGaugeImpl& g = store_.nullGauge("");
+  g.inc();
   EXPECT_EQ(0, g.value());
 }
 

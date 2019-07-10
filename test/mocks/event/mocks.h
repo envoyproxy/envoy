@@ -113,6 +113,7 @@ public:
   MOCK_METHOD2(listenForSignal_, SignalEvent*(int signal_num, SignalCb cb));
   MOCK_METHOD1(post, void(std::function<void()> callback));
   MOCK_METHOD1(run, void(RunType type));
+  MOCK_METHOD1(setTrackedObject, const ScopeTrackedObject*(const ScopeTrackedObject* object));
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
 
   GlobalTimeSystem time_system_;

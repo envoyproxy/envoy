@@ -60,6 +60,7 @@ correspondence between an xDS API and a resource type. That is:
 -  CDS: :ref:`envoy.api.v2.Cluster <envoy_api_msg_Cluster>`
 -  EDS: :ref:`envoy.api.v2.ClusterLoadAssignment <envoy_api_msg_ClusterLoadAssignment>`
 -  SDS: :ref:`envoy.api.v2.Auth.Secret <envoy_api_msg_Auth.Secret>`
+-  RTDS: :ref:`envoy.service.discovery.v2.Runtime <envoy_api_msg_service.discovery.v2.Runtime>`
 
 The concept of `type URLs <https://developers.google.com/protocol-buffers/docs/proto3#any>`_ appears below, and takes the form
 `type.googleapis.com/<resource type>`, e.g.

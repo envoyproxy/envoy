@@ -1,83 +1,36 @@
+// TODO(jmarantz): rename this file and class to heap_allocator.h.
+
 #pragma once
 
-#include <cstdint>
-#include <string>
-#include <unordered_set>
+#include <vector>
 
+#include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/symbol_table.h"
 
-#include "common/common/hash.h"
-#include "common/common/thread.h"
-#include "common/common/thread_annotations.h"
 #include "common/stats/metric_impl.h"
-#include "common/stats/stat_data_allocator_impl.h"
-#include "common/stats/stat_merger.h"
-#include "common/stats/symbol_table_impl.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Stats {
 
-/**
- * This structure is an alternate backing store for both CounterImpl and GaugeImpl. It is designed
- * so that it can be allocated efficiently from the heap on demand.
- */
-struct HeapStatData : public InlineStorage {
-private:
-  explicit HeapStatData(StatName stat_name) { stat_name.copyToStorage(symbol_storage_); }
-
+class HeapStatDataAllocator : public StatDataAllocator {
 public:
-  static HeapStatData* alloc(StatName stat_name, SymbolTable& symbol_table);
-
-  void free(SymbolTable& symbol_table);
-  StatName statName() const { return StatName(symbol_storage_); }
-
-  bool operator==(const HeapStatData& rhs) const { return statName() == rhs.statName(); }
-  uint64_t hash() const { return statName().hash(); }
-
-  std::atomic<uint64_t> value_{0};
-  std::atomic<uint64_t> pending_increment_{0};
-  std::atomic<uint16_t> flags_{0};
-  std::atomic<uint16_t> ref_count_{1};
-  SymbolTable::Storage symbol_storage_; // This is a 'using' nickname for uint8_t[].
-};
-
-template <class Stat> class HeapStat : public Stat {
-public:
-  HeapStat(HeapStatData& data, StatDataAllocatorImpl<HeapStatData>& alloc,
-           absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
-      : Stat(data, alloc, tag_extracted_name, tags) {}
-
-  HeapStat(HeapStatData& data, StatDataAllocatorImpl<HeapStatData>& alloc,
-           absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
-           Gauge::ImportMode import_mode)
-      : Stat(data, alloc, tag_extracted_name, tags, import_mode) {}
-
-  StatName statName() const override { return this->data_.statName(); }
-};
-
-class HeapStatDataAllocator : public StatDataAllocatorImpl<HeapStatData> {
-public:
-  HeapStatDataAllocator(SymbolTable& symbol_table) : StatDataAllocatorImpl(symbol_table) {}
+  HeapStatDataAllocator(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   ~HeapStatDataAllocator() override;
 
-  HeapStatData& alloc(StatName name);
-  void free(HeapStatData& data) override;
+  void removeCounterFromSet(Counter* counter);
+  void removeGaugeFromSet(Gauge* gauge);
 
   // StatDataAllocator
   CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
-                               const std::vector<Tag>& tags) override {
-    return std::make_shared<HeapStat<CounterImpl<HeapStatData>>>(alloc(name), *this,
-                                                                 tag_extracted_name, tags);
-  }
-
+                               const std::vector<Tag>& tags) override;
   GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
-                           const std::vector<Tag>& tags, Gauge::ImportMode import_mode) override {
-    return std::make_shared<HeapStat<GaugeImpl<HeapStatData>>>(
-        alloc(name), *this, tag_extracted_name, tags, import_mode);
-  }
+                           const std::vector<Tag>& tags, Gauge::ImportMode import_mode) override;
+  SymbolTable& symbolTable() override { return symbol_table_; }
+  const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
@@ -85,17 +38,29 @@ public:
 
 private:
   struct HeapStatHash {
-    size_t operator()(const HeapStatData* a) const { return a->hash(); }
+    using is_transparent = void;
+    size_t operator()(const Metric* a) const { return a->statName().hash(); }
+    size_t operator()(StatName a) const { return a.hash(); }
   };
+
   struct HeapStatCompare {
-    bool operator()(const HeapStatData* a, const HeapStatData* b) const { return *a == *b; }
+    using is_transparent = void;
+    bool operator()(const Metric* a, const Metric* b) const {
+      return a->statName() == b->statName();
+    }
+    bool operator()(StatName a, const Metric* b) const { return a == b->statName(); }
+    bool operator()(const Metric* a, StatName b) const { return a->statName() == b; }
   };
 
   // An unordered set of HeapStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher, which key off of the
   // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
-  using StatSet = absl::flat_hash_set<HeapStatData*, HeapStatHash, HeapStatCompare>;
-  StatSet stats_ GUARDED_BY(mutex_);
+  template <class StatType>
+  using StatSet = absl::flat_hash_set<StatType*, HeapStatHash, HeapStatCompare>;
+  StatSet<Counter> counters_ GUARDED_BY(mutex_);
+  StatSet<Gauge> gauges_ GUARDED_BY(mutex_);
+
+  SymbolTable& symbol_table_;
 
   // A mutex is needed here to protect both the stats_ object from both
   // alloc() and free() operations. Although alloc() operations are called under existing locking,

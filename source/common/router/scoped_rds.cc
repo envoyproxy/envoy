@@ -35,7 +35,8 @@ create(const envoy::config::filter::network::http_connection_manager::v2::HttpCo
         ScopedRouteConfigurationsList& scoped_route_list =
             config.scoped_routes().scoped_route_configurations_list();
     return scoped_routes_config_provider_manager.createStaticConfigProvider(
-        RepeatedPtrUtil::convertToConstMessagePtrVector(
+        RepeatedPtrUtil::convertToConstMessagePtrContainer<envoy::api::v2::ScopedRouteConfiguration,
+                                                           ProtobufTypes::ConstMessagePtrVector>(
             scoped_route_list.scoped_route_configurations()),
         factory_context,
         ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
@@ -158,7 +159,9 @@ ScopedRdsConfigProvider::ScopedRdsConfigProvider(
           MutableConfigProviderCommonBase::subscription_.get())),
       rds_config_source_(std::move(rds_config_source)) {
   initialize([scope_key_builder](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalScopedConfigImpl>(scope_key_builder);
+    return std::make_shared<ThreadLocalScopedConfigImpl>(
+        envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder(
+            scope_key_builder));
   });
 }
 

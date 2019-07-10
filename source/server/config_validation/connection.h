@@ -28,7 +28,7 @@ public:
 
   // connect may be called in config verification mode.
   // It is redefined as no-op. Calling parent's method triggers connection to upstream host.
-  virtual void connect() override {}
+  void connect() override {}
 };
 
 } // namespace Network

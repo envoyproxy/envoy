@@ -100,7 +100,7 @@ public:
 
   struct ClusterSlotsRequest : public Extensions::NetworkFilters::Common::Redis::RespValue {
   public:
-    ClusterSlotsRequest() : Extensions::NetworkFilters::Common::Redis::RespValue() {
+    ClusterSlotsRequest() {
       type(Extensions::NetworkFilters::Common::Redis::RespType::Array);
       std::vector<NetworkFilters::Common::Redis::RespValue> values(2);
       values[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
@@ -160,12 +160,13 @@ private:
 
     ~DnsDiscoveryResolveTarget();
 
-    void startResolve();
+    void startResolveDns();
 
     RedisCluster& parent_;
     Network::ActiveDnsQuery* active_query_{};
     const std::string dns_address_;
     const uint32_t port_;
+    Event::TimerPtr resolve_timer_;
   };
 
   using DnsDiscoveryResolveTargetPtr = std::unique_ptr<DnsDiscoveryResolveTarget>;
@@ -193,14 +194,12 @@ private:
     RedisDiscoverySession(RedisCluster& parent,
                           NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
-    ~RedisDiscoverySession();
+    ~RedisDiscoverySession() override;
 
-    void registerDiscoveryAddress(
-        const std::list<Network::Address::InstanceConstSharedPtr>& address_list,
-        const uint32_t port);
+    void registerDiscoveryAddress(std::list<Network::DnsResponse>&& response, const uint32_t port);
 
     // Start discovery against a random host from existing hosts
-    void startResolve();
+    void startResolveRedis();
 
     // Extensions::NetworkFilters::Common::Redis::Client::Config
     bool disableOutlierEvents() const override { return true; }

@@ -12,15 +12,25 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "abstract_codec_lib",
+    srcs = [],
+    hdrs = [
+        "codec.h",
+    ],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "kafka_request_codec_lib",
     srcs = ["request_codec.cc"],
     hdrs = [
-        "codec.h",
         "request_codec.h",
     ],
     deps = [
+        ":abstract_codec_lib",
         ":kafka_request_parser_lib",
-        "//source/common/buffer:buffer_lib",
     ],
 )
 
@@ -55,7 +65,7 @@ envoy_cc_library(
 )
 
 genrule(
-    name = "kafka_generated_source",
+    name = "kafka_request_generated_source",
     srcs = [
         "@kafka_source//:request_protocol_files",
     ],
@@ -64,21 +74,90 @@ genrule(
         "external/kafka_request_resolver.cc",
     ],
     cmd = """
-      ./$(location :kafka_code_generator) generate-source \
+      ./$(location :kafka_protocol_code_generator_bin) request \
         $(location external/requests.h) $(location external/kafka_request_resolver.cc) \
         $(SRCS)
     """,
     tools = [
-        ":kafka_code_generator",
+        ":kafka_protocol_code_generator_bin",
+    ],
+)
+
+envoy_cc_library(
+    name = "kafka_response_codec_lib",
+    srcs = ["response_codec.cc"],
+    hdrs = [
+        "response_codec.h",
+    ],
+    deps = [
+        ":abstract_codec_lib",
+        ":kafka_response_parser_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "kafka_response_parser_lib",
+    srcs = [
+        "external/kafka_response_resolver.cc",
+        "kafka_response_parser.cc",
+    ],
+    hdrs = [
+        "external/responses.h",
+        "kafka_response_parser.h",
+    ],
+    deps = [
+        ":kafka_response_lib",
+        ":parser_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "kafka_response_lib",
+    srcs = [
+    ],
+    hdrs = [
+        "kafka_response.h",
+    ],
+    deps = [
+        ":serialization_lib",
+    ],
+)
+
+genrule(
+    name = "kafka_response_generated_source",
+    srcs = [
+        "@kafka_source//:response_protocol_files",
+    ],
+    outs = [
+        "external/responses.h",
+        "external/kafka_response_resolver.cc",
+    ],
+    cmd = """
+      ./$(location :kafka_protocol_code_generator_bin) response \
+        $(location external/responses.h) $(location external/kafka_response_resolver.cc) \
+        $(SRCS)
+    """,
+    tools = [
+        ":kafka_protocol_code_generator_bin",
     ],
 )
 
 py_binary(
-    name = "kafka_code_generator",
-    srcs = ["protocol_code_generator/kafka_generator.py"],
-    data = glob(["protocol_code_generator/*.j2"]),
-    main = "protocol_code_generator/kafka_generator.py",
-    deps = ["@com_github_pallets_jinja//:jinja2"],
+    name = "kafka_protocol_code_generator_bin",
+    srcs = ["protocol/launcher.py"],
+    data = glob(["protocol/*.j2"]),
+    main = "protocol/launcher.py",
+    deps = [
+        ":kafka_protocol_generator_lib",
+        "@com_github_pallets_jinja//:jinja2",
+    ],
+)
+
+py_library(
+    name = "kafka_protocol_generator_lib",
+    srcs = ["protocol/generator.py"],
 )
 
 envoy_cc_library(
@@ -112,20 +191,28 @@ genrule(
         "external/serialization_composite.h",
     ],
     cmd = """
-      ./$(location :serialization_composite_generator) generate-source \
+      ./$(location :serialization_composite_code_generator_bin) \
       $(location external/serialization_composite.h)
     """,
     tools = [
-        ":serialization_composite_generator",
+        ":serialization_composite_code_generator_bin",
     ],
 )
 
 py_binary(
-    name = "serialization_composite_generator",
-    srcs = ["serialization_code_generator/serialization_composite_generator.py"],
-    data = glob(["serialization_code_generator/*.j2"]),
-    main = "serialization_code_generator/serialization_composite_generator.py",
-    deps = ["@com_github_pallets_jinja//:jinja2"],
+    name = "serialization_composite_code_generator_bin",
+    srcs = ["serialization/launcher.py"],
+    data = glob(["serialization/*.j2"]),
+    main = "serialization/launcher.py",
+    deps = [
+        ":serialization_composite_generator_lib",
+        "@com_github_pallets_jinja//:jinja2",
+    ],
+)
+
+py_library(
+    name = "serialization_composite_generator_lib",
+    srcs = ["serialization/generator.py"],
 )
 
 envoy_cc_library(

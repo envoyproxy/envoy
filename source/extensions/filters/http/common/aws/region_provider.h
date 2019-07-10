@@ -24,7 +24,7 @@ public:
   virtual absl::optional<std::string> getRegion() PURE;
 };
 
-typedef std::shared_ptr<RegionProvider> RegionProviderSharedPtr;
+using RegionProviderSharedPtr = std::shared_ptr<RegionProvider>;
 
 } // namespace Aws
 } // namespace Common

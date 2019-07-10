@@ -12,7 +12,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
                              added_via_api),
       local_info_(factory_context.localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
+      respect_dns_ttl_(cluster.respect_dns_ttl()) {
   std::list<ResolveTargetPtr> resolve_targets;
   const envoy::api::v2::ClusterLoadAssignment load_assignment(
       cluster.has_load_assignment() ? cluster.load_assignment()
@@ -90,24 +91,28 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+      [this](std::list<Network::DnsResponse>&& response) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
 
         std::unordered_map<std::string, HostSharedPtr> updated_hosts;
         HostVector new_hosts;
-        for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+        std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
+        for (const auto& resp : response) {
           // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
           // make a new address that has port in it. We need to both support IPv6 as well as
           // potentially move port handling into the DNS interface itself, which would work better
           // for SRV.
-          ASSERT(address != nullptr);
+          ASSERT(resp.address_ != nullptr);
           new_hosts.emplace_back(new HostImpl(
-              parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
+              parent_.info_, dns_address_,
+              Network::Utility::getAddressWithPort(*(resp.address_), port_),
               lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
               locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config(),
               locality_lb_endpoint_.priority(), lb_endpoint_.health_status()));
+
+          ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
         }
 
         HostVector hosts_added;
@@ -130,7 +135,16 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         // completes. This is not perfect but is easier to code and unclear if the extra
         // complexity is needed so will start with this.
         parent_.onPreInitComplete();
-        resolve_timer_->enableTimer(parent_.dns_refresh_rate_ms_);
+
+        std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
+
+        if (parent_.respect_dns_ttl_ && ttl_refresh_rate != std::chrono::seconds(0)) {
+          final_refresh_rate = ttl_refresh_rate;
+          ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
+                    final_refresh_rate.count());
+        }
+
+        resolve_timer_->enableTimer(final_refresh_rate);
       });
 }
 

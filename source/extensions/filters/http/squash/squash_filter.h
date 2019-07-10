@@ -71,7 +71,7 @@ class SquashFilter : public Http::StreamDecoderFilter,
                      protected Logger::Loggable<Logger::Id::filter> {
 public:
   SquashFilter(SquashFilterConfigSharedPtr config, Upstream::ClusterManager& cm);
-  ~SquashFilter();
+  ~SquashFilter() override;
 
   // Http::StreamFilterBase
   void onDestroy() override;

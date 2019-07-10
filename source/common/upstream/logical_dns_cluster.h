@@ -37,7 +37,7 @@ public:
                     Server::Configuration::TransportSocketFactoryContext& factory_context,
                     Stats::ScopePtr&& stats_scope, bool added_via_api);
 
-  ~LogicalDnsCluster();
+  ~LogicalDnsCluster() override;
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -62,6 +62,7 @@ private:
 
   Network::DnsResolverSharedPtr dns_resolver_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
+  const bool respect_dns_ttl_;
   Network::DnsLookupFamily dns_lookup_family_;
   Event::TimerPtr resolve_timer_;
   std::string dns_url_;

@@ -36,8 +36,8 @@ protected:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(OwnedImplTest, OwnedImplTest,
-                        testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
+INSTANTIATE_TEST_SUITE_P(OwnedImplTest, OwnedImplTest,
+                         testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
 
 TEST_P(OwnedImplTest, AddBufferFragmentNoCleanup) {
   char input[] = "hello world";
