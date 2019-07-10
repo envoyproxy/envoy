@@ -3,6 +3,9 @@
 set -e
 
 # Set up basic requirements and install them.
+# workaround https://askubuntu.com/questions/41605/trouble-downloading-packages-list-due-to-a-hash-sum-mismatch-error
+sudo rm -rf /var/lib/apt/lists/*
+sudo apt-get clean
 sudo apt-get update
 export DEBIAN_FRONTEND=noninteractive
 sudo apt-get install -y wget software-properties-common make cmake git \
