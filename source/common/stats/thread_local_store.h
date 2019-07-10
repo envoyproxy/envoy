@@ -28,9 +28,9 @@ namespace Stats {
  * histograms, one to collect the values and other as backup that is used for merge process. The
  * swap happens during the merge process.
  */
-class ThreadLocalHistogramImpl : public Histogram, public MetricImpl {
+class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
-  ThreadLocalHistogramImpl(StatName name, absl::string_view tag_extracted_name,
+  ThreadLocalHistogramImpl(StatName name, const std::string& tag_extracted_name,
                            const std::vector<Tag>& tags, SymbolTable& symbol_table);
   ~ThreadLocalHistogramImpl() override;
 
@@ -51,7 +51,6 @@ public:
   bool used() const override { return used_; }
 
   // Stats::Metric
-  StatName statName() const override { return name_.statName(); }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
 private:
@@ -60,25 +59,23 @@ private:
   histogram_t* histograms_[2];
   std::atomic<bool> used_;
   std::thread::id created_thread_id_;
-  StatNameStorage name_;
   SymbolTable& symbol_table_;
 };
 
-using TlsHistogramSharedPtr = std::shared_ptr<ThreadLocalHistogramImpl>;
+using TlsHistogramSharedPtr = RefcountPtr<ThreadLocalHistogramImpl>;
 
 class TlsScope;
 
 /**
  * Log Linear Histogram implementation that is stored in the main thread.
  */
-class ParentHistogramImpl : public ParentHistogram, public MetricImpl {
+class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Store& parent, TlsScope& tlsScope,
                       absl::string_view tag_extracted_name, const std::vector<Tag>& tags);
   ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
-  bool used() const override;
   void recordValue(uint64_t value) override;
 
   /**
@@ -97,8 +94,13 @@ public:
   const std::string bucketSummary() const override;
 
   // Stats::Metric
-  StatName statName() const override { return name_.statName(); }
   SymbolTable& symbolTable() override { return parent_.symbolTable(); }
+  bool used() const override;
+
+  // RefcountInterface
+  void incRefCount() override { refcount_helper_.incRefCount(); }
+  bool decRefCount() override { return refcount_helper_.decRefCount(); }
+  uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
 private:
   bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
@@ -112,10 +114,10 @@ private:
   mutable Thread::MutexBasicLockable merge_lock_;
   std::list<TlsHistogramSharedPtr> tls_histograms_ GUARDED_BY(merge_lock_);
   bool merged_;
-  StatNameStorage name_;
+  RefcountHelper refcount_helper_;
 };
 
-using ParentHistogramImplSharedPtr = std::shared_ptr<ParentHistogramImpl>;
+using ParentHistogramImplSharedPtr = RefcountPtr<ParentHistogramImpl>;
 
 /**
  * Class used to create ThreadLocalHistogram in the scope.
@@ -278,9 +280,9 @@ private:
     findHistogram(StatName name) const override;
 
     template <class StatType>
-    using MakeStatFn = std::function<std::shared_ptr<StatType>(StatDataAllocator&, StatName name,
-                                                               absl::string_view tag_extracted_name,
-                                                               const std::vector<Tag>& tags)>;
+    using MakeStatFn = std::function<RefcountPtr<StatType>(StatDataAllocator&, StatName name,
+                                                           absl::string_view tag_extracted_name,
+                                                           const std::vector<Tag>& tags)>;
 
     /**
      * Makes a stat either by looking it up in the central cache,
@@ -294,10 +296,10 @@ private:
      *     used if non-empty, or filled in if empty (and non-null).
      */
     template <class StatType>
-    StatType& safeMakeStat(StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
+    StatType& safeMakeStat(StatName name, StatMap<RefcountPtr<StatType>>& central_cache_map,
                            StatNameStorageSet& central_rejected_stats,
                            MakeStatFn<StatType> make_stat,
-                           StatMap<std::shared_ptr<StatType>>* tls_cache,
+                           StatMap<RefcountPtr<StatType>>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
     /**
@@ -311,7 +313,7 @@ private:
      */
     template <class StatType>
     absl::optional<std::reference_wrapper<const StatType>>
-    findStatLockHeld(StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map) const;
+    findStatLockHeld(StatName name, StatMap<RefcountPtr<StatType>>& central_cache_map) const;
 
     void extractTagsAndTruncate(StatName& name,
                                 std::unique_ptr<StatNameManagedStorage>& truncated_name_storage,

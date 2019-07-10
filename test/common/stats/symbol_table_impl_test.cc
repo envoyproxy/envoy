@@ -74,8 +74,8 @@ protected:
   std::unique_ptr<StatNamePool> pool_;
 };
 
-INSTANTIATE_TEST_CASE_P(StatNameTest, StatNameTest,
-                        testing::ValuesIn({SymbolTableType::Real, SymbolTableType::Fake}));
+INSTANTIATE_TEST_SUITE_P(StatNameTest, StatNameTest,
+                         testing::ValuesIn({SymbolTableType::Real, SymbolTableType::Fake}));
 
 TEST_P(StatNameTest, AllocFree) { encodeDecode("hello.world"); }
 

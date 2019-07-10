@@ -24,7 +24,9 @@ static const std::string UnspecifiedValueString = "-";
 namespace {
 
 // Matches newline pattern in a StartTimeFormatter format string.
-const std::regex& getNewlinePattern(){CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n")};
+const std::regex& getStartTimeNewlinePattern(){
+    CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n")};
+const std::regex& getNewlinePattern(){CONSTRUCT_ON_FIRST_USE(std::regex, "\n")};
 
 // Helper that handles the case when the ConnectionInfo is missing or if the desired value is
 // empty.
@@ -169,6 +171,11 @@ void AccessLogFormatParser::parseCommandHeader(const std::string& token, const s
   } else {
     alternative_header = "";
   }
+  // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
+  if (std::regex_search(main_header, getNewlinePattern()) ||
+      std::regex_search(alternative_header, getNewlinePattern())) {
+    throw EnvoyException("Invalid header configuration. Format string contains newline.");
+  }
 }
 
 void AccessLogFormatParser::parseCommand(const std::string& token, const size_t start,
@@ -280,7 +287,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
                                      : "";
         // Validate the input specifier here. The formatted string may be destined for a header, and
         // should not contain invalid characters {NUL, LR, CF}.
-        if (std::regex_search(args, getNewlinePattern())) {
+        if (std::regex_search(args, getStartTimeNewlinePattern())) {
           throw EnvoyException("Invalid header configuration. Format string contains newline.");
         }
         formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(args)});

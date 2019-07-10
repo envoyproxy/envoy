@@ -895,7 +895,7 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 
   if (encrypt == 1) {
     // Encrypt
-    RELEASE_ASSERT(session_ticket_keys_.size() >= 1, "");
+    RELEASE_ASSERT(!session_ticket_keys_.empty(), "");
     // TODO(ggreenway): validate in SDS that session_ticket_keys_ cannot be empty,
     // or if we allow it to be emptied, reconfigure the context so this callback
     // isn't set.

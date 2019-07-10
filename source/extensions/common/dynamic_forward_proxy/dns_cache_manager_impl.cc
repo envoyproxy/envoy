@@ -26,17 +26,19 @@ DnsCacheSharedPtr DnsCacheManagerImpl::getCache(
   }
 
   DnsCacheSharedPtr new_cache =
-      std::make_shared<DnsCacheImpl>(main_thread_dispatcher_, tls_, config);
+      std::make_shared<DnsCacheImpl>(main_thread_dispatcher_, tls_, root_scope_, config);
   caches_.emplace(config.name(), ActiveCache{config, new_cache});
   return new_cache;
 }
 
 DnsCacheManagerSharedPtr getCacheManager(Singleton::Manager& singleton_manager,
                                          Event::Dispatcher& main_thread_dispatcher,
-                                         ThreadLocal::SlotAllocator& tls) {
+                                         ThreadLocal::SlotAllocator& tls,
+                                         Stats::Scope& root_scope) {
   return singleton_manager.getTyped<DnsCacheManager>(
-      SINGLETON_MANAGER_REGISTERED_NAME(dns_cache_manager), [&main_thread_dispatcher, &tls] {
-        return std::make_shared<DnsCacheManagerImpl>(main_thread_dispatcher, tls);
+      SINGLETON_MANAGER_REGISTERED_NAME(dns_cache_manager),
+      [&main_thread_dispatcher, &tls, &root_scope] {
+        return std::make_shared<DnsCacheManagerImpl>(main_thread_dispatcher, tls, root_scope);
       });
 }
 

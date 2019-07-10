@@ -10,18 +10,18 @@ namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 
-// TODO(mattklein123): circuit breakers / maximums on the number of hosts that the cache can
-//                     contain.
-// TODO(mattklein123): stats
-
 DnsCacheImpl::DnsCacheImpl(
     Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
+    Stats::Scope& root_scope,
     const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config)
     : main_thread_dispatcher_(main_thread_dispatcher),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(main_thread_dispatcher.createDnsResolver({})), tls_slot_(tls.allocateSlot()),
+      scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
+      stats_{ALL_DNS_CACHE_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))},
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
-      host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)) {
+      host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
+      max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(); });
   updateTlsHostsMap();
 }
@@ -38,21 +38,29 @@ DnsCacheImpl::~DnsCacheImpl() {
   }
 }
 
-DnsCacheImpl::LoadDnsCacheHandlePtr DnsCacheImpl::loadDnsCache(absl::string_view host,
-                                                               uint16_t default_port,
-                                                               LoadDnsCacheCallbacks& callbacks) {
+DnsCacheImpl::LoadDnsCacheEntryResult
+DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
+                                LoadDnsCacheEntryCallbacks& callbacks) {
   ENVOY_LOG(debug, "thread local lookup for host '{}'", host);
   auto& tls_host_info = tls_slot_->getTyped<ThreadLocalHostInfo>();
   auto tls_host = tls_host_info.host_map_->find(host);
   if (tls_host != tls_host_info.host_map_->end()) {
     ENVOY_LOG(debug, "thread local hit for host '{}'", host);
-    return nullptr;
+    return {LoadDnsCacheEntryStatus::InCache, nullptr};
+  } else if (tls_host_info.host_map_->size() >= max_hosts_) {
+    // Given that we do this check in thread local context, it's possible for two threads to race
+    // and potentially go slightly above the configured max hosts. This is an OK given compromise
+    // given how much simpler the implementation is.
+    ENVOY_LOG(debug, "DNS cache overflow for host '{}'", host);
+    stats_.host_overflow_.inc();
+    return {LoadDnsCacheEntryStatus::Overflow, nullptr};
   } else {
     ENVOY_LOG(debug, "thread local miss for host '{}', posting to main thread", host);
     main_thread_dispatcher_.post(
         [this, host = std::string(host), default_port]() { startCacheLoad(host, default_port); });
-    return std::make_unique<LoadDnsCacheHandleImpl>(tls_host_info.pending_resolutions_, host,
-                                                    callbacks);
+    return {LoadDnsCacheEntryStatus::Loading,
+            std::make_unique<LoadDnsCacheEntryHandleImpl>(tls_host_info.pending_resolutions_, host,
+                                                          callbacks)};
   }
 }
 
@@ -126,18 +134,18 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
   ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}'", host,
             host_info.host_to_resolve_, host_info.port_);
   ASSERT(host_info.active_query_ == nullptr);
-  host_info.active_query_ = resolver_->resolve(
-      host_info.host_to_resolve_, dns_lookup_family_,
-      [this, host](const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) {
-        finishResolve(host, address_list);
-      });
+
+  stats_.dns_query_attempt_.inc();
+  host_info.active_query_ =
+      resolver_->resolve(host_info.host_to_resolve_, dns_lookup_family_,
+                         [this, host](std::list<Network::DnsResponse>&& response) {
+                           finishResolve(host, std::move(response));
+                         });
 }
 
-void DnsCacheImpl::finishResolve(
-    const std::string& host,
-    const std::list<Network::Address::InstanceConstSharedPtr>& address_list) {
-  ENVOY_LOG(debug, "main thread resolve complete for host '{}'. {} results", host,
-            address_list.size());
+void DnsCacheImpl::finishResolve(const std::string& host,
+                                 std::list<Network::DnsResponse>&& response) {
+  ENVOY_LOG(debug, "main thread resolve complete for host '{}'. {} results", host, response.size());
   const auto primary_host_it = primary_hosts_.find(host);
   ASSERT(primary_host_it != primary_hosts_.end());
 
@@ -149,10 +157,16 @@ void DnsCacheImpl::finishResolve(
         std::make_shared<DnsHostInfoImpl>(main_thread_dispatcher_.timeSource());
   }
 
-  const auto new_address =
-      !address_list.empty()
-          ? Network::Utility::getAddressWithPort(*address_list.front(), primary_host_info.port_)
-          : nullptr;
+  const auto new_address = !response.empty()
+                               ? Network::Utility::getAddressWithPort(*(response.front().address_),
+                                                                      primary_host_info.port_)
+                               : nullptr;
+
+  if (response.empty()) {
+    stats_.dns_query_failure_.inc();
+  } else {
+    stats_.dns_query_success_.inc();
+  }
 
   // Only the change the address if:
   // 1) The new address is valid &&
@@ -168,6 +182,7 @@ void DnsCacheImpl::finishResolve(
     primary_host_info.host_info_->address_ = new_address;
     runAddUpdateCallbacks(host, primary_host_info.host_info_);
     address_changed = true;
+    stats_.host_address_changed_.inc();
   }
 
   if (first_resolve || address_changed) {
@@ -229,6 +244,20 @@ void DnsCacheImpl::ThreadLocalHostInfo::updateHostMap(const TlsHostMapSharedPtr&
       ++pending_resolution_it;
     }
   }
+}
+
+DnsCacheImpl::PrimaryHostInfo::PrimaryHostInfo(DnsCacheImpl& parent,
+                                               absl::string_view host_to_resolve, uint16_t port,
+                                               const Event::TimerCb& timer_cb)
+    : parent_(parent), host_to_resolve_(host_to_resolve), port_(port),
+      refresh_timer_(parent.main_thread_dispatcher_.createTimer(timer_cb)) {
+  parent_.stats_.host_added_.inc();
+  parent_.stats_.num_hosts_.inc();
+}
+
+DnsCacheImpl::PrimaryHostInfo::~PrimaryHostInfo() {
+  parent_.stats_.host_removed_.inc();
+  parent_.stats_.num_hosts_.dec();
 }
 
 } // namespace DynamicForwardProxy

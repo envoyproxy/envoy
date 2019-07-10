@@ -19,7 +19,7 @@ extensions/filters/common/original_src @snowp @klarose
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
-/*/extensions/filters/http/grpc_http1_reverse_bridge @snowp
+/*/extensions/filters/http/grpc_http1_reverse_bridge @snowp @zuercher
 # header_to_metadata extension
 /*/extensions/filters/http/header_to_metadata @rgs1 @zuercher
 # alts transport socket extension

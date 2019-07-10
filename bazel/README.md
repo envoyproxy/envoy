@@ -350,6 +350,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * Hot restart with `--define hot_restart=disabled`
 * Google C++ gRPC client with `--define google_grpc=disabled`
 * Backtracing on signals with `--define signal_trace=disabled`
+* Active stream state dump on signals with `--define signal_trace=disabled` or `--define disable_object_dump_on_signal_trace=disabled`
 * tcmalloc with `--define tcmalloc=disabled`
 
 ## Enabling optional features
@@ -483,7 +484,7 @@ resources, you can override Bazel's default job parallelism determination with
 `--jobs=N` to restrict the build to at most `N` simultaneous jobs, e.g.:
 
 ```
-bazel build --jobs=2 //source/...
+bazel build --jobs=2 //source/exe:envoy-static
 ```
 
 # Debugging the Bazel build
@@ -492,19 +493,19 @@ When trying to understand what Bazel is doing, the `-s` and `--explain` options
 are useful. To have Bazel provide verbose output on which commands it is executing:
 
 ```
-bazel build -s //source/...
+bazel build -s //source/exe:envoy-static
 ```
 
 To have Bazel emit to a text file the rationale for rebuilding a target:
 
 ```
-bazel build --explain=file.txt //source/...
+bazel build --explain=file.txt //source/exe:envoy-static
 ```
 
 To get more verbose explanations:
 
 ```
-bazel build --explain=file.txt --verbose_explanations //source/...
+bazel build --explain=file.txt --verbose_explanations //source/exe:envoy-static
 ```
 
 # Resolving paths in bazel build output

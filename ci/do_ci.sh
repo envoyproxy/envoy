@@ -107,7 +107,7 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   if [[ "$TEST_TARGETS" == "//test/..." ]]; then
     # We have various test binaries in the test directory such as tools, benchmarks, etc. We
     # run a build pass to make sure they compile.
-    bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
+    bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/exe:envoy-static //test/...
   fi
   # Now run all of the tests which should already be compiled.
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c opt ${TEST_TARGETS}
@@ -205,9 +205,9 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   echo "bazel with different compiletime options build with tests..."
   # Building all the dependencies from scratch to link them against libc++.
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //source/exe:envoy-static
+  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //source/exe:envoy-static --build_tag_filters=-nofips
   echo "Building and testing ${TEST_TARGETS}"
-  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg ${TEST_TARGETS}
+  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg ${TEST_TARGETS} --test_tag_filters=-nofips --build_tests_only
 
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
   # these tests under "-c opt" to save time in CI.
@@ -246,7 +246,7 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
 
   # gcovr is a pain to run with `bazel run`, so package it up into a
   # relocatable and hermetic-ish .par file.
-  bazel build @com_github_gcovr_gcovr//:gcovr.par
+  bazel build --python_version=PY2 @com_github_gcovr_gcovr//:gcovr.par
   export GCOVR="/tmp/gcovr.par"
   cp -f "${ENVOY_SRCDIR}/bazel-bin/external/com_github_gcovr_gcovr/gcovr.par" ${GCOVR}
 
