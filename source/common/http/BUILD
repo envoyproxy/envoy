@@ -231,6 +231,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:header_map_interface",
         "//source/common/singleton:const_singleton",
+        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 
