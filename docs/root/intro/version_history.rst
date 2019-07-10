@@ -1,6 +1,9 @@
 Version history
 ---------------
 
+1.12.0 (pending)
+================
+
 1.11.0 (July 11, 2019)
 ======================
 * access log: added a new field for downstream TLS session ID to file and gRPC access logger.

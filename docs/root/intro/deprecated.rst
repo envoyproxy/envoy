@@ -10,6 +10,10 @@ The following features have been DEPRECATED and will be removed in the specified
 A logged warning is expected for each deprecated item that is in deprecation window.
 Deprecated items below are listed in chronological order.
 
+Version 1.12.0 (pending)
+========================
+
+
 Version 1.11.0 (July 11, 2019)
 ==============================
 * The --max-stats and --max-obj-name-len flags no longer has any effect.
