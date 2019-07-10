@@ -5,15 +5,50 @@
 #include "envoy/http/header_map.h"
 
 #include "common/singleton/const_singleton.h"
+#include "common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 namespace Http {
+
+// This class allows early override of the x-envoy prefix from bootstrap config,
+// so that servers can configure their own x-custom-string prefix.
+//
+// Once the HeaderValues const singleton has been created, changing the prefix
+// is disallowed. Essentially this is write-once then read-only.
+class PrefixValue {
+public:
+  const char* prefix() {
+    absl::WriterMutexLock lock(&m_);
+    read_ = true;
+    return prefix_.c_str();
+  }
+
+  // The char* prefix is used directly, so must be available for the interval where prefix() may be
+  // called.
+  void setPrefix(const char* prefix) {
+    absl::WriterMutexLock lock(&m_);
+    // The check for unchanged string is purely for integration tests - this
+    // should not happen in production.
+    RELEASE_ASSERT(!read_ || prefix_ == std::string(prefix),
+                   "Attempting to change the header prefix after it has been used!");
+    if (!read_) {
+      prefix_ = prefix;
+    }
+  }
+
+private:
+  absl::Mutex m_;
+  bool read_ = false;
+  std::string prefix_ = "x-envoy";
+};
 
 /**
  * Constant HTTP headers and values. All lower case.
  */
 class HeaderValues {
 public:
+  const char* prefix() { return ThreadSafeSingleton<PrefixValue>::get().prefix(); }
+
   const LowerCaseString Accept{"accept"};
   const LowerCaseString AcceptEncoding{"accept-encoding"};
   const LowerCaseString AccessControlRequestHeaders{"access-control-request-headers"};
@@ -35,41 +70,49 @@ public:
   const LowerCaseString ContentType{"content-type"};
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
-  const LowerCaseString EnvoyAttemptCount{"x-envoy-attempt-count"};
-  const LowerCaseString EnvoyAuthPartialBody{"x-envoy-auth-partial-body"};
-  const LowerCaseString EnvoyCluster{"x-envoy-cluster"};
-  const LowerCaseString EnvoyDegraded{"x-envoy-degraded"};
-  const LowerCaseString EnvoyDownstreamServiceCluster{"x-envoy-downstream-service-cluster"};
-  const LowerCaseString EnvoyDownstreamServiceNode{"x-envoy-downstream-service-node"};
-  const LowerCaseString EnvoyExternalAddress{"x-envoy-external-address"};
-  const LowerCaseString EnvoyForceTrace{"x-envoy-force-trace"};
-  const LowerCaseString EnvoyHedgeOnPerTryTimeout{"x-envoy-hedge-on-per-try-timeout"};
-  const LowerCaseString EnvoyImmediateHealthCheckFail{"x-envoy-immediate-health-check-fail"};
-  const LowerCaseString EnvoyOriginalUrl{"x-envoy-original-url"};
-  const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
-  const LowerCaseString EnvoyIpTags{"x-envoy-ip-tags"};
-  const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
-  const LowerCaseString EnvoyNotForwarded{"x-envoy-not-forwarded"};
-  const LowerCaseString EnvoyOriginalDstHost{"x-envoy-original-dst-host"};
-  const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
-  const LowerCaseString EnvoyOverloaded{"x-envoy-overloaded"};
-  const LowerCaseString EnvoyRateLimited{"x-envoy-ratelimited"};
-  const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
-  const LowerCaseString EnvoyRetryGrpcOn{"x-envoy-retry-grpc-on"};
-  const LowerCaseString EnvoyRetriableStatusCodes{"x-envoy-retriable-status-codes"};
-  const LowerCaseString EnvoyUpstreamAltStatName{"x-envoy-upstream-alt-stat-name"};
-  const LowerCaseString EnvoyUpstreamCanary{"x-envoy-upstream-canary"};
-  const LowerCaseString EnvoyUpstreamHostAddress{"x-envoy-upstream-host-address"};
-  const LowerCaseString EnvoyUpstreamHostname{"x-envoy-upstream-hostname"};
+  const LowerCaseString EnvoyAttemptCount{absl::StrCat(prefix(), "-attempt-count")};
+  const LowerCaseString EnvoyAuthPartialBody{absl::StrCat(prefix(), "-auth-partial-body")};
+  const LowerCaseString EnvoyCluster{absl::StrCat(prefix(), "-cluster")};
+  const LowerCaseString EnvoyDegraded{absl::StrCat(prefix(), "-degraded")};
+  const LowerCaseString EnvoyDownstreamServiceCluster{
+      absl::StrCat(prefix(), "-downstream-service-cluster")};
+  const LowerCaseString EnvoyDownstreamServiceNode{
+      absl::StrCat(prefix(), "-downstream-service-node")};
+  const LowerCaseString EnvoyExternalAddress{absl::StrCat(prefix(), "-external-address")};
+  const LowerCaseString EnvoyForceTrace{absl::StrCat(prefix(), "-force-trace")};
+  const LowerCaseString EnvoyHedgeOnPerTryTimeout{
+      absl::StrCat(prefix(), "-hedge-on-per-try-timeout")};
+  const LowerCaseString EnvoyImmediateHealthCheckFail{
+      absl::StrCat(prefix(), "-immediate-health-check-fail")};
+  const LowerCaseString EnvoyOriginalUrl{absl::StrCat(prefix(), "-original-url")};
+  const LowerCaseString EnvoyInternalRequest{absl::StrCat(prefix(), "-internal")};
+  const LowerCaseString EnvoyIpTags{absl::StrCat(prefix(), "-ip-tags")};
+  const LowerCaseString EnvoyMaxRetries{absl::StrCat(prefix(), "-max-retries")};
+  const LowerCaseString EnvoyNotForwarded{absl::StrCat(prefix(), "-not-forwarded")};
+  const LowerCaseString EnvoyOriginalDstHost{absl::StrCat(prefix(), "-original-dst-host")};
+  const LowerCaseString EnvoyOriginalPath{absl::StrCat(prefix(), "-original-path")};
+  const LowerCaseString EnvoyOverloaded{absl::StrCat(prefix(), "-overloaded")};
+  const LowerCaseString EnvoyRateLimited{absl::StrCat(prefix(), "-ratelimited")};
+  const LowerCaseString EnvoyRetryOn{absl::StrCat(prefix(), "-retry-on")};
+  const LowerCaseString EnvoyRetryGrpcOn{absl::StrCat(prefix(), "-retry-grpc-on")};
+  const LowerCaseString EnvoyRetriableStatusCodes{
+      absl::StrCat(prefix(), "-retriable-status-codes")};
+  const LowerCaseString EnvoyUpstreamAltStatName{absl::StrCat(prefix(), "-upstream-alt-stat-name")};
+  const LowerCaseString EnvoyUpstreamCanary{absl::StrCat(prefix(), "-upstream-canary")};
+  const LowerCaseString EnvoyUpstreamHostAddress{absl::StrCat(prefix(), "-upstream-host-address")};
+  const LowerCaseString EnvoyUpstreamHostname{absl::StrCat(prefix(), "-upstream-hostname")};
   const LowerCaseString EnvoyUpstreamRequestTimeoutAltResponse{
-      "x-envoy-upstream-rq-timeout-alt-response"};
-  const LowerCaseString EnvoyUpstreamRequestTimeoutMs{"x-envoy-upstream-rq-timeout-ms"};
+      absl::StrCat(prefix(), "-upstream-rq-timeout-alt-response")};
+  const LowerCaseString EnvoyUpstreamRequestTimeoutMs{
+      absl::StrCat(prefix(), "-upstream-rq-timeout-ms")};
   const LowerCaseString EnvoyUpstreamRequestPerTryTimeoutMs{
-      "x-envoy-upstream-rq-per-try-timeout-ms"};
-  const LowerCaseString EnvoyExpectedRequestTimeoutMs{"x-envoy-expected-rq-timeout-ms"};
-  const LowerCaseString EnvoyUpstreamServiceTime{"x-envoy-upstream-service-time"};
-  const LowerCaseString EnvoyUpstreamHealthCheckedCluster{"x-envoy-upstream-healthchecked-cluster"};
-  const LowerCaseString EnvoyDecoratorOperation{"x-envoy-decorator-operation"};
+      absl::StrCat(prefix(), "-upstream-rq-per-try-timeout-ms")};
+  const LowerCaseString EnvoyExpectedRequestTimeoutMs{
+      absl::StrCat(prefix(), "-expected-rq-timeout-ms")};
+  const LowerCaseString EnvoyUpstreamServiceTime{absl::StrCat(prefix(), "-upstream-service-time")};
+  const LowerCaseString EnvoyUpstreamHealthCheckedCluster{
+      absl::StrCat(prefix(), "-upstream-healthchecked-cluster")};
+  const LowerCaseString EnvoyDecoratorOperation{absl::StrCat(prefix(), "-decorator-operation")};
   const LowerCaseString Etag{"etag"};
   const LowerCaseString Expect{"expect"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};

@@ -270,6 +270,13 @@ void InstanceImpl::initialize(const Options& options,
   InstanceUtil::loadBootstrapConfig(bootstrap_, options, messageValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
+  // Immediate after the bootstrap has been loaded, override the header prefix, if configured to
+  // do so. This must be set before any other code block references the HeaderValues ConstSingleton.
+  if (!bootstrap_.header_prefix().empty()) {
+    // setPrefix has a release assert verifying that setPrefix() is not called after prefix()
+    ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix(bootstrap_.header_prefix().c_str());
+  }
+
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));

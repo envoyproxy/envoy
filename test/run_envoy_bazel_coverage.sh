@@ -34,7 +34,15 @@ fi
 # This is where we are going to copy the .gcno files into.
 GCNO_ROOT=bazel-out/k8-dbg/bin/test/coverage/coverage_tests.runfiles/"${WORKSPACE}"
 echo "    GCNO_ROOT=${GCNO_ROOT}"
-rm -rf ${GCNO_ROOT}
+
+echo "Cleaning .gcno from previous coverage runs..."
+NUM_PREVIOUS_GCNO_FILES=0
+for f in $(find -L "${GCNO_ROOT}" -name "*.gcno")
+do
+  rm -f "${f}"
+  let NUM_PREVIOUS_GCNO_FILES=NUM_PREVIOUS_GCNO_FILES+1
+done
+echo "Cleanup completed. ${NUM_PREVIOUS_GCNO_FILES} files deleted."
 
 # Make sure //test/coverage:coverage_tests is up-to-date.
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
