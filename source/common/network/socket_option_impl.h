@@ -91,8 +91,7 @@ static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
 
 // Both Linux and FreeBSD use IPV6_RECVPKTINFO for both sending source address and
 // receiving destination address.
-#define ENVOY_SELF_IPV6_ADDR                                                                       \
-  ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_RECVPKTINFO)
+#define ENVOY_SELF_IPV6_ADDR ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_RECVPKTINFO)
 
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
