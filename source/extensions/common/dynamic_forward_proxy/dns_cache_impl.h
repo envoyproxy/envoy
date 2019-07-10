@@ -71,18 +71,20 @@ private:
   };
 
   struct DnsHostInfoImpl : public DnsHostInfo {
-    DnsHostInfoImpl(TimeSource& time_source, absl::string_view resolved_host)
-        : time_source_(time_source), resolved_host_(resolved_host) {
+    DnsHostInfoImpl(TimeSource& time_source, absl::string_view resolved_host, bool is_ip_address)
+        : time_source_(time_source), resolved_host_(resolved_host), is_ip_address_(is_ip_address) {
       touch();
     }
 
     // DnsHostInfo
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
     const std::string& resolvedHost() override { return resolved_host_; }
+    bool isIpAddress() override { return is_ip_address_; }
     void touch() override { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
 
     TimeSource& time_source_;
     const std::string resolved_host_;
+    const bool is_ip_address_;
     bool first_resolve_complete_{};
     Network::Address::InstanceConstSharedPtr address_;
     // Using std::chrono::steady_clock::duration is required for compilation within an atomic vs.
@@ -95,7 +97,7 @@ private:
   // Primary host information that accounts for TTL, re-resolution, etc.
   struct PrimaryHostInfo {
     PrimaryHostInfo(DnsCacheImpl& parent, absl::string_view host_to_resolve, uint16_t port,
-                    const Event::TimerCb& timer_cb);
+                    bool is_ip_address, const Event::TimerCb& timer_cb);
     ~PrimaryHostInfo();
 
     DnsCacheImpl& parent_;

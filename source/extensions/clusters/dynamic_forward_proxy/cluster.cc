@@ -84,10 +84,10 @@ void Cluster::onDnsHostAddOrUpdate(
 
   // Create an override transport socket options that automatically provides both SNI as well as
   // SAN verification for the resolved host if the cluster has been configured with TLS.
-  // TODO(mattklein123): If the host is an IP address we should not set SNI.
   Network::TransportSocketOptionsSharedPtr transport_socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
-          host_info->resolvedHost(), std::vector<std::string>{host_info->resolvedHost()});
+          !host_info->isIpAddress() ? host_info->resolvedHost() : "",
+          std::vector<std::string>{host_info->resolvedHost()});
 
   const auto new_host_map = std::make_shared<HostInfoMap>(*current_map);
   const auto emplaced =
