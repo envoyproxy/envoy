@@ -89,7 +89,7 @@ stages:
           - script: git checkout master && git pull origin master
           - script: ./ci/linux_ci_setup.sh
             displayName: 'Install dependencies'
-          - script: bazel build //test/performance:test_binary_size --config=sizeopt
+          - script: ./bazelw build //test/performance:test_binary_size --config=sizeopt
             displayName: 'Build test binary'
           - task: PublishPipelineArtifact@0
             displayName: 'Publish master test binary'
