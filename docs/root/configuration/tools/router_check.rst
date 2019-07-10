@@ -46,11 +46,12 @@ expects a cluster name match of "instant-server".::
   - test_name: ...,
     input:
       authority: ...,
-      path": ...,
-      method": ...,
-      internal" : ...,
-      random_value" : ...,
-      ssl" : ...,
+      path: ...,
+      method: ...,
+      internal: ...,
+      random_value: ...,
+      ssl: ...,
+      runtime: ...,
       - additional_headers:
           key: ...,
           value: ...
@@ -96,6 +97,12 @@ input
     By setting x-forwarded-proto to a given protocol, the tool is able to simulate the behavior of
     a client issuing a request via http or https. By default ssl is false which corresponds to
     x-forwarded-proto set to http.
+
+  runtime
+    *(optional, string)* A string representing the runtime setting to enable for the test. The runtime
+    setting along with the random_value is used by the router to decide if the route should be enabled.
+    Only a random_value lesser than the fractional percentage defined on the route entry enables the
+    route.
 
   additional_headers
     *(optional, array)*  Additional headers to be added as input for route determination. The "authority",
