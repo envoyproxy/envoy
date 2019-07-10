@@ -72,7 +72,6 @@ void FilterChainManagerImpl::addFilterChain(
       }
     }
 
-    // TODO(silentdai): use absl::Span to avoid vector construction at server_names and alpn
     addFilterChainForDestinationPorts(
         destination_ports_map_,
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
