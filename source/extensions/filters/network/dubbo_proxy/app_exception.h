@@ -27,12 +27,12 @@ struct AppExceptionBase : public EnvoyException,
                       Buffer::Instance& buffer) const override {
     ASSERT(buffer.length() == 0);
 
-    ENVOY_LOG(debug, "err {}", what());
+    ENVOY_LOG(debug, "Exception information: {}", what());
 
     metadata.setResponseStatus<T>(status_);
     metadata.setMessageType(MessageType::Response);
     if (!protocol.encode(buffer, metadata, what(), response_type_)) {
-      throw EnvoyException("failed to encode local reply message");
+      throw EnvoyException("Failed to encode local reply message");
     }
 
     return ResponseType::Exception;

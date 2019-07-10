@@ -135,7 +135,6 @@ class RpcResult {
 public:
   virtual ~RpcResult() = default;
   virtual bool hasException() const PURE;
-  virtual bool hasValue() const PURE;
 };
 
 using RpcResultSharedPtr = std::shared_ptr<RpcResult>;

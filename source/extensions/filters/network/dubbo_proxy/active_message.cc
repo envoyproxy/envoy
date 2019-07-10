@@ -300,8 +300,7 @@ FilterStatus ActiveMessage::applyDecoderFilters(ActiveMessageDecoderFilter* filt
                                                 FilterIterationStartState state) {
   ASSERT(filter_action_ != nullptr);
   if (!local_response_sent_) {
-    std::list<ActiveMessageDecoderFilterPtr>::iterator entry = commonDecodePrefix(filter, state);
-    for (; entry != decoder_filters_.end(); entry++) {
+    for (auto entry = commonDecodePrefix(filter, state); entry != decoder_filters_.end(); entry++) {
       const FilterStatus status = filter_action_((*entry)->handler().get());
       if (local_response_sent_) {
         break;
@@ -323,8 +322,7 @@ FilterStatus ActiveMessage::applyEncoderFilters(ActiveMessageEncoderFilter* filt
   ASSERT(encoder_filter_action_ != nullptr);
 
   if (!local_response_sent_) {
-    std::list<ActiveMessageEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, state);
-    for (; entry != encoder_filters_.end(); entry++) {
+    for (auto entry = commonEncodePrefix(filter, state); entry != encoder_filters_.end(); entry++) {
       const FilterStatus status = encoder_filter_action_((*entry)->handler().get());
       if (local_response_sent_) {
         break;

@@ -56,14 +56,14 @@ DubboHessian2SerializerImpl::deserializeRpcResult(Buffer::Instance& buffer,
   case RpcResponseType::ResponseWithException:
   case RpcResponseType::ResponseWithExceptionWithAttachments:
   case RpcResponseType::ResponseWithValue:
-    result->SetException(true);
+    result->setException(true);
     break;
   case RpcResponseType::ResponseWithNullValue:
     has_value = false;
     FALLTHRU;
   case RpcResponseType::ResponseValueWithAttachments:
   case RpcResponseType::ResponseNullValueWithAttachments:
-    result->SetException(false);
+    result->setException(false);
     break;
   default:
     throw EnvoyException(fmt::format("not supported return type {}", static_cast<uint8_t>(type)));

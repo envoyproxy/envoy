@@ -52,9 +52,7 @@ public:
   ~RpcResultImpl() override = default;
 
   bool hasException() const override { return has_exception_; }
-  void SetException(bool has_exception) { has_exception_ = has_exception; }
-
-  bool hasValue() const override { return false; }
+  void setException(bool has_exception) { has_exception_ = has_exception; }
 
 private:
   bool has_exception_ = false;
