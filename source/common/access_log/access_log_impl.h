@@ -233,9 +233,9 @@ public:
    * Create a particular extension filter implementation from a config proto. If the
    * implementation is unable to produce a filter with the provided parameters, it should throw an
    * EnvoyException. The returned pointer should never be nullptr.
-   * @param config the custom configuration for this filter type.
-   * @param runtime passed through from FilterFactory.
-   * @param random passed through from FilterFactory
+   * @param config supplies the custom configuration for this filter type.
+   * @param runtime supplies the runtime loader.
+   * @param random supplies the random generator.
    */
   virtual FilterPtr
   createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,

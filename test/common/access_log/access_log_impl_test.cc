@@ -1139,8 +1139,7 @@ public:
   ~TestHeaderFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
-                         Runtime::Loader& /* runtime */,
-                         Runtime::RandomGenerator& /* random */) override {
+                         Runtime::Loader&, Runtime::RandomGenerator&) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
     const auto& header_config =
@@ -1171,14 +1170,14 @@ config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr logger = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
-  request_headers_.addCopy("test-header", "present");
+  request_headers_.addCopy("test-header", "foo/bar");
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 /**
@@ -1189,10 +1188,8 @@ public:
   SampleExtensionFilter(size_t sample_rate) : sample_rate_(sample_rate) {}
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& /* info */,
-                const Http::HeaderMap& /* request_headers */,
-                const Http::HeaderMap& /* response_headers */,
-                const Http::HeaderMap& /* response_trailers */) override {
+  bool evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap&, const Http::HeaderMap&,
+                const Http::HeaderMap&) override {
     if (current_++ == 0) {
       return true;
     }
@@ -1215,8 +1212,7 @@ public:
   ~SampleExtensionFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
-                         Runtime::Loader& /* runtime */,
-                         Runtime::RandomGenerator& /* random */) override {
+                         Runtime::Loader&, Runtime::RandomGenerator&) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
     const Json::ObjectSharedPtr filter_config =
@@ -1245,16 +1241,16 @@ config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr logger = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
   // For rate=5 expect 1st request to be recorded, 2nd-5th skipped, and 6th recorded.
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   for (int i = 2; i <= 5; ++i) {
     EXPECT_CALL(*file_, write(_)).Times(0);
-    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+    logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   }
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
 TEST_F(AccessLogImplTest, UnregisteredExtensionFilter) {
