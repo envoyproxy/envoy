@@ -261,7 +261,7 @@ public:
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     if (expected_option.has_value()) {
       expectCreateListenSocket(expected_state, expected_num_options);
-      expectSetsockopt(os_sys_calls, expected_option.value().first, expected_option.value().second,
+      expectSetsockopt(os_sys_calls, expected_option.level(), expected_option.option(),
                        expected_value, expected_num_options);
       manager_->addOrUpdateListener(listener, "", true);
       EXPECT_EQ(1U, manager_->listeners().size());
@@ -2352,7 +2352,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappi
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
                             EnvoyException,
-                            "error adding listener: multiple filter chains with "
+                            "error adding listener '127.0.0.1:1234': multiple filter chains with "
                             "overlapping matching rules are defined");
 }
 

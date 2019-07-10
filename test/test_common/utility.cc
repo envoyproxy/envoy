@@ -160,11 +160,33 @@ void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name,
   }
 }
 
-std::list<Network::Address::InstanceConstSharedPtr>
-TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
-  std::list<Network::Address::InstanceConstSharedPtr> ret;
+void TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
+                                   Event::TestTimeSystem& time_system) {
+  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+void TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
+                                 Event::TestTimeSystem& time_system) {
+  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+void TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
+                                 Event::TestTimeSystem& time_system) {
+  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+std::list<Network::DnsResponse>
+TestUtility::makeDnsResponse(const std::list<std::string>& addresses, std::chrono::seconds ttl) {
+  std::list<Network::DnsResponse> ret;
   for (const auto& address : addresses) {
-    ret.emplace_back(Network::Utility::parseInternetAddress(address));
+
+    ret.emplace_back(Network::DnsResponse(Network::Utility::parseInternetAddress(address), ttl));
   }
   return ret;
 }

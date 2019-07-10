@@ -13,8 +13,7 @@ class DirectoryIteratorImpl : public DirectoryIterator {
 public:
   DirectoryIteratorImpl(const std::string& directory_path);
   DirectoryIteratorImpl()
-      : DirectoryIterator(), directory_path_(""), dir_(nullptr),
-        os_sys_calls_(Api::OsSysCallsSingleton::get()) {}
+      : directory_path_(""), dir_(nullptr), os_sys_calls_(Api::OsSysCallsSingleton::get()) {}
 
   ~DirectoryIteratorImpl();
 

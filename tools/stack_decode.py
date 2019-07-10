@@ -11,6 +11,7 @@
 # In each case this script will add file and line information to any backtrace log
 # lines found and echo back all non-Backtrace lines untouched.
 
+from __future__ import print_function
 import collections
 import re
 import subprocess
@@ -73,6 +74,6 @@ if __name__ == "__main__":
     rununder.wait()
     sys.exit(rununder.returncode)  # Pass back test pass/fail result
   else:
-    print "Usage (execute subprocess): stack_decode.py executable_file [additional args]"
-    print "Usage (read from stdin): stack_decode.py -s executable_file"
+    print("Usage (execute subprocess): stack_decode.py executable_file [additional args]")
+    print("Usage (read from stdin): stack_decode.py -s executable_file")
     sys.exit(1)

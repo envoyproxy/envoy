@@ -42,6 +42,7 @@ TEST_F(MetricImplTest, OneTag) {
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("name", tags[0].name_);
   EXPECT_EQ("value", tags[0].value_);
+  EXPECT_EQ("counter.name.value", counter->name());
   EXPECT_EQ("counter", counter->tagExtractedName());
   EXPECT_EQ(makeStat("counter"), counter->tagExtractedStatName());
 }

@@ -6,6 +6,7 @@
 #include <string>
 
 #include "common/common/assert.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
 #include "common/singleton/const_singleton.h"
@@ -54,7 +55,7 @@ HeaderString::HeaderString(const std::string& ref_value) : type_(Type::Reference
   ASSERT(valid());
 }
 
-HeaderString::HeaderString(HeaderString&& move_value) {
+HeaderString::HeaderString(HeaderString&& move_value) noexcept {
   type_ = move_value.type_;
   string_length_ = move_value.string_length_;
   switch (move_value.type_) {
@@ -552,6 +553,20 @@ void HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
     }
     return to_remove;
   });
+}
+
+void HeaderMapImpl::dumpState(std::ostream& os, int indent_level) const {
+  using IterateData = std::pair<std::ostream*, const char*>;
+  const char* spaces = spacesForLevel(indent_level);
+  IterateData iterate_data = std::make_pair(&os, spaces);
+  iterate(
+      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+        auto* data = static_cast<IterateData*>(context);
+        *data->first << data->second << "'" << header.key().getStringView() << "', '"
+                     << header.value().getStringView() << "'\n";
+        return HeaderMap::Iterate::Continue;
+      },
+      &iterate_data);
 }
 
 HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl** entry,

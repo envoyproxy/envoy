@@ -25,8 +25,7 @@ std::vector<uint8_t> Utility::getSha256Digest(const Buffer::Instance& buffer) {
     rc = EVP_DigestUpdate(ctx, slice.mem_, slice.len_);
     RELEASE_ASSERT(rc == 1, "Failed to update digest");
   }
-  unsigned int len;
-  rc = EVP_DigestFinal(ctx, digest.data(), &len);
+  rc = EVP_DigestFinal(ctx, digest.data(), nullptr);
   RELEASE_ASSERT(rc == 1, "Failed to finalize digest");
   EVP_MD_CTX_free(ctx);
   return digest;
@@ -35,10 +34,9 @@ std::vector<uint8_t> Utility::getSha256Digest(const Buffer::Instance& buffer) {
 std::vector<uint8_t> Utility::getSha256Hmac(const std::vector<uint8_t>& key,
                                             absl::string_view message) {
   std::vector<uint8_t> hmac(SHA256_DIGEST_LENGTH);
-  unsigned int len;
   const auto ret =
       HMAC(EVP_sha256(), key.data(), key.size(), reinterpret_cast<const uint8_t*>(message.data()),
-           message.size(), hmac.data(), &len);
+           message.size(), hmac.data(), nullptr);
   RELEASE_ASSERT(ret != nullptr, "Failed to create HMAC");
   return hmac;
 }

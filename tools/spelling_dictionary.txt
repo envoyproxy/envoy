@@ -18,6 +18,7 @@ CB
 CBs
 CDS
 CHACHA
+CHLO
 CIDR
 CLA
 CLI
@@ -104,6 +105,7 @@ GOAWAY
 GRPC
 GTEST
 GiB
+GURL
 HC
 HCM
 HDS
@@ -164,6 +166,7 @@ NOAUTH
 NOLINT
 NOLINTNEXTLINE
 NONCES
+NOSORT
 NS
 NUL
 Nilsson
@@ -225,6 +228,7 @@ Runn
 SA
 SAN
 SANs
+SCT
 SDK
 SDS
 SENDSRCADDR
@@ -266,6 +270,7 @@ TPROXY
 TSAN
 TSI
 TTL
+TTLs
 TX
 TXT
 UA
@@ -289,7 +294,10 @@ WS
 Welford's
 Werror
 XDS
+decRefCount
+getaddrinfo
 sendto
+upcasts
 vip
 xDSes
 XFCC
@@ -540,6 +548,7 @@ keepalives
 ketama
 kqueue
 kubernetes
+kv
 kvs
 lala
 latencies

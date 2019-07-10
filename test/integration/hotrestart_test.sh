@@ -8,8 +8,8 @@ source "$TEST_RUNDIR/test/integration/test_utility.sh"
 JSON_TEST_ARRAY=()
 
 # Ensure that the runtime watch root exist.
-mkdir -p "${TEST_RUNDIR}"/test/common/runtime/test_data/current/envoy
-mkdir -p "${TEST_RUNDIR}"/test/common/runtime/test_data/current/envoy_override
+mkdir -p "${TEST_TMPDIR}"/test/common/runtime/test_data/current/envoy
+mkdir -p "${TEST_TMPDIR}"/test/common/runtime/test_data/current/envoy_override
 
 # Parameterize IPv4 and IPv6 testing.
 if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "all" ]] \

@@ -67,9 +67,6 @@ Output
     locations ats cluster_name
     Test_6
 
-  Testing with valid :ref:`runtime values <envoy_api_field_route.RouteMatch.runtime_fraction>` is not currently supported,
-  this may be added in future work.
-
 Building
   The tool can be built locally using Bazel. ::
 

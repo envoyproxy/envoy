@@ -208,7 +208,7 @@ public:
   bool use_rds_with_vhosts{false};
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, VhdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // tests a scenario when:
 //  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts
