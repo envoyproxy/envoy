@@ -35,18 +35,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "base_connection_pool_test",
-    srcs = ["base_connection_pool_test.cc"],
-    deps = [
-        "//source/common/http:conn_pool_base_lib",
-        "//test/common/upstream:utility_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-    ],
-)
-
-envoy_cc_test(
     name = "codec_client_test",
     srcs = ["codec_client_test.cc"],
     deps = [
