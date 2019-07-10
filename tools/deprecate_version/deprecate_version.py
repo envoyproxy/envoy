@@ -31,6 +31,11 @@ import sys
 import github
 from git import Repo
 
+try:
+  input = raw_input  # Python 2
+except NameError:
+  pass  # Python 3
+
 # Tag issues created with these labels.
 LABELS = ['deprecation', 'tech debt', 'no stalebot']
 
