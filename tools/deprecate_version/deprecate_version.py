@@ -143,7 +143,7 @@ def GetRuntimeAndPr():
   # grep source code looking for reloadable features which are true to find the
   # PR they were added.
   grep_output = subprocess.check_output(
-      'grep -r "envoy.reloadable_features\." source/*', shell=True)
+      'grep -r "envoy.reloadable_features\." source/', shell=True)
   features_to_flip = []
   runtime_feature_regex = re.compile(r'.*(source.*cc).*"(envoy.reloadable_features\.[^"]+)".*')
   for line in grep_output.splitlines():
