@@ -19,7 +19,7 @@ namespace Network {
 // SocketOptionName is an optional value that captures the setsockopt(2)
 // arguments. The idea here is that if a socket option is not supported
 // on a platform, we can make this the empty value, which allows us to
-// avoid #ifdef proliferation of #ifdef.
+// avoid #ifdef proliferation.
 struct SocketOptionName {
   SocketOptionName() = default;
   SocketOptionName(const SocketOptionName&) = default;
