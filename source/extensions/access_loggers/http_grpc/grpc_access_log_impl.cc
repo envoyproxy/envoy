@@ -326,8 +326,7 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
     request_properties->set_scheme(std::string(request_headers.Scheme()->value().getStringView()));
   }
   if (request_headers.Host() != nullptr) {
-    request_properties->set_authority(
-        std::string(request_headers.Host()->value().getStringView()));
+    request_properties->set_authority(std::string(request_headers.Host()->value().getStringView()));
   }
   if (request_headers.Path() != nullptr) {
     request_properties->set_path(std::string(request_headers.Path()->value().getStringView()));
