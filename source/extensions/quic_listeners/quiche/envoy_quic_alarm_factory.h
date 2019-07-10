@@ -19,7 +19,7 @@ namespace Quic {
 
 class EnvoyQuicAlarmFactory : public quic::QuicAlarmFactory, NonCopyable {
 public:
-  EnvoyQuicAlarmFactory(Event::Scheduler& scheduler, quic::QuicClock& clock)
+  EnvoyQuicAlarmFactory(Event::Scheduler& scheduler, const quic::QuicClock& clock)
       : scheduler_(scheduler), clock_(clock) {}
 
   ~EnvoyQuicAlarmFactory() override = default;
@@ -32,7 +32,7 @@ public:
 
 private:
   Event::Scheduler& scheduler_;
-  quic::QuicClock& clock_;
+  const quic::QuicClock& clock_;
 };
 
 } // namespace Quic

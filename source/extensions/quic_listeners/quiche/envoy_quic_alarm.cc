@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace Quic {
 
-EnvoyQuicAlarm::EnvoyQuicAlarm(Event::Scheduler& scheduler, quic::QuicClock& clock,
+EnvoyQuicAlarm::EnvoyQuicAlarm(Event::Scheduler& scheduler, const quic::QuicClock& clock,
                                quic::QuicArenaScopedPtr<quic::QuicAlarm::Delegate> delegate)
     : QuicAlarm(std::move(delegate)), scheduler_(scheduler),
       timer_(scheduler_.createTimer([this]() { Fire(); })), clock_(clock) {}

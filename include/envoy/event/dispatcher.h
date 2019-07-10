@@ -199,6 +199,8 @@ public:
    * @return the watermark buffer factory for this dispatcher.
    */
   virtual Buffer::WatermarkFactory& getWatermarkFactory() PURE;
+
+  virtual Scheduler& scheduler() PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

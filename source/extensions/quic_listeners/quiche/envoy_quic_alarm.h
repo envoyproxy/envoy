@@ -16,7 +16,7 @@ namespace Quic {
 // wraps an Event::Timer object and provide interface for QUIC to interact with the timer.
 class EnvoyQuicAlarm : public quic::QuicAlarm {
 public:
-  EnvoyQuicAlarm(Event::Scheduler& scheduler, quic::QuicClock& clock,
+  EnvoyQuicAlarm(Event::Scheduler& scheduler, const quic::QuicClock& clock,
                  quic::QuicArenaScopedPtr<quic::QuicAlarm::Delegate> delegate);
 
   ~EnvoyQuicAlarm() override { ASSERT(!IsSet()); };
@@ -32,7 +32,7 @@ private:
 
   Event::Scheduler& scheduler_;
   Event::TimerPtr timer_;
-  quic::QuicClock& clock_;
+  const quic::QuicClock& clock_;
 };
 
 } // namespace Quic
