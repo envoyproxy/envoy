@@ -133,6 +133,17 @@ message Bootstrap {
   // over the wire individually because the statsd protocol doesn't have any way to represent a
   // histogram summary. Be aware that this can be a very large volume of data.
   bool enable_dispatcher_stats = 16;
+
+  // Optional string which will be used in lieu of x-envoy in prefixing headers.
+  //
+  // For example, if this string is present and set to X-Foo, then x-envoy-retry-on will be
+  // transformed into x-foo-retry-on etc.
+  //
+  // Note this applies to the headers Envoy will generate, the headers Envoy will sanitize, and the
+  // headers Envoy will trust for core code and core extensions only. Be VERY careful making
+  // changes to this string, especially in multi-layer Envoy deployments or deployments using
+  // extensions which are not upstream.
+  string header_prefix = 18;
 }
 
 // Administration interface :ref:`operations documentation
