@@ -13,8 +13,8 @@ struct Watch;
 using WatchPtr = std::unique_ptr<Watch>;
 
 struct AddedRemoved {
-  AddedRemoved(std::set<std::string> added, std::set<std::string> removed)
-      : added_(added), removed_(removed) {}
+  AddedRemoved(std::set<std::string>&& added, std::set<std::string>&& removed)
+      : added_(std::move(added)), removed_(std::move(removed)) {}
   std::set<std::string> added_;
   std::set<std::string> removed_;
 };
