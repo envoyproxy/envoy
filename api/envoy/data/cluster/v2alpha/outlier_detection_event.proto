@@ -47,12 +47,37 @@ message OutlierDetectionEvent {
 
 // Type of ejection that took place
 enum OutlierEjectionType {
-  // In case upstream host returns certain number of consecutive 5xx
+  // In case upstream host returns certain number of consecutive 5xx.
+  // If
+  // :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>`
+  // is *false*, all type of errors are treated as HTTP 5xx errors.
+  // See :ref:`Cluster outlier detection <arch_overview_outlier_detection>` documentation for
+  // details.
   CONSECUTIVE_5XX = 0;
   // In case upstream host returns certain number of consecutive gateway errors
   CONSECUTIVE_GATEWAY_FAILURE = 1;
   // Runs over aggregated success rate statistics from every host in cluster
+  // and selects hosts for which ratio of successful replies deviates from other hosts
+  // in the cluster.
+  // If
+  // :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>`
+  // is *false*, all errors (externally and locally generated) are used to calculate success rate
+  // statistics. See :ref:`Cluster outlier detection <arch_overview_outlier_detection>`
+  // documentation for details.
   SUCCESS_RATE = 2;
+  // Consecutive local origin failures: Connection failures, resets, timeouts, etc
+  // This type of ejection happens only when
+  // :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>`
+  // is set to *true*.
+  // See :ref:`Cluster outlier detection <arch_overview_outlier_detection>` documentation for
+  CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 3;
+  // Runs over aggregated success rate statistics for local origin failures
+  // for all hosts in the cluster and selects hosts for which success rate deviates from other
+  // hosts in the cluster. This type of ejection happens only when
+  // :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>`
+  // is set to *true*.
+  // See :ref:`Cluster outlier detection <arch_overview_outlier_detection>` documentation for
+  SUCCESS_RATE_LOCAL_ORIGIN = 4;
 }
 
 // Represents possible action applied to upstream host

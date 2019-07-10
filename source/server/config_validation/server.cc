@@ -13,6 +13,8 @@
 #include "common/protobuf/utility.h"
 #include "common/singleton/manager_impl.h"
 
+#include "server/ssl_context_manager.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -44,7 +46,7 @@ ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem
     : options_(options), stats_store_(store),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),
-      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
+      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
@@ -92,7 +94,7 @@ void ValidationInstance::initialize(const Options& options,
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>();
   ssl_context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(api_->timeSource());
+      createContextManager(Ssl::ContextManagerFactory::name(), api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
       dispatcher(), localInfo(), *secret_manager_, messageValidationVisitor(), *api_, http_context_,

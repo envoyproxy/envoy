@@ -101,6 +101,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_object_dump_on_signal_trace",
+    values = {"define": "object_dump_on_signal_trace=disabled"},
+)
+
+config_setting(
     name = "disable_hot_restart",
     values = {"define": "hot_restart=disabled"},
 )
@@ -156,6 +161,11 @@ config_setting(
         "@bazel_tools//platforms:x86_64",
     ],
     values = {"define": "boringssl=fips"},
+)
+
+config_setting(
+    name = "boringssl_disabled",
+    values = {"define": "boringssl=disabled"},
 )
 
 config_setting(

@@ -23,6 +23,7 @@ const std::string ResponseFlagUtils::RATE_LIMITED = "RL";
 const std::string ResponseFlagUtils::UNAUTHORIZED_EXTERNAL_SERVICE = "UAEX";
 const std::string ResponseFlagUtils::RATELIMIT_SERVICE_ERROR = "RLSE";
 const std::string ResponseFlagUtils::STREAM_IDLE_TIMEOUT = "SI";
+const std::string ResponseFlagUtils::INVALID_ENVOY_REQUEST_HEADERS = "IH";
 
 void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
   if (result.empty()) {
@@ -35,7 +36,7 @@ void ResponseFlagUtils::appendString(std::string& result, const std::string& app
 const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info) {
   std::string result;
 
-  static_assert(ResponseFlag::LastFlag == 0x10000, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x20000, "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
     appendString(result, FAILED_LOCAL_HEALTH_CHECK);
@@ -105,6 +106,10 @@ const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info
     appendString(result, STREAM_IDLE_TIMEOUT);
   }
 
+  if (stream_info.hasResponseFlag(ResponseFlag::InvalidEnvoyRequestHeaders)) {
+    appendString(result, INVALID_ENVOY_REQUEST_HEADERS);
+  }
+
   return result.empty() ? NONE : result;
 }
 
@@ -129,6 +134,7 @@ absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(const std::string
        ResponseFlag::DownstreamConnectionTermination},
       {ResponseFlagUtils::UPSTREAM_RETRY_LIMIT_EXCEEDED, ResponseFlag::UpstreamRetryLimitExceeded},
       {ResponseFlagUtils::STREAM_IDLE_TIMEOUT, ResponseFlag::StreamIdleTimeout},
+      {ResponseFlagUtils::INVALID_ENVOY_REQUEST_HEADERS, ResponseFlag::InvalidEnvoyRequestHeaders},
   };
   const auto& it = map.find(flag);
   if (it != map.end()) {

@@ -16,38 +16,13 @@
 namespace Envoy {
 namespace Stats {
 
-/**
- * Holds backing store for both CounterImpl and GaugeImpl. This provides a level
- * of indirection needed to enable stats created with the same name from
- * different scopes to share the same value.
- */
-struct HeapStatData : public InlineStorage {
-private:
-  explicit HeapStatData(StatName stat_name) { stat_name.copyToStorage(symbol_storage_); }
-
-public:
-  static HeapStatData* alloc(StatName stat_name, SymbolTable& symbol_table);
-
-  void free(SymbolTable& symbol_table);
-  StatName statName() const { return StatName(symbol_storage_); }
-
-  bool operator==(const HeapStatData& rhs) const { return statName() == rhs.statName(); }
-  uint64_t hash() const { return statName().hash(); }
-
-  std::atomic<uint64_t> value_{0};
-  std::atomic<uint64_t> pending_increment_{0};
-  std::atomic<uint16_t> flags_{0};
-  std::atomic<uint16_t> ref_count_{1};
-  SymbolTable::Storage symbol_storage_; // This is a 'using' nickname for uint8_t[].
-};
-
 class HeapStatDataAllocator : public StatDataAllocator {
 public:
   HeapStatDataAllocator(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   ~HeapStatDataAllocator() override;
 
-  HeapStatData& alloc(StatName name);
-  void free(HeapStatData& data);
+  void removeCounterFromSet(Counter* counter);
+  void removeGaugeFromSet(Gauge* gauge);
 
   // StatDataAllocator
   CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
@@ -63,17 +38,27 @@ public:
 
 private:
   struct HeapStatHash {
-    size_t operator()(const HeapStatData* a) const { return a->hash(); }
+    using is_transparent = void;
+    size_t operator()(const Metric* a) const { return a->statName().hash(); }
+    size_t operator()(StatName a) const { return a.hash(); }
   };
+
   struct HeapStatCompare {
-    bool operator()(const HeapStatData* a, const HeapStatData* b) const { return *a == *b; }
+    using is_transparent = void;
+    bool operator()(const Metric* a, const Metric* b) const {
+      return a->statName() == b->statName();
+    }
+    bool operator()(StatName a, const Metric* b) const { return a == b->statName(); }
+    bool operator()(const Metric* a, StatName b) const { return a->statName() == b; }
   };
 
   // An unordered set of HeapStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher, which key off of the
   // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
-  using StatSet = absl::flat_hash_set<HeapStatData*, HeapStatHash, HeapStatCompare>;
-  StatSet stats_ GUARDED_BY(mutex_);
+  template <class StatType>
+  using StatSet = absl::flat_hash_set<StatType*, HeapStatHash, HeapStatCompare>;
+  StatSet<Counter> counters_ GUARDED_BY(mutex_);
+  StatSet<Gauge> gauges_ GUARDED_BY(mutex_);
 
   SymbolTable& symbol_table_;
 

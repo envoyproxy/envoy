@@ -65,9 +65,32 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
 
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
   ON_CALL(*this, tracingConfig()).WillByDefault(ReturnRef(tracing_config_));
+  ON_CALL(*this, sendLocalReply(_, _, _, _, _))
+      .WillByDefault(Invoke([this](Code code, absl::string_view body,
+                                   std::function<void(HeaderMap & headers)> modify_headers,
+                                   const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                   absl::string_view details) {
+        sendLocalReply_(code, body, modify_headers, grpc_status, details);
+      }));
 }
 
 MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() = default;
+
+void MockStreamDecoderFilterCallbacks::sendLocalReply_(
+    Code code, absl::string_view body, std::function<void(HeaderMap& headers)> modify_headers,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  details_ = std::string(details);
+  Utility::sendLocalReply(
+      is_grpc_request_,
+      [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
+        if (modify_headers != nullptr) {
+          modify_headers(*headers);
+        }
+        encodeHeaders(std::move(headers), end_stream);
+      },
+      [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
+      stream_destroyed_, code, body, grpc_status, is_head_request_);
+}
 
 MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);

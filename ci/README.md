@@ -70,26 +70,35 @@ The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/env
 `$ENVOY_DOCKER_BUILD_DIR` points).
 
 To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/master/bazel#advanced-caching-setup) add the http_remote_cache endpoint to
-the BAZEL_BUILD_OPTIONS environment variable
+the BAZEL_BUILD_EXTRA_OPTIONS environment variable
 
 ```bash
-BAZEL_BUILD_OPTIONS='--remote_http_cache=http://127.0.0.1:28080' ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.release'
+./ci/run_envoy_docker.sh "BAZEL_BUILD_EXTRA_OPTIONS='--remote_http_cache=http://127.0.0.1:28080' ./ci/do_ci.sh bazel.release"
 ```
 
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
 * `bazel.api` &mdash; build and run API tests under `-c fastbuild` with clang.
 * `bazel.asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang.
+* `bazel.asan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-asan` with clang.
 * `bazel.debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
+* `bazel.debug <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c dbg`.
 * `bazel.debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
 * `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with clang.
-* `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt` with gcc.
-* `bazel.release <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt` with gcc.
-* `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with gcc.
+* `bazel.dev <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c fastbuild` with clang.
+* `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt` with clang.
+* `bazel.release <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt` with clang.
+* `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with clang.
+* `bazel.sizeopt` &mdash; build Envoy static binary and run tests under `-c opt --config=sizeopt` with clang.
+* `bazel.sizeopt <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt --config=sizeopt` with clang.
+* `bazel.sizeopt.server_only` &mdash; build Envoy static binary under `-c opt --config=sizeopt` with clang.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
+* `bazel.coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `bazel.coverity` &mdash; build Envoy static binary and run Coverity Scan static analysis.
 * `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
-* `bazel.compile_time_options` &mdash; build Envoy and test with various compile-time options toggled to their non-default state, to ensure they still build.
+* `bazel.tsan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-tsan` with clang.
+* `bazel.compile_time_options` &mdash; build Envoy and run tests with various compile-time options toggled to their non-default state, to ensure they still build.
+* `bazel.compile_time_options <test>` &mdash; build Envoy and run a specified test or test dir with various compile-time options toggled to their non-default state, to ensure they still build.
 * `bazel.clang_tidy` &mdash; build and run clang-tidy over all source files.
 * `check_format`&mdash; run `clang-format` and `buildifier` on entire source tree.
 * `fix_format`&mdash; run and enforce `clang-format` and `buildifier` on entire source tree.

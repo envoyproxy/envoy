@@ -65,6 +65,7 @@ TEST_F(ReverseBridgeTest, InvalidGrpcRequest) {
     // We should remove the first five bytes.
     Envoy::Buffer::OwnedImpl buffer;
     buffer.add("abc", 3);
+    EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _));
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).WillOnce(Invoke([](auto& headers, auto) {
       EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Status, "200"));
       EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
