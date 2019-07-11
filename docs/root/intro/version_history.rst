@@ -11,7 +11,7 @@ Version history
 * admin: the administration interface now includes a :ref:`/ready endpoint <operations_admin_interface>` for easier readiness checks.
 * admin: extend :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to support parameters within the request body.
 * admin: the :ref:`/listener endpoint <operations_admin_interface_listeners>` now returns :ref:`listeners.proto<envoy_api_msg_admin.v2alpha.Listeners>` which includes listener names and ports.
-* admin: added host priority to :http:get:`/clusters` and :http:get:`/clusters?format=json` end point response
+* admin: added host priority to :http:get:`/clusters` and :http:get:`/clusters?format=json` endpoint response
 * admin: the :ref:`/clusters endpoint <operations_admin_interface_clusters>` now shows hostname
   for each host, useful for DNS based clusters.
 * api: track and report requests issued since last load report.
@@ -19,7 +19,8 @@ Version history
 * control-plane: management servers can respond with HTTP 304 to indicate that config is up to date for Envoy proxies polling a :ref:`REST API Config Type <envoy_api_field_core.ApiConfigSource.api_type>`
 * csrf: added support for whitelisting additional source origins.
 * dns: added support for getting DNS record TTL which is used by STRICT_DNS/LOGICAL_DNS cluster as DNS refresh rate.
-* dubbo_proxy: support the :ref:`Dubbo proxy filter <config_network_filters_dubbo_proxy>`.
+* dubbo_proxy: support the :ref:`dubbo proxy filter <config_network_filters_dubbo_proxy>`.
+* dynamo_request_parser: adding support for transactions. Adds check for new types of dynamodb operations (TransactWriteItems, TransactGetItems) and awareness for new types of dynamodb errors (IdempotentParameterMismatchException, TransactionCanceledException, TransactionInProgressException).
 * eds: added support to specify max time for which endpoints can be used :ref:`gRPC filter <envoy_api_msg_ClusterLoadAssignment.Policy>`.
 * eds: removed max limit for `load_balancing_weight`.
 * event: added :ref:`loop duration and poll delay statistics <operations_performance>`.
@@ -41,12 +42,12 @@ Version history
 * http: added :ref:`dynamic forward proxy <arch_overview_http_dynamic_forward_proxy>` support.
 * http: tracking the active stream and dumping state in Envoy crash handlers. This can be disabled by building with `--define disable_object_dump_on_signal_trace=disabled`
 * jwt_authn: make filter's parsing of JWT more flexible, allowing syntax like ``jwt=eyJhbGciOiJS...ZFnFIw,extra=7,realm=123``
-* outlier_detector: added configuration :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>` to distinguish locally and externally generated errors. See :ref:`arch_overview_outlier_detection` for full details.
 * listener: added :ref:`source IP <envoy_api_field_listener.FilterChainMatch.source_prefix_ranges>`
   and :ref:`source port <envoy_api_field_listener.FilterChainMatch.source_ports>` filter
   chain matching.
 * lua: exposed functions to Lua to verify digital signature.
 * original_src filter: added the :ref:`filter<config_http_filters_original_src>`.
+* outlier_detector: added configuration :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>` to distinguish locally and externally generated errors. See :ref:`arch_overview_outlier_detection` for full details.
 * rbac: migrated from v2alpha to v2.
 * redis: add support for Redis cluster custom cluster type.
 * redis: automatically route commands using cluster slots for Redis cluster.
@@ -58,7 +59,7 @@ Version history
   :ref:`buffer_flush_timeout <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.buffer_flush_timeout>` to control how quickly the buffer is flushed if it is not full.
 * redis: added auth support :ref:`downstream_auth_password <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.downstream_auth_password>` for downstream client authentication, and :ref:`auth_password <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProtocolOptions.auth_password>` to configure authentication passwords for upstream server clusters.
 * retry: added a retry predicate that :ref:`rejects canary hosts. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
-* router: add support for configuring a :ref:`grpc timeout offset <envoy_api_field_route.RouteAction.grpc_timeout_offset>` on incoming requests.
+* router: add support for configuring a :ref:`gRPC timeout offset <envoy_api_field_route.RouteAction.grpc_timeout_offset>` on incoming requests.
 * router: added ability to control retry back-off intervals via :ref:`retry policy <envoy_api_msg_route.RetryPolicy.RetryBackOff>`.
 * router: added ability to issue a hedged retry in response to a per try timeout via a :ref:`hedge policy <envoy_api_msg_route.HedgePolicy>`.
 * router: added a route name field to each http route in route.Route list
@@ -80,12 +81,12 @@ Version history
 * sandbox: added :ref:`CSRF sandbox <install_sandboxes_csrf>`.
 * server: ``--define manual_stamp=manual_stamp`` was added to allow server stamping outside of binary rules.
   more info in the `bazel docs <https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#enabling-optional-features>`_.
-* server: added :ref:`Server State <statistics>` statistic.
+* server: added :ref:`server state <statistics>` statistic.
 * server: added :ref:`initialization_time_ms<statistics>` statistic.
 * subset: added :ref:`list_as_any<envoy_api_field_Cluster.LbSubsetConfig.list_as_any>` option to
   the subset lb which allows matching metadata against any of the values in a list value
   on the endpoints.
-* tool: added :repo:`proto <test/tools/router_check/validation.proto>` support for :ref:`router check tool <install_tools_route_table_check_tool>` tests.
+* tools: added :repo:`proto <test/tools/router_check/validation.proto>` support for :ref:`router check tool <install_tools_route_table_check_tool>` tests.
 * tracing: add trace sampling configuration to the route, to override the route level.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
 * upstream: an EDS management server can now force removal of a host that is still passing active
@@ -167,7 +168,7 @@ Version history
 * router: added :ref:`rq_reset_after_downstream_response_started <config_http_filters_router_stats>` counter stat to router stats.
 * router: added per-route configuration of :ref:`internal redirects <envoy_api_field_route.RouteAction.internal_redirect_action>`.
 * router: removed deprecated route-action level headers_to_add/remove.
-* router: made :ref: `max retries header <config_http_filters_router_x-envoy-max-retries>` take precedence over the number of retries in route and virtual host retry policies.
+* router: made :ref:`max retries header <config_http_filters_router_x-envoy-max-retries>` take precedence over the number of retries in route and virtual host retry policies.
 * router: added support for prefix wildcards in :ref:`virtual host domains<envoy_api_field_route.VirtualHost.domains>`
 * stats: added support for histograms in prometheus
 * stats: added usedonly flag to prometheus stats to only output metrics which have been
