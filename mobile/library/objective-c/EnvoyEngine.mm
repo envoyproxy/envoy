@@ -10,7 +10,7 @@
 
 + (int)runWithConfig:(NSString *)config logLevel:(NSString *)logLevel {
   try {
-    return run_envoy(config.UTF8String, logLevel.UTF8String);
+    return run_engine(config.UTF8String, logLevel.UTF8String);
   } catch (NSException *e) {
     NSLog(@"Envoy exception: %@", e);
     NSDictionary *userInfo = @{@"exception" : e};
