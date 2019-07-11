@@ -556,7 +556,7 @@ public:
         runtime_(runtime), singleton_manager_(c.singletonManager()), tls_(c.threadLocal()),
         init_manager_(c.initManager()), api_(c.api()) {}
 
-  // TODO(aconway) some contexts are not obviously available in the upstream
+  // TODO(kyessenov) some contexts are not obviously available in the upstream
   // code, and will throw NOT_IMPLEMENTED. These should be implemented by
   // someone with a better understanding of the lifecycle and role of each context.
   AccessLog::AccessLogManager& accessLogManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -706,7 +706,7 @@ ClusterInfoImpl::ClusterInfoImpl(
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     const std::string& string_name = proto_config.name();
-    ENVOY_LOG(debug, "  filter #{}:", i);
+    ENVOY_LOG(debug, "  upstream filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedNetworkFilterConfigFactory>(
