@@ -755,7 +755,6 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
   EXPECT_CALL(*client2, close());
   EXPECT_CALL(*client1, active()).WillOnce(Return(true));
   EXPECT_CALL(*client2, active()).WillOnce(Return(true));
-
   EXPECT_EQ(upstreamCxDrained().value(), 0);
 
   tls_.shutdownThread();
@@ -839,7 +838,6 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
   EXPECT_EQ(hostAddressMap().size(), 0);
   EXPECT_EQ(clientMap().size(), 0);
   EXPECT_EQ(clientsToDrain().size(), 0);
-
   EXPECT_EQ(upstreamCxDrained().value(), 0);
 
   tls_.shutdownThread();
