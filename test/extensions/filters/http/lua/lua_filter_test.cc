@@ -1264,7 +1264,7 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   num_loops = 200
 #endif
 
-  for (uint64_t i = 0; i < num_loops; i++) {
+      for (uint64_t i = 0; i < num_loops; i++) {
     Http::TestHeaderMapImpl request_headers{{":path", "/"}};
     Http::TestHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
