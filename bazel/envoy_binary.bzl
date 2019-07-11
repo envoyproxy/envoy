@@ -67,6 +67,12 @@ def _envoy_linkopts():
                    "-ldl",
                    "-Wl,--hash-style=gnu",
                ],
+           }) + select({
+               "//bazel:coverage_llvm_build": [
+                   "-fprofile-instr-generate",
+                   "-fcoverage-mapping",
+               ],
+               "//conditions:default": [],
            }) + envoy_static_link_libstdcpp_linkopts() + \
            _envoy_select_exported_symbols(["-Wl,-E"])
 

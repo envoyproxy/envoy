@@ -77,8 +77,8 @@ BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} -c dbg --copt=-DNDEBUG"
 # stats. The #foo# pattern is because gcov produces files such as
 # bazel-out#local-fastbuild#bin#external#spdlog_git#_virtual_includes#spdlog#spdlog#details#pattern_formatter_impl.h.gcov.
 # To find these while modifying this regex, perform a gcov run with -k set.
-[[ -z "${GCOVR_EXCLUDE_REGEX}" ]] && GCOVR_EXCLUDE_REGEX=".*pb.h.gcov|.*#k8-dbg#bin#.*|test#.*|external#.*|.*#external#.*|.*#prebuilt#.*|.*#config_validation#.*|.*#chromium_url#.*"
-[[ -z "${GCOVR_EXCLUDE_DIR}" ]] && GCOVR_EXCLUDE_DIR=".*/external/.*"
+[[ -z "${LCOV_EXCLUDE_REGEX}" ]] && LCOV_EXCLUDE_REGEX=".*pb.h.gcov|.*#k8-dbg#bin#.*|test#.*|external#.*|.*#external#.*|.*#prebuilt#.*|.*#config_validation#.*|.*#chromium_url#.*"
+[[ -z "${LCOV_EXCLUDE_DIR}" ]] && LCOV_EXCLUDE_DIR=".*/external/.*"
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
 mkdir -p "${COVERAGE_DIR}"
@@ -100,8 +100,8 @@ echo "OK: copied ${NUM_GCNO_FILES} .gcno files"
 # original source are relative to its execution location.
 cd -P "${GCOVR_DIR}"
 echo "Running gcovr in $(pwd)..."
-time "${GCOVR}" -v --gcov-exclude="${GCOVR_EXCLUDE_REGEX}" \
-  --exclude-directories="${GCOVR_EXCLUDE_DIR}" -r . \
+time "${GCOVR}" -v --gcov-exclude="${LCOV_EXCLUDE_REGEX}" \
+  --exclude-directories="${LCOV_EXCLUDE_DIR}" -r . \
   --html --html-details --exclude-unreachable-branches --print-summary \
   -o "${COVERAGE_DIR}"/coverage.html > "${COVERAGE_SUMMARY}"
 

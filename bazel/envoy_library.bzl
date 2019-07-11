@@ -47,7 +47,13 @@ def envoy_cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
-        copts = envoy_copts(repository) + copts,
+        copts = envoy_copts(repository) + copts + select({
+            repository + "//bazel:coverage_llvm_build": [
+                "-fprofile-instr-generate",
+                "-fcoverage-mapping",
+            ],
+            "//conditions:default": [],
+        }),
         visibility = visibility,
         tags = tags,
         textual_hdrs = textual_hdrs,
