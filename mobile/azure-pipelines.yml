@@ -152,6 +152,25 @@ stages:
             inputs:
               artifactName: 'envoy-linux.aar'
               targetPath: 'dist/envoy.aar'
+      - job: kotlin_library_tests
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'Ubuntu 16.04'
+        variables:
+          android_ndk_home: /usr/local/lib/android/sdk/ndk-bundle
+        steps:
+          - checkout: self
+            submodules: true
+          - script: ./ci/linux_ci_setup.sh
+            displayName: 'Install dependencies'
+          - script: |
+              export PATH=/usr/lib/llvm-8/bin:$PATH
+              export CC=clang
+              export CXX=clang++
+            displayName: 'Set up clang toolchain'
+          - script: |
+              ./bazelw test --test_output=all --build_tests_only //library/kotlin/test/...
+            displayName: '//library/kotlin tests'
       - job: linux_java_helloworld
         dependsOn: linux_dist
         timeoutInMinutes: 60
