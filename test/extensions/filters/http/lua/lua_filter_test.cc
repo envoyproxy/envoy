@@ -1261,7 +1261,7 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
 #if defined(__has_feature) && (__has_feature(thread_sanitizer))
   // per https://github.com/envoyproxy/envoy/issues/7374 this test is causing
   // problems on tsan
-  num_loops = 200
+  num_loops = 200;
 #endif
 
       for (uint64_t i = 0; i < num_loops; i++) {
