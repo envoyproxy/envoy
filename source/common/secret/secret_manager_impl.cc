@@ -134,8 +134,7 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     *dump_secret->mutable_last_updated() = last_updated_ts;
     secret->set_name(secret_data.resource_name);
     if (secret_ready) {
-      auto dump_context = secret->mutable_validation_context();
-      dump_context->MergeFrom(*validation_context);
+      secret->mutable_validation_context()->MergeFrom(*validation_context);
     }
   }
   return config_dump;
