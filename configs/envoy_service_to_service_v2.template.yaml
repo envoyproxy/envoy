@@ -543,10 +543,14 @@ tracing:
       "@type": type.googleapis.com/envoy.config.trace.v2.LightstepConfig
       access_token_file: "/etc/envoy/lightstep_access_token"
       collector_cluster: lightstep_saas
-runtime:
-  symlink_root: "/srv/runtime_data/current"
-  subdirectory: envoy
-  override_subdirectory: envoy_override
+layered_runtime:
+    layers:
+    - name: base
+      static_layer:
+        health_check:
+          min_interval: 5
+    - name: root
+      disk_layer: { symlink_root: /srv/runtime_data/current, subdirectory: envoy }
 admin:
   access_log_path: /var/log/envoy/admin_access.log
   address:
