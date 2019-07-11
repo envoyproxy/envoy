@@ -23,10 +23,10 @@ public:
    * Create a particular AccessLog::Instance implementation from a config proto. If the
    * implementation is unable to produce a factory with the provided parameters, it should throw an
    * EnvoyException. The returned pointer should never be nullptr.
-   * @param config is the custom configuration for this access log type.
-   * @param filter can determine whether a particular request should be logged. If no filter
+   * @param config the custom configuration for this access log type.
+   * @param filter filter to determine whether a particular request should be logged. If no filter
    * was specified in the configuration, argument will be nullptr.
-   * @param context is an object through which persistent resources can be accessed.
+   * @param context general filter context through which persistent resources can be accessed.
    */
   virtual AccessLog::InstanceSharedPtr createAccessLogInstance(const Protobuf::Message& config,
                                                                AccessLog::FilterPtr&& filter,
