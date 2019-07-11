@@ -275,15 +275,6 @@ public:
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
 
-  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) {
-    ensureSocketOptions();
-    listen_socket_options_->emplace_back(std::move(option));
-  }
-  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
-    ensureSocketOptions();
-    Network::Socket::appendOptions(listen_socket_options_, options);
-  }
-
   // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {
     return parent_.server_.accessLogManager();
@@ -337,6 +328,15 @@ public:
   SystemTime last_updated_;
 
 private:
+  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) {
+    ensureSocketOptions();
+    listen_socket_options_->emplace_back(std::move(option));
+  }
+  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
+    ensureSocketOptions();
+    Network::Socket::appendOptions(listen_socket_options_, options);
+  }
+
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
   FilterChainManagerImpl filter_chain_manager_;
