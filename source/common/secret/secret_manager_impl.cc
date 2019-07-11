@@ -107,11 +107,11 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     if (secret_ready) {
       auto tls_certificate = secret->mutable_tls_certificate();
       tls_certificate->MergeFrom(*tls_cert);
-    // We clear private key and password to avoid information leaking.j
-    // TODO(incfly): switch to more generic scrubbing mechanism once
-    // https://github.com/envoyproxy/envoy/issues/4757 is resolved.
-    tls_certificate->clear_private_key();
-    tls_certificate->clear_password();
+      // We clear private key and password to avoid information leaking.j
+      // TODO(incfly): switch to more generic scrubbing mechanism once
+      // https://github.com/envoyproxy/envoy/issues/4757 is resolved.
+      tls_certificate->clear_private_key();
+      tls_certificate->clear_password();
     }
   }
 
@@ -133,8 +133,10 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     dump_secret->set_version_info(secret_data.version_info_);
     *dump_secret->mutable_last_updated() = last_updated_ts;
     secret->set_name(secret_data.resource_name);
-    auto dump_context = secret->mutable_validation_context();
-    dump_context->MergeFrom(*validation_context);
+    if (secret_ready) {
+      auto dump_context = secret->mutable_validation_context();
+      dump_context->MergeFrom(*validation_context);
+    }
   }
   return config_dump;
 }

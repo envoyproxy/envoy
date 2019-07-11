@@ -292,9 +292,6 @@ validation_context:
   secret_resources.Clear();
   secret_resources.Add()->PackFrom(typed_secret);
 
-  // TODO(incfly): different config source is needed here...
-  // add helper function in the test class for easier add the test.
-  // uint64_t hash = MessageUtil::hash(config_source);
   init_target_handle->initialize(init_watcher);
   secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       secret_resources, "validation-context-v1");
@@ -320,6 +317,64 @@ dynamic_active_secrets:
     validation_context:
       trusted_ca:
         inline_string: "DUMMY_INLINE_STRING_TRUSTED_CA" 
+)EOF";
+  checkConfigDump(updated_config_dump);
+}
+
+TEST_F(SecretManagerImplTest, ConfigDumpHandlerWarmingSecrets) {
+  Server::MockInstance server;
+  auto secret_manager = std::make_unique<SecretManagerImpl>(config_tracker_);
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+
+  envoy::api::v2::core::ConfigSource config_source;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockRandomGenerator> random;
+  Stats::IsolatedStoreImpl stats;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(init_manager, add(_))
+      .WillRepeatedly(Invoke([&init_target_handle](const Init::Target& target) {
+        init_target_handle = target.createHandle("test");
+      }));
+  EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
+
+  auto secret_provider =
+      secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
+  const std::string expected_secrets_config_dump = R"EOF(
+dynamic_warming_secrets:
+  version_info: "uninitialized"
+  last_updated:
+    seconds: 1234567891
+    nanos: 234000000
+  secret:
+    name: "abc.com"
+  )EOF";
+  checkConfigDump(expected_secrets_config_dump);
+
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567899000));
+  auto context_secret_provider = secret_manager->findOrCreateCertificateValidationContextProvider(
+      config_source, "abc.com.validation", secret_context);
+  init_target_handle->initialize(init_watcher);
+  const std::string updated_config_dump = R"EOF(
+dynamic_warming_secrets:
+- version_info: "uninitialized"
+  last_updated:
+    seconds: 1234567891
+    nanos: 234000000
+  secret:
+    name: "abc.com"
+- version_info: "uninitialized"
+  last_updated:
+    seconds: 1234567899
+  secret:
+    name: "abc.com.validation"
 )EOF";
   checkConfigDump(updated_config_dump);
 }
