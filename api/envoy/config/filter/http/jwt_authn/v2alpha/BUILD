@@ -18,6 +18,6 @@ api_go_proto_library(
     deps = [
         "//envoy/api/v2/core:base_go_proto",
         "//envoy/api/v2/core:http_uri_go_proto",
-        "//envoy/api/v2/route_go_proto",
+        "//envoy/api/v2/route:route_go_proto",
     ],
 )
