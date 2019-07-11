@@ -3,6 +3,7 @@ Version history
 
 1.12.0 (pending)
 ================
+* grpc: added AWS IAM grpc credentials extension for AWS-managed xDS.
 
 1.11.0 (July 11, 2019)
 ======================
@@ -30,7 +31,6 @@ Version history
 * ext_authz: added a `x-envoy-auth-partial-body` metadata header set to `false|true` indicating if there is a partial body sent in the authorization request message.
 * ext_authz: added configurable status code that allows customizing HTTP responses on filter check status errors.
 * ext_authz: added option to `ext_authz` that allows the filter clearing route cache.
-* grpc: added AWS IAM grpc credentials extension for AWS-managed xDS.
 * grpc-json: added support for :ref:`auto mapping
   <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.auto_mapping>`.
 * health check: added :ref:`initial jitter <envoy_api_field_core.HealthCheck.initial_jitter>` to add jitter to the first health check in order to prevent thundering herd on Envoy startup.
