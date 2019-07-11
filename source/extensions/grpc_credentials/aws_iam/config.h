@@ -44,7 +44,7 @@ public:
   grpc::Status GetMetadata(grpc::string_ref, grpc::string_ref, const grpc::AuthContext&,
                            std::multimap<grpc::string, grpc::string>* metadata) override;
 
-  bool IsBlocking() const { return true; }
+  bool IsBlocking() const override { return true; }
 
 private:
   static Http::RequestMessageImpl buildMessageToSign(grpc::string_ref service_url,
