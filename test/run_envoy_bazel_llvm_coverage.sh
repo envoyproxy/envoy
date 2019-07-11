@@ -22,7 +22,7 @@ echo "    VALIDATE_COVERAGE=${VALIDATE_COVERAGE}"
 
 rm -rf $(find -L bazel-bin -name "test-*.profraw")
 
-"${BAZEL_COVERAGE}" test "${COVERAGE_TARGET}" ${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG \
+"${BAZEL_COVERAGE}" test "${COVERAGE_TARGET}" ${BAZEL_TEST_OPTIONS} -c fastbuild --copt=-DNDEBUG \
   --cache_test_results=no --define ENVOY_CONFIG_COVERAGE=llvm --test_output=all \
   --strategy=Genrule=local --strategy=TestRunner=local \
   --test_filter='-QuicPlatformTest.QuicStackTraceTest:IpVersions/ClusterMemoryTestRunner.*' \
@@ -36,12 +36,12 @@ llvm-profdata merge -sparse $(find -L bazel-bin -name "test-*.profraw") -o ${COV
 
 echo "Generating report..."
 llvm-cov show bazel-bin/source/exe/envoy-static -instr-profile=${COVERAGE_DIR}/coverage.profdata \
-  -ignore-filename-regex='(/external/|/k8-dbg/bin/|/chromium_url/)' -output-dir=${COVERAGE_DIR}/llvm-cov -format=html
+  -ignore-filename-regex='(/external/|/k8-fastbuild/bin/|/chromium_url/)' -output-dir=${COVERAGE_DIR}/llvm-cov -format=html
 sed -i -e 's|>bazel-out/[^/]*/bin/\([^/]*\)/[^<]*/_virtual_includes/[^/]*|>\1|g' "${COVERAGE_DIR}/llvm-cov/index.html"
 
 echo "Generating lcov report..."
 llvm-cov export bazel-bin/source/exe/envoy-static -instr-profile=${COVERAGE_DIR}/coverage.profdata \
-  -ignore-filename-regex='(/external/|/k8-dbg/bin/|/chromium_url/)' -format=lcov | \
+  -ignore-filename-regex='(/external/|/k8-fastbuild/bin/|/chromium_url/)' -format=lcov | \
   test/coverage/lcov_fix_filename.py > ${COVERAGE_DIR}/envoy.lcov
 
 echo "Generating HTML report from lcov..."
