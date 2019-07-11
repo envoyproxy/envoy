@@ -35,7 +35,7 @@ api_proto_library_internal(
     name = "base",
     srcs = ["base.proto"],
     visibility = [
-        "//visibility:public",
+        ":friends",
     ],
     deps = [
         "//envoy/type:percent",
