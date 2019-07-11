@@ -45,6 +45,7 @@ public:
 
 private:
   bool inflateNext();
+  void updateOutput(Buffer::Instance& output_buffer);
 
   const uint64_t chunk_size_;
   bool initialized_;

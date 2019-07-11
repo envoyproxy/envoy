@@ -20,3 +20,14 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_name = "envoy.filters.http.header_to_metadata",
+    deps = [
+        "//source/extensions/filters/http/header_to_metadata:config",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)

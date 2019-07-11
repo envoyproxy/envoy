@@ -165,8 +165,6 @@ envoy_sh_test(
     data = [
         "test_utility.sh",
         "//source/exe:envoy-static",
-        "//test/common/runtime:filesystem_setup.sh",
-        "//test/common/runtime:filesystem_test_data",
         "//test/config/integration:server_config_files",
         "//tools:socket_passing",
     ],
@@ -178,8 +176,6 @@ envoy_sh_test(
     data = [
         "test_utility.sh",
         "//source/exe:envoy-static",
-        "//test/common/runtime:filesystem_setup.sh",
-        "//test/common/runtime:filesystem_test_data",
         "//test/config/integration:server_config_files",
     ],
 )
@@ -557,6 +553,15 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/service/discovery/v2:hds_cc",
+    ],
+)
+
+envoy_cc_test(
+    name = "header_prefix_integration_test",
+    srcs = ["header_prefix_integration_test.cc"],
+    coverage = False,
+    deps = [
+        ":http_protocol_integration_lib",
     ],
 )
 

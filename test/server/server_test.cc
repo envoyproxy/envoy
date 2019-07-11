@@ -170,10 +170,10 @@ protected:
   void initialize(const std::string& bootstrap_path) { initialize(bootstrap_path, false); }
 
   void initialize(const std::string& bootstrap_path, const bool use_intializing_instance) {
-    if (bootstrap_path.empty()) {
+    if (bootstrap_path.empty() && options_.config_path_.empty()) {
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           "test/config/integration/server.json", {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
-    } else {
+    } else if (options_.config_path_.empty()) {
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
     }
@@ -531,6 +531,15 @@ TEST_P(ServerInstanceImplTest, EmptyBootstrap) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+}
+
+// Custom header bootstrap succeeds.
+TEST_P(ServerInstanceImplTest, CusomHeaderBoostrap) {
+  options_.config_path_ = TestEnvironment::writeStringToFileForTest(
+      "custom.yaml", "header_prefix: \"x-envoy\"\nstatic_resources:\n");
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_NO_THROW(initialize(options_.config_path_));
 }
 
 // Negative test for protoc-gen-validate constraints.
