@@ -10,7 +10,6 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 
-#include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -29,25 +28,9 @@ public:
   /**
    * Log a completed request if the underlying AccessLog `filter_` allows it.
    */
-  virtual void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-                   const Http::HeaderMap* response_trailers,
-                   const StreamInfo::StreamInfo& stream_info) override {
-    static Http::HeaderMapImpl empty_headers;
-    if (!request_headers) {
-      request_headers = &empty_headers;
-    }
-    if (!response_headers) {
-      response_headers = &empty_headers;
-    }
-    if (!response_trailers) {
-      response_trailers = &empty_headers;
-    }
-    if (filter_ &&
-        !filter_->evaluate(stream_info, *request_headers, *response_headers, *response_trailers)) {
-      return;
-    }
-    return emitLog(*request_headers, *response_headers, *response_trailers, stream_info);
-  }
+  void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
+           const Http::HeaderMap* response_trailers,
+           const StreamInfo::StreamInfo& stream_info) override;
 
 private:
   /**

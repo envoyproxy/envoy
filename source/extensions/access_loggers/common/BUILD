@@ -12,6 +12,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "access_log_base",
+    srcs = ["access_log_base.cc"],
     hdrs = ["access_log_base.h"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
