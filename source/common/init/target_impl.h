@@ -28,7 +28,7 @@ using InternalInitalizeFn = std::function<void(WatcherHandlePtr)>;
  */
 class TargetHandleImpl : public TargetHandle, Logger::Loggable<Logger::Id::init> {
 private:
-  friend class AbstractTarget;
+  friend class TargetImplBase;
   TargetHandleImpl(absl::string_view handle_name, absl::string_view name,
                    std::weak_ptr<InternalInitalizeFn> fn);
 
@@ -47,17 +47,26 @@ private:
   const std::weak_ptr<InternalInitalizeFn> fn_;
 };
 
-class AbstractTarget : public Target, protected Logger::Loggable<Logger::Id::init> {
+class TargetImplBase : public Target, protected Logger::Loggable<Logger::Id::init> {
 public:
-  AbstractTarget(absl::string_view name, std::shared_ptr<InternalInitalizeFn> fn);
+  TargetImplBase(absl::string_view name, std::shared_ptr<InternalInitalizeFn> fn);
+  ~TargetImplBase() override;
 
   // Init::Target
   absl::string_view name() const override;
   TargetHandlePtr createHandle(absl::string_view handle_name) const override;
 
-  virtual bool ready() PURE;
+  /**
+   * Signal to the init manager that this target has finished initializing. This is safe to call
+   * any time.
+   * The timing of ready() matters. See the derived classes of TargetImplBase.
+   * @return true if the init manager received this call, false otherwise.
+   */
+  bool ready();
 
 protected:
+  virtual void doReady() PURE;
+
   // Human-readable name for logging
   const std::string name_;
 
@@ -71,8 +80,9 @@ protected:
 /**
  * A TargetImpl is an entity that can be registered with a Manager for initialization. It can only
  * be invoked through a TargetHandle.
+ * Calling ready() before and after initialization has already ended will have no effect.
  */
-class TargetImpl : public AbstractTarget {
+class TargetImpl : public TargetImplBase {
 public:
   /**
    * @param name a human-readable target name, for logging / debugging
@@ -81,42 +91,25 @@ public:
    *     internally to simplify usage.
    */
   TargetImpl(absl::string_view name, InitializeFn fn);
-  ~TargetImpl() override;
 
-  /**
-   * Signal to the init manager that this target has finished initializing. This is safe to call
-   * any time.
-   * Notes: Calling it before initialization begins is allowed.
-   *        Calling it after initialization has already ended will have no effect.
-   * @return true if the init manager received this call, false otherwise.
-   */
-  bool ready() override;
+  // TargetImplBase
+  void doReady() override;
 };
+
 /**
- * A TargetImpl is an entity that can be registered with a Manager for initialization. It can only
- * be invoked through a TargetHandle.
+ * An EagerTargetImpl is an entity that can be registered with a Manager. ready() should be invoked
+ * by EagerTargetImpl owner and can be invoked anytime.
  */
-class EagerTargetImpl : public AbstractTarget {
+class EagerTargetImpl : public TargetImplBase {
 public:
   /**
    * @param name a human-readable target name, for logging / debugging
-   * @fn a callback function to invoke when `initialize` is called on the handle. Note that this
-   *     doesn't take a WatcherHandlePtr (like TargetFn does). Managing the watcher handle is done
-   *     internally to simplify usage.
    */
-  EagerTargetImpl(absl::string_view name, InitializeFn fn);
-  ~EagerTargetImpl() override;
-
-  /**
-   * Signal to the init manager that this target has finished initializing. This is safe to call
-   * any time.
-   * Notes: Calling it before initialization begins is allowed.
-   *        Calling it after initialization has already ended will have no effect.
-   * @return true if the init manager received this call, false otherwise.
-   */
-  bool ready() override;
+  EagerTargetImpl(absl::string_view name);
 
 private:
+  // TargetImplBase
+  void doReady() override;
   // True if this target is currently ready
   bool is_ready_{};
 };

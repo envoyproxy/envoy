@@ -15,14 +15,7 @@ void expectUninitialized(const Manager& m) { EXPECT_EQ(Manager::State::Uninitial
 void expectInitializing(const Manager& m) { EXPECT_EQ(Manager::State::Initializing, m.state()); }
 void expectInitialized(const Manager& m) { EXPECT_EQ(Manager::State::Initialized, m.state()); }
 
-template <typename T> class InitManagerImplTest : public ::testing::Test {};
-
-using TargetTypes = ::testing::Types<ExpectableTargetImpl, ExpectableEagerTargetImpl>;
-
-TYPED_TEST_SUITE(InitManagerImplTest, TargetTypes);
-
-// Universal tests for all Target implementation
-TYPED_TEST(InitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
+TEST(InitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -31,7 +24,7 @@ TYPED_TEST(InitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
   ExpectableTargetImpl t1("t1");
   m.add(t1);
 
-  TypeParam t2("t2");
+  ExpectableTargetImpl t2("t2");
   m.add(t2);
 
   ExpectableWatcherImpl w;
@@ -44,16 +37,16 @@ TYPED_TEST(InitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
   expectInitialized(m);
 }
 
-TYPED_TEST(InitManagerImplTest, AddAsyncTargetsWhenUninitialized) {
+TEST(InitManagerImplTest, AddAsyncTargetsWhenUninitialized) {
   InSequence s;
 
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  TypeParam t1("t1");
+  ExpectableTargetImpl t1("t1");
   m.add(t1);
 
-  TypeParam t2("t2");
+  ExpectableTargetImpl t2("t2");
   m.add(t2);
 
   ExpectableWatcherImpl w;
@@ -74,16 +67,16 @@ TYPED_TEST(InitManagerImplTest, AddAsyncTargetsWhenUninitialized) {
   expectInitialized(m);
 }
 
-TYPED_TEST(InitManagerImplTest, AddMixedTargetsWhenUninitialized) {
+TEST(InitManagerImplTest, AddMixedTargetsWhenUninitialized) {
   InSequence s;
 
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  TypeParam t1("t1");
+  ExpectableTargetImpl t1("t1");
   m.add(t1);
 
-  TypeParam t2("t2");
+  ExpectableTargetImpl t2("t2");
   m.add(t2);
 
   ExpectableWatcherImpl w;
@@ -100,13 +93,13 @@ TYPED_TEST(InitManagerImplTest, AddMixedTargetsWhenUninitialized) {
   expectInitialized(m);
 }
 
-TYPED_TEST(InitManagerImplTest, AddImmediateTargetWhenInitializing) {
+TEST(InitManagerImplTest, AddImmediateTargetWhenInitializing) {
   InSequence s;
 
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  TypeParam t1("t1");
+  ExpectableTargetImpl t1("t1");
   m.add(t1);
 
   ExpectableWatcherImpl w;
@@ -117,7 +110,7 @@ TYPED_TEST(InitManagerImplTest, AddImmediateTargetWhenInitializing) {
   expectInitializing(m);
 
   // adding an immediate target shouldn't finish initialization
-  TypeParam t2("t2");
+  ExpectableTargetImpl t2("t2");
   t2.expectInitializeWillCallReady();
   m.add(t2);
   expectInitializing(m);
@@ -128,7 +121,7 @@ TYPED_TEST(InitManagerImplTest, AddImmediateTargetWhenInitializing) {
   expectInitialized(m);
 }
 
-TYPED_TEST(InitManagerImplTest, UnavailableTarget) {
+TEST(InitManagerImplTest, UnavailableTargetImpl) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -136,7 +129,7 @@ TYPED_TEST(InitManagerImplTest, UnavailableTarget) {
 
   // add a target and destroy it
   {
-    TypeParam t("t");
+    ExpectableTargetImpl t("t");
     m.add(t);
     t.expectInitialize().Times(0);
   }
@@ -149,10 +142,10 @@ TYPED_TEST(InitManagerImplTest, UnavailableTarget) {
   expectInitialized(m);
 }
 
-TYPED_TEST(InitManagerImplTest, UnavailableManager) {
+TEST(InitManagerImplTest, UnavailableManager) {
   InSequence s;
 
-  TypeParam t("t");
+  ExpectableTargetImpl t("t");
   ExpectableWatcherImpl w;
 
   {
@@ -172,13 +165,13 @@ TYPED_TEST(InitManagerImplTest, UnavailableManager) {
   t.ready();
 }
 
-TYPED_TEST(InitManagerImplTest, UnavailableWatcher) {
+TEST(InitManagerImplTest, UnavailableWatcher) {
   InSequence s;
 
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  TypeParam t("t");
+  ExpectableTargetImpl t("t");
   m.add(t);
 
   {
@@ -196,32 +189,30 @@ TYPED_TEST(InitManagerImplTest, UnavailableWatcher) {
   t.ready();
 }
 
-// Specialized test for EagerTargetImpl
-TEST(EagerInitManagerImplTest, AddReadyTarget) {
+TEST(InitManagerImplWithEagerTargetTest, AddReadyTarget) {
   InSequence s;
 
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  ExpectableEagerTargetImpl t1("t1");
+  EagerTargetImpl t1("t1");
   t1.ready();
   m.add(t1);
 
   ExpectableWatcherImpl w;
 
-  t1.expectInitialize();
   w.expectReady();
   m.initialize(w);
   expectInitialized(m);
 }
 
-TEST(EagerInitManagerImplTest, AddTargetAndMarkReadyBeforeInitialization) {
+TEST(InitManagerImplWithEagerTargetTest, AddTargetAndMarkReadyBeforeInitialization) {
   InSequence s;
 
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  ExpectableEagerTargetImpl t1("t1");
+  EagerTargetImpl t1("t1");
   // vs AddReadyTarget case:
   // Swap the add() and ready() order but still before m.initialize().
   m.add(t1);
@@ -229,9 +220,64 @@ TEST(EagerInitManagerImplTest, AddTargetAndMarkReadyBeforeInitialization) {
 
   ExpectableWatcherImpl w;
 
-  t1.expectInitialize();
   w.expectReady();
   m.initialize(w);
+  expectInitialized(m);
+}
+
+TEST(InitManagerImplWithEagerTargetTest, UnavailableEagerTargetImpl) {
+  InSequence s;
+
+  ManagerImpl m("test");
+  expectUninitialized(m);
+
+  // destroy EagerTargets. Any internal state of ready should be considered
+  // ready at destroy.
+  {
+    // add a target
+    {
+      EagerTargetImpl t("t");
+      m.add(t);
+    }
+
+    // add a target and mark it ready
+    {
+      EagerTargetImpl t("t");
+      m.add(t);
+      t.ready();
+    }
+
+    // add a ready target
+    {
+      EagerTargetImpl t("t");
+      t.ready();
+      m.add(t);
+    }
+  }
+  ExpectableWatcherImpl w;
+
+  // initialization should complete despite the destroyed target
+  w.expectReady();
+  m.initialize(w);
+  expectInitialized(m);
+}
+
+TEST(InitManagerImplWithEagerTargetTest, BlockingEagerTargetImpl) {
+  InSequence s;
+
+  ManagerImpl m("test");
+  expectUninitialized(m);
+
+  EagerTargetImpl t("t");
+  m.add(t);
+  expectUninitialized(m);
+
+  ExpectableWatcherImpl w;
+  m.initialize(w);
+  expectInitializing(m);
+
+  w.expectReady();
+  t.ready();
   expectInitialized(m);
 }
 

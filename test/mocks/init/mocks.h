@@ -50,23 +50,6 @@ public:
   ::testing::internal::TypedExpectation<void()>& expectInitializeWillCallReady();
 };
 
-class ExpectableEagerTargetImpl : public EagerTargetImpl {
-public:
-  ExpectableEagerTargetImpl(absl::string_view name = "test");
-  MOCK_METHOD0(initialize, void());
-
-  /**
-   * Convenience method to provide a shorthand for EXPECT_CALL(target, initialize()). Can be
-   * chained, for example: target.expectInitialize().Times(0);
-   */
-  ::testing::internal::TypedExpectation<void()>& expectInitialize();
-
-  /**
-   * Convenience method to provide a shorthand for expectInitialize() with mocked behavior of
-   * calling `ready` immediately.
-   */
-  ::testing::internal::TypedExpectation<void()>& expectInitializeWillCallReady();
-};
 /**
  * MockManager is a typical mock. In many cases, it won't be necessary to mock any of its methods.
  * In cases where its `add` and `initialize` methods are actually called in a test, it's usually
