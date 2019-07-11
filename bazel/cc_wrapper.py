@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 import contextlib
 import os
 import shlex
