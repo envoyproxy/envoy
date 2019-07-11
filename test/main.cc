@@ -8,7 +8,7 @@
 #include "absl/debugging/symbolize.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "exe/signal_action.h"
+#include "common/signal/signal_action.h"
 #endif
 
 // The main entry point (and the rest of this file) should have no logic in it,

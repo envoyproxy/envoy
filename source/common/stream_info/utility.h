@@ -38,6 +38,7 @@ private:
   const static std::string UNAUTHORIZED_EXTERNAL_SERVICE;
   const static std::string RATELIMIT_SERVICE_ERROR;
   const static std::string STREAM_IDLE_TIMEOUT;
+  const static std::string INVALID_ENVOY_REQUEST_HEADERS;
 };
 
 /**

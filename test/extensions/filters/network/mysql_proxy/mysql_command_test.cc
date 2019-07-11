@@ -71,7 +71,7 @@ public:
   std::string buildCreate(enum TestResource res, std::string option, bool if_not_exists,
                           std::string res_name, std::string value) {
     std::string command("CREATE ");
-    if (option != "") {
+    if (!option.empty()) {
       command.append(option);
       command.append(SPACE);
     }
@@ -159,7 +159,7 @@ public:
   //"INSERT INTO <table> ...
   std::string buildInsert(std::string option, bool into, std::string table, std::string values) {
     std::string command("INSERT ");
-    if (option != "") {
+    if (!option.empty()) {
       command.append(option);
       command.append(SPACE);
     }

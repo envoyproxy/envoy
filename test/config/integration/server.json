@@ -451,7 +451,7 @@
   },
 
   "runtime": {
-    "symlink_root": "{{ test_rundir }}/test/common/runtime/test_data/current",
+    "symlink_root": "{{ test_tmpdir }}/test/common/runtime/test_data/current",
     "subdirectory": "envoy",
     "override_subdirectory": "envoy_override"
   },

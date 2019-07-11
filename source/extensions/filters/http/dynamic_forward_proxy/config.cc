@@ -12,7 +12,7 @@ Http::FilterFactoryCb DynamicForwardProxyFilterFactory::createFilterFactoryFromP
     const envoy::config::filter::http::dynamic_forward_proxy::v2alpha::FilterConfig& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context.singletonManager(), context.dispatcher(), context.threadLocal());
+      context.singletonManager(), context.dispatcher(), context.threadLocal(), context.scope());
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
       proto_config, cache_manager_factory, context.clusterManager()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

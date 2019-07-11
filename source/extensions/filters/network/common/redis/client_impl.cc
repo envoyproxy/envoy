@@ -31,7 +31,7 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
   client->connection_->connect();
   client->connection_->noDelay(true);
-  return std::move(client);
+  return client;
 }
 
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
@@ -92,7 +92,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
 }
 
 void ClientImpl::onConnectOrOpTimeout() {
-  putOutlierEvent(Upstream::Outlier::Result::TIMEOUT);
+  putOutlierEvent(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT);
   if (connected_) {
     host_->cluster().stats().upstream_rq_timeout_.inc();
     host_->stats().rq_timeout_.inc();
@@ -108,7 +108,7 @@ void ClientImpl::onData(Buffer::Instance& data) {
   try {
     decoder_->decode(data);
   } catch (ProtocolError&) {
-    putOutlierEvent(Upstream::Outlier::Result::REQUEST_FAILED);
+    putOutlierEvent(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_FAILED);
     host_->cluster().stats().upstream_cx_protocol_error_.inc();
     host_->stats().rq_error_.inc();
     connection_->close(Network::ConnectionCloseType::NoFlush);
@@ -127,7 +127,7 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
     if (!pending_requests_.empty()) {
       host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
       if (event == Network::ConnectionEvent::RemoteClose) {
-        putOutlierEvent(Upstream::Outlier::Result::SERVER_FAILURE);
+        putOutlierEvent(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED);
         host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
       }
       if (event == Network::ConnectionEvent::LocalClose) {
@@ -195,7 +195,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
-  putOutlierEvent(Upstream::Outlier::Result::SUCCESS);
+  putOutlierEvent(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS);
 }
 
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)

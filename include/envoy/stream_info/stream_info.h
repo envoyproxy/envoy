@@ -61,8 +61,10 @@ enum ResponseFlag {
   UpstreamRetryLimitExceeded = 0x8000,
   // Request hit the stream idle timeout, triggering a 408.
   StreamIdleTimeout = 0x10000,
+  // Request specified x-envoy-* header values that failed strict header checks.
+  InvalidEnvoyRequestHeaders = 0x20000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = StreamIdleTimeout
+  LastFlag = InvalidEnvoyRequestHeaders
 };
 
 /**
@@ -95,6 +97,8 @@ struct ResponseCodeDetailValues {
   const std::string MissingHost = "missing_host_header";
   // The request was rejected due to the request headers being larger than the configured limit.
   const std::string RequestHeadersTooLarge = "request_headers_too_large";
+  // The request was rejected due to x-envoy-* headers failing strict header validation.
+  const std::string InvalidEnvoyRequestHeaders = "request_headers_failed_strict_check";
   // The request was rejected due to the Path or :path header field missing.
   const std::string MissingPath = "missing_path_rejected";
   // The request was rejected due to using an absolute path on a route not supporting them.

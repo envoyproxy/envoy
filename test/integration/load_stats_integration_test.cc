@@ -173,14 +173,14 @@ public:
       return;
     }
 
-    const auto local_cluster_stats = local_loadstats_request.cluster_stats(0);
+    const auto& local_cluster_stats = local_loadstats_request.cluster_stats(0);
     auto* cluster_stats = loadstats_request.mutable_cluster_stats(0);
 
     cluster_stats->set_total_dropped_requests(cluster_stats->total_dropped_requests() +
                                               local_cluster_stats.total_dropped_requests());
 
     for (int i = 0; i < local_cluster_stats.upstream_locality_stats_size(); ++i) {
-      auto local_upstream_locality_stats = local_cluster_stats.upstream_locality_stats(i);
+      const auto& local_upstream_locality_stats = local_cluster_stats.upstream_locality_stats(i);
       bool copied = false;
       for (int j = 0; j < cluster_stats->upstream_locality_stats_size(); ++j) {
         auto* upstream_locality_stats = cluster_stats->mutable_upstream_locality_stats(j);
