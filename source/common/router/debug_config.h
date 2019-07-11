@@ -39,7 +39,7 @@ struct DebugConfig : public StreamInfo::FilterState::Object {
 
   /**
    * Append cluster information as a response header if `append_cluster_` is true. The router will
-   * use `cluster_header_` as the header name, if specified, or "x-envoy-cluster" by default.
+   * use `cluster_header_` as the header name, if specified, or 'x-envoy-cluster' by default.
    */
   bool append_cluster_{};
   absl::optional<Http::LowerCaseString> cluster_header_;
@@ -47,7 +47,7 @@ struct DebugConfig : public StreamInfo::FilterState::Object {
   /**
    * Append upstream host name and address as response headers, if `append_upstream_host_` is true.
    * The router will use `hostname_header_` and `host_address_header_` as the header names, if
-   * specified, or "x-envoy-upstream-hostname" and "x-envoy-upstream-host-address" by default.
+   * specified, or 'x-envoy-upstream-hostname' and 'x-envoy-upstream-host-address' by default.
    */
   bool append_upstream_host_{};
   absl::optional<Http::LowerCaseString> hostname_header_;
@@ -57,7 +57,7 @@ struct DebugConfig : public StreamInfo::FilterState::Object {
    * Do not forward the associated request to the upstream cluster, if `do_not_forward_` is true.
    * If the router would have forwarded it (assuming all other preconditions are met), it will
    * instead respond with a 204 "no content." Append `not_forwarded_header_`, if specified, or
-   * "x-envoy-not-forwarded" by default. Any debug headers specified above (or others introduced by
+   * 'x-envoy-not-forwarded' by default. Any debug headers specified above (or others introduced by
    * other filters) will be appended to this empty response.
    */
   bool do_not_forward_{};

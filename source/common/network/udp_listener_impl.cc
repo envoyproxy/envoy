@@ -16,6 +16,7 @@
 #include "common/common/stack_array.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/io_socket_error_impl.h"
 
 #include "event2/listener.h"
 
@@ -88,8 +89,7 @@ void UdpListenerImpl::handleReadCallback() {
     if (!result.ok()) {
       // No more to read or encountered a system error.
       if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
-        ENVOY_UDP_LOG(error, "recvfrom result {}: {}",
-                      static_cast<int>(result.err_->getErrorCode()),
+        ENVOY_UDP_LOG(error, "recvmsg result {}: {}", static_cast<int>(result.err_->getErrorCode()),
                       result.err_->getErrorDetails());
         cb_.onReceiveError(UdpListenerCallbacks::ErrorCode::SyscallError,
                            result.err_->getErrorCode());
@@ -159,15 +159,22 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
   buffer.getRawSlices(slices.begin(), num_slices);
-  Api::IoCallUint64Result send_result =
-      socket_.ioHandle().sendmsg(slices.begin(), num_slices, 0, *send_data.send_address_);
+  Api::IoCallUint64Result send_result(
+      /*rc=*/0, /*err=*/Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+  do {
+    send_result = socket_.ioHandle().sendmsg(slices.begin(), num_slices, 0, send_data.local_ip_,
+                                             send_data.peer_address_);
+  } while (!send_result.ok() &&
+           // Send again if interrupted.
+           send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);
 
   if (send_result.ok()) {
     ASSERT(send_result.rc_ == buffer.length());
     ENVOY_UDP_LOG(trace, "sendmsg sent:{} bytes", send_result.rc_);
   } else {
-    ENVOY_UDP_LOG(debug, "sendmsg failed with error {}. Ret {}",
-                  static_cast<int>(send_result.err_->getErrorCode()), send_result.rc_);
+    ENVOY_UDP_LOG(debug, "sendmsg failed with error code {}: {}",
+                  static_cast<int>(send_result.err_->getErrorCode()),
+                  send_result.err_->getErrorDetails());
   }
 
   // The send_result normalizes the rc_ value to 0 in error conditions.
