@@ -70,6 +70,7 @@ ECONNREFUSED
 EDESTRUCTION
 EDF
 EDS
+EINVAL
 EIP
 ELB
 ENOTSUP
@@ -609,6 +610,7 @@ optimizations
 ostream
 outlier
 outliers
+offsetof
 overridable
 param
 parameterizable
