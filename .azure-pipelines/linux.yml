@@ -1,7 +1,7 @@
 resources:
   containers:
   - container: envoy-build
-    image: envoyproxy/envoy-build:d0cefa7f071dbd4ef24399c2db8656c3a5d8c3ef
+    image: envoyproxy/envoy-build:8246167b9d238797cbc6c03dccc9e3921c37617d
 
 jobs:
 - job: EnvoyFullTest
@@ -10,7 +10,7 @@ jobs:
     vmImage: 'Ubuntu 16.04'
   container: envoy-build
   steps:
-  # bazel.dev isn't for CI purpose but we use it here to experiment with Azure Pipeline 
+  # bazel.dev isn't for CI purpose but we use it here to experiment with Azure Pipeline
   # as it builds faster, before Azure can provision larger VM or we can use RBE.
   - script: ci/do_ci.sh bazel.dev
     env:

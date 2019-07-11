@@ -100,7 +100,8 @@ private:
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
         : parent_(parent), iteration_state_(IterationState::Continue),
           iterate_from_current_filter_(false), headers_continued_(false),
-          continue_headers_continued_(false), end_stream_(false), dual_filter_(dual_filter) {}
+          continue_headers_continued_(false), end_stream_(false), dual_filter_(dual_filter),
+          decode_headers_called_(false) {}
 
     // Functions in the following block are called after the filter finishes processing
     // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -128,6 +129,9 @@ private:
     virtual void doData(bool end_stream) PURE;
     virtual void doTrailers() PURE;
     virtual const HeaderMapPtr& trailers() PURE;
+    virtual void doMetadata() PURE;
+    // TODO(soya3129): make this pure when adding impl to encodefilter.
+    virtual void handleMetadataAfterHeadersCallback() {}
 
     // Http::StreamFilterCallbacks
     const Network::Connection* connection() override;
@@ -151,7 +155,25 @@ private:
       ASSERT(iteration_state_ != IterationState::Continue);
       iteration_state_ = IterationState::Continue;
     }
+    MetadataMapVector* getSavedRequestMetadata() {
+      if (saved_request_metadata_ == nullptr) {
+        saved_request_metadata_ = std::make_unique<MetadataMapVector>();
+      }
+      return saved_request_metadata_.get();
+    }
+    MetadataMapVector* getSavedResponseMetadata() {
+      if (saved_response_metadata_ == nullptr) {
+        saved_response_metadata_ = std::make_unique<MetadataMapVector>();
+      }
+      return saved_response_metadata_.get();
+    }
 
+    // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
+    // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
+    // [de|en]codeHeaders() adds new metadata to [de|en]code, but we don't know
+    // [de|en]codeHeaders()'s return value yet. The storage is created on demand.
+    std::unique_ptr<MetadataMapVector> saved_request_metadata_;
+    std::unique_ptr<MetadataMapVector> saved_response_metadata_;
     // The state of iteration.
     enum class IterationState {
       Continue,            // Iteration has not stopped for any frame type.
@@ -173,6 +195,7 @@ private:
     // If true, end_stream is called for this filter.
     bool end_stream_ : 1;
     const bool dual_filter_ : 1;
+    bool decode_headers_called_ : 1;
   };
 
   /**
@@ -205,13 +228,29 @@ private:
       parent_.decodeData(this, *parent_.buffered_request_data_, end_stream,
                          ActiveStream::FilterIterationStartState::CanStartFromCurrent);
     }
+    void doMetadata() override {
+      if (saved_request_metadata_ != nullptr) {
+        drainSavedRequestMetadata();
+      }
+    }
     void doTrailers() override { parent_.decodeTrailers(this, *parent_.request_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.request_trailers_; }
+
+    void drainSavedRequestMetadata() {
+      ASSERT(saved_request_metadata_ != nullptr);
+      for (auto& metadata_map : *getSavedRequestMetadata()) {
+        parent_.decodeMetadata(this, *metadata_map);
+      }
+      getSavedRequestMetadata()->clear();
+    }
+    // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
+    void handleMetadataAfterHeadersCallback() override;
 
     // Http::StreamDecoderFilterCallbacks
     void addDecodedData(Buffer::Instance& data, bool streaming) override;
     void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
     HeaderMap& addDecodedTrailers() override;
+    MetadataMapVector& addDecodedMetadata() override;
     void continueDecoding() override;
     const Buffer::Instance* decodingBuffer() override {
       return parent_.buffered_request_data_.get();
@@ -299,6 +338,19 @@ private:
       parent_.encodeData(this, *parent_.buffered_response_data_, end_stream,
                          ActiveStream::FilterIterationStartState::CanStartFromCurrent);
     }
+    void drainSavedResponseMetadata() {
+      ASSERT(saved_response_metadata_ != nullptr);
+      for (auto& metadata_map : *getSavedResponseMetadata()) {
+        parent_.encodeMetadata(this, std::move(metadata_map));
+      }
+      getSavedResponseMetadata()->clear();
+    }
+
+    void doMetadata() override {
+      if (saved_response_metadata_ != nullptr) {
+        drainSavedResponseMetadata();
+      }
+    }
     void doTrailers() override { parent_.encodeTrailers(this, *parent_.response_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.response_trailers_; }
 
@@ -358,12 +410,14 @@ private:
     const Network::Connection* connection();
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addDecodedTrailers();
+    MetadataMapVector& addDecodedMetadata();
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
     // Sends data through decoding filter chains. filter_iteration_start_state indicates which
     // filter to start the iteration with.
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream,
                     FilterIterationStartState filter_iteration_start_state);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
+    void decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map);
     void disarmRequestTimeout();
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
@@ -382,6 +436,8 @@ private:
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
     void maybeEndEncode(bool end_stream);
+    // Returns true if new metadata is decoded. Otherwise, returns false.
+    bool processNewlyAddedMetadata();
     uint64_t streamId() { return stream_id_; }
     // Returns true if filter has stopped iteration for all frame types. Otherwise, returns false.
     // filter_streaming is the variable to indicate if stream is streaming, and its value may be
@@ -400,7 +456,7 @@ private:
     void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(HeaderMapPtr&& trailers) override;
-    void decodeMetadata(MetadataMapPtr&&) override { NOT_REACHED_GCOVR_EXCL_LINE; }
+    void decodeMetadata(MetadataMapPtr&&) override;
 
     // Http::FilterChainFactoryCallbacks
     void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
@@ -516,6 +572,13 @@ private:
       return os;
     }
 
+    MetadataMapVector* getRequestMetadataMapVector() {
+      if (request_metadata_map_vector_ == nullptr) {
+        request_metadata_map_vector_ = std::make_unique<MetadataMapVector>();
+      }
+      return request_metadata_map_vector_.get();
+    }
+
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_route_config_;
@@ -543,6 +606,10 @@ private:
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_{};
+    // Stores metadata added in the decoding filter that is being processed. Will be cleared before
+    // processing the next filter. The storage is created on demand. We need to store metadata
+    // temporarily in the filter in case the filter has stopped all while processing headers.
+    std::unique_ptr<MetadataMapVector> request_metadata_map_vector_{nullptr};
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
     const std::string* decorated_operation_{nullptr};
