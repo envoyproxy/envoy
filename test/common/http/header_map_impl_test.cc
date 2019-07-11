@@ -557,6 +557,25 @@ TEST(HeaderMapImplTest, DoubleInlineAdd) {
   }
 }
 
+// Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
+// combine set-cookie headers
+TEST(HeaderMapImplTest, DoubleCookieAdd) {
+  HeaderMapImpl headers;
+  const std::string foo("foo");
+  const std::string bar("bar");
+  LowerCaseString& set_cookie = Http::Headers::get().SetCookie;
+  headers.addReference(set_cookie, foo);
+  headers.addReference(set_cookie, bar);
+  EXPECT_EQ("foo,bar", headers.get(set_cookie)->value().getStringView());
+  EXPECT_EQ(2UL, headers.size());
+
+  std::vector<absl::string_view> out;
+  Http::HeaderUtility::GetAllOfHeader(header_map, "set-cookie", out);
+  ASSERT_EQ(out.size(), 2);
+  ASSERT_EQ(out[0], "foo");
+  ASSERT_EQ(out[1], "bar");
+}
+
 TEST(HeaderMapImplTest, DoubleInlineSet) {
   HeaderMapImpl headers;
   headers.setReferenceKey(Headers::get().ContentType, "blah");

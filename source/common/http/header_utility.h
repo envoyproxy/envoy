@@ -18,6 +18,27 @@ class HeaderUtility {
 public:
   enum class HeaderMatchType { Value, Regex, Range, Present, Prefix, Suffix };
 
+  // Get all instances of the header key specified, and return the values in the
+  // vector provided.
+  //
+  // This should not be used for inline headers, as it turns a constant time
+  // lookup into O(n)
+  static void getAllOfHeader(const Http::HeaderMap& headers, absl::string_view key,
+                             std::vector<absl::string_view>& out) {
+    auto args = std::make_pair(LowerCaseString(std::string(key)), &out);
+
+    headers.iterate(
+        [](const HeaderEntry& header, void* context) -> Envoy::Http::HeaderMap::Iterate {
+          auto key_ret =
+              static_cast<std::pair<LowerCaseString, std::vector<absl::string_view>*>*>(context);
+          if (header.key() == key_ret->first.get().c_str()) {
+            key_ret->second->emplace_back(header.value().getStringView());
+          }
+          return Envoy::Http::HeaderMap::Iterate::Continue;
+        },
+        &args);
+  }
+
   // A HeaderData specifies one of exact value or regex or range element
   // to match in a request's header, specified in the header_match_type_ member.
   // It is the runtime equivalent of the HeaderMatchSpecifier proto in RDS API.
