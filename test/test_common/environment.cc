@@ -42,7 +42,7 @@ std::string makeTempDir(char* name_template) {
   char* dirname = ::_mktemp(name_template);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
                                                  name_template, strerror(errno)));
-#if defined(_LIBCPP_VERSION) && !defined(__APPLE__)
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
   std::__fs::filesystem::create_directories(dirname);
 #elif defined __cpp_lib_experimental_filesystem
   std::experimental::filesystem::create_directories(dirname);
@@ -85,7 +85,7 @@ char** argv_;
 } // namespace
 
 void TestEnvironment::createPath(const std::string& path) {
-#if defined(_LIBCPP_VERSION) && !defined(__APPLE__)
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
   std::__fs::filesystem::create_directories(std::__fs::filesystem::path(path));
@@ -98,7 +98,7 @@ void TestEnvironment::createPath(const std::string& path) {
 }
 
 void TestEnvironment::createParentPath(const std::string& path) {
-#if defined(_LIBCPP_VERSION) && !defined(__APPLE__)
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
   std::__fs::filesystem::create_directories(std::__fs::filesystem::path(path).parent_path());
@@ -113,7 +113,7 @@ void TestEnvironment::createParentPath(const std::string& path) {
 
 void TestEnvironment::removePath(const std::string& path) {
   RELEASE_ASSERT(absl::StartsWith(path, TestEnvironment::temporaryDirectory()), "");
-#if defined(_LIBCPP_VERSION) && !defined(__APPLE__)
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
   if (!std::__fs::filesystem::exists(path)) {
