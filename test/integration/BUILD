@@ -819,7 +819,6 @@ envoy_cc_test(
     srcs = [
         "aws_metadata_fetcher_integration_test.cc",
     ],
-    tags = ["exclusive"],
     deps = [
         ":integration_lib",
         "//source/common/common:fmt_lib",
