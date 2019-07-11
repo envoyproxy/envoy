@@ -1,3 +1,4 @@
+#include <iostream>
 #include <memory>
 #include <string>
 
@@ -3263,6 +3264,268 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
   )EOF";
   initialize(yaml);
   expectSetsockoptSoKeepalive(7, 4, 1);
+}
+
+TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
+  const std::string yaml = R"EOF(
+  {
+    "static_resources": {
+      "clusters": [
+        {
+          "name": "cluster_1",
+          "connect_timeout": "0.250s",
+          "type": "STATIC",
+          "lb_policy": "ROUND_ROBIN",
+           "common_lb_config": {
+							"close_connections_on_host_set_change": true
+		       }
+        }
+      ]
+    }
+  }
+  )EOF";
+
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+
+  create(parseBootstrapFromV2Yaml(yaml));
+
+  // Set up for an initialize callback.
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  std::unique_ptr<MockClusterUpdateCallbacks> callbacks(new NiceMock<MockClusterUpdateCallbacks>());
+  ClusterUpdateCallbacksHandlePtr cb =
+      cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
+
+  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+
+  // Test for no hosts returning the correct values before we have hosts.
+  EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster(
+                         "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+  EXPECT_EQ(nullptr, cluster_manager_->tcpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                                             nullptr, nullptr));
+  EXPECT_EQ(nullptr,
+            cluster_manager_->tcpConnForCluster("cluster_1", nullptr, nullptr).connection_);
+
+  Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
+
+  // Set up the HostSet
+  HostSharedPtr host1 = makeTestHost(cluster.info(), "tcp://127.0.0.1:80");
+  HostSharedPtr host2 = makeTestHost(cluster.info(), "tcp://127.0.0.1:81");
+
+  HostVector hosts{host1, host2};
+  auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+  // sending non-mergeable updates
+  cluster.prioritySet().updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      100);
+
+  //here actually no conn pools are being drained, as this is initial addition of hosts
+	EXPECT_EQ(
+		1, factory_.stats_.counter("cluster_manager.upstream_connections_closed_on_host_set_change")
+					 .value());
+
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _))
+      .Times(3)
+      .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+      .Times(3)
+      .WillRepeatedly(ReturnNew<Tcp::ConnectionPool::MockInstance>());
+
+  // This should provide us a CP for each of the above hosts.
+  Http::ConnectionPool::MockInstance* cp1 =
+      dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+
+  Http::ConnectionPool::MockInstance* cp2 =
+      dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+
+  Tcp::ConnectionPool::MockInstance* tcp1 =
+      dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, nullptr, nullptr));
+
+  Tcp::ConnectionPool::MockInstance* tcp2 =
+      dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, nullptr, nullptr));
+
+  EXPECT_NE(cp1, cp2);
+  EXPECT_NE(tcp1, tcp2);
+
+  EXPECT_CALL(*cp2, addDrainedCallback(_))
+      .WillOnce(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+
+  EXPECT_CALL(*cp1, addDrainedCallback(_))
+      .WillOnce(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+
+  EXPECT_CALL(*tcp1, addDrainedCallback(_))
+      .WillOnce(Invoke([](Tcp::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+
+  EXPECT_CALL(*tcp2, addDrainedCallback(_))
+      .WillOnce(Invoke([](Tcp::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+
+  HostVector hosts_removed;
+  hosts_removed.push_back(host2);
+
+  // this update should drain all conn pools (host1, host2)
+  cluster.prioritySet().updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, {},
+      hosts_removed, 100);
+
+  EXPECT_EQ(
+      2, factory_.stats_.counter("cluster_manager.upstream_connections_closed_on_host_set_change")
+             .value());
+
+  // recreate conn pool for host1
+  cp1 = dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
+      "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+
+  tcp1 = dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
+      "cluster_1", ResourcePriority::Default, nullptr, nullptr));
+
+  HostSharedPtr host3 = makeTestHost(cluster.info(), "tcp://127.0.0.1:82");
+
+  HostVector hosts_added;
+  hosts_added.push_back(host3);
+
+  EXPECT_CALL(*cp1, addDrainedCallback(_))
+      .WillOnce(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+
+  EXPECT_CALL(*tcp1, addDrainedCallback(_))
+      .WillOnce(Invoke([](Tcp::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+
+  // adding host3 should drain conn pool to host1
+  cluster.prioritySet().updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr,
+      hosts_added, {}, 100);
+
+  EXPECT_EQ(3, factory_.stats_.counter("cluster_manager.upstream_connections_closed_on_host_set_change").value());
+}
+
+TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
+  const std::string yaml = R"EOF(
+  {
+    "static_resources": {
+      "clusters": [
+        {
+          "name": "cluster_1",
+          "connect_timeout": "0.250s",
+          "type": "STATIC",
+          "lb_policy": "ROUND_ROBIN"
+        }
+      ]
+    }
+  }
+  )EOF";
+
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+
+  create(parseBootstrapFromV2Yaml(yaml));
+
+  // Set up for an initialize callback.
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  std::unique_ptr<MockClusterUpdateCallbacks> callbacks(new NiceMock<MockClusterUpdateCallbacks>());
+  ClusterUpdateCallbacksHandlePtr cb =
+      cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
+
+  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+
+  // Test for no hosts returning the correct values before we have hosts.
+  EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster(
+                         "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+  EXPECT_EQ(nullptr, cluster_manager_->tcpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                                             nullptr, nullptr));
+  EXPECT_EQ(nullptr,
+            cluster_manager_->tcpConnForCluster("cluster_1", nullptr, nullptr).connection_);
+
+  Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
+
+  // Set up the HostSet
+  HostSharedPtr host1 = makeTestHost(cluster.info(), "tcp://127.0.0.1:80");
+  HostSharedPtr host2 = makeTestHost(cluster.info(), "tcp://127.0.0.1:81");
+
+  HostVector hosts{host1, host2};
+  auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+  // sending non-mergeable updates
+  cluster.prioritySet().updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      100);
+
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _))
+      .Times(2)
+      .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+      .Times(2)
+      .WillRepeatedly(ReturnNew<Tcp::ConnectionPool::MockInstance>());
+
+  // This should provide us a CP for each of the above hosts.
+  Http::ConnectionPool::MockInstance* cp1 =
+      dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+
+  Http::ConnectionPool::MockInstance* cp2 =
+      dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+
+  Tcp::ConnectionPool::MockInstance* tcp1 =
+      dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, nullptr, nullptr));
+
+  Tcp::ConnectionPool::MockInstance* tcp2 =
+      dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, nullptr, nullptr));
+
+  EXPECT_NE(cp1, cp2);
+  EXPECT_NE(tcp1, tcp2);
+
+  HostSharedPtr host3 = makeTestHost(cluster.info(), "tcp://127.0.0.1:82");
+
+  HostVector hosts_added;
+  hosts_added.push_back(host3);
+
+  // no conn pools should be drained
+  EXPECT_CALL(*cp1, drainConnections()).Times(0);
+  EXPECT_CALL(*cp2, drainConnections()).Times(0);
+  EXPECT_CALL(*tcp1, drainConnections()).Times(0);
+  EXPECT_CALL(*tcp2, drainConnections()).Times(0);
+
+  // no conn pools should be drained
+  cluster.prioritySet().updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr,
+      hosts_added, {}, 100);
+
+  EXPECT_CALL(*cp2, addDrainedCallback(_))
+      .WillOnce(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+
+  EXPECT_CALL(*tcp2, addDrainedCallback(_))
+      .WillOnce(Invoke([](Tcp::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+
+  EXPECT_CALL(*cp1, drainConnections()).Times(0);
+  EXPECT_CALL(*tcp1, drainConnections()).Times(0);
+
+  HostVector hosts_removed;
+  hosts_removed.push_back(host2);
+
+  // conn pool for host2 should be drained
+  cluster.prioritySet().updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, {},
+      hosts_removed, 100);
+
+  EXPECT_EQ(0, factory_.stats_.counter("upstream_connections_closed_on_host_set_change").value());
 }
 
 } // namespace

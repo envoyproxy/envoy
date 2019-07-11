@@ -313,12 +313,25 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // Now setup for cross-thread updates.
   cluster.prioritySet().addMemberUpdateCb(
       [&cluster, this](const HostVector&, const HostVector& hosts_removed) -> void {
-        // TODO(snowp): Should this be subject to merge windows?
+        const bool close_connections_on_host_set_change =
+            cluster.info()->lbConfig().close_connections_on_host_set_change();
 
-        // Whenever hosts are removed from the cluster, we make each TLS cluster drain it's
-        // connection pools for the removed hosts.
-        if (!hosts_removed.empty()) {
-          postThreadLocalHostRemoval(cluster, hosts_removed);
+        if (close_connections_on_host_set_change) {
+          for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+            // this will drain all tcp and http connection pools
+            postThreadLocalHostRemoval(cluster, host_set->hosts());
+          }
+          cm_stats_.upstream_connections_closed_on_host_set_change_.inc();
+        } else {
+          // TODO(snowp): Should this be subject to merge windows?
+
+          // Whenever hosts are removed from the cluster, we make each TLS cluster drain it's
+          // connection pools for the removed hosts. If `close_connections_on_host_set_change` is
+          // enabled, this case will be covered by first <code>if</code> statement, where all
+          // connection pools are drained.
+          if (!hosts_removed.empty()) {
+            postThreadLocalHostRemoval(cluster, hosts_removed);
+          }
         }
       });
 
