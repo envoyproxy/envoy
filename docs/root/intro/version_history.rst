@@ -3,6 +3,7 @@ Version history
 
 1.12.0 (pending)
 ================
+* config: added support for delta xDS (including ADS) delivery
 
 1.11.0 (July 11, 2019)
 ======================
@@ -19,7 +20,6 @@ Version history
   for each host, useful for DNS based clusters.
 * api: track and report requests issued since last load report.
 * build: releases are built with Clang and linked with LLD.
-* config: added support for delta xDS (including ADS) delivery
 * control-plane: management servers can respond with HTTP 304 to indicate that config is up to date for Envoy proxies polling a :ref:`REST API Config Type <envoy_api_field_core.ApiConfigSource.api_type>`
 * csrf: added support for whitelisting additional source origins.
 * dns: added support for getting DNS record TTL which is used by STRICT_DNS/LOGICAL_DNS cluster as DNS refresh rate.
