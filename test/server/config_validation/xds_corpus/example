@@ -1,4 +1,11 @@
 actions {
+  add_listener {
+    version : "1"
+    name : "listener_0"
+    route_config : "route_config_0"
+  }
+}
+actions {
   add_route {
     name : "route_config_0"
     cluster : "cluster_0"
@@ -6,44 +13,15 @@ actions {
 }
 
 actions {
-  add_listener {
-    version : "1"
-    name : "listener_0"
-    route_config : "route_config_0"
-  }
-}
-actions {
-  remove_listener {
-    name : "listener_0"
-    version : "1"
-  }
-}
-actions {
-  add_listener {
-    version: "1"
-    name : "listener_1"
-    route_config : "route_config_0"
- }
-}
-actions {
   add_route {
-    name : "route_config_3"
+    name : "route_config_1"
     cluster : "cluster_0"
-  } 
+  }
 }
 actions {
   add_listener {
-    version: "1"
+    version : "1"
     name : "listener_1"
-    route_config : "route_config_2"
+    route_config : "route_config_1"
   }
 }
-
-#actions {
-#  add_listener {
-#    version : "2"
-#    name : "listener_1"
-#    route_config : "route_config_0"
-#  }
-#
-#}
