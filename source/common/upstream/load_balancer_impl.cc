@@ -117,9 +117,8 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
 // - normalized total health is < 100%. There are not enough healthy hosts to handle the load.
 // Continue distributing the load among priority sets, but turn on panic mode for a given priority
 //   if # of healthy hosts in priority set is low.
-// - normalized total health is 0%. All hosts are down. Redirect 100% of traffic to P=0 and enable
-// panic mode.
-//   However, disable panic mode only when healthy panic threshold is 0%
+// - normalized total health is 0%. All hosts are down. Redirect 100% of traffic to P=0.
+//   And if panic threshold > 0% then enable panic mode for P=0, otherwise disable.
 
 void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    const PrioritySet& priority_set,
