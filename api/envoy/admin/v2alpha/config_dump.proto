@@ -240,6 +240,11 @@ message SecretsConfigDump {
     envoy.api.v2.auth.Secret secret = 4;
   }
 
-  // List of all the secrets fetched via SDS.
-  repeated DynamicSecret dynamic_secrets = 1;
+  // The dynamically loaded active secrets. These are secrets that are available to service
+  // clusters or listeners.
+  repeated DynamicSecret dynamic_active_secrets = 1;
+
+  // The dynamically loaded warming secrets. These are secrets that are currently undergoing
+  // warming in preparation to service clusters or listeners.
+  repeated DynamicSecret dynamic_warming_secrets = 2;
 }

@@ -265,7 +265,7 @@ tls_certificate:
 
   // Private key is removed.
   const std::string expected_secrets_config_dump = R"EOF(
-dynamic_secrets:
+dynamic_active_secrets:
   version_info: "keycert-v1"
   last_updated:
     seconds: 1234567891
@@ -302,7 +302,7 @@ validation_context:
       *context_secret_provider->secret(), *api_);
   EXPECT_EQ("DUMMY_INLINE_STRING_TRUSTED_CA", cert_validation_context.caCert());
   const std::string updated_config_dump = R"EOF(
-dynamic_secrets:
+dynamic_active_secrets:
 - version_info: "keycert-v1"
   last_updated:
     seconds: 1234567891

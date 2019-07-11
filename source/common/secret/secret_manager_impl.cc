@@ -84,52 +84,55 @@ SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
                                                     secret_provider_context);
 }
 
-// TODO: question, what's the handling of static inlined stuff? they're just internal constructs
-// not needed to be exposed, maybe?
 ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::SecretsConfigDump>();
   auto providers = certificate_providers_.allSecretProviders();
   for (const auto& cert_secrets : providers) {
     const auto& secret_data = cert_secrets->secretData();
     const auto& tls_cert = cert_secrets->secret();
-    const auto& dynamic_secret = config_dump->mutable_dynamic_secrets()->Add();
-    const auto& secret = dynamic_secret->mutable_secret();
+    ::envoy::admin::v2alpha::SecretsConfigDump_DynamicSecret* dump_secret;
+    bool secret_ready = tls_cert != nullptr;
+    if (secret_ready) {
+      dump_secret = config_dump->mutable_dynamic_active_secrets()->Add();
+    } else {
+      dump_secret = config_dump->mutable_dynamic_warming_secrets()->Add();
+    }
+    auto secret = dump_secret->mutable_secret();
 
     ProtobufWkt::Timestamp last_updated_ts;
     TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
-    dynamic_secret->set_version_info(secret_data.version_info_);
-    *dynamic_secret->mutable_last_updated() = last_updated_ts;
+    dump_secret->set_version_info(secret_data.version_info_);
+    *dump_secret->mutable_last_updated() = last_updated_ts;
     secret->set_name(secret_data.resource_name);
-    // TODO(incfly): this means the config is registered but Envoy hasn't received a
-    // valid push from SDS server yet... should we still dump it somehow?
-    if (!tls_cert) {
-      continue;
-    }
-    auto tls_certificate = secret->mutable_tls_certificate();
-    tls_certificate->MergeFrom(*tls_cert);
-
+    if (secret_ready) {
+      auto tls_certificate = secret->mutable_tls_certificate();
+      tls_certificate->MergeFrom(*tls_cert);
     // We clear private key and password to avoid information leaking.j
     // TODO(incfly): switch to more generic scrubbing mechanism once
     // https://github.com/envoyproxy/envoy/issues/4757 is resolved.
     tls_certificate->clear_private_key();
     tls_certificate->clear_password();
+    }
   }
 
   // Handling validation Context provided via SDS.
   auto context_secret_provider = validation_context_providers_.allSecretProviders();
   for (const auto& validation_context_secret : context_secret_provider) {
-    auto secret_data = validation_context_secret->secretData();
-    auto validation_context = validation_context_secret->secret();
-    auto dynamic_secret = config_dump->mutable_dynamic_secrets()->Add();
-    auto secret = dynamic_secret->mutable_secret();
+    const auto& secret_data = validation_context_secret->secretData();
+    const auto& validation_context = validation_context_secret->secret();
+    ::envoy::admin::v2alpha::SecretsConfigDump_DynamicSecret* dump_secret;
+    bool secret_ready = validation_context != nullptr;
+    if (secret_ready) {
+      dump_secret = config_dump->mutable_dynamic_active_secrets()->Add();
+    } else {
+      dump_secret = config_dump->mutable_dynamic_warming_secrets()->Add();
+    }
+    auto secret = dump_secret->mutable_secret();
     ProtobufWkt::Timestamp last_updated_ts;
     TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
-    dynamic_secret->set_version_info(secret_data.version_info_);
-    *dynamic_secret->mutable_last_updated() = last_updated_ts;
+    dump_secret->set_version_info(secret_data.version_info_);
+    *dump_secret->mutable_last_updated() = last_updated_ts;
     secret->set_name(secret_data.resource_name);
-    if (!validation_context) {
-      continue;
-    }
     auto dump_context = secret->mutable_validation_context();
     dump_context->MergeFrom(*validation_context);
   }
