@@ -2,6 +2,12 @@
 
 set -e
 
+# Quick syntax check of .clang-tidy using PyYAML.
+if ! python -c 'import yaml, sys; yaml.safe_load(sys.stdin)' < .clang-tidy > /dev/null; then
+  echo ".clang-tidy has a syntax error"
+  exit 1
+fi
+
 echo "Generating compilation database..."
 
 cp -f .bazelrc .bazelrc.bak

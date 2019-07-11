@@ -741,9 +741,14 @@ bool ListenerManagerImpl::removeListener(const std::string& name) {
     warming_listeners_.erase(existing_warming_listener);
   }
 
-  // If there is an active listener it needs to be moved to draining.
+  // If there is an active listener it needs to be moved to draining after workers have started, or
+  // destroyed directly.
   if (existing_active_listener != active_listeners_.end()) {
-    drainListener(std::move(*existing_active_listener));
+    // Listeners in active_listeners_ are added to workers after workers start, so we drain
+    // listeners only after this occurs.
+    if (workers_started_) {
+      drainListener(std::move(*existing_active_listener));
+    }
     active_listeners_.erase(existing_active_listener);
   }
 
