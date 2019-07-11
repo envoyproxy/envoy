@@ -14,7 +14,7 @@
 /**
  * External entrypoint for library.
  */
-extern "C" int run_envoy(const char* config, const char* log_level) {
+envoy_status_t run_engine(const char* config, const char* log_level) {
   std::unique_ptr<Envoy::MainCommon> main_common;
 
   char* envoy_argv[] = {strdup("envoy"), strdup("--config-yaml"), strdup(config),
@@ -44,17 +44,16 @@ extern "C" int run_envoy(const char* config, const char* log_level) {
   try {
     main_common = std::make_unique<Envoy::MainCommon>(5, envoy_argv);
   } catch (const Envoy::NoServingException& e) {
-    return EXIT_SUCCESS;
+    return ENVOY_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {
     std::cerr << e.what() << std::endl;
-
-    return EXIT_FAILURE;
+    return ENVOY_FAILURE;
   } catch (const Envoy::EnvoyException& e) {
     std::cerr << e.what() << std::endl;
-    return EXIT_FAILURE;
+    return ENVOY_FAILURE;
   }
 
   // Run the server listener loop outside try/catch blocks, so that unexpected
   // exceptions show up as a core-dumps for easier diagnostics.
-  return main_common->run() ? EXIT_SUCCESS : EXIT_FAILURE;
+  return main_common->run() ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
