@@ -744,11 +744,11 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
 Http::CodecClientPtr
 ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
 
-  const bool validate_header_values =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_header_values");
+  const bool strict_header_validation =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation");
   return std::make_unique<Http::CodecClientProd>(
       Http::CodecClient::Type::HTTP2, std::move(data.connection_), data.host_description_,
-      dispatcher_, validate_header_values);
+      dispatcher_, strict_header_validation);
 }
 
 std::ostream& operator<<(std::ostream& out, HealthState state) {

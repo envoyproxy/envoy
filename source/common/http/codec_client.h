@@ -242,7 +242,7 @@ class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
                   Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
-                  bool validate_header_values);
+                  bool strict_header_validation);
 };
 
 } // namespace Http

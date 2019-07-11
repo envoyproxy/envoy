@@ -325,10 +325,10 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type
     : ConnectionImpl::ConnectionImpl(connection, type, max_headers_kb, false) {}
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type,
-                               uint32_t max_headers_kb, bool validate_header_values)
+                               uint32_t max_headers_kb, bool strict_header_validation)
     : connection_(connection), output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                                               [&]() -> void { this->onAboveHighWatermark(); }),
-      max_headers_kb_(max_headers_kb), validate_headers_(validate_header_values) {
+      max_headers_kb_(max_headers_kb), strict_header_validation_(strict_header_validation) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
@@ -429,7 +429,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 
   const absl::string_view header_value = absl::string_view(data, length);
 
-  if (validate_headers_) {
+  if (strict_header_validation_) {
     if (!Http::HeaderUtility::headerIsValid(header_value)) {
       ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
       error_code_ = Http::Code::BadRequest;
@@ -517,8 +517,8 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            ServerConnectionCallbacks& callbacks,
                                            Http1Settings settings, uint32_t max_request_headers_kb,
-                                           bool validate_header_values)
-    : ConnectionImpl(connection, HTTP_REQUEST, max_request_headers_kb, validate_header_values),
+                                           bool strict_header_validation)
+    : ConnectionImpl(connection, HTTP_REQUEST, max_request_headers_kb, strict_header_validation),
       callbacks_(callbacks), codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
@@ -695,8 +695,9 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
     : ClientConnectionImpl::ClientConnectionImpl(connection, callbacks, false) {}
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&,
-                                           bool validate_header_values)
-    : ConnectionImpl(connection, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB, validate_header_values) {}
+                                           bool strict_header_validation)
+    : ConnectionImpl(connection, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB, strict_header_validation) {
+}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||
