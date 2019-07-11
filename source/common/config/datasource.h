@@ -68,7 +68,7 @@ public:
     manager.add(init_target_);
   }
 
-  ~RemoteAsyncDataProvider() { init_target_.ready(); }
+  ~RemoteAsyncDataProvider() override { init_target_.ready(); }
 
   // Config::DataFetcher::RemoteDataFetcherCallback
   void onSuccess(absl::string_view data) override {
