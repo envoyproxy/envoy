@@ -88,7 +88,7 @@ build:remote --auth_enabled=true
 build:remote-clang --config=remote
 build:remote-clang --crosstool_top=@envoy//bazel/toolchains/clang:toolchain
 build:remote-clang --extra_toolchains=@envoy//bazel/toolchains/cpp:cc-toolchain-clang-x86_64-default
-build:remote-clang --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/bin:/usr/bin:/usr/lib/llvm-8/bin
+build:remote-clang --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin
 
 # Docker sandbox
 build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build:cfc514546bc0284536893cca5fa43d7128edcd35
@@ -104,4 +104,4 @@ build:docker-sandbox --linkopt=-fuse-ld=lld
 build:docker-clang --config=docker-sandbox
 build:docker-clang --crosstool_top=@envoy//bazel/toolchains/clang:toolchain
 build:docker-clang --extra_toolchains=@envoy//bazel/toolchains/cpp:cc-toolchain-clang-x86_64-default
-build:docker-clang --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/bin:/usr/bin:/usr/lib/llvm-8/bin
+build:docker-clang --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin
