@@ -677,7 +677,6 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
   drainClients();
   EXPECT_EQ(clientsToDrain().size(), 0); // client1 has been drained and closed.
   EXPECT_EQ(drainTimer()->enabled(), false);
-
   EXPECT_EQ(upstreamCxDrained().value(), 1);
 
   tls_.shutdownThread();
