@@ -104,12 +104,12 @@ protected:
 
 class DiskLoaderImplTest : public LoaderImplTest {
 public:
-  static void SetUpTestSuite() {
+  void SetUp() override {
     TestEnvironment::exec(
         {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
   }
 
-  static void TearDownTestSuite() {
+  void TearDown() override {
     TestEnvironment::removePath(TestEnvironment::temporaryPath("test/common/runtime/test_data"));
   }
 
