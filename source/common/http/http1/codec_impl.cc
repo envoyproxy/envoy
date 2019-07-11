@@ -320,6 +320,11 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
   return *table;
 }
 
+// TODO(alyssawilk) The overloaded constructors here and on {Client,Server}ConnectionImpl
+// can be cleaned up once "strict_header_validation" becomes the default behavior, rather
+// than a runtime-guarded one. The overloads were a workaround for the fact that Runtime
+// doesn't work from integration test call sites in scenarios where the required
+// thread-local storage is not available.
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type,
                                uint32_t max_headers_kb)
     : ConnectionImpl::ConnectionImpl(connection, type, max_headers_kb, false) {}
