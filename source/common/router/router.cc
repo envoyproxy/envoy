@@ -1052,7 +1052,10 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
   // chance to return before returning a response downstream.
   if (could_not_retry && (numRequestsAwaitingHeaders() > 0 || pending_retries_ > 0)) {
     upstream_request.upstream_host_->stats().rq_error_.inc();
-    upstream_request.removeFromList(upstream_requests_);
+
+    // Reset the stream because there are other in-flight requests that we'll
+    // wait around for and we're not interested in consuming any body/trailers.
+    upstream_request.removeFromList(upstream_requests_)->resetStream();
     return;
   }
 
