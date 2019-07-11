@@ -244,6 +244,9 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   setup_clang_toolchain
   echo "bazel coverage build with tests ${TEST_TARGETS}"
 
+  # LLVM coverage is a memory hog too.
+  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_cpu_resources=6"
+
   test/run_envoy_bazel_llvm_coverage.sh ${TEST_TARGETS}
   collect_build_profile coverage
   exit 0

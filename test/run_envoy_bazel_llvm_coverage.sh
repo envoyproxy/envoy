@@ -22,9 +22,8 @@ echo "    VALIDATE_COVERAGE=${VALIDATE_COVERAGE}"
 
 rm -rf $(find -L bazel-bin -name "test-*.profraw")
 
-"${BAZEL_COVERAGE}" test "${COVERAGE_TARGET}" ${BAZEL_TEST_OPTIONS} -c fastbuild --copt=-DNDEBUG \
-  --cache_test_results=no --define ENVOY_CONFIG_COVERAGE=llvm --test_output=all \
-  --strategy=Genrule=local --strategy=TestRunner=local \
+"${BAZEL_COVERAGE}" test "${COVERAGE_TARGET}" ${BAZEL_BUILD_OPTIONS} -c fastbuild --copt=-DNDEBUG \
+  --cache_test_results=no --define ENVOY_CONFIG_COVERAGE=llvm --test_output=all  --strategy=TestRunner=local \
   --test_filter='-QuicPlatformTest.QuicStackTraceTest:IpVersions/ClusterMemoryTestRunner.*' \
   --test_env=LLVM_PROFILE_FILE=test-%p.profraw
 
