@@ -4,12 +4,7 @@
 
 static NSString *const kConfig = @"config";
 static NSString *const kLogLevel = @"logLevel";
-
-static NSString *const kLogLevelToString[] = {
-    [EnvoyLogLevelTrace] = @"trace", [EnvoyLogLevelDebug] = @"debug",
-    [EnvoyLogLevelInfo] = @"info",   [EnvoyLogLevelWarn] = @"warn",
-    [EnvoyLogLevelError] = @"error", [EnvoyLogLevelCritical] = @"critical",
-    [EnvoyLogLevelOff] = @"off"};
+static NSString *const kDefaultLogLevel = @"info";
 
 @interface Envoy ()
 @property (nonatomic, strong) NSThread *runner;
@@ -20,16 +15,16 @@ static NSString *const kLogLevelToString[] = {
 @synthesize runner;
 
 - (instancetype)initWithConfig:(NSString *)config {
-  self = [self initWithConfig:config logLevel:EnvoyLogLevelInfo];
+  self = [self initWithConfig:config logLevel:kDefaultLogLevel];
   return self;
 }
 
-- (instancetype)initWithConfig:(NSString *)config logLevel:(EnvoyLogLevel)logLevel {
+- (instancetype)initWithConfig:(NSString *)config logLevel:(NSString *)logLevel {
   self = [super init];
   if (self) {
     NSDictionary *args = @{
       kConfig : config,
-      kLogLevel : kLogLevelToString[logLevel],
+      kLogLevel : logLevel,
     };
     self.runner = [[NSThread alloc] initWithTarget:self selector:@selector(run:) object:args];
     [self.runner start];
