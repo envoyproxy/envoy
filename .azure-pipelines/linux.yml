@@ -10,7 +10,7 @@ jobs:
     vmImage: 'Ubuntu 16.04'
   container: envoy-build
   steps:
-  - script: ci/do_ci.sh bazel.release
+  - script: ci/do_ci.sh bazel.asan
     env:
       ENVOY_SRCDIR: $(Build.SourcesDirectory)
       BUILD_DIR: $(Build.StagingDirectory)
@@ -23,6 +23,6 @@ jobs:
   - task: PublishTestResults@2
     inputs:
       testResultsFiles: '**/testlogs/**/test.xml'
-      testRunTitle: 'bazel.release'
+      testRunTitle: 'bazel.asan'
       searchFolder: $(Build.StagingDirectory)
     condition: always()
