@@ -9,7 +9,10 @@ load("//bazel:swift_static_framework.bzl", "swift_static_framework")
 
 swift_static_framework(
     name = "ios_framework",
-    srcs = ["Envoy.swift"],
+    srcs = [
+        "Envoy.swift",
+        "LogLevel.swift",
+    ],
     module_name = "Envoy",
     objc_includes = ["//library/objective-c:EnvoyEngine.h"],
     visibility = ["//visibility:public"],
@@ -20,6 +23,7 @@ swift_library(
     name = "envoy_swift_lib",
     srcs = [
         "Envoy.swift",
+        "LogLevel.swift",
     ],
     module_name = "Envoy",
     visibility = ["//visibility:public"],
