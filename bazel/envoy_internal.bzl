@@ -84,9 +84,7 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
 
 def envoy_static_link_libstdcpp_linkopts():
     return envoy_select_force_libcpp(
-        # TODO(PiotrSikora): statically link libc++ once that's possible.
-        # See: https://reviews.llvm.org/D53238
-        ["-stdlib=libc++"],
+        ["-stdlib=libc++", "-l:libc++.a", "-l:libc++abi.a", "-static-libgcc"],
         ["-static-libstdc++", "-static-libgcc"],
     )
 
