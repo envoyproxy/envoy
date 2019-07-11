@@ -557,6 +557,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "header_prefix_integration_test",
+    srcs = ["header_prefix_integration_test.cc"],
+    coverage = False,
+    deps = [
+        ":http_protocol_integration_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "overload_integration_test",
     srcs = ["overload_integration_test.cc"],
     deps = [

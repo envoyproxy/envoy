@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["fault_config.h"],
     deps = [
         "//include/envoy/http:header_map_interface",
+        "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/filter/fault/v2:fault_cc",
     ],
