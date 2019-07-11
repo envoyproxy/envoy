@@ -563,15 +563,15 @@ std::vector<RedisDnsConfigTuple> generateRedisDnsParams() {
   {
     std::string family_yaml(R"EOF(dns_lookup_family: V6_ONLY)EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V6Only);
-    std::list<std::string> dns_response{"::1", "::2"};
-    std::list<std::string> resolved_host{"[::1]:22120", "[::2]:22120"};
+    std::list<std::string> dns_response{"::1", "2001:0db8:85a3:0000:0000:8a2e:0370:7334"};
+    std::list<std::string> resolved_host{"[::1]:22120", "[2001:db8:85a3::8a2e:370:7334]:22120"};
     dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, resolved_host));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: AUTO)EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
-    std::list<std::string> dns_response{"::1", "::2"};
-    std::list<std::string> resolved_host{"[::1]:22120", "[::2]:22120"};
+    std::list<std::string> dns_response{"::1", "2001:0db8:85a3:0000:0000:8a2e:0370:7334"};
+    std::list<std::string> resolved_host{"[::1]:22120", "[2001:db8:85a3::8a2e:370:7334]:22120"};
     dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, resolved_host));
   }
   return dns_config;
