@@ -15,7 +15,14 @@ void expectUninitialized(const Manager& m) { EXPECT_EQ(Manager::State::Uninitial
 void expectInitializing(const Manager& m) { EXPECT_EQ(Manager::State::Initializing, m.state()); }
 void expectInitialized(const Manager& m) { EXPECT_EQ(Manager::State::Initialized, m.state()); }
 
-TEST(InitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
+template <typename T> class InitManagerImplTest : public ::testing::Test {};
+
+using TargetTypes = ::testing::Types<ExpectableTargetImpl, ExpectableEagerTargetImpl>;
+
+TYPED_TEST_SUITE(InitManagerImplTest, TargetTypes);
+
+// Universal tests for all Target implementation
+TYPED_TEST(InitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -24,7 +31,7 @@ TEST(InitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
   ExpectableTargetImpl t1("t1");
   m.add(t1);
 
-  ExpectableTargetImpl t2("t2");
+  TypeParam t2("t2");
   m.add(t2);
 
   ExpectableWatcherImpl w;
@@ -37,54 +44,16 @@ TEST(InitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
   expectInitialized(m);
 }
 
-TEST(InitManagerImplTest, AddReadyTarget) {
+TYPED_TEST(InitManagerImplTest, AddAsyncTargetsWhenUninitialized) {
   InSequence s;
 
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  ExpectableEagerTargetImpl t1("t1");
-  t1.ready();
+  TypeParam t1("t1");
   m.add(t1);
 
-  ExpectableWatcherImpl w;
-
-  t1.expectInitialize();
-  w.expectReady();
-  m.initialize(w);
-  expectInitialized(m);
-}
-
-TEST(InitManagerImplTest, AddTargetAndMarkReadyBeforeInitialization) {
-  InSequence s;
-
-  ManagerImpl m("test");
-  expectUninitialized(m);
-
-  ExpectableEagerTargetImpl t1("t1");
-  // vs AddReadyTarget case:
-  // Swap the add() and ready() order but still before m.initialize().
-  m.add(t1);
-  t1.ready();
-
-  ExpectableWatcherImpl w;
-
-  t1.expectInitialize();
-  w.expectReady();
-  m.initialize(w);
-  expectInitialized(m);
-}
-
-TEST(InitManagerImplTest, AddAsyncTargetsWhenUninitialized) {
-  InSequence s;
-
-  ManagerImpl m("test");
-  expectUninitialized(m);
-
-  ExpectableTargetImpl t1("t1");
-  m.add(t1);
-
-  ExpectableTargetImpl t2("t2");
+  TypeParam t2("t2");
   m.add(t2);
 
   ExpectableWatcherImpl w;
@@ -105,16 +74,16 @@ TEST(InitManagerImplTest, AddAsyncTargetsWhenUninitialized) {
   expectInitialized(m);
 }
 
-TEST(InitManagerImplTest, AddMixedTargetsWhenUninitialized) {
+TYPED_TEST(InitManagerImplTest, AddMixedTargetsWhenUninitialized) {
   InSequence s;
 
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  ExpectableTargetImpl t1("t1");
+  TypeParam t1("t1");
   m.add(t1);
 
-  ExpectableTargetImpl t2("t2");
+  TypeParam t2("t2");
   m.add(t2);
 
   ExpectableWatcherImpl w;
@@ -131,13 +100,13 @@ TEST(InitManagerImplTest, AddMixedTargetsWhenUninitialized) {
   expectInitialized(m);
 }
 
-TEST(InitManagerImplTest, AddImmediateTargetWhenInitializing) {
+TYPED_TEST(InitManagerImplTest, AddImmediateTargetWhenInitializing) {
   InSequence s;
 
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  ExpectableTargetImpl t1("t1");
+  TypeParam t1("t1");
   m.add(t1);
 
   ExpectableWatcherImpl w;
@@ -148,7 +117,7 @@ TEST(InitManagerImplTest, AddImmediateTargetWhenInitializing) {
   expectInitializing(m);
 
   // adding an immediate target shouldn't finish initialization
-  ExpectableTargetImpl t2("t2");
+  TypeParam t2("t2");
   t2.expectInitializeWillCallReady();
   m.add(t2);
   expectInitializing(m);
@@ -159,7 +128,7 @@ TEST(InitManagerImplTest, AddImmediateTargetWhenInitializing) {
   expectInitialized(m);
 }
 
-TEST(InitManagerImplTest, UnavailableTarget) {
+TYPED_TEST(InitManagerImplTest, UnavailableTarget) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -167,7 +136,7 @@ TEST(InitManagerImplTest, UnavailableTarget) {
 
   // add a target and destroy it
   {
-    ExpectableTargetImpl t("t");
+    TypeParam t("t");
     m.add(t);
     t.expectInitialize().Times(0);
   }
@@ -180,10 +149,10 @@ TEST(InitManagerImplTest, UnavailableTarget) {
   expectInitialized(m);
 }
 
-TEST(InitManagerImplTest, UnavailableManager) {
+TYPED_TEST(InitManagerImplTest, UnavailableManager) {
   InSequence s;
 
-  ExpectableTargetImpl t("t");
+  TypeParam t("t");
   ExpectableWatcherImpl w;
 
   {
@@ -203,13 +172,13 @@ TEST(InitManagerImplTest, UnavailableManager) {
   t.ready();
 }
 
-TEST(InitManagerImplTest, UnavailableWatcher) {
+TYPED_TEST(InitManagerImplTest, UnavailableWatcher) {
   InSequence s;
 
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  ExpectableTargetImpl t("t");
+  TypeParam t("t");
   m.add(t);
 
   {
@@ -225,6 +194,45 @@ TEST(InitManagerImplTest, UnavailableWatcher) {
 
   // initialization should finish without notifying the watcher
   t.ready();
+}
+
+// Specialized test for EagerTargetImpl
+TEST(EagerInitManagerImplTest, AddReadyTarget) {
+  InSequence s;
+
+  ManagerImpl m("test");
+  expectUninitialized(m);
+
+  ExpectableEagerTargetImpl t1("t1");
+  t1.ready();
+  m.add(t1);
+
+  ExpectableWatcherImpl w;
+
+  t1.expectInitialize();
+  w.expectReady();
+  m.initialize(w);
+  expectInitialized(m);
+}
+
+TEST(EagerInitManagerImplTest, AddTargetAndMarkReadyBeforeInitialization) {
+  InSequence s;
+
+  ManagerImpl m("test");
+  expectUninitialized(m);
+
+  ExpectableEagerTargetImpl t1("t1");
+  // vs AddReadyTarget case:
+  // Swap the add() and ready() order but still before m.initialize().
+  m.add(t1);
+  t1.ready();
+
+  ExpectableWatcherImpl w;
+
+  t1.expectInitialize();
+  w.expectReady();
+  m.initialize(w);
+  expectInitialized(m);
 }
 
 } // namespace
