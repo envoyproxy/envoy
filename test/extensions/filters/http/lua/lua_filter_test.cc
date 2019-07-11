@@ -250,6 +250,8 @@ TEST_F(LuaHttpFilterTest, ScriptBodyChunksRequestBody) {
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
