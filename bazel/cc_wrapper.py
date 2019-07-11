@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 import contextlib
 import os
 import shlex
@@ -112,7 +112,7 @@ def main():
 
     with closing_fd(new_flagfile_fd):
       for arg in new_driver_args:
-        os.write(new_flagfile_fd, arg + "\n")
+        os.write(new_flagfile_fd, bytes(str(arg + "\n").encode("utf-8")))
 
     # Provide new arguments using the temp file containing the args
     new_args = ["@" + new_flagfile_path]
