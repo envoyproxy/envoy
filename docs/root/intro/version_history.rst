@@ -1,8 +1,8 @@
 Version history
 ---------------
 
-1.11.0 (Pending)
-================
+1.11.0 (July 11, 2019)
+======================
 * access log: added a new field for downstream TLS session ID to file and gRPC access logger.
 * access log: added a new field for route name to file and gRPC access logger.
 * access log: added a new field for response code details in :ref:`file access logger<config_access_log_format_response_code_details>` and :ref:`gRPC access logger<envoy_api_field_data.accesslog.v2.HTTPResponseProperties.response_code_details>`.
