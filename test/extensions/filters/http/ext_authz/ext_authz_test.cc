@@ -806,6 +806,8 @@ TEST_F(HttpFilterTestParam, ContextExtensions) {
 
   // Engage the filter so that check is called.
   filter_->decodeHeaders(request_headers_, false);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
 
   // Make sure that the extensions appear in the check request issued by the filter.
   EXPECT_EQ("value_vhost", check_request.attributes().context_extensions().at("key_vhost"));
