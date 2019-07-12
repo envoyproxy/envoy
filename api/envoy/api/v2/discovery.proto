@@ -35,10 +35,10 @@ message DiscoveryRequest {
 
   // List of resources to subscribe to, e.g. list of cluster names or a route
   // configuration name. If this is empty, all resources for the API are
-  // returned. LDS/CDS expect empty resource_names, since this is global
-  // discovery for the Envoy instance. The LDS and CDS responses will then imply
-  // a number of resources that need to be fetched via EDS/RDS, which will be
-  // explicitly enumerated in resource_names.
+  // returned. LDS/CDS may have empty resource_names, which will cause all
+  // resources for the Envoy instance to be returned. The LDS and CDS responses
+  // will then imply a number of resources that need to be fetched via EDS/RDS,
+  // which will be explicitly enumerated in resource_names.
   repeated string resource_names = 3;
 
   // Type of the resource that is being requested, e.g.
