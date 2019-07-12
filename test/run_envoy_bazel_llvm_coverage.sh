@@ -39,7 +39,7 @@ llvm-profdata merge -sparse $(find -L bazel-out -name coverage.dat) -o ${COVERAG
 
 echo "Generating report..."
 llvm-cov show bazel-bin/test/coverage/coverage_tests -instr-profile=${COVERAGE_DIR}/coverage.profdata \
-  -ignore-filename-regex='(/external/|pb\.(validate\.)?(h|cc)|/chromium_url/|/tmp)' -output-dir=${COVERAGE_DIR} -format=html
+  -ignore-filename-regex='(/external/|pb\.(validate\.)?(h|cc)|/chromium_url/|/test/|/tmp)' -output-dir=${COVERAGE_DIR} -format=html
 sed -i -e 's|>proc/self/cwd/|>|g' "${COVERAGE_DIR}/index.html"
 sed -i -e 's|>bazel-out/[^/]*/bin/\([^/]*\)/[^<]*/_virtual_includes/[^/]*|>\1|g' "${COVERAGE_DIR}/index.html"
 
