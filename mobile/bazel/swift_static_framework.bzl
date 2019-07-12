@@ -48,7 +48,7 @@ def _swift_static_framework_impl(ctx):
 
         libraries = archive[CcInfo].linking_context.libraries_to_link
         archives = []
-        for library in libraries:
+        for library in libraries.to_list():
             archive = library.pic_static_library or library.static_library
             if archive:
                 archives.append(archive)
