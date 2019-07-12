@@ -1,7 +1,7 @@
 .. _config_listener_filters_http_inspector:
 
 HTTP Inspector
-=============
+==============
 
 HTTP Inspector listener filter allows detecting whether the application protocol appears to be HTTP, 
 and if it is HTTP, it detects the HTTP protocol (HTTP/1.x or HTTP/2) further. This can be used to select a
