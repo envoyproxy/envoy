@@ -123,6 +123,8 @@ TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
     Http::TestHeaderMapImpl request_headers;
     request_headers.addCopy(Http::Headers::get().ContentType, content_type);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+    Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+    EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
               request_headers.ContentType()->value().getStringView());
   }

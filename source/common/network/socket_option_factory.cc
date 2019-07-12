@@ -100,8 +100,8 @@ SocketOptionFactory::buildTcpFastOpenOptions(uint32_t queue_length) {
 std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpPacketInfoOptions() {
   std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
-      envoy::api::v2::core::SocketOption::STATE_BOUND, ENVOY_RECV_IP_PKT_INFO,
-      ENVOY_RECV_IPV6_PKT_INFO, 1));
+      envoy::api::v2::core::SocketOption::STATE_BOUND, ENVOY_SELF_IP_ADDR, ENVOY_SELF_IPV6_ADDR,
+      1));
   return options;
 }
 

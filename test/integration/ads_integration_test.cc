@@ -969,6 +969,9 @@ TEST_P(AdsIntegrationTest, ListenerDrainBeforeServerStart) {
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {}, "1");
   test_server_->waitForGaugeGe("listener_manager.total_listeners_active", 1);
+  // Before server is started, even though listeners are added to active list
+  // we mark them as "warming" in config dump since they're not initialized yet.
+  EXPECT_EQ(getListenersConfigDump().dynamic_warming_listeners().size(), 1);
 
   // Remove listener.
   sendDiscoveryResponse<envoy::api::v2::Listener>(Config::TypeUrl::get().Listener, {}, {}, {}, "1");
