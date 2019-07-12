@@ -29,7 +29,7 @@ public:
    * This function will be called when data is fetched successfully from remote.
    * @param data remote data
    */
-  virtual void onSuccess(absl::string_view data) PURE;
+  virtual void onSuccess(const std::string& data) PURE;
 
   /**
    * This function is called when error happens during fetching data.

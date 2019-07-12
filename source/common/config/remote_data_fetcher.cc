@@ -42,7 +42,6 @@ void RemoteDataFetcher::onSuccess(Http::MessagePtr&& response) {
   if (status_code == enumToInt(Http::Code::OK)) {
     ENVOY_LOG(debug, "fetch remote data [uri = {}]: success", uri_.uri());
     if (response->body()) {
-      const auto len = response->body()->length();
       const auto content_hash =
           Hex::encode(Envoy::Common::Crypto::Utility::getSha256Digest(*response->body()));
 
@@ -50,8 +49,7 @@ void RemoteDataFetcher::onSuccess(Http::MessagePtr&& response) {
         ENVOY_LOG(debug, "fetch remote data [uri = {}]: data is invalid", uri_.uri());
         callback_.onFailure(FailureReason::InvalidData);
       } else {
-        callback_.onSuccess(
-            absl::string_view(static_cast<char*>(response->body()->linearize(len)), len));
+        callback_.onSuccess(response->body()->toString());
       }
     } else {
       ENVOY_LOG(debug, "fetch remote data [uri = {}]: body is empty", uri_.uri());

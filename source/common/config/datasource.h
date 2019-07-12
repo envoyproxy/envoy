@@ -71,8 +71,8 @@ public:
   ~RemoteAsyncDataProvider() override { init_target_.ready(); }
 
   // Config::DataFetcher::RemoteDataFetcherCallback
-  void onSuccess(absl::string_view data) override {
-    callback_(std::string(data));
+  void onSuccess(const std::string& data) override {
+    callback_(data);
     init_target_.ready();
   }
 
