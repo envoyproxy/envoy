@@ -66,6 +66,7 @@ public:
   MOCK_METHOD0(touch, void());
 
   Network::Address::InstanceConstSharedPtr address_;
+  std::string resolved_host_;
 };
 
 class MockUpdateCallbacks : public DnsCache::UpdateCallbacks {

@@ -1,27 +1,13 @@
 #include "extensions/clusters/dynamic_forward_proxy/cluster.h"
 
+#include "common/network/transport_socket_options_impl.h"
+
 #include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace DynamicForwardProxy {
-
-class ClusterInfoWithOverridenTls : public Upstream::ClusterInfoWrapper {
-public:
-  ClusterInfoWithOverridenTls(const Upstream::ClusterInfoConstSharedPtr& real_cluster_info,
-                              Network::TransportSocketFactoryPtr&& transport_socket_factory)
-      : ClusterInfoWrapper(real_cluster_info),
-        transport_socket_factory_(std::move(transport_socket_factory)) {}
-
-  // Upstream::ClusterInfo
-  Network::TransportSocketFactory& transportSocketFactory() const override {
-    return *transport_socket_factory_;
-  }
-
-private:
-  const Network::TransportSocketFactoryPtr transport_socket_factory_;
-};
 
 Cluster::Cluster(
     const envoy::api::v2::Cluster& cluster,
@@ -33,15 +19,9 @@ Cluster::Cluster(
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                                        added_via_api),
-      cluster_config_(cluster), dns_cache_manager_(cache_manager_factory.get()),
+      dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
-      transport_factory_context_(factory_context.admin(), factory_context.sslContextManager(),
-                                 factory_context.statsScope(), factory_context.clusterManager(),
-                                 factory_context.localInfo(), factory_context.dispatcher(),
-                                 factory_context.random(), factory_context.stats(),
-                                 factory_context.singletonManager(), factory_context.threadLocal(),
-                                 factory_context.messageValidationVisitor(), factory_context.api()),
       host_map_(std::make_shared<HostInfoMap>()) {
   // TODO(mattklein123): Technically, we should support attaching to an already warmed DNS cache.
   //                     This will require adding a hosts() or similar API to the cache and
@@ -101,43 +81,26 @@ void Cluster::onDnsHostAddOrUpdate(
   }
 
   ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
-  Upstream::ClusterInfoConstSharedPtr cluster_info_to_use;
-  if (createCustomTlsForHost()) {
-    // Create an override cluster configuration that automatically provides both SNI as well as
-    // SAN verification for the resolved host if the cluster has been configured with TLS.
-    // TODO(mattklein123): The fact that we are copying the cluster config, etc. is not very clean.
-    //                     consider streamlining this in the future.
-    // TODO(mattklein123): If the host is an IP address we should not set SNI.
-    envoy::api::v2::Cluster override_cluster = cluster_config_;
-    override_cluster.mutable_tls_context()->set_sni(host_info->resolvedHost());
-    override_cluster.mutable_tls_context()
-        ->mutable_common_tls_context()
-        ->mutable_validation_context()
-        ->add_verify_subject_alt_name(host_info->resolvedHost());
-    cluster_info_to_use = std::make_shared<ClusterInfoWithOverridenTls>(
-        info(),
-        Upstream::createTransportSocketFactory(override_cluster, transport_factory_context_));
-  } else {
-    cluster_info_to_use = info();
-  }
+
+  // Create an override transport socket options that automatically provides both SNI as well as
+  // SAN verification for the resolved host if the cluster has been configured with TLS.
+  // TODO(mattklein123): If the host is an IP address we should not set SNI.
+  Network::TransportSocketOptionsSharedPtr transport_socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          host_info->resolvedHost(), std::vector<std::string>{host_info->resolvedHost()});
 
   const auto new_host_map = std::make_shared<HostInfoMap>(*current_map);
-  const auto emplaced = new_host_map->try_emplace(
-      host, host_info,
-      std::make_shared<Upstream::LogicalHost>(cluster_info_to_use, host, host_info->address(),
-                                              dummy_locality_lb_endpoint_, dummy_lb_endpoint_));
+  const auto emplaced =
+      new_host_map->try_emplace(host, host_info,
+                                std::make_shared<Upstream::LogicalHost>(
+                                    info(), host, host_info->address(), dummy_locality_lb_endpoint_,
+                                    dummy_lb_endpoint_, transport_socket_options));
   Upstream::HostVector hosts_added;
   hosts_added.emplace_back(emplaced.first->second.logical_host_);
 
   // Swap in the new map. This will be picked up when the per-worker LBs are recreated via
   // the host set update.
   swapAndUpdateMap(new_host_map, hosts_added, {});
-}
-
-bool Cluster::createCustomTlsForHost() {
-  // TODO(mattklein123): Consider custom settings per host and/or global cluster config to turn this
-  // off.
-  return !cluster_config_.has_transport_socket() && cluster_config_.has_tls_context();
 }
 
 void Cluster::swapAndUpdateMap(const HostInfoMapSharedPtr& new_hosts_map,

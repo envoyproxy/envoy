@@ -6,8 +6,6 @@
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/logical_host.h"
 
-#include "server/transport_socket_config_impl.h"
-
 #include "extensions/clusters/well_known_names.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 
@@ -97,9 +95,7 @@ private:
   void swapAndUpdateMap(const HostInfoMapSharedPtr& new_hosts_map,
                         const Upstream::HostVector& hosts_added,
                         const Upstream::HostVector& hosts_removed);
-  bool createCustomTlsForHost();
 
-  const envoy::api::v2::Cluster cluster_config_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
   const Extensions::Common::DynamicForwardProxy::DnsCache::AddUpdateCallbacksHandlePtr
@@ -107,7 +103,6 @@ private:
   const envoy::api::v2::endpoint::LocalityLbEndpoints dummy_locality_lb_endpoint_;
   const envoy::api::v2::endpoint::LbEndpoint dummy_lb_endpoint_;
   const LocalInfo::LocalInfo& local_info_;
-  Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context_;
 
   absl::Mutex host_map_lock_;
   HostInfoMapSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);

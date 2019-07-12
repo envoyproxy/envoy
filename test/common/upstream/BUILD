@@ -301,15 +301,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "logical_host_test",
-    srcs = ["logical_host_test.cc"],
-    deps = [
-        "//source/common/upstream:logical_host_lib",
-        "//test/mocks/upstream:cluster_info_mocks",
-    ],
-)
-
-envoy_cc_test(
     name = "ring_hash_lb_test",
     srcs = ["ring_hash_lb_test.cc"],
     deps = [

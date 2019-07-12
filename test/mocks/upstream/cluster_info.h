@@ -125,7 +125,6 @@ public:
   absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
-  absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig> lb_least_request_config_;
   absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   envoy::api::v2::Cluster::CommonLbConfig lb_config_;

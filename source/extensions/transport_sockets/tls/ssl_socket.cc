@@ -43,11 +43,10 @@ public:
 } // namespace
 
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
-                     Network::TransportSocketOptionsSharedPtr transport_socket_options)
-    : ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
-      ssl_(ctx_->newSsl(transport_socket_options != nullptr
-                            ? transport_socket_options->serverNameOverride()
-                            : absl::nullopt)) {
+                     const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+    : transport_socket_options_(transport_socket_options),
+      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
+      ssl_(ctx_->newSsl(transport_socket_options_.get())) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_.get());
   } else {
