@@ -12,6 +12,10 @@ swift_static_framework(
     srcs = [
         "Envoy.swift",
         "LogLevel.swift",
+        "Request.swift",
+        "RequestBuilder.swift",
+        "RequestMethod.swift",
+        "RetryPolicy.swift",
     ],
     module_name = "Envoy",
     objc_includes = ["//library/objective-c:EnvoyEngine.h"],
