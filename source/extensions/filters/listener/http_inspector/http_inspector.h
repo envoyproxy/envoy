@@ -61,7 +61,7 @@ public:
 private:
   void onRead();
   void done(bool success);
-  void parseHttpHeader(const unsigned char* data, unsigned int len);
+  void parseHttpHeader(absl::string_view data);
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_;

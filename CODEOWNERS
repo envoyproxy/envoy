@@ -43,4 +43,4 @@ extensions/filters/common/original_src @snowp @klarose
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @snowp
 # http inspector
-/*/extensions/filters/listener/http_inspector @crazyxy @PiotrSikora
+/*/extensions/filters/listener/http_inspector @crazyxy @PiotrSikora @lizan

@@ -9,6 +9,8 @@
 
 #include "extensions/transport_sockets/well_known_names.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
@@ -36,13 +38,13 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 
   ASSERT(file_event_ == nullptr);
 
-  file_event_ =
-      cb.dispatcher().createFileEvent(socket.ioHandle().fd(),
-                                      [this](uint32_t events) {
-                                        ASSERT(events == Event::FileReadyType::Read);
-                                        onRead();
-                                      },
-                                      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+  file_event_ = cb.dispatcher().createFileEvent(
+      socket.ioHandle().fd(),
+      [this](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Read);
+        onRead();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 
   cb_ = &cb;
   return Network::FilterStatus::StopIteration;
@@ -66,22 +68,22 @@ void Filter::onRead() {
     const uint8_t* data = buf_ + read_;
     const size_t len = result.rc_ - read_;
     read_ = result.rc_;
-    parseHttpHeader(data, len);
+    absl::string_view header(reinterpret_cast<const char*>(data), len);
+    parseHttpHeader(header);
   } else {
     done(false);
   }
 }
 
-void Filter::parseHttpHeader(const unsigned char* data, unsigned int len) {
-  if (len >= HTTP2_CONNECTION_PREFACE_LEN &&
-      !memcmp(data, HTTP2_CONNECTION_PREFACE, HTTP2_CONNECTION_PREFACE_LEN)) {
+void Filter::parseHttpHeader(absl::string_view data) {
+  if (absl::StartsWith(data, HTTP2_CONNECTION_PREFACE)) {
     ENVOY_LOG(trace, "http inspector: http2 connection preface found");
     protocol_ = "HTTP/2";
     config_->stats().http2_found_.inc();
     done(true);
   } else {
     unsigned int id = 0, sid = 0, spaces[2];
-    while (id + 1 < len && (data[id] != '\r' || data[id + 1] != '\n')) {
+    while (id + 1 < data.length() && (data[id] != '\r' || data[id + 1] != '\n')) {
       if (data[id] == ' ') {
         if (sid < 2) {
           spaces[sid++] = id;
@@ -93,17 +95,16 @@ void Filter::parseHttpHeader(const unsigned char* data, unsigned int len) {
       id++;
     }
 
-    if (sid != 2 || id + 1 == len) {
+    if (sid != 2 || id + 1 == data.length()) {
       ENVOY_LOG(trace, "http inspector: invalid http1x request line");
       done(false);
       return;
     }
 
-    auto buf = reinterpret_cast<const char*>(data);
-    absl::string_view method(buf, spaces[0]);
+    absl::string_view method(data.data(), spaces[0]);
     // TODO(crazyxy): check request URI
-    absl::string_view request_uri(buf + spaces[0] + 1, spaces[1] - spaces[0] - 1);
-    absl::string_view http_version(buf + spaces[1] + 1, id - spaces[1] - 1);
+    absl::string_view request_uri(data.data() + spaces[0] + 1, spaces[1] - spaces[0] - 1);
+    absl::string_view http_version(data.data() + spaces[1] + 1, id - spaces[1] - 1);
 
     if (std::find(HTTP_METHODS.begin(), HTTP_METHODS.end(), method) == HTTP_METHODS.end() ||
         std::find(HTTP_PROTOCOLS.begin(), HTTP_PROTOCOLS.end(), http_version) ==
