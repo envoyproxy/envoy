@@ -646,11 +646,11 @@ TEST(HeaderMapImplTest, AddCopy) {
   headers.addCopy(cache_control, "public");
   EXPECT_EQ("max-age=1345,public", headers.get(cache_control)->value().getStringView());
   headers.addCopy(cache_control, "");
-  EXPECT_EQ("max-age=1345,public", headers.get(cache_control)->value().getStringView());
+  EXPECT_EQ("max-age=1345,public,", headers.get(cache_control)->value().getStringView());
   headers.addCopy(cache_control, 123);
-  EXPECT_EQ("max-age=1345,public,123", headers.get(cache_control)->value().getStringView());
+  EXPECT_EQ("max-age=1345,public,,123", headers.get(cache_control)->value().getStringView());
   headers.addCopy(cache_control, std::numeric_limits<uint64_t>::max());
-  EXPECT_EQ("max-age=1345,public,123,18446744073709551615",
+  EXPECT_EQ("max-age=1345,public,,123,18446744073709551615",
             headers.get(cache_control)->value().getStringView());
 }
 
@@ -790,8 +790,9 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
   {
     HeaderString value3;
     value3.setCopy("empty", 5);
-    HeaderMapImpl::appendToHeader(value3, "");
     EXPECT_EQ(value3, "empty");
+    HeaderMapImpl::appendToHeader(value3, "");
+    EXPECT_EQ(value3, "empty,");
   }
   // Regression test for appending to an empty string with a short string, then
   // setting integer.
