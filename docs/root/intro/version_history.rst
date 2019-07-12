@@ -3,6 +3,7 @@ Version history
 
 1.12.0 (pending)
 ================
+* filter: added listener filter for inspecting http protocol
 
 1.11.0 (July 11, 2019)
 ======================
