@@ -68,8 +68,7 @@ void Filter::onRead() {
     const uint8_t* data = buf_ + read_;
     const size_t len = result.rc_ - read_;
     read_ = result.rc_;
-    absl::string_view header(reinterpret_cast<const char*>(data), len);
-    parseHttpHeader(header);
+    parseHttpHeader(absl::string_view(reinterpret_cast<const char*>(data), len));
   } else {
     done(false);
   }
