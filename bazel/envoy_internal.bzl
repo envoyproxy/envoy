@@ -82,12 +82,6 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
         "//conditions:default": default or [],
     })
 
-def envoy_static_link_libstdcpp_linkopts():
-    return envoy_select_force_libcpp(
-        ["-stdlib=libc++", "-l:libc++.a", "-l:libc++abi.a", "-static-libgcc"],
-        ["-static-libstdc++", "-static-libgcc"],
-    )
-
 # Dependencies on tcmalloc_and_profiler should be wrapped with this function.
 def tcmalloc_external_dep(repository):
     return select({

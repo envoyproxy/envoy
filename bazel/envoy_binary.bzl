@@ -4,7 +4,6 @@ load(
     ":envoy_internal.bzl",
     "envoy_copts",
     "envoy_external_dep_path",
-    "envoy_static_link_libstdcpp_linkopts",
     "tcmalloc_external_dep",
 )
 
@@ -67,8 +66,7 @@ def _envoy_linkopts():
                    "-ldl",
                    "-Wl,--hash-style=gnu",
                ],
-           }) + envoy_static_link_libstdcpp_linkopts() + \
-           _envoy_select_exported_symbols(["-Wl,-E"])
+           }) + _envoy_select_exported_symbols(["-Wl,-E"])
 
 def _envoy_stamped_deps():
     return select({
