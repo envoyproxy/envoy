@@ -59,6 +59,15 @@ public:
     ON_CALL(upstream_cx_drained_, inc()).WillByDefault(Invoke([&]() {
       upstream_cx_drained_.value_++;
     }));
+    max_upstream_unknown_connections_reached_.value_ = 0;
+    ON_CALL(*store, counter(Eq("max_upstream_unknown_connections_reached")))
+        .WillByDefault(ReturnRef(max_upstream_unknown_connections_reached_));
+    ON_CALL(max_upstream_unknown_connections_reached_, value())
+        .WillByDefault(
+            Invoke([&]() -> uint64_t { return max_upstream_unknown_connections_reached_.value_; }));
+    ON_CALL(max_upstream_unknown_connections_reached_, inc()).WillByDefault(Invoke([&]() {
+      max_upstream_unknown_connections_reached_.value_++;
+    }));
 
     std::unique_ptr<InstanceImpl> conn_pool_impl = std::make_unique<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
@@ -141,9 +150,9 @@ public:
     return conn_pool_impl->redis_cluster_stats_.upstream_cx_drained_;
   }
 
-  NiceMock<Stats::MockStore>* statsScope() {
+  Stats::Counter& maxUpstreamUnknownConnectionsReached() {
     InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
-    return dynamic_cast<NiceMock<Stats::MockStore>*>(conn_pool_impl->stats_scope_.get());
+    return conn_pool_impl->redis_cluster_stats_.max_upstream_unknown_connections_reached_;
   }
 
   // Common::Redis::Client::ClientFactory
@@ -164,6 +173,7 @@ public:
   std::string auth_password_;
   NiceMock<Api::MockApi> api_;
   NiceMock<Stats::MockCounter> upstream_cx_drained_;
+  NiceMock<Stats::MockCounter> max_upstream_unknown_connections_reached_;
 };
 
 TEST_F(RedisConnPoolImplTest, Basic) {
@@ -527,6 +537,7 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToHostWithZeroMaxUnknownUpstreamConnect
 
   // The max_unknown_upstream_connections is set to 0. Request should fail.
   EXPECT_EQ(nullptr, conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1));
+  EXPECT_EQ(maxUpstreamUnknownConnectionsReached().value(), 1);
   tls_.shutdownThread();
 }
 
