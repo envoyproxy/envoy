@@ -1,7 +1,6 @@
 licenses(["notice"])  # Apache 2
 
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
-load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 
 envoy_package()
 
@@ -19,17 +18,6 @@ swift_static_framework(
     ],
     module_name = "Envoy",
     objc_includes = ["//library/objective-c:EnvoyEngine.h"],
-    visibility = ["//visibility:public"],
-    deps = ["//library/objective-c:envoy_engine_objc_lib"],
-)
-
-swift_library(
-    name = "envoy_swift_lib",
-    srcs = [
-        "Envoy.swift",
-        "LogLevel.swift",
-    ],
-    module_name = "Envoy",
     visibility = ["//visibility:public"],
     deps = ["//library/objective-c:envoy_engine_objc_lib"],
 )
