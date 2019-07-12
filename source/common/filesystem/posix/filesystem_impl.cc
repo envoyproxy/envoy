@@ -87,6 +87,17 @@ std::string InstanceImplPosix::fileReadToEnd(const std::string& path) {
 }
 
 bool InstanceImplPosix::illegalPath(const std::string& path) {
+  // Special case, allow /dev/fd/* access here so that config can be passed in a
+  // file descriptor from an execing bootstrap script. The reason we do this
+  // _before_ canonicalizing the path is that different unix flavors implement
+  // /dev/fd/* differently, for example on linux they are symlinks to /dev/pts/*
+  // which are symlinks to /proc/self/fds/. On BSD (and darwin) they are not
+  // symlinks at all. To avoid lots of platform, specifics, we whitelist
+  // /dev/fd/* _before_ resolving the canonical path.
+  if (absl::StartsWith(path, "/dev/fd/")) {
+    return false;
+  }
+
   const Api::SysCallStringResult canonical_path = canonicalPath(path);
   if (canonical_path.rc_.empty()) {
     ENVOY_LOG_MISC(debug, "Unable to determine canonical path for {}: {}", path,
