@@ -22,10 +22,14 @@ fi
 
 rm -rf $(find -L bazel-bin -name "test-*.profraw")
 
+# Make sure //test/coverage:coverage_tests is up-to-date.
+SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+(BAZEL_BIN="${BAZEL_COVERAGE}" "${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS})
+
 BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata bazel coverage ${BAZEL_BUILD_OPTIONS} \
     -c fastbuild --copt=-DNDEBUG --instrumentation_filter=//source/...,//include/... --dynamic_mode=off \
-    --strategy=TestRunner=local --test_sharding_strategy=disabled \
-    --test_env=HEAPCHECK= --test_filter='-QuicPlatformTest.QuicStackTraceTest' ${COVERAGE_TARGETS}
+    --strategy=TestRunner=local --test_sharding_strategy=disabled --test_arg="--log-path /dev/null" --test_arg="-l trace" \
+    --test_env=HEAPCHECK= --test_filter='-QuicPlatformTest.QuicStackTraceTest' //test/coverage:coverage_tests
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
 mkdir -p "${COVERAGE_DIR}"
