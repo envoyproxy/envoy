@@ -19,15 +19,15 @@ if [[ $# -gt 0 ]]; then
 elif [[ -n "${COVERAGE_TARGET}" ]]; then
   COVERAGE_TARGETS=${COVERAGE_TARGET}
 else
-  COVERAGE_TARGETS=//test/...
+  COVERAGE_TARGETS="//test/... @com_googlesource_quiche//:all"
 fi
 
 rm -rf $(find -L bazel-bin -name "test-*.profraw")
 
 "${BAZEL_COVERAGE}" test "${COVERAGE_TARGETS}" ${BAZEL_BUILD_OPTIONS} -c fastbuild --copt=-DNDEBUG \
-  --cache_test_results=no --define ENVOY_CONFIG_COVERAGE=llvm --test_output=all  --strategy=TestRunner=local \
-  --test_filter='-QuicPlatformTest.QuicStackTraceTest:IpVersions/ClusterMemoryTestRunner.*' \
-  --test_env=LLVM_PROFILE_FILE=test-%p.profraw
+  --cache_test_results=no --define ENVOY_CONFIG_COVERAGE=llvm --cxxopt="-DENVOY_CONFIG_COVERAGE=1" \
+  --test_output=all --strategy=TestRunner=local --test_filter='-QuicPlatformTest.QuicStackTraceTest' \
+  --test_env=LLVM_PROFILE_FILE=test-%p.profraw --test_arg="--log-path /dev/null" --test_arg="-l trace"
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
 mkdir -p "${COVERAGE_DIR}"
