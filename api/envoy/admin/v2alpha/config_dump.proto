@@ -56,7 +56,7 @@ message ListenersConfigDump {
   // will be "".
   string version_info = 1;
 
-  // Describes a statically loaded cluster.
+  // Describes a statically loaded listener.
   message StaticListener {
     // The listener config.
     envoy.api.v2.Listener listener = 1;
@@ -240,11 +240,27 @@ message SecretsConfigDump {
     envoy.api.v2.auth.Secret secret = 4;
   }
 
+  // StaticSecret specifies statically loaded secret.
+  message StaticSecret {
+    // The name assigned to the secret.
+    string name = 1;
+
+    // The timestamp when the Listener was last updated.
+    google.protobuf.Timestamp last_updated = 2;
+
+    // The secret config.
+    envoy.api.v2.auth.Secret secret = 3;
+  }
+
+
+  // The statically loaded secrets.
+  repeated StaticSecret static_secrets = 1;
+
   // The dynamically loaded active secrets. These are secrets that are available to service
   // clusters or listeners.
-  repeated DynamicSecret dynamic_active_secrets = 1;
+  repeated DynamicSecret dynamic_active_secrets = 2;
 
   // The dynamically loaded warming secrets. These are secrets that are currently undergoing
   // warming in preparation to service clusters or listeners.
-  repeated DynamicSecret dynamic_warming_secrets = 2;
+  repeated DynamicSecret dynamic_warming_secrets = 3;
 }

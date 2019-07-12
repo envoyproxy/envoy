@@ -14,7 +14,7 @@
 namespace Envoy {
 namespace Secret {
 
-class SecretManagerImpl : public SecretManager, public Logger::Loggable<Logger::Id::secret> {
+class SecretManagerImpl : public SecretManager {
 public:
   SecretManagerImpl(Server::ConfigTracker& config_tracker);
   void addStaticSecret(const envoy::api::v2::auth::Secret& secret) override;

@@ -251,6 +251,8 @@ tls_certificate:
     inline_string: "DUMMY_INLINE_BYTES_FOR_CERT_CHAIN"
   private_key:
     inline_string: "DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY"
+  password:
+    inline_string: "DUMMY_PASSWORD"
 )EOF";
   envoy::api::v2::auth::Secret typed_secret;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
@@ -263,7 +265,7 @@ tls_certificate:
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_CERT_CHAIN", tls_config.certificateChain());
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY", tls_config.privateKey());
 
-  // Private key is removed.
+  // Private key and password are removed.
   const std::string expected_secrets_config_dump = R"EOF(
 dynamic_active_secrets:
   version_info: "keycert-v1"
@@ -275,6 +277,10 @@ dynamic_active_secrets:
     tls_certificate:
       certificate_chain:
         inline_string: "DUMMY_INLINE_BYTES_FOR_CERT_CHAIN"
+      private_key:
+        inline_string: "[redacted]"
+      password:
+        inline_string: "[redacted]"
 )EOF";
   checkConfigDump(expected_secrets_config_dump);
 
@@ -309,6 +315,10 @@ dynamic_active_secrets:
     tls_certificate:
       certificate_chain:
         inline_string: "DUMMY_INLINE_BYTES_FOR_CERT_CHAIN"
+      private_key:
+        inline_string: "[redacted]"
+      password:
+        inline_string: "[redacted]"
 - version_info: "validation-context-v1"
   last_updated:
     seconds: 1234567899
@@ -377,6 +387,9 @@ dynamic_warming_secrets:
     name: "abc.com.validation"
 )EOF";
   checkConfigDump(updated_config_dump);
+}
+
+TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSecrets) {
 }
 
 } // namespace
