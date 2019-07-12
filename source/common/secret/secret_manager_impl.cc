@@ -86,6 +86,33 @@ SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
 
 ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::SecretsConfigDump>();
+  // Handle static tls key/cert providers.
+  for (const auto& cert_iter : static_tls_certificate_providers_) {
+    const auto& tls_cert = cert_iter.second;
+    auto dump_secret = config_dump->mutable_static_secrets()->Add();
+    dump_secret->set_name(cert_iter.first);
+    dump_secret->set_name(cert_iter.first);
+    if (!tls_cert.get()) {
+      continue;
+    }
+    auto dump_tls_cert = dump_secret->mutable_secret()->mutable_tls_certificate();
+    dump_tls_cert->MergeFrom(*tls_cert.get()->secret());
+    // TODO: same util function to handle the key clean.
+  }
+
+  // Handle static certificate validation context providers.
+  for (const auto& context_iter : static_certificate_validation_context_providers_) {
+    const auto& validation_context = context_iter.second;
+    auto dump_secret = config_dump->mutable_static_secrets()->Add();
+    dump_secret->set_name(context_iter.first);
+    if (!validation_context.get()) {
+      continue;
+    }
+    dump_secret->mutable_secret()->mutable_validation_context()->MergeFrom(
+        *validation_context.get()->secret());
+  }
+
+  // Handle dynamic cert providers.
   auto providers = certificate_providers_.allSecretProviders();
   for (const auto& cert_secrets : providers) {
     const auto& secret_data = cert_secrets->secretData();
@@ -119,7 +146,7 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     }
   }
 
-  // Handling validation Context provided via SDS.
+  // Handling dynamic cert validation context providers.
   auto context_secret_provider = validation_context_providers_.allSecretProviders();
   for (const auto& validation_context_secret : context_secret_provider) {
     const auto& secret_data = validation_context_secret->secretData();
