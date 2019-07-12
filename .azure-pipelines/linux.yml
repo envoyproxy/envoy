@@ -14,7 +14,7 @@ jobs:
     env:
       ENVOY_SRCDIR: $(Build.SourcesDirectory)
       BUILD_DIR: $(Build.StagingDirectory)
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-clang --jobs=100 --curses=no"
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-clang --experimental_remote_download_outputs=minimal --jobs=100 --curses=no"
       BAZEL_EXTRA_TEST_OPTIONS: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only"
       BAZEL_REMOTE_CACHE: remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
