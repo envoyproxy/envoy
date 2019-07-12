@@ -46,9 +46,6 @@ public:
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return buffer_flush_timeout_;
   }
-  std::chrono::milliseconds upstreamDrainPollInterval() const override {
-    return upstream_drain_poll_interval_;
-  }
   uint32_t maxUpstreamUnknownConnections() const override {
     return max_upstream_unknown_connections_;
   }
@@ -59,7 +56,6 @@ private:
   const bool enable_redirection_;
   const uint32_t max_buffer_size_before_flush_;
   const std::chrono::milliseconds buffer_flush_timeout_;
-  const std::chrono::milliseconds upstream_drain_poll_interval_;
   const uint32_t max_upstream_unknown_connections_;
 };
 

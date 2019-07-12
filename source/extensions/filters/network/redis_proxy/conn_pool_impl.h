@@ -37,7 +37,9 @@ namespace ConnPool {
 // TODO(mattklein123): Circuit breaking
 // TODO(rshriram): Fault injection
 
-#define REDIS_CLUSTER_STATS(COUNTER) COUNTER(upstream_cx_drained)
+#define REDIS_CLUSTER_STATS(COUNTER)                                                               \
+  COUNTER(upstream_cx_drained)                                                                     \
+  COUNTER(max_upstream_unknown_connections_reached)
 
 struct RedisClusterStats {
   REDIS_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)

@@ -157,9 +157,6 @@ class ConfigBufferSizeGTSingleRequest : public Config {
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return std::chrono::milliseconds(1);
   }
-  std::chrono::milliseconds upstreamDrainPollInterval() const override {
-    return std::chrono::milliseconds(0);
-  }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
 };
 
@@ -470,9 +467,6 @@ class ConfigOutlierDisabled : public Config {
   bool enableRedirection() const override { return false; }
   unsigned int maxBufferSizeBeforeFlush() const override { return 0; }
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
-    return std::chrono::milliseconds(0);
-  }
-  std::chrono::milliseconds upstreamDrainPollInterval() const override {
     return std::chrono::milliseconds(0);
   }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }

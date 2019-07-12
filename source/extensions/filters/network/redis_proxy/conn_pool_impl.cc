@@ -164,7 +164,7 @@ void InstanceImpl::ThreadLocalPool::onHostsRemoved(
         clients_to_drain_.push_back(std::move(it->second));
         client_map_.erase(it);
         if (!drain_timer_->enabled()) {
-          drain_timer_->enableTimer(parent_.config_.upstreamDrainPollInterval());
+          drain_timer_->enableTimer(std::chrono::seconds(1));
         }
       } else {
         // There are no pending requests so close the connection.
@@ -186,7 +186,7 @@ void InstanceImpl::ThreadLocalPool::drainClients() {
     (*clients_to_drain_.begin())->redis_client_->close();
   }
   if (!clients_to_drain_.empty()) {
-    drain_timer_->enableTimer(parent_.config_.upstreamDrainPollInterval());
+    drain_timer_->enableTimer(std::chrono::seconds(1));
   }
 }
 
@@ -271,6 +271,7 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
     // This host is not known to the cluster manager. Create a new host and insert it into the map.
     if (created_via_redirect_hosts_.size() == parent_.config_.maxUpstreamUnknownConnections()) {
       // Too many upstream connections to unknown hosts have been created.
+      parent_.redis_cluster_stats_.max_upstream_unknown_connections_reached_.inc();
       return nullptr;
     }
     if (!ipv6) {

@@ -77,10 +77,6 @@ private:
       return std::chrono::milliseconds(1);
     }
 
-    // Redirection connection and draining controls.
-    std::chrono::milliseconds upstreamDrainPollInterval() const override {
-      return std::chrono::milliseconds(0);
-    }
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks

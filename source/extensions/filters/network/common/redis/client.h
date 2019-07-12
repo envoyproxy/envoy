@@ -142,11 +142,6 @@ public:
   virtual std::chrono::milliseconds bufferFlushTimeoutInMs() const PURE;
 
   /**
-   * @return interval for checking the state of draining upstream connections.
-   */
-  virtual std::chrono::milliseconds upstreamDrainPollInterval() const PURE;
-
-  /**
    * @return the maximum number of upstream connections to unknown hosts when enableRedirection() is
    * true.
    *
