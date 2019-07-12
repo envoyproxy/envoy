@@ -8,6 +8,7 @@
 
 #include "common/common/logger.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "http_protocol_header.h"
 
 namespace Envoy {
@@ -62,6 +63,9 @@ private:
   void onRead();
   void done(bool success);
   void parseHttpHeader(absl::string_view data);
+
+  const absl::flat_hash_set<std::string>& httpMethods() const;
+  const absl::flat_hash_set<std::string>& httpProtocols() const;
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_;

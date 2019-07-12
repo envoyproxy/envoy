@@ -106,9 +106,7 @@ void Filter::parseHttpHeader(absl::string_view data) {
     absl::string_view request_uri(data.data() + spaces[0] + 1, spaces[1] - spaces[0] - 1);
     absl::string_view http_version(data.data() + spaces[1] + 1, id - spaces[1] - 1);
 
-    if (std::find(HTTP_METHODS.begin(), HTTP_METHODS.end(), method) == HTTP_METHODS.end() ||
-        std::find(HTTP_PROTOCOLS.begin(), HTTP_PROTOCOLS.end(), http_version) ==
-            HTTP_PROTOCOLS.end()) {
+    if (httpMethods().count(method) == 0 || httpProtocols().count(http_version) == 0) {
       ENVOY_LOG(trace, "http inspector: method: {} or protocol: {} not found", method,
                 http_version);
       done(false);
@@ -145,6 +143,22 @@ void Filter::done(bool success) {
   file_event_.reset();
   // Do not skip other listener filters.
   cb_->continueFilterChain(true);
+}
+
+const absl::flat_hash_set<std::string>& Filter::httpMethods() const {
+  static const absl::flat_hash_set<std::string>* methods = new absl::flat_hash_set<std::string>(
+      {Http::Headers::get().MethodValues.Connect, Http::Headers::get().MethodValues.Delete,
+       Http::Headers::get().MethodValues.Get, Http::Headers::get().MethodValues.Head,
+       Http::Headers::get().MethodValues.Post, Http::Headers::get().MethodValues.Put,
+       Http::Headers::get().MethodValues.Options, Http::Headers::get().MethodValues.Trace});
+  return *methods;
+}
+
+const absl::flat_hash_set<std::string>& Filter::httpProtocols() const {
+  static const absl::flat_hash_set<std::string>* protocols =
+      new absl::flat_hash_set<std::string>({Http::Headers::get().ProtocolStrings.Http10String,
+                                            Http::Headers::get().ProtocolStrings.Http11String});
+  return *protocols;
 }
 
 } // namespace HttpInspector
