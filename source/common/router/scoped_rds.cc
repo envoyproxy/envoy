@@ -169,8 +169,13 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   }
 }
 
-// TODO(stevenzzzz): consider generalizing this function as it overlaps with
+// TODO(stevenzzzz): see issue #7508, consider generalizing this function as it overlaps with
 // CdsApiImpl::onConfigUpdate.
+// TODO(stevenzzzz): revisit the handling of deleted scopes here, per @htuch, SRDS's SotW update API
+// should be similar to RDS' on the wire, act in a quasi-incremental way. See related discussion
+// https://github.com/cncf/udpa-wg or
+// https://blog.envoyproxy.io/the-universal-data-plane-api-d15cec7a.
+// For now, we make this a quasi-incremental API, i.e., no removal of scopes(RouteConfigurations).
 void ScopedRdsConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
@@ -196,22 +201,16 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
                       scope_name_by_key_hash[key_fingerprint], scope_name));
     }
   }
-  ScopedRouteMap scoped_routes_to_remove = scoped_route_map_;
   Protobuf::RepeatedPtrField<envoy::api::v2::Resource> to_add_repeated;
-  Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
   for (auto& iter : scoped_routes) {
     const std::string& scope_name = iter.first;
-    scoped_routes_to_remove.erase(scope_name);
     auto* to_add = to_add_repeated.Add();
     to_add->set_name(scope_name);
     to_add->set_version(version_info);
     to_add->mutable_resource()->PackFrom(iter.second);
   }
 
-  for (const auto& scoped_route : scoped_routes_to_remove) {
-    *to_remove_repeated.Add() = scoped_route.first;
-  }
-  onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
+  onConfigUpdate(to_add_repeated, {}, version_info);
 }
 
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(
