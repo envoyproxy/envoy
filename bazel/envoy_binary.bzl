@@ -68,7 +68,7 @@ def _envoy_linkopts():
                    "-Wl,--hash-style=gnu",
                ],
            }) + select({
-               "//bazel:coverage_llvm_build": [
+               "@envoy//bazel:coverage_llvm_build": [
                    "-fprofile-instr-generate",
                    "-fcoverage-mapping",
                ],
