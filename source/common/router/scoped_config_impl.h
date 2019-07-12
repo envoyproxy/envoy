@@ -167,6 +167,8 @@ public:
       }
     }
   }
+  ~ScopedRouteInfo() = default;
+
   Router::ConfigConstSharedPtr routeConfig() const { return route_provider_->config(); }
   const ScopeKey& scopeKey() const { return scope_key_; }
   const envoy::api::v2::ScopedRouteConfiguration& configProto() const { return config_proto_; }

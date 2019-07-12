@@ -76,7 +76,7 @@ bool ConfigSubscriptionInstance::checkAndApplyConfigUpdate(const Protobuf::Messa
 }
 
 void DeltaConfigSubscriptionInstance::applyDeltaConfigUpdate(
-    const std::function<void(const ConfigSharedPtr&)>& update_fn) {
+    const std::function<void(const ConfigSharedPtr&)>& update_fn, Event::PostCb complete_cb) {
   // The Config implementation is assumed to be shared across the config providers bound to this
   // subscription, therefore, simply propagating the update to all worker threads for a single bound
   // provider will be sufficient.
@@ -92,10 +92,19 @@ void DeltaConfigSubscriptionInstance::applyDeltaConfigUpdate(
   // needed. Such logic could be generalized as part of this framework such that this function owns
   // the diffing and issues the corresponding call to add/modify/remove a resource according to a
   // vector of functions passed by the caller.
-  auto* typed_provider =
-      static_cast<DeltaMutableConfigProviderBase*>(getAnyBoundMutableConfigProvider());
-  ConfigSharedPtr config = typed_provider->getConfig();
-  typed_provider->onConfigUpdate([config, update_fn]() { update_fn(config); });
+  // For now each config provider has its own copy of config, we need to propagate the update to
+  // every provider.
+  for (auto* provider : mutable_config_providers_) {
+    auto* typed_provider = static_cast<DeltaMutableConfigProviderBase*>(provider);
+    typed_provider->onConfigUpdate(
+        [update_fn, typed_provider]() {
+          // Note: this lambda is run on every worker thread, getting the config from within the
+          // lambda ensures us getting the per-worker config.
+          ConfigSharedPtr config = typed_provider->getConfig();
+          update_fn(config);
+        },
+        std::move(complete_cb));
+  }
 }
 
 ConfigProviderManagerImplBase::ConfigProviderManagerImplBase(Server::Admin& admin,

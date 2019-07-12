@@ -92,8 +92,6 @@ protected:
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  Upstream::ClusterManager::ClusterInfoMap cluster_map_;
-  Upstream::MockClusterMockPrioritySet cluster_;
   std::unique_ptr<ScopedRoutesConfigProviderManager> config_provider_manager_;
   MockRouteConfigProviderManager route_config_provider_manager_;
   absl::flat_hash_map<std::string, std::shared_ptr<MockConfig>> cached_route_configs_;
@@ -253,6 +251,17 @@ key:
       // Partially reject.
       1UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
+  // foo_scope update is applied.
+  EXPECT_EQ(dynamic_cast<ScopedRdsConfigProvider*>(provider_.get())
+                ->subscription()
+                .scopedRouteMap()
+                .size(),
+            1UL);
+  EXPECT_EQ(dynamic_cast<ScopedRdsConfigProvider*>(provider_.get())
+                ->subscription()
+                .scopedRouteMap()
+                .count("foo_scope"),
+            1);
 }
 
 // Tests that only one resource is provided during a config update.

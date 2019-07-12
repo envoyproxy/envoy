@@ -207,8 +207,6 @@ public:
 
 private:
   RouteConfigProviderManager& route_config_provider_manager_;
-  // From ConfigSource fingerprint to shared RouteConfigProvider.
-  absl::flat_hash_map<std::string, std::shared_ptr<RouteConfigProvider>> cached_route_providers_;
 };
 
 // The optional argument passed to the ConfigProviderManager::create*() functions.

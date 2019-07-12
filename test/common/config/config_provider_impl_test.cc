@@ -737,9 +737,9 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
   // Issue a second config update to validate that having multiple providers bound to the
   // subscription causes a single update to the underlying shared config implementation.
   subscription.onConfigUpdate(untyped_dummy_configs, "2");
-  // NOTE: the config implementation is append only and _does not_ track updates/removals to the
-  // config proto set, so the expectation is to double the size of the set.
-  EXPECT_EQ(provider1->config<const ThreadLocalDummyConfig>()->numProtos(), 4);
+  // NOTE: the two providers share the same config, each config update propagation would add 2
+  // protos to the same config's proto vector, so the expectation is 6 here.
+  EXPECT_EQ(provider1->config<const ThreadLocalDummyConfig>()->numProtos(), 6);
   EXPECT_EQ(provider1->configProtoInfoVector<test::common::config::DummyConfig>().value().version_,
             "2");
 }

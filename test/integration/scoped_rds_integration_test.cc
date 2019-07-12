@@ -49,7 +49,7 @@ protected:
           const std::string& scope_key_builder_config_yaml = R"EOF(
 fragments:
   - header_value_extractor:
-      name: X-Google-VIP
+      name: Addr
       element:
         key: x-foo-key
         separator: ;
@@ -175,7 +175,7 @@ name: foo_scope2
 route_configuration_name: foo_route1
 key:
   fragments:
-    - string_key: x-foo-key
+    - string_key: x-bar-key
 )EOF";
 
   const std::string route_config_tmpl = R"EOF(

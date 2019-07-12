@@ -143,13 +143,17 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   for (const auto& scope_name : removed_resources) {
     auto iter = scoped_route_map_.find(scope_name);
     if (iter != scoped_route_map_.end()) {
+      ScopedRouteInfoConstSharedPtr to_be_deleted = iter->second;
       scope_name_by_hash_.erase(iter->second->scopeKey().hash());
       scoped_route_map_.erase(iter);
-      applyDeltaConfigUpdate([scope_name](const ConfigProvider::ConfigConstSharedPtr& config) {
-        auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
-            static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
-        thread_local_scoped_config->removeRoutingScope(scope_name);
-      });
+      applyDeltaConfigUpdate(
+          [scope_name](const ConfigProvider::ConfigConstSharedPtr& config) {
+            auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
+                static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
+            thread_local_scoped_config->removeRoutingScope(scope_name);
+          },
+          // We need to delete the associated RouteConfigProvider in main thread.
+          [to_be_deleted]() { /*to_be_deleted is destructed in main thread.*/ });
       any_applied = true;
       ENVOY_LOG(debug, "srds: remove scoped route '{}'", scope_name);
     }
@@ -171,7 +175,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
   absl::flat_hash_map<std::string, envoy::api::v2::ScopedRouteConfiguration> scoped_routes;
-  absl::flat_hash_map<uint64_t, std::string> scope_key_by_key_hash;
+  absl::flat_hash_map<uint64_t, std::string> scope_name_by_key_hash;
   for (const auto& resource_any : resources) {
     // Throws (thus rejects all) on any error.
     auto scoped_route = MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
@@ -186,10 +190,10 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     const envoy::api::v2::ScopedRouteConfiguration& scoped_route_config =
         scope_config_inserted.first->second;
     uint64_t key_fingerprint = MessageUtil::hash(scoped_route_config.key());
-    if (!scope_key_by_key_hash.try_emplace(key_fingerprint, scope_name).second) {
+    if (!scope_name_by_key_hash.try_emplace(key_fingerprint, scope_name).second) {
       throw EnvoyException(
           fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
-                      scope_key_by_key_hash[key_fingerprint], scope_name));
+                      scope_name_by_key_hash[key_fingerprint], scope_name));
     }
   }
   ScopedRouteMap scoped_routes_to_remove = scoped_route_map_;

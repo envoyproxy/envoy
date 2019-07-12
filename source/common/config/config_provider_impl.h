@@ -291,8 +291,11 @@ protected:
    * subscription.
    *
    * @param update_fn the callback to run on each worker thread.
+   * @param complete_cb the callback to run on each worker thread. NOTE it's called each time a
+   * registered provider's update propagation finishes.
    */
-  void applyDeltaConfigUpdate(const std::function<void(const ConfigSharedPtr&)>& update_fn);
+  void applyDeltaConfigUpdate(const std::function<void(const ConfigSharedPtr&)>& update_fn,
+                              Event::PostCb complete_cb = Event::PostCb());
 };
 
 /**
@@ -409,10 +412,16 @@ public:
 
   /**
    * Propagates a delta config update to all workers.
-   * @param updateCb the callback to run on each worker.
+   * @param update_cb the callback to run on each worker.
+   * @param complete_cb the callback to run in main thread after the update propagation is done on
+   * every worker thread.
    */
-  void onConfigUpdate(Envoy::Event::PostCb update_cb) {
-    tls_->runOnAllThreads(std::move(update_cb));
+  void onConfigUpdate(Envoy::Event::PostCb update_cb, Event::PostCb complete_cb) {
+    if (complete_cb) {
+      tls_->runOnAllThreads(std::move(update_cb), std::move(complete_cb));
+    } else {
+      tls_->runOnAllThreads(std::move(update_cb));
+    }
   }
 
 protected:
