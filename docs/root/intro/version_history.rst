@@ -3,6 +3,7 @@ Version history
 
 1.12.0 (pending)
 ================
+* admin: added ability to configure listener socket options
 
 1.11.0 (July 11, 2019)
 ======================
