@@ -486,9 +486,10 @@ def _com_google_absl():
 def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf",
-        # The patch is only needed until
-        # https://github.com/protocolbuffers/protobuf/pull/5901 is available.
-        # TODO(htuch): remove this when > protobuf 3.7.1 is released.
+        # The patch includes
+        # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
+        # foreign_cc build for zlib as its dependency.
+        # TODO(asraa): remove this when > protobuf 3.8.0 is released.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
     )
@@ -499,9 +500,10 @@ def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf_cc",
         repository_key = "com_google_protobuf",
-        # The patch is only needed until
-        # https://github.com/protocolbuffers/protobuf/pull/5901 is available.
-        # TODO(htuch): remove this when > protobuf 3.7.1 is released.
+        # The patch includes
+        # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
+        # foreign_cc build for zlib as its dependency.
+        # TODO(asraa): remove this when > protobuf 3.8.0 is released.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
     )

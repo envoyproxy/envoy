@@ -30,6 +30,7 @@ REPOSITORIES_BZL = "bazel/repositories.bzl"
 # definitions for real-world time, the construction of them in main(), and perf annotation.
 # For now it includes the validation server but that really should be injected too.
 REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
+                       "./source/extensions/filters/http/common/aws/utility.cc",
                        "./source/common/event/real_time_system.cc",
                        "./source/common/event/real_time_system.h", "./source/exe/main_common.cc",
                        "./source/exe/main_common.h", "./source/server/config_validation/server.cc",
@@ -56,6 +57,7 @@ SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
 PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
+X_ENVOY_USED_DIRECTLY_REGEX = re.compile(r'.*\"x-envoy-.*\".*')
 PROTO_OPTION_JAVA_PACKAGE = "option java_package = \""
 PROTO_OPTION_JAVA_OUTER_CLASSNAME = "option java_outer_classname = \""
 PROTO_OPTION_JAVA_MULTIPLE_FILES = "option java_multiple_files = "
@@ -457,6 +459,9 @@ def checkSourceLine(line, file_path, reportError):
   # Check fixable errors. These may have been fixed already.
   if line.find(".  ") != -1:
     reportError("over-enthusiastic spaces")
+  if ('source' in file_path or 'include' in file_path) and X_ENVOY_USED_DIRECTLY_REGEX.match(line):
+    reportError(
+        "Please do not use the raw literal x-envoy in source code.  See Envoy::Http::PrefixValue.")
   if hasInvalidAngleBracketDirectory(line):
     reportError("envoy includes should not have angle brackets")
   for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
