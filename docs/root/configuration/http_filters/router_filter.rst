@@ -80,7 +80,7 @@ gateway-error
   or 504.
 
 reset
-  Envoy will attempt a retry if the upstream server does not respond due to a reset.
+  Envoy will attempt a retry if the upstream server does not respond at all (disconnect/reset/read timeout.)
 
 connect-failure
   Envoy will attempt a retry if a request is failed because of a connection failure to the upstream
