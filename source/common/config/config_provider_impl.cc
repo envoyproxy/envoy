@@ -103,7 +103,7 @@ void DeltaConfigSubscriptionInstance::applyDeltaConfigUpdate(
           ConfigSharedPtr config = typed_provider->getConfig();
           update_fn(config);
         },
-        std::move(complete_cb));
+        complete_cb);
   }
 }
 

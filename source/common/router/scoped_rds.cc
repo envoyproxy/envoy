@@ -171,9 +171,9 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
 
 // TODO(stevenzzzz): see issue #7508, consider generalizing this function as it overlaps with
 // CdsApiImpl::onConfigUpdate.
-// TODO(stevenzzzz): revisit the handling of deleted scopes here, per @htuch, SRDS's SotW update API
-// should be similar to RDS' on the wire, act in a quasi-incremental way. See related discussion
-// https://github.com/cncf/udpa-wg or
+// TODO(stevenzzzz): revisit the handling of deleted scopes here, per @htuch, the SRDS state of the
+// world update API should be similar to RDS' on the wire, act in a quasi-incremental way. See
+// related discussion https://github.com/cncf/udpa-wg or
 // https://blog.envoyproxy.io/the-universal-data-plane-api-d15cec7a.
 // For now, we make this a quasi-incremental API, i.e., no removal of scopes(RouteConfigurations).
 void ScopedRdsConfigSubscription::onConfigUpdate(
@@ -190,7 +190,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     auto scope_config_inserted = scoped_routes.try_emplace(scope_name, std::move(scoped_route));
     if (!scope_config_inserted.second) {
       throw EnvoyException(
-          fmt::format("duplicate scoped route configuration '{}' found", scoped_route.name()));
+          fmt::format("duplicate scoped route configuration '{}' found", scope_name));
     }
     const envoy::api::v2::ScopedRouteConfiguration& scoped_route_config =
         scope_config_inserted.first->second;

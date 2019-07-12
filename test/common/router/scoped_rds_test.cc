@@ -77,7 +77,8 @@ protected:
 
   // The delta style API helper.
   Protobuf::RepeatedPtrField<envoy::api::v2::Resource>
-  anyToResource(Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources, std::string version) {
+  anyToResource(Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                const std::string& version) {
     Protobuf::RepeatedPtrField<envoy::api::v2::Resource> added_resources;
     for (const auto& resource_any : resources) {
       auto config = TestUtility::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource_any);
@@ -507,8 +508,8 @@ dynamic_scoped_route_configs:
   const auto& scoped_routes_config_dump4 =
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
-  // The StoW update API acts in a quasi-incremental way, there is no deletion, and no change, so no
-  // version flip.
+  // The delta update API acts in a quasi-incremental way, there is no deletion, and no change, so
+  // no version flip.
   EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump4));
 }
 
