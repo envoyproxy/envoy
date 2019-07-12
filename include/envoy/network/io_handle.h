@@ -11,6 +11,7 @@ struct RawSlice;
 namespace Network {
 namespace Address {
 class Instance;
+class Ip;
 } // namespace Address
 
 /**
@@ -71,12 +72,15 @@ public:
    * Send a message to the address.
    * @param slices points to the location of data to be sent.
    * @param num_slice indicates number of slices |slices| contains.
-   * @param address is the destination address.
+   * @param self_ip is the source address whose port should be ignored. Nullptr
+   * if caller wants kernel to select source address.
+   * @param peer_address is the destination address.
    * @return a Api::IoCallUint64Result with err_ = an Api::IoError instance or
    * err_ = nullptr and rc_ = the bytes written for success.
    */
   virtual Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice,
-                                          int flags, const Address::Instance& address) PURE;
+                                          int flags, const Address::Ip* self_ip,
+                                          const Address::Instance& peer_address) PURE;
 
   struct RecvMsgOutput {
     /*

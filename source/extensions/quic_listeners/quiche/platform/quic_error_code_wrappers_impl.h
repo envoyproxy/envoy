@@ -6,6 +6,8 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include <errno.h>
+#include <memory>
 
-#define QUIC_EMSGSIZE_IMPL EMSGSIZE
+#include "envoy/api/io_error.h"
+
+#define QUIC_EMSGSIZE_IMPL static_cast<int>(Envoy::Api::IoError::IoErrorCode::MessageTooBig)

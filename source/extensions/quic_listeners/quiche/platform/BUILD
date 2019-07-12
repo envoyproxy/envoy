@@ -157,6 +157,7 @@ envoy_cc_library(
     deps = [
         ":flags_impl_lib",
         ":string_utils_lib",
+        "//include/envoy/api:io_error_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:byte_order_lib",
