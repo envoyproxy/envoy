@@ -24,7 +24,7 @@ rm -rf $(find -L bazel-bin -name "test-*.profraw")
 
 # Make sure //test/coverage:coverage_tests is up-to-date.
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
-(BAZEL_BIN="${BAZEL_COVERAGE}" "${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS})
+NO_GCOV=1 "${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS}
 
 BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata bazel coverage ${BAZEL_BUILD_OPTIONS} \
     -c fastbuild --copt=-DNDEBUG --instrumentation_filter=//source/...,//include/... --dynamic_mode=off \
@@ -38,7 +38,7 @@ echo "Merging profile data..."
 llvm-profdata merge -sparse $(find -L bazel-out -name coverage.dat) -o ${COVERAGE_DIR}/coverage.profdata
 
 echo "Generating report..."
-llvm-cov show bazel-bin/source/exe/envoy-static -instr-profile=${COVERAGE_DIR}/coverage.profdata \
+llvm-cov show bazel-bin/test/coverage/coverage_tests -instr-profile=${COVERAGE_DIR}/coverage.profdata \
   -ignore-filename-regex='(/external/|pb\.(validate\.)?(h|cc)|/chromium_url/|/tmp)' -output-dir=${COVERAGE_DIR} -format=html
 sed -i -e 's|>proc/self/cwd/|>|g' "${COVERAGE_DIR}/index.html"
 sed -i -e 's|>bazel-out/[^/]*/bin/\([^/]*\)/[^<]*/_virtual_includes/[^/]*|>\1|g' "${COVERAGE_DIR}/index.html"
