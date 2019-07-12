@@ -60,6 +60,7 @@ envoy_cmake_external(
     copy_pdb = True,
     lib_source = "@com_github_c_ares_c_ares//:all",
     pdb_name = "c-ares",
+    linkopts = ["-lresolv.9"],
     static_libraries = select({
         "//bazel:windows_x86_64": ["cares.lib"],
         "//conditions:default": ["libcares.a"],
