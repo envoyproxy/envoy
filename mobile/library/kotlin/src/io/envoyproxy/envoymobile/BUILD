@@ -2,7 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:aar_with_jni.bzl", "aar_with_jni")
-load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library")
+load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library", "kt_jvm_library")
 
 envoy_package()
 
@@ -29,4 +29,14 @@ kt_android_library(
     manifest = "EnvoyManifest.xml",
     visibility = ["//visibility:public"],
     deps = ["//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib"],
+)
+
+kt_jvm_library(
+    name = "envoy_interfaces_lib",
+    srcs = [
+        "Request.kt",
+        "RequestBuilder.kt",
+        "RequestMethod.kt",
+        "RetryPolicy.kt",
+    ],
 )
