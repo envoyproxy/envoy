@@ -9,20 +9,6 @@
 namespace Envoy {
 namespace Config {
 
-void TlsContextJson::translateDownstreamTlsContext(
-    const Json::Object& json_tls_context,
-    envoy::api::v2::auth::DownstreamTlsContext& downstream_tls_context) {
-  translateCommonTlsContext(json_tls_context, *downstream_tls_context.mutable_common_tls_context());
-  JSON_UTIL_SET_BOOL(json_tls_context, downstream_tls_context, require_client_certificate);
-
-  const std::vector<std::string> paths =
-      json_tls_context.getStringArray("session_ticket_key_paths", true);
-  for (const std::string& path : paths) {
-    downstream_tls_context.mutable_session_ticket_keys()->mutable_keys()->Add()->set_filename(path);
-  }
-  MessageUtil::validate(downstream_tls_context);
-}
-
 void TlsContextJson::translateUpstreamTlsContext(
     const Json::Object& json_tls_context,
     envoy::api::v2::auth::UpstreamTlsContext& upstream_tls_context) {

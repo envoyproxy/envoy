@@ -51,6 +51,7 @@ void FakeStream::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
 }
 
 void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
+  received_data_ = true;
   Thread::LockGuard lock(lock_);
   body_.add(data);
   setEndStream(end_stream);
@@ -62,6 +63,13 @@ void FakeStream::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   setEndStream(true);
   trailers_ = std::move(trailers);
   decoder_event_.notifyOne();
+}
+
+void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
+  for (const auto& metadata : *metadata_map_ptr) {
+    duplicated_metadata_key_count_[metadata.first]++;
+    metadata_map_.insert(metadata);
+  }
 }
 
 void FakeStream::encode100ContinueHeaders(const Http::HeaderMapImpl& headers) {

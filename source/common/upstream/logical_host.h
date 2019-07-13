@@ -14,11 +14,13 @@ public:
   LogicalHost(const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
               const Network::Address::InstanceConstSharedPtr& address,
               const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-              const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint)
+              const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
+              const Network::TransportSocketOptionsSharedPtr& override_transport_socket_options)
       : HostImpl(cluster, hostname, address, lb_endpoint.metadata(),
                  lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
                  lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
-                 lb_endpoint.health_status()) {}
+                 lb_endpoint.health_status()),
+        override_transport_socket_options_(override_transport_socket_options) {}
 
   // Set the new address. Updates are typically rare so a R/W lock is used for address updates.
   // Note that the health check address update requires no lock to be held since it is only
@@ -51,6 +53,7 @@ public:
   }
 
 private:
+  const Network::TransportSocketOptionsSharedPtr override_transport_socket_options_;
   mutable absl::Mutex address_lock_;
 };
 

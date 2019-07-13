@@ -67,6 +67,7 @@ public:
 
     // Allow touch() to still be strict.
     EXPECT_CALL(*host_map_[host], address()).Times(AtLeast(0));
+    EXPECT_CALL(*host_map_[host], resolvedHost()).Times(AtLeast(0));
   }
 
   void updateTestHostAddress(const std::string& host, const std::string& address) {

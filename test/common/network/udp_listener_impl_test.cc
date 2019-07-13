@@ -4,6 +4,7 @@
 
 #include "common/network/address_impl.h"
 #include "common/network/socket_option_factory.h"
+#include "common/network/socket_option_impl.h"
 #include "common/network/udp_listener_impl.h"
 #include "common/network/utility.h"
 
@@ -54,8 +55,15 @@ protected:
   }
 
   SocketPtr createServerSocket(bool bind) {
+    // Set IP_FREEBIND to allow sendmsg to send with nonlocal IPv6 source address.
     return std::make_unique<NetworkListenSocket<NetworkSocketTrait<Address::SocketType::Datagram>>>(
-        Network::Test::getAnyAddress(version_), nullptr, bind);
+        Network::Test::getAnyAddress(version_),
+#ifdef IP_FREEBIND
+        SocketOptionFactory::buildIpFreebindOptions(),
+#else
+        nullptr,
+#endif
+        bind);
   }
 
   SocketPtr createClientSocket(bool bind) {
@@ -342,7 +350,8 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
 /**
  * Tests UDP listener for sending datagrams to destination.
  *  1. Setup a udp listener and client socket
- *  2. Send the data from the udp listener to the client socket and validate the contents
+ *  2. Send the data from the udp listener to the client socket and validate the contents and source
+ * address.
  */
 TEST_P(UdpListenerImplTest, SendData) {
   // Setup client socket.
@@ -352,68 +361,98 @@ TEST_P(UdpListenerImplTest, SendData) {
   const std::string payload("hello world");
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
-  UdpSendData send_data{client_socket_->localAddress(), *buffer};
+  // Use a self address that is unlikely to be picked by source address discovery
+  // algorithm if not specified in recvmsg. Port is not taken into
+  // consideration.
+  Address::InstanceConstSharedPtr send_from_addr;
+  if (version_ == Address::IpVersion::v4) {
+    // Linux kernel regards any 127.x.x.x as local address. But Mac OS doesn't.
+    send_from_addr.reset(new Address::Ipv4Instance(
+#ifndef __APPLE__
+        "127.1.2.3",
+#else
+        "127.0.0.1",
+#endif
+        server_socket_->localAddress()->ip()->port()));
+  } else {
+    // Only use non-local v6 address if IP_FREEBIND is supported. Otherwise use
+    // ::1 to avoid EINVAL error. Unfortunately this can't verify that sendmsg with
+    // customized source address is doing the work because kernel also picks ::1
+    // if it's not specified in cmsghdr.
+    send_from_addr.reset(new Address::Ipv6Instance(
+#ifdef IP_FREEBIND
+        "::9",
+#else
+        "::1",
+#endif
+        server_socket_->localAddress()->ip()->port()));
+  }
+
+  UdpSendData send_data{send_from_addr->ip(), *client_socket_->localAddress(), *buffer};
 
   auto send_result = listener_->send(send_data);
 
-  EXPECT_EQ(send_result.ok(), true);
+  EXPECT_TRUE(send_result.ok()) << "send() failed : " << send_result.err_->getErrorDetails();
 
-  // This is trigerred on opening the listener on registering the event
-  EXPECT_CALL(listener_callbacks_, onWriteReady_(_)).WillOnce(Invoke([&](const Socket& socket) {
-    EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
-  }));
-
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-
-  Buffer::InstancePtr result_buffer(new Buffer::OwnedImpl());
-  const uint64_t bytes_to_read = 11;
+  const uint64_t bytes_to_read = payload.length();
+  // Make receive buffer 1 byte larger for trailing '\0'.
+  auto recv_buf = std::make_unique<char[]>(bytes_to_read + 1);
   uint64_t bytes_read = 0;
   int retry = 0;
 
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+  sockaddr_storage peer_addr;
+  socklen_t addr_len = sizeof(sockaddr_storage);
   do {
-    Api::IoCallUint64Result result =
-        result_buffer->read(client_socket_->ioHandle(), bytes_to_read - bytes_read);
-
-    if (result.ok()) {
-      bytes_read += result.rc_;
-    } else if (retry == 10 || result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+    Api::SysCallSizeResult result =
+        os_sys_calls.recvfrom(client_socket_->ioHandle().fd(), recv_buf.get(), bytes_to_read, 0,
+                              reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
+    if (result.rc_ >= 0) {
+      bytes_read = result.rc_;
+      Address::InstanceConstSharedPtr peer_address =
+          Address::addressFromSockAddr(peer_addr, addr_len, false);
+      EXPECT_EQ(send_from_addr->asString(), peer_address->asString());
+    } else if (retry == 10 || result.errno_ != EAGAIN) {
       break;
     }
 
-    if (bytes_read == bytes_to_read) {
+    if (bytes_read >= bytes_to_read) {
       break;
     }
 
     retry++;
     ::usleep(10000);
+    ASSERT(bytes_read == 0);
   } while (true);
-
-  EXPECT_EQ(result_buffer->toString(), payload);
+  EXPECT_EQ(bytes_to_read, bytes_read);
+  recv_buf[bytes_to_read] = '\0';
+  EXPECT_EQ(recv_buf.get(), payload);
 }
 
 /**
  * The send fails because the server_socket is created with bind=false.
  */
 TEST_P(UdpListenerImplTest, SendDataError) {
+  Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink()); // For coverage build.
   const std::string payload("hello world");
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
   // send data to itself
-  UdpSendData send_data{server_socket_->localAddress(), *buffer};
+  UdpSendData send_data{send_to_addr_->ip(), *server_socket_->localAddress(), *buffer};
 
-  // This is trigerred on opening the listener on registering the event
-  EXPECT_CALL(listener_callbacks_, onWriteReady_(_)).WillOnce(Invoke([&](const Socket& socket) {
-    EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
-  }));
   // Inject mocked OsSysCalls implementation to mock a write failure.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, ENOTSUP}));
   auto send_result = listener_->send(send_data);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(send_result.ok());
   EXPECT_EQ(send_result.err_->getErrorCode(), Api::IoError::IoErrorCode::NoSupport);
-  dispatcher_->exit();
+  // Failed write shouldn't drain the data.
+  EXPECT_EQ(payload.length(), buffer->length());
+
+  ON_CALL(os_sys_calls, sendmsg(_, _, _)).WillByDefault(Return(Api::SysCallSizeResult{-1, EINVAL}));
+  // EINVAL should cause RELEASE_ASSERT.
+  EXPECT_DEATH(listener_->send(send_data), "Invalid argument passed in");
 }
 
 } // namespace

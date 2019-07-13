@@ -1592,6 +1592,89 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
   // TODO: Verify hedge stats here once they are implemented.
 }
 
+// Tests that an upstream request is reset even if it can't be retried as long as there is
+// another in-flight request we're waiting on.
+// Sequence:
+// 1) first upstream request per try timeout
+// 2) second upstream request sent
+// 3) second upstream request gets 5xx, retries exhausted, assert it's reset
+// 4) first upstream request gets 2xx
+TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
+  enableHedgeOnPerTryTimeout();
+
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder1 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder1 = &decoder;
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                        absl::optional<uint64_t>(absl::nullopt)))
+      .Times(2);
+  expectPerTryTimerCreate();
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  EXPECT_CALL(
+      cm_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  NiceMock<Http::MockStreamEncoder> encoder2;
+  Http::StreamDecoder* response_decoder2 = nullptr;
+  router_.retry_state_->expectHedgedPerTryTimeoutRetry();
+  per_try_timeout_->callback_();
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder2 = &decoder;
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  router_.retry_state_->callback_();
+
+  // We should not have updated any stats yet because no requests have been
+  // canceled
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+
+  // Now write a 5xx back on the 2nd request with no retries remaining. The 2nd request
+  // should be reset immediately.
+  Http::HeaderMapPtr bad_response_headers(new Http::TestHeaderMapImpl{{":status", "500"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(500));
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(encoder2.stream_, resetStream(_));
+  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _))
+      .WillOnce(Return(RetryStatus::NoOverflow));
+  // Not end_stream, otherwise we wouldn't need to reset.
+  response_decoder2->decodeHeaders(std::move(bad_response_headers), false);
+
+  // Now write a 200 back. We expect the 2nd stream to be reset and stats to be
+  // incremented properly.
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool end_stream) -> void {
+        EXPECT_EQ(headers.Status()->value(), "200");
+        EXPECT_TRUE(end_stream);
+      }));
+  response_decoder1->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+
+  // TODO: Verify hedge stats here once they are implemented.
+}
+
 // Three requests sent: 1) 5xx error, 2) per try timeout, 3) gets good response
 // headers.
 TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
