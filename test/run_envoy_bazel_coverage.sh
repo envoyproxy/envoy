@@ -38,7 +38,7 @@ COVERAGE_BINARY="bazel-bin/test/coverage/coverage_tests"
 COVERAGE_DATA="bazel-out/k8-fastbuild/testlogs/test/coverage/coverage_tests/coverage.dat"
 
 echo "Generating report..."
-llvm-cov show "${COVERAGE_BINARY}" -instr-profile="${COVERAGE_DATA}" \
+llvm-cov show "${COVERAGE_BINARY}" -instr-profile="${COVERAGE_DATA}" -Xdemangler=c++filt \
   -ignore-filename-regex="${COVERAGE_IGNORE_REGEX}" -output-dir=${COVERAGE_DIR} -format=html
 sed -i -e 's|>proc/self/cwd/|>|g' "${COVERAGE_DIR}/index.html"
 sed -i -e 's|>bazel-out/[^/]*/bin/\([^/]*\)/[^<]*/_virtual_includes/[^/]*|>\1|g' "${COVERAGE_DIR}/index.html"
