@@ -53,12 +53,27 @@ void FilterChainManagerImpl::addFilterChain(
       const auto& cidr_range = Network::Address::CidrRange::create(destination_ip);
       destination_ips.push_back(cidr_range.asString());
     }
-
+    if (destination_ips.empty()) {
+      if (Network::Address::ipFamilySupported(AF_INET)) {
+        destination_ips.push_back(Network::Utility::getIpv4CidrCatchAllAddress());
+      }
+      if (Network::Address::ipFamilySupported(AF_INET6)) {
+        destination_ips.push_back(Network::Utility::getIpv6CidrCatchAllAddress());
+      }
+    }
     std::vector<std::string> source_ips;
     source_ips.reserve(filter_chain_match.source_prefix_ranges().size());
     for (const auto& source_ip : filter_chain_match.source_prefix_ranges()) {
       const auto& cidr_range = Network::Address::CidrRange::create(source_ip);
       source_ips.push_back(cidr_range.asString());
+    }
+    if (source_ips.empty()) {
+      if (Network::Address::ipFamilySupported(AF_INET)) {
+        source_ips.push_back(Network::Utility::getIpv4CidrCatchAllAddress());
+      }
+      if (Network::Address::ipFamilySupported(AF_INET6)) {
+        source_ips.push_back(Network::Utility::getIpv6CidrCatchAllAddress());
+      }
     }
 
     // Reject partial wildcards, we don't match on them.
@@ -230,6 +245,7 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
                                                                          const T& data) {
   std::vector<Network::Address::CidrRange> subnets;
   if (cidr == EMPTY_STRING) {
+    // This branch should never hit unless OS doesn't support ip family.
     if (Network::Address::ipFamilySupported(AF_INET)) {
       subnets.push_back(
           Network::Address::CidrRange::create(Network::Utility::getIpv4CidrCatchAllAddress()));

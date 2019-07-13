@@ -141,5 +141,78 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
   auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
 }
+
+TEST_F(FilterChainManagerImplTest, EmptyDstAddressAndCatchAllAddress) {
+  const std::string filter_chain_yaml0 = R"EOF(
+      filter_chain_match:
+          destination_port: 443
+          server_names:
+          - "*.foo.com"
+      filters:
+  )EOF";
+  const std::string filter_chain_yaml1 = R"EOF(
+      filter_chain_match:
+          destination_port: 443
+          prefix_ranges:
+          - address_prefix: 0.0.0.0
+            prefix_len: 0
+          server_names:
+            - "*.bar.com"  
+      filters:
+  )EOF";
+
+  envoy::api::v2::listener::FilterChain filter_chain_0, filter_chain_1;
+  TestUtility::loadFromYaml(
+      TestEnvironment::substitute(filter_chain_yaml0, Network::Address::IpVersion::v4),
+      filter_chain_0);
+  TestUtility::loadFromYaml(
+      TestEnvironment::substitute(filter_chain_yaml1, Network::Address::IpVersion::v4),
+      filter_chain_1);
+  filter_chain_manager_.addFilterChain(
+      std::vector<const envoy::api::v2::listener::FilterChain*>{&filter_chain_0, &filter_chain_1},
+      filter_chain_factory_builder_);
+
+  auto* filter_chain =
+      findFilterChainHelper(443, "127.0.0.1", "www.bar.com", "tls", {}, "8.8.8.8", 111);
+  EXPECT_NE(filter_chain, nullptr);
+
+  filter_chain = findFilterChainHelper(443, "127.0.0.1", "www.foo.com", "tls", {}, "8.8.8.8", 111);
+  EXPECT_NE(filter_chain, nullptr);
+}
+
+TEST_F(FilterChainManagerImplTest, EmptyDstAddressIsSuperSetOfCatchAllAddress) {
+  const std::string filter_chain_yaml0 = R"EOF(
+      filter_chain_match:
+          destination_port: 443
+          server_names:
+          - "*.foo.com"
+      filters:
+  )EOF";
+  const std::string filter_chain_yaml1 = R"EOF(
+      filter_chain_match:
+          destination_port: 443
+          prefix_ranges:
+          - address_prefix: 0.0.0.0
+            prefix_len: 0
+          server_names:
+            - "*.foo.com"  
+      filters:
+  )EOF";
+
+  envoy::api::v2::listener::FilterChain filter_chain_0, filter_chain_1;
+  TestUtility::loadFromYaml(
+      TestEnvironment::substitute(filter_chain_yaml0, Network::Address::IpVersion::v4),
+      filter_chain_0);
+  TestUtility::loadFromYaml(
+      TestEnvironment::substitute(filter_chain_yaml1, Network::Address::IpVersion::v4),
+      filter_chain_1);
+  EXPECT_THROW_WITH_MESSAGE(filter_chain_manager_.addFilterChain(
+                                std::vector<const envoy::api::v2::listener::FilterChain*>{
+                                    &filter_chain_0, &filter_chain_1},
+                                filter_chain_factory_builder_),
+                            EnvoyException,
+                            "error adding listener '127.0.0.1:1234': multiple filter chains with "
+                            "overlapping matching rules are defined");
+}
 } // namespace Server
 } // namespace Envoy
