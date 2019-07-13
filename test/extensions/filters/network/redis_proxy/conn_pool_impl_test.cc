@@ -50,6 +50,7 @@ public:
 
     std::unique_ptr<NiceMock<Stats::MockStore>> store =
         std::make_unique<NiceMock<Stats::MockStore>>();
+
     upstream_cx_drained_.value_ = 0;
     ON_CALL(*store, counter(Eq("upstream_cx_drained")))
         .WillByDefault(ReturnRef(upstream_cx_drained_));
@@ -59,6 +60,7 @@ public:
     ON_CALL(upstream_cx_drained_, inc()).WillByDefault(Invoke([&]() {
       upstream_cx_drained_.value_++;
     }));
+
     max_upstream_unknown_connections_reached_.value_ = 0;
     ON_CALL(*store, counter(Eq("max_upstream_unknown_connections_reached")))
         .WillByDefault(ReturnRef(max_upstream_unknown_connections_reached_));
