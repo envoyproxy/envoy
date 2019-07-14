@@ -140,7 +140,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_envoyproxy_sqlparser()
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
-    _com_github_gcovr_gcovr()
     _com_github_google_benchmark()
     _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
@@ -163,9 +162,6 @@ def envoy_dependencies(skip_targets = []):
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
-
-    # Used for bundling gcovr into a relocatable .par file.
-    _repository_impl("subpar")
 
     _python_deps()
     _cc_deps()
@@ -255,16 +251,6 @@ def _com_github_gabime_spdlog():
     native.bind(
         name = "spdlog",
         actual = "@com_github_gabime_spdlog//:spdlog",
-    )
-
-def _com_github_gcovr_gcovr():
-    _repository_impl(
-        name = "com_github_gcovr_gcovr",
-        build_file = "@envoy//bazel/external:gcovr.BUILD",
-    )
-    native.bind(
-        name = "gcovr",
-        actual = "@com_github_gcovr_gcovr//:gcovr",
     )
 
 def _com_github_google_benchmark():
