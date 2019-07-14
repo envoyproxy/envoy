@@ -250,6 +250,14 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   export GCOVR="/tmp/gcovr.par"
   cp -f "${ENVOY_SRCDIR}/bazel-bin/external/com_github_gcovr_gcovr/gcovr.par" ${GCOVR}
 
+  # Reduce the amount of memory and number of cores Bazel tries to use to
+  # prevent it from launching too many subprocesses. This should prevent the
+  # system from running out of memory and killing tasks. See discussion on
+  # https://github.com/envoyproxy/envoy/pull/5611.
+  # TODO(akonradi): use --local_cpu_resources flag once Bazel has a release
+  # after 0.21.
+  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_ram_resources=12288"
+
   test/run_envoy_bazel_coverage.sh ${TEST_TARGETS}
   collect_build_profile coverage
   exit 0
