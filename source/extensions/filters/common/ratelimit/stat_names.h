@@ -8,6 +8,9 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
+// Captures a set of stat-names needed for recording during rate-limit
+// filters. These should generally be initialized once per process, and
+// not per-request, to avoid lock contention.
 struct StatNames {
   StatNames(Stats::StatNamePool& pool)
       : ok_(pool.add("ratelimit.ok")), error_(pool.add("ratelimit.error")),

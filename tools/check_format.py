@@ -41,6 +41,22 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
                        "./test/test_common/utility.cc", "./test/test_common/utility.h",
                        "./test/integration/integration.h")
 
+# Files matching these directories can use stats by string for now. These should
+# be eliminated but for now we don't want to grow this work. The goal for this
+# whitelist is to eliminate it by making code transformations similar to
+# https://github.com/envoyproxy/envoy/pull/7573 and others.
+STAT_FROM_STRING_WHITELIST = ("./source/common/memory/heap_shrinker.cc",
+                              "./source/extensions/filters/http/dynamo/dynamo_filter.cc",
+                              "./source/extensions/filters/http/ext_authz/ext_authz.cc",
+                              "./source/extensions/filters/http/fault/fault_filter.cc",
+                              "./source/extensions/filters/http/ip_tagging/ip_tagging_filter.cc",
+                              "./source/extensions/filters/network/mongo_proxy/proxy.cc",
+                              "./source/extensions/filters/network/zookeeper_proxy/filter.cc",
+                              "./source/extensions/stat_sinks/common/statsd/statsd.cc",
+                              "./source/extensions/transport_sockets/tls/context_impl.cc",
+                              "./source/server/guarddog_impl.cc",
+                              "./source/server/overload_manager_impl.cc")
+
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = ("./test/common/protobuf/utility_test.cc",
                                  "./test/common/grpc/codec_test.cc")
@@ -315,6 +331,10 @@ def whitelistedForJsonStringToMessage(file_path):
   return file_path in JSON_STRING_TO_MESSAGE_WHITELIST
 
 
+def whitelistedForStatFromString(file_path):
+  return file_path in STAT_FROM_STRING_WHITELIST
+
+
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
@@ -459,7 +479,8 @@ def checkSourceLine(line, file_path, reportError):
   # Check fixable errors. These may have been fixed already.
   if line.find(".  ") != -1:
     reportError("over-enthusiastic spaces")
-  if ('source' in file_path or 'include' in file_path) and X_ENVOY_USED_DIRECTLY_REGEX.match(line):
+  if (file_path.startswith('./source/') or file_path.startswith('./include/')) and \
+      X_ENVOY_USED_DIRECTLY_REGEX.match(line):
     reportError(
         "Please do not use the raw literal x-envoy in source code.  See Envoy::Http::PrefixValue.")
   if hasInvalidAngleBracketDirectory(line):
@@ -545,6 +566,9 @@ def checkSourceLine(line, file_path, reportError):
     # behavior.
     reportError("Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
 
+  if file_path.startswith('./source/') and ('.counter(' in line or '.gauge(' in line) and \
+      not whitelistedForStatFromString(file_path):
+    reportError("Don't lookup stats by name at runtime; used StatName saved during construction")
 
 def checkBuildLine(line, file_path, reportError):
   if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/")):
