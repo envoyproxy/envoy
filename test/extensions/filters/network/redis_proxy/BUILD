@@ -127,7 +127,6 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "redis_proxy_integration_test",
-    size = "small",
     srcs = ["redis_proxy_integration_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
     deps = [
