@@ -18,6 +18,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:filter_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:matchers_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",

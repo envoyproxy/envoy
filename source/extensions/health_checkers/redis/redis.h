@@ -77,6 +77,8 @@ private:
       return std::chrono::milliseconds(1);
     }
 
+    uint32_t maxUpstreamUnknownConnections() const override { return 0; }
+
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
@@ -101,7 +103,7 @@ private:
     NetworkFilters::Common::Redis::RespValue request_;
   };
 
-  typedef std::unique_ptr<RedisActiveHealthCheckSession> RedisActiveHealthCheckSessionPtr;
+  using RedisActiveHealthCheckSessionPtr = std::unique_ptr<RedisActiveHealthCheckSession>;
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(Upstream::HostSharedPtr host) override {

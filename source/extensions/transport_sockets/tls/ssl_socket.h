@@ -44,7 +44,7 @@ class SslSocket : public Network::TransportSocket,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
-            Network::TransportSocketOptionsSharedPtr transport_socket_options);
+            const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
@@ -90,6 +90,7 @@ private:
   void drainErrorQueue();
   void shutdownSsl();
 
+  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
   bssl::UniquePtr<SSL> ssl_;

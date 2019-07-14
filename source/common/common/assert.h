@@ -9,9 +9,9 @@ namespace Assert {
 
 class ActionRegistration {
 public:
-  virtual ~ActionRegistration() {}
+  virtual ~ActionRegistration() = default;
 };
-typedef std::unique_ptr<ActionRegistration> ActionRegistrationPtr;
+using ActionRegistrationPtr = std::unique_ptr<ActionRegistration>;
 
 /**
  * Sets an action to be invoked when a debug assertion failure is detected
@@ -30,7 +30,7 @@ typedef std::unique_ptr<ActionRegistration> ActionRegistrationPtr;
  * @param action The action to take when an assertion fails.
  * @return A registration object. The registration is removed when the object is destructed.
  */
-ActionRegistrationPtr setDebugAssertionFailureRecordAction(std::function<void()> action);
+ActionRegistrationPtr setDebugAssertionFailureRecordAction(const std::function<void()>& action);
 
 /**
  * Invokes the action set by setDebugAssertionFailureRecordAction, or does nothing if

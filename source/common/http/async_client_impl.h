@@ -164,7 +164,7 @@ private:
 
   struct NullVirtualHost : public Router::VirtualHost {
     // Router::VirtualHost
-    Stats::StatName statName() const override { return Stats::StatName(); }
+    Stats::StatName statName() const override { return {}; }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     const Router::Config& routeConfig() const override { return route_configuration_; }
@@ -302,6 +302,7 @@ private:
     // filter which uses this function for buffering.
     ASSERT(buffered_body_ != nullptr);
   }
+  MetadataMapVector& addDecodedMetadata() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
@@ -368,7 +369,7 @@ public:
                    const AsyncClient::RequestOptions& options);
 
   // AsyncClient::Request
-  virtual void cancel() override;
+  void cancel() override;
 
 private:
   void initialize();

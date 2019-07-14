@@ -1,6 +1,11 @@
 #include "server/filter_chain_manager_impl.h"
 
 #include "common/common/empty_string.h"
+#include "common/common/fmt.h"
+#include "common/config/utility.h"
+#include "common/protobuf/utility.h"
+
+#include "server/configuration_impl.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -23,28 +28,70 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
 }
 
 void FilterChainManagerImpl::addFilterChain(
-    uint16_t destination_port, const std::vector<std::string>& destination_ips,
-    const std::vector<std::string>& server_names, const std::string& transport_protocol,
-    const std::vector<std::string>& application_protocols,
-    const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
-    const std::vector<std::string>& source_ips,
-    const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
-    Network::TransportSocketFactoryPtr&& transport_socket_factory,
-    std::vector<Network::FilterFactoryCb> filters_factory) {
-  const auto filter_chain = std::make_shared<FilterChainImpl>(std::move(transport_socket_factory),
-                                                              std::move(filters_factory));
-  addFilterChainForDestinationPorts(destination_ports_map_, destination_port, destination_ips,
-                                    server_names, transport_protocol, application_protocols,
-                                    source_type, source_ips, source_ports, filter_chain);
+    absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
+    FilterChainFactoryBuilder& filter_chain_factory_builder) {
+  std::unordered_set<envoy::api::v2::listener::FilterChainMatch, MessageUtil, MessageUtil>
+      filter_chains;
+  for (const auto& filter_chain : filter_chain_span) {
+    const auto& filter_chain_match = filter_chain->filter_chain_match();
+    if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
+                                       "unimplemented fields",
+                                       address_->asString()));
+    }
+    if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
+                                       "the same matching rules are defined",
+                                       address_->asString()));
+    }
+    filter_chains.insert(filter_chain_match);
+
+    // Validate IP addresses.
+    std::vector<std::string> destination_ips;
+    destination_ips.reserve(filter_chain_match.prefix_ranges().size());
+    for (const auto& destination_ip : filter_chain_match.prefix_ranges()) {
+      const auto& cidr_range = Network::Address::CidrRange::create(destination_ip);
+      destination_ips.push_back(cidr_range.asString());
+    }
+
+    std::vector<std::string> source_ips;
+    source_ips.reserve(filter_chain_match.source_prefix_ranges().size());
+    for (const auto& source_ip : filter_chain_match.source_prefix_ranges()) {
+      const auto& cidr_range = Network::Address::CidrRange::create(source_ip);
+      source_ips.push_back(cidr_range.asString());
+    }
+
+    // Reject partial wildcards, we don't match on them.
+    for (const auto& server_name : filter_chain_match.server_names()) {
+      if (server_name.find('*') != std::string::npos &&
+          !FilterChainManagerImpl::isWildcardServerName(server_name)) {
+        throw EnvoyException(
+            fmt::format("error adding listener '{}': partial wildcards are not supported in "
+                        "\"server_names\"",
+                        address_->asString()));
+      }
+    }
+
+    addFilterChainForDestinationPorts(
+        destination_ports_map_,
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
+        filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
+        filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
+        filter_chain_match.source_ports(),
+        std::shared_ptr<Network::FilterChain>(
+            filter_chain_factory_builder.buildFilterChain(*filter_chain)));
+  }
+  convertIPsToTries();
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(
     DestinationPortsMap& destination_ports_map, uint16_t destination_port,
-    const std::vector<std::string>& destination_ips, const std::vector<std::string>& server_names,
-    const std::string& transport_protocol, const std::vector<std::string>& application_protocols,
+    const std::vector<std::string>& destination_ips,
+    const absl::Span<const std::string* const> server_names, const std::string& transport_protocol,
+    const absl::Span<const std::string* const> application_protocols,
     const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
-    const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
+    const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (destination_ports_map.find(destination_port) == destination_ports_map.end()) {
     destination_ports_map[destination_port] =
@@ -57,11 +104,11 @@ void FilterChainManagerImpl::addFilterChainForDestinationPorts(
 
 void FilterChainManagerImpl::addFilterChainForDestinationIPs(
     DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
-    const std::vector<std::string>& server_names, const std::string& transport_protocol,
-    const std::vector<std::string>& application_protocols,
+    const absl::Span<const std::string* const> server_names, const std::string& transport_protocol,
+    const absl::Span<const std::string* const> application_protocols,
     const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
-    const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
+    const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (destination_ips.empty()) {
     addFilterChainForServerNames(destination_ips_map[EMPTY_STRING], server_names,
@@ -77,11 +124,12 @@ void FilterChainManagerImpl::addFilterChainForDestinationIPs(
 }
 
 void FilterChainManagerImpl::addFilterChainForServerNames(
-    ServerNamesMapSharedPtr& server_names_map_ptr, const std::vector<std::string>& server_names,
-    const std::string& transport_protocol, const std::vector<std::string>& application_protocols,
+    ServerNamesMapSharedPtr& server_names_map_ptr,
+    const absl::Span<const std::string* const> server_names, const std::string& transport_protocol,
+    const absl::Span<const std::string* const> application_protocols,
     const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
-    const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
+    const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (server_names_map_ptr == nullptr) {
     server_names_map_ptr = std::make_shared<ServerNamesMap>();
@@ -93,16 +141,16 @@ void FilterChainManagerImpl::addFilterChainForServerNames(
                                           application_protocols, source_type, source_ips,
                                           source_ports, filter_chain);
   } else {
-    for (const auto& server_name : server_names) {
-      if (isWildcardServerName(server_name)) {
+    for (const auto& server_name_ptr : server_names) {
+      if (isWildcardServerName(*server_name_ptr)) {
         // Add mapping for the wildcard domain, i.e. ".example.com" for "*.example.com".
         addFilterChainForApplicationProtocols(
-            server_names_map[server_name.substr(1)][transport_protocol], application_protocols,
+            server_names_map[server_name_ptr->substr(1)][transport_protocol], application_protocols,
             source_type, source_ips, source_ports, filter_chain);
       } else {
-        addFilterChainForApplicationProtocols(server_names_map[server_name][transport_protocol],
-                                              application_protocols, source_type, source_ips,
-                                              source_ports, filter_chain);
+        addFilterChainForApplicationProtocols(
+            server_names_map[*server_name_ptr][transport_protocol], application_protocols,
+            source_type, source_ips, source_ports, filter_chain);
       }
     }
   }
@@ -110,18 +158,18 @@ void FilterChainManagerImpl::addFilterChainForServerNames(
 
 void FilterChainManagerImpl::addFilterChainForApplicationProtocols(
     ApplicationProtocolsMap& application_protocols_map,
-    const std::vector<std::string>& application_protocols,
+    const absl::Span<const std::string* const> application_protocols,
     const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
-    const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
+    const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (application_protocols.empty()) {
     addFilterChainForSourceTypes(application_protocols_map[EMPTY_STRING], source_type, source_ips,
                                  source_ports, filter_chain);
   } else {
-    for (const auto& application_protocol : application_protocols) {
-      addFilterChainForSourceTypes(application_protocols_map[application_protocol], source_type,
-                                   source_ips, source_ports, filter_chain);
+    for (const auto& application_protocol_ptr : application_protocols) {
+      addFilterChainForSourceTypes(application_protocols_map[*application_protocol_ptr],
+                                   source_type, source_ips, source_ports, filter_chain);
     }
   }
 }
@@ -130,7 +178,7 @@ void FilterChainManagerImpl::addFilterChainForSourceTypes(
     SourceTypesArray& source_types_array,
     const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
-    const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
+    const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (source_ips.empty()) {
     addFilterChainForSourceIPs(source_types_array[source_type].first, EMPTY_STRING, source_ports,
@@ -145,7 +193,7 @@ void FilterChainManagerImpl::addFilterChainForSourceTypes(
 
 void FilterChainManagerImpl::addFilterChainForSourceIPs(
     SourceIPsMap& source_ips_map, const std::string& source_ip,
-    const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
+    const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (source_ports.empty()) {
     addFilterChainForSourcePorts(source_ips_map[source_ip], 0, filter_chain);
@@ -168,9 +216,9 @@ void FilterChainManagerImpl::addFilterChainForSourcePorts(
     // If we got here and found already configured branch, then it means that this FilterChainMatch
     // is a duplicate, and that there is some overlap in the repeated fields with already processed
     // FilterChainMatches.
-    // TODO(lambdai): bring back the address in exception
-    throw EnvoyException(fmt::format("error adding listener: multiple filter chains with "
-                                     "overlapping matching rules are defined"));
+    throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
+                                     "overlapping matching rules are defined",
+                                     address_->asString()));
   }
 }
 

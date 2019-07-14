@@ -233,12 +233,12 @@ envoy_cc_library(
     srcs = ["lds_api.cc"],
     hdrs = ["lds_api.h"],
     deps = [
+        "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/init:manager_interface",
         "//include/envoy/server:listener_manager_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/config:resources_lib",
-        "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
@@ -269,10 +269,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/listener:well_known_names",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/transport_sockets:well_known_names",
-        "//source/extensions/transport_sockets/tls:context_config_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2:lds_cc",
     ],
@@ -284,9 +281,12 @@ envoy_cc_library(
     hdrs = ["filter_chain_manager_impl.h"],
     deps = [
         "//include/envoy/server:listener_manager_interface",
+        "//include/envoy/server:transport_socket_config_interface",
         "//source/common/common:empty_string",
+        "//source/common/config:utility_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:lc_trie_lib",
+        "//source/server:configuration_lib",
     ],
 )
 
@@ -311,7 +311,7 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2:srds_cc",
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
         "@envoy_api//envoy/service/discovery/v2:hds_cc",
-        "@envoy_api//envoy/service/discovery/v2:tds_cc",
+        "@envoy_api//envoy/service/discovery/v2:rtds_cc",
         "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )
@@ -338,6 +338,7 @@ envoy_cc_library(
         ":guarddog_lib",
         ":listener_hooks_lib",
         ":listener_manager_lib",
+        ":ssl_context_manager_lib",
         ":worker_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:signal_interface",
@@ -361,7 +362,7 @@ envoy_cc_library(
         "//source/common/common:version_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:async_client_manager_lib",
-        "//source/common/grpc:common_lib",
+        "//source/common/grpc:context_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:context_lib",
         "//source/common/init:manager_lib",
@@ -379,6 +380,16 @@ envoy_cc_library(
         "//source/server:overload_manager_lib",
         "//source/server/http:admin_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "ssl_context_manager_lib",
+    srcs = ["ssl_context_manager.cc"],
+    hdrs = ["ssl_context_manager.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/ssl:context_manager_interface",
     ],
 )
 

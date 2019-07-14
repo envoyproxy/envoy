@@ -47,28 +47,9 @@ protected:
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("route_scopes", _));
     config_provider_manager_ =
         std::make_unique<ScopedRoutesConfigProviderManager>(factory_context_.admin_);
-
-    const std::string rds_config_yaml = R"EOF(
-api_config_source:
-  api_type: REST
-  cluster_names:
-    - foo_rds_cluster
-  refresh_delay: { seconds: 1, nanos: 0 }
-)EOF";
-    TestUtility::loadFromYaml(rds_config_yaml, rds_config_source_);
   }
 
   ~ScopedRoutesTestBase() override { factory_context_.thread_local_.shutdownThread(); }
-
-  void setupMockClusterMap() {
-    InSequence s;
-    cluster_map_.emplace("foo_cluster", cluster_);
-    EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map_));
-    EXPECT_CALL(cluster_, info());
-    EXPECT_CALL(*cluster_.info_, addedViaApi());
-    EXPECT_CALL(cluster_, info());
-    EXPECT_CALL(*cluster_.info_, type());
-  }
 
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
@@ -85,25 +66,11 @@ protected:
   void setup() {
     InSequence s;
 
-    setupMockClusterMap();
     const std::string config_yaml = R"EOF(
 name: foo_scoped_routes
 scope_key_builder:
   fragments:
     - header_value_extractor: { name: X-Google-VIP }
-rds_config_source:
-  api_config_source:
-    api_type: REST
-    cluster_names:
-      - foo_cluster
-    refresh_delay: { seconds: 1, nanos: 0 }
-scoped_rds:
-  scoped_rds_config_source:
-    api_config_source:
-      api_type: REST
-      cluster_names:
-        - foo_cluster
-      refresh_delay: { seconds: 1, nanos: 0 }
 )EOF";
     envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes scoped_routes_config;
     TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
@@ -112,20 +79,15 @@ scoped_rds:
         ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.name(),
                                                 scoped_routes_config.rds_config_source(),
                                                 scoped_routes_config.scope_key_builder()));
-    subscription_ = &dynamic_cast<ScopedRdsConfigProvider&>(*provider_).subscription();
+    subscription_callbacks_ = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
-  ScopedRdsConfigSubscription& subscription() const { return *subscription_; }
-
-  ScopedRdsConfigSubscription* subscription_;
+  Envoy::Config::SubscriptionCallbacks* subscription_callbacks_{};
   Envoy::Config::ConfigProviderPtr provider_;
 };
 
 TEST_F(ScopedRdsTest, ValidateFail) {
   setup();
-
-  ScopedRdsConfigSubscription& subscription =
-      dynamic_cast<ScopedRdsConfigProvider&>(*provider_).subscription();
 
   // 'name' validation: value must be > 1 byte.
   const std::string config_yaml = R"EOF(
@@ -137,7 +99,7 @@ key:
 )EOF";
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
-  EXPECT_THROW(subscription.onConfigUpdate(resources, "1"), ProtoValidationException);
+  EXPECT_THROW(subscription_callbacks_->onConfigUpdate(resources, "1"), ProtoValidationException);
 
   // 'route_configuration_name' validation: value must be > 1 byte.
   const std::string config_yaml2 = R"EOF(
@@ -149,7 +111,7 @@ key:
 )EOF";
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources2;
   parseScopedRouteConfigurationFromYaml(*resources2.Add(), config_yaml2);
-  EXPECT_THROW(subscription.onConfigUpdate(resources2, "1"), ProtoValidationException);
+  EXPECT_THROW(subscription_callbacks_->onConfigUpdate(resources2, "1"), ProtoValidationException);
 
   // 'key' validation: must define at least 1 fragment.
   const std::string config_yaml3 = R"EOF(
@@ -159,7 +121,7 @@ key:
 )EOF";
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources3;
   parseScopedRouteConfigurationFromYaml(*resources3.Add(), config_yaml3);
-  EXPECT_THROW(subscription.onConfigUpdate(resources3, "1"), ProtoValidationException);
+  EXPECT_THROW(subscription_callbacks_->onConfigUpdate(resources3, "1"), ProtoValidationException);
 }
 
 // Tests that multiple uniquely named resources are allowed in config updates.
@@ -183,7 +145,7 @@ key:
     - string_key: x-foo-key
 )EOF";
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
-  EXPECT_NO_THROW(subscription().onConfigUpdate(resources, "1"));
+  EXPECT_NO_THROW(subscription_callbacks_->onConfigUpdate(resources, "1"));
   EXPECT_EQ(
       1UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
@@ -203,46 +165,8 @@ key:
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
-  EXPECT_THROW_WITH_MESSAGE(subscription().onConfigUpdate(resources, "1"), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(subscription_callbacks_->onConfigUpdate(resources, "1"), EnvoyException,
                             "duplicate scoped route configuration foo_scope found");
-}
-
-// Tests that defining an invalid cluster in the SRDS config results in an error.
-TEST_F(ScopedRdsTest, UnknownCluster) {
-  const std::string config_yaml = R"EOF(
-name: foo_scoped_routes
-scope_key_builder:
-  fragments:
-    - header_value_extractor: { name: X-Google-VIP }
-rds_config_source:
-  api_config_source:
-    api_type: REST
-    cluster_names:
-      - foo_cluster
-    refresh_delay: { seconds: 1, nanos: 0 }
-scoped_rds:
-  scoped_rds_config_source:
-    api_config_source:
-      api_type: REST
-      cluster_names:
-        - foo_cluster
-      refresh_delay: { seconds: 1, nanos: 0 }
-)EOF";
-  envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes scoped_routes_config;
-  TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
-
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
-  EXPECT_THROW_WITH_MESSAGE(
-      config_provider_manager_->createXdsConfigProvider(
-          scoped_routes_config.scoped_rds(), factory_context_, "foo.",
-          ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.name(),
-                                                  scoped_routes_config.rds_config_source(),
-                                                  scoped_routes_config.scope_key_builder())),
-      EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS "
-      "cluster: 'foo_cluster' does not exist, was added via api, or is an "
-      "EDS cluster");
 }
 
 // Tests a config update failure.
@@ -253,7 +177,7 @@ TEST_F(ScopedRdsTest, ConfigUpdateFailure) {
   timeSystem().setSystemTime(time);
   const EnvoyException ex(fmt::format("config failure"));
   // Verify the failure updates the lastUpdated() timestamp.
-  subscription().onConfigUpdateFailed(&ex);
+  subscription_callbacks_->onConfigUpdateFailed(&ex);
   EXPECT_EQ(std::chrono::time_point_cast<std::chrono::milliseconds>(provider_->lastUpdated())
                 .time_since_epoch(),
             time);
@@ -291,12 +215,6 @@ scoped_routes:
   scope_key_builder:
     fragments:
       - header_value_extractor: { name: X-Google-VIP }
-  rds_config_source:
-    api_config_source:
-      api_type: REST
-      cluster_names:
-        - foo_rds_cluster
-      refresh_delay: { seconds: 1, nanos: 0 }
 $1
 )EOF";
   const std::string inline_scoped_route_configs_yaml = R"EOF(
@@ -340,15 +258,9 @@ dynamic_scoped_route_configs:
                             expected_config_dump);
   EXPECT_EQ(expected_config_dump.DebugString(), scoped_routes_config_dump2.DebugString());
 
-  setupMockClusterMap();
   const std::string scoped_rds_config_yaml = R"EOF(
   scoped_rds:
     scoped_rds_config_source:
-      api_config_source:
-        api_type: REST
-        cluster_names:
-          - foo_cluster
-        refresh_delay: { seconds: 1, nanos: 0 }
 )EOF";
   Envoy::Config::ConfigProviderPtr dynamic_provider = ScopedRoutesConfigProviderUtil::create(
       parseHttpConnectionManagerFromYaml(absl::Substitute(
@@ -364,9 +276,8 @@ key:
 )EOF"));
 
   timeSystem().setSystemTime(std::chrono::milliseconds(1234567891567));
-  ScopedRdsConfigSubscription& subscription =
-      dynamic_cast<ScopedRdsConfigProvider&>(*dynamic_provider).subscription();
-  subscription.onConfigUpdate(resources, "1");
+  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(resources,
+                                                                                     "1");
 
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
@@ -403,7 +314,8 @@ dynamic_scoped_route_configs:
   EXPECT_EQ(expected_config_dump.DebugString(), scoped_routes_config_dump3.DebugString());
 
   resources.Clear();
-  subscription.onConfigUpdate(resources, "2");
+  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(resources,
+                                                                                     "2");
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
   - name: foo-scoped-routes

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/stats/scope.h"
@@ -46,7 +47,7 @@ struct SslStats {
 
 class ContextImpl : public virtual Envoy::Ssl::Context {
 public:
-  virtual bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name);
+  virtual bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options);
 
   /**
    * Logs successful TLS handshake and updates stats.
@@ -94,7 +95,7 @@ protected:
   // A SSL_CTX_set_cert_verify_callback for custom cert validation.
   static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
 
-  int verifyCertificate(X509* cert);
+  int verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list);
 
   /**
    * Verifies certificate hash for pinning. The hash is a hex-encoded SHA-256 of the DER-encoded
@@ -161,14 +162,14 @@ protected:
   const unsigned tls_max_version_;
 };
 
-typedef std::shared_ptr<ContextImpl> ContextImplSharedPtr;
+using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;
 
 class ClientContextImpl : public ContextImpl, public Envoy::Ssl::ClientContext {
 public:
   ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
                     TimeSource& time_source);
 
-  bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name) override;
+  bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options) override;
 
 private:
   int newSessionKey(SSL_SESSION* session);

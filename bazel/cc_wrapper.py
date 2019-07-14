@@ -1,12 +1,11 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 import contextlib
 import os
 import shlex
 import sys
 import tempfile
 
-envoy_real_cc = {ENVOY_REAL_CC}
-envoy_real_cxx = {ENVOY_REAL_CXX}
+compiler = {ENVOY_REAL_CC}
 envoy_cflags = {ENVOY_CFLAGS}
 envoy_cxxflags = {ENVOY_CXXFLAGS}
 
@@ -25,7 +24,7 @@ def sanitize_flagfile(in_path, out_fd):
       if line != "-lstdc++\n":
         os.write(out_fd, line)
       elif "-stdlib=libc++" in envoy_cxxflags:
-        os.write(out_fd, "-lc++\n")
+        os.write(out_fd, "-l:libc++.a\n-l:libc++abi.a\n")
 
 
 # Is the arg a flag indicating that we're building for C++ (rather than C)?
@@ -37,11 +36,9 @@ def is_cpp_flag(arg):
 def modify_driver_args(input_driver_flags):
   # Detect if we're building for C++ or vanilla C.
   if any(map(is_cpp_flag, input_driver_flags)):
-    compiler = envoy_real_cxx
     # Append CXXFLAGS to all C++ targets (this is mostly for dependencies).
     argv = shlex.split(envoy_cxxflags)
   else:
-    compiler = envoy_real_cc
     # Append CFLAGS to all C targets (this is mostly for dependencies).
     argv = shlex.split(envoy_cflags)
 
@@ -50,9 +47,8 @@ def modify_driver_args(input_driver_flags):
   # b) replace all occurrences of -lstdc++ with -lc++ (when linking against libc++).
   if "-static-libstdc++" in input_driver_flags or "-stdlib=libc++" in envoy_cxxflags:
     for arg in input_driver_flags:
-      if arg == "-lstdc++":
-        if "-stdlib=libc++" in envoy_cxxflags:
-          argv.append("-lc++")
+      if arg in ("-lstdc++", "-static-libstdc++"):
+        pass
       elif arg.startswith("-Wl,@"):
         # tempfile.mkstemp will write to the out-of-sandbox tempdir
         # unless the user has explicitly set environment variables
@@ -66,6 +62,13 @@ def modify_driver_args(input_driver_flags):
         argv.append(arg)
   else:
     argv += input_driver_flags
+
+  # This flags should after all libraries
+  if "-static-libstdc++" in input_driver_flags:
+    argv.append("-l:libstdc++.a")
+  if "-lstdc++" in input_driver_flags and "-stdlib=libc++" in envoy_cxxflags:
+    argv.append("-l:libc++.a")
+    argv.append("-l:libc++abi.a")
 
   # Bazel will add -fuse-ld=gold in some cases, gcc/clang will take the last -fuse-ld argument,
   # so whenever we see lld once, add it to the end.
@@ -87,13 +90,13 @@ def modify_driver_args(input_driver_flags):
     # See https://github.com/envoyproxy/envoy/issues/2987
     argv.append("-Wno-maybe-uninitialized")
 
-  return compiler, argv
+  return argv
 
 
 def main():
   # Append CXXFLAGS to correctly detect include paths for either libstdc++ or libc++.
   if sys.argv[1:5] == ["-E", "-xc++", "-", "-v"]:
-    os.execv(envoy_real_cxx, [envoy_real_cxx] + sys.argv[1:] + shlex.split(envoy_cxxflags))
+    os.execv(compiler, [compiler] + sys.argv[1:] + shlex.split(envoy_cxxflags))
 
   if sys.argv[1].startswith("@"):
     # Read flags from file
@@ -102,21 +105,21 @@ def main():
       input_driver_flags = fd.read().splitlines()
 
     # Compute new args
-    compiler, new_driver_args = modify_driver_args(input_driver_flags)
+    new_driver_args = modify_driver_args(input_driver_flags)
 
     # Write args to temp file
     (new_flagfile_fd, new_flagfile_path) = tempfile.mkstemp(dir="./", suffix=".linker-params")
 
     with closing_fd(new_flagfile_fd):
       for arg in new_driver_args:
-        os.write(new_flagfile_fd, arg + "\n")
+        os.write(new_flagfile_fd, bytes(str(arg + "\n").encode("utf-8")))
 
     # Provide new arguments using the temp file containing the args
     new_args = ["@" + new_flagfile_path]
   else:
     # TODO(https://github.com/bazelbuild/bazel/issues/7687): Remove this branch
     # when Bazel 0.27 is released.
-    compiler, new_args = modify_driver_args(sys.argv[1:])
+    new_args = modify_driver_args(sys.argv[1:])
 
   os.execv(compiler, [compiler] + new_args)
 

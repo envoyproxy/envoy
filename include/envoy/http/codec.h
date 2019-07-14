@@ -23,7 +23,7 @@ class Stream;
  */
 class StreamEncoder {
 public:
-  virtual ~StreamEncoder() {}
+  virtual ~StreamEncoder() = default;
 
   /**
    * Encode 100-Continue headers.
@@ -69,7 +69,7 @@ public:
  */
 class StreamDecoder {
 public:
-  virtual ~StreamDecoder() {}
+  virtual ~StreamDecoder() = default;
 
   /**
    * Called with decoded 100-Continue headers.
@@ -129,7 +129,7 @@ enum class StreamResetReason {
  */
 class StreamCallbacks {
 public:
-  virtual ~StreamCallbacks() {}
+  virtual ~StreamCallbacks() = default;
 
   /**
    * Fires when a stream has been remote reset.
@@ -156,7 +156,7 @@ public:
  */
 class Stream {
 public:
-  virtual ~Stream() {}
+  virtual ~Stream() = default;
 
   /**
    * Add stream callbacks.
@@ -203,7 +203,7 @@ public:
  */
 class ConnectionCallbacks {
 public:
-  virtual ~ConnectionCallbacks() {}
+  virtual ~ConnectionCallbacks() = default;
 
   /**
    * Fires when the remote indicates "go away." No new streams should be created.
@@ -279,7 +279,7 @@ struct Http2Settings {
  */
 class Connection {
 public:
-  virtual ~Connection() {}
+  virtual ~Connection() = default;
 
   /**
    * Dispatch incoming connection data.
@@ -327,7 +327,7 @@ public:
  */
 class DownstreamWatermarkCallbacks {
 public:
-  virtual ~DownstreamWatermarkCallbacks() {}
+  virtual ~DownstreamWatermarkCallbacks() = default;
 
   /**
    * Called when the downstream connection or stream goes over its high watermark. Note that this
@@ -369,7 +369,7 @@ public:
  */
 class ServerConnection : public virtual Connection {};
 
-typedef std::unique_ptr<ServerConnection> ServerConnectionPtr;
+using ServerConnectionPtr = std::unique_ptr<ServerConnection>;
 
 /**
  * A client side HTTP connection.
@@ -384,7 +384,7 @@ public:
   virtual StreamEncoder& newStream(StreamDecoder& response_decoder) PURE;
 };
 
-typedef std::unique_ptr<ClientConnection> ClientConnectionPtr;
+using ClientConnectionPtr = std::unique_ptr<ClientConnection>;
 
 } // namespace Http
 } // namespace Envoy

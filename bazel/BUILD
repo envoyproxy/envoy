@@ -101,6 +101,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_object_dump_on_signal_trace",
+    values = {"define": "object_dump_on_signal_trace=disabled"},
+)
+
+config_setting(
     name = "disable_hot_restart",
     values = {"define": "hot_restart=disabled"},
 )
@@ -156,6 +161,11 @@ config_setting(
         "@bazel_tools//platforms:x86_64",
     ],
     values = {"define": "boringssl=fips"},
+)
+
+config_setting(
+    name = "boringssl_disabled",
+    values = {"define": "boringssl=disabled"},
 )
 
 config_setting(
@@ -270,6 +280,20 @@ alias(
             # If we're not on an linux platform return a value that will never match in the select() statement calling this
             # since it would have already been matched above.
             "//conditions:default": ":linux_x86_64",
+        },
+    ),
+)
+
+alias(
+    name = "x86",
+    actual = select(
+        {
+            ":darwin_x86_64": ":darwin_x86_64",
+            ":ios_x86_64": "ios_x86_64",
+            "linux_x86_64": "linux_x86_64",
+            "windows_x86_64": "windows_x86_64",
+            # If we're not on an x86 platform return a value that will never match in the select() statement calling this since it would have already been matched above.
+            "//conditions:default": ":darwin_x86_64",
         },
     ),
 )

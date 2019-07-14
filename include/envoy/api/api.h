@@ -17,7 +17,7 @@ namespace Api {
  */
 class Api {
 public:
-  virtual ~Api() {}
+  virtual ~Api() = default;
 
   /**
    * Allocate a dispatcher.
@@ -54,7 +54,7 @@ public:
   virtual const Stats::Scope& rootScope() PURE;
 };
 
-typedef std::unique_ptr<Api> ApiPtr;
+using ApiPtr = std::unique_ptr<Api>;
 
 } // namespace Api
 } // namespace Envoy

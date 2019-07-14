@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
+        "//source/extensions/filters/network/redis_proxy:router_interface",
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/mocks:common_lib",
         "//test/mocks/stats:stats_mocks",
@@ -119,13 +120,13 @@ envoy_extension_cc_test(
         ":redis_mocks",
         "//source/extensions/filters/network/redis_proxy:router_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
     ],
 )
 
 envoy_extension_cc_test(
     name = "redis_proxy_integration_test",
-    size = "small",
     srcs = ["redis_proxy_integration_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
     deps = [

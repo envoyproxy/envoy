@@ -44,7 +44,7 @@ private:
   std::vector<FakeStreamPtr> streams_;
 };
 
-typedef std::unique_ptr<AutonomousHttpConnection> AutonomousHttpConnectionPtr;
+using AutonomousHttpConnectionPtr = std::unique_ptr<AutonomousHttpConnection>;
 
 // An upstream which creates AutonomousHttpConnection for new incoming connections.
 class AutonomousUpstream : public FakeUpstream {

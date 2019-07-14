@@ -27,8 +27,8 @@ public:
   uint32_t times_high_watermark_called_{0};
 };
 
-INSTANTIATE_TEST_CASE_P(WatermarkBufferTest, WatermarkBufferTest,
-                        testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
+INSTANTIATE_TEST_SUITE_P(WatermarkBufferTest, WatermarkBufferTest,
+                         testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
 
 TEST_P(WatermarkBufferTest, TestWatermark) { ASSERT_EQ(10, buffer_.highWatermark()); }
 

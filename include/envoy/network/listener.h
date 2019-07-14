@@ -20,7 +20,7 @@ class UdpListenerFilterManager;
  */
 class ListenerConfig {
 public:
-  virtual ~ListenerConfig() {}
+  virtual ~ListenerConfig() = default;
 
   /**
    * @return FilterChainManager& the factory for adding and searching through configured
@@ -90,7 +90,7 @@ public:
  */
 class ListenerCallbacks {
 public:
-  virtual ~ListenerCallbacks() {}
+  virtual ~ListenerCallbacks() = default;
 
   /**
    * Called when a new connection is accepted.
@@ -120,6 +120,7 @@ struct UdpRecvData {
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr peer_address_; // TODO(conquerAtapple): Fix ownership semantics.
   Buffer::InstancePtr buffer_;
+  MonotonicTime receive_time_;
 
   // TODO(conquerAtapple):
   // Add UdpReader here so that the callback handler can
@@ -133,7 +134,9 @@ struct UdpRecvData {
  * Encapsulates the information needed to send a udp packet to a target
  */
 struct UdpSendData {
-  Address::InstanceConstSharedPtr send_address_;
+  const Address::Ip* local_ip_;
+  const Address::Instance& peer_address_;
+
   // The buffer is a reference so that it can be reused by the sender to send different
   // messages
   Buffer::Instance& buffer_;
@@ -171,7 +174,7 @@ public:
    * @param error_code ErrorCode for the error event.
    * @param error_number System error number.
    */
-  virtual void onReceiveError(const ErrorCode& error_code, int error_number) PURE;
+  virtual void onReceiveError(const ErrorCode& error_code, Api::IoError::IoErrorCode err) PURE;
 };
 
 /**
@@ -179,7 +182,7 @@ public:
  */
 class Listener {
 public:
-  virtual ~Listener() {}
+  virtual ~Listener() = default;
 
   /**
    * Temporarily disable accepting new connections.
@@ -192,14 +195,14 @@ public:
   virtual void enable() PURE;
 };
 
-typedef std::unique_ptr<Listener> ListenerPtr;
+using ListenerPtr = std::unique_ptr<Listener>;
 
 /**
  * A UDP listener interface.
  */
 class UdpListener : public virtual Listener {
 public:
-  virtual ~UdpListener() {}
+  ~UdpListener() override = default;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this listener.

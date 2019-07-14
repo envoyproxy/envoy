@@ -572,11 +572,15 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   makeSingleRequest();
 
+  EXPECT_FALSE(
+      test_server_->server().clusterManager().adsMux().paused(Config::TypeUrl::get().Cluster));
   // Send the first warming cluster.
   sendDiscoveryResponse<envoy::api::v2::Cluster>(
       Config::TypeUrl::get().Cluster, {buildCluster("warming_cluster_1")},
       {buildCluster("warming_cluster_1")}, {"cluster_0"}, "2");
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  EXPECT_TRUE(
+      test_server_->server().clusterManager().adsMux().paused(Config::TypeUrl::get().Cluster));
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
                                       {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"}));
@@ -591,6 +595,8 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
                                       {"warming_cluster_2", "warming_cluster_1"},
                                       {"warming_cluster_2"}, {}));
 
+  EXPECT_TRUE(
+      test_server_->server().clusterManager().adsMux().paused(Config::TypeUrl::get().Cluster));
   // Finish warming the clusters.
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment,
@@ -602,6 +608,8 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
 
   // Validate that clusters are warmed.
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  EXPECT_FALSE(
+      test_server_->server().clusterManager().adsMux().paused(Config::TypeUrl::get().Cluster));
 
   // CDS is resumed and EDS response was acknowledged.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}));
@@ -944,6 +952,30 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
   };
 
   initialize();
+}
+
+// Validates that listeners can be removed before server start.
+TEST_P(AdsIntegrationTest, ListenerDrainBeforeServerStart) {
+  initialize();
+
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")},
+                                                 {buildCluster("cluster_0")}, {}, "1");
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
+      {buildListener("listener_0", "route_config_0")}, {}, "1");
+  test_server_->waitForGaugeGe("listener_manager.total_listeners_active", 1);
+  // Before server is started, even though listeners are added to active list
+  // we mark them as "warming" in config dump since they're not initialized yet.
+  EXPECT_EQ(getListenersConfigDump().dynamic_warming_listeners().size(), 1);
+
+  // Remove listener.
+  sendDiscoveryResponse<envoy::api::v2::Listener>(Config::TypeUrl::get().Listener, {}, {}, {}, "1");
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 0);
 }
 
 } // namespace

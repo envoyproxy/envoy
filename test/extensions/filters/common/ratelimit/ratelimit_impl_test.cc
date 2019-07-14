@@ -67,7 +67,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(client_), _, _))
         .WillOnce(
             Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
-                          Buffer::InstancePtr&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                          Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
                           const absl::optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
               std::string service_name = "envoy.service.ratelimit.v2.RateLimitService";
               EXPECT_EQ(service_name, service_full_name);

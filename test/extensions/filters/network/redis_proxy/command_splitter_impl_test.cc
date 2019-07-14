@@ -13,11 +13,7 @@
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
-
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ByRef;
@@ -40,12 +36,13 @@ namespace CommandSplitter {
 
 class PassthruRouter : public Router {
 public:
-  PassthruRouter(ConnPool::InstanceSharedPtr conn_pool) : conn_pool_(conn_pool) {}
+  PassthruRouter(ConnPool::InstanceSharedPtr conn_pool)
+      : route_(std::make_shared<testing::NiceMock<MockRoute>>(conn_pool)) {}
 
-  ConnPool::InstanceSharedPtr upstreamPool(std::string&) override { return conn_pool_; }
+  RouteSharedPtr upstreamPool(std::string&) override { return route_; }
 
 private:
-  ConnPool::InstanceSharedPtr conn_pool_;
+  RouteSharedPtr route_;
 };
 
 class RedisCommandSplitterImplTest : public testing::Test {

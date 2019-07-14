@@ -22,15 +22,31 @@ echo "    VALIDATE_COVERAGE=${VALIDATE_COVERAGE}"
 
 # This is the target that will be run to generate coverage data. It can be overridden by consumer
 # projects that want to run coverage on a different/combined target.
-[[ -z "${COVERAGE_TARGET}" ]] && COVERAGE_TARGET="//test/coverage:coverage_tests"
-# This is where we are going to copy the .gcno files into.
-GCNO_ROOT=bazel-out/k8-dbg/bin/"${COVERAGE_TARGET/:/\/}".runfiles/"${WORKSPACE}"
-echo "    GCNO_ROOT=${GCNO_ROOT}"
-rm -rf ${GCNO_ROOT}
+# Command-line arguments take precedence over ${COVERAGE_TARGET}.
+if [[ $# -gt 0 ]]; then
+  COVERAGE_TARGETS=$*
+elif [[ -n "${COVERAGE_TARGET}" ]]; then
+  COVERAGE_TARGETS=${COVERAGE_TARGET}
+else
+  COVERAGE_TARGETS=//test/...
+fi
 
-# Make sure ${COVERAGE_TARGET} is up-to-date.
+# This is where we are going to copy the .gcno files into.
+GCNO_ROOT=bazel-out/k8-dbg/bin/test/coverage/coverage_tests.runfiles/"${WORKSPACE}"
+echo "    GCNO_ROOT=${GCNO_ROOT}"
+
+echo "Cleaning .gcno from previous coverage runs..."
+NUM_PREVIOUS_GCNO_FILES=0
+for f in $(find -L "${GCNO_ROOT}" -name "*.gcno")
+do
+  rm -f "${f}"
+  let NUM_PREVIOUS_GCNO_FILES=NUM_PREVIOUS_GCNO_FILES+1
+done
+echo "Cleanup completed. ${NUM_PREVIOUS_GCNO_FILES} files deleted."
+
+# Make sure //test/coverage:coverage_tests is up-to-date.
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
-(BAZEL_BIN="${BAZEL_COVERAGE}" "${SCRIPT_DIR}"/coverage/gen_build.sh)
+(BAZEL_BIN="${BAZEL_COVERAGE}" "${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS})
 
 echo "Cleaning .gcda/.gcov from previous coverage runs..."
 NUM_PREVIOUS_GCOV_FILES=0
@@ -42,7 +58,7 @@ done
 echo "Cleanup completed. ${NUM_PREVIOUS_GCOV_FILES} files deleted."
 
 # Force dbg for path consistency later, don't include debug code in coverage.
-BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
+BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} -c dbg --copt=-DNDEBUG"
 
 # Run all tests under "bazel test", no sandbox. We're going to generate the
 # .gcda inplace in the bazel-out/ directory. This is in contrast to the "bazel
@@ -50,7 +66,7 @@ BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
 # https://github.com/bazelbuild/bazel/issues/1118). This works today as we have
 # a single coverage test binary and do not require the "bazel coverage" support
 # for collecting multiple traces and glueing them together.
-"${BAZEL_COVERAGE}" test "${COVERAGE_TARGET}" ${BAZEL_TEST_OPTIONS} \
+"${BAZEL_COVERAGE}" test //test/coverage:coverage_tests ${BAZEL_BUILD_OPTIONS} \
   --cache_test_results=no --cxxopt="--coverage" --cxxopt="-DENVOY_CONFIG_COVERAGE=1" \
   --linkopt="--coverage" --define ENVOY_CONFIG_COVERAGE=1 --test_output=streamed \
   --strategy=Genrule=standalone --spawn_strategy=standalone --test_timeout=4000 \
@@ -61,7 +77,7 @@ BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
 # stats. The #foo# pattern is because gcov produces files such as
 # bazel-out#local-fastbuild#bin#external#spdlog_git#_virtual_includes#spdlog#spdlog#details#pattern_formatter_impl.h.gcov.
 # To find these while modifying this regex, perform a gcov run with -k set.
-[[ -z "${GCOVR_EXCLUDE_REGEX}" ]] && GCOVR_EXCLUDE_REGEX=".*pb.h.gcov|.*#k8-dbg#bin#.*|test#.*|external#.*|.*#external#.*|.*#prebuilt#.*|.*#config_validation#.*|.*#chromium_url#.*"
+[[ -z "${GCOVR_EXCLUDE_REGEX}" ]] && GCOVR_EXCLUDE_REGEX=".*pb\\..*|test#.*|.*#test#.*|external#.*|.*#external#.*|.*#prebuilt#.*|.*#config_validation#.*|.*#chromium_url#.*"
 [[ -z "${GCOVR_EXCLUDE_DIR}" ]] && GCOVR_EXCLUDE_DIR=".*/external/.*"
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage

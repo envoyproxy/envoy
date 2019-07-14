@@ -12,6 +12,14 @@ load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
+NOBORINGSSL_SKIP_TARGETS = {
+    # The lua filter depends on BoringSSL
+    "lua": "envoy.filters.http.lua",
+
+    # These two extensions are supposed to be replaced with alternative extensions.
+    "tls": "envoy.transport_sockets.tls",
+    "tls_inspector": "envoy.filters.listener.tls_inspector",
+}
 
 # go version for rules_go
 GO_VERSION = "1.12.5"
@@ -420,6 +428,10 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/hash:hash",
     )
     native.bind(
+        name = "abseil_hash_testing",
+        actual = "@com_google_absl//absl/hash:hash_testing",
+    )
+    native.bind(
         name = "abseil_inlined_vector",
         actual = "@com_google_absl//absl/container:inlined_vector",
     )
@@ -474,9 +486,10 @@ def _com_google_absl():
 def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf",
-        # The patch is only needed until
-        # https://github.com/protocolbuffers/protobuf/pull/5901 is available.
-        # TODO(htuch): remove this when > protobuf 3.7.1 is released.
+        # The patch includes
+        # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
+        # foreign_cc build for zlib as its dependency.
+        # TODO(asraa): remove this when > protobuf 3.8.0 is released.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
     )
@@ -487,9 +500,10 @@ def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf_cc",
         repository_key = "com_google_protobuf",
-        # The patch is only needed until
-        # https://github.com/protocolbuffers/protobuf/pull/5901 is available.
-        # TODO(htuch): remove this when > protobuf 3.7.1 is released.
+        # The patch includes
+        # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
+        # foreign_cc build for zlib as its dependency.
+        # TODO(asraa): remove this when > protobuf 3.8.0 is released.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
     )

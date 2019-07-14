@@ -17,11 +17,8 @@ envoy_cc_test(
     deps = [
         ":utility_lib",
         "//source/common/config:utility_lib",
-        "//source/common/http:message_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:cds_api_lib",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -274,6 +271,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -404,6 +402,7 @@ envoy_cc_test_library(
         "//source/common/stats:stats_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

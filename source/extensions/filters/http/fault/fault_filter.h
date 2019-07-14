@@ -101,7 +101,7 @@ private:
   TimeSource& time_source_;
 };
 
-typedef std::shared_ptr<FaultFilterConfig> FaultFilterConfigSharedPtr;
+using FaultFilterConfigSharedPtr = std::shared_ptr<FaultFilterConfig>;
 
 /**
  * An HTTP stream rate limiter. Split out for ease of testing and potential code reuse elsewhere.
@@ -135,6 +135,13 @@ public:
    * Called if the stream receives trailers.
    */
   Http::FilterTrailersStatus onTrailers();
+
+  /**
+   * Like the owning filter, we must handle inline destruction, so we have a destroy() method which
+   * kills any callbacks.
+   */
+  void destroy() { token_timer_.reset(); }
+  bool destroyed() { return token_timer_ == nullptr; }
 
 private:
   void onTokenTimer();

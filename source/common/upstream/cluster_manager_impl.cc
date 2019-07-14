@@ -19,6 +19,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/cds_json.h"
+#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/async_client_impl.h"
@@ -183,7 +184,8 @@ ClusterManagerImpl::ClusterManagerImpl(
     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
-    Server::Admin& admin, Api::Api& api, Http::Context& http_context)
+    Server::Admin& admin, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+    Http::Context& http_context)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
       local_info_(local_info), cm_stats_(generateStats(stats)),
@@ -191,7 +193,8 @@ ClusterManagerImpl::ClusterManagerImpl(
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
-      http_context_(http_context) {
+      http_context_(http_context), subscription_factory_(local_info, main_thread_dispatcher, *this,
+                                                         random, validation_visitor, api) {
   async_client_manager_ =
       std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls, time_source_, api);
   const auto& cm_config = bootstrap.cluster_manager();
@@ -240,7 +243,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   }
 
   cm_stats_.cluster_added_.add(bootstrap.static_resources().clusters().size());
-  updateGauges();
+  updateClusterCounts();
 
   absl::optional<std::string> local_cluster_name;
   if (!cm_config.local_cluster_name().empty()) {
@@ -341,7 +344,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     const auto merge_timeout =
         PROTOBUF_GET_MS_OR_DEFAULT(cluster.info()->lbConfig(), update_merge_window, 1000);
     // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
-    const bool is_mergeable = !hosts_added.size() && !hosts_removed.size();
+    const bool is_mergeable = hosts_added.empty() && hosts_removed.empty();
 
     if (merge_timeout > 0) {
       // If this is not mergeable, we should cancel any scheduled updates since
@@ -442,13 +445,12 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
 }
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
-                                            const std::string& version_info,
-                                            ClusterWarmingCallback cluster_warming_cb) {
+                                            const std::string& version_info) {
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration. We check
   // both the warming clusters and the active clusters to see if we need an update or the update
   // should be blocked.
-  const std::string cluster_name = cluster.name();
+  const std::string& cluster_name = cluster.name();
   const auto existing_active_cluster = active_clusters_.find(cluster_name);
   const auto existing_warming_cluster = warming_clusters_.find(cluster_name);
   const uint64_t new_hash = MessageUtil::hash(cluster);
@@ -491,8 +493,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
   } else {
     auto& cluster_entry = warming_clusters_.at(cluster_name);
     ENVOY_LOG(info, "add/update cluster {} starting warming", cluster_name);
-    cluster_warming_cb(cluster_name, ClusterWarmingState::Starting);
-    cluster_entry->cluster_->initialize([this, cluster_name, cluster_warming_cb] {
+    cluster_entry->cluster_->initialize([this, cluster_name] {
       auto warming_it = warming_clusters_.find(cluster_name);
       auto& cluster_entry = *warming_it->second;
 
@@ -506,12 +507,11 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
       ENVOY_LOG(info, "warming cluster {} complete", cluster_name);
       createOrUpdateThreadLocalCluster(cluster_entry);
       onClusterInit(*cluster_entry.cluster_);
-      cluster_warming_cb(cluster_name, ClusterWarmingState::Finished);
-      updateGauges();
+      updateClusterCounts();
     });
   }
 
-  updateGauges();
+  updateClusterCounts();
   return true;
 }
 
@@ -569,7 +569,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
 
   if (removed) {
     cm_stats_.cluster_removed_.inc();
-    updateGauges();
+    updateClusterCounts();
     // Cancel any pending merged updates.
     updates_map_.erase(cluster_name);
   }
@@ -645,16 +645,35 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
     cluster_entry_it->second->thread_aware_lb_ = std::move(new_cluster_pair.second);
   }
 
-  updateGauges();
+  updateClusterCounts();
 }
 
-void ClusterManagerImpl::updateGauges() {
+void ClusterManagerImpl::updateClusterCounts() {
+  // This if/else block implements a control flow mechanism that can be used by an ADS
+  // implementation to properly sequence CDS and RDS updates. It is not enforcing on ADS. ADS can
+  // use it to detect when a previously sent cluster becomes warm before sending routes that depend
+  // on it. This can improve incidence of HTTP 503 responses from Envoy when a route is used before
+  // it's supporting cluster is ready.
+  //
+  // We achieve that by leaving CDS in the paused state as long as there is at least
+  // one cluster in the warming state. This prevents CDS ACK from being sent to ADS.
+  // Once cluster is warmed up, CDS is resumed, and ACK is sent to ADS, providing a
+  // signal to ADS to proceed with RDS updates.
+  // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
+  if (ads_mux_) {
+    const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
+    if (previous_warming == 0 && !warming_clusters_.empty()) {
+      ads_mux_->pause(Config::TypeUrl::get().Cluster);
+    } else if (previous_warming > 0 && warming_clusters_.empty()) {
+      ads_mux_->resume(Config::TypeUrl::get().Cluster);
+    }
+  }
   cm_stats_.active_clusters_.set(active_clusters_.size());
   cm_stats_.warming_clusters_.set(warming_clusters_.size());
 }
 
-ThreadLocalCluster* ClusterManagerImpl::get(const std::string& cluster) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
+ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
+  auto& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry != cluster_manager.thread_local_clusters_.end()) {
@@ -1216,9 +1235,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-  return ClusterManagerPtr{
-      new ClusterManagerImpl(bootstrap, *this, stats_, tls_, runtime_, random_, local_info_,
-                             log_manager_, main_thread_dispatcher_, admin_, api_, http_context_)};
+  return ClusterManagerPtr{new ClusterManagerImpl(
+      bootstrap, *this, stats_, tls_, runtime_, random_, local_info_, log_manager_,
+      main_thread_dispatcher_, admin_, validation_visitor_, api_, http_context_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
@@ -1254,8 +1273,7 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
 CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                                                ClusterManager& cm) {
   // TODO(htuch): Differentiate static vs. dynamic validation visitors.
-  return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_,
-                            validation_visitor_, api_);
+  return CdsApiImpl::create(cds_config, cm, stats_, validation_visitor_);
 }
 
 } // namespace Upstream

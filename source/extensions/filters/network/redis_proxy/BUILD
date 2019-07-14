@@ -75,6 +75,7 @@ envoy_cc_library(
     deps = [
         ":config_interface",
         ":conn_pool_interface",
+        "//include/envoy/stats:stats_macros",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
@@ -135,6 +136,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:to_lower_table_lib",
+        "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
     ],

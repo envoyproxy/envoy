@@ -261,7 +261,7 @@ public:
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     if (expected_option.has_value()) {
       expectCreateListenSocket(expected_state, expected_num_options);
-      expectSetsockopt(os_sys_calls, expected_option.value().first, expected_option.value().second,
+      expectSetsockopt(os_sys_calls, expected_option.level(), expected_option.option(),
                        expected_value, expected_num_options);
       manager_->addOrUpdateListener(listener, "", true);
       EXPECT_EQ(1U, manager_->listeners().size());
@@ -382,8 +382,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, Network::Address::SocketType::Datagram, _, true));
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).Times(testing::AtLeast(1));
   manager_->addOrUpdateListener(listener_proto, "", true);
-  EXPECT_EQ(1U, manager_->listeners().size());
+  EXPECT_EQ(1u, manager_->listeners().size());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig) {
@@ -730,7 +733,7 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
 
   InSequence s;
 
-  MockLdsApi* lds_api = new MockLdsApi();
+  auto* lds_api = new MockLdsApi();
   EXPECT_CALL(listener_factory_, createLdsApi_(_)).WillOnce(Return(lds_api));
   envoy::api::v2::core::ConfigSource lds_config;
   manager_->createLdsApi(lds_config);
@@ -763,6 +766,7 @@ filter_chains: {}
 version_info: version1
 static_listeners:
 dynamic_active_listeners:
+dynamic_warming_listeners:
   version_info: "version1"
   listener:
     name: "foo"
@@ -774,7 +778,6 @@ dynamic_active_listeners:
   last_updated:
     seconds: 1001001001
     nanos: 1000000
-dynamic_warming_listeners:
 dynamic_draining_listeners:
 )EOF");
 
@@ -805,6 +808,7 @@ per_connection_buffer_limit_bytes: 10
 version_info: version2
 static_listeners:
 dynamic_active_listeners:
+dynamic_warming_listeners:
   version_info: "version2"
   listener:
     name: "foo"
@@ -817,7 +821,6 @@ dynamic_active_listeners:
   last_updated:
     seconds: 2002002002
     nanos: 2000000
-dynamic_warming_listeners:
 dynamic_draining_listeners:
 )EOF");
 
@@ -2349,7 +2352,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappi
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
                             EnvoyException,
-                            "error adding listener: multiple filter chains with "
+                            "error adding listener '127.0.0.1:1234': multiple filter chains with "
                             "overlapping matching rules are defined");
 }
 

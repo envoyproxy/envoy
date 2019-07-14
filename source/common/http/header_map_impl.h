@@ -81,6 +81,7 @@ public:
   void removePrefix(const LowerCaseString& key) override;
   size_t size() const override { return headers_.size(); }
   bool empty() const override { return headers_.empty(); }
+  void dumpState(std::ostream& os, int indent_level = 0) const override;
 
 protected:
   // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.
@@ -111,7 +112,7 @@ protected:
     const LowerCaseString* key_;
   };
 
-  typedef StaticLookupResponse (*EntryCb)(HeaderMapImpl&);
+  using EntryCb = StaticLookupResponse (*)(HeaderMapImpl&);
 
   /**
    * This is the static lookup table that is used to determine whether a header is one of the O(1)
@@ -201,7 +202,7 @@ protected:
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
 };
 
-typedef std::unique_ptr<HeaderMapImpl> HeaderMapImplPtr;
+using HeaderMapImplPtr = std::unique_ptr<HeaderMapImpl>;
 
 } // namespace Http
 } // namespace Envoy

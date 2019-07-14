@@ -2,7 +2,6 @@
 // quiescent system with disabled cstate power management.
 
 #include <chrono>
-#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -12,9 +11,7 @@
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/supported_commands.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
-#include "extensions/filters/network/redis_proxy/conn_pool.h"
 
-#include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "benchmark/benchmark.h"
@@ -35,7 +32,7 @@ public:
 };
 
 class NullRouterImpl : public Router {
-  ConnPool::InstanceSharedPtr upstreamPool(std::string&) override { return nullptr; }
+  RouteSharedPtr upstreamPool(std::string&) override { return nullptr; }
 };
 
 class CommandLookUpSpeedTest {

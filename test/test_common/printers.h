@@ -17,7 +17,7 @@ void PrintTo(const HeaderMapImpl& headers, std::ostream* os);
  * Pretty print const HeaderMapPtr&
  */
 class HeaderMap;
-typedef std::unique_ptr<HeaderMap> HeaderMapPtr;
+using HeaderMapPtr = std::unique_ptr<HeaderMap>;
 void PrintTo(const HeaderMap& headers, std::ostream* os);
 void PrintTo(const HeaderMapPtr& headers, std::ostream* os);
 } // namespace Http

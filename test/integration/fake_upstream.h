@@ -62,6 +62,7 @@ public:
   const Http::HeaderMap& headers() { return *headers_; }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
+  bool receivedData() { return received_data_; }
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -126,7 +127,7 @@ public:
                << "Couldn't decode gRPC data frame: " << body().toString();
       }
     }
-    if (decoded_grpc_frames_.size() < 1) {
+    if (decoded_grpc_frames_.empty()) {
       timeout = std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
                                                                       timeSystem().monotonicTime());
       if (!waitForData(client_dispatcher, grpc_decoder_.length(), timeout)) {
@@ -150,7 +151,7 @@ public:
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
-  void decodeMetadata(Http::MetadataMapPtr&&) override {}
+  void decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) override;
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -161,6 +162,11 @@ public:
   virtual void setEndStream(bool end) { end_stream_ = end; }
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
+
+  Http::MetadataMap& metadata_map() { return metadata_map_; }
+  std::unordered_map<std::string, uint64_t>& duplicated_metadata_key_count() {
+    return duplicated_metadata_key_count_;
+  }
 
 protected:
   Http::HeaderMapPtr headers_;
@@ -178,9 +184,12 @@ private:
   std::vector<Grpc::Frame> decoded_grpc_frames_;
   bool add_served_by_header_{};
   Event::TestTimeSystem& time_system_;
+  Http::MetadataMap metadata_map_;
+  std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
+  bool received_data_{false};
 };
 
-typedef std::unique_ptr<FakeStream> FakeStreamPtr;
+using FakeStreamPtr = std::unique_ptr<FakeStream>;
 
 // Encapsulates various state and functionality related to sharing a Connection object across
 // threads. With FakeUpstream fabricated objects, we have a Connection that is associated with a
@@ -289,10 +298,10 @@ private:
   const bool allow_unexpected_disconnects_;
 };
 
-typedef std::unique_ptr<SharedConnectionWrapper> SharedConnectionWrapperPtr;
+using SharedConnectionWrapperPtr = std::unique_ptr<SharedConnectionWrapper>;
 
 class QueuedConnectionWrapper;
-typedef std::unique_ptr<QueuedConnectionWrapper> QueuedConnectionWrapperPtr;
+using QueuedConnectionWrapperPtr = std::unique_ptr<QueuedConnectionWrapper>;
 
 /**
  * Wraps a raw Network::Connection in a safe way, such that the connection can
@@ -435,7 +444,7 @@ private:
   std::list<FakeStreamPtr> new_streams_;
 };
 
-typedef std::unique_ptr<FakeHttpConnection> FakeHttpConnectionPtr;
+using FakeHttpConnectionPtr = std::unique_ptr<FakeHttpConnection>;
 
 /**
  * Fake raw connection for integration testing.
@@ -444,7 +453,7 @@ class FakeRawConnection : public FakeConnectionBase {
 public:
   FakeRawConnection(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
       : FakeConnectionBase(shared_connection, time_system) {}
-  typedef const std::function<bool(const std::string&)> ValidatorFunction;
+  using ValidatorFunction = const std::function<bool(const std::string&)>;
 
   // Writes to data. If data is nullptr, discards the received data.
   ABSL_MUST_USE_RESULT
@@ -500,7 +509,7 @@ private:
   std::string data_;
 };
 
-typedef std::unique_ptr<FakeRawConnection> FakeRawConnectionPtr;
+using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;
 
 /**
  * Provides a fake upstream server for integration testing.
@@ -624,6 +633,6 @@ private:
   const Network::FilterChainSharedPtr filter_chain_;
 };
 
-typedef std::unique_ptr<FakeUpstream> FakeUpstreamPtr;
+using FakeUpstreamPtr = std::unique_ptr<FakeUpstream>;
 
 } // namespace Envoy

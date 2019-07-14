@@ -65,7 +65,6 @@ envoy_cc_test(
     deps = [
         "//source/common/config:filter_json_lib",
         "//source/common/config:utility_lib",
-        "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:rds_lib",
         "//source/server/http:admin_lib",
@@ -74,6 +73,18 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "scoped_config_impl_test",
+    srcs = ["scoped_config_impl_test.cc"],
+    external_deps = [
+        "abseil_strings",
+    ],
+    deps = [
+        "//source/common/router:scoped_config_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -101,14 +112,12 @@ envoy_cc_test(
     name = "vhds_test",
     srcs = ["vhds_test.cc"],
     deps = [
-        "//source/common/config:filter_json_lib",
         "//source/common/config:utility_lib",
-        "//source/common/http:message_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/protobuf",
         "//source/common/router:rds_lib",
         "//source/common/router:vhds_lib",
         "//source/server/http:admin_lib",
+        "//test/mocks/config:config_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
@@ -173,7 +182,15 @@ envoy_directory_genrule(
 filegroup(
     name = "route_corpus",
     testonly = 1,
-    srcs = [":corpus_from_config_impl"] + glob(["route_corpus/**"]),
+    srcs = select({
+        # TODO(asraa): Clean this up for cross-compilation. Right now we assume
+        # the host and target are the same on x86 builds, so we only execute the
+        # corpus generation binary on x86 platforms.
+        "//bazel:x86": [":corpus_from_config_impl"],
+        "//conditions:default": [],
+    }) + glob([
+        "route_corpus/**",
+    ]),
 )
 
 envoy_cc_fuzz_test(

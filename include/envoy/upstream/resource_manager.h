@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 
 #include "envoy/common/pure.h"
 
@@ -20,7 +21,7 @@ const size_t NumResourcePriorities = 2;
  */
 class Resource {
 public:
-  virtual ~Resource() {}
+  virtual ~Resource() = default;
 
   /**
    * @return true if the resource can be created.
@@ -49,13 +50,27 @@ public:
 };
 
 /**
+ * RAII wrapper that increments a resource on construction and decrements it on destruction.
+ */
+class ResourceAutoIncDec {
+public:
+  ResourceAutoIncDec(Resource& resource) : resource_(resource) { resource_.inc(); }
+  ~ResourceAutoIncDec() { resource_.dec(); }
+
+private:
+  Resource& resource_;
+};
+
+using ResourceAutoIncDecPtr = std::unique_ptr<ResourceAutoIncDec>;
+
+/**
  * Global resource manager that loosely synchronizes maximum connections, pending requests, etc.
  * NOTE: Currently this is used on a per cluster basis. In the future we may consider also chaining
  *       this with a global resource manager.
  */
 class ResourceManager {
 public:
-  virtual ~ResourceManager() {}
+  virtual ~ResourceManager() = default;
 
   /**
    * @return Resource& active TCP connections.

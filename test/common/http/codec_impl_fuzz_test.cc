@@ -338,7 +338,7 @@ public:
   std::deque<Buffer::OwnedImpl> bufs_;
 };
 
-typedef std::unique_ptr<HttpStream> HttpStreamPtr;
+using HttpStreamPtr = std::unique_ptr<HttpStream>;
 
 namespace {
 
