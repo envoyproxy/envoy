@@ -9,7 +9,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/stats/symbol_table_impl.h"
+
 #include "extensions/filters/common/ratelimit/ratelimit.h"
+#include "extensions/filters/common/ratelimit/stat_names.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
 
 namespace Envoy {
@@ -40,19 +43,7 @@ public:
 
   bool failureModeAllow() const { return !failure_mode_deny_; };
 
-  struct StatNames {
-    StatNames(Stats::StatNamePool& pool)
-        : ok_(pool.add("ratelimit.ok")),
-          error_(pool.add("ratelimit.error")),
-          failure_mode_allowed_(pool.add("ratelimit.failure_mode_allowed")),
-          over_limit_(pool.add("ratelimit.over_limit")) {}
-    Stats::StatName ok_;
-    Stats::StatName error_;
-    Stats::StatName failure_mode_allowed_;
-    Stats::StatName over_limit_;
-  };
-
-  StatNames& statNames() { return stat_names_; }
+  Filters::Common::RateLimit::StatNames& statNames() { return stat_names_; }
 
 private:
   const std::string domain_;
@@ -63,7 +54,7 @@ private:
   Upstream::ClusterManager& cm_;
   const bool failure_mode_deny_;
   Stats::StatNamePool stat_name_pool_;
-  StatNames stat_names_;
+  Filters::Common::RateLimit::StatNames stat_names_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

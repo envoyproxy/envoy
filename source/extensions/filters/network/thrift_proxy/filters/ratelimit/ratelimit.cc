@@ -65,7 +65,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   UNREFERENCED_PARAMETER(headers);
 
   state_ = State::Complete;
-  Config::StatNames& stat_names = config_->statNames();
+  Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:

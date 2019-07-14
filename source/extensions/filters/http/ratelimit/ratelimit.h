@@ -18,6 +18,7 @@
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit.h"
+#include "extensions/filters/common/ratelimit/stat_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -46,7 +47,8 @@ public:
             config.rate_limited_as_resource_exhausted()
                 ? absl::make_optional(Grpc::Status::GrpcStatus::ResourceExhausted)
                 : absl::nullopt),
-        http_context_(http_context) {}
+        http_context_(http_context), stat_name_pool_(scope.symbolTable()),
+        stat_names_(stat_name_pool_) {}
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
@@ -58,6 +60,19 @@ public:
     return rate_limited_grpc_status_;
   }
   Http::Context& httpContext() { return http_context_; }
+
+  struct StatNames {
+    StatNames(Stats::StatNamePool& pool)
+        : ok_(pool.add("ratelimit.ok")), error_(pool.add("ratelimit.error")),
+          failure_mode_allowed_(pool.add("ratelimit.failure_mode_allowed")),
+          over_limit_(pool.add("ratelimit.over_limit")) {}
+    Stats::StatName ok_;
+    Stats::StatName error_;
+    Stats::StatName failure_mode_allowed_;
+    Stats::StatName over_limit_;
+  };
+
+  Filters::Common::RateLimit::StatNames& statNames() { return stat_names_; }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -80,6 +95,8 @@ private:
   const bool failure_mode_deny_;
   const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   Http::Context& http_context_;
+  Stats::StatNamePool stat_name_pool_;
+  Filters::Common::RateLimit::StatNames stat_names_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
