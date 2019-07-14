@@ -1,8 +1,8 @@
 #include "extensions/filters/network/zookeeper_proxy/decoder.h"
 
-#include "common/common/enum_to_int.h"
-
 #include <string>
+
+#include "common/common/enum_to_int.h"
 
 namespace Envoy {
 namespace Extensions {
