@@ -20,7 +20,7 @@ accepting new connections.
   for a :ref:`bounded period of time <envoy_api_field_core.ConfigSource.initial_fetch_timeout>` 
   for at least one response (or failure) for LDS/RDS requests. After which, it starts accepting connections.
 * If LDS itself returns a listener that needs an RDS response, Envoy further waits for 
-   a :ref:`bounded period of time <envoy_api_field_core.ConfigSource.initial_fetch_timeout>`until an RDS
+  a :ref:`bounded period of time <envoy_api_field_core.ConfigSource.initial_fetch_timeout>` until an RDS
   response (or failure) is received. Note that this process takes place on every future listener
   addition via LDS and is known as :ref:`listener warming <config_listeners_lds>`.
 * After all of the previous steps have taken place, the listeners start accepting new connections.
