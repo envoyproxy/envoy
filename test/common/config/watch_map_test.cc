@@ -119,7 +119,7 @@ TEST(WatchMapImplTest, Basic) {
   {
     // The watch is interested in Alice and Bob...
     std::set<std::string> update_to({"alice", "bob"});
-    AddedRemoved added_removed = watch_map.updateWatchInterest(watch.get(), update_to);
+    AddedRemoved added_removed = watch->updateWatchInterest(update_to);
     EXPECT_EQ(update_to, added_removed.added_);
     EXPECT_TRUE(added_removed.removed_.empty());
 
@@ -142,7 +142,7 @@ TEST(WatchMapImplTest, Basic) {
   {
     // The watch is now interested in Bob, Carol, Dave, Eve...
     std::set<std::string> update_to({"bob", "carol", "dave", "eve"});
-    AddedRemoved added_removed = watch_map.updateWatchInterest(watch.get(), update_to);
+    AddedRemoved added_removed = watch->updateWatchInterest(update_to);
     EXPECT_EQ(std::set<std::string>({"carol", "dave", "eve"}), added_removed.added_);
     EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.removed_);
 
@@ -191,10 +191,10 @@ TEST(WatchMapImplTest, Overlap) {
   // First watch becomes interested.
   {
     std::set<std::string> update_to({"alice", "dummy"});
-    AddedRemoved added_removed = watch_map.updateWatchInterest(watch1.get(), update_to);
+    AddedRemoved added_removed = watch1->updateWatchInterest(update_to);
     EXPECT_EQ(update_to, added_removed.added_); // add to subscription
     EXPECT_TRUE(added_removed.removed_.empty());
-    watch_map.updateWatchInterest(watch2.get(), {"dummy"});
+    watch2->updateWatchInterest({"dummy"});
 
     // First watch receives update.
     expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version1");
@@ -204,7 +204,7 @@ TEST(WatchMapImplTest, Overlap) {
   // Second watch becomes interested.
   {
     std::set<std::string> update_to({"alice", "dummy"});
-    AddedRemoved added_removed = watch_map.updateWatchInterest(watch2.get(), update_to);
+    AddedRemoved added_removed = watch2->updateWatchInterest(update_to);
     EXPECT_TRUE(added_removed.added_.empty()); // nothing happens
     EXPECT_TRUE(added_removed.removed_.empty());
 
@@ -215,7 +215,7 @@ TEST(WatchMapImplTest, Overlap) {
   }
   // First watch loses interest.
   {
-    AddedRemoved added_removed = watch_map.updateWatchInterest(watch1.get(), {"dummy"});
+    AddedRemoved added_removed = watch1->updateWatchInterest({"dummy"});
     EXPECT_TRUE(added_removed.added_.empty()); // nothing happens
     EXPECT_TRUE(added_removed.removed_.empty());
 
@@ -226,7 +226,7 @@ TEST(WatchMapImplTest, Overlap) {
   }
   // Second watch loses interest.
   {
-    AddedRemoved added_removed = watch_map.updateWatchInterest(watch2.get(), {"dummy"});
+    AddedRemoved added_removed = watch2->updateWatchInterest({"dummy"});
     EXPECT_TRUE(added_removed.added_.empty());
     EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.removed_); // remove from subscription
   }
@@ -253,10 +253,10 @@ TEST(WatchMapImplTest, AddRemoveAdd) {
   // First watch becomes interested.
   {
     std::set<std::string> update_to({"alice", "dummy"});
-    AddedRemoved added_removed = watch_map.updateWatchInterest(watch1.get(), update_to);
+    AddedRemoved added_removed = watch1->updateWatchInterest(update_to);
     EXPECT_EQ(update_to, added_removed.added_); // add to subscription
     EXPECT_TRUE(added_removed.removed_.empty());
-    watch_map.updateWatchInterest(watch2.get(), {"dummy"});
+    watch2->updateWatchInterest({"dummy"});
 
     // First watch receives update.
     expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version1");
@@ -265,7 +265,7 @@ TEST(WatchMapImplTest, AddRemoveAdd) {
   }
   // First watch loses interest.
   {
-    AddedRemoved added_removed = watch_map.updateWatchInterest(watch1.get(), {"dummy"});
+    AddedRemoved added_removed = watch1->updateWatchInterest({"dummy"});
     EXPECT_TRUE(added_removed.added_.empty());
     EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.removed_); // remove from subscription
 
@@ -275,7 +275,7 @@ TEST(WatchMapImplTest, AddRemoveAdd) {
   // Second watch becomes interested.
   {
     std::set<std::string> update_to({"alice", "dummy"});
-    AddedRemoved added_removed = watch_map.updateWatchInterest(watch2.get(), update_to);
+    AddedRemoved added_removed = watch2->updateWatchInterest(update_to);
     EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.added_); // add to subscription
     EXPECT_TRUE(added_removed.removed_.empty());
 
@@ -291,7 +291,7 @@ TEST(WatchMapImplTest, UninterestingUpdate) {
   NamedMockSubscriptionCallbacks callbacks;
   WatchMapImpl watch_map;
   WatchPtr watch = watch_map.addWatch(callbacks);
-  watch_map.updateWatchInterest(watch.get(), {"alice"});
+  watch->updateWatchInterest({"alice"});
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> alice_update;
   envoy::api::v2::ClusterLoadAssignment alice;
@@ -312,8 +312,9 @@ TEST(WatchMapImplTest, UninterestingUpdate) {
   expectNoDeltaUpdate(callbacks, "version3");
   doDeltaAndSotwUpdate(watch_map, bob_update, {}, "version3");
 
+  // TODO TODO DONT NEED THIS
   // Clean removal of the watch: first update to "interested in nothing", then remove.
-  watch_map.updateWatchInterest(watch.get(), {});
+  watch->updateWatchInterest({});
   watch.reset();
 }
 
@@ -326,7 +327,7 @@ TEST(WatchMapImplTest, WatchingEverything) {
   WatchPtr watch1 = watch_map.addWatch(callbacks1);
   WatchPtr watch2 = watch_map.addWatch(callbacks2);
   // watch1 never specifies any names, and so is treated as interested in everything.
-  watch_map.updateWatchInterest(watch2.get(), {"alice"});
+  watch2->updateWatchInterest({"alice"});
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
   envoy::api::v2::ClusterLoadAssignment alice;
@@ -360,9 +361,9 @@ TEST(WatchMapImplTest, DeltaOnConfigUpdate) {
   WatchPtr watch1 = watch_map.addWatch(callbacks1);
   WatchPtr watch2 = watch_map.addWatch(callbacks2);
   WatchPtr watch3 = watch_map.addWatch(callbacks3);
-  watch_map.updateWatchInterest(watch1.get(), {"updated"});
-  watch_map.updateWatchInterest(watch2.get(), {"updated", "removed"});
-  watch_map.updateWatchInterest(watch3.get(), {"removed"});
+  watch1->updateWatchInterest({"updated"});
+  watch2->updateWatchInterest({"updated", "removed"});
+  watch3->updateWatchInterest({"removed"});
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
   envoy::api::v2::ClusterLoadAssignment updated;

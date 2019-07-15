@@ -15,54 +15,28 @@
 namespace Envoy {
 namespace Config {
 
-// Manages "watches" of xDS resources. Several xDS callers might ask for a subscription to the same
-// resource name "X". The xDS machinery must return to each their very own subscription to X.
-// The xDS machinery's "watch" concept accomplishes that, while avoiding parallel redundant xDS
-// requests for X. Each of those subscriptions is viewed as a "watch" on X, while behind the scenes
-// there is just a single real subscription to that resource name.
-//
-// This class maintains the watches<-->subscription mapping: it
-// 1) delivers updates to all interested watches, and
-// 2) tracks which resource names should be {added to,removed from} the subscription when the
-//    {first,last} watch on a resource name is {added,removed}.
-//
-// #1 is accomplished by WatchMap's implementation of the SubscriptionCallbacks interface.
-// This interface allows the xDS client to just throw each xDS update message it receives directly
-// into WatchMap::onConfigUpdate, rather than having to track the various watches' callbacks.
-//
-// The information for #2 is returned by updateWatchInterest(); the caller should use it to
-// update the subscription accordingly.
-//
-// A WatchMap is assumed to be dedicated to a single type_url type of resource (EDS, CDS, etc).
+// Because WatchMap implements the SubscriptionCallbacks interface, the xDS client can just
+// throw xDS updates directly into WatchMap::onConfigUpdate, which then routes the right
+// updates into the right Watches.
 class WatchMapImpl : public WatchMap,
                      public SubscriptionCallbacks,
                      public Logger::Loggable<Logger::Id::config> {
 public:
   WatchMapImpl() = default;
 
-  // Adds 'callbacks' to the WatchMap, with no resource names being watched.
-  // (Use updateWatchInterest() to add some names).
-  // Returns the newly added watch, to be used for updateWatchInterest. Destroy to remove from map.
   WatchPtr addWatch(SubscriptionCallbacks& callbacks) override;
+  void removeWatch(Watch* watch) override;
+  void setWildcardness(Watch* watch, bool is_wildcard) override;
 
-  // Updates the set of resource names that the given watch should watch.
-  // Returns any resource name additions/removals that are unique across all watches. That is:
-  // 1) if 'resources' contains X and no other watch cares about X, X will be in added_.
-  // 2) if 'resources' does not contain Y, and this watch was the only one that cared about Y,
-  //    Y will be in removed_.
-  AddedRemoved updateWatchInterest(Watch* watch,
-                                   const std::set<std::string>& update_to_these_names) override;
+  std::set<std::string> findAdditions(const std::vector<std::string>& newly_added_to_watch,
+                                      Watch* watch) override;
+  std::set<std::string> findRemovals(const std::vector<std::string>& newly_removed_from_watch,
+                                     Watch* watch) override;
 
   WatchMapImpl(const WatchMapImpl&) = delete;
   WatchMapImpl& operator=(const WatchMapImpl&) = delete;
 
 private:
-  friend struct Watch;
-  // Meant to be called only by ~Watch().
-  // Expects that the watch to be removed has already had all of its resource names removed via
-  // updateWatchInterest().
-  void removeWatch(Watch* watch) override;
-
   // SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
@@ -73,16 +47,6 @@ private:
   void onConfigUpdateFailed(const EnvoyException* e) override;
 
   std::string resourceName(const ProtobufWkt::Any&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-
-  // Given a list of names that are new to an individual watch, returns those names that are in fact
-  // new to the entire subscription.
-  std::set<std::string> findAdditions(const std::vector<std::string>& newly_added_to_watch,
-                                      Watch* watch);
-
-  // Given a list of names that an individual watch no longer cares about, returns those names that
-  // in fact the entire subscription no longer cares about.
-  std::set<std::string> findRemovals(const std::vector<std::string>& newly_removed_from_watch,
-                                     Watch* watch);
 
   // Returns the union of watch_interest_[resource_name] and wildcard_watches_.
   absl::flat_hash_set<Watch*> watchesInterestedIn(const std::string& resource_name);

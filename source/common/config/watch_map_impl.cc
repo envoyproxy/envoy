@@ -1,10 +1,12 @@
 #include "common/config/watch_map_impl.h"
 
+#include "common/config/watch_impl.h"
+
 namespace Envoy {
 namespace Config {
 
 WatchPtr WatchMapImpl::addWatch(SubscriptionCallbacks& callbacks) {
-  auto watch = std::make_unique<Watch>(*this, callbacks);
+  auto watch = std::make_unique<WatchImpl>(*this, callbacks);
   wildcard_watches_.insert(watch.get());
   watches_.insert(watch.get());
   return watch;
@@ -15,28 +17,12 @@ void WatchMapImpl::removeWatch(Watch* watch) {
   watches_.erase(watch);
 }
 
-AddedRemoved WatchMapImpl::updateWatchInterest(Watch* watch,
-                                               const std::set<std::string>& update_to_these_names) {
-  if (update_to_these_names.empty()) {
+void WatchMapImpl::setWildcardness(Watch* watch, bool is_wildcard) {
+  if (is_wildcard) {
     wildcard_watches_.insert(watch);
   } else {
     wildcard_watches_.erase(watch);
   }
-
-  std::vector<std::string> newly_added_to_watch;
-  std::set_difference(update_to_these_names.begin(), update_to_these_names.end(),
-                      watch->resource_names_.begin(), watch->resource_names_.end(),
-                      std::inserter(newly_added_to_watch, newly_added_to_watch.begin()));
-
-  std::vector<std::string> newly_removed_from_watch;
-  std::set_difference(watch->resource_names_.begin(), watch->resource_names_.end(),
-                      update_to_these_names.begin(), update_to_these_names.end(),
-                      std::inserter(newly_removed_from_watch, newly_removed_from_watch.begin()));
-
-  watch->resource_names_ = update_to_these_names;
-
-  return AddedRemoved(findAdditions(newly_added_to_watch, watch),
-                      findRemovals(newly_removed_from_watch, watch));
 }
 
 absl::flat_hash_set<Watch*> WatchMapImpl::watchesInterestedIn(const std::string& resource_name) {
@@ -57,7 +43,6 @@ void WatchMapImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::
     ENVOY_LOG(warn, "WatchMapImpl::onConfigUpdate: there are no watches!");
     return;
   }
-  SubscriptionCallbacks& name_getter = (*watches_.begin())->callbacks_;
 
   // Build a map from watches, to the set of updated resources that each watch cares about. Each
   // entry in the map is then a nice little bundle that can be fed directly into the individual
@@ -65,7 +50,7 @@ void WatchMapImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::
   absl::flat_hash_map<Watch*, Protobuf::RepeatedPtrField<ProtobufWkt::Any>> per_watch_updates;
   for (const auto& r : resources) {
     const absl::flat_hash_set<Watch*>& interested_in_r =
-        watchesInterestedIn(name_getter.resourceName(r));
+        watchesInterestedIn((*watches_.begin())->resourceName(r));
     for (const auto& interested_watch : interested_in_r) {
       per_watch_updates[interested_watch].Add()->CopyFrom(r);
     }
@@ -78,9 +63,9 @@ void WatchMapImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::
       // This update included no resources this watch cares about - so we do an empty
       // onConfigUpdate(), to notify the watch that its resources - if they existed before this -
       // were dropped.
-      watch->callbacks_.onConfigUpdate({}, version_info);
+      watch->onConfigUpdate({}, version_info);
     } else {
-      watch->callbacks_.onConfigUpdate(this_watch_updates->second, version_info);
+      watch->onConfigUpdate(this_watch_updates->second, version_info);
     }
   }
 }
@@ -109,27 +94,27 @@ void WatchMapImpl::onConfigUpdate(
 
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (const auto& added : per_watch_added) {
-    const Watch* cur_watch = added.first;
+    Watch* cur_watch = added.first;
     auto removed = per_watch_removed.find(cur_watch);
     if (removed == per_watch_removed.end()) {
       // additions only, no removals
-      cur_watch->callbacks_.onConfigUpdate(added.second, {}, system_version_info);
+      cur_watch->onConfigUpdate(added.second, {}, system_version_info);
     } else {
       // both additions and removals
-      cur_watch->callbacks_.onConfigUpdate(added.second, removed->second, system_version_info);
+      cur_watch->onConfigUpdate(added.second, removed->second, system_version_info);
       // Drop the removals now, so the final removals-only pass won't use them.
       per_watch_removed.erase(removed);
     }
   }
   // Any removals-only updates will not have been picked up in the per_watch_added loop.
   for (auto& removed : per_watch_removed) {
-    removed.first->callbacks_.onConfigUpdate({}, removed.second, system_version_info);
+    removed.first->onConfigUpdate({}, removed.second, system_version_info);
   }
 }
 
 void WatchMapImpl::onConfigUpdateFailed(const EnvoyException* e) {
   for (auto& watch : watches_) {
-    watch->callbacks_.onConfigUpdateFailed(e);
+    watch->onConfigUpdateFailed(e);
   }
 }
 
