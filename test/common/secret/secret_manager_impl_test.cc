@@ -268,6 +268,7 @@ tls_certificate:
   // Private key and password are removed.
   const std::string expected_secrets_config_dump = R"EOF(
 dynamic_active_secrets:
+- name: "abc.com"
   version_info: "keycert-v1"
   last_updated:
     seconds: 1234567891
@@ -289,7 +290,7 @@ dynamic_active_secrets:
   auto context_secret_provider = secret_manager->findOrCreateCertificateValidationContextProvider(
       config_source, "abc.com.validation", secret_context);
   const std::string validation_yaml = R"EOF(
-name: "abc.com.validation"
+name: "abc.com"
 validation_context:
   trusted_ca:
     inline_string: "DUMMY_INLINE_STRING_TRUSTED_CA" 
@@ -306,7 +307,8 @@ validation_context:
   EXPECT_EQ("DUMMY_INLINE_STRING_TRUSTED_CA", cert_validation_context.caCert());
   const std::string updated_config_dump = R"EOF(
 dynamic_active_secrets:
-- version_info: "keycert-v1"
+- name: "abc.com"
+  version_info: "keycert-v1"
   last_updated:
     seconds: 1234567891
     nanos: 234000000
@@ -319,7 +321,8 @@ dynamic_active_secrets:
         inline_string: "[redacted]"
       password:
         inline_string: "[redacted]"
-- version_info: "validation-context-v1"
+- name: "abc.com.validation" 
+  version_info: "validation-context-v1"
   last_updated:
     seconds: 1234567899
   secret:
@@ -359,6 +362,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerWarmingSecrets) {
       secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
   const std::string expected_secrets_config_dump = R"EOF(
 dynamic_warming_secrets:
+- name: "abc.com"
   version_info: "uninitialized"
   last_updated:
     seconds: 1234567891
@@ -374,13 +378,15 @@ dynamic_warming_secrets:
   init_target_handle->initialize(init_watcher);
   const std::string updated_config_dump = R"EOF(
 dynamic_warming_secrets:
-- version_info: "uninitialized"
+- name: "abc.com"
+  version_info: "uninitialized"
   last_updated:
     seconds: 1234567891
     nanos: 234000000
   secret:
     name: "abc.com"
-- version_info: "uninitialized"
+- name: "abc.com.validation"
+  version_info: "uninitialized"
   last_updated:
     seconds: 1234567899
   secret:
@@ -429,10 +435,16 @@ tls_certificate:
   secret_manager->addStaticSecret(tls_cert_secret);
   const std::string expected_config_dump = R"EOF(
 static_secrets:
-- name: "abc.com"
-  tls_certificate:
-    certificate_chain:
-      inline_string: "DUMMY_INLINE_BYTES_FOR_CERT_CHAIN"
+- name: "abc.com" 
+  secret:
+    name: "abc.com"
+    tls_certificate:
+      certificate_chain:
+        inline_string: "DUMMY_INLINE_BYTES_FOR_CERT_CHAIN"
+      private_key:
+        inline_string: "[redacted]"
+      password:
+        inline_string: "[redacted]"
 )EOF";
   checkConfigDump(expected_config_dump);
 }

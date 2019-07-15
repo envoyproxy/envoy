@@ -84,35 +84,51 @@ SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
                                                     secret_provider_context);
 }
 
+// We clear private key and password to avoid information leaking.
+// TODO(incfly): switch to more generic scrubbing mechanism once
+// https://github.com/envoyproxy/envoy/issues/4757 is resolved.
+void redactSecret(::envoy::api::v2::auth::Secret* secret) {
+  if (secret && secret->type_case() == envoy::api::v2::auth::Secret::TypeCase::kTlsCertificate) {
+    auto tls_certificate = secret->mutable_tls_certificate();
+    if (tls_certificate->has_private_key()) {
+      tls_certificate->mutable_private_key()->set_inline_string("[redacted]");
+    }
+    if (tls_certificate->has_password()) {
+      tls_certificate->mutable_password()->set_inline_string("[redacted]");
+    }
+  }
+}
+
 ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::SecretsConfigDump>();
   // Handle static tls key/cert providers.
   for (const auto& cert_iter : static_tls_certificate_providers_) {
     const auto& tls_cert = cert_iter.second;
-    auto dump_secret = config_dump->mutable_static_secrets()->Add();
-    dump_secret->set_name(cert_iter.first);
-    dump_secret->set_name(cert_iter.first);
+    auto static_secret = config_dump->mutable_static_secrets()->Add();
+    static_secret->set_name(cert_iter.first);
     if (!tls_cert.get()) {
       continue;
     }
-    auto dump_tls_cert = dump_secret->mutable_secret()->mutable_tls_certificate();
-    dump_tls_cert->MergeFrom(*tls_cert.get()->secret());
-    // TODO: same util function to handle the key clean.
+    auto dump_secret = static_secret->mutable_secret();
+    dump_secret->set_name(cert_iter.first);
+    dump_secret->mutable_tls_certificate()->MergeFrom(*tls_cert.get()->secret());
+    redactSecret(dump_secret);
   }
 
   // Handle static certificate validation context providers.
   for (const auto& context_iter : static_certificate_validation_context_providers_) {
     const auto& validation_context = context_iter.second;
-    auto dump_secret = config_dump->mutable_static_secrets()->Add();
-    dump_secret->set_name(context_iter.first);
+    auto static_secret = config_dump->mutable_static_secrets()->Add();
+    static_secret->set_name(context_iter.first);
     if (!validation_context.get()) {
       continue;
     }
-    dump_secret->mutable_secret()->mutable_validation_context()->MergeFrom(
-        *validation_context.get()->secret());
+    auto dump_secret = static_secret->mutable_secret();
+    dump_secret->set_name(context_iter.first);
+    dump_secret->mutable_validation_context()->MergeFrom(*validation_context.get()->secret());
   }
 
-  // Handle dynamic cert providers.
+  // Handle dynamic tls_certificate providers.
   auto providers = certificate_providers_.allSecretProviders();
   for (const auto& cert_secrets : providers) {
     const auto& secret_data = cert_secrets->secretData();
@@ -124,26 +140,18 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     } else {
       dump_secret = config_dump->mutable_dynamic_warming_secrets()->Add();
     }
+    dump_secret->set_name(secret_data.resource_name);
     auto secret = dump_secret->mutable_secret();
-
+    secret->set_name(secret_data.resource_name);
     ProtobufWkt::Timestamp last_updated_ts;
     TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
     dump_secret->set_version_info(secret_data.version_info_);
     *dump_secret->mutable_last_updated() = last_updated_ts;
     secret->set_name(secret_data.resource_name);
     if (secret_ready) {
-      auto tls_certificate = secret->mutable_tls_certificate();
-      tls_certificate->MergeFrom(*tls_cert);
-      // We clear private key and password to avoid information leaking.
-      // TODO(incfly): switch to more generic scrubbing mechanism once
-      // https://github.com/envoyproxy/envoy/issues/4757 is resolved.
-      if (tls_certificate->has_private_key()) {
-        tls_certificate->mutable_private_key()->set_inline_string("[redacted]");
-      }
-      if (tls_certificate->has_password()) {
-        tls_certificate->mutable_password()->set_inline_string("[redacted]");
-      }
+      secret->mutable_tls_certificate()->MergeFrom(*tls_cert);
     }
+    redactSecret(secret);
   }
 
   // Handling dynamic cert validation context providers.
@@ -158,12 +166,13 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     } else {
       dump_secret = config_dump->mutable_dynamic_warming_secrets()->Add();
     }
+    dump_secret->set_name(secret_data.resource_name);
     auto secret = dump_secret->mutable_secret();
+    secret->set_name(secret_data.resource_name);
     ProtobufWkt::Timestamp last_updated_ts;
     TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
     dump_secret->set_version_info(secret_data.version_info_);
     *dump_secret->mutable_last_updated() = last_updated_ts;
-    secret->set_name(secret_data.resource_name);
     if (secret_ready) {
       secret->mutable_validation_context()->MergeFrom(*validation_context);
     }
