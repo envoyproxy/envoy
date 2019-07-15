@@ -341,9 +341,9 @@ public:
     size_t index_;
   };
 
-  ConstIterator begin() const noexcept { return ConstIterator(*this, 0); }
+  ConstIterator begin() const noexcept { return {*this, 0}; }
 
-  ConstIterator end() const noexcept { return ConstIterator(*this, size_); }
+  ConstIterator end() const noexcept { return {*this, size_}; }
 
 private:
   constexpr static size_t InlineRingCapacity = 8;

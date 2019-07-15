@@ -54,7 +54,7 @@ RedisCluster::RedisCluster(
 
 void RedisCluster::startPreInit() {
   for (const DnsDiscoveryResolveTargetPtr& target : dns_discovery_resolve_targets_) {
-    target->startResolve();
+    target->startResolveDns();
   }
 }
 
@@ -123,16 +123,32 @@ RedisCluster::DnsDiscoveryResolveTarget::~DnsDiscoveryResolveTarget() {
   }
 }
 
-void RedisCluster::DnsDiscoveryResolveTarget::startResolve() {
+void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
   ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+      [this](std::list<Network::DnsResponse>&& response) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
-        parent_.redis_discovery_session_.registerDiscoveryAddress(address_list, port_);
-        parent_.redis_discovery_session_.startResolve();
+        if (response.empty()) {
+          parent_.info_->stats().update_empty_.inc();
+          if (!resolve_timer_) {
+            resolve_timer_ =
+                parent_.dispatcher_.createTimer([this]() -> void { startResolveDns(); });
+          }
+          // if the initial dns resolved to empty, we'll skip the redis discovery phase and treat it
+          // as an empty cluster.
+          parent_.onPreInitComplete();
+          resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+        } else {
+          // Once the DNS resolve the initial set of addresses, call startResolveRedis on the
+          // RedisDiscoverySession. The RedisDiscoverySession will using the "cluster slots" command
+          // for service discovery and slot allocation. All subsequent discoveries are handled by
+          // RedisDiscoverySession and will not use DNS resolution again.
+          parent_.redis_discovery_session_.registerDiscoveryAddress(std::move(response), port_);
+          parent_.redis_discovery_session_.startResolveRedis();
+        }
       });
 }
 
@@ -141,7 +157,7 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
     Envoy::Extensions::Clusters::Redis::RedisCluster& parent,
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
     : parent_(parent), dispatcher_(parent.dispatcher_),
-      resolve_timer_(parent.dispatcher_.createTimer([this]() -> void { startResolve(); })),
+      resolve_timer_(parent.dispatcher_.createTimer([this]() -> void { startResolveRedis(); })),
       client_factory_(client_factory), buffer_timeout_(0) {}
 
 namespace {
@@ -190,17 +206,16 @@ void RedisCluster::RedisDiscoveryClient::onEvent(Network::ConnectionEvent event)
 }
 
 void RedisCluster::RedisDiscoverySession::registerDiscoveryAddress(
-    const std::list<Envoy::Network::Address::InstanceConstSharedPtr>& address_list,
-    const uint32_t port) {
+    std::list<Envoy::Network::DnsResponse>&& response, const uint32_t port) {
   // Since the address from DNS does not have port, we need to make a new address that has port in
   // it.
-  for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
-    ASSERT(address != nullptr);
-    discovery_address_list_.push_back(Network::Utility::getAddressWithPort(*address, port));
+  for (const Network::DnsResponse& res : response) {
+    ASSERT(res.address_ != nullptr);
+    discovery_address_list_.push_back(Network::Utility::getAddressWithPort(*(res.address_), port));
   }
 }
 
-void RedisCluster::RedisDiscoverySession::startResolve() {
+void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   parent_.info_->stats().update_attempt_.inc();
   // If a resolution is currently in progress, skip it.
   if (current_request_) {

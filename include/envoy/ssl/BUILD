@@ -40,6 +40,7 @@ envoy_cc_library(
     deps = [
         ":context_config_interface",
         ":context_interface",
+        "//include/envoy/common:time_interface",
         "//include/envoy/stats:stats_interface",
     ],
 )

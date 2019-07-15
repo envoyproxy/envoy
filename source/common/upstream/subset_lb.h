@@ -175,7 +175,8 @@ private:
                                       uint32_t idx);
   void forEachSubset(LbSubsetMap& subsets, std::function<void(LbSubsetEntryPtr)> cb);
 
-  SubsetMetadata extractSubsetMetadata(const std::set<std::string>& subset_keys, const Host& host);
+  std::vector<SubsetMetadata> extractSubsetMetadata(const std::set<std::string>& subset_keys,
+                                                    const Host& host);
   std::string describeMetadata(const SubsetMetadata& kvs);
 
   const LoadBalancerType lb_type_;
@@ -209,6 +210,7 @@ private:
 
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;
+  const bool list_as_any_;
 
   friend class SubsetLoadBalancerDescribeMetadataTester;
 };

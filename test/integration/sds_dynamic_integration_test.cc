@@ -239,8 +239,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
 
 class SdsDynamicDownstreamCertValidationContextTest : public SdsDynamicDownstreamIntegrationTest {
 public:
-  SdsDynamicDownstreamCertValidationContextTest()
-      : SdsDynamicDownstreamIntegrationTest(), use_combined_validation_context_(false) {}
+  SdsDynamicDownstreamCertValidationContextTest() : use_combined_validation_context_(false) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {

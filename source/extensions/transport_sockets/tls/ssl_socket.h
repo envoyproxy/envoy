@@ -46,7 +46,7 @@ class SslSocket : public Network::TransportSocket,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
-            Network::TransportSocketOptionsSharedPtr transport_socket_options);
+            const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
@@ -94,8 +94,12 @@ private:
   Network::PostIoAction doHandshake();
   void drainErrorQueue();
   void shutdownSsl();
-  bool isThreadSafe() const { return run_tid_->isCurrentThreadId(); }
+  bool isThreadSafe() const {
+    return callbacks_ != nullptr &&
+           run_tid_ == callbacks_->connection().dispatcher().getCurrentThreadId();
+  }
 
+  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
   bssl::UniquePtr<SSL> ssl_;
@@ -107,7 +111,7 @@ private:
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
   mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
   bool async_handshake_in_progress_{};
-  Thread::ThreadIdPtr run_tid_;
+  Thread::ThreadId run_tid_;
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory,

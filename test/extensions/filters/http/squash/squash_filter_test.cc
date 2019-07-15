@@ -209,6 +209,8 @@ protected:
   void doDownstreamRequest() {
     startDownstreamRequest();
 
+    Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+    EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
     Envoy::Http::TestHeaderMapImpl trailers{};
     // Complete a full request cycle
     Envoy::Buffer::OwnedImpl buffer("nothing here");
@@ -244,7 +246,7 @@ protected:
   }
 
   Envoy::Http::AsyncClient::Callbacks* popPendingCallback() {
-    if (0 == callbacks_.size()) {
+    if (callbacks_.empty()) {
       // Can't use ASSERT_* as this is not a test function
       throw std::underflow_error("empty deque");
     }

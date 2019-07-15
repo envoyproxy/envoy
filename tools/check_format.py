@@ -17,7 +17,8 @@ import traceback
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
                      "./tools/testdata/check_format/", "./tools/pyformat/")
-SUFFIXES = (".cc", ".h", "BUILD", "WORKSPACE", ".bzl", ".java", ".md", ".rst", ".proto")
+SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto",
+            ".rst")
 DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
 
@@ -29,6 +30,7 @@ REPOSITORIES_BZL = "bazel/repositories.bzl"
 # definitions for real-world time, the construction of them in main(), and perf annotation.
 # For now it includes the validation server but that really should be injected too.
 REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
+                       "./source/extensions/filters/http/common/aws/utility.cc",
                        "./source/common/event/real_time_system.cc",
                        "./source/common/event/real_time_system.h", "./source/exe/main_common.cc",
                        "./source/exe/main_common.h", "./source/server/config_validation/server.cc",
@@ -55,6 +57,7 @@ SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
 PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
+X_ENVOY_USED_DIRECTLY_REGEX = re.compile(r'.*\"x-envoy-.*\".*')
 PROTO_OPTION_JAVA_PACKAGE = "option java_package = \""
 PROTO_OPTION_JAVA_OUTER_CLASSNAME = "option java_outer_classname = \""
 PROTO_OPTION_JAVA_MULTIPLE_FILES = "option java_multiple_files = "
@@ -83,7 +86,6 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/http/ratelimit",
   "extensions/filters/http/buffer",
   "extensions/filters/http/grpc_http1_bridge",
-  "extensions/filters/http/grpc_http1_reverse_bridge",
   "extensions/filters/http/rbac",
   "extensions/filters/http/gzip",
   "extensions/filters/http/ip_tagging",
@@ -146,8 +148,8 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/ext_authz",
   "extensions/filters/network/redis_proxy",
   "extensions/filters/network/kafka",
-  "extensions/filters/network/kafka/protocol_code_generator",
-  "extensions/filters/network/kafka/serialization_code_generator",
+  "extensions/filters/network/kafka/protocol",
+  "extensions/filters/network/kafka/serialization",
   "extensions/filters/network/mongo_proxy",
   "extensions/filters/network/common",
   "extensions/filters/network/common/redis",
@@ -190,7 +192,7 @@ def checkTools():
                             "users".format(CLANG_FORMAT_PATH))
   else:
     error_messages.append(
-        "Command {} not found. If you have clang-format in version 7.x.x "
+        "Command {} not found. If you have clang-format in version 8.x.x "
         "installed, but the binary name is different or it's not available in "
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
@@ -352,6 +354,13 @@ def isWorkspaceFile(file_path):
   return os.path.basename(file_path) == "WORKSPACE"
 
 
+def isBuildFixerExcludedFile(file_path):
+  for excluded_path in build_fixer_check_excluded_paths:
+    if file_path.startswith(excluded_path):
+      return True
+  return False
+
+
 def hasInvalidAngleBracketDirectory(line):
   if not line.startswith(INCLUDE_ANGLE):
     return False
@@ -449,6 +458,9 @@ def checkSourceLine(line, file_path, reportError):
   # Check fixable errors. These may have been fixed already.
   if line.find(".  ") != -1:
     reportError("over-enthusiastic spaces")
+  if ('source' in file_path or 'include' in file_path) and X_ENVOY_USED_DIRECTLY_REGEX.match(line):
+    reportError(
+        "Please do not use the raw literal x-envoy in source code.  See Envoy::Http::PrefixValue.")
   if hasInvalidAngleBracketDirectory(line):
     reportError("envoy includes should not have angle brackets")
   for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
@@ -556,8 +568,10 @@ def fixBuildPath(file_path):
     sys.stdout.write(fixBuildLine(line, file_path))
 
   error_messages = []
+
   # TODO(htuch): Add API specific BUILD fixer script.
-  if not isApiFile(file_path) and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
+  if not isBuildFixerExcludedFile(file_path) and not isApiFile(file_path) and not isSkylarkFile(
+      file_path) and not isWorkspaceFile(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
 
@@ -568,7 +582,9 @@ def fixBuildPath(file_path):
 
 def checkBuildPath(file_path):
   error_messages = []
-  if not isApiFile(file_path) and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
+
+  if not isBuildFixerExcludedFile(file_path) and not isApiFile(file_path) and not isSkylarkFile(
+      file_path) and not isWorkspaceFile(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
 
@@ -794,6 +810,12 @@ if __name__ == "__main__":
       default=[],
       help="exclude paths from the namespace_check.")
   parser.add_argument(
+      "--build_fixer_check_excluded_paths",
+      type=str,
+      nargs="+",
+      default=[],
+      help="exclude paths from envoy_build_fixer check.")
+  parser.add_argument(
       "--include_dir_order",
       type=str,
       default=",".join(common.includeDirOrder()),
@@ -805,39 +827,45 @@ if __name__ == "__main__":
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
   namespace_check = args.namespace_check
   namespace_check_excluded_paths = args.namespace_check_excluded_paths
+  build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths
   include_dir_order = args.include_dir_order
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
-
-  # Returns the list of directories with owners listed in CODEOWNERS
-  def ownedDirectories():
-    owned = []
-    try:
-      with open('./CODEOWNERS') as f:
-        for line in f:
-          # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
-          # name and store it in the list of directories with documented owners.
-          m = re.search(r'..*(extensions[^@]* )@.*@.*', line)
-          if m is not None:
-            owned.append(m.group(1).strip())
-      return owned
-    except IOError:
-      return []  # for the check format tests.
-
-  # Calculate the list of owned directories once per run.
-  owned_directories = ownedDirectories()
 
   # Check whether all needed external tools are available.
   ct_error_messages = checkTools()
   if checkErrorMessages(ct_error_messages):
     sys.exit(1)
 
+  # Returns the list of directories with owners listed in CODEOWNERS. May append errors to
+  # error_messages.
+  def ownedDirectories(error_messages):
+    owned = []
+    try:
+      with open('./CODEOWNERS') as f:
+        for line in f:
+          # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
+          # name and store it in the list of directories with documented owners.
+          m = re.search(r'.*(extensions[^@]*\s+)(@.*)', line)
+          if m is not None and not line.startswith('#'):
+            owned.append(m.group(1).strip())
+            owners = re.findall('@\S+', m.group(2).strip())
+            if len(owners) < 2:
+              error_messages.append("Extensions require at least 2 owners in CODEOWNERS:\n"
+                                    "    {}".format(line))
+      return owned
+    except IOError:
+      return []  # for the check format tests.
+
+  # Calculate the list of owned directories once per run.
+  error_messages = []
+  owned_directories = ownedDirectories(error_messages)
+
   if os.path.isfile(target_path):
-    error_messages = checkFormat("./" + target_path)
+    error_messages += checkFormat("./" + target_path)
   else:
     pool = multiprocessing.Pool(processes=args.num_workers)
     results = []
-    error_messages = []
     # For each file in target_path, start a new task in the pool and collect the
     # results (results is passed by reference, and is used as an output).
     os.path.walk(target_path, checkFormatVisitor,

@@ -1043,6 +1043,8 @@ TEST(AccessLogFormatterTest, ParserFailures) {
       "%protocol%",
       "%REQ(TEST):%",
       "%REQ(TEST):3q4%",
+      "%REQ(\n)%",
+      "%REQ(?\n)%",
       "%RESP(TEST):%",
       "%RESP(X?Y):%",
       "%RESP(X?Y):343o24%",

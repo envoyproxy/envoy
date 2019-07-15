@@ -51,3 +51,8 @@ envoy_cc_library(
     name = "backoff_strategy_interface",
     hdrs = ["backoff_strategy.h"],
 )
+
+envoy_cc_library(
+    name = "scope_tracker_interface",
+    hdrs = ["scope_tracker.h"],
+)

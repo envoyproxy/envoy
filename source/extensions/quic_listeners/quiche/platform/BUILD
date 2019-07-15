@@ -105,7 +105,10 @@ envoy_cc_library(
         "quic_logging_impl.h",
     ],
     visibility = ["//visibility:public"],
-    deps = ["//source/common/common:assert_lib"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:stl_helpers",
+    ],
 )
 
 envoy_cc_library(
@@ -119,19 +122,20 @@ envoy_cc_library(
         "quic_client_stats_impl.h",
         "quic_containers_impl.h",
         "quic_endian_impl.h",
+        "quic_error_code_wrappers_impl.h",
         "quic_estimate_memory_usage_impl.h",
         "quic_fallthrough_impl.h",
         "quic_flag_utils_impl.h",
         "quic_flags_impl.h",
         "quic_iovec_impl.h",
-        "quic_ip_address_impl.h",
+        "quic_macros_impl.h",
         "quic_map_util_impl.h",
         "quic_mem_slice_impl.h",
+        "quic_optional_impl.h",
         "quic_prefetch_impl.h",
         "quic_ptr_util_impl.h",
         "quic_reference_counted_impl.h",
         "quic_server_stats_impl.h",
-        "quic_socket_address_impl.h",
         "quic_stack_trace_impl.h",
         "quic_str_cat_impl.h",
         "quic_stream_buffer_allocator_impl.h",
@@ -146,12 +150,14 @@ envoy_cc_library(
         "abseil_memory",
         "abseil_node_hash_map",
         "abseil_node_hash_set",
+        "abseil_optional",
         "googletest",
     ],
     visibility = ["//visibility:public"],
     deps = [
         ":flags_impl_lib",
         ":string_utils_lib",
+        "//include/envoy/api:io_error_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:byte_order_lib",
@@ -220,8 +226,15 @@ envoy_cc_library(
     deps = [
         "@com_googlesource_quiche//:quic_core_buffer_allocator_lib",
         "@com_googlesource_quiche//:quic_core_utils_lib",
-        "@com_googlesource_quiche//:quic_platform_mem_slice_span_lib",
+        "@com_googlesource_quiche//:quic_platform_mem_slice_span",
     ],
+)
+
+envoy_cc_library(
+    name = "quic_platform_bbr2_sender_impl_lib",
+    hdrs = ["quic_bbr2_sender_impl.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@com_googlesource_quiche//:quic_core_congestion_control_bbr_lib"],
 )
 
 envoy_cc_library(

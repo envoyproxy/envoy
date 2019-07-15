@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <tuple>
 #include <vector>
 
 #include "envoy/api/v2/core/base.pb.h"
@@ -15,9 +16,31 @@
 namespace Envoy {
 namespace Network {
 
-// Optional variant of setsockopt(2) optname. The idea here is that if the option is not supported
-// on a platform, we can make this the empty value. This allows us to avoid proliferation of #ifdef.
-using SocketOptionName = absl::optional<std::pair<int, int>>;
+// SocketOptionName is an optional value that captures the setsockopt(2)
+// arguments. The idea here is that if a socket option is not supported
+// on a platform, we can make this the empty value, which allows us to
+// avoid #ifdef proliferation.
+struct SocketOptionName {
+  SocketOptionName() = default;
+  SocketOptionName(const SocketOptionName&) = default;
+  SocketOptionName(int level, int option, const std::string& name)
+      : value_(std::make_tuple(level, option, name)) {}
+
+  int level() const { return std::get<0>(value_.value()); }
+  int option() const { return std::get<1>(value_.value()); }
+  const std::string& name() const { return std::get<2>(value_.value()); }
+
+  bool has_value() const { return value_.has_value(); }
+  bool operator==(const SocketOptionName& rhs) const { return value_ == rhs.value_; }
+
+private:
+  absl::optional<std::tuple<int, int, std::string>> value_;
+};
+
+// ENVOY_MAKE_SOCKET_OPTION_NAME is a helper macro to generate a
+// SocketOptionName with a descriptive string name.
+#define ENVOY_MAKE_SOCKET_OPTION_NAME(level, option)                                               \
+  Network::SocketOptionName(level, option, #level "/" #option)
 
 /**
  * Base class for Sockets

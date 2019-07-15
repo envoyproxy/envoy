@@ -160,12 +160,13 @@ private:
 
     ~DnsDiscoveryResolveTarget();
 
-    void startResolve();
+    void startResolveDns();
 
     RedisCluster& parent_;
     Network::ActiveDnsQuery* active_query_{};
     const std::string dns_address_;
     const uint32_t port_;
+    Event::TimerPtr resolve_timer_;
   };
 
   using DnsDiscoveryResolveTargetPtr = std::unique_ptr<DnsDiscoveryResolveTarget>;
@@ -195,12 +196,10 @@ private:
 
     ~RedisDiscoverySession() override;
 
-    void registerDiscoveryAddress(
-        const std::list<Network::Address::InstanceConstSharedPtr>& address_list,
-        const uint32_t port);
+    void registerDiscoveryAddress(std::list<Network::DnsResponse>&& response, const uint32_t port);
 
     // Start discovery against a random host from existing hosts
-    void startResolve();
+    void startResolveRedis();
 
     // Extensions::NetworkFilters::Common::Redis::Client::Config
     bool disableOutlierEvents() const override { return true; }
@@ -212,6 +211,7 @@ private:
     bool enableRedirection() const override { return false; }
     uint32_t maxBufferSizeBeforeFlush() const override { return 0; }
     std::chrono::milliseconds bufferFlushTimeoutInMs() const override { return buffer_timeout_; }
+    uint32_t maxUpstreamUnknownConnections() const override { return 0; }
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;

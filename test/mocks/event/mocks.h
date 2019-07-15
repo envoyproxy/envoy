@@ -113,8 +113,9 @@ public:
   MOCK_METHOD2(listenForSignal_, SignalEvent*(int signal_num, SignalCb cb));
   MOCK_METHOD1(post, void(std::function<void()> callback));
   MOCK_METHOD1(run, void(RunType type));
+  MOCK_METHOD1(setTrackedObject, const ScopeTrackedObject*(const ScopeTrackedObject* object));
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
-  MOCK_METHOD0(getCurrentThreadId, Thread::ThreadIdPtr(void));
+  MOCK_METHOD0(getCurrentThreadId, Thread::ThreadId());
 
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;

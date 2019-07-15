@@ -12,6 +12,12 @@ MockConnectionInfo::~MockConnectionInfo() {}
 MockClientContext::MockClientContext() {}
 MockClientContext::~MockClientContext() {}
 
+MockClientContextConfig::MockClientContextConfig() {}
+MockClientContextConfig::~MockClientContextConfig() {}
+
+MockServerContextConfig::MockServerContextConfig() {}
+MockServerContextConfig::~MockServerContextConfig() {}
+
 MockPrivateKeyMethodManager::MockPrivateKeyMethodManager() {}
 MockPrivateKeyMethodManager::~MockPrivateKeyMethodManager() {}
 
