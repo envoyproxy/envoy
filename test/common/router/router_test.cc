@@ -4388,8 +4388,8 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
       {"x-envoy-upstream-rq-per-try-timeout-ms", "100"},
       {"x-envoy-max-retries", "2"},
       {"not-checked", "always passes"},
-      {"x-envoy-retry-on",
-       "5xx,gateway-error,retriable-4xx,refused-stream,connect-failure,retriable-status-codes"},
+      {"x-envoy-retry-on", "5xx,gateway-error,retriable-4xx,refused-stream,connect-failure,"
+                           "retriable-status-codes,reset"},
       {"x-envoy-retry-grpc-on",
        "cancelled,internal,deadline-exceeded,resource-exhausted,unavailable"},
   };
