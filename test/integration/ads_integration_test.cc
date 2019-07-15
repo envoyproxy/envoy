@@ -17,7 +17,6 @@
 #include "test/integration/ads_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
