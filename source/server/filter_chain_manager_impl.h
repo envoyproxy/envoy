@@ -48,10 +48,7 @@ public:
   void addFilterChainInternalForFcds(
       absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
       std::unique_ptr<FilterChainFactoryBuilder> filter_chain_factory_builder);
-  void addFilterChainInternal(
-      absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
-      std::unique_ptr<FilterChainFactoryBuilder> filter_chain_factory_builder);
-
+  
   static bool isWildcardServerName(const std::string& name);
 
   // In order to share between internal class
@@ -179,7 +176,7 @@ private:
 
   std::unique_ptr<FilterChainLookup> createFilterChainLookup();
 
-  void warmed(FilterChainLookup* warming_lookup);
+  void lookupWarmed(FilterChainLookup* warming_lookup);
 
   // The invariant:
   // Once the active one is ready, there is always an active one until shutdown.

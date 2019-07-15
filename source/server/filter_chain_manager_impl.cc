@@ -115,69 +115,15 @@ void FilterChainManagerImpl::addFilterChainInternalForFcds(
     addFilterChainForDestinationPorts(
         warming_lookup_->destination_ports_map_,
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
-        server_names, filter_chain_match.transport_protocol(), application_protocols,
-        filter_chain_match.source_type(), source_ips, filter_chain_match.source_ports(),
-        existing_chain_impl);
+        filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
+        filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
+        filter_chain_match.source_ports(), existing_chain_impl);
     ENVOY_LOG(trace, "Added a filter chain");
   }
   convertIPsToTries(warming_lookup_->destination_ports_map_);
   // TODO(silentdai) : trigger fcds api
   ENVOY_LOG(debug, "initializing filter chain lookup of listener {}", address_->asString());
   warming_lookup_->initialize();
-}
-
-void FilterChainManagerImpl::addFilterChainInternal(
-    absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
-    std::unique_ptr<FilterChainFactoryBuilder> filter_chain_factory_builder) {
-  active_lookup_ = std::make_unique<FilterChainLookup>();
-
-  std::unordered_set<envoy::api::v2::listener::FilterChainMatch, MessageUtil, MessageUtil>
-      filter_chains;
-  for (const auto& filter_chain : filter_chain_span) {
-    const auto& filter_chain_match = filter_chain->filter_chain_match();
-    if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
-      throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
-                                       "unimplemented fields",
-                                       address_->asString()));
-    }
-    if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
-      throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
-                                       "the same matching rules are defined",
-                                       address_->asString()));
-    }
-    filter_chains.insert(filter_chain_match);
-
-    // Validate IP addresses.
-    std::vector<std::string> destination_ips;
-    destination_ips.reserve(filter_chain_match.prefix_ranges().size());
-    for (const auto& destination_ip : filter_chain_match.prefix_ranges()) {
-      const auto& cidr_range = Network::Address::CidrRange::create(destination_ip);
-      destination_ips.push_back(cidr_range.asString());
-    }
-
-    std::vector<std::string> source_ips;
-    source_ips.reserve(filter_chain_match.source_prefix_ranges().size());
-    for (const auto& source_ip : filter_chain_match.source_prefix_ranges()) {
-      const auto& cidr_range = Network::Address::CidrRange::create(source_ip);
-      source_ips.push_back(cidr_range.asString());
-    }
-
-    std::vector<std::string> server_names(filter_chain_match.server_names().begin(),
-                                          filter_chain_match.server_names().end());
-
-    std::vector<std::string> application_protocols(
-        filter_chain_match.application_protocols().begin(),
-        filter_chain_match.application_protocols().end());
-    addFilterChainForDestinationPorts(
-        active_lookup_->destination_ports_map_,
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
-        filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
-        filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
-        filter_chain_match.source_ports(),
-        std::shared_ptr<Network::FilterChain>(
-            filter_chain_factory_builder->buildFilterChain(*filter_chain)));
-  }
-  convertIPsToTries(active_lookup_->destination_ports_map_);
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(
@@ -567,14 +513,13 @@ void FilterChainManagerImpl::convertIPsToTries(DestinationPortsMap& destination_
   }
 }
 
-void FilterChainManagerImpl::warmed(FilterChainLookup* warming_lookup) {
+void FilterChainManagerImpl::lookupWarmed(FilterChainLookup* warming_lookup) {
   ENVOY_LOG(info, "initial lookup active {} warming {} : mark {} as active immediately.",
             static_cast<void*>(active_lookup_.get()), static_cast<void*>(warming_lookup_.get()),
             static_cast<void*>(this));
   if (warming_lookup != warming_lookup_.get()) {
     ENVOY_LOG(error, "transforming warmed up lookup {} but is replaced by newer warming one {}. ",
               static_cast<void*>(warming_lookup), static_cast<void*>(warming_lookup_.get()));
-    return;
   } else {
     ENVOY_LOG(info, "updating to warmed up lookup {}", static_cast<void*>(warming_lookup));
     std::swap(warming_lookup_, active_lookup_);
@@ -585,24 +530,23 @@ std::unique_ptr<FilterChainManagerImpl::FilterChainLookup>
 FilterChainManagerImpl::createFilterChainLookup() {
   auto res = std::make_unique<FilterChainManagerImpl::FilterChainLookup>();
   res->has_active_lookup_ = active_lookup_ != nullptr;
-  ENVOY_LOG(trace, "{} filter chain lookup {} has_active_lookup = {}", address_->asString(),
-            static_cast<void*>(res.get()), res->has_active_lookup_);
+  ENVOY_LOG(trace,
+            "filter chain manager {} is initializing filter chain lookup {} has_active_lookup = {}",
+            address_->asString(), static_cast<void*>(res.get()), res->has_active_lookup_);
   res->init_watcher_ =
       std::make_unique<Init::WatcherImpl>("lookup warmed cb", [lookup = res.get(), this]() {
-        warmed(lookup);
+        lookupWarmed(lookup);
         if (!lookup->has_active_lookup_) {
           ENVOY_LOG(
               debug,
-              "lookup {} was created with no active lookup, mark filter chain manager {} as ready",
-              static_cast<void*>(lookup), address_->asString());
-          init_target_.ready();
-          target_ready_ = true;
+              "filter chain manager {} activated a new lookup {} was created with no active lookup",
+              address_->asString(), static_cast<void*>(lookup));
         } else {
-          ENVOY_LOG(debug,
-                    "lookup {} was created with active lookup, wont notify "
-                    "filter chain manager {}",
-                    static_cast<void*>(lookup), address_->asString());
+          ENVOY_LOG(debug, "filter chain manager {} warmed up a new lookup {}",
+                    address_->asString(), static_cast<void*>(lookup));
         }
+        init_target_.ready();
+        target_ready_ = true;
       });
   return res;
 }

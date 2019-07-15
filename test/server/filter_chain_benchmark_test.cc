@@ -27,9 +27,12 @@ namespace {
 
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
   std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&) const override {
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&) override {
     // A place holder to be found
     return std::make_unique<Network::MockFilterChain>();
+  }
+  void setInitManager(Init::Manager& init_manager) override {
+    UNREFERENCED_PARAMETER(init_manager);
   }
 };
 
@@ -160,21 +163,24 @@ public:
         Network::Address::IpVersion::v4);
     TestUtility::loadFromYaml(listener_yaml_config_, listener_config_);
     filter_chains_ = listener_config_.filter_chains();
+    dummy_builder_ = std::make_unique<MockFilterChainFactoryBuilder>();
   }
   absl::Span<const envoy::api::v2::listener::FilterChain* const> filter_chains_;
   std::string listener_yaml_config_;
   envoy::api::v2::Listener listener_config_;
-  MockFilterChainFactoryBuilder dummy_builder_;
+  std::unique_ptr<FilterChainFactoryBuilder> dummy_builder_;
+  Init::ManagerImpl init_manager_{"benchmark"};
   FilterChainManagerImpl filter_chain_manager_{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
+      init_manager_, std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
 };
 
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
 (::benchmark::State& state) {
   for (auto _ : state) {
     FilterChainManagerImpl filter_chain_manager{
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
-    filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_);
+        init_manager_, std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
+    dummy_builder_ = std::make_unique<MockFilterChainFactoryBuilder>();
+    filter_chain_manager.addFilterChain(filter_chains_, std::move(dummy_builder_));
   }
 }
 
@@ -187,8 +193,9 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
         10000 + i, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111)));
   }
   FilterChainManagerImpl filter_chain_manager{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
-  filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_);
+      init_manager_, std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
+  dummy_builder_ = std::make_unique<MockFilterChainFactoryBuilder>();
+  filter_chain_manager.addFilterChain(filter_chains_, std::move(dummy_builder_));
   for (auto _ : state) {
     for (int i = 0; i < state.range(0); i++) {
       filter_chain_manager.findFilterChain(sockets[i]);
