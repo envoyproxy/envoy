@@ -312,7 +312,6 @@ TEST(WatchMapImplTest, UninterestingUpdate) {
   expectNoDeltaUpdate(callbacks, "version3");
   doDeltaAndSotwUpdate(watch_map, bob_update, {}, "version3");
 
-  // TODO TODO DONT NEED THIS
   // Clean removal of the watch: first update to "interested in nothing", then remove.
   watch->updateWatchInterest({});
   watch.reset();
