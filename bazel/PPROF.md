@@ -10,7 +10,7 @@ specific place yourself.
 
 Static linking is already available (because of a `HeapProfilerDump()` call
 inside
-[`Envoy::Profiler::Heap::forceLink()`](https://github.com/envoyproxy/envoy/blob/master/source/common/profiler/profiler.cc#L21-L26)).
+[`Envoy::Profiler::Heap::stopProfiler())`](https://github.com/envoyproxy/envoy/blob/master/source/common/profiler/profiler.cc#L32-L39)).
 
 ### Compiling a statically-linked Envoy
 
