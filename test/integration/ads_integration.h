@@ -4,6 +4,10 @@
 #include <string>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/rds.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
