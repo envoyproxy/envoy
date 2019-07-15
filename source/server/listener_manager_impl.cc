@@ -182,6 +182,8 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
   return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
+class ListenerFilterChainFactoryBuilder;
+
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                            ListenerManagerImpl& parent, const std::string& name, bool modifiable,
                            bool workers_started, uint64_t hash)
@@ -282,8 +284,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       parent_.server_.threadLocal(), parent_.server_.messageValidationVisitor(),
       parent_.server_.api());
   factory_context.setInitManager(initManager());
-  ListenerFilterChainFactoryBuilder builder(*this, factory_context);
-  filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
+  filter_chain_manager_.addFilterChain(
+      config.filter_chains(),
+      std::make_unique<ListenerFilterChainFactoryBuilder>(*this, std::move(factory_context)));
   const bool need_tls_inspector =
       std::any_of(
           config.filter_chains().begin(), config.filter_chains().end(),
@@ -506,7 +509,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   ListenerImplPtr new_listener(
       new ListenerImpl(config, version_info, *this, name, modifiable, workers_started_, hash));
   ListenerImpl& new_listener_ref = *new_listener;
-  
+
   // We mandate that a listener with the same name must have the same configured address. This
   // avoids confusion during updates and allows us to use the same bound address. Note that in
   // the case of port 0 binding, the new listener will implicitly use the same bound port from
@@ -537,7 +540,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
     } else {
-      new_listener->debugLog("update active listener");
+      new_listener->debugLog("add active listener");
       *existing_active_listener = std::move(new_listener);
     }
   } else {
@@ -569,6 +572,10 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
         });
     if (existing_draining_listener != draining_listeners_.cend()) {
       draining_listener_socket = existing_draining_listener->listener_->getSocket();
+      ENVOY_LOG(debug, "find draining listen socket for {}",
+                draining_listener_socket->localAddress());
+    } else {
+      new_listener->debugLog("cannot find draining socket");
     }
 
     new_listener->setSocket(draining_listener_socket
@@ -578,10 +585,10 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
                                                               new_listener->listenSocketOptions(),
                                                               new_listener->bindToPort()));
     if (workers_started_) {
-      new_listener->debugLog("add warming listener");
+      new_listener->debugLog("replace warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
     } else {
-      new_listener->debugLog("add active listener");
+      new_listener->debugLog("replace active listener");
       active_listeners_.emplace_back(std::move(new_listener));
     }
 

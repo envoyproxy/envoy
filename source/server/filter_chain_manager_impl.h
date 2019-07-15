@@ -48,7 +48,7 @@ public:
   void addFilterChainInternalForFcds(
       absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
       std::unique_ptr<FilterChainFactoryBuilder> filter_chain_factory_builder);
-  
+
   static bool isWildcardServerName(const std::string& name);
 
   // In order to share between internal class
