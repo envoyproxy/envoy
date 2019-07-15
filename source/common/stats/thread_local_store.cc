@@ -450,8 +450,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
 
   Gauge& gauge = safeMakeStat<Gauge>(
       final_stat_name, central_cache_.gauges_, central_cache_.rejected_stats_,
-      [import_mode](Allocator& allocator, StatName name,
-                    absl::string_view tag_extracted_name,
+      [import_mode](Allocator& allocator, StatName name, absl::string_view tag_extracted_name,
                     const std::vector<Tag>& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, tag_extracted_name, tags, import_mode);
       },
