@@ -43,8 +43,6 @@ public:
          ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
          Init::Manager& init_manager, std::function<void()> destructor_cb);
 
-  // TODO: what's the thread model of the admin::config_dump vs xDS config updates?
-  // any lock mechanism needed?
   SecretData secretData();
 
 protected:
