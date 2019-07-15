@@ -544,13 +544,18 @@ tracing:
       access_token_file: "/etc/envoy/lightstep_access_token"
       collector_cluster: lightstep_saas
 layered_runtime:
-    layers:
-    - name: base
-      static_layer:
-        health_check:
-          min_interval: 5
+  layers:
     - name: root
-      disk_layer: { symlink_root: /srv/runtime_data/current, subdirectory: envoy }
+      disk_layer:
+        symlink_root: /srv/configset/envoydata/current
+        subdirectory: envoy
+    - name: override
+      disk_layer:
+        symlink_root: /srv/configset/envoydata/current
+        subdirectory: envoy_override
+        append_service_cluster: true
+    - name: admin
+      admin_layer: {}
 admin:
   access_log_path: /var/log/envoy/admin_access.log
   address:
