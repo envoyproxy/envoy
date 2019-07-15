@@ -3,7 +3,7 @@ Version history
 
 1.12.0 (pending)
 ================
-* admin: added ability to configure listener socket options
+* admin: added ability to configure listener :ref:`socket options <envoy_api_field_config.bootstrap.v2.Admin.socket_options>`.
 
 1.11.0 (July 11, 2019)
 ======================

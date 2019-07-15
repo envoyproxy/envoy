@@ -15,7 +15,8 @@ ConfigTracker& ValidationAdmin::getConfigTracker() { return config_tracker_; }
 
 void ValidationAdmin::startHttpListener(const std::string&, const std::string&,
                                         Network::Address::InstanceConstSharedPtr,
-                                        Network::Socket::OptionsSharedPtr, Stats::ScopePtr&&) {
+                                        const Network::Socket::OptionsSharedPtr&,
+                                        Stats::ScopePtr&&) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
