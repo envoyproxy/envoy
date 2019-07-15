@@ -79,6 +79,9 @@ gateway-error
   This policy is similar to the *5xx* policy but will only retry requests that result in a 502, 503,
   or 504.
 
+reset
+  Envoy will attempt a retry if the upstream server does not respond at all (disconnect/reset/read timeout.)
+
 connect-failure
   Envoy will attempt a retry if a request is failed because of a connection failure to the upstream
   server (connect timeout, etc.). (Included in *5xx*)
