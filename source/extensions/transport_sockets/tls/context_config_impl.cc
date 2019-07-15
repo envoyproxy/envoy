@@ -369,17 +369,6 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   }
 }
 
-ServerContextConfigImpl::ServerContextConfigImpl(
-    const Json::Object& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context)
-    : ServerContextConfigImpl(
-          [&config] {
-            envoy::api::v2::auth::DownstreamTlsContext downstream_tls_context;
-            Config::TlsContextJson::translateDownstreamTlsContext(config, downstream_tls_context);
-            return downstream_tls_context;
-          }(),
-          factory_context) {}
-
 // Append a SessionTicketKey to keys, initializing it with key_data.
 // Throws if key_data is invalid.
 void ServerContextConfigImpl::validateAndAppendKey(

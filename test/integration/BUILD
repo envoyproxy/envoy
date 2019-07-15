@@ -165,8 +165,6 @@ envoy_sh_test(
     data = [
         "test_utility.sh",
         "//source/exe:envoy-static",
-        "//test/common/runtime:filesystem_setup.sh",
-        "//test/common/runtime:filesystem_test_data",
         "//test/config/integration:server_config_files",
         "//tools:socket_passing",
     ],
@@ -178,8 +176,6 @@ envoy_sh_test(
     data = [
         "test_utility.sh",
         "//source/exe:envoy-static",
-        "//test/common/runtime:filesystem_setup.sh",
-        "//test/common/runtime:filesystem_test_data",
         "//test/config/integration:server_config_files",
     ],
 )
@@ -211,6 +207,9 @@ envoy_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/health_check:config",
+        "//test/integration/filters:metadata_stop_all_filter_config_lib",
+        "//test/integration/filters:request_metadata_filter_config_lib",
+        "//test/integration/filters:response_metadata_filter_config_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -317,7 +316,6 @@ envoy_cc_test_library(
         "//test/integration/filters:modify_buffer_filter_config_lib",
         "//test/integration/filters:passthrough_filter_config_lib",
         "//test/integration/filters:pause_filter_lib",
-        "//test/integration/filters:response_metadata_filter_config_lib",
         "//test/test_common:registry_lib",
     ],
 )
@@ -557,6 +555,15 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/service/discovery/v2:hds_cc",
+    ],
+)
+
+envoy_cc_test(
+    name = "header_prefix_integration_test",
+    srcs = ["header_prefix_integration_test.cc"],
+    coverage = False,
+    deps = [
+        ":http_protocol_integration_lib",
     ],
 )
 
@@ -812,7 +819,6 @@ envoy_cc_test(
     srcs = [
         "aws_metadata_fetcher_integration_test.cc",
     ],
-    tags = ["exclusive"],
     deps = [
         ":integration_lib",
         "//source/common/common:fmt_lib",

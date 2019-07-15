@@ -156,6 +156,20 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "request_metadata_filter_config_lib",
+    srcs = [
+        "request_metadata_filter.cc",
+    ],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "random_pause_filter_lib",
     srcs = [
         "random_pause_filter.cc",
@@ -245,5 +259,21 @@ envoy_cc_test_library(
         "//include/envoy/server:filter_config_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/network:connection_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "metadata_stop_all_filter_config_lib",
+    srcs = [
+        "metadata_stop_all_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//include/envoy/event:timer_interface",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )

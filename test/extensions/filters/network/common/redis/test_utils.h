@@ -17,11 +17,12 @@ namespace Client {
 
 inline envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings
 createConnPoolSettings(int64_t millis = 20, bool hashtagging = true,
-                       bool redirection_support = true) {
+                       bool redirection_support = true, uint32_t max_unknown_conns = 100) {
   envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings setting{};
   setting.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(millis));
   setting.set_enable_hashtagging(hashtagging);
   setting.set_enable_redirection(redirection_support);
+  setting.mutable_max_upstream_unknown_connections()->set_value(max_unknown_conns);
   return setting;
 }
 

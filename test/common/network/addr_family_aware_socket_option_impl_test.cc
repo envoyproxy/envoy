@@ -23,7 +23,7 @@ protected:
 // We fail to set the option when the underlying setsockopt syscall fails.
 TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionFailure) {
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
-                                                Network::SocketOptionName(std::make_pair(5, 10)),
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10),
                                                 {},
                                                 1};
   EXPECT_LOG_CONTAINS("warning", "Failed to set IP socket option on non-IP socket",
@@ -47,10 +47,10 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionSuccess) {
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
-                                                Network::SocketOptionName(std::make_pair(5, 10)),
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10),
                                                 {},
                                                 1};
-  testSetSocketOptionSuccess(socket_option, Network::SocketOptionName(std::make_pair(5, 10)), 1,
+  testSetSocketOptionSuccess(socket_option, ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1,
                              {envoy::api::v2::core::SocketOption::STATE_PREBIND});
 }
 
@@ -62,7 +62,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4EmptyOptionNames) {
   AddrFamilyAwareSocketOptionImpl socket_option{
       envoy::api::v2::core::SocketOption::STATE_PREBIND, {}, {}, 1};
 
-  EXPECT_LOG_CONTAINS("warning", "Setting option on socket failed: Operation not supported",
+  EXPECT_LOG_CONTAINS("warning", "Failed to set unsupported option on socket",
                       EXPECT_FALSE(socket_option.setOption(
                           socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
 }
@@ -75,7 +75,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6EmptyOptionNames) {
   AddrFamilyAwareSocketOptionImpl socket_option{
       envoy::api::v2::core::SocketOption::STATE_PREBIND, {}, {}, 1};
 
-  EXPECT_LOG_CONTAINS("warning", "Setting option on socket failed: Operation not supported",
+  EXPECT_LOG_CONTAINS("warning", "Failed to set unsupported option on socket",
                       EXPECT_FALSE(socket_option.setOption(
                           socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
 }
@@ -88,10 +88,9 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4IgnoreV6) {
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
-                                                Network::SocketOptionName(std::make_pair(5, 10)),
-                                                Network::SocketOptionName(std::make_pair(6, 11)),
-                                                1};
-  testSetSocketOptionSuccess(socket_option, Network::SocketOptionName(std::make_pair(5, 10)), 1,
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10),
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(6, 11), 1};
+  testSetSocketOptionSuccess(socket_option, ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1,
                              {envoy::api::v2::core::SocketOption::STATE_PREBIND});
 }
 
@@ -103,9 +102,9 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Only) {
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
                                                 {},
-                                                Network::SocketOptionName(std::make_pair(6, 11)),
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(6, 11),
                                                 1};
-  testSetSocketOptionSuccess(socket_option, Network::SocketOptionName(std::make_pair(6, 11)), 1,
+  testSetSocketOptionSuccess(socket_option, ENVOY_MAKE_SOCKET_OPTION_NAME(6, 11), 1,
                              {envoy::api::v2::core::SocketOption::STATE_PREBIND});
 }
 
@@ -117,10 +116,10 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6OnlyV4Fallback) {
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
-                                                Network::SocketOptionName(std::make_pair(5, 10)),
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10),
                                                 {},
                                                 1};
-  testSetSocketOptionSuccess(socket_option, Network::SocketOptionName(std::make_pair(5, 10)), 1,
+  testSetSocketOptionSuccess(socket_option, ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1,
                              {envoy::api::v2::core::SocketOption::STATE_PREBIND});
 }
 
@@ -132,10 +131,9 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Precedence) {
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
-                                                Network::SocketOptionName(std::make_pair(5, 10)),
-                                                Network::SocketOptionName(std::make_pair(6, 11)),
-                                                1};
-  testSetSocketOptionSuccess(socket_option, Network::SocketOptionName(std::make_pair(6, 11)), 1,
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10),
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(6, 11), 1};
+  testSetSocketOptionSuccess(socket_option, ENVOY_MAKE_SOCKET_OPTION_NAME(6, 11), 1,
                              {envoy::api::v2::core::SocketOption::STATE_PREBIND});
 }
 
@@ -144,13 +142,12 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4GetSocketOptionName) {
   socket_.local_address_ = Utility::parseInternetAddress("1.2.3.4", 5678);
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
-                                                Network::SocketOptionName(std::make_pair(5, 10)),
-                                                Network::SocketOptionName(std::make_pair(6, 11)),
-                                                1};
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10),
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(6, 11), 1};
   auto result =
       socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), makeDetails(std::make_pair(5, 10), 1));
+  EXPECT_EQ(result.value(), makeDetails(ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1));
 }
 
 // GetSocketOptionName returns the v4 information for a v6 address
@@ -158,13 +155,12 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6GetSocketOptionName) {
   socket_.local_address_ = Utility::parseInternetAddress("2::1", 5678);
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
-                                                Network::SocketOptionName(std::make_pair(5, 10)),
-                                                Network::SocketOptionName(std::make_pair(6, 11)),
-                                                5};
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10),
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(6, 11), 5};
   auto result =
       socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), makeDetails(std::make_pair(6, 11), 5));
+  EXPECT_EQ(result.value(), makeDetails(ENVOY_MAKE_SOCKET_OPTION_NAME(6, 11), 5));
 }
 
 // GetSocketOptionName returns nullopt if the state is wrong
@@ -172,9 +168,8 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, GetSocketOptionWrongState) {
   socket_.local_address_ = Utility::parseInternetAddress("2::1", 5678);
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
-                                                Network::SocketOptionName(std::make_pair(5, 10)),
-                                                Network::SocketOptionName(std::make_pair(6, 11)),
-                                                5};
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10),
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(6, 11), 5};
   auto result =
       socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_BOUND);
   EXPECT_FALSE(result.has_value());
@@ -183,9 +178,8 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, GetSocketOptionWrongState) {
 // GetSocketOptionName returns nullopt if the version could not be determined
 TEST_F(AddrFamilyAwareSocketOptionImplTest, GetSocketOptionCannotDetermineVersion) {
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
-                                                Network::SocketOptionName(std::make_pair(5, 10)),
-                                                Network::SocketOptionName(std::make_pair(6, 11)),
-                                                5};
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10),
+                                                ENVOY_MAKE_SOCKET_OPTION_NAME(6, 11), 5};
 
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>();
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillOnce(testing::ReturnRef(*io_handle));

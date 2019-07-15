@@ -209,6 +209,8 @@ protected:
   void doDownstreamRequest() {
     startDownstreamRequest();
 
+    Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+    EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
     Envoy::Http::TestHeaderMapImpl trailers{};
     // Complete a full request cycle
     Envoy::Buffer::OwnedImpl buffer("nothing here");
