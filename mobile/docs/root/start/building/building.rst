@@ -21,9 +21,11 @@ submodule with ``git submodule update --init``.
 Bazel requirements
 ------------------
 
-Envoy-Mobile is compiled using Bazel 0.26.1.
+Envoy-Mobile is compiled using Bazel 0.28.0.
 Take a look at our CI set up for :repo:`mac <ci/mac_ci_setup.sh>` and :repo:`linux <ci/linux_ci_setup.sh>`,
 in order to see how to install a specific Bazel version in your environment.
+
+To assist with build consistency across environments, a `bazelw` script is included in project root, along with several common build configurations included in the project's `.bazelrc`.
 
 --------------------
 Android requirements
@@ -49,7 +51,7 @@ Android AAR
 Envoy Mobile can be compiled into an ``.aar`` file for use with Android apps.
 This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and may be run locally:
 
-``bazel build android_dist --config=android``
+``./bazelw build android_dist --config=android``
 
 Upon completion of the build, you'll see an ``envoy.aar`` file at :repo:`dist/envoy.aar <dist>`.
 
@@ -71,7 +73,7 @@ iOS static framework
 Envoy Mobile supports being compiled into a ``.framework`` directory for consumption by iOS apps.
 This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and may be run locally:
 
-``bazel build ios_dist --config=ios``
+``./bazelw build ios_dist --config=ios``
 
 Upon completion of the build, you'll see a ``Envoy.framework`` directory at
 :repo:`dist/Envoy.framework <dist>`.
