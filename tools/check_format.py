@@ -581,8 +581,8 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
 
   if isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
-     ('.counter(' in line or '.gauge(' in line) and \
-     not whitelistedForStatFromString(file_path):
+     not whitelistedForStatFromString(file_path) and \
+     ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
     reportError("Don't lookup stats by name at runtime; used StatName saved during construction")
 
 

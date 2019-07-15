@@ -209,7 +209,13 @@ if __name__ == "__main__":
       "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "
       "check_format.py")
   errors += checkUnfixableError(
-      "stat_from_string.cc",
+      "counter_from_string.cc",
+      "Don't lookup stats by name at runtime; used StatName saved during construction")
+  errors += checkUnfixableError(
+      "gauge_from_string.cc",
+      "Don't lookup stats by name at runtime; used StatName saved during construction")
+  errors += checkUnfixableError(
+      "histogram_from_string.cc",
       "Don't lookup stats by name at runtime; used StatName saved during construction")
 
   errors += fixFileExpectingFailure(
