@@ -45,6 +45,8 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
 # be eliminated but for now we don't want to grow this work. The goal for this
 # whitelist is to eliminate it by making code transformations similar to
 # https://github.com/envoyproxy/envoy/pull/7573 and others.
+#
+# TODO(#4196): Eliminate this list completely and then merge #4980.
 STAT_FROM_STRING_WHITELIST = ("./source/common/memory/heap_shrinker.cc",
                               "./source/extensions/filters/http/dynamo/dynamo_filter.cc",
                               "./source/extensions/filters/http/ext_authz/ext_authz.cc",
@@ -475,6 +477,9 @@ def hasCondVarWaitFor(line):
   return True
 
 
+# Determines whether the filename is either in the specified subdirectory, or
+# at the top level. We consider files in the top level for the benefit of
+# the check_format testcases in tools/testdata/check_format.
 def isInSubdir(filename, *subdirs):
   # Skip this check for check_format's unit-tests.
   if filename.count("/") <= 1:

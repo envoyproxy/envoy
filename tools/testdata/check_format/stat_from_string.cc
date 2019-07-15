@@ -1,8 +1,8 @@
 namespace Envoy {
 
-void init(int stats) {
-  stats.counter("hello");
-  stats.gauge("world");
+void init(Stats::Scope& scope) {
+  scope.counter("hello");
+  scope.gauge("world");
 }
 
 } // namespace Envoy

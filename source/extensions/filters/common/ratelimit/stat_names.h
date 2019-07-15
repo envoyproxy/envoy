@@ -12,7 +12,7 @@ namespace RateLimit {
 // filters. These should generally be initialized once per process, and
 // not per-request, to avoid lock contention.
 struct StatNames {
-  StatNames(Stats::StatNamePool& pool)
+  explicit StatNames(Stats::StatNamePool& pool)
       : ok_(pool.add("ratelimit.ok")), error_(pool.add("ratelimit.error")),
         failure_mode_allowed_(pool.add("ratelimit.failure_mode_allowed")),
         over_limit_(pool.add("ratelimit.over_limit")) {}
