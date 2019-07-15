@@ -219,23 +219,10 @@ key:
                 .size(),
             2);
 
-  // Deletion happens on delta API only.
+  // Delete foo_scope2.
   resources.RemoveLast();
 
   EXPECT_NO_THROW(subscription_callbacks_->onConfigUpdate(resources, "3"));
-  EXPECT_EQ(dynamic_cast<ScopedRdsConfigProvider*>(provider_.get())
-                ->subscription()
-                .scopedRouteMap()
-                .size(),
-            2);
-  EXPECT_EQ(
-      3UL,
-      factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
-  Protobuf::RepeatedPtrField<std::string> deletes;
-  *deletes.Add() = "foo_scope2";
-  EXPECT_NO_THROW(
-      subscription_callbacks_->onConfigUpdate(anyToResource(resources, "4"), deletes, "4"));
-  // foo_scope2 is deleted.
   EXPECT_EQ(dynamic_cast<ScopedRdsConfigProvider*>(provider_.get())
                 ->subscription()
                 .scopedRouteMap()
@@ -246,6 +233,20 @@ key:
                 .scopedRouteMap()
                 .count("foo_scope"),
             1);
+  EXPECT_EQ(
+      3UL,
+      factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
+  // Delete foo_scope via Delta API.
+  Protobuf::RepeatedPtrField<std::string> deletes;
+  *deletes.Add() = "foo_scope";
+  resources.RemoveLast();
+  EXPECT_NO_THROW(
+      subscription_callbacks_->onConfigUpdate(anyToResource(resources, "4"), deletes, "4"));
+  EXPECT_EQ(dynamic_cast<ScopedRdsConfigProvider*>(provider_.get())
+                ->subscription()
+                .scopedRouteMap()
+                .size(),
+            0);
   EXPECT_EQ(
       4UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
@@ -493,23 +494,16 @@ inline_scoped_route_configs:
       nanos: 234000000
 dynamic_scoped_route_configs:
   - name: foo-dynamic-scoped-routes
-    scoped_route_configs:
-      - name: dynamic-foo
-        route_configuration_name: dynamic-foo-route-config
-        key:
-          fragments: { string_key: "172.30.30.10" }
     last_updated:
       seconds: 1234567891
       nanos: 567000000
-    version_info: "1"
+    version_info: "2"
 )EOF",
                             expected_config_dump);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump4 =
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
-  // The delta update API acts in a quasi-incremental way, there is no deletion, and no change, so
-  // no version flip.
   EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump4));
 }
 
