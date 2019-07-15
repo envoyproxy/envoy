@@ -25,7 +25,7 @@ protected:
   }
 
   FakeSymbolTableImpl symbol_table_;
-  HeapStatDataAllocator alloc_;
+  AllocatorImpl alloc_;
   StatNamePool pool_;
 };
 

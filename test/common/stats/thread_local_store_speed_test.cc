@@ -56,7 +56,7 @@ public:
 private:
   Stats::FakeSymbolTableImpl symbol_table_;
   Event::SimulatedTimeSystem time_system_;
-  Stats::HeapStatDataAllocator heap_alloc_;
+  Stats::AllocatorImpl heap_alloc_;
   Stats::ThreadLocalStoreImpl store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

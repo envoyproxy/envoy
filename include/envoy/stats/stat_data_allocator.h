@@ -25,9 +25,9 @@ namespace Stats {
  * substrings, with an opportunity for reduced memory consumption.
  * TODO(fredlas) this interface can be deleted now that the shared memory version is gone.
  */
-class StatDataAllocator {
+class Allocator {
 public:
-  virtual ~StatDataAllocator() = default;
+  virtual ~Allocator() = default;
 
   /**
    * @param name the full name of the stat.

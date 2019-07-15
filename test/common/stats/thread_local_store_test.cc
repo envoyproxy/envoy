@@ -43,7 +43,7 @@ public:
     store_->addSink(sink_);
   }
 
-  void resetStoreWithAlloc(StatDataAllocator& alloc) {
+  void resetStoreWithAlloc(Allocator& alloc) {
     store_ = std::make_unique<ThreadLocalStoreImpl>(alloc);
     store_->addSink(sink_);
   }
@@ -51,7 +51,7 @@ public:
   Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  HeapStatDataAllocator alloc_;
+  AllocatorImpl alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
 };
@@ -169,7 +169,7 @@ public:
   FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  HeapStatDataAllocator alloc_;
+  AllocatorImpl alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
   InSequence s;
@@ -461,7 +461,7 @@ public:
   StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
   Stats::FakeSymbolTableImpl symbol_table_;
-  HeapStatDataAllocator alloc_;
+  AllocatorImpl alloc_;
   ThreadLocalStoreImpl store_;
   StatNamePool pool_;
 };
@@ -758,7 +758,7 @@ public:
   Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  HeapStatDataAllocator heap_alloc_;
+  AllocatorImpl heap_alloc_;
   ThreadLocalStoreImpl store_;
   ScopePtr scope_;
 };
@@ -849,7 +849,7 @@ TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   MockSink sink;
   Stats::FakeSymbolTableImpl symbol_table;
-  HeapStatDataAllocator alloc(symbol_table);
+  AllocatorImpl alloc(symbol_table);
   ThreadLocalStoreImpl store(alloc);
   store.addSink(sink);
 
@@ -867,7 +867,7 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
 
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
   Stats::FakeSymbolTableImpl symbol_table;
-  HeapStatDataAllocator alloc(symbol_table);
+  AllocatorImpl alloc(symbol_table);
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
   ThreadLocalStoreImpl store(alloc);
@@ -933,7 +933,7 @@ TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher = api->allocateDispatcher();
   NiceMock<ThreadLocal::MockInstance> tls;
-  HeapStatDataAllocator alloc(symbol_table);
+  AllocatorImpl alloc(symbol_table);
   ThreadLocalStoreImpl store(alloc);
 
   store.initializeThreading(*dispatcher, tls);
