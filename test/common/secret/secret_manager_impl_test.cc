@@ -290,7 +290,7 @@ dynamic_active_secrets:
   auto context_secret_provider = secret_manager->findOrCreateCertificateValidationContextProvider(
       config_source, "abc.com.validation", secret_context);
   const std::string validation_yaml = R"EOF(
-name: "abc.com"
+name: "abc.com.validation"
 validation_context:
   trusted_ca:
     inline_string: "DUMMY_INLINE_STRING_TRUSTED_CA" 
@@ -445,6 +445,52 @@ static_secrets:
         inline_string: "[redacted]"
       password:
         inline_string: "[redacted]"
+)EOF";
+  checkConfigDump(expected_config_dump);
+}
+
+TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticValidationContext) {
+  Server::MockInstance server;
+  auto secret_manager = std::make_unique<SecretManagerImpl>(config_tracker_);
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+
+  envoy::api::v2::core::ConfigSource config_source;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockRandomGenerator> random;
+  Stats::IsolatedStoreImpl stats;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(init_manager, add(_))
+      .WillRepeatedly(Invoke([&init_target_handle](const Init::Target& target) {
+        init_target_handle = target.createHandle("test");
+      }));
+  EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
+
+  const std::string validation_context =
+      R"EOF(
+name: "abc.com.validation"
+validation_context:
+  trusted_ca:
+    inline_string: "DUMMY_INLINE_STRING_TRUSTED_CA"
+)EOF";
+  envoy::api::v2::auth::Secret validation_secret;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(validation_context), validation_secret);
+  secret_manager->addStaticSecret(validation_secret);
+  const std::string expected_config_dump = R"EOF(
+static_secrets:
+- name: "abc.com.validation"
+  secret:
+    name: "abc.com.validation"
+    validation_context:
+      trusted_ca:
+        inline_string: "DUMMY_INLINE_STRING_TRUSTED_CA"
 )EOF";
   checkConfigDump(expected_config_dump);
 }
