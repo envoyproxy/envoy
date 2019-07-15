@@ -16,7 +16,6 @@ void TestPrivateKeyConnection::delayed_op() {
   timer_ = dispatcher_.createTimer([this]() -> void {
     finished_ = true;
     this->cb_.onPrivateKeyMethodComplete();
-    return;
   });
   timer_->enableTimer(timeout_0ms);
 }
