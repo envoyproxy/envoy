@@ -9,7 +9,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/hash.h"
-#include "common/stats/heap_stat_data.h"
+#include "common/stats/allocator_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/null_counter.h"
 #include "common/stats/null_gauge.h"

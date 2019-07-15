@@ -5,7 +5,7 @@
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/stats/fake_symbol_table_impl.h"
-#include "common/stats/heap_stat_data.h"
+#include "common/stats/allocator_impl.h"
 #include "common/stats/tag_producer_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"

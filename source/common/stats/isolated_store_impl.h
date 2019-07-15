@@ -9,7 +9,7 @@
 #include "envoy/stats/store.h"
 
 #include "common/common/utility.h"
-#include "common/stats/heap_stat_data.h"
+#include "common/stats/allocator_impl.h"
 #include "common/stats/null_counter.h"
 #include "common/stats/null_gauge.h"
 #include "common/stats/store_impl.h"
