@@ -568,8 +568,9 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   bool createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
-  void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
+  void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
+  void setReadDisableOnNewConnection(bool value) { read_disable_on_new_connection_ = value; }
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
   // Stops the dispatcher loop and joins the listening thread.
@@ -628,6 +629,7 @@ private:
   // deleted) on the same thread that allocated the connection.
   std::list<QueuedConnectionWrapperPtr> consumed_connections_ GUARDED_BY(lock_);
   bool allow_unexpected_disconnects_;
+  bool read_disable_on_new_connection_;
   const bool enable_half_close_;
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;

@@ -104,7 +104,8 @@ public:
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
-                                        Http::ServerConnectionCallbacks& callbacks) override;
+                                        Http::ServerConnectionCallbacks& callbacks,
+                                        const bool strict_header_validation) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
@@ -235,11 +236,7 @@ private:
                                  const absl::optional<std::regex> regex = absl::nullopt,
                                  bool pretty_print = false);
 
-  static std::string
-  runtimeAsJson(const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries);
   std::vector<const UrlHandler*> sortedHandlers() const;
-  static const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>
-  sortedRuntime(const std::unordered_map<std::string, const Runtime::Snapshot::Entry>& entries);
   envoy::admin::v2alpha::ServerInfo::State serverState();
   /**
    * URL handlers.

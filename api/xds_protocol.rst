@@ -160,8 +160,8 @@ Resource hints
 ^^^^^^^^^^^^^^
 
 The :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` specified in the :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` are a hint.
-Some resource types, e.g. `Clusters` and `Listeners` will
-specify an empty :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` list, since Envoy is interested in
+Some resource types, e.g. `Clusters` and `Listeners` may
+specify an empty :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` list, since a client such as Envoy is interested in
 learning about all the :ref:`Clusters (CDS) <envoy_api_msg_Cluster>` and :ref:`Listeners (LDS) <envoy_api_msg_Listener>`
 that the management server(s) know about corresponding to its node
 identification. Other resource types, e.g. :ref:`RouteConfiguration (RDS) <envoy_api_msg_RouteConfiguration>`
@@ -169,10 +169,11 @@ and :ref:`ClusterLoadAssignment (EDS) <envoy_api_msg_ClusterLoadAssignment>`, fo
 CDS/LDS updates and Envoy is able to explicitly enumerate these
 resources.
 
-LDS/CDS resource hints will always be empty and it is expected that the
-management server will provide the complete state of the LDS/CDS
-resources in each response. An absent `Listener` or `Cluster` will
-be deleted.
+Envoy will always set the LDS/CDS resource hints to empty and it is expected that the management
+server will provide the complete state of the LDS/CDS resources in each response. An absent
+`Listener` or `Cluster` will be deleted. Other xDS clients may specify explicit LDS/CDS resources as
+resource hints, for example if they only have a singleton listener and already know its name from
+some out-of-band configuration.
 
 For EDS/RDS, the management server does not need to supply every
 requested resource and may also supply additional, unrequested

@@ -678,6 +678,8 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
+
+  const bool strict_header_validation_;
 };
 
 } // namespace Http
