@@ -517,6 +517,7 @@ message Cluster {
   message CommonLbConfig {
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.
     // If not specified, the default is 50%.
+    // To disable panic mode, set to 0%.
     //
     // .. note::
     //   The specified percent will be truncated to the nearest 1%.
