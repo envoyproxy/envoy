@@ -41,6 +41,7 @@ build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
 build:clang-tsan --linkopt -fsanitize=thread
 build:clang-tsan --linkopt -fuse-ld=lld
+build:clang-tsan --linkopt -static-libsan
 build:clang-tsan --define tcmalloc=disabled
 # Needed due to https://github.com/libevent/libevent/issues/777
 build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
@@ -60,6 +61,7 @@ build:libc++ --action_env=CC
 build:libc++ --action_env=CXX
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:libc++ --action_env=PATH
+build:libc++ --host_linkopt=-fuse-ld=lld
 build:libc++ --define force_libcpp=enabled
 
 # Optimize build for binary size reduction.

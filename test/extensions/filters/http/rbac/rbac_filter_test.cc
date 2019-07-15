@@ -88,6 +88,8 @@ TEST_F(RoleBasedAccessControlFilterTest, Allowed) {
   setDestinationPort(123);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
 
