@@ -20,7 +20,7 @@ class TransportSocketFactoryContext;
 
 namespace Ssl {
 
-typedef std::shared_ptr<SSL_PRIVATE_KEY_METHOD> BoringSslPrivateKeyMethodSharedPtr;
+using BoringSslPrivateKeyMethodSharedPtr = std::shared_ptr<SSL_PRIVATE_KEY_METHOD>;
 
 class PrivateKeyMethodProvider {
 public:
@@ -57,7 +57,7 @@ public:
   virtual BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() PURE;
 };
 
-typedef std::shared_ptr<PrivateKeyMethodProvider> PrivateKeyMethodProviderSharedPtr;
+using PrivateKeyMethodProviderSharedPtr = std::shared_ptr<PrivateKeyMethodProvider>;
 
 /**
  * A manager for finding correct user-provided functions for handling BoringSSL private key
