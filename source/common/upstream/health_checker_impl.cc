@@ -336,8 +336,10 @@ Http::CodecClient::Type HttpHealthCheckerImpl::codecClientType(bool use_http2) {
 
 Http::CodecClient*
 ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
+  const bool strict_header_validation =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation");
   return new Http::CodecClientProd(codec_client_type_, std::move(data.connection_),
-                                   data.host_description_, dispatcher_, false);
+                                   data.host_description_, dispatcher_, strict_header_validation);
 }
 
 TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
@@ -743,12 +745,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
 
 Http::CodecClientPtr
 ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-
-  const bool strict_header_validation =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation");
-  return std::make_unique<Http::CodecClientProd>(
-      Http::CodecClient::Type::HTTP2, std::move(data.connection_), data.host_description_,
-      dispatcher_, strict_header_validation);
+  return std::make_unique<Http::CodecClientProd>(Http::CodecClient::Type::HTTP2,
+                                                 std::move(data.connection_),
+                                                 data.host_description_, dispatcher_, false);
 }
 
 std::ostream& operator<<(std::ostream& out, HealthState state) {
