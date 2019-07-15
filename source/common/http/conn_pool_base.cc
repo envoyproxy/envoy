@@ -41,6 +41,10 @@ void ConnPoolImplBase::purgePendingRequests(
 void ConnPoolImplBase::onPendingRequestCancel(PendingRequest& request) {
   ENVOY_LOG(debug, "cancelling pending request");
   if (!pending_requests_to_purge_.empty()) {
+    // if pending_requests_to_purge_ is not empty, it means that we are called from
+    // with-in a onPoolFailure callback invoked in purgePendingRequests (i.e. purgePendingRequests
+    // is down in the call stack). Remove this quest from the list as it is cancelled,
+    // and there is not need to call its onPoolFailure callback.
     request.removeFromList(pending_requests_to_purge_);
   } else {
     request.removeFromList(pending_requests_);
