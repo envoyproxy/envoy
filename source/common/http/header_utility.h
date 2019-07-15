@@ -46,6 +46,13 @@ public:
   static bool matchHeaders(const Http::HeaderMap& request_headers, const HeaderData& config_header);
 
   /**
+   * Validates that a header value is valid, according to RFC 7230, section 3.2.
+   * http://tools.ietf.org/html/rfc7230#section-3.2
+   * @return bool true if the header values are valid, according to the aforementioned RFC.
+   */
+  static bool headerIsValid(const absl::string_view header_value);
+
+  /**
    * Add headers from one HeaderMap to another
    * @param headers target where headers will be added
    * @param headers_to_add supplies the headers to be added
