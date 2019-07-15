@@ -275,6 +275,15 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
   }
 
+  Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
+      parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
+      parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
+      parent_.server_.threadLocal(), parent_.server_.messageValidationVisitor(),
+      parent_.server_.api());
+  factory_context.setInitManager(initManager());
+  ListenerFilterChainFactoryBuilder builder(*this, factory_context);
+  filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
   const bool need_tls_inspector =
       std::any_of(
           config.filter_chains().begin(), config.filter_chains().end(),
@@ -376,18 +385,6 @@ void ListenerImpl::initialize() {
   if (workers_started_) {
     dynamic_init_manager_.initialize(*init_watcher_);
   }
-
-  // moved from constructor
-  Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
-      parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
-      parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
-      parent_.server_.threadLocal(), parent_.server_.messageValidationVisitor(),
-      parent_.server_.api());
-
-  filter_chain_manager_.addFilterChain(
-      config_.filter_chains(),
-      std::make_unique<ListenerFilterChainFactoryBuilder>(*this, std::move(factory_context)));
 }
 
 Init::Manager& ListenerImpl::initManager() {
@@ -509,6 +506,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   ListenerImplPtr new_listener(
       new ListenerImpl(config, version_info, *this, name, modifiable, workers_started_, hash));
   ListenerImpl& new_listener_ref = *new_listener;
+  
   // We mandate that a listener with the same name must have the same configured address. This
   // avoids confusion during updates and allows us to use the same bound address. Note that in
   // the case of port 0 binding, the new listener will implicitly use the same bound port from
@@ -530,19 +528,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
     new_listener->setSocket((*existing_warming_listener)->getSocket());
-
-    updateWarmingActiveGauges();
-    stats_.listener_modified_.inc();
-
-    // TODO(silentdai): use swap. both lhs and rhs should not expire
-    // RAII
-    auto owned_existing_warming = std::move(*existing_warming_listener);
-    (*existing_warming_listener) = std::move(new_listener);
-
-    // Initialize before free the existing listener. Otherwise the existing listener might be the
-    // last one in warming state and notify the global init manager that all targets are done.
-    new_listener_ref.initialize();
-    return true;
+    *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not. Either way we get the socket from the existing listener.
@@ -552,17 +538,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
       warming_listeners_.emplace_back(std::move(new_listener));
     } else {
       new_listener->debugLog("update active listener");
-      updateWarmingActiveGauges();
-      stats_.listener_modified_.inc();
-
-      // RAII
-      auto owned_existing_active = std::move(*existing_active_listener);
-      (*existing_active_listener) = std::move(new_listener);
-      // Initialize before free the existing listener. Otherwise the existing listener might be the
-      // last one in warming state and notify the global init manager that all targets are done.
-      new_listener_ref.initialize();
-      //*existing_active_listener = std::move(new_listener);
-      return true;
+      *existing_active_listener = std::move(new_listener);
     }
   } else {
     // Typically we catch address issues when we try to bind to the same address multiple times.
