@@ -1,15 +1,16 @@
 #include "test/integration/ads_integration.h"
 
-#include "envoy/grpc/status.h"
-#include "envoy/service/discovery/v2/ads.pb.h"
-#include "envoy/stats/scope.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/rds.pb.h"
 
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
-#include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 

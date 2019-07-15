@@ -4,17 +4,9 @@
 #include <string>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
-#include "test/mocks/server/mocks.h"
-#include "test/test_common/simulated_time_system.h"
 
 namespace Envoy {
 static const std::string& AdsIntegrationConfig() {
@@ -70,8 +62,6 @@ public:
   envoy::admin::v2alpha::ClustersConfigDump getClustersConfigDump();
   envoy::admin::v2alpha::ListenersConfigDump getListenersConfigDump();
   envoy::admin::v2alpha::RoutesConfigDump getRoutesConfigDump();
-
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
 };
 
 } // namespace Envoy

@@ -7,7 +7,6 @@
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v2/ads.pb.h"
-#include "envoy/stats/scope.h"
 
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
@@ -20,7 +19,6 @@
 #include "test/integration/utility.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
