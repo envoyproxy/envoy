@@ -475,12 +475,21 @@ def hasCondVarWaitFor(line):
   return True
 
 
+def isInSubdir(filename, *subdirs):
+  # Skip this check for check_format's unit-tests.
+  if filename.count("/") <= 1:
+    return True
+  for subdir in subdirs:
+    if filename.startswith('./' + subdir + '/'):
+      return True
+  return False
+
+
 def checkSourceLine(line, file_path, reportError):
   # Check fixable errors. These may have been fixed already.
   if line.find(".  ") != -1:
     reportError("over-enthusiastic spaces")
-  if (file_path.startswith('./source/') or file_path.startswith('./include/')) and \
-      X_ENVOY_USED_DIRECTLY_REGEX.match(line):
+  if isInSubdir(file_path, 'source', 'include') and X_ENVOY_USED_DIRECTLY_REGEX.match(line):
     reportError(
         "Please do not use the raw literal x-envoy in source code.  See Envoy::Http::PrefixValue.")
   if hasInvalidAngleBracketDirectory(line):
@@ -566,9 +575,11 @@ def checkSourceLine(line, file_path, reportError):
     # behavior.
     reportError("Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
 
-  if file_path.startswith('./source/') and ('.counter(' in line or '.gauge(' in line) and \
-      not whitelistedForStatFromString(file_path):
+  if isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
+     ('.counter(' in line or '.gauge(' in line) and \
+     not whitelistedForStatFromString(file_path):
     reportError("Don't lookup stats by name at runtime; used StatName saved during construction")
+
 
 def checkBuildLine(line, file_path, reportError):
   if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/")):
