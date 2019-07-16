@@ -29,6 +29,14 @@ public:
   virtual ~Slot() = default;
 
   /**
+   * This is a helper, mainly used for test code, to determine if a given thread
+   * has a valid slot (i.e. if it is a worker thread) or not.
+   *
+   * @return true if this is a valid slot (called from a worker thread).
+   */
+  virtual bool valid() PURE;
+
+  /**
    * @return ThreadLocalObjectSharedPtr a thread local object stored in the slot.
    */
   virtual ThreadLocalObjectSharedPtr get() PURE;

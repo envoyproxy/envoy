@@ -14,6 +14,7 @@
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "server/listener_hooks.h"
 #include "server/options_impl.h"
@@ -51,7 +52,10 @@ public:
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
                                    Server::Configuration::Initial& config) override {
-    return Server::InstanceUtil::createRuntime(server, config);
+    return std::make_unique<Runtime::LoaderImpl>(
+        server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
+        server.initManager(), server.stats(), server.random(), server.messageValidationVisitor(),
+        server.api());
   }
 };
 
@@ -216,6 +220,32 @@ private:
 
 } // namespace Stats
 
+// The base class runtime doesn't work from non-worker threads, but we need the
+// runtimeFeatureEnabled checks to work from the test client and test server, in
+// case of runtime features used from either location.
+// Instead, use a test safe runtime which for worker threads returns a real
+// runtime snapshot, and for non-worker-threads returns a synthetic snapshot.
+//
+// As snapshot should never be altered by non-worker threads, locks around
+// creation and return should suffice for thread safety.
+class TestSafeRuntime : public Runtime::LoaderImpl {
+  using Runtime::LoaderImpl::LoaderImpl;
+
+  Runtime::Snapshot& snapshot() override {
+    if (tls()->valid()) {
+      return Runtime::LoaderImpl::snapshot();
+    }
+    absl::MutexLock lock(&mutex_);
+    if (!snapshot_) {
+      snapshot_ = createNewSnapshot();
+    }
+    return *snapshot_;
+  }
+
+  absl::Mutex mutex_;
+  std::unique_ptr<Runtime::SnapshotImpl> snapshot_;
+};
+
 class IntegrationTestServer;
 using IntegrationTestServerPtr = std::unique_ptr<IntegrationTestServer>;
 
@@ -299,7 +329,10 @@ public:
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
                                    Server::Configuration::Initial& config) override {
-    return Server::InstanceUtil::createRuntime(server, config);
+    return std::make_unique<TestSafeRuntime>(server.dispatcher(), server.threadLocal(),
+                                             config.runtime(), server.localInfo(),
+                                             server.initManager(), server.stats(), server.random(),
+                                             server.messageValidationVisitor(), server.api());
   }
 
   // Should not be called until createAndRunEnvoyServer() is called.

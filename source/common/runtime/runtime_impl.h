@@ -246,11 +246,14 @@ public:
   Snapshot& snapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
 
+protected:
+  ThreadLocal::SlotPtr& tls() { return tls_; }
+  virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
+
 private:
   friend RtdsSubscription;
 
   // Create a new Snapshot
-  virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
