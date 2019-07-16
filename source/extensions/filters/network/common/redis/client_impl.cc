@@ -16,9 +16,10 @@ ConfigImpl::ConfigImpl(
           config.max_buffer_size_before_flush()), // This is a scalar, so default is zero.
       buffer_flush_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
           config, buffer_flush_timeout,
-          3)) // Default timeout is 3ms. If max_buffer_size_before_flush is zero, this is not used
-              // as the buffer is flushed on each request immediately.
-{}
+          3)), // Default timeout is 3ms. If max_buffer_size_before_flush is zero, this is not used
+               // as the buffer is flushed on each request immediately.
+      max_upstream_unknown_connections_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)) {}
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
@@ -124,14 +125,12 @@ void ClientImpl::putOutlierEvent(Upstream::Outlier::Result result) {
 void ClientImpl::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+
+    Upstream::reportUpstreamCxDestroy(host_, event);
     if (!pending_requests_.empty()) {
-      host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
+      Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
       if (event == Network::ConnectionEvent::RemoteClose) {
         putOutlierEvent(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED);
-        host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
-      }
-      if (event == Network::ConnectionEvent::LocalClose) {
-        host_->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
       }
     }
 

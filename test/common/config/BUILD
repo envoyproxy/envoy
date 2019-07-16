@@ -301,3 +301,17 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "datasource_test",
+    srcs = ["datasource_test.cc"],
+    deps = [
+        "//source/common/common:empty_string",
+        "//source/common/config:datasource_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/core:base_cc",
+    ],
+)

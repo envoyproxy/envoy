@@ -14,6 +14,7 @@
 #include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "absl/strings/match.h"
@@ -341,8 +342,13 @@ void ConnPoolImpl::ActiveClient::onConnectTimeout() {
 }
 
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
+
+  const bool strict_header_validation =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation");
+
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP1, std::move(data.connection_),
-                                           data.host_description_, dispatcher_)};
+                                           data.host_description_, dispatcher_,
+                                           strict_header_validation)};
   return codec;
 }
 
