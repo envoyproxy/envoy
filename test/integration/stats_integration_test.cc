@@ -210,7 +210,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/06/29  7364     45685       46000   combine 2 levels of stat ref-counting into 1
   // 2019/06/30  7428     42742       43000   remove stats multiple inheritance, inline HeapStatData
   // 2019/07/06  7477     42742       43000   fork gauge representation to drop pending_increment_
-  // 2019/07/12  7503     42966       43000   add upstream filters to clusters
+  // 2019/07/15  7555     42806       43000   static link libstdc++ in tests
+  // 2019/07/16  7503     42966       43000   add upstream filters to clusters
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you

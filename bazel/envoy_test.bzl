@@ -8,7 +8,6 @@ load(
     "envoy_external_dep_path",
     "envoy_linkstatic",
     "envoy_select_force_libcpp",
-    "envoy_static_link_libstdcpp_linkopts",
     "tcmalloc_external_dep",
 )
 
@@ -205,7 +204,7 @@ def envoy_cc_test_binary(
     envoy_cc_binary(
         name,
         testonly = 1,
-        linkopts = _envoy_test_linkopts() + envoy_static_link_libstdcpp_linkopts(),
+        linkopts = _envoy_test_linkopts(),
         **kargs
     )
 
