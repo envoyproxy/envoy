@@ -10,7 +10,7 @@ jobs:
     vmImage: 'Ubuntu 16.04'
   container: envoy-build
   steps:
-  - script: ci/do_ci.sh bazel.asan
+  - script: ci/do_ci.sh bazel.release
     env:
       ENVOY_SRCDIR: $(Build.SourcesDirectory)
       BUILD_DIR: $(Build.StagingDirectory)
@@ -20,9 +20,15 @@ jobs:
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
 
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: "$(Build.StagingDirectory)/envoy"
+
   - task: PublishTestResults@2
     inputs:
       testResultsFiles: '**/testlogs/**/test.xml'
-      testRunTitle: 'bazel.asan'
+      testRunTitle: 'bazel.release'
       searchFolder: $(Build.StagingDirectory)
+      mergeTestResults: true
+      publishRunAttachments: true
     condition: always()
